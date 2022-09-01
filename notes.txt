@@ -1,10 +1,16 @@
+### 01 SEP 2022
+
+TODO
+
+[X] Create chartcompiler-app from artcompiler-app-template
+
+
 ### 31 AUG 2022
 
 TODO
 
-[ ] GraphQL query to compile an L0 item that display the current count into a
+[X] GraphQL query to compile an L0 item that display the current count into a
     message. E.g. "hello, 3!"
-[ ] Create chartcompiler-app from artcompiler-app-template
 
 
 DATA TASK

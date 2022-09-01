@@ -76,7 +76,7 @@ export default function Example() {
         ```
       */}
       <Head>
-        <title>TEMPLATE | ARTCOMPILER</title>
+        <title>CHARTCOMPILER</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"
