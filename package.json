@@ -1,0 +1,43 @@
+{
+  "name": "artcompiler-app-template",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@graffiticode/L0": "file:src/modules/graffiticode-L0-0.0.5.tgz",
+    "@graphql-tools/schema": "^9.0.1",
+    "@headlessui/react": "^1.6.6",
+    "@heroicons/react": "^1.0.6",
+    "@observablehq/plot": "^0.5.2",
+    "@tailwindcss/forms": "^0.5.2",
+    "axios": "^0.27.2",
+    "bent": "^7.3.12",
+    "c3": "^0.7.20",
+    "d3": "^7.6.1",
+    "dashify": "^2.0.0",
+    "firebase-admin": "^11.0.1",
+    "graphql": "^16.6.0",
+    "graphql-helix": "^1.13.0",
+    "graphql-request": "^4.3.0",
+    "next": "12.2.2",
+    "next-auth": "^4.10.0",
+    "react": "^18.2.0",
+    "react-dom": "18.2.0",
+    "react-redux": "^8.0.2",
+    "redux": "^4.2.0",
+    "redux-devtools-extension": "^2.13.9",
+    "redux-thunk": "^2.4.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.7",
+    "eslint": "8.19.0",
+    "eslint-config-next": "12.2.2",
+    "postcss": "^8.4.14",
+    "tailwindcss": "^3.1.6"
+  }
+}
