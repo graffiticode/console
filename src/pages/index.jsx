@@ -42,19 +42,22 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-import { useEffect } from 'react'
-import { useDispatch } from 'react-redux'
-import { startClock } from '../utils/redux/actions'
-import Link from 'next/link'
-import Examples from '../components/examples'
+import { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { startClock } from '../utils/redux/actions';
+import Link from 'next/link';
+import Examples from '../components/examples';
+import Gallery from '../components/gallery';
 
 const ReduxApplet = () => {
   return (
     <>
-      <Examples />
+      <Gallery />
+      {/*
       <Link href="/show-redux-state">
         <a>Click to see current Redux State</a>
       </Link>
+      */}
     </>
   )
 }
