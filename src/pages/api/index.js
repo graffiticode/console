@@ -33,14 +33,14 @@ function createTaskHello(name) {
 }
 
 async function postTask(task) {
-  const post = bent('http://localhost:3100/', 'POST', 'json', 200);
+  const post = bent('https://api.artcompiler.com/', 'POST', 'json', 200);
   const response = await post('task', { task });
   return response.data;
 }
 
 async function getData(id) {
   try {
-    const get = bent('http://localhost:3100/', 'GET', 'json', 200);
+    const get = bent('https://api.artcompiler.com/', 'GET', 'json', 200);
     const resp = await get(`data?id=${id}`);
     return resp.data;
   } catch (x) {
