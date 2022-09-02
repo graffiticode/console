@@ -7,7 +7,7 @@ const Examples = () => {
     <div style={{ marginBottom: 10 }}>
       <Clock />
       <Counter />
-      <L104Form />
+      <L104Form items="1,2,3,4"/>
     </div>
   )
 };

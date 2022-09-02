@@ -19,6 +19,23 @@ export const compileHello = () => (dispatch, getState) => {
   getData().catch(console.error);
 };
 
+export const getItems = () => (dispatch, getState) => {
+  const query = gql `
+    query get($filter: String!) {
+      getItems(filter: $filter)
+    }
+  `;
+  const state = getState();
+  const getData = async () => {
+    const filter = `${state.filter}`;
+    request('/api', query, { filter }).then((data) => {
+      console.log("getData() hello=" + data.compileHello);
+      dispatch(sayHello(data.compileHello));
+    });
+  };
+  getData().catch(console.error);
+};
+
 // INITIALIZES CLOCK ON SERVER
 export const serverRenderClock = () => (dispatch) =>
   dispatch({

@@ -187,7 +187,6 @@ export default function Form() {
   var elts = render(data);
   return (
     <>
-      <Script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.16.0/d3.min.js" />
       <div>
         <div id="chart" className="L104">
           {elts}

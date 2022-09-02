@@ -76,7 +76,7 @@ export default function Example() {
         ```
       */}
       <Head>
-        <title>CHARTCOMPILER</title>
+        <title>DASHBOARD | CHARTCOMPILER</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"
