@@ -14,9 +14,12 @@
   }
   ```
 */
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { Listbox, Transition } from '@headlessui/react'
 import { CalendarIcon, PaperClipIcon, TagIcon, UserCircleIcon } from '@heroicons/react/solid'
+
+import CodeMirror from './CodeMirror';
+import { javascript } from "@codemirror/lang-javascript";
 
 const assignees = [
   { name: 'Unassigned', value: null },
@@ -47,7 +50,6 @@ export default function Example() {
   const [assigned, setAssigned] = useState(assignees[0])
   const [labelled, setLabelled] = useState(labels[0])
   const [dated, setDated] = useState(dueDates[0])
-
   return (
     <div className="container columns-2 h-screen">
     <form action="#" className="relative">
@@ -65,16 +67,11 @@ export default function Example() {
         <label htmlFor="description" className="sr-only">
           Description
         </label>
-        <div className="border-t">
-        <textarea
-          rows={2}
-          name="description"
-          id="description"
-          className="block w-full h-96 border-0 py-2 resize-none placeholder-gray-500 focus:ring-0 sm:text-sm"
-          placeholder="Task code..."
-          defaultValue={''}
+        <CodeMirror 
+          value="console.log('hello world!');"
+          height="200px"
+          extensions={[javascript({ jsx: true })]}
         />
-        </div>
         {/* Spacer element to match the height of the toolbar */}
         <div aria-hidden="true">
           <div className="h-px" />

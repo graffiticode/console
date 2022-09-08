@@ -1,5 +1,4 @@
 import * as types from './types';
-import axios from 'axios';
 import { request, gql } from 'graphql-request';
 
 export const compileHello = () => (dispatch, getState) => {
