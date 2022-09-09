@@ -32,7 +32,6 @@ const user = {
 const navigation = [
   { name: 'Home', href: '/', current: false },
   { name: 'Charts', href: '/charts', current: false },
-  { name: 'Console', href: '/console', current: false },
   { name: 'Settings', href: '/settings', current: true },
 ]
 const userNavigation = [
