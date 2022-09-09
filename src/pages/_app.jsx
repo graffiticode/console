@@ -2,7 +2,7 @@ import { SessionProvider } from "next-auth/react"
 import { Provider as ReduxProvider } from 'react-redux'
 import { useStore } from '../utils/redux/store'
 import '../styles/globals.css';
-import './style.css';
+//import './style.css';
 export default function App({
   Component,
   pageProps: { session, ...pageProps },

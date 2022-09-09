@@ -14,11 +14,8 @@ import {
   UsersIcon,
   XIcon,
   BellIcon,
-} from '@heroicons/react/outline';
-import SignIn from '../components/signin';
-import Editor from '../components/editor';
-import L104Form from '../components/forms/L104/src/form';
-import Examples from '../components/examples';
+} from '@heroicons/react/outline'
+import SignIn from '../components/signin'
 
 export function Logo(props) {
   return (
@@ -33,11 +30,10 @@ const user = {
     'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
 }
 const navigation = [
-  { name: 'Home', href: '/', current: true },
-  { name: 'Graffiticode', href: '/graffiticode', current: false },
-  { name: 'Languages', href: '#', current: false },
-  { name: 'Metrics', href: '#', current: false },
-  { name: 'Docs', href: '#', current: false },
+  { name: 'Home', href: '/', current: false },
+  { name: 'Console', href: '/console', current: false },
+  { name: 'Gallery', href: '/', current: false },
+  { name: 'Settings', href: '/', current: true },
 ]
 const userNavigation = [
   { name: 'Your Profile', href: '#' },
@@ -49,7 +45,32 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+import { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { startClock } from '../utils/redux/actions';
+import Link from 'next/link';
+import Examples from '../components/examples';
+import Gallery from '../components/gallery';
+
+const ReduxApplet = () => {
+  return (
+    <>
+      <Gallery />
+      {/*
+      <Link href="/show-redux-state">
+        <a>Click to see current Redux State</a>
+      </Link>
+      */}
+    </>
+  )
+}
+
 export default function Example() {
+  const dispatch = useDispatch()
+  useEffect(() => {
+    dispatch(startClock())
+  }, [dispatch])
+
   return (
     <>
       {/*
@@ -61,7 +82,7 @@ export default function Example() {
         ```
       */}
       <Head>
-        <title>ARTCOMPILER</title>
+        <title>DASHBOARD | CHARTCOMPILER</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"
@@ -84,6 +105,7 @@ export default function Example() {
                           <a
                             key={item.name}
                             href={item.href}
+                            target={item.target}
                             className={classNames(
                               item.current
                                 ? 'bg-gray-900 text-white'
@@ -228,9 +250,11 @@ export default function Example() {
         */}
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      <Editor />
-      <Examples />
-      <L104Form items="1,2,3,4"/>
+            {/* Replace with your content */}
+            <div className="px-4 py-6 sm:px-0">
+              <div className="border-4 border-dashed border-gray-200 rounded-lg h-96">
+              </div>
+            </div>
           </div>
         </main>
       </div>

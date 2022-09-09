@@ -51,8 +51,7 @@ export default function Example() {
   const [labelled, setLabelled] = useState(labels[0])
   const [dated, setDated] = useState(dueDates[0])
   return (
-    <div className="container columns-2 h-screen">
-    <form action="#" className="relative">
+    <div className="container h-screen">
       <div className="border border-gray-300 rounded-none overflow-hidden focus-within:border-gray-500 focus-within:ring-gray-500">
         <label htmlFor="title" className="sr-only">
           Title
@@ -67,11 +66,11 @@ export default function Example() {
         <label htmlFor="description" className="sr-only">
           Description
         </label>
-        <CodeMirror 
-          value="console.log('hello world!');"
-          height="200px"
-          extensions={[javascript({ jsx: true })]}
-        />
+        <div className="border-t">
+          <CodeMirror
+            extensions={[javascript({ jsx: true })]}
+          />
+        </div>
         {/* Spacer element to match the height of the toolbar */}
         <div aria-hidden="true">
           <div className="h-px" />
@@ -81,23 +80,6 @@ export default function Example() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="absolute bottom-0 inset-x-px">
-        {/* Actions: These are just examples to demonstrate the concept, replace/wire these up however makes sense for your project. */}
-        <div className="border-t border-gray-200 px-2 py-2 flex justify-between items-center space-x-3 sm:px-3">
-          <div className="flex-shrink-0">
-            <button
-              type="submit"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-none text-white bg-gray-500 hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-            >
-              Save
-            </button>
-          </div>
-        </div>
-      </div>
-      </form>
-      <div>
       </div>
     </div>
   )

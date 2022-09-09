@@ -31,6 +31,9 @@ const user = {
 }
 const navigation = [
   { name: 'Home', href: '/', current: true },
+  { name: 'Console', href: '/console', current: false },
+  { name: 'Gallery', href: '/gallery', current: false },
+  { name: 'Settings', href: '/settings', current: false },
 ]
 const userNavigation = [
   { name: 'Your Profile', href: '#' },
@@ -247,13 +250,11 @@ export default function Example() {
         */}
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <ReduxApplet />
-            {/* Replace with your content
+            {/* Replace with your content */}
             <div className="px-4 py-6 sm:px-0">
               <div className="border-4 border-dashed border-gray-200 rounded-lg h-96">
               </div>
             </div>
-            End replace */}
           </div>
         </main>
       </div>

@@ -18,10 +18,17 @@ export default function useCodeMirror(extensions) {
       return undefined;
     }
 
-    let startState = EditorState.create({
+    const theme = EditorView.theme({
+      "&": {height: "300px"},
+      ".cm-scroller": {overflow: "auto"},
+      "class": "mx-4",
+    });
+
+    const startState = EditorState.create({
       doc: "Hello World",
       extensions: [
-        keymap.of(defaultKeymap)
+        keymap.of(defaultKeymap),
+        theme,
       ]
     });
 
@@ -29,7 +36,7 @@ export default function useCodeMirror(extensions) {
       state: startState,
       parent: element,
     });
-
+    
     return () => view.destroy();    
   }, [element]);
 

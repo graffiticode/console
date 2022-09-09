@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/outline';
 import SignIn from '../components/signin';
 import Editor from '../components/editor';
+import L104Form from '../components/forms/L104/src/form';
 
 export function Logo(props) {
   return (
@@ -31,11 +32,10 @@ const user = {
     'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
 }
 const navigation = [
-  { name: 'Home', href: '/', current: true },
-  // { name: 'Graffiticode', href: '/graffiticode', current: false },
-  // { name: 'Languages', href: '#', current: false },
-  // { name: 'Metrics', href: '#', current: false },
-  // { name: 'Docs', href: '#', current: false },
+  { name: 'Home', href: '/', current: false },
+  { name: 'Console', href: '/console', current: true },
+  { name: 'Gallery', href: '/gallery', current: false },
+  { name: 'Settings', href: '/settings', current: false },
 ]
 const userNavigation = [
   { name: 'Your Profile', href: '#' },
@@ -225,8 +225,9 @@ export default function Example() {
         </header>
         */}
         <main>
-          <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="grid gtrid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <Editor />
+            <L104Form items="1,2,3,4"/>
           </div>
         </main>
       </div>
