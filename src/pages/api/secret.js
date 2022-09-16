@@ -10,7 +10,6 @@ const setupIntent = await stripe.setupIntents.create({
 
 const handler = async (req, res) => {
   const intent = setupIntent;
-  console.log("handler() intent=" + JSON.stringify(intent, null, 2));
   res.json({client_secret: intent.client_secret});
 };
 

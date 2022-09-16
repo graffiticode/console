@@ -51,7 +51,7 @@ function classNames(...classes) {
 // recreating the `Stripe` object on every render.
 const stripePromise = loadStripe('pk_test_51LhI57LUz4JwpsJ6p6lzznvkbFNQj8k9LnAYckCJZ4Tv9AZzYHxKafXTKsTS12F8vUpKyELdBvXtvgSmNOzdqug200VALmBhSl');
 
-const response = await fetch('http://localhost:3000/api/secret');
+const response = await fetch('https://dashboard.chartcompiler.com/api/secret');
 const {client_secret: clientSecret} = await response.json();
 
 function SetupApp() {
