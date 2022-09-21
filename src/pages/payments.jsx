@@ -10,11 +10,11 @@ import {
   FolderIcon,
   HomeIcon,
   InboxIcon,
-  MenuIcon,
+  Bars3Icon,
   UsersIcon,
   XIcon,
   BellIcon,
-} from '@heroicons/react/outline'
+} from '@heroicons/react/24/outline'
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import SignIn from '../components/signin'
@@ -51,17 +51,14 @@ function classNames(...classes) {
 // recreating the `Stripe` object on every render.
 const stripePromise = loadStripe('pk_test_51LhI57LUz4JwpsJ6p6lzznvkbFNQj8k9LnAYckCJZ4Tv9AZzYHxKafXTKsTS12F8vUpKyELdBvXtvgSmNOzdqug200VALmBhSl');
 
-const response = await fetch('http://localhost:3000/api/secret');
-const {client_secret: clientSecret} = await response.json();
-
 function SetupApp() {
+  const { data: session } = useSession();
   const options = {
     // passing the client secret obtained in step 2
     clientSecret,
     // Fully customizable with appearance API.
     appearance: {/*...*/},
   };
-
   return (
     <Elements stripe={stripePromise} options={options}>
       <SetupForm />
@@ -176,7 +173,7 @@ export default function Example() {
                       {open ? (
                         <XIcon className="block h-6 w-6" aria-hidden="true" />
                       ) : (
-                        <MenuIcon className="block h-6 w-6" aria-hidden="true" />
+                        <Bars3Icon className="block h-6 w-6" aria-hidden="true" />
                       )}
                     </Disclosure.Button>
                   </div>

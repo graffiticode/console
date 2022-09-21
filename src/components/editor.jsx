@@ -16,7 +16,7 @@
 */
 import { Fragment, useState, useEffect } from 'react'
 import { Listbox, Transition } from '@headlessui/react'
-import { CalendarIcon, PaperClipIcon, TagIcon, UserCircleIcon } from '@heroicons/react/solid'
+import { CalendarIcon, PaperClipIcon, TagIcon, UserCircleIcon } from '@heroicons/react/24/solid'
 
 import CodeMirror from './CodeMirror';
 import { javascript } from "@codemirror/lang-javascript";

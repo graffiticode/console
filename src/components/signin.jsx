@@ -10,8 +10,11 @@ export default function SignIn() {
   if (session) {
     console.log("SignIn() session=" + JSON.stringify(session, null, 2));
     const postUser = async () => {
-      const res = await axios.post('/api/user', { ...session.user });
-      console.log("postUser() res.data=" + JSON.stringify(res.data, null, 2));
+      const userRes = await axios.post('/api/user', { ...session.user });
+      const { id } = userRes.data;
+      const secretRes = await axios.get(`http://localhost:3000/api/secret?id=${id}`);
+      const { client_secret: clientSecret } = secretRes.data;
+      console.log("postUser() clientSecret=" + clientSecret);      
     }
     postUser().catch(console.error);
     return (

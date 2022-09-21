@@ -10,11 +10,11 @@ import {
   FolderIcon,
   HomeIcon,
   InboxIcon,
-  MenuIcon,
+  Bars3Icon,
   UsersIcon,
   XIcon,
   BellIcon,
-} from '@heroicons/react/outline';
+} from '@heroicons/react/24/outline';
 import SignIn from '../components/signin';
 import Editor from '../components/editor';
 import L104Form from '../components/forms/L104/src/form';
@@ -152,7 +152,7 @@ export default function Example() {
                       {open ? (
                         <XIcon className="block h-6 w-6" aria-hidden="true" />
                       ) : (
-                        <MenuIcon className="block h-6 w-6" aria-hidden="true" />
+                        <Bars3Icon className="block h-6 w-6" aria-hidden="true" />
                       )}
                     </Disclosure.Button>
                   </div>
