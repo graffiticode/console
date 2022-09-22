@@ -10,29 +10,29 @@ const types = {
 
 const ShowPaymentInfo = () =>
   <>
-        <dt className="text-sm font-medium text-gray-500">Visa card ending 4242</dt>
-        <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-        <button
-          type="button"
-          className="inline-flex items-center bg-gray-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-        >
-          Change payment method
-        </button>
-        </dd>
+    <dt className="text-sm font-medium text-gray-500">Visa card ending 4242</dt>
+    <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+      <button
+        type="button"
+className="inline-flex items-center bg-gray-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+      >
+        Change payment method
+      </button>
+    </dd>
   </>;
 
 const NoPaymentInfo = ({setMode}) => 
   <>
-                <dt className="text-sm font-medium text-gray-500">No card on file</dt>
-            <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-              <button
-                  type="button"
-                  onClick={() => setMode(types.COLLECT_PAYMENT_INFO)}
-                className="inline-flex items-center bg-gray-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                >
-                Add payment method
-              </button>
-                </dd>
+    <dt className="text-sm font-medium text-gray-500">No card on file</dt>
+    <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+      <button
+        type="button"
+        onClick={() => setMode(types.COLLECT_PAYMENT_INFO)}
+        className="inline-flex items-center bg-gray-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+      >
+        Add payment method
+      </button>
+    </dd>
   </>;
 
 export default function Example() {
@@ -50,7 +50,7 @@ export default function Example() {
           </div>
           <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Current usage</dt>
-            <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">$10.50</dd>
+            <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">$10.50 (1,050 compiles)</dd>
           </div>
         </dl>
       </div>
