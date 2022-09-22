@@ -1,6 +1,23 @@
 import * as types from './types';
 import { request, gql } from 'graphql-request';
 
+export const addPayment = () => (dispatch, getState) => {
+  const query = gql `
+    mutation post ($id: String!) {
+      addPayment(id: $id)
+    }
+  `;
+  const state = getState();
+  const getData = async () => {
+    const id = `${state.id}`;
+    request('/api', query, { id }).then((data) => {
+      console.log("getData() hello=" + data.compileHello);
+      dispatch(showPayment(data.stripeSecret));
+    });
+  };
+  getData().catch(console.error);
+};
+
 export const compileHello = () => (dispatch, getState) => {
   const query = gql `
     mutation post ($name: String!) {
@@ -61,3 +78,5 @@ export const decrementCount = () => ({ type: types.DECREMENT });
 export const resetCount = () => ({ type: types.RESET });
 
 export const sayHello = (data) => ({ type: types.HELLO, data });
+
+export const showPayment = (data) => ({ type: types.SHOW_PAYMENT, data });
