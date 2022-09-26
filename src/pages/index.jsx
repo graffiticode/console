@@ -80,7 +80,7 @@ export default function Example() {
         ```
       */}
       <Head>
-        <title>DASHBOARD | CHARTCOMPILER</title>
+        <title>Dashboard</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"

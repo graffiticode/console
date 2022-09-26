@@ -2,6 +2,7 @@ import db from '../../utils/db';
 
 export default async (req, res) => {
   try {
+    console.log("GET /users");
     const users = await db.collection('users').orderBy('created').get();
     const usersData = users.docs.map(entry => ({
       id: entry.id,

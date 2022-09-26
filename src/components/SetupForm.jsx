@@ -56,28 +56,21 @@ const stripePromise = loadStripe('pk_test_51LhI57LUz4JwpsJ6p6lzznvkbFNQj8k9LnAYc
 
 function SetupApp() {
   const { data: session } = useSession();
-  const [options, setOptions] = useState({});
+  const [clientSecret, setClientSecret] = useState();
   useEffect(() => {
     const fetchSecret = async () => {
       const userRes = await axios.post('/api/user', { ...session.user });
       const { id } = userRes.data;
-      const secretRes = await axios.get(`http://localhost:3000/api/secret?id=${id}`);
+      const secretRes = await axios.get(`/api/secret?id=${id}`);
       const { client_secret: clientSecret } = secretRes.data;
-      console.log("postUser() clientSecret=" + clientSecret);      
-      setOptions({
-        // passing the client secret obtained in step 2
-        clientSecret,
-        // Fully customizable with appearance API.
-        appearance: {/*...*/},
-      });
+      setClientSecret(clientSecret);
     };
     fetchSecret();
-  });
-            
+  }, []);
             
   return (
-    options.clientSecret &&
-      <Elements stripe={stripePromise} options={options}>
+    clientSecret &&
+      <Elements stripe={stripePromise} options={clientSecret}>
         <SetupForm />
       </Elements>
       || <div />

@@ -1,14 +1,19 @@
-//import { doc, getDoc } from "firebase/firestore";
 import db from '../../utils/db';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {});
 
 const handler = async (req, res) => {
+  console.log("GET /secret");
   const { id } = req.query;
-  console.log("GET /secret id=" + id);
   const client = await db.doc(`users/${id}`).get();
-  console.log("GET /secret client=" + JSON.stringify(client, null, 2));
-  const clientData = client.data();
-  console.log("Document data:", clientData);
-  res.json({ client_secret: clientData.stripeClientSecret });
+  const { stripeCustomer } = client.data();
+  const stripeSetupIntent = await stripe.setupIntents.create({
+    customer: stripeCustomer.id,
+    payment_method_types: ['card'],
+  });
+  const stripeClientSecret = stripeSetupIntent.client_secret;
+  res.json({ client_secret: stripeClientSecret });
 };
 
 export default handler;

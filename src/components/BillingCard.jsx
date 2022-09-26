@@ -22,7 +22,7 @@ className="inline-flex items-center bg-gray-600 px-2.5 py-1.5 text-xs font-mediu
   </>;
 
 const NoPaymentInfo = ({setMode}) => 
-  <>
+      <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
     <dt className="text-sm font-medium text-gray-500">No card on file</dt>
     <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
       <button
@@ -33,7 +33,7 @@ const NoPaymentInfo = ({setMode}) =>
         Add payment method
       </button>
     </dd>
-  </>;
+  </div>;
 
 export default function Example() {
   const [mode, setMode] = useState(types.NO_PAYMENT_INFO);
@@ -41,13 +41,11 @@ export default function Example() {
     <div className="overflow-hidden bg-white">
       <div className="px-4 py-5 sm:p-0">
         <dl className="divide-y">
-          <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-            {
-              mode === types.COLLECT_PAYMENT_INFO && <StripeSetupForm />
-              || mode === types.SHOW_PAYMENT_INFO && <ShowPaymentInfo />
-                || <NoPaymentInfo setMode={setMode}/>
-            }
-          </div>
+          {
+            mode === types.COLLECT_PAYMENT_INFO && <StripeSetupForm />
+            || mode === types.SHOW_PAYMENT_INFO && <ShowPaymentInfo />
+            || <NoPaymentInfo setMode={setMode}/>
+          }
           <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
             <dt className="text-sm font-medium text-gray-500">Current usage</dt>
             <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">$10.50 (1,050 compiles)</dd>
