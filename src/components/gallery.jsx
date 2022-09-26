@@ -71,7 +71,7 @@ export default function Example() {
 
         <div className="fixed inset-0 overflow-hidden">
           <div className="absolute inset-0 overflow-hidden">
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 h-2/3 flex max-w-full">
+            <div className="pointer-events-none fixed inset-x-0 bottom-0 h-1/2 flex max-w-full">
               <Transition.Child
                 as={Fragment}
                 enter="transform transition ease-in-out duration-500 sm:duration-700"
