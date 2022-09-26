@@ -101,7 +101,7 @@ export default function Example() {
                     <div className="relative mt-6 flex-1 px-4 sm:px-6">
                       {/* Replace with your content */}
                       <div className="absolute inset-0 px-4 sm:px-6">
-                        <div className="h-full w-5/12 border-2 border-dashed border-gray-200" aria-hidden="true" />
+                        <div className="h-full w-full md:w-5/12 border-2 border-dashed border-gray-200" aria-hidden="true" />
                       </div>
                       {/* /End replace */}
                     </div>
