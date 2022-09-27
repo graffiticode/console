@@ -1,10 +1,11 @@
+// https://www.codiga.io/blog/implement-codemirror-6-in-react/
+// https://app.codiga.io/hub/snippet/8008/useCodeMirror
 import React, { useCallback, useEffect, useState } from "react";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap} from "@codemirror/view";
 import { Extension } from "@codemirror/state";
 import { javascript } from "@codemirror/lang-javascript";
 import { defaultKeymap } from "@codemirror/commands";
-
 
 export default function useCodeMirror(extensions) {
   const [element, setElement] = useState();
@@ -27,6 +28,7 @@ export default function useCodeMirror(extensions) {
     const startState = EditorState.create({
       doc: "Hello World",
       extensions: [
+        ...extensions,
         keymap.of(defaultKeymap),
         theme,
       ]

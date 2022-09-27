@@ -15,6 +15,7 @@ const typeDefs = `
 
   type Mutation {
     compileHello(name: String!): String!
+    compileTask(lang: String!, code: String!): String!
   }
 `;
 
@@ -52,6 +53,14 @@ const resolvers = {
   Mutation: {
     compileHello: async (_, args) => {
       const task = createTaskHello(args.name);
+      const { id } = await postTask(task);
+      const data = await getData(id);
+      return data;
+    },
+    compileTask: async (_, args) => {
+      const lang = args.lang;
+      const code = JSON.parse(args.code);
+      const task = { lang, code };
       const { id } = await postTask(task);
       const data = await getData(id);
       return data;

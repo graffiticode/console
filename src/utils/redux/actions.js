@@ -18,16 +18,34 @@ export const addPayment = () => (dispatch, getState) => {
   getData().catch(console.error);
 };
 
-export const compileHello = () => (dispatch, getState) => {
+export const compileHello = (name) => (dispatch, getState) => {
   const query = gql `
     mutation post ($name: String!) {
       compileHello(name: $name)
     }
   `;
   const state = getState();
-  const getData = async () => {
-    const name = `${state.counter}`;
+  const getData = async (name) => {
+    //const name = `${state.counter}`;
     request('/api', query, { name }).then((data) => {
+      console.log("getData() hello=" + data.compileHello);
+      dispatch(sayHello(data.compileHello));
+    });
+  };
+  getData(String(name)).catch(console.error);
+};
+
+export const compileTask = () => (dispatch, getState) => {
+  const query = gql `
+    mutation post ($lang: String!, $code: String!) {
+      compileTask(lang: $lang, code: $code)
+    }
+  `;
+  const state = getState();
+  const getData = async () => {
+    const lang = `${state.lang}`;
+    const code = `${state.code}`;
+    request('/api', query, { lang, code }).then((data) => {
       console.log("getData() hello=" + data.compileHello);
       dispatch(sayHello(data.compileHello));
     });

@@ -3,7 +3,9 @@ import charts from './charts.json' assert {type: 'json'};
 import { Fragment, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
-
+import Editor from './editor';
+import Form from './forms/L0/src/form';
+import { useSelector } from 'react-redux'
 const files = [
   {
     source:
@@ -60,7 +62,9 @@ function Gallery({ setOpen }) {
 
 
 export default function Example() {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(true);
+
+  
 
   return (
     <>
@@ -99,11 +103,10 @@ export default function Example() {
                       </div>
                     </div>
                     <div className="relative mt-6 flex-1 px-4 sm:px-6">
-                      {/* Replace with your content */}
-                      <div className="absolute inset-0 px-4 sm:px-6">
-                        <div className="h-full w-full md:w-5/12 border-2 border-dashed border-gray-200" aria-hidden="true" />
+                      <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
+                        <Editor />
+                        <Form items="1,2,3,4"/>
                       </div>
-                      {/* /End replace */}
                     </div>
                   </div>
                 </Dialog.Panel>

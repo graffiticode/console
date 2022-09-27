@@ -51,8 +51,7 @@ export default function Example() {
   const [labelled, setLabelled] = useState(labels[0])
   const [dated, setDated] = useState(dueDates[0])
   return (
-    <div className="container h-screen">
-      <div className="border border-gray-300 rounded-none overflow-hidden focus-within:border-gray-500 focus-within:ring-gray-500">
+      <div className="h-full border border-gray-300 rounded-none overflow-hidden focus-within:border-gray-500 focus-within:ring-gray-500">
         <label htmlFor="title" className="sr-only">
           Title
         </label>
@@ -81,6 +80,5 @@ export default function Example() {
           </div>
         </div>
       </div>
-    </div>
   )
 }
