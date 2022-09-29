@@ -22,6 +22,8 @@ import {
 } from '@heroicons/react/24/outline'
 import BillingCard from './BillingCard';
 import APIKeysCard from './APIKeysCard';
+import { useSession, signIn, signOut } from "next-auth/react";
+import SignInAlert from "./SignInAlert";
 const user = {
   name: 'Debbie Lewis',
   handle: 'deblewis',
@@ -59,6 +61,14 @@ export default function Example() {
   const [allowCommenting, setAllowCommenting] = useState(true)
   const [allowMentions, setAllowMentions] = useState(true)
   let current = 'billing';
+  const { data: session } = useSession();
+  if (!session) {
+    return (
+      <div className="justify-center w-full">
+        <SignInAlert />
+      </div>
+    );
+  } else {
   return (
     <div> 
      <Disclosure as="div" className="relative overflow-hidden bg-sky-700">
@@ -106,4 +116,5 @@ export default function Example() {
     </div>
     </div>
   )
+  }
 }

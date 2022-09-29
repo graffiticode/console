@@ -1,6 +1,6 @@
 import Head from 'next/head'
 import Image from 'next/image';
-import { useSession } from 'next-auth/react'
+import { useSession, signIn } from 'next-auth/react'
 import { Fragment, useState } from 'react'
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react'
 import {
@@ -16,6 +16,12 @@ import {
   BellIcon,
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/signin'
+import { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { startClock } from '../utils/redux/actions';
+import Link from 'next/link';
+import Examples from '../components/examples';
+import Gallery from '../components/gallery';
 
 export function Logo(props) {
   return (
@@ -43,13 +49,6 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { startClock } from '../utils/redux/actions';
-import Link from 'next/link';
-import Examples from '../components/examples';
-import Gallery from '../components/gallery';
-
 const ReduxApplet = () => {
   return (
     <>
@@ -65,10 +64,6 @@ const ReduxApplet = () => {
 
 export default function Example() {
   const dispatch = useDispatch()
-  useEffect(() => {
-    dispatch(startClock())
-  }, [dispatch])
-
   return (
     <>
       {/*

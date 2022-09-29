@@ -7,6 +7,7 @@ import {
   shouldRenderGraphiQL,
   renderGraphiQL,
 } from 'graphql-helix';
+import { getToken } from "next-auth/jwt";
 
 const typeDefs = `
   type Query {
@@ -71,27 +72,37 @@ const resolvers = {
 const schema = makeExecutableSchema({ typeDefs, resolvers });
 
 export default async function handler(req, res) {
-  const request = {
-    body: req.body,
-    headers: req.headers,
-    method: req.method,
-    query: req.query,
-  };
-  if (shouldRenderGraphiQL(request)) {
-    res.send(
-      renderGraphiQL({
-        endpoint: "/api",
-      })
-    );
+  // If you don't have NEXTAUTH_SECRET set, you will have to pass your secret as `secret` to `getToken`
+  const token = await getToken({ req });
+  if (token) {
+    console.log("JSON Web Token", JSON.stringify(token, null, 2));
+    // Signed in
+    const request = {
+      body: req.body,
+      headers: req.headers,
+      method: req.method,
+      query: req.query,
+    };
+    if (shouldRenderGraphiQL(request)) {
+      res.send(
+        renderGraphiQL({
+          endpoint: "/api",
+        })
+      );
+    } else {
+      const { operationName, query, variables } = getGraphQLParameters(request);
+      const result = await processRequest({
+        operationName,
+        query,
+        variables,
+        request,
+        schema,
+      });
+      sendResult(result, res);
+    }
   } else {
-    const { operationName, query, variables } = getGraphQLParameters(request);
-    const result = await processRequest({
-      operationName,
-      query,
-      variables,
-      request,
-      schema,
-    });
-    sendResult(result, res);
+    // Not Signed in
+    res.status(401);
+    res.end();
   }
 }

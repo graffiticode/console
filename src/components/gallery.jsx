@@ -1,11 +1,14 @@
 import charts from './charts.json' assert {type: 'json'};
 /* This example requires Tailwind CSS v2.0+ */
-import { Fragment, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import Form from './forms/L0/src/form';
 import { useSelector } from 'react-redux'
+import { useSession, signIn, signOut } from "next-auth/react";
+import SignInAlert from "./SignInAlert";
 const files = [
   {
     source:
@@ -60,12 +63,16 @@ function Gallery({ setOpen }) {
   )
 }
 
-
 export default function Example() {
   const [open, setOpen] = useState(true);
-
-  
-
+  const { data: session } = useSession();
+  if (!session) {
+    return (
+      <div className="justify-center w-full">
+        <SignInAlert />
+      </div>
+    );
+  } else {
   return (
     <>
       <Gallery setOpen={setOpen}/>
@@ -118,4 +125,5 @@ export default function Example() {
     </Transition.Root>
     </>
   )
+  }
 }
