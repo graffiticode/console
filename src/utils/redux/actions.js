@@ -21,36 +21,35 @@ export const addPayment = () => (dispatch, getState) => {
 export const compileHello = (name) => (dispatch, getState) => {
   const query = gql `
     mutation post ($name: String!) {
-      compileHello(name: $name)
+      compileTask(name: $name)
     }
   `;
   const state = getState();
   const getData = async (name) => {
-    //const name = `${state.counter}`;
+    const msg = `hello, ${name}!`;
     request('/api', query, { name }).then((data) => {
-      console.log("getData() hello=" + data.compileHello);
-      dispatch(sayHello(data.compileHello));
+      console.log("getData() hello=" + data.compileTask);
+      dispatch(sayHello(data.compileTask));
     });
   };
   getData(String(name)).catch(console.error);
 };
 
-export const compileTask = () => (dispatch, getState) => {
+export const compileTask = ({ lang, code }) => (dispatch, getState) => {
   const query = gql `
     mutation post ($lang: String!, $code: String!) {
       compileTask(lang: $lang, code: $code)
     }
   `;
-  const state = getState();
-  const getData = async () => {
-    const lang = `${state.lang}`;
-    const code = `${state.code}`;
+  //const state = getState();
+  const getData = async ({lang, code}) => {
+    console.log("compileTask() lang=" + lang + " code=" + code);
     request('/api', query, { lang, code }).then((data) => {
-      console.log("getData() hello=" + data.compileHello);
-      dispatch(sayHello(data.compileHello));
+      console.log("getData() hello=" + data.compileTask);
+      dispatch(sayHello(data.compileTask));
     });
   };
-  getData().catch(console.error);
+  getData({ lang, code }).catch(console.error);
 };
 
 export const getItems = () => (dispatch, getState) => {

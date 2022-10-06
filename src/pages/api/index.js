@@ -15,26 +15,32 @@ const typeDefs = `
   }
 
   type Mutation {
-    compileHello(name: String!): String!
     compileTask(lang: String!, code: String!): String!
   }
 `;
 
-function createTaskHello(name) {
+function parse(lang, code) {
+  // Replace with actual parser.
+  return {
+    "1": { "tag": "STR", "elts": [code] },
+    "2": { "tag": "EXPRS", "elts": [1] },
+    "3": { "tag": "PROG", "elts": [2] },
+    "root": 3,
+    "version": "1"
+  };
+};
+
+function createTask(lang, code) {
+  code = typeof code === 'string' && parse(lang, code) || code;
   const task = {
-    lang: "0",
-    code: {
-      "1": { "tag": "STR", "elts": [`hello, ${name}!`] },
-      "2": { "tag": "EXPRS", "elts": [1] },
-      "3": { "tag": "PROG", "elts": [2] },
-      "root": 3,
-      "version": "1"
-    }
+    lang,
+    code,
   };
   return task;
 }
 
 async function postTask(task) {
+  console.log("postTask() task=" + JSON.stringify(task, null, 2));
   const post = bent('https://api.artcompiler.com/', 'POST', 'json', 200);
   const response = await post('task', { task });
   return response.data;
@@ -52,16 +58,8 @@ async function getData(id) {
 
 const resolvers = {
   Mutation: {
-    compileHello: async (_, args) => {
-      const task = createTaskHello(args.name);
-      const { id } = await postTask(task);
-      const data = await getData(id);
-      return data;
-    },
-    compileTask: async (_, args) => {
-      const lang = args.lang;
-      const code = JSON.parse(args.code);
-      const task = { lang, code };
+    compileTask: async (_, {lang, code}) => {
+      const task = createTask(lang, code);
       const { id } = await postTask(task);
       const data = await getData(id);
       return data;

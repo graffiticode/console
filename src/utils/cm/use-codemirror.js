@@ -3,9 +3,15 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap} from "@codemirror/view";
-import { Extension } from "@codemirror/state";
-import { javascript } from "@codemirror/lang-javascript";
+import { Extension, Compartment } from "@codemirror/state";
+import { graffiticode } from "@graffiticode/lang-graffiticode";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { defaultKeymap } from "@codemirror/commands";
+import {tags} from "@lezer/highlight";
+const myHighlightStyle = HighlightStyle.define([
+  {tag: tags.keyword, color: "#fc6"},
+  {tag: tags.comment, color: "#f5d", fontStyle: "italic"}
+]);
 
 export default function useCodeMirror(extensions) {
   const [element, setElement] = useState();
@@ -31,6 +37,8 @@ export default function useCodeMirror(extensions) {
         ...extensions,
         keymap.of(defaultKeymap),
         theme,
+        graffiticode(),
+        syntaxHighlighting(myHighlightStyle),
       ]
     });
 

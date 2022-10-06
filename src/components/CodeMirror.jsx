@@ -1,11 +1,15 @@
-import { EditorView} from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
 import useCodeMirror from "../utils/cm/use-codemirror";
 import { debounce } from "lodash";
 import { useSelector, useDispatch } from 'react-redux'
-import { compileHello } from '../utils/redux/actions'
-
+import { compileTask } from '../utils/redux/actions'
+import { ParseContext } from '@codemirror/language';
+import { graffiticode } from "@graffiticode/lang-graffiticode";
 const debouncedStartCompletion = debounce((view, dispatch) => {
-  dispatch(compileHello(view.state.doc));
+  const lang = '0';
+  const code = view.state.doc.toString();
+  // const tree = graffiticode().language.parser.parse(src);
+  dispatch(compileTask({ lang, code }));
 }, 300);
 
 function customCompletionDisplay(dispatch) {
