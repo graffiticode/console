@@ -45,9 +45,8 @@ function createTask(lang, code) {
 }
 
 async function postTask(auth, task) {
-  console.log("postTask() task=" + JSON.stringify(task, null, 2));
-//  const post = bent('https://api.artcompiler.com/', 'POST', 'json', 200);
-  const post = bent('http://localhost:3100/', 'POST', 'json', 200);
+  const post = bent('https://api.graffiticode.org/', 'POST', 'json', 200);
+  // const post = bent('http://localhost:3100/', 'POST', 'json', 200);
   const response = await post('task', {
     auth,
     task
