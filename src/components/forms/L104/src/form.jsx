@@ -5,11 +5,6 @@ import * as d3 from 'd3';
 
 function AreaChart() {
   const props = useSelector((state) => state.chart);
-  if (props === undefined) {
-    return <div />;
-  }
-//  const [props, setProps] = useState(renderTask);
-  console.log("AreaChart() props=" + JSON.stringify(props, null, 2));
   useEffect(() => {
     (async () => {
     const c3 = await import('c3');
