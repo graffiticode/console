@@ -56,8 +56,8 @@ async function postTask(auth, task) {
 
 async function getData(auth, id) {
   try {
-    const get = bent('http://localhost:3100/', 'GET', 'json', 200);
-    // const get = bent('https://api.graffiticode.org/', 'GET', 'json', 200);
+    // const get = bent('http://localhost:3100/', 'GET', 'json', 200);
+    const get = bent('https://api.graffiticode.org/', 'GET', 'json', 200);
     const resp = await get(`data?id=${id}&auth=${auth}`);
     console.log("getData() data=" + JSON.stringify(resp.data, null, 2));
     return JSON.stringify(resp.data);
