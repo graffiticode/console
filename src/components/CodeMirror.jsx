@@ -6,9 +6,15 @@ import { compileTask } from '../utils/redux/actions'
 import { ParseContext } from '@codemirror/language';
 import { graffiticode } from "@graffiticode/lang-graffiticode";
 const debouncedStartCompletion = debounce((view, dispatch) => {
-  const lang = '0';
-  const code = view.state.doc.toString();
-  // const tree = graffiticode().language.parser.parse(src);
+  const lang = '104';
+  const doc = view.state.doc;
+  const lines = [];
+  for (const text of doc.iter()) {
+    console.log("text=" + text);
+    lines.push(text);
+  }
+  const code = lines.join("\n");
+
   dispatch(compileTask({ lang, code }));
 }, 300);
 
@@ -30,7 +36,7 @@ const CodeMirror = () => {
     customCompletionDisplay(dispatch),
   ];
   const { ref } = useCodeMirror(extensions);
-  return <div ref={ref}/>;
+  return <div id="editor" ref={ref}/>;
 };
 
 export default CodeMirror;

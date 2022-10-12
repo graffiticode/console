@@ -4,7 +4,11 @@ import Script from 'next/script'
 import * as d3 from 'd3';
 
 function AreaChart() {
-  const [props, setProps] = useState(areaChartData);
+  const props = useSelector((state) => state.chart);
+  if (props === undefined) {
+    return <div />;
+  }
+//  const [props, setProps] = useState(renderTask);
   console.log("AreaChart() props=" + JSON.stringify(props, null, 2));
   useEffect(() => {
     (async () => {
@@ -182,8 +186,10 @@ function TableChart() {
 }
 
 export default function Form() {
-  const [data, setData] = useState(areaChartData);
-  //const data = useSelector((state) => state.data);
+  const data = useSelector((state) => state.chart);
+  if (data === undefined) {
+    return <div />;
+  }
   var elts = render(data);
   return (
     <>
@@ -259,7 +265,9 @@ function render(nodes) {
       break;
     case "area-chart":
       elts.push(
-        <AreaChart key={i} style={n.style} {...n}/>
+        <div>
+          <AreaChart key={i} style={n.style} {...n}/>
+        </div>
       );
       break;
     case "title":
@@ -319,52 +327,3 @@ const initData = {
   }
 };
 
-const areaChartData = {
-  "type": "area-chart",
-  "args": {
-    "vals": [
-      [
-        "Point_Issue_Date",
-        "Points_Issued"
-      ],
-      [
-        "2019-07-21",
-        1
-      ],
-      [
-        "2019-07-22",
-        449
-      ],
-      [
-        "2019-07-23",
-        491
-      ],
-      [
-        "2019-07-24",
-        198
-      ],
-      [
-        "2019-07-25",
-        623
-      ],
-      [
-        "2019-07-26",
-        422
-      ],
-      [
-        "2019-07-27",
-        628
-      ]
-    ]
-  },
-  "hideXAxis": true,
-  "hideYAxis": true,
-  "hideLegend": true,
-  "dotRadius": 1.5,
-  "lineWidth": 1,
-  "colors": [
-    "#13ce66  "
-  ],
-  "height": 30,
-  "width": 144
-};

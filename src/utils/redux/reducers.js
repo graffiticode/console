@@ -10,6 +10,15 @@ const helloReducer = (state = "", { type, data }) => {
   }
 };
 
+const taskReducer = (state = "", { type, data }) => {
+  switch (type) {
+  case types.RENDER_TASK:
+    return data;
+  default:
+    return state;
+  }
+};
+
 // COUNTER REDUCER
 const counterReducer = (state = 0, { type, data }) => {
   switch (type) {
@@ -48,6 +57,7 @@ const reducers = {
   counter: counterReducer,
   timer: timerReducer,
   hello: helloReducer,
+  chart: taskReducer,
 };
 
 export default combineReducers(reducers);

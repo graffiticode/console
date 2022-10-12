@@ -1,4 +1,11 @@
-import * as types from './types';
+import {
+  TICK,
+  INCREMENT,
+  DECREMENT,
+  RESET,
+  HELLO,
+  RENDER_TASK,
+} from './types';
 import { request, gql } from 'graphql-request';
 
 export const addPayment = () => (dispatch, getState) => {
@@ -11,28 +18,11 @@ export const addPayment = () => (dispatch, getState) => {
   const getData = async () => {
     const id = `${state.id}`;
     request('/api', query, { id }).then((data) => {
-      console.log("getData() hello=" + data.compileHello);
+      console.log("addPayment() getData() hello=" + data.addPayment);
       dispatch(showPayment(data.stripeSecret));
     });
   };
   getData().catch(console.error);
-};
-
-export const compileHello = (name) => (dispatch, getState) => {
-  const query = gql `
-    mutation post ($name: String!) {
-      compileTask(name: $name)
-    }
-  `;
-  const state = getState();
-  const getData = async (name) => {
-    const msg = `hello, ${name}!`;
-    request('/api', query, { name }).then((data) => {
-      console.log("getData() hello=" + data.compileTask);
-      dispatch(sayHello(data.compileTask));
-    });
-  };
-  getData(String(name)).catch(console.error);
 };
 
 export const compileTask = ({ lang, code }) => (dispatch, getState) => {
@@ -45,28 +35,11 @@ export const compileTask = ({ lang, code }) => (dispatch, getState) => {
   const getData = async ({lang, code}) => {
     console.log("compileTask() lang=" + lang + " code=" + code);
     request('/api', query, { lang, code }).then((data) => {
-      console.log("getData() hello=" + data.compileTask);
-      dispatch(sayHello(data.compileTask));
+      console.log("compileTask() getData() data=" + data.compileTask);
+      dispatch(renderTask(JSON.parse(data.compileTask)));
     });
   };
   getData({ lang, code }).catch(console.error);
-};
-
-export const getItems = () => (dispatch, getState) => {
-  const query = gql `
-    query get($filter: String!) {
-      getItems(filter: $filter)
-    }
-  `;
-  const state = getState();
-  const getData = async () => {
-    const filter = `${state.filter}`;
-    request('/api', query, { filter }).then((data) => {
-      console.log("getData() hello=" + data.compileHello);
-      dispatch(sayHello(data.compileHello));
-    });
-  };
-  getData().catch(console.error);
 };
 
 // INITIALIZES CLOCK ON SERVER
@@ -86,14 +59,16 @@ export const startClock = () => (dispatch) =>
   }, 5000);
 
 // INCREMENT COUNTER BY 1
-export const incrementCount = () => ({ type: types.INCREMENT });
+export const incrementCount = () => ({ type: INCREMENT });
 
 // DECREMENT COUNTER BY 1
-export const decrementCount = () => ({ type: types.DECREMENT });
+export const decrementCount = () => ({ type: DECREMENT });
 
 // RESET COUNTER
-export const resetCount = () => ({ type: types.RESET });
+export const resetCount = () => ({ type: RESET });
 
-export const sayHello = (data) => ({ type: types.HELLO, data });
+export const sayHello = (data) => ({ type: HELLO, data });
 
-export const showPayment = (data) => ({ type: types.SHOW_PAYMENT, data });
+export const renderTask = (data) => ({ type: RENDER_TASK, data });
+
+//export const showPayment = (data) => ({ type: SHOW_PAYMENT, data });
