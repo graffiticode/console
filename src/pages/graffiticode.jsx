@@ -17,7 +17,6 @@ import {
 } from '@heroicons/react/24/outline';
 import SignIn from '../components/signin';
 import Editor from '../components/editor';
-import L104Form from '../components/forms/L104/src/form';
 import Examples from '../components/examples';
 
 export function Logo(props) {
@@ -229,7 +228,6 @@ export default function Example() {
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <Editor />
       <Examples />
-      <L104Form items="1,2,3,4"/>
           </div>
         </main>
       </div>
