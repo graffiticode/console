@@ -6,7 +6,7 @@ import { compileTask } from '../utils/redux/actions'
 import { ParseContext } from '@codemirror/language';
 import { graffiticode } from "@graffiticode/lang-graffiticode";
 const debouncedStartCompletion = debounce((view, dispatch) => {
-  const lang = '104';
+  const lang = '114';
   const doc = view.state.doc;
   const lines = [];
   for (const text of doc.iter()) {
