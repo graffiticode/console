@@ -6,7 +6,6 @@ import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import Form from './forms/L114/src/Form';
-import styles from './gallery.module.css';
 import { useSelector } from 'react-redux'
 import { useSession, signIn, signOut } from "next-auth/react";
 import SignInAlert from "./SignInAlert";
@@ -113,7 +112,7 @@ export default function Example() {
                     <div className="relative mt-6 flex-1 px-4 sm:px-6">
                       <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
                         <Editor />
-                        <Form className={styles.c3ChartArcs} items="1,2,3,4"/>
+                        <Form items="1,2,3,4"/>
                       </div>
                     </div>
                   </div>
