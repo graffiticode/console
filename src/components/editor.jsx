@@ -46,7 +46,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Example() {
+export default function Example({ userId }) {
   const [assigned, setAssigned] = useState(assignees[0])
   const [labelled, setLabelled] = useState(labels[0])
   const [dated, setDated] = useState(dueDates[0])
@@ -67,6 +67,7 @@ export default function Example() {
         </label>
         <div className="border-t">
           <CodeMirror
+            userId={userId}
             extensions={[javascript({ jsx: true })]}
           />
         </div>

@@ -52,12 +52,23 @@ const timerReducer = (state = initialTimerState, { type, payload }) => {
   }
 };
 
+const userIdReducer = (state = "", { type, data }) => {
+  console.log("userIdReducer() type=" + type + " data=" + data);
+  switch (type) {
+  case types.USER_ID:
+    return data;
+  default:
+    return state;
+  }
+};
+
 // COMBINED REDUCERS
 const reducers = {
   counter: counterReducer,
   timer: timerReducer,
   hello: helloReducer,
   chart: taskReducer,
+  userId: userIdReducer,
 };
 
 export default combineReducers(reducers);

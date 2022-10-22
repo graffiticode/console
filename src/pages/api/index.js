@@ -21,20 +21,9 @@ const typeDefs = `
   }
 
   type Mutation {
-    compileTask(lang: String!, code: String!): String!
+    compileTask(user: String!, lang: String!, code: String!): String!
   }
 `;
-
-function parse(lang, code) {
-  // Replace with actual parser.
-  return {
-    "1": { "tag": "STR", "elts": [code] },
-    "2": { "tag": "EXPRS", "elts": [1] },
-    "3": { "tag": "PROG", "elts": [2] },
-    "root": 3,
-    "version": "1"
-  };
-};
 
 function createTask(lang, code) {
   const task = {
@@ -44,7 +33,8 @@ function createTask(lang, code) {
   return task;
 }
 
-async function postTask(auth, task) {
+async function postTask(user, auth, task) {
+  console.log("postTask() user=" + user + " auth=" + auth + " task=" + task);
   try {
     //const post = bent('http://localhost:3100/', 'POST', 'json', 200);
     const post = bent('https://api.graffiticode.org/', 'POST', 'json', 200);
@@ -72,10 +62,10 @@ async function getData(auth, id) {
 
 const resolvers = {
   Mutation: {
-    compileTask: async (_, {lang, code}) => {
+    compileTask: async (_, {user, lang, code}) => {
       const auth = authToken;
       const task = createTask(lang, code);
-      const { id } = await postTask(auth, task);
+      const { id } = await postTask(user, auth, task);
       const data = await getData(auth, id);
       return data;
     },

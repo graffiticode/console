@@ -5,6 +5,7 @@ import {
   RESET,
   HELLO,
   RENDER_TASK,
+  SET_USER_ID,
 } from './types';
 import { request, gql } from 'graphql-request';
 
@@ -25,21 +26,22 @@ export const addPayment = () => (dispatch, getState) => {
   getData().catch(console.error);
 };
 
-export const compileTask = ({ lang, code }) => (dispatch, getState) => {
+export const compileTask = ({ user, lang, code }) => (dispatch, getState) => {
   const query = gql `
-    mutation post ($lang: String!, $code: String!) {
-      compileTask(lang: $lang, code: $code)
+    mutation post ($user: String!, $lang: String!, $code: String!) {
+      compileTask(user: $user, lang: $lang, code: $code)
     }
   `;
-  //const state = getState();
-  const getData = async ({lang, code}) => {
-    console.log("compileTask() lang=" + lang + " code=" + code);
-    request('/api', query, { lang, code }).then((data) => {
+  const state = getState();
+  console.log("compileTask() state=" + JSON.stringify(state, null, 2));
+  const getData = async ({user, lang, code}) => {
+    console.log("compileTask() user=" + user + " lang=" + lang + " code=" + code);
+    request('/api', query, { user, lang, code }).then((data) => {
       console.log("compileTask() getData() data=" + data.compileTask);
       dispatch(renderTask(JSON.parse(data.compileTask)));
     });
   };
-  getData({ lang, code }).catch(console.error);
+  getData({ user, lang, code }).catch(console.error);
 };
 
 // INITIALIZES CLOCK ON SERVER
@@ -70,5 +72,7 @@ export const resetCount = () => ({ type: RESET });
 export const sayHello = (data) => ({ type: HELLO, data });
 
 export const renderTask = (data) => ({ type: RENDER_TASK, data });
+
+export const setUserId = (data) => ({ type: SET_USER_ID, data });
 
 //export const showPayment = (data) => ({ type: SHOW_PAYMENT, data });

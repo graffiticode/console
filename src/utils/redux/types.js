@@ -5,3 +5,4 @@ export const DECREMENT = 'DECREMENT';
 export const RESET = 'RESET';
 export const HELLO = 'HELLO';
 export const RENDER_TASK = 'RENDER-TASK';
+export const SET_USER_ID = 'SET-USER-ID';

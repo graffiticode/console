@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useSession } from "next-auth/react";
 import { EditorView } from "@codemirror/view";
 import useCodeMirror from "../utils/cm/use-codemirror";
 import { debounce } from "lodash";
@@ -5,7 +7,8 @@ import { useSelector, useDispatch } from 'react-redux'
 import { compileTask } from '../utils/redux/actions'
 import { ParseContext } from '@codemirror/language';
 import { graffiticode } from "@graffiticode/lang-graffiticode";
-const debouncedStartCompletion = debounce((view, dispatch) => {
+const debouncedStartCompletion = debounce((userId, view, dispatch) => {
+  console.log("debouncedStartCompletion() userId=" + userId);
   const lang = '114';
   const doc = view.state.doc;
   const lines = [];
@@ -14,26 +17,27 @@ const debouncedStartCompletion = debounce((view, dispatch) => {
     lines.push(text);
   }
   const code = lines.join("\n");
-
-  dispatch(compileTask({ lang, code }));
+  const user = userId;
+  dispatch(compileTask({ user, lang, code }));
 }, 300);
 
-function customCompletionDisplay(dispatch) {
+function customCompletionDisplay(userId, dispatch) {
   return EditorView.updateListener.of(({ view, docChanged }) => {
     if (docChanged) {
       // when a completion is active each keystroke triggers the
       // completion source function, to avoid it we close any open
       // completion inmediatly.
       //closeCompletion(view);
-      debouncedStartCompletion(view, dispatch);
+      debouncedStartCompletion(userId, view, dispatch);
     }
   });
 }
 
-const CodeMirror = () => {
+const CodeMirror = ({ userId }) => {
+  console.log("CodeMirror() userId=" + userId);
   const dispatch = useDispatch();
   const extensions = [
-    customCompletionDisplay(dispatch),
+    customCompletionDisplay(userId, dispatch),
   ];
   const { ref } = useCodeMirror(extensions);
   return <div id="editor" ref={ref}/>;

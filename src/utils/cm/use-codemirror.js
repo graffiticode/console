@@ -32,7 +32,7 @@ export default function useCodeMirror(extensions) {
     });
 
     const startState = EditorState.create({
-      doc: "Hello World",
+      doc: "..",
       extensions: [
         ...extensions,
         keymap.of(defaultKeymap),

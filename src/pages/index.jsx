@@ -43,7 +43,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { startClock } from '../utils/redux/actions';
 import Link from 'next/link';
@@ -64,7 +64,9 @@ const ReduxApplet = () => {
 }
 
 export default function Example() {
-  const dispatch = useDispatch()
+  const dispatch = useDispatch();
+  const [userId, setUserId] = useState();
+
   useEffect(() => {
     dispatch(startClock())
   }, [dispatch])
@@ -127,8 +129,7 @@ export default function Example() {
                         <span className="sr-only">View notifications</span>
                         <BellIcon className="h-6 w-6" aria-hidden="true" />
                       </button>
-                      <SignIn />
-
+                      <SignIn setUserId={setUserId}/>
                       {/* Profile dropdown
                       <Menu as="div" className="ml-3 relative">
                         <div>

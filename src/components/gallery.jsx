@@ -63,7 +63,7 @@ function Gallery({ setOpen }) {
   )
 }
 
-export default function Example() {
+export default function Example({ userId }) {
   const [open, setOpen] = useState(true);
   const { data: session } = useSession();
   if (!session) {
@@ -111,7 +111,7 @@ export default function Example() {
                     </div>
                     <div className="relative mt-6 flex-1 px-4 sm:px-6">
                       <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
-                        <Editor />
+                        <Editor userId={userId}/>
                         <Form items="1,2,3,4"/>
                       </div>
                     </div>

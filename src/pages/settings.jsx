@@ -66,6 +66,7 @@ const ReduxApplet = () => {
 
 export default function Example() {
   const dispatch = useDispatch()
+  const [userId, setUserId] = useState();
   useEffect(() => {
     dispatch(startClock())
   }, [dispatch])
@@ -128,7 +129,7 @@ export default function Example() {
                         <span className="sr-only">View notifications</span>
                         <BellIcon className="h-6 w-6" aria-hidden="true" />
                       </button>
-                      <SignIn />
+                      <SignIn setUserId={() => setUserId}/>
 
                       {/* Profile dropdown
                       <Menu as="div" className="ml-3 relative">
