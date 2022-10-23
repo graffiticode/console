@@ -1,8 +1,14 @@
 import Head from 'next/head'
 import Image from 'next/image';
 import { useSession } from 'next-auth/react'
-import { Fragment, useState } from 'react'
+import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react'
+import { useDispatch } from 'react-redux';
+import { startClock } from '../utils/redux/actions';
+import Link from 'next/link';
+import Examples from '../components/examples';
+import Gallery from '../components/gallery';
+
 import {
   CalendarIcon,
   CashIcon,
@@ -42,13 +48,6 @@ const userNavigation = [
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
-
-import { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { startClock } from '../utils/redux/actions';
-import Link from 'next/link';
-import Examples from '../components/examples';
-import Gallery from '../components/gallery';
 
 const ReduxApplet = () => {
   return (
