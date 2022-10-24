@@ -34,16 +34,10 @@ function createTask(lang, code) {
 }
 
 async function postTask(user, auth, task) {
-  console.log("postTask() user=" + user + " auth=" + auth + " task=" + task);
   try {
     //const post = bent('http://localhost:3100/', 'POST', 'json', 200);
     const post = bent('https://api.graffiticode.org/', 'POST', 'json', 200);
-    const response = await post('task', {
-      auth,
-      task
-    });
-    console.log("postTask() response=" + JSON.stringify(response, null, 2));
-    return response.data;
+    const { data } = await post('task', {auth, task});
   } catch (x) {
     console.log("POST /task catch " + x);
     return x;
@@ -54,9 +48,8 @@ async function getData(auth, id) {
   try {
     //const get = bent('http://localhost:3100/', 'GET', 'json', 200);
     const get = bent('https://api.graffiticode.org/', 'GET', 'json', 200);
-    const resp = await get(`data?id=${id}&auth=${auth}`);
-    console.log("getData() data=" + JSON.stringify(resp.data, null, 2));
-    return JSON.stringify(resp.data);
+    const { data } = await get(`data?id=${id}&auth=${auth}`);
+    return JSON.stringify(data);
   } catch (x) {
     console.log("GET /data catch " + x);
   }
@@ -68,7 +61,6 @@ const resolvers = {
       const auth = authToken;
       const task = createTask(lang, code);
       const response = await postTask(user, auth, task);
-      console.log("compileTask() response=" + JSON.stringify(response));
       const id = response.id;
       let data;
       if (id) {
