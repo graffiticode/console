@@ -46,40 +46,51 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+import { FaceSmileIcon as FaceSmileIconOutline } from '@heroicons/react/24/outline'
+import {
+  FaceFrownIcon,
+  FaceSmileIcon as FaceSmileIconMini,
+  FireIcon,
+  HandThumbUpIcon,
+  HeartIcon,
+  XMarkIcon,
+} from '@heroicons/react/20/solid'
+const moods = [
+  { name: 'Excited', value: 'excited', icon: FireIcon, iconColor: 'text-white', bgColor: 'bg-red-500' },
+  { name: 'Loved', value: 'loved', icon: HeartIcon, iconColor: 'text-white', bgColor: 'bg-pink-400' },
+  { name: 'Happy', value: 'happy', icon: FaceSmileIconMini, iconColor: 'text-white', bgColor: 'bg-green-400' },
+  { name: 'Sad', value: 'sad', icon: FaceFrownIcon, iconColor: 'text-white', bgColor: 'bg-yellow-400' },
+  { name: 'Thumbsy', value: 'thumbsy', icon: HandThumbUpIcon, iconColor: 'text-white', bgColor: 'bg-blue-500' },
+  { name: 'I feel nothing', value: null, icon: XMarkIcon, iconColor: 'text-gray-400', bgColor: 'bg-transparent' },
+]
+
 export default function Example({ userId }) {
-  const [assigned, setAssigned] = useState(assignees[0])
-  const [labelled, setLabelled] = useState(labels[0])
-  const [dated, setDated] = useState(dueDates[0])
+  const [selected, setSelected] = useState(moods[5])
   return (
-      <div className="h-full border border-gray-300 rounded-none overflow-hidden focus-within:border-gray-500 focus-within:ring-gray-500">
-        <label htmlFor="title" className="sr-only">
-          Title
-        </label>
-        <input
-          type="text"
-          name="title"
-          id="title"
-          className="block w-full border-0 divide-y pt-2.5 text-md font-medium placeholder-gray-500 focus:ring-0"
-          placeholder="Task name"
-        />
-        <label htmlFor="description" className="sr-only">
-          Description
-        </label>
-        <div className="border-t">
-          <CodeMirror
-            userId={userId}
-            extensions={[javascript({ jsx: true })]}
-          />
-        </div>
-        {/* Spacer element to match the height of the toolbar */}
-        <div aria-hidden="true">
-          <div className="h-px" />
-          <div className="py-2">
-            <div className="py-px">
-              <div className="h-9" />
+    <div className="flex items-start space-x-4">
+      <div className="min-w-0 flex-1">
+          <div className="border-b border-gray-400 focus-within:border-none">
+            <label htmlFor="comment" className="sr-only">
+              Add your comment
+            </label>
+            <CodeMirror
+              userId={userId}
+              extensions={[javascript({ jsx: true })]}
+            />
+          </div>
+          <div className="flex justify-between pt-2">
+            <div className="flex items-center space-x-5">
+            </div>
+            <div className="flex-shrink-0">
+              <button
+                type="button"
+                className="inline-flex items-center rounded-none border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              >
+                Post
+              </button>
             </div>
           </div>
-        </div>
       </div>
+    </div>
   )
 }

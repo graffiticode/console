@@ -42,9 +42,11 @@ async function postTask(user, auth, task) {
       auth,
       task
     });
+    console.log("postTask() response=" + JSON.stringify(response, null, 2));
     return response.data;
   } catch (x) {
     console.log("POST /task catch " + x);
+    return x;
   }
 }
 
@@ -65,8 +67,13 @@ const resolvers = {
     compileTask: async (_, {user, lang, code}) => {
       const auth = authToken;
       const task = createTask(lang, code);
-      const { id } = await postTask(user, auth, task);
-      const data = await getData(auth, id);
+      const response = await postTask(user, auth, task);
+      console.log("compileTask() response=" + JSON.stringify(response));
+      const id = response.id;
+      let data;
+      if (id) {
+        data = await getData(auth, id);
+      }
       return data;
     },
   },

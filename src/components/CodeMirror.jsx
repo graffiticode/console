@@ -22,8 +22,10 @@ const debouncedStartCompletion = debounce((userId, view, dispatch) => {
 }, 300);
 
 function customCompletionDisplay(userId, dispatch) {
+  console.log("[1] customCompeletionDisplay() userId=" + userId);
   return EditorView.updateListener.of(({ view, docChanged }) => {
     if (docChanged) {
+      console.log("[2] customCompeletionDisplay() userId=" + userId);
       // when a completion is active each keystroke triggers the
       // completion source function, to avoid it we close any open
       // completion inmediatly.

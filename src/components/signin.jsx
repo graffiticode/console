@@ -16,11 +16,12 @@ export default function SignIn({ userId, setUserId }) {
     const postUser = async () => {
       const userRes = await axios.post('/api/user', { ...session.user });
       const { id } = userRes.data;
+      console.log("SignIn userId=" + userId);
       const secretRes = await axios.get(`/api/secret?id=${id}`);
       const { client_secret: clientSecret } = secretRes.data;
       setUserId(id);
     }
-    if (userId === "") {
+    if (userId === "" || userId === undefined) {
       postUser().catch(console.error);
     }
     return (
