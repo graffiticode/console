@@ -19,28 +19,6 @@ function shuffleArray(array) {
   return array.slice(0, 1000);
 }
 
-
-// function Gallery({ setOpen }) {
-//   return (
-//     <ul role="list" className="grid grid-cols-3 gap-x-4 gap-y-8 sm:grid-cols-4 sm:gap-x-6 lg:grid-cols-6 xl:gap-x-8">
-//       {shuffleArray(charts).map((chart) => (
-//         <li key={chart} className="relative">
-//           <div className="group block w-full overflow-hidden rounded-none bg-white hover:ring-1 hover:ring-gray-400">
-//             <button onClick={() => setOpen(true)}>
-//               <img src={`https://cdn.acx.ac/${chart}.png`} alt="" className="pointer-events-none object-cover group-hover:opacity-75" />
-//             </button>
-//             {/*
-//             <button type="button" className="absolute inset-0 focus:outline-none">
-//               <span className="sr-only">View details for {file.title}</span>
-//             </button>
-//             */}
-//           </div>
-//         </li>
-//       ))}
-//     </ul>
-//   )
-// }
-
 import { EnvelopeIcon, PhoneIcon } from '@heroicons/react/20/solid'
 
 const tasks = [
@@ -90,7 +68,7 @@ function Gallery({setOpen}) {
       {tasks.map((task) => (
         <li
           key={task.id}
-          className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-lg bg-white text-center shadow"
+          className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
         >
           <button onClick={() => setOpen(true)}>
           <div className="flex flex-1 flex-col p-8">
@@ -101,7 +79,7 @@ function Gallery({setOpen}) {
               {/*
               <dt className="sr-only">Role</dt>
               <dd className="mt-3">
-                <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                <span className="rounded-none bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
                   {task.label}
                 </span>
               </dd>
