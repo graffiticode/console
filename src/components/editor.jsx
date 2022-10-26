@@ -96,7 +96,7 @@ export default function Example({ userId }) {
                   dispatch(saveTask({user, lang, code}))
                 }}
               >
-                Post
+                Create Task
               </button>
             </div>
           </div>

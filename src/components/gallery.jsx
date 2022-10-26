@@ -30,6 +30,13 @@ const tasks = [
       'https://cdn.acx.ac/xV2Ud8VXs5nIQrmZ2c7.png',
   },
   {
+    id: 'l1aFe7vRi5oIe4g6QCL',
+    title: 'Table',
+    label: 'prod',
+    imageUrl:
+      'https://cdn.acx.ac/l1aFe7vRi5oIe4g6QCL.png',
+  },
+  {
     id: 'o5dSVpbziL5fbz8mBCA',
     title: 'Horizontal Bar',
     label: 'prod',
@@ -51,11 +58,11 @@ const tasks = [
       'https://cdn.acx.ac/l1aFezOzU5oIeRaPKtL.png',
   },
   {
-    id: 'l1aFe7vRi5oIe4g6QCL',
-    title: 'Table',
+    id: '5bMFn7JaceZhP5X2tV',
+    title: 'Double Bar',
     label: 'prod',
     imageUrl:
-      'https://cdn.acx.ac/l1aFe7vRi5oIe4g6QCL.png',
+      'https://cdn.acx.ac/5bMFn7JaceZhP5X2tV.png',
   },
   // More tasks...
 ]
@@ -76,16 +83,14 @@ function Gallery({setOpen}) {
             <dl className="mt-1 flex flex-grow flex-col justify-between">
               <dt className="sr-only">Title</dt>
               <dd className="text-sm text-gray-700">{task.title}</dd>
-              {/*
               <dt className="sr-only">Role</dt>
               <dd className="mt-3">
                 <span className="rounded-none bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                  {task.label}
+                  {task.label || "unlabeled"}
                 </span>
               </dd>
-              */}
             </dl>
-            <h3 className="mt-6 text-sm font-light text-gray-500">{task.id}</h3>
+            <h3 className="mt-6 text-xs font-light text-gray-500">{task.id}</h3>
           </div>
           {/*
           <div>
