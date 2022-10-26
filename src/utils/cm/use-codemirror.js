@@ -13,7 +13,7 @@ const myHighlightStyle = HighlightStyle.define([
   {tag: tags.comment, color: "#f5d", fontStyle: "italic"}
 ]);
 
-export default function useCodeMirror(extensions) {
+export default function useCodeMirror(extensions, setView) {
   const [element, setElement] = useState();
   const ref = useCallback((node) => {
     if (!node) return;
@@ -46,6 +46,8 @@ export default function useCodeMirror(extensions) {
       state: startState,
       parent: element,
     });
+
+    setView(view);
     
     return () => view.destroy();    
   }, [element]);

@@ -44,6 +44,24 @@ export const compileTask = ({ user, lang, code }) => (dispatch, getState) => {
   getData({ user, lang, code }).catch(console.error);
 };
 
+export const saveTask = ({ user, lang, code }) => (dispatch, getState) => {
+  const query = gql `
+    mutation post ($user: String!, $lang: String!, $code: String!) {
+      saveTask(user: $user, lang: $lang, code: $code)
+    }
+  `;
+  const state = getState();
+  console.log("saveTask() state=" + JSON.stringify(state, null, 2));
+  const post = async ({user, lang, code}) => {
+    console.log("saveTask() user=" + user + " lang=" + lang + " code=" + code);
+    request('/api', query, { user, lang, code }).then((data) => {
+      console.log("saveTask() post() saveTask=" + data.saveTask);
+      //dispatch(renderTask(JSON.parse(data.saveTask)));
+    });
+  };
+  post({ user, lang, code }).catch(console.error);
+};
+
 // INITIALIZES CLOCK ON SERVER
 export const serverRenderClock = () => (dispatch) =>
   dispatch({

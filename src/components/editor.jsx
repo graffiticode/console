@@ -18,8 +18,10 @@ import { Fragment, useState, useEffect } from 'react'
 import { Listbox, Transition } from '@headlessui/react'
 import { CalendarIcon, PaperClipIcon, TagIcon, UserCircleIcon } from '@heroicons/react/24/solid'
 
-import CodeMirror from './CodeMirror';
+import CodeMirror, { getCode } from './CodeMirror';
 import { javascript } from "@codemirror/lang-javascript";
+import { saveTask } from '../utils/redux/actions'
+import { useDispatch } from 'react-redux'
 
 const assignees = [
   { name: 'Unassigned', value: null },
@@ -65,7 +67,11 @@ const moods = [
 ]
 
 export default function Example({ userId }) {
-  const [selected, setSelected] = useState(moods[5])
+  const [selected, setSelected] = useState(moods[5]);
+  const [view, setView] = useState();
+  const dispatch = useDispatch();
+  const user = userId;
+  const lang = 'L114';
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
@@ -75,6 +81,7 @@ export default function Example({ userId }) {
             </label>
             <CodeMirror
               userId={userId}
+              setView={setView}
               extensions={[javascript({ jsx: true })]}
             />
           </div>
@@ -83,8 +90,11 @@ export default function Example({ userId }) {
             </div>
             <div className="flex-shrink-0">
               <button
-                type="button"
-                className="inline-flex items-center rounded-none border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                className="inline-flex items-center rounded-none border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700 focus:outline-none"
+                onClick={() => {
+                  const code = getCode(view);
+                  dispatch(saveTask({user, lang, code}))
+                }}
               >
                 Post
               </button>

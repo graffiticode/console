@@ -9,6 +9,9 @@ import {
   renderGraphiQL,
 } from 'graphql-helix';
 import { getToken } from "next-auth/jwt";
+import { buildTaskDaoFactory } from "../../utils/storage/index.js";
+import { buildGetTaskDaoForStorageType } from "./utils.js";
+const taskDaoFactory = buildTaskDaoFactory({});
 
 const clientAddress = process.env.ARTCOMPILER_CLIENT_ADDRESS
   ? process.env.ARTCOMPILER_CLIENT_ADDRESS
@@ -22,6 +25,7 @@ const typeDefs = `
 
   type Mutation {
     compileTask(user: String!, lang: String!, code: String!): String!
+    saveTask(user: String!, lang: String!, code: String!): String!
   }
 `;
 
@@ -33,11 +37,36 @@ function createTask(lang, code) {
   return task;
 }
 
+const normalizeTasksParameter = async tasks => {
+  tasks = !Array.isArray(tasks) && [tasks] || tasks;
+  return tasks;
+};
+
+const getIdFromIds = ids => {
+  if (ids.length === 1) {
+    return ids[0];
+  } else {
+    return ids;
+  }
+};
+
+async function saveTask(user, task) {
+  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
+  const tasks = await normalizeTasksParameter(task);
+  console.log("saveTask() tasks=" + JSON.stringify(tasks, null, 2));
+  const taskDao = getTaskDaoForStore("memory");
+  const ids = await Promise.all(tasks.map(task => taskDao.create({ user, task })));
+  console.log("saveTask() ids=" + ids);
+  const id = getIdFromIds(ids);
+  return JSON.stringify(id);
+}
+
 async function postTask(user, auth, task) {
   try {
     //const post = bent('http://localhost:3100/', 'POST', 'json', 200);
     const post = bent('https://api.graffiticode.org/', 'POST', 'json', 200);
     const { data } = await post('task', {auth, task});
+    return data;
   } catch (x) {
     console.log("POST /task catch " + x);
     return x;
@@ -60,13 +89,20 @@ const resolvers = {
     compileTask: async (_, {user, lang, code}) => {
       const auth = authToken;
       const task = createTask(lang, code);
-      const response = await postTask(user, auth, task);
-      const id = response.id;
+      const resp = await postTask(user, auth, task);
+      console.log("compileTask() resp=" + JSON.stringify(resp, null, 2));
       let data;
-      if (id) {
-        data = await getData(auth, id);
+      if (resp && resp.id) {
+        data = await getData(auth, resp.id);
       }
       return data;
+    },
+    saveTask: async (_, {user, lang, code}) => {
+      const auth = authToken;
+      const task = createTask(lang, code);
+      const id = await saveTask(user, task);
+      console.log("saveTask() id=" + id);
+      return id;
     },
   },
 };
