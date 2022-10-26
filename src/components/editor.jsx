@@ -71,7 +71,7 @@ export default function Example({ userId }) {
   const [view, setView] = useState();
   const dispatch = useDispatch();
   const user = userId;
-  const lang = 'L114';
+  const lang = '114';
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">

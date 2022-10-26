@@ -49,7 +49,7 @@ function customCompletionDisplay(userId, dispatch) {
 }
 
 const CodeMirror = ({ userId, setView }) => {
-  console.log("CodeMirror() userId=" + userId);
+  console.log("***CodeMirror() userId=" + userId);
   const dispatch = useDispatch();
   const extensions = [
     customCompletionDisplay(userId, dispatch),

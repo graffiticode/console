@@ -55,6 +55,7 @@ async function saveTask(user, task) {
   const tasks = await normalizeTasksParameter(task);
   console.log("saveTask() tasks=" + JSON.stringify(tasks, null, 2));
   const taskDao = getTaskDaoForStore("memory");
+  // TODO fix taskDao.create()
   const ids = await Promise.all(tasks.map(task => taskDao.create({ user, task })));
   console.log("saveTask() ids=" + ids);
   const id = getIdFromIds(ids);
