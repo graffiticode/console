@@ -19,6 +19,15 @@ const taskReducer = (state = "", { type, data }) => {
   }
 };
 
+const addTaskReducer = (state = ['Create Task'], { type, data }) => {
+  switch (type) {
+  case types.ADD_TASK:
+    return state.includes(data) && state || [data].concat(state);
+  default:
+    return state;
+  }
+};
+
 // COUNTER REDUCER
 const counterReducer = (state = 0, { type, data }) => {
   switch (type) {
@@ -69,6 +78,7 @@ const reducers = {
   hello: helloReducer,
   chart: taskReducer,
   userId: userIdReducer,
+  tasks: addTaskReducer,
 };
 
 export default combineReducers(reducers);

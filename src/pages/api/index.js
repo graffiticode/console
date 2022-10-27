@@ -26,6 +26,7 @@ const typeDefs = `
   type Mutation {
     compileTask(user: String!, lang: String!, code: String!): String!
     saveTask(user: String!, lang: String!, code: String!): String!
+    getTask(user: String!, id: String!): String!
   }
 `;
 
@@ -53,13 +54,23 @@ const getIdFromIds = ids => {
 async function saveTask(user, task) {
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const tasks = await normalizeTasksParameter(task);
-  console.log("saveTask() tasks=" + JSON.stringify(tasks, null, 2));
   const taskDao = getTaskDaoForStore("memory");
-  // TODO fix taskDao.create()
   const ids = await Promise.all(tasks.map(task => taskDao.create({ user, task })));
   console.log("saveTask() ids=" + ids);
   const id = getIdFromIds(ids);
   return JSON.stringify(id);
+}
+
+async function getTask(auth, id) {
+  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
+  const taskDao = getTaskDaoForStore("memory");
+  const ids = [].concat(id);
+  const tasksForIds = await Promise.all(ids.map(async id => taskDao.get({ id, auth })));
+  const tasks = tasksForIds.reduce((tasks, tasksForId) => {
+    tasks.push(...tasksForId);
+    return tasks;
+  }, []);
+  return JSON.stringify(tasks[0]);
 }
 
 async function postTask(user, auth, task) {

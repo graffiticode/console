@@ -6,6 +6,7 @@ import {
   HELLO,
   RENDER_TASK,
   SET_USER_ID,
+  ADD_TASK,
 } from './types';
 import { request, gql } from 'graphql-request';
 
@@ -56,7 +57,7 @@ export const saveTask = ({ user, lang, code }) => (dispatch, getState) => {
     console.log("saveTask() user=" + user + " lang=" + lang + " code=" + code);
     request('/api', query, { user, lang, code }).then((data) => {
       console.log("saveTask() post() saveTask=" + data.saveTask);
-      //dispatch(renderTask(JSON.parse(data.saveTask)));
+      dispatch(addTask(JSON.parse(data.saveTask)));
     });
   };
   post({ user, lang, code }).catch(console.error);
@@ -90,6 +91,8 @@ export const resetCount = () => ({ type: RESET });
 export const sayHello = (data) => ({ type: HELLO, data });
 
 export const renderTask = (data) => ({ type: RENDER_TASK, data });
+
+export const addTask = (data) => ({ type: ADD_TASK, data });
 
 export const setUserId = (data) => ({ type: SET_USER_ID, data });
 

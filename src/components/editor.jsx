@@ -66,7 +66,7 @@ const moods = [
   { name: 'I feel nothing', value: null, icon: XMarkIcon, iconColor: 'text-gray-400', bgColor: 'bg-transparent' },
 ]
 
-export default function Example({ userId }) {
+export default function Example({ userId, setOpen }) {
   const [selected, setSelected] = useState(moods[5]);
   const [view, setView] = useState();
   const dispatch = useDispatch();
@@ -76,9 +76,6 @@ export default function Example({ userId }) {
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
           <div className="border-b border-gray-400 focus-within:border-none">
-            <label htmlFor="comment" className="sr-only">
-              Add your comment
-            </label>
             <CodeMirror
               userId={userId}
               setView={setView}
@@ -93,7 +90,8 @@ export default function Example({ userId }) {
                 className="inline-flex items-center rounded-none border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700 focus:outline-none"
                 onClick={() => {
                   const code = getCode(view);
-                  dispatch(saveTask({user, lang, code}))
+                  dispatch(saveTask({user, lang, code}));
+                  setOpen(false);
                 }}
               >
                 Create Task

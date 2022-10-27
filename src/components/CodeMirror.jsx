@@ -34,7 +34,7 @@ const debouncedStartCompletion = debounce((userId, view, dispatch) => {
 }, 300);
 
 function customCompletionDisplay(userId, dispatch) {
-  const fn = ({ view, docChanged }) => {
+  return EditorView.updateListener.of(({ view, docChanged }) => {
     if (docChanged) {
       // when a completion is active each keystroke triggers the
       // completion source function, to avoid it we close any open
@@ -42,8 +42,7 @@ function customCompletionDisplay(userId, dispatch) {
       //closeCompletion(view);
       debouncedStartCompletion(userId, view, dispatch);
     }
-  };
-  return EditorView.updateListener.of(fn);
+  });
 }
 
 const CodeMirror = ({ userId, setView }) => {

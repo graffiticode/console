@@ -70,11 +70,13 @@ const tasks = [
 // TODO load tasks from store
 
 function Gallery({setOpen}) {
+  const tasks = useSelector(state => state.tasks);
+  console.log("Gallery() tasks=" + JSON.stringify(tasks, null, 2));
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       {tasks.map((task) => (
         <li
-          key={task.id}
+          key={task}
           className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
         >
           <button onClick={() => setOpen(true)}>
@@ -84,13 +86,15 @@ function Gallery({setOpen}) {
               <dt className="sr-only">Title</dt>
               <dd className="text-sm text-gray-700">{task.title}</dd>
               <dt className="sr-only">Role</dt>
+              {/*
               <dd className="mt-3">
                 <span className="rounded-none bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                  {task.label || "unlabeled"}
+                  {task.label}
                 </span>
               </dd>
+              */}
             </dl>
-            <h3 className="mt-6 text-xs font-light text-gray-500">{task.id}</h3>
+            <h3 className="mt-6 text-xs font-light text-gray-500">{task}</h3>
           </div>
           {/*
           <div>
@@ -142,7 +146,7 @@ export default function Example({ userId }) {
 
         <div className="fixed inset-0 overflow-hidden">
           <div className="absolute inset-0 overflow-hidden">
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 h-1/2 flex max-w-full">
+            <div className="pointer-events-none fixed inset-x-0 bottom-0 h-5/6 flex max-w-full">
               <Transition.Child
                 as={Fragment}
                 enter="transform transition ease-in-out duration-500 sm:duration-700"
@@ -170,7 +174,7 @@ export default function Example({ userId }) {
                     </div>
                     <div className="relative mt-6 flex-1 px-4 sm:px-6">
                       <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
-                        <Editor userId={userId}/>
+                        <Editor userId={userId} setOpen={setOpen}/>
                         <Form items="1,2,3,4"/>
                       </div>
                     </div>
