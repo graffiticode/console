@@ -7,6 +7,7 @@ import {
   RENDER_TASK,
   SET_USER_ID,
   ADD_TASK,
+  INIT_TASKS,
 } from './types';
 import { request, gql } from 'graphql-request';
 
@@ -63,6 +64,24 @@ export const saveTask = ({ user, lang, code }) => (dispatch, getState) => {
   post({ user, lang, code }).catch(console.error);
 };
 
+export const loadTasks = ({ uid }) => (dispatch, getState) => {
+  const query = gql `
+    query get($uid: String!) {
+      getTasks(uid: $uid)
+    }
+  `;
+  const state = getState();
+  console.log("loadTasks() state=" + JSON.stringify(state, null, 2));
+  const get = async ({ uid }) => {
+    console.log("saveTask() uid=" + uid);
+    request('/api', query, { uid }).then((data) => {
+      console.log("getTasks() get() data=" + JSON.stringify(data, null, 2));
+      dispatch(initTasks(data.getTasks));
+    });
+  };
+  get({ uid }).catch(console.error);
+};
+
 // INITIALIZES CLOCK ON SERVER
 export const serverRenderClock = () => (dispatch) =>
   dispatch({
@@ -93,6 +112,8 @@ export const sayHello = (data) => ({ type: HELLO, data });
 export const renderTask = (data) => ({ type: RENDER_TASK, data });
 
 export const addTask = (data) => ({ type: ADD_TASK, data });
+
+export const initTasks = (data) => ({ type: INIT_TASKS, data });
 
 export const setUserId = (data) => ({ type: SET_USER_ID, data });
 

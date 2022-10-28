@@ -67,7 +67,7 @@ const tasks = [
   // More tasks...
 ]
 
-// TODO load tasks from store
+// TODO load tasks from users account
 
 function Gallery({setOpen}) {
   const tasks = useSelector(state => state.tasks);

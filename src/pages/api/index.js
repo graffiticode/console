@@ -11,6 +11,8 @@ import {
 import { getToken } from "next-auth/jwt";
 import { buildTaskDaoFactory } from "../../utils/storage/index.js";
 import { buildGetTaskDaoForStorageType } from "./utils.js";
+import { FieldValue } from 'firebase-admin/firestore';
+
 const taskDaoFactory = buildTaskDaoFactory({});
 
 const clientAddress = process.env.ARTCOMPILER_CLIENT_ADDRESS
@@ -20,7 +22,7 @@ let authToken = process.env.ARTCOMPILER_CLIENT_SECRET || "eyJhbGciOiJIUzI1NiIsIn
 
 const typeDefs = `
   type Query {
-    data: String
+    getTasks(uid: String!): [String!]
   }
 
   type Mutation {
@@ -51,14 +53,36 @@ const getIdFromIds = ids => {
   }
 };
 
-async function saveTask(user, task) {
+import db from '../../utils/db';
+
+async function saveTask(uid, task) {
+  const auth = { uid };
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const tasks = await normalizeTasksParameter(task);
   const taskDao = getTaskDaoForStore("memory");
-  const ids = await Promise.all(tasks.map(task => taskDao.create({ user, task })));
-  console.log("saveTask() ids=" + ids);
+  const ids = await Promise.all(tasks.map(task => taskDao.create({ auth, task })));
   const id = getIdFromIds(ids);
+
+  const taskRef = await db.doc(`tasks/${id}`);
+  taskRef.set({task});
+  const userRef = await db.doc(`users/${uid}`);
+  const userDoc = await userRef.get();
+  const userData = userDoc.data();
+  if (userData.taskIds === undefined) {
+    await userRef.update({taskIds: [id]});
+  } else {
+    await userRef.update({taskIds: FieldValue.arrayUnion(id)});
+  }
   return JSON.stringify(id);
+}
+
+async function getTasks(uid) {
+  console.log("getTasks() uid=" + uid);
+  const auth = { uid };
+  return [
+    `${uid}/foo`,
+    `${uid}/bar`
+  ];
 }
 
 async function getTask(auth, id) {
@@ -97,6 +121,11 @@ async function getData(auth, id) {
 }
 
 const resolvers = {
+  Query: {
+    getTasks: async (_, { uid }) => {
+      return getTasks(uid);
+    },
+  },
   Mutation: {
     compileTask: async (_, {user, lang, code}) => {
       const auth = authToken;

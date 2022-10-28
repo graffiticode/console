@@ -23,6 +23,8 @@ const addTaskReducer = (state = ['[blank]'], { type, data }) => {
   switch (type) {
   case types.ADD_TASK:
     return state.includes(data) && state || [data].concat(state);
+  case types.INIT_TASKS:
+    return data;
   default:
     return state;
   }
