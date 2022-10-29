@@ -10,116 +10,29 @@ import { useSelector } from 'react-redux'
 import { useSession, signIn, signOut } from "next-auth/react";
 import SignInAlert from "./SignInAlert";
 
-// https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
-function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array.slice(0, 1000);
-}
-
 import { EnvelopeIcon, PhoneIcon } from '@heroicons/react/20/solid'
 
-const tasks = [
-  {
-    id: 'xV2Ud8VXs5nIQrmZ2c7',
-    title: 'Bar',
-    label: 'prod',
-    imageUrl:
-      'https://cdn.acx.ac/xV2Ud8VXs5nIQrmZ2c7.png',
-  },
-  {
-    id: 'l1aFe7vRi5oIe4g6QCL',
-    title: 'Table',
-    label: 'prod',
-    imageUrl:
-      'https://cdn.acx.ac/l1aFe7vRi5oIe4g6QCL.png',
-  },
-  {
-    id: 'o5dSVpbziL5fbz8mBCA',
-    title: 'Horizontal Bar',
-    label: 'prod',
-    imageUrl:
-      'https://cdn.acx.ac/o5dSVpbziL5fbz8mBCA.png',
-  },
-  {
-    id: 'MxRF0xqwSJXSqmmv4I9',
-    title: 'Stacked Bar',
-    label: 'prod',
-    imageUrl:
-      'https://cdn.acx.ac/MxRF0xqwSJXSqmmv4I9.png',
-  },
-  {
-    id: 'l1aFezOzU5oIeRaPKtL',
-    title: 'Area',
-    label: 'prod',
-    imageUrl:
-      'https://cdn.acx.ac/l1aFezOzU5oIeRaPKtL.png',
-  },
-  {
-    id: '5bMFn7JaceZhP5X2tV',
-    title: 'Double Bar',
-    label: 'prod',
-    imageUrl:
-      'https://cdn.acx.ac/5bMFn7JaceZhP5X2tV.png',
-  },
-  // More tasks...
-]
-
-// TODO load tasks from users account
-
-function Gallery({setOpen}) {
+function Gallery({setOpen, setTask}) {
   const tasks = useSelector(state => state.tasks);
-  console.log("Gallery() tasks=" + JSON.stringify(tasks, null, 2));
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       {tasks.map((task) => (
         <li
-          key={task}
+          key={task.taskId}
           className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
         >
-          <button onClick={() => setOpen(true)}>
-          <div className="flex flex-1 flex-col p-8">
-            <img className="mx-auto rounded-none" src={task.imageUrl} alt="" />
-            <dl className="mt-1 flex flex-grow flex-col justify-between">
-              <dt className="sr-only">Title</dt>
-              <dd className="text-sm text-gray-700">{task.title}</dd>
-              <dt className="sr-only">Role</dt>
-              {/*
-              <dd className="mt-3">
-                <span className="rounded-none bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                  {task.label}
-                </span>
-              </dd>
-              */}
-            </dl>
-            <h3 className="mt-6 text-xs font-light text-gray-500">{task}</h3>
-          </div>
-          {/*
-          <div>
-            <div className="-mt-px flex divide-x divide-gray-200">
-              <div className="flex w-0 flex-1">
-                <a
-                  href={`mailto:${task.email}`}
-                  className="relative -mr-px inline-flex w-0 flex-1 items-center justify-center rounded-bl-lg border border-transparent py-4 text-sm font-medium text-gray-700 hover:text-gray-500"
-                >
-                  <EnvelopeIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                  <span className="ml-3">Email</span>
-                </a>
-              </div>
-              <div className="-ml-px flex w-0 flex-1">
-                <a
-                  href={`tel:${task.telephone}`}
-                  className="relative inline-flex w-0 flex-1 items-center justify-center rounded-br-lg border border-transparent py-4 text-sm font-medium text-gray-700 hover:text-gray-500"
-                >
-                  <PhoneIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                  <span className="ml-3">Call</span>
-                </a>
-              </div>
+          <button onClick={() => {
+              setOpen(true);
+              setTask(task);
+            }}>
+            <div className="flex flex-1 flex-col p-8">
+              <img className="mx-auto rounded-none" src={task.imageUrl} alt="" />
+              <dl className="mt-1 flex flex-grow flex-col justify-between">
+                <dt className="sr-only">Title</dt>
+                <dd className="text-sm text-gray-700">{task.title}</dd>
+              </dl>
+              <h3 className="mt-6 text-xs font-light text-gray-500">{task.taskId}</h3>
             </div>
-          </div>
-          */}
           </button>
         </li>
       ))}
@@ -129,6 +42,7 @@ function Gallery({setOpen}) {
 
 export default function Example({ userId }) {
   const [open, setOpen] = useState(true);
+  const [task, setTask] = useState();
   const { data: session } = useSession();
   if (!session) {
     return (
@@ -139,53 +53,52 @@ export default function Example({ userId }) {
   } else {
   return (
     <>
-      <Gallery setOpen={setOpen}/>
-    <Transition.Root show={open} as={Fragment}>
-      <Dialog as="div" className="relative z-10" onClose={setOpen}>
-        <div className="fixed inset-0" />
-
-        <div className="fixed inset-0 overflow-hidden">
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 h-5/6 flex max-w-full">
-              <Transition.Child
-                as={Fragment}
-                enter="transform transition ease-in-out duration-500 sm:duration-700"
-                enterFrom="translate-y-full"
-                enterTo="translate-y-0"
-                leave="transform transition ease-in-out duration-500 sm:duration-700"
-                leaveFrom="translate-y-0"
-                leaveTo="translate-y-full"
-              >
-                <Dialog.Panel className="pointer-events-auto w-screen">
-                  <div className="flex h-full flex-col overflow-y-scroll bg-white py-6 border-2">
-                    <div className="px-4 sm:px-6">
-                      <div className="flex items-start justify-between">
-                        <div className="ml-3 flex h-7 items-center">
-                          <button
-                            type="button"
-                            className="rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-                            onClick={() => setOpen(false)}
-                          >
-                            <span className="sr-only">Close panel</span>
-                            <XMarkIcon className="h-6 w-6" aria-hidden="true" />
-                          </button>
+      <Gallery setOpen={setOpen} setTask={setTask}/>
+      <Transition.Root show={open} as={Fragment}>
+        <Dialog as="div" className="relative z-10" onClose={setOpen}>
+          <div className="fixed inset-0" />
+          <div className="fixed inset-0 overflow-hidden">
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="pointer-events-none fixed inset-x-0 bottom-0 h-5/6 flex max-w-full">
+                <Transition.Child
+                  as={Fragment}
+                  enter="transform transition ease-in-out duration-500 sm:duration-700"
+                  enterFrom="translate-y-full"
+                  enterTo="translate-y-0"
+                  leave="transform transition ease-in-out duration-500 sm:duration-700"
+                  leaveFrom="translate-y-0"
+                  leaveTo="translate-y-full"
+                >
+                  <Dialog.Panel className="pointer-events-auto w-screen">
+                    <div className="flex h-full flex-col overflow-y-scroll bg-white py-6 border-2">
+                      <div className="px-4 sm:px-6">
+                        <div className="flex items-start justify-between">
+                          <div className="ml-3 flex h-7 items-center">
+                            <button
+                              type="button"
+                              className="rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
+                              onClick={() => setOpen(false)}
+                              >
+                              <span className="sr-only">Close panel</span>
+                              <XMarkIcon className="h-6 w-6" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="relative mt-6 flex-1 px-4 sm:px-6">
+                        <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
+                          <Editor userId={userId} task={task} setOpen={setOpen}/>
+                          <Form items="1,2,3,4"/>
                         </div>
                       </div>
                     </div>
-                    <div className="relative mt-6 flex-1 px-4 sm:px-6">
-                      <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
-                        <Editor userId={userId} setOpen={setOpen}/>
-                        <Form items="1,2,3,4"/>
-                      </div>
-                    </div>
-                  </div>
-                </Dialog.Panel>
-              </Transition.Child>
+                  </Dialog.Panel>
+                </Transition.Child>
+              </div>
             </div>
           </div>
-        </div>
-      </Dialog>
-    </Transition.Root>
+        </Dialog>
+      </Transition.Root>
     </>
   )
   }

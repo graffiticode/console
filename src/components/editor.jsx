@@ -66,7 +66,7 @@ const moods = [
   { name: 'I feel nothing', value: null, icon: XMarkIcon, iconColor: 'text-gray-400', bgColor: 'bg-transparent' },
 ]
 
-export default function Example({ userId, setOpen }) {
+export default function Editor({ userId, task, setOpen }) {
   const [selected, setSelected] = useState(moods[5]);
   const [view, setView] = useState();
   const dispatch = useDispatch();
@@ -80,6 +80,7 @@ export default function Example({ userId, setOpen }) {
               userId={userId}
               setView={setView}
               extensions={[javascript({ jsx: true })]}
+              code={task && task.code || ".."}
             />
           </div>
           <div className="flex justify-between pt-2">

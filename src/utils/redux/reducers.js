@@ -64,7 +64,6 @@ const timerReducer = (state = initialTimerState, { type, payload }) => {
 };
 
 const userIdReducer = (state = "", { type, data }) => {
-  console.log("userIdReducer() type=" + type + " data=" + data);
   switch (type) {
   case types.USER_ID:
     return data;

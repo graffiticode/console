@@ -13,7 +13,7 @@ const myHighlightStyle = HighlightStyle.define([
   {tag: tags.comment, color: "#f5d", fontStyle: "italic"}
 ]);
 
-export default function useCodeMirror(extensions, setView) {
+export default function useCodeMirror(extensions, setView, doc) {
   const [element, setElement] = useState();
   const ref = useCallback((node) => {
     if (!node) return;
@@ -24,7 +24,6 @@ export default function useCodeMirror(extensions, setView) {
     if (!element) {
       return undefined;
     }
-
     const theme = EditorView.theme({
       "&": {height: "300px"},
       ".cm-scroller": {overflow: "auto"},
@@ -32,7 +31,7 @@ export default function useCodeMirror(extensions, setView) {
     });
 
     const startState = EditorState.create({
-      doc: "..",
+      doc: doc || '..',
       extensions: [
         ...extensions,
         keymap.of(defaultKeymap),

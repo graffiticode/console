@@ -22,7 +22,7 @@ let authToken = process.env.ARTCOMPILER_CLIENT_SECRET || "eyJhbGciOiJIUzI1NiIsIn
 
 const typeDefs = `
   type Query {
-    getTasks(uid: String!): [String!]
+    getTasks(uid: String!): String!
   }
 
   type Mutation {
@@ -62,7 +62,6 @@ async function saveTask(uid, task) {
   const taskDao = getTaskDaoForStore("memory");
   const ids = await Promise.all(tasks.map(task => taskDao.create({ auth, task })));
   const id = getIdFromIds(ids);
-
   const taskRef = await db.doc(`tasks/${id}`);
   taskRef.set({task});
   const userRef = await db.doc(`users/${uid}`);
@@ -77,12 +76,22 @@ async function saveTask(uid, task) {
 }
 
 async function getTasks(uid) {
-  console.log("getTasks() uid=" + uid);
-  const auth = { uid };
-  return [
-    `${uid}/foo`,
-    `${uid}/bar`
-  ];
+  const userRef = await db.doc(`users/${uid}`);
+  const userDoc = await userRef.get();
+  const userData = userDoc.data();
+  const auth = {uid};
+  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
+  const taskDao = getTaskDaoForStore("memory");
+  const taskIds = userData.taskIds || [];
+  console.log("getTasks() taskIds=" + JSON.stringify(taskIds, null, 2));
+  const tasksForIds = await Promise.all(taskIds.map(async id => taskDao.get({ id, auth })));
+  console.log("getTasks() tasksForIds=" + JSON.stringify(tasksForIds, null, 2));
+  const tasks = tasksForIds.reduce((tasks, tasksForId) => {
+    tasks.push(...tasksForId);
+    return tasks;
+  }, []);
+//  const tasks = taskIds.map(taskId => ({taskId}));
+  return JSON.stringify(tasks);  
 }
 
 async function getTask(auth, id) {

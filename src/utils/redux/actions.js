@@ -21,7 +21,6 @@ export const addPayment = () => (dispatch, getState) => {
   const getData = async () => {
     const id = `${state.id}`;
     request('/api', query, { id }).then((data) => {
-      console.log("addPayment() getData() hello=" + data.addPayment);
       dispatch(showPayment(data.stripeSecret));
     });
   };
@@ -35,11 +34,8 @@ export const compileTask = ({ user, lang, code }) => (dispatch, getState) => {
     }
   `;
   const state = getState();
-  console.log("compileTask() state=" + JSON.stringify(state, null, 2));
   const getData = async ({user, lang, code}) => {
-    console.log("compileTask() user=" + user + " lang=" + lang + " code=" + code);
     request('/api', query, { user, lang, code }).then((data) => {
-      console.log("compileTask() getData() data=" + data.compileTask);
       dispatch(renderTask(JSON.parse(data.compileTask)));
     });
   };
@@ -53,12 +49,10 @@ export const saveTask = ({ user, lang, code }) => (dispatch, getState) => {
     }
   `;
   const state = getState();
-  console.log("saveTask() state=" + JSON.stringify(state, null, 2));
   const post = async ({user, lang, code}) => {
-    console.log("saveTask() user=" + user + " lang=" + lang + " code=" + code);
     request('/api', query, { user, lang, code }).then((data) => {
-      console.log("saveTask() post() saveTask=" + data.saveTask);
-      dispatch(addTask(JSON.parse(data.saveTask)));
+      const taskId = JSON.parse(data.saveTask);
+      dispatch(addTask({taskId, lang, code}));
     });
   };
   post({ user, lang, code }).catch(console.error);
@@ -70,16 +64,14 @@ export const loadTasks = ({ uid }) => (dispatch, getState) => {
       getTasks(uid: $uid)
     }
   `;
-  const state = getState();
-  console.log("loadTasks() state=" + JSON.stringify(state, null, 2));
   const get = async ({ uid }) => {
-    console.log("saveTask() uid=" + uid);
     request('/api', query, { uid }).then((data) => {
-      console.log("getTasks() get() data=" + JSON.stringify(data, null, 2));
-      dispatch(initTasks(data.getTasks));
+      console.log("loadTasks() data=" + data.getTasks);
+      const tasks = JSON.parse(data.getTasks);
+      dispatch(initTasks(tasks));
     });
   };
-  get({ uid }).catch(console.error);
+  get({uid}).catch(console.error);
 };
 
 // INITIALIZES CLOCK ON SERVER

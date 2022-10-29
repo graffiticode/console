@@ -14,7 +14,10 @@ const buildObjectToId = ({ idsByObject, objectsById }) => obj => {
   return idsByObject.get(key);
 };
 
-const buildObjectFromId = ({ objectsById }) => id => objectsById.get(id);
+const buildObjectFromId = ({ objectsById }) => id => {
+  console.log([...objectsById.entries()]);
+  return objectsById.get(id);
+};
 
 const buildTaskCreate = ({ objectToId, aclsById }) => async ({ auth, task }) => {
   const langId = task.lang;
@@ -54,27 +57,32 @@ const buildCheckAuth = ({ aclsById }) => ({ id, auth }) => {
 const buildTaskGet = ({ objectFromId, aclsById }) => {
   const checkAuth = buildCheckAuth({ aclsById });
   return async ({ id, auth }) => {
-    const tasks = [];
+    try {
+      const tasks = [];
+      let ids = decodeID(id);
+      console.log("buildTaskGet() ids=" + ids);
+      while (ids.length > 2) {
+        const [langId, codeId, ...dataIds] = ids;
+        console.log("buildTaskGet() langId=" + langId + " codeId=" + codeId);
+        const lang = langId.toString();
+        const code = objectFromId(codeId);
+        console.log("buildTaskGet() code=" + JSON.stringify(code, null, 2));
+        if (!code) {
+          throw new NotFoundError();
+        }
+        
+        const subTaskId = encodeID([langId, codeId, 0]);
+        checkAuth({ id: subTaskId, auth });
 
-    let ids = decodeID(id);
-    while (ids.length > 2) {
-      const [langId, codeId, ...dataIds] = ids;
-
-      const lang = langId.toString();
-      const code = objectFromId(codeId);
-      if (!code) {
-        throw new NotFoundError();
+        tasks.push({ lang, code });
+        
+        ids = dataIds;
       }
-
-      const subTaskId = encodeID([langId, codeId, 0]);
-      checkAuth({ id: subTaskId, auth });
-
-      tasks.push({ lang, code });
-
-      ids = dataIds;
+      return tasks;
+    } catch (x) {
+      console.log("buildTaskGet() error=" + x.stack);
+      return [];
     }
-
-    return tasks;
   };
 };
 

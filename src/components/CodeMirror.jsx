@@ -16,16 +16,14 @@ export const getCode = view => {
   for (const text of doc.iter()) {
     lines.push(text);
   }
-  return lines.join("\n");
+  return lines.join("");
 };
 
 const debouncedStartCompletion = debounce((userId, view, dispatch) => {
-  console.log("debouncedStartCompletion() userId=" + userId);
   const lang = '114';
   const doc = view.state.doc;
   const lines = [];
   for (const text of doc.iter()) {
-    console.log("text=" + text);
     lines.push(text);
   }
   const code = lines.join("\n");
@@ -45,12 +43,12 @@ function customCompletionDisplay(userId, dispatch) {
   });
 }
 
-const CodeMirror = ({ userId, setView }) => {
+const CodeMirror = ({ userId, setView, code }) => {
   const dispatch = useDispatch();
   const extensions = [
     customCompletionDisplay(userId, dispatch),
   ];
-  const { ref } = useCodeMirror(extensions, setView);
+  const { ref } = useCodeMirror(extensions, setView, code);
   return <div id="editor" ref={ref}/>;
 };
 
