@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { NotFoundError, DecodeIdError } from "../errors/http.js";
 import admin from "firebase-admin";
+import db from '../db';
 
 const createCodeHash = code =>
   createHash("sha256")
@@ -51,14 +52,13 @@ const appendIds = (id, ...otherIds) => {
 const buildTaskCreate = ({ db }) => async ({ task, auth }) => {
   const { lang, code } = task;
   const codeHash = createCodeHash(code);
-
   const codeHashRef = db.doc(`code-hashes/${codeHash}`);
   const codeHashDoc = await codeHashRef.get();
-
   let taskId;
   let taskRef;
   if (codeHashDoc.exists) {
     taskId = codeHashDoc.get("taskId");
+    console.log("[1] buildTaskCreate() taskId=" + taskId);
     taskRef = db.doc(`tasks/${taskId}`);
     const taskUpdate = { count: admin.firestore.FieldValue.increment(1) };
     if (auth) {
@@ -78,6 +78,7 @@ const buildTaskCreate = ({ db }) => async ({ task, auth }) => {
     const task = { lang, code, codeHash, count: 1, acls };
     const taskRef = await tasksCol.add(task);
     taskId = taskRef.id;
+    console.log("[2] buildTaskCreate() taskId=" + JSON.stringify(codeHashDoc, null, 2));
     await codeHashRef.set({ taskId });
   }
   return encodeId({ taskIds: [taskId] });
@@ -128,12 +129,12 @@ export const buildFirestoreTaskDao = ({ db }) => {
 };
 
 export const buildCreateFirestoreDb = () => {
-  let db;
+  // let db;
   return () => {
-    if (!db) {
-      admin.initializeApp();
-      db = admin.firestore();
-    }
+    // if (!db) {
+    //   admin.initializeApp();
+    //   db = admin.firestore();
+    // }
     return db;
   };
 };

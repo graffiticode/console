@@ -28,6 +28,7 @@ export const addPayment = () => (dispatch, getState) => {
 };
 
 export const compileTask = ({ user, lang, code }) => (dispatch, getState) => {
+  console.log("compileTask() user=" + user);
   const query = gql `
     mutation post ($user: String!, $lang: String!, $code: String!) {
       compileTask(user: $user, lang: $lang, code: $code)
@@ -43,6 +44,7 @@ export const compileTask = ({ user, lang, code }) => (dispatch, getState) => {
 };
 
 export const saveTask = ({ user, lang, code }) => (dispatch, getState) => {
+  console.log("saveTask() user=" + user);
   const query = gql `
     mutation post ($user: String!, $lang: String!, $code: String!) {
       saveTask(user: $user, lang: $lang, code: $code)
@@ -108,5 +110,3 @@ export const addTask = (data) => ({ type: ADD_TASK, data });
 export const initTasks = (data) => ({ type: INIT_TASKS, data });
 
 export const setUserId = (data) => ({ type: SET_USER_ID, data });
-
-//export const showPayment = (data) => ({ type: SHOW_PAYMENT, data });

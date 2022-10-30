@@ -49,10 +49,10 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-const ReduxApplet = ({userId}) => {
+const ReduxApplet = () => {
   return (
     <>
-      <Gallery userId={userId}/>
+      <Gallery />
       {/*
       <Link href="/show-redux-state">
         <a>Click to see current Redux State</a>
@@ -64,8 +64,6 @@ const ReduxApplet = ({userId}) => {
 
 export default function Example() {
   const dispatch = useDispatch()
-  const [userId, setUserId] = useState();
-  console.log("charts/Example() setUserId=" + setUserId);
   return (
     <>
       {/*
@@ -124,7 +122,7 @@ export default function Example() {
                         <span className="sr-only">View notifications</span>
                         <BellIcon className="h-6 w-6" aria-hidden="true" />
                       </button>
-                      <SignIn userId={userId} setUserId={setUserId}/>
+                      <SignIn />
                       {/* Profile dropdown
                       <Menu as="div" className="ml-3 relative">
                         <div>
@@ -206,7 +204,7 @@ export default function Example() {
                       <div className="text-sm font-medium leading-none text-gray-400">{user.email}</div>
                     </div>
                     */}
-                    <SignIn userId={userId} setUserId={setUserId}/>
+                    <SignIn />
                     <button
                       type="button"
                       className="ml-auto bg-gray-800 flex-shrink-0 p-1 rounded-full text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
@@ -244,7 +242,7 @@ export default function Example() {
         */}
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <ReduxApplet userId={userId}/>
+            <ReduxApplet />
             {/* Replace with your content
             <div className="px-4 py-6 sm:px-0">
               <div className="border-4 border-dashed border-gray-200 rounded-lg h-96">

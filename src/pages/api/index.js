@@ -56,12 +56,14 @@ const getIdFromIds = ids => {
 import db from '../../utils/db';
 
 async function saveTask(uid, task) {
+  console.log("saveTask() uid=" + uid + " task=" + JSON.stringify(task, null, 2));
   const auth = { uid };
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const tasks = await normalizeTasksParameter(task);
-  const taskDao = getTaskDaoForStore("memory");
+  const taskDao = getTaskDaoForStore("firestore");
   const ids = await Promise.all(tasks.map(task => taskDao.create({ auth, task })));
   const id = getIdFromIds(ids);
+  console.log("saveTask() id=" + id);
   const taskRef = await db.doc(`tasks/${id}`);
   taskRef.set({task});
   const userRef = await db.doc(`users/${uid}`);
@@ -76,12 +78,13 @@ async function saveTask(uid, task) {
 }
 
 async function getTasks(uid) {
+  // TODO get tasks from firestore.
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
   const auth = {uid};
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-  const taskDao = getTaskDaoForStore("memory");
+  const taskDao = getTaskDaoForStore("firestore");
   const taskIds = userData.taskIds || [];
   console.log("getTasks() taskIds=" + JSON.stringify(taskIds, null, 2));
   const tasksForIds = await Promise.all(taskIds.map(async id => taskDao.get({ id, auth })));
@@ -90,13 +93,12 @@ async function getTasks(uid) {
     tasks.push(...tasksForId);
     return tasks;
   }, []);
-//  const tasks = taskIds.map(taskId => ({taskId}));
   return JSON.stringify(tasks);  
 }
 
 async function getTask(auth, id) {
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-  const taskDao = getTaskDaoForStore("memory");
+  const taskDao = getTaskDaoForStore("firestore");
   const ids = [].concat(id);
   const tasksForIds = await Promise.all(ids.map(async id => taskDao.get({ id, auth })));
   const tasks = tasksForIds.reduce((tasks, tasksForId) => {
@@ -106,7 +108,7 @@ async function getTask(auth, id) {
   return JSON.stringify(tasks[0]);
 }
 
-async function postTask(user, auth, task) {
+async function postTask(auth, task) {
   try {
     //const post = bent('http://localhost:3100/', 'POST', 'json', 200);
     const post = bent('https://api.graffiticode.org/', 'POST', 'json', 200);
@@ -139,8 +141,7 @@ const resolvers = {
     compileTask: async (_, {user, lang, code}) => {
       const auth = authToken;
       const task = createTask(lang, code);
-      const resp = await postTask(user, auth, task);
-      console.log("compileTask() resp=" + JSON.stringify(resp, null, 2));
+      const resp = await postTask(auth, task);
       let data;
       if (resp && resp.id) {
         data = await getData(auth, resp.id);

@@ -40,9 +40,11 @@ function Gallery({setOpen, setTask}) {
   )
 }
 
-export default function Example({ userId }) {
+export default function Example() {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
+  const userId = useSelector(state => state.userId);
+  console.log("gallery userId=" + userId);
   const { data: session } = useSession();
   if (!session) {
     return (

@@ -29,12 +29,6 @@ export function Logo(props) {
   )
 }
 
-const user = {
-  name: 'Tom Cook',
-  email: 'tom@example.com',
-  imageUrl:
-    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-}
 const navigation = [
   { name: 'Charts', href: '/charts', current: false },
   { name: 'Settings', href: '/settings', current: false },
@@ -128,7 +122,7 @@ export default function Example() {
                         <span className="sr-only">View notifications</span>
                         <BellIcon className="h-6 w-6" aria-hidden="true" />
                       </button>
-                      <SignIn setUserId={setUserId}/>
+                      <SignIn userId={userId} setUserId={setUserId}/>
                       {/* Profile dropdown
                       <Menu as="div" className="ml-3 relative">
                         <div>

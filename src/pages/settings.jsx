@@ -129,8 +129,7 @@ export default function Example() {
                         <span className="sr-only">View notifications</span>
                         <BellIcon className="h-6 w-6" aria-hidden="true" />
                       </button>
-                      <SignIn setUserId={() => setUserId}/>
-
+                      <SignIn userId={userId} setUserId={setUserId}/>
                       {/* Profile dropdown
                       <Menu as="div" className="ml-3 relative">
                         <div>
