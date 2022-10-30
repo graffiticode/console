@@ -56,16 +56,12 @@ const getIdFromIds = ids => {
 import db from '../../utils/db';
 
 async function saveTask(uid, task) {
-  console.log("saveTask() uid=" + uid + " task=" + JSON.stringify(task, null, 2));
   const auth = { uid };
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const tasks = await normalizeTasksParameter(task);
   const taskDao = getTaskDaoForStore("firestore");
   const ids = await Promise.all(tasks.map(task => taskDao.create({ auth, task })));
   const id = getIdFromIds(ids);
-  console.log("saveTask() id=" + id);
-  const taskRef = await db.doc(`tasks/${id}`);
-  taskRef.set({task});
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
@@ -86,13 +82,13 @@ async function getTasks(uid) {
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const taskDao = getTaskDaoForStore("firestore");
   const taskIds = userData.taskIds || [];
-  console.log("getTasks() taskIds=" + JSON.stringify(taskIds, null, 2));
-  const tasksForIds = await Promise.all(taskIds.map(async id => taskDao.get({ id, auth })));
-  console.log("getTasks() tasksForIds=" + JSON.stringify(tasksForIds, null, 2));
-  const tasks = tasksForIds.reduce((tasks, tasksForId) => {
-    tasks.push(...tasksForId);
+  const tasksForIds = await Promise.all(taskIds.map(
+    async id => taskDao.get({ id, auth })
+  ));
+  const tasks = tasksForIds.reduce((tasks, tasksForId, index) => {
+    tasks[taskIds[index]] = [...tasksForId];
     return tasks;
-  }, []);
+  }, {});
   return JSON.stringify(tasks);  
 }
 
@@ -152,7 +148,6 @@ const resolvers = {
       const auth = authToken;
       const task = createTask(lang, code);
       const id = await saveTask(user, task);
-      console.log("saveTask() id=" + id);
       return id;
     },
   },

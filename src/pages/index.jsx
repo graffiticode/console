@@ -6,7 +6,6 @@ import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react'
 import { useDispatch } from 'react-redux';
 import { startClock } from '../utils/redux/actions';
 import Link from 'next/link';
-import Examples from '../components/examples';
 import Gallery from '../components/gallery';
 
 import {

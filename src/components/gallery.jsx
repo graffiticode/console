@@ -12,39 +12,43 @@ import SignInAlert from "./SignInAlert";
 
 import { EnvelopeIcon, PhoneIcon } from '@heroicons/react/20/solid'
 
-function Gallery({setOpen, setTask}) {
+function Tasks({setOpen, setTask}) {
   const tasks = useSelector(state => state.tasks);
+  const tasksIds = Object.keys(tasks).reverse();
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-      {tasks.map((task) => (
-        <li
-          key={task.taskId}
-          className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
-        >
-          <button onClick={() => {
-              setOpen(true);
-              setTask(task);
+      {tasksIds.map((taskId) => {
+        const task = tasks[taskId][0];
+        return (
+          <li
+            key={taskId}
+            className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
+            >
+            <button onClick={() => {
+                setOpen(true);
+                setTask(task);
             }}>
-            <div className="flex flex-1 flex-col p-8">
-              <img className="mx-auto rounded-none" src={task.imageUrl} alt="" />
-              <dl className="mt-1 flex flex-grow flex-col justify-between">
-                <dt className="sr-only">Title</dt>
-                <dd className="text-sm text-gray-700">{task.title}</dd>
-              </dl>
-              <h3 className="mt-6 text-xs font-light text-gray-500">{task.taskId}</h3>
-            </div>
-          </button>
-        </li>
-      ))}
+              <div className="flex flex-1 flex-col p-8">
+                <img className="mx-auto rounded-none" src={task.imageUrl} alt="" />
+                <dl className="mt-1 flex flex-grow flex-col justify-between">
+                  <dt className="sr-only">Title</dt>
+                  <dd className="text-sm text-gray-700">{task.title}</dd>
+                </dl>
+              <h3 className="mt-6 text-xs font-light text-gray-500">{taskId}</h3>
+              </div>
+            </button>
+          </li>
+        )
+      })
+      }
     </ul>
   )
 }
 
-export default function Example() {
+export default function Gallery() {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const userId = useSelector(state => state.userId);
-  console.log("gallery userId=" + userId);
   const { data: session } = useSession();
   if (!session) {
     return (
@@ -55,7 +59,7 @@ export default function Example() {
   } else {
   return (
     <>
-      <Gallery setOpen={setOpen} setTask={setTask}/>
+      <Tasks setOpen={setOpen} setTask={setTask}/>
       <Transition.Root show={open} as={Fragment}>
         <Dialog as="div" className="relative z-10" onClose={setOpen}>
           <div className="fixed inset-0" />

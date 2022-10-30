@@ -58,7 +58,6 @@ const buildTaskCreate = ({ db }) => async ({ task, auth }) => {
   let taskRef;
   if (codeHashDoc.exists) {
     taskId = codeHashDoc.get("taskId");
-    console.log("[1] buildTaskCreate() taskId=" + taskId);
     taskRef = db.doc(`tasks/${taskId}`);
     const taskUpdate = { count: admin.firestore.FieldValue.increment(1) };
     if (auth) {
@@ -78,7 +77,6 @@ const buildTaskCreate = ({ db }) => async ({ task, auth }) => {
     const task = { lang, code, codeHash, count: 1, acls };
     const taskRef = await tasksCol.add(task);
     taskId = taskRef.id;
-    console.log("[2] buildTaskCreate() taskId=" + JSON.stringify(codeHashDoc, null, 2));
     await codeHashRef.set({ taskId });
   }
   return encodeId({ taskIds: [taskId] });

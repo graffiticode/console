@@ -15,14 +15,12 @@ const buildObjectToId = ({ idsByObject, objectsById }) => obj => {
 };
 
 const buildObjectFromId = ({ objectsById }) => id => {
-  console.log([...objectsById.entries()]);
   return objectsById.get(id);
 };
 
 const buildTaskCreate = ({ objectToId, aclsById }) => async ({ auth, task }) => {
   const langId = task.lang;
   const codeId = objectToId(task.code);
-  console.log("taskCreate() auth=" + auth + " langId=" + langId + " codeId=" + codeId);
   const id = encodeID([langId, codeId, 0]);
 
   if (!aclsById.has(id)) {
@@ -60,13 +58,10 @@ const buildTaskGet = ({ objectFromId, aclsById }) => {
     try {
       const tasks = [];
       let ids = decodeID(id);
-      console.log("buildTaskGet() ids=" + ids);
       while (ids.length > 2) {
         const [langId, codeId, ...dataIds] = ids;
-        console.log("buildTaskGet() langId=" + langId + " codeId=" + codeId);
         const lang = langId.toString();
         const code = objectFromId(codeId);
-        console.log("buildTaskGet() code=" + JSON.stringify(code, null, 2));
         if (!code) {
           throw new NotFoundError();
         }

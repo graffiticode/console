@@ -25,10 +25,10 @@ const taskReducer = (state = "", { type, data }) => {
   }
 };
 
-const addTaskReducer = (state = ['[blank]'], { type, data }) => {
+const addTaskReducer = (state = {}, { type, data }) => {
   switch (type) {
   case ADD_TASK:
-    return state.includes(data) && state || [data].concat(state);
+    return {...state, ...data};
   case INIT_TASKS:
     return data;
   default:
@@ -37,7 +37,6 @@ const addTaskReducer = (state = ['[blank]'], { type, data }) => {
 };
 
 const userIdReducer = (state = "", { type, data }) => {
-  console.log("userIdReducer() type=" + type + " data=" + data);
   switch (type) {
   case SET_USER_ID:
     return data;

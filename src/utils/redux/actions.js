@@ -1,9 +1,4 @@
 import {
-  TICK,
-  INCREMENT,
-  DECREMENT,
-  RESET,
-  HELLO,
   RENDER_TASK,
   SET_USER_ID,
   ADD_TASK,
@@ -28,7 +23,6 @@ export const addPayment = () => (dispatch, getState) => {
 };
 
 export const compileTask = ({ user, lang, code }) => (dispatch, getState) => {
-  console.log("compileTask() user=" + user);
   const query = gql `
     mutation post ($user: String!, $lang: String!, $code: String!) {
       compileTask(user: $user, lang: $lang, code: $code)
@@ -44,7 +38,6 @@ export const compileTask = ({ user, lang, code }) => (dispatch, getState) => {
 };
 
 export const saveTask = ({ user, lang, code }) => (dispatch, getState) => {
-  console.log("saveTask() user=" + user);
   const query = gql `
     mutation post ($user: String!, $lang: String!, $code: String!) {
       saveTask(user: $user, lang: $lang, code: $code)
@@ -54,7 +47,9 @@ export const saveTask = ({ user, lang, code }) => (dispatch, getState) => {
   const post = async ({user, lang, code}) => {
     request('/api', query, { user, lang, code }).then((data) => {
       const taskId = JSON.parse(data.saveTask);
-      dispatch(addTask({taskId, lang, code}));
+      dispatch(addTask({
+        [taskId]: [{lang, code}]
+      }));
     });
   };
   post({ user, lang, code }).catch(console.error);
@@ -68,7 +63,6 @@ export const loadTasks = ({ uid }) => (dispatch, getState) => {
   `;
   const get = async ({ uid }) => {
     request('/api', query, { uid }).then((data) => {
-      console.log("loadTasks() data=" + data.getTasks);
       const tasks = JSON.parse(data.getTasks);
       dispatch(initTasks(tasks));
     });
@@ -91,17 +85,6 @@ export const startClock = () => (dispatch) =>
       payload: { light: true, ts: Date.now() }
     });
   }, 5000);
-
-// INCREMENT COUNTER BY 1
-export const incrementCount = () => ({ type: INCREMENT });
-
-// DECREMENT COUNTER BY 1
-export const decrementCount = () => ({ type: DECREMENT });
-
-// RESET COUNTER
-export const resetCount = () => ({ type: RESET });
-
-export const sayHello = (data) => ({ type: HELLO, data });
 
 export const renderTask = (data) => ({ type: RENDER_TASK, data });
 

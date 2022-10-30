@@ -48,7 +48,6 @@ import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { startClock } from '../utils/redux/actions';
 import Link from 'next/link';
-import Examples from '../components/examples';
 import Gallery from '../components/gallery';
 
 const ReduxApplet = () => {
@@ -66,7 +65,6 @@ const ReduxApplet = () => {
 
 export default function Example() {
   const dispatch = useDispatch()
-  const [userId, setUserId] = useState();
   useEffect(() => {
     dispatch(startClock())
   }, [dispatch])
@@ -129,7 +127,7 @@ export default function Example() {
                         <span className="sr-only">View notifications</span>
                         <BellIcon className="h-6 w-6" aria-hidden="true" />
                       </button>
-                      <SignIn userId={userId} setUserId={setUserId}/>
+                      <SignIn />
                       {/* Profile dropdown
                       <Menu as="div" className="ml-3 relative">
                         <div>

@@ -67,7 +67,6 @@ const moods = [
 ]
 
 export default function Editor({ userId, task, setOpen }) {
-  console.log("Editor() userId=" + userId);
   const [selected, setSelected] = useState(moods[5]);
   const [view, setView] = useState();
   const dispatch = useDispatch();
