@@ -7,6 +7,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { compileTask } from '../utils/redux/actions'
 import { ParseContext } from '@codemirror/language';
 import { graffiticode } from "@graffiticode/lang-graffiticode";
+
 export const getCode = view => {
   if (view === undefined) {
     return "";
@@ -20,19 +21,21 @@ export const getCode = view => {
 };
 
 const debouncedStartCompletion = debounce((view, dispatch) => {
-  const lang = '114';
   const doc = view.state.doc;
   const lines = [];
   for (const text of doc.iter()) {
     lines.push(text);
   }
-  const code = lines.join("\n");
   const user = 'public';
-  dispatch(compileTask({ user, lang, code }));
+  const lang = '114';
+  const code = lines.join("\n");
+  if (code !== '') {
+    dispatch(compileTask({ user, lang, code }));
+  }
 }, 300);
 
 function customCompletionDisplay(dispatch) {
-  return EditorView.updateListener.of(({ view, docChanged }) => {
+  return EditorView.updateListener.of(({ view, docChanged, transactions }) => {
     if (docChanged) {
       // when a completion is active each keystroke triggers the
       // completion source function, to avoid it we close any open
@@ -50,6 +53,11 @@ const CodeMirror = ({ setView, code }) => {
     customCompletionDisplay(dispatch),
   ];
   const { ref } = useCodeMirror(extensions, setView, code);
+  const user = 'public';
+  const lang = '114';
+  if (code !== '') {
+    dispatch(compileTask({ user, lang, code }));
+  }
   return <div id="editor" ref={ref}/>;
 };
 

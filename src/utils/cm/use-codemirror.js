@@ -31,7 +31,7 @@ export default function useCodeMirror(extensions, setView, doc) {
     });
 
     const startState = EditorState.create({
-      doc: doc || '..',
+      doc: doc || '',
       extensions: [
         ...extensions,
         keymap.of(defaultKeymap),

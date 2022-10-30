@@ -80,7 +80,7 @@ export default function Editor({ userId, task, setOpen }) {
               userId={userId}
               setView={setView}
               extensions={[javascript({ jsx: true })]}
-              code={task && task.code || ".."}
+              code={task && task.code || ''}
             />
           </div>
           <div className="flex justify-between pt-2">
