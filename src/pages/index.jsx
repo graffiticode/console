@@ -4,7 +4,6 @@ import { useSession } from 'next-auth/react'
 import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react'
 import { useDispatch } from 'react-redux';
-import { startClock } from '../utils/redux/actions';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
 
@@ -58,10 +57,6 @@ const ReduxApplet = () => {
 export default function Example() {
   const dispatch = useDispatch();
   const [userId, setUserId] = useState();
-
-  useEffect(() => {
-    dispatch(startClock())
-  }, [dispatch])
 
   return (
     <>

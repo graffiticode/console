@@ -55,7 +55,18 @@ const getIdFromIds = ids => {
 
 import db from '../../utils/db';
 
+async function compileTask(auth, task) {
+  const resp = await postTask(auth, task);
+  let data;
+  if (resp && resp.id) {
+    data = await getData(auth, resp.id);
+  }
+  return data;
+}
+
 async function saveTask(uid, task) {
+  const data = await compileTask(authToken, task);
+  task = {...task, data: JSON.stringify(data)};
   const auth = { uid };
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const tasks = await normalizeTasksParameter(task);
@@ -74,7 +85,6 @@ async function saveTask(uid, task) {
 }
 
 async function getTasks(uid) {
-  // TODO get tasks from firestore.
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
@@ -121,7 +131,7 @@ async function getData(auth, id) {
     //const get = bent('http://localhost:3100/', 'GET', 'json', 200);
     const get = bent('https://api.graffiticode.org/', 'GET', 'json', 200);
     const { data } = await get(`data?id=${id}&auth=${auth}`);
-    return JSON.stringify(data);
+    return data;
   } catch (x) {
     console.log("GET /data catch " + x);
   }
@@ -135,14 +145,8 @@ const resolvers = {
   },
   Mutation: {
     compileTask: async (_, {user, lang, code}) => {
-      const auth = authToken;
       const task = createTask(lang, code);
-      const resp = await postTask(auth, task);
-      let data;
-      if (resp && resp.id) {
-        data = await getData(auth, resp.id);
-      }
-      return data;
+      return JSON.stringify(await compileTask(authToken, task));
     },
     saveTask: async (_, {user, lang, code}) => {
       const auth = authToken;
@@ -198,9 +202,9 @@ function postAuth(path, data, resume) {
 export default async function handler(req, res) {
   // If you don't have NEXTAUTH_SECRET set, you will have to pass your secret as `secret` to `getToken`
   const token = await getToken({ req });
-  console.log("ARTCOMPILER_CLIENT_SECRET authToken=" + authToken);
+  // console.log("ARTCOMPILER_CLIENT_SECRET authToken=" + authToken);
   if (token) {
-    console.log("JSON Web Token", JSON.stringify(token, null, 2));
+    // console.log("JSON Web Token", JSON.stringify(token, null, 2));
     // Signed in
     const request = {
       body: req.body,

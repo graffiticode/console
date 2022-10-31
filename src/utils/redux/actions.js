@@ -37,22 +37,23 @@ export const compileTask = ({ user, lang, code }) => (dispatch, getState) => {
   getData({ user, lang, code }).catch(console.error);
 };
 
-export const saveTask = ({ user, lang, code }) => (dispatch, getState) => {
+export const saveTask = ({ user, lang, code, data }) => (dispatch, getState) => {
   const query = gql `
     mutation post ($user: String!, $lang: String!, $code: String!) {
       saveTask(user: $user, lang: $lang, code: $code)
     }
   `;
   const state = getState();
-  const post = async ({user, lang, code}) => {
+  console.log("saveTask() state=" + JSON.stringify(state, null, 2));
+  const post = async ({user, lang, code, data}) => {
     request('/api', query, { user, lang, code }).then((data) => {
       const taskId = JSON.parse(data.saveTask);
       dispatch(addTask({
-        [taskId]: [{lang, code}]
+        [taskId]: [{lang, code, data}]
       }));
     });
   };
-  post({ user, lang, code }).catch(console.error);
+  post({ user, lang, code, data }).catch(console.error);
 };
 
 export const loadTasks = ({ uid }) => (dispatch, getState) => {
@@ -69,22 +70,6 @@ export const loadTasks = ({ uid }) => (dispatch, getState) => {
   };
   get({uid}).catch(console.error);
 };
-
-// INITIALIZES CLOCK ON SERVER
-export const serverRenderClock = () => (dispatch) =>
-  dispatch({
-    type: TICK,
-    payload: { light: false, ts: Date.now() },
-  });
-
-// INITIALIZES CLOCK ON CLIENT
-export const startClock = () => (dispatch) =>
-  setInterval(() => {
-    dispatch({
-      type: TICK,
-      payload: { light: true, ts: Date.now() }
-    });
-  }, 5000);
 
 export const renderTask = (data) => ({ type: RENDER_TASK, data });
 

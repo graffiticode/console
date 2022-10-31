@@ -50,7 +50,7 @@ const appendIds = (id, ...otherIds) => {
 };
 
 const buildTaskCreate = ({ db }) => async ({ task, auth }) => {
-  const { lang, code } = task;
+  const { lang, code, data = {} } = task;
   const codeHash = createCodeHash(code);
   const codeHashRef = db.doc(`code-hashes/${codeHash}`);
   const codeHashDoc = await codeHashRef.get();
@@ -74,7 +74,7 @@ const buildTaskCreate = ({ db }) => async ({ task, auth }) => {
       acls = { public: true, uids: {} };
     }
     const tasksCol = db.collection("tasks");
-    const task = { lang, code, codeHash, count: 1, acls };
+    const task = { lang, code, data, codeHash, count: 1, acls };
     const taskRef = await tasksCol.add(task);
     taskId = taskRef.id;
     await codeHashRef.set({ taskId });
@@ -113,7 +113,8 @@ const buildTaskGet = ({ db }) => {
         checkAuth({ taskDoc, auth });
         const lang = taskDoc.get("lang");
         const code = taskDoc.get("code");
-        return { lang, code };
+        const data = taskDoc.get("data") || {};
+        return { lang, code, data };
       })
     );
     return tasks;

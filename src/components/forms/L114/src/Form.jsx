@@ -4,97 +4,97 @@ import Script from 'next/script'
 import * as d3 from 'd3';
 import styles from './Form.module.css';
 
-function AreaChart() {
-  const props = useSelector((state) => state.chart);
+function AreaChart({formId, data}) {
   useEffect(() => {
     (async () => {
-    const c3 = await import('c3');
-    let cols = props.args.vals[0];
-    let rows = props.args.vals;
-    let vals = [];
-    let colors = props.colors;
-    let showXAxis = props.hideXAxis !== true;
-    let showYAxis = props.hideYAxis !== true;
-    let lineWidth = props.lineWidth;
-    let dotRadius = props.dotRadius;
-    let chartPadding = props.chartPadding;
-    let [min, max] = getRange(rows.slice(1)); // Slice off labels.
-    let pad = (max - min) / 4;
-    rows = rebaseValues(pad - min, rows);  // val + pad - min
-    let types = {}
-    types[cols[cols.length - 1]] = "area";  // Use last column as values.
-    let padding = {
-      top: -5,
-      right: -20,
-      bottom: -7,
-      left: -20,
-    };
-    if (chartPadding) {
-      if (chartPadding instanceof Array) {
-        padding = {
-          top: padding.top + chartPadding[0],
-          right: padding.right + chartPadding[1],
-          bottom: padding.bottom + chartPadding[2],
-          left: padding.left + chartPadding[3],
-        }
-      } // Otherwise, its undefine, scalar or object, which is fine.
-    }
-    var chart = c3.generate({
-      bindto: "#chart",
-      padding: padding,
+      if (!data || Object.keys(data).length === 0) {
+        return;
+      }
+      const c3 = await import('c3');
+      let cols = data.args.vals[0];
+      let rows = data.args.vals;
+      let vals = [];
+      let colors = data.colors;
+      let showXAxis = data.hideXAxis !== true;
+      let showYAxis = data.hideYAxis !== true;
+      let lineWidth = data.lineWidth;
+      let dotRadius = data.dotRadius;
+      let chartPadding = data.chartPadding;
+      let [min, max] = getRange(rows.slice(1)); // Slice off labels.
+      let pad = (max - min) / 4;
+      rows = rebaseValues(pad - min, rows);  // val + pad - min
+      let types = {}
+      types[cols[cols.length - 1]] = "area";  // Use last column as values.
+      let padding = {
+        top: -5,
+        right: -20,
+        bottom: -7,
+        left: -20,
+      };
+      if (chartPadding) {
+        if (chartPadding instanceof Array) {
+          padding = {
+            top: padding.top + chartPadding[0],
+            right: padding.right + chartPadding[1],
+            bottom: padding.bottom + chartPadding[2],
+            left: padding.left + chartPadding[3],
+          }
+        } // Otherwise, its undefine, scalar or object, which is fine.
+      }
+      var chart = c3.generate({
+        bindto: `#${formId}`,
+        padding: padding,
       transition: {
         duration: 0
       },
-      data: {
-        rows: rows,
-        types: types,
-      },
-      legend: {
-        show: false,
-      },
-      axis: {
-        x: {
-          show: showXAxis,
-          padding: {
-            left: 1,
-            right: 1,
+        data: {
+          rows: rows,
+          types: types,
+        },
+        legend: {
+          show: false,
+        },
+        axis: {
+          x: {
+            show: showXAxis,
+            padding: {
+              left: 1,
+              right: 1,
+            },
+          },
+          y: {
+            show: showYAxis,
+            padding: {
+              left: 0,
+              right: 0,
+            }
           },
         },
-        y: {
-          show: showYAxis,
-          padding: {
-            left: 0,
-            right: 0,
-          }
+        color: {
+          pattern: colors,
         },
-      },
-      color: {
-        pattern: colors,
-      },
-      size: {
-        width: props.width,
-        height: props.height,
-      },
-    });
-    if (lineWidth) {
-      d3.selectAll(".c3-line").style("stroke-width", lineWidth)
-    }
-    if (dotRadius) {
-      d3.selectAll(".c3-circle").attr("r", dotRadius)
-    }
+        size: {
+          width: data.width,
+          height: data.height,
+        },
+      });
+      if (lineWidth) {
+        d3.selectAll(".c3-line").style("stroke-width", lineWidth)
+      }
+      if (dotRadius) {
+        d3.selectAll(".c3-circle").attr("r", dotRadius)
+      }
     })();
-  });
+  }, [data]);
 }
 
-function TableChart() {
-  const [props, setProps] = useState(initData);
-  console.log("TableChart() props=" + JSON.stringify(props, null, 2));
+function TableChart({ data }) {
   useEffect(() => {
-    let data = props.args.vals.slice(1); // Slice off labels.
-    let style = props.style;
-    let padding = props.chartPadding || 0;
-    let width = props.width - 2 * padding || "100%";
-    let height = props.height - 2 * padding || "100%";
+    let data = data.args.vals.slice(1); // Slice off labels.
+    let style = data.style;
+    let padding = data.chartPadding || 0;
+    let width = data.width - 2 * padding || "100%";
+    let height = data.height - 2 * padding || "100%";
     // render the table
     tabulate(data, ["Reward", "Count"]);
     if (style) {
@@ -181,16 +181,16 @@ function TableChart() {
   });
 }
 
-export default function Form() {
-  const data = useSelector((state) => state.chart);
-  if (data === undefined) {
+export default function Form({ id, data }) {
+  if (!data || Object.keys(data).length === 0) {
     return <div />;
   }
-  var elts = render(data);
+  const formId = `form-${id}`;
+  var elts = render(formId, data);
   return (
     <>
       <div>
-        <div id="chart" className={styles.area}>
+        <div id={formId} className={styles.area}>
           {elts}
         </div>
       </div>
@@ -242,7 +242,7 @@ const rebaseValues = (offset, vals) => {
 };
 
 
-function render(nodes) {
+function render(formId, nodes) {
   let elts = [];
   if (!(nodes instanceof Array)) {
     // HACK not all arguments are arrays. Not sure they should be.
@@ -251,7 +251,7 @@ function render(nodes) {
   nodes.forEach(function (n, i) {
     let args = [];
     if (n.args) {
-      args = render(n.args);
+      args = render(formId, n.args);
     }
     switch (n.type) {
     case "table-chart":
@@ -262,7 +262,7 @@ function render(nodes) {
     case "area-chart":
       elts.push(
         <div>
-          <AreaChart key={i} style={n.style} {...n}/>
+          <AreaChart formId={formId} data={n} key={i} style={n.style} {...n}/>
         </div>
       );
       break;

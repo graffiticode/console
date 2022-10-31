@@ -12,6 +12,20 @@ import SignInAlert from "./SignInAlert";
 
 import { EnvelopeIcon, PhoneIcon } from '@heroicons/react/20/solid'
 
+function getTitle(task) {
+  return task.code.split(`\n`)[0].split('|')[1] || "Untitled";
+}
+
+function getData(task) {
+  let data;
+  try {
+    data = task.data && JSON.parse(task.data) || {};
+  } catch (x) {
+    data = {};
+  }
+  return data;
+}
+
 function Tasks({setOpen, setTask}) {
   const tasks = useSelector(state => state.tasks);
   const tasksIds = Object.keys(tasks).reverse();
@@ -29,12 +43,14 @@ function Tasks({setOpen, setTask}) {
                 setTask(task);
             }}>
               <div className="flex flex-1 flex-col p-8">
-                <img className="mx-auto rounded-none" src={task.imageUrl} alt="" />
+                <Form id={taskId} data={getData(task)}/>
                 <dl className="mt-1 flex flex-grow flex-col justify-between">
                   <dt className="sr-only">Title</dt>
-                  <dd className="text-sm text-gray-700">{task.title}</dd>
+                  <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
                 </dl>
-              <h3 className="mt-6 text-xs font-light text-gray-500">{taskId}</h3>
+                <h3 className="mt-6 text-xs font-light text-gray-500">
+                  {`...${taskId.slice(taskId.length - 10)}`}
+                </h3>
               </div>
             </button>
           </li>
@@ -48,6 +64,7 @@ function Tasks({setOpen, setTask}) {
 export default function Gallery() {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
+  const data = useSelector((state) => state.chart);
   const userId = useSelector(state => state.userId);
   const { data: session } = useSession();
   if (!session) {
@@ -94,7 +111,7 @@ export default function Gallery() {
                       <div className="relative mt-6 flex-1 px-4 sm:px-6">
                         <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
                           <Editor userId={userId} task={task} setOpen={setOpen}/>
-                          <Form items="1,2,3,4"/>
+                          <Form id={'editor'} data={data}/>
                         </div>
                       </div>
                     </div>

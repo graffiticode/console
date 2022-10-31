@@ -21,7 +21,7 @@ import { CalendarIcon, PaperClipIcon, TagIcon, UserCircleIcon } from '@heroicons
 import CodeMirror, { getCode } from './CodeMirror';
 import { javascript } from "@codemirror/lang-javascript";
 import { saveTask } from '../utils/redux/actions'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 
 const assignees = [
   { name: 'Unassigned', value: null },
@@ -69,6 +69,7 @@ const moods = [
 export default function Editor({ userId, task, setOpen }) {
   const [selected, setSelected] = useState(moods[5]);
   const [view, setView] = useState();
+  const data = useSelector((state) => state.chart);
   const dispatch = useDispatch();
   const user = userId;
   const lang = '114';
@@ -91,7 +92,7 @@ export default function Editor({ userId, task, setOpen }) {
                 className="inline-flex items-center rounded-none border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700 focus:outline-none"
                 onClick={() => {
                   const code = getCode(view);
-                  dispatch(saveTask({user, lang, code}));
+                  dispatch(saveTask({user, lang, code, data}));
                   setOpen(false);
                 }}
               >

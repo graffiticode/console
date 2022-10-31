@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from "next-auth/react";
 import { EditorView } from "@codemirror/view";
 import useCodeMirror from "../utils/cm/use-codemirror";
@@ -49,15 +49,17 @@ function customCompletionDisplay(dispatch) {
 const CodeMirror = ({ setView, code }) => {
   const userId = useSelector(state => state.userId);
   const dispatch = useDispatch();
+  useEffect(() => {
+    if (code !== '') {
+      dispatch(compileTask({ user, lang, code }));
+    }
+  }, [code]);
   const extensions = [
     customCompletionDisplay(dispatch),
   ];
   const { ref } = useCodeMirror(extensions, setView, code);
   const user = 'public';
   const lang = '114';
-  if (code !== '') {
-    dispatch(compileTask({ user, lang, code }));
-  }
   return <div id="editor" ref={ref}/>;
 };
 
