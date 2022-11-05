@@ -1,6 +1,7 @@
 import https from 'https';
 import bent from 'bent';
 import { makeExecutableSchema } from '@graphql-tools/schema';
+import { getToken } from "next-auth/jwt";
 import {
   getGraphQLParameters,
   processRequest,
@@ -8,12 +9,12 @@ import {
   shouldRenderGraphiQL,
   renderGraphiQL,
 } from 'graphql-helix';
-import { getToken } from "next-auth/jwt";
-import { buildTaskDaoFactory } from "../../utils/storage/index.js";
-import { buildGetTaskDaoForStorageType } from "./utils.js";
-import { FieldValue } from 'firebase-admin/firestore';
-
-const taskDaoFactory = buildTaskDaoFactory({});
+import {
+  createTask,
+  getTasks,
+  compileTask,
+  saveTask
+} from './resolvers.js';
 
 const clientAddress = process.env.ARTCOMPILER_CLIENT_ADDRESS
   ? process.env.ARTCOMPILER_CLIENT_ADDRESS
@@ -32,111 +33,6 @@ const typeDefs = `
   }
 `;
 
-function createTask(lang, code) {
-  const task = {
-    lang,
-    code,
-  };
-  return task;
-}
-
-const normalizeTasksParameter = async tasks => {
-  tasks = !Array.isArray(tasks) && [tasks] || tasks;
-  return tasks;
-};
-
-const getIdFromIds = ids => {
-  if (ids.length === 1) {
-    return ids[0];
-  } else {
-    return ids;
-  }
-};
-
-import db from '../../utils/db';
-
-async function compileTask(auth, task) {
-  const resp = await postTask(auth, task);
-  let data;
-  if (resp && resp.id) {
-    data = await getData(auth, resp.id);
-  }
-  return data;
-}
-
-async function saveTask(uid, task) {
-  const data = await compileTask(authToken, task);
-  task = {...task, data: JSON.stringify(data)};
-  const auth = { uid };
-  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-  const tasks = await normalizeTasksParameter(task);
-  const taskDao = getTaskDaoForStore("firestore");
-  const ids = await Promise.all(tasks.map(task => taskDao.create({ auth, task })));
-  const id = getIdFromIds(ids);
-  const userRef = await db.doc(`users/${uid}`);
-  const userDoc = await userRef.get();
-  const userData = userDoc.data();
-  if (userData.taskIds === undefined) {
-    await userRef.update({taskIds: [id]});
-  } else {
-    await userRef.update({taskIds: FieldValue.arrayUnion(id)});
-  }
-  return JSON.stringify(id);
-}
-
-async function getTasks(uid) {
-  const userRef = await db.doc(`users/${uid}`);
-  const userDoc = await userRef.get();
-  const userData = userDoc.data();
-  const auth = {uid};
-  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-  const taskDao = getTaskDaoForStore("firestore");
-  const taskIds = userData.taskIds || [];
-  const tasksForIds = await Promise.all(taskIds.map(
-    async id => taskDao.get({ id, auth })
-  ));
-  const tasks = tasksForIds.reduce((tasks, tasksForId, index) => {
-    tasks[taskIds[index]] = [...tasksForId];
-    return tasks;
-  }, {});
-  return JSON.stringify(tasks);  
-}
-
-async function getTask(auth, id) {
-  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-  const taskDao = getTaskDaoForStore("firestore");
-  const ids = [].concat(id);
-  const tasksForIds = await Promise.all(ids.map(async id => taskDao.get({ id, auth })));
-  const tasks = tasksForIds.reduce((tasks, tasksForId) => {
-    tasks.push(...tasksForId);
-    return tasks;
-  }, []);
-  return JSON.stringify(tasks[0]);
-}
-
-async function postTask(auth, task) {
-  try {
-    //const post = bent('http://localhost:3100/', 'POST', 'json', 200);
-    const post = bent('https://api.graffiticode.org/', 'POST', 'json', 200);
-    const { data } = await post('task', {auth, task});
-    return data;
-  } catch (x) {
-    console.log("POST /task catch " + x);
-    return x;
-  }
-}
-
-async function getData(auth, id) {
-  try {
-    //const get = bent('http://localhost:3100/', 'GET', 'json', 200);
-    const get = bent('https://api.graffiticode.org/', 'GET', 'json', 200);
-    const { data } = await get(`data?id=${id}&auth=${auth}`);
-    return data;
-  } catch (x) {
-    console.log("GET /data catch " + x);
-  }
-}
-
 const resolvers = {
   Query: {
     getTasks: async (_, { uid }) => {
@@ -149,9 +45,8 @@ const resolvers = {
       return JSON.stringify(await compileTask(authToken, task));
     },
     saveTask: async (_, {user, lang, code}) => {
-      const auth = authToken;
       const task = createTask(lang, code);
-      const id = await saveTask(user, task);
+      const id = await saveTask(authToken, user, task);
       return id;
     },
   },

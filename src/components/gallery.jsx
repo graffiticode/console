@@ -61,6 +61,8 @@ function Tasks({setOpen, setTask}) {
   )
 }
 
+// TODO scape images and display in tasks list.
+
 export default function Gallery() {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();

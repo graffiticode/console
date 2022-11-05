@@ -1,7 +1,11 @@
-### 02 SEP 2022
+### 23 SEP 2022
 
 [ ] Add more chart types
 [ ] Add stripe payments with usage based pricing
+[ ] Editor / Console
+
+### 02 SEP 2022
+
 [x] Create firestore db
 [x] Add next-auth sign-in
 [x] Add gallery view
