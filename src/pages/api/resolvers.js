@@ -5,8 +5,6 @@ import { buildTaskDaoFactory } from "../../utils/storage/index.js";
 import { buildGetTaskDaoForStorageType } from "./utils.js";
 import { FieldValue } from 'firebase-admin/firestore';
 import db from '../../utils/db';
-import L0Form from '../../components/forms/L0/src/form.js';
-//import L114Form from '../../components/forms/L114/src/form.js';
 
 const taskDaoFactory = buildTaskDaoFactory({});
 
@@ -57,7 +55,11 @@ export async function saveTask(authToken, uid, task) {
   } else {
     await userRef.update({taskIds: FieldValue.arrayUnion(id)});
   }
-  const imageUrl = `https://cdn.acx.ac/${id}.jpg`;
+  const lang = '0';
+  postSnap({id, lang, data}, (err, val) => {
+    console.log("snap!!");
+  });
+  const imageUrl = `https://cdn.acx.ac/${id}.png`;
   return JSON.stringify({id, imageUrl});
 }
 
@@ -137,47 +139,72 @@ const uploadFileToS3 = (name, base64data) => {
 
 // https://cdn.acx.ac/world.png
 
-function composeHtmlForForm({ lang, data }) {
+function composeHtmlForForm({ id, lang, data }) {
+  id = '0';
   return `
-<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Add React in One Minute</title>
   </head>
   <body>
-
-    <!-- We will put our React component inside this div. -->
-    <div id="form"></div>
-
-    <!-- Load React. -->
-    <!-- Note: when deploying, replace "development.js" with "production.min.js". -->
+    <div id="form">xx</div>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-
-    <!-- Load our React component. -->
     <script>
       (async () => {
+        const {id, data} = {id:'0', data:{}};
         try {
-          const Form = await import('/L${lang}/form.js');
+          const { Form } = await import('http://localhost:3000/api/form/0');
           const e = React.createElement;
           const domContainer = document.querySelector('#form');
           const root = ReactDOM.createRoot(domContainer);
-          root.render(e(Form, {data: ${JSON.stringify(data)}}));
+          return root.render(e(Form, { data: 'world' }, []));
         } catch (x) {
-          console.log("catch x=" + x);
+          alert(x);
         }
       })();
     </script>
+
   </body>
 </html>
 `;
 };
 
+// function composeHtmlForForm({ id, lang, data }) {
+//   id = '0';
+//   return `
+// <html>
+//   <head>
+//     <meta charset="UTF-8" />
+//   </head>
+//   <body>
+//     <div id="form">xx</div>
+//     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+//     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 
-const postSnap = async ({name, lang, data}) => {
-  const html = await composeHtmlForForm({lang, data});
-  const val = await makeSnap({name, html}, (err, val) => {
+//     <script>
+//       (async () => {
+//         const {id, data} = {id:'0', data:{}};
+//         try {
+//           const { Form } = await import('/api/form/0');
+//           const e = React.createElement;
+//           const domContainer = document.querySelector('#form');
+//           const root = ReactDOM.createRoot(domContainer);
+//           return root.render(e(Form, { data: 'world' }, []));
+//         } catch (x) {
+//           alert(x);
+//         }
+//       })();
+//     </script>
+//   </body>
+// </html>
+// `;
+// };
+
+const postSnap = async ({id, lang, data}, resume) => {
+  const html = await composeHtmlForForm({id, lang, data});
+  console.log("postSnap() id=" + id + " html=" + html);
+  const val = makeSnap({id, html}, (err, val) => {
     if (err) {
       console.log("SNAP() err=" + err);
       resume(err);
@@ -187,70 +214,70 @@ const postSnap = async ({name, lang, data}) => {
   });
 };
 
-const makeSnap = ({name, html}, resume) => {
+const makeSnap = ({id, html}, resume) => {
   (async() => {
     try {
+      console.log("makeSnap() id=" + id + " html=" + html);
       const t0 = new Date;
       const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox']});
       const page = await browser.newPage();
+      console.log("makeSnap() setting content...");
       await page.setContent(html);
+      console.log("makeSnap() loading...");
+      //await page.goto('http://localhost:3000/form.html?id=123');
       const checkLoaded = async (t0) => {
-        try {
-          let td = new Date - t0;
-          if (td > 10000) {
-            resume("Aborting. Page taking too long to load.");
-            return;
+        let td = new Date - t0;
+        console.log("checkLoaded() td=" + td);
+        if (td > 10000) {
+          resume("Aborting. Page taking too long to load.");
+          return;
+        }
+        let isLoaded = !!(await page.$("#form"));
+        console.log("makeSnap() isLoaded=" + isLoaded);
+        if (isLoaded) {
+          try {
+            const clip = await page.$("#form");
+            const boxModel = await clip.boxModel();
+            const box = boxModel.content[2];
+            const x = 0;
+            const y = 0;
+            const width = box.x;
+            const height = box.y;
+            // await page.setViewport({
+            //   width: width,
+            //   height: height,
+            //   deviceScaleFactor: 2,
+            // });
+            const base64 = await page.screenshot({
+              encoding: "base64",
+              clip: {
+                x: x,
+                y: y,
+                width: width,
+                height: height,
+              },
+              omitBackground: true,
+            });
+            const filename = id.trim() + '.png';
+            uploadFileToS3(filename, base64, () => {});
+            await page.close();
+            console.log("makeSnap() filename=" + filename);
+            resume(null, filename);
+            browser.close();
+          } catch (x) {
+            console.log("ERROR loading " + id + " " + x.stack);
+            resume("ERROR loading " + id, null);
           }
-          let isLoaded = !!(await page.$("#form"));
-          if (isLoaded) {
-            // Viewer save snap, so our job is done here.
-            setTimeout(async () => {
-              try {
-                const clip = await page.$("#form");
-                const boxModel = await clip.boxModel();
-                const box = boxModel.content[2];
-                const x = 0;
-                const y = 0;
-                const width = box.x;
-                const height = box.y;
-                // await page.setViewport({
-                //   width: width,
-                //   height: height,
-                //   deviceScaleFactor: 2,
-                // });
-                const base64 = await page.screenshot({
-                  encoding: "base64",
-                  clip: {
-                    x: x,
-                    y: y,
-                    width: width,
-                    height: height,
-                  },
-                  omitBackground: true,
-                });
-                const filename = name.trim() + '.png';
-                uploadFileToS3(filename, base64, () => {});
-                await page.close();
-                resume(null, filename);
-              } catch (x) {
-                console.log("ERROR loading " + name + " " + x.stack);
-                resume("ERROR loading " + name, null);
-              }
-            }, 500);  // Wait a second to let viewer do its thing before exiting.
-          } else {
-            setTimeout(() => {
-              checkLoaded(t0);
-            }, 100);
-          }
-        } catch (x) {
-          console.log("[1] ERROR " + x.stack);
-          resume("ERROR name=" + name);
+        } else {
+          setTimeout(() => {
+            checkLoaded(t0);
+          }, 100);
         }
       };
       checkLoaded(new Date);
     } catch (x) {
-      console.log("[2] ERROR loading id=" + name + " " + x.stack);
-      resume("ERROR id=" + name);
+      console.log("[2] ERROR loading id=" + id + " " + x.stack);
+      resume("ERROR id=" + id);
     }
   })();
 };
