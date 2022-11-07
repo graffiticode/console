@@ -9,7 +9,12 @@
 
     <script>
       (async () => {
-        const {id, data} = {id:'0', data:{}};
+        let id;
+        try {
+          id = document.location.search.split('?')[1].split('=')[1];
+        } catch (x) {
+          alert(`Missing id parameter in ${document.location.href}`);
+        }
         try {
           const { Form } = await import(`/api/form/${id}`);
           const e = React.createElement;

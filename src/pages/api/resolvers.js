@@ -56,9 +56,7 @@ export async function saveTask(authToken, uid, task) {
     await userRef.update({taskIds: FieldValue.arrayUnion(id)});
   }
   const lang = '0';
-  postSnap({id, lang, data}, (err, val) => {
-    console.log("snap!!");
-  });
+  postSnap({id, lang, data}, (err, val) => {});
   const imageUrl = `https://cdn.acx.ac/${id}.png`;
   return JSON.stringify({id, imageUrl});
 }
@@ -137,106 +135,31 @@ const uploadFileToS3 = (name, base64data) => {
   });
 };
 
-// https://cdn.acx.ac/world.png
-
-function composeHtmlForForm({ id, lang, data }) {
-  id = '0';
-  return `
-<html>
-  <head>
-    <meta charset="UTF-8" />
-  </head>
-  <body>
-    <div id="form">xx</div>
-    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-    <script>
-      (async () => {
-        const {id, data} = {id:'0', data:{}};
-        try {
-          const { Form } = await import('http://localhost:3000/api/form/0');
-          const e = React.createElement;
-          const domContainer = document.querySelector('#form');
-          const root = ReactDOM.createRoot(domContainer);
-          return root.render(e(Form, { data: 'world' }, []));
-        } catch (x) {
-          alert(x);
-        }
-      })();
-    </script>
-
-  </body>
-</html>
-`;
-};
-
-// function composeHtmlForForm({ id, lang, data }) {
-//   id = '0';
-//   return `
-// <html>
-//   <head>
-//     <meta charset="UTF-8" />
-//   </head>
-//   <body>
-//     <div id="form">xx</div>
-//     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-//     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-
-//     <script>
-//       (async () => {
-//         const {id, data} = {id:'0', data:{}};
-//         try {
-//           const { Form } = await import('/api/form/0');
-//           const e = React.createElement;
-//           const domContainer = document.querySelector('#form');
-//           const root = ReactDOM.createRoot(domContainer);
-//           return root.render(e(Form, { data: 'world' }, []));
-//         } catch (x) {
-//           alert(x);
-//         }
-//       })();
-//     </script>
-//   </body>
-// </html>
-// `;
-// };
-
 const postSnap = async ({id, lang, data}, resume) => {
-  const html = await composeHtmlForForm({id, lang, data});
-  console.log("postSnap() id=" + id + " html=" + html);
-  const val = makeSnap({id, html}, (err, val) => {
-    if (err) {
-      console.log("SNAP() err=" + err);
-      resume(err);
-    } else {
-      resume(err, val);
-    }
-  });
+  const val = makeSnap({id}, resume);
 };
 
-const makeSnap = ({id, html}, resume) => {
+const makeSnap = ({id}, resume) => {
   (async() => {
     try {
-      console.log("makeSnap() id=" + id + " html=" + html);
       const t0 = new Date;
-      const browser = await puppeteer.launch({args: ['--no-sandbox', '--disable-setuid-sandbox']});
+      const browser = await puppeteer.launch({args: [
+        '--no-sandbox',
+      ]});
       const page = await browser.newPage();
-      console.log("makeSnap() setting content...");
-      await page.setContent(html);
-      console.log("makeSnap() loading...");
-      //await page.goto('http://localhost:3000/form.html?id=123');
+      await page.goto(`http://localhost:3000/form.html?id=${id}`);
       const checkLoaded = async (t0) => {
+        try {
         let td = new Date - t0;
-        console.log("checkLoaded() td=" + td);
         if (td > 10000) {
+          console.log("timeout td=" + td);
           resume("Aborting. Page taking too long to load.");
           return;
         }
-        let isLoaded = !!(await page.$("#form"));
-        console.log("makeSnap() isLoaded=" + isLoaded);
+        let isLoaded = !!(await page.$(".graffito"));
         if (isLoaded) {
           try {
-            const clip = await page.$("#form");
+            const clip = await page.$(".graffito");
             const boxModel = await clip.boxModel();
             const box = boxModel.content[2];
             const x = 0;
@@ -261,17 +184,21 @@ const makeSnap = ({id, html}, resume) => {
             const filename = id.trim() + '.png';
             uploadFileToS3(filename, base64, () => {});
             await page.close();
-            console.log("makeSnap() filename=" + filename);
             resume(null, filename);
             browser.close();
           } catch (x) {
+            browser.close();
             console.log("ERROR loading " + id + " " + x.stack);
             resume("ERROR loading " + id, null);
           }
         } else {
-          setTimeout(() => {
-            checkLoaded(t0);
+          setTimeout(async () => {
+            await checkLoaded(t0);
           }, 100);
+        }
+        } catch (x) {
+          browser.close();
+          console.log("catch x=" + x);
         }
       };
       checkLoaded(new Date);
