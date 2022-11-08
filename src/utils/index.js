@@ -56,7 +56,7 @@ const buildGetBaseUrlForLanguage = ({
   if (isNonEmptyString(envBaseUrl)) {
     return envBaseUrl;
   }
-  const config = { useLocalCompiles: true };
+  const config = {};
   const host = getApiHost(lang, config);
   const port = getApiPort(lang, config);
   let protocol = "https";
