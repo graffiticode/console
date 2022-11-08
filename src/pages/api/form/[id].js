@@ -1,15 +1,17 @@
 import React from 'react';
-import bent from 'bent';
+import {
+  getLanguageAsset,
+} from "../../../utils";
+
 export default async function handler(req, res) {
   const { id } = req.query;
-  const baseUrl = 'http://localhost:3100/L0';
+  const lang = '0';
   const path = '/form.js';
-  const getLanguageAsset = bent(baseUrl, "string");
-  const asset = await getLanguageAsset(path);
+  const form = await getLanguageAsset(lang, path);
   if (path.indexOf(".svg") > 0) {
     res.setHeader("Content-Type", "image/svg+xml");
   } else if (path.indexOf(".js") > 0) {
     res.setHeader("Content-Type", "application/javascript");
   }
-  res.send(asset);
+  res.send(form);
 };

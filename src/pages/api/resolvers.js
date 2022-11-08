@@ -5,7 +5,6 @@ import { buildTaskDaoFactory } from "../../utils/storage/index.js";
 import { buildGetTaskDaoForStorageType } from "./utils.js";
 import { FieldValue } from 'firebase-admin/firestore';
 import db from '../../utils/db';
-
 const taskDaoFactory = buildTaskDaoFactory({});
 
 const normalizeTasksParameter = async tasks => {
@@ -136,10 +135,10 @@ const uploadFileToS3 = (name, base64data) => {
 };
 
 const postSnap = async ({id, lang, data}, resume) => {
-  const val = makeSnap({id}, resume);
+  const val = makeSnap({id, lang, data}, resume);
 };
 
-const makeSnap = ({id}, resume) => {
+const makeSnap = ({id, lang, data}, resume) => {
   (async() => {
     try {
       const t0 = new Date;
@@ -147,7 +146,7 @@ const makeSnap = ({id}, resume) => {
         '--no-sandbox',
       ]});
       const page = await browser.newPage();
-      await page.goto(`http://localhost:3000/form.html?id=${id}`);
+      await page.goto(`http://localhost:3000/form.html?id=${id}&data={data}`);
       const checkLoaded = async (t0) => {
         try {
         let td = new Date - t0;

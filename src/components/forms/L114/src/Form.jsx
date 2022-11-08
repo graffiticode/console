@@ -181,23 +181,6 @@ function TableChart({ data }) {
   });
 }
 
-export default function Form({ id, data }) {
-  if (!data || Object.keys(data).length === 0) {
-    return <div />;
-  }
-  const formId = `form-${id}`;
-  var elts = render(formId, data);
-  return (
-    <>
-      <div>
-        <div id={formId} className={styles.area}>
-          {elts}
-        </div>
-      </div>
-    </>
-  );
-}
-
 const getRange = (vals, grouped, min, max) => {
   // min and max are seed values is given.
   // Assert all vals are numbers.
@@ -322,4 +305,21 @@ const initData = {
     }
   }
 };
+
+export default function Form({ id, data }) {
+  if (!data || Object.keys(data).length === 0) {
+    return <div />;
+  }
+  const formId = `form-${id}`;
+  var elts = render(formId, data);
+  return (
+    <>
+      <div>
+        <div id={formId} className={styles.area}>
+          {elts}
+        </div>
+      </div>
+    </>
+  );
+}
 
