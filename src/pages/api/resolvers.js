@@ -146,7 +146,8 @@ const makeSnap = ({id, lang, data}, resume) => {
         '--no-sandbox',
       ]});
       const page = await browser.newPage();
-      await page.goto(`http://localhost:5147/form?id=abc`);
+      const url = `http://localhost:5147/form?id=${id}&data=${JSON.stringify(data)}`;
+      await page.goto(url);
       const checkLoaded = async (t0) => {
         try {
         let td = new Date - t0;
