@@ -146,7 +146,7 @@ const makeSnap = ({id, lang, data}, resume) => {
         '--no-sandbox',
       ]});
       const page = await browser.newPage();
-      await page.goto(`http://localhost:3000/form.html?id=${id}&data={data}`);
+      await page.goto(`http://localhost:5147/form?id=abc`);
       const checkLoaded = async (t0) => {
         try {
         let td = new Date - t0;
@@ -155,21 +155,21 @@ const makeSnap = ({id, lang, data}, resume) => {
           resume("Aborting. Page taking too long to load.");
           return;
         }
-        let isLoaded = !!(await page.$(".graffito"));
+        let isLoaded = !!(await page.$("svg"));
         if (isLoaded) {
           try {
-            const clip = await page.$(".graffito");
+            const clip = await page.$("svg");
             const boxModel = await clip.boxModel();
             const box = boxModel.content[2];
             const x = 0;
             const y = 0;
             const width = box.x;
             const height = box.y;
-            // await page.setViewport({
-            //   width: width,
-            //   height: height,
-            //   deviceScaleFactor: 2,
-            // });
+            await page.setViewport({
+              width: width,
+              height: height,
+              deviceScaleFactor: 2,
+            });
             const base64 = await page.screenshot({
               encoding: "base64",
               clip: {

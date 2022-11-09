@@ -33,11 +33,10 @@ export function getApiPort(lang, config) {
 }
 
 export const buildGetLanguageAsset = ({ getBaseUrlForLanguage, bent }) => {
-  return async (lang, path) => {
+  return async (lang, file) => {
     const baseUrl = getBaseUrlForLanguage(lang);
-    console.log("getLanguageAsset() baseUrl=" + baseUrl + " path=" + path);
     const getLanguageAsset = bent(baseUrl, "string");
-    const asset = await getLanguageAsset(path);
+    const asset = await getLanguageAsset(file);
     return asset;
   };
 };
@@ -56,7 +55,9 @@ const buildGetBaseUrlForLanguage = ({
   if (isNonEmptyString(envBaseUrl)) {
     return envBaseUrl;
   }
-  const config = {};
+  const config = {
+    useLocalCompiles: true
+  };
   const host = getApiHost(lang, config);
   const port = getApiPort(lang, config);
   let protocol = "https";
@@ -65,7 +66,7 @@ const buildGetBaseUrlForLanguage = ({
   } else if (isNonEmptyString(config.protocol)) {
     protocol = config.protocol;
   }
-  return `${protocol}://${host}:${port}/L${lang}`;
+  return `${protocol}://${host}:${port}/L${lang}/`;
 };
 
 export const getBaseUrlForLanguage = buildGetBaseUrlForLanguage({

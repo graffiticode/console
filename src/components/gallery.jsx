@@ -1,3 +1,4 @@
+import { Image } from 'next/image';
 import charts from './charts.json' assert {type: 'json'};
 /* This example requires Tailwind CSS v2.0+ */
 import { Fragment, useRef, useState } from 'react'
@@ -43,7 +44,7 @@ function Tasks({setOpen, setTask}) {
                 setTask(task);
             }}>
               <div className="flex flex-1 flex-col p-8">
-                <Form id={taskId} data={getData(task)}/>
+                <img src={`https://cdn.acx.ac/${taskId}.png`} />
                 <dl className="mt-1 flex flex-grow flex-col justify-between">
                   <dt className="sr-only">Title</dt>
                   <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
