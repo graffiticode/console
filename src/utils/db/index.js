@@ -1,8 +1,14 @@
 import admin from 'firebase-admin';
-import serviceAccount from './serviceAccountKey.json';
+
+// NOTE: JSON.stringify the firebase service acccount key and set it to
+// the environment variable GOOGLE_APP_CREDENTIALS
 
 if (!admin.apps.length) {
   try {
+    const credentials = process.env.GOOGLE_APP_CREDENTIALS;
+    console.log("GOOGLE_APP_CREDENTIALS=" + credentials);
+    const serviceAccount = JSON.parse(credentials);
+    console.log("serviceAccount=" + JSON.stringify(serviceAccount, null, 2));
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     });
