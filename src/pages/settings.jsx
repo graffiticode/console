@@ -31,7 +31,8 @@ const user = {
     'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
 }
 const navigation = [
-  { name: 'Charts', href: '/charts', current: false },
+  { name: 'Home', href: '/', current: false },
+  { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Settings', href: '/settings', current: true },
 ]
 const userNavigation = [
@@ -45,8 +46,6 @@ function classNames(...classes) {
 }
 
 import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { startClock } from '../utils/redux/actions';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
 
@@ -64,11 +63,6 @@ const ReduxApplet = () => {
 }
 
 export default function Example() {
-  const dispatch = useDispatch()
-  useEffect(() => {
-    dispatch(startClock())
-  }, [dispatch])
-
   return (
     <>
       {/*

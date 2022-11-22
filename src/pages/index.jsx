@@ -28,7 +28,8 @@ export function Logo(props) {
 }
 
 const navigation = [
-  { name: 'Charts', href: '/charts', current: false },
+  { name: 'Home', href: '/', current: true },
+  { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Settings', href: '/settings', current: false },
 ]
 const userNavigation = [

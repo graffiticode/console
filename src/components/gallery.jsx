@@ -64,7 +64,7 @@ function Tasks({setOpen, setTask}) {
 // TODO scape images and display in tasks list.
 
 export default function Gallery() {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [task, setTask] = useState();
   const data = useSelector((state) => state.chart);
   const userId = useSelector(state => state.userId);
