@@ -73,6 +73,7 @@ function postAuth(path, data, resume) {
       data += chunk;
     }).on('end', function () {
       if (res.statusCode === 401) {
+        console.log("postAuth() statusCode=401");
         resume(res.statusCode, data);
       } else {
         try {
@@ -96,10 +97,12 @@ function postAuth(path, data, resume) {
 
 export default async function handler(req, res) {
   // If you don't have NEXTAUTH_SECRET set, you will have to pass your secret as `secret` to `getToken`
+  console.log("handler() headers=" + JSON.stringify(req.headers, null, 2));
+  console.log("handler() body=" + JSON.stringify(req.body, null, 2));
   const token = await getToken({ req });
-  // console.log("ARTCOMPILER_CLIENT_SECRET authToken=" + authToken);
+  console.log("handler() token=" + token);
   if (token) {
-    // console.log("JSON Web Token", JSON.stringify(token, null, 2));
+    console.log("JSON Web Token", JSON.stringify(token, null, 2));
     // Signed in
     const request = {
       body: req.body,
@@ -142,6 +145,7 @@ export default async function handler(req, res) {
     }
   } else {
     // Not Signed in
+    console.log("graphql statusCode=401");
     res.status(401);
     res.end();
   }

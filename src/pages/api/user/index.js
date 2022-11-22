@@ -5,7 +5,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {});
 
 export default async (req, res) => {
   try {
-    console.log("POST /user");
     const { name, email } = req.body;
     const users = await db.collection('users').get();
     let id;
@@ -21,14 +20,14 @@ export default async (req, res) => {
       res.status(200).json({ id });
     } else {
       // Otherwise, make a new one.
-      const stripeCustomer = await stripe.customers.create({
-        name,
-        email,
-      });
+      // const stripeCustomer = await stripe.customers.create({
+      //   name,
+      //   email,
+      // });
       const { id } = await db.collection('users').add({
         ...req.body,
         created: new Date().toISOString(),
-        stripeCustomer,
+        // stripeCustomer,
       });
       res.status(200).json({ id });
     }

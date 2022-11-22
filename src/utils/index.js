@@ -21,7 +21,6 @@ export function getApiHost(lang, config) {
 
 export function getApiPort(lang, config) {
   config = config || global.config || {};
-  console.log("getApiPort() config=" + JSON.stringify(config, null, 2));
   if (config.useLocalCompiles) {
     lang = lang.indexOf("L") === 0 && lang.substring(1) || lang;
     return '3100';

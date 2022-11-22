@@ -61,6 +61,7 @@ export async function saveTask(authToken, uid, task) {
 }
 
 export async function getTasks(uid) {
+  console.log("getTasks() uid=" + uid);
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();

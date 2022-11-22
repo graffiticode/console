@@ -63,6 +63,7 @@ export const loadTasks = ({ uid }) => (dispatch, getState) => {
     }
   `;
   const get = async ({ uid }) => {
+    console.log("loadTasks() uid=" + uid);
     request('/api', query, { uid }).then((data) => {
       const tasks = JSON.parse(data.getTasks);
       dispatch(initTasks(tasks));

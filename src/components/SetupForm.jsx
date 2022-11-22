@@ -65,7 +65,8 @@ function SetupApp() {
       const { client_secret: clientSecret } = secretRes.data;
       setClientSecret(clientSecret);
     };
-    fetchSecret();
+    // Turn off for now.
+    // fetchSecret();
   }, []);
             
   return (
