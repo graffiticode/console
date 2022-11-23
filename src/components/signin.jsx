@@ -24,7 +24,7 @@ export default function SignIn() {
     }
     if (userId === "" || userId === undefined) {
       postUser().catch(console.error);
-    }
+    } 
     return (
       <>
         <button onClick={() => signOut()}>{session.user.name} (Sign out)</button>

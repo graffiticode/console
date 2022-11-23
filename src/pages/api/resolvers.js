@@ -31,8 +31,10 @@ export function createTask(lang, code) {
 export async function compileTask(auth, task) {
   const resp = await postTask(auth, task);
   let data;
+  console.log("compileTask() resp.id=" + resp.id);
   if (resp && resp.id) {
     data = await getData(auth, resp.id);
+    console.log("compileTask() data=" + JSON.stringify(data, null, 2));
   }
   return data;
 }

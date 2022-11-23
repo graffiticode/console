@@ -20,46 +20,45 @@ export const getCode = view => {
   return lines.join("");
 };
 
-const debouncedStartCompletion = debounce((view, dispatch) => {
+const debouncedStartCompletion = debounce((view, dispatch, lang) => {
   const doc = view.state.doc;
   const lines = [];
   for (const text of doc.iter()) {
     lines.push(text);
   }
   const user = 'public';
-  const lang = '114';
   const code = lines.join("\n");
   if (code !== '') {
     dispatch(compileTask({ user, lang, code }));
   }
 }, 300);
 
-function customCompletionDisplay(dispatch) {
+function customCompletionDisplay(dispatch, lang) {
   return EditorView.updateListener.of(({ view, docChanged, transactions }) => {
     if (docChanged) {
       // when a completion is active each keystroke triggers the
       // completion source function, to avoid it we close any open
       // completion inmediatly.
       //closeCompletion(view);
-      debouncedStartCompletion(view, dispatch);
+      debouncedStartCompletion(view, dispatch, lang);
     }
   });
 }
 
-const CodeMirror = ({ setView, code }) => {
+const CodeMirror = ({ setView, lang, code }) => {
   const userId = useSelector(state => state.userId);
+//  const lang = useSelector(state => state.lang);
   const dispatch = useDispatch();
+  const user = 'public';
   useEffect(() => {
     if (code !== '') {
       dispatch(compileTask({ user, lang, code }));
     }
   }, [code]);
   const extensions = [
-    customCompletionDisplay(dispatch),
+    customCompletionDisplay(dispatch, lang),
   ];
   const { ref } = useCodeMirror(extensions, setView, code);
-  const user = 'public';
-  const lang = '114';
   return <div id="editor" ref={ref}/>;
 };
 

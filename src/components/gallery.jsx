@@ -5,7 +5,8 @@ import { Dialog, Transition } from '@headlessui/react'
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import Editor from './editor';
-import Form from './forms/L114/src/Form';
+import L0Form from './forms/L0/src/form.jsx';
+import L114Form from './forms/L114/src/form.jsx';
 import { useSelector } from 'react-redux'
 import { useSession, signIn, signOut } from "next-auth/react";
 import SignInAlert from "./SignInAlert";
@@ -26,44 +27,59 @@ function getData(task) {
   return data;
 }
 
-function Tasks({setOpen, setTask}) {
-  const tasks = useSelector(state => state.tasks);
+function Tasks({setOpen, setTask, lang}) {
+  let tasks = useSelector(state => state.tasks);
   const tasksIds = Object.keys(tasks).reverse();
+  tasks = tasksIds.map(taskId => {
+    const task = tasks[taskId][0];
+    if (task.lang === lang) {
+      task.taskId = taskId;
+      return task;
+    } else {
+      return null;
+    }
+  });
+  tasks = tasks.filter(task => task !== null);
+  if (tasks.length === 0) {
+    tasks.push({lang, code: '', data: 'ok', taskId: '0'});
+  }
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-      {tasksIds.map((taskId) => {
-        const task = tasks[taskId][0];
+      {tasks.map((task) => {
+        if (task === undefined) {
+          return;
+        }
+        const taskId = task.taskId;
         return (
           <li
-            key={taskId}
-            className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
+              key={taskId}
+              className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
             >
             <button onClick={() => {
-                setOpen(true);
-                setTask(task);
+              setOpen(true);
+              setTask(task);
             }}>
-              <div className="flex flex-1 flex-col p-8">
-                <img src={`https://cdn.acx.ac/${taskId}.png`} />
-                <dl className="mt-1 flex flex-grow flex-col justify-between">
-                  <dt className="sr-only">Title</dt>
-                  <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
-                </dl>
-                <h3 className="mt-6 text-xs font-light text-gray-500">
-                  {`...${taskId.slice(taskId.length - 10)}`}
-                </h3>
-              </div>
+            <div className="flex flex-1 flex-col p-8">
+              <img src={`https://cdn.acx.ac/${taskId}.png`} />
+              <dl className="mt-1 flex flex-grow flex-col justify-between">
+                <dt className="sr-only">Title</dt>
+                <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
+              </dl>
+              <h3 className="mt-6 text-xs font-light text-gray-500">
+                {`...${taskId.slice(taskId.length - 10)}`}
+              </h3>
+            </div>
             </button>
           </li>
         )
-      })
-      }
+      })}
     </ul>
-  )
+  );
 }
 
 // TODO scape images and display in tasks list.
 
-export default function Gallery() {
+export default function Gallery({lang}) {
   const [open, setOpen] = useState(false);
   const [task, setTask] = useState();
   const data = useSelector((state) => state.chart);
@@ -76,9 +92,18 @@ export default function Gallery() {
       </div>
     );
   } else {
-  return (
+    let Form;
+    switch (lang) {
+      case '114':
+        Form = L114Form;
+        break;
+      default:
+        Form = L0Form;
+        break;
+    }
+    return (
     <>
-      <Tasks setOpen={setOpen} setTask={setTask}/>
+      <Tasks setOpen={setOpen} setTask={setTask} lang={lang}/>
       <Transition.Root show={open} as={Fragment}>
         <Dialog as="div" className="relative z-10" onClose={setOpen}>
           <div className="fixed inset-0" />

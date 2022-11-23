@@ -72,7 +72,8 @@ export default function Editor({ userId, task, setOpen }) {
   const data = useSelector((state) => state.chart);
   const dispatch = useDispatch();
   const user = userId;
-  const lang = '114';
+  const lang = task && task.lang || '0';
+  const code = task && task.code || '';
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
@@ -81,7 +82,8 @@ export default function Editor({ userId, task, setOpen }) {
               userId={userId}
               setView={setView}
               extensions={[javascript({ jsx: true })]}
-              code={task && task.code || ''}
+              lang={lang}
+              code={code}
             />
           </div>
           <div className="flex justify-between pt-2">

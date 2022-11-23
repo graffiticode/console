@@ -23,6 +23,7 @@ export const addPayment = () => (dispatch, getState) => {
 };
 
 export const compileTask = ({ user, lang, code }) => (dispatch, getState) => {
+  console.log("compileTask() lang=" + lang);
   const query = gql `
     mutation post ($user: String!, $lang: String!, $code: String!) {
       compileTask(user: $user, lang: $lang, code: $code)
@@ -47,9 +48,9 @@ export const saveTask = ({ user, lang, code, data }) => (dispatch, getState) => 
   console.log("saveTask() state=" + JSON.stringify(state, null, 2));
   const post = async ({user, lang, code, data}) => {
     request('/api', query, { user, lang, code }).then((data) => {
-      const taskId = JSON.parse(data.saveTask);
+      const { id } = JSON.parse(data.saveTask);
       dispatch(addTask({
-        [taskId]: [{lang, code, data}]
+        [id]: [{lang, code, data}]
       }));
     });
   };
