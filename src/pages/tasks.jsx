@@ -44,22 +44,9 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-const ReduxApplet = () => {
-  return (
-    <>
-      <Gallery />
-      {/*
-      <Link href="/show-redux-state">
-        <a>Click to see current Redux State</a>
-      </Link>
-      */}
-    </>
-  )
-}
-
 export default function Tasks() {
   const dispatch = useDispatch()
-  const [language, setLanguage] = useState({id: 1, name: 'L0'})
+  const [language, setLanguage] = useState({id: 1, name: 'L1'})
   const lang = language.name.slice(1);
   return (
     <>

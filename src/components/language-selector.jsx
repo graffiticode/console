@@ -17,10 +17,8 @@ import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
 import { Combobox } from '@headlessui/react'
 
 const languages = [
-  {id: 1, name: 'L0'},
-  {id: 2, name: 'L1'},
-  {id: 3, name: 'L114'},
-  {id: 4, name: 'L146'},
+  {id: 1, name: 'L1'},
+  {id: 2, name: 'L147'},
 ];
 
 function classNames(...classes) {

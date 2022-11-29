@@ -5,8 +5,6 @@ import { Dialog, Transition } from '@headlessui/react'
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import Editor from './editor';
-import L0Form from './forms/L0/src/form.jsx';
-import L114Form from './forms/L114/src/form.jsx';
 import { useSelector } from 'react-redux'
 import { useSession, signIn, signOut } from "next-auth/react";
 import SignInAlert from "./SignInAlert";
@@ -77,8 +75,6 @@ function Tasks({setOpen, setTask, lang}) {
   );
 }
 
-// TODO scape images and display in tasks list.
-
 export default function Gallery({lang}) {
   const [open, setOpen] = useState(false);
   const [task, setTask] = useState();
@@ -92,15 +88,8 @@ export default function Gallery({lang}) {
       </div>
     );
   } else {
-    let Form;
-    switch (lang) {
-      case '114':
-        Form = L114Form;
-        break;
-      default:
-        Form = L0Form;
-        break;
-    }
+    const url = `/api/form/${lang}?data=${JSON.stringify(data)}`;
+    console.log("Gallery() url=" + url);
     return (
     <>
       <Tasks setOpen={setOpen} setTask={setTask} lang={lang}/>
@@ -138,7 +127,7 @@ export default function Gallery({lang}) {
                       <div className="relative mt-6 flex-1 px-4 sm:px-6">
                         <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
                           <Editor userId={userId} task={task} setOpen={setOpen}/>
-                          <Form id={'editor'} data={data}/>
+                          <iframe src={url} />
                         </div>
                       </div>
                     </div>

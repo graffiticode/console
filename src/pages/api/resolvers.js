@@ -31,7 +31,7 @@ export function createTask(lang, code) {
 export async function compileTask(auth, task) {
   const resp = await postTask(auth, task);
   let data;
-  console.log("compileTask() resp.id=" + resp.id);
+  console.log("compileTask() resp=" + JSON.stringify(resp));
   if (resp && resp.id) {
     data = await getData(auth, resp.id);
     console.log("compileTask() data=" + JSON.stringify(data, null, 2));
@@ -42,6 +42,7 @@ export async function compileTask(auth, task) {
 export async function saveTask(authToken, uid, task) {
   const data = await compileTask(authToken, task);
   task = {...task, data: JSON.stringify(data)};
+  const { lang } = task;
   const auth = { uid };
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const tasks = await normalizeTasksParameter(task);
@@ -56,7 +57,6 @@ export async function saveTask(authToken, uid, task) {
   } else {
     await userRef.update({taskIds: FieldValue.arrayUnion(id)});
   }
-  const lang = '0';
   postSnap({id, lang, data}, (err, val) => {});
   const imageUrl = `https://cdn.acx.ac/${id}.png`;
   return JSON.stringify({id, imageUrl});
@@ -94,9 +94,10 @@ export async function getTask(auth, id) {
 }
 
 export async function postTask(auth, task) {
+  console.log("postTask() task=" + JSON.stringify(task, null, 2));
   try {
-    //const post = bent('http://localhost:3100/', 'POST', 'json', 200);
-    const post = bent('https://api.graffiticode.org/', 'POST', 'json', 200);
+    const post = bent('http://localhost:3100/', 'POST', 'json', 200);
+    //const post = bent('https://api.graffiticode.org/', 'POST', 'json', 200);
     const { data } = await post('task', {auth, task});
     return data;
   } catch (x) {
@@ -107,8 +108,8 @@ export async function postTask(auth, task) {
 
 export async function getData(auth, id) {
   try {
-    //const get = bent('http://localhost:3100/', 'GET', 'json', 200);
-    const get = bent('https://api.graffiticode.org/', 'GET', 'json', 200);
+    const get = bent('http://localhost:3100/', 'GET', 'json', 200);
+    //const get = bent('https://api.graffiticode.org/', 'GET', 'json', 200);
     const { data } = await get(`data?id=${id}&auth=${auth}`);
     return data;
   } catch (x) {
@@ -149,62 +150,45 @@ const makeSnap = ({id, lang, data}, resume) => {
         '--no-sandbox',
       ]});
       const page = await browser.newPage();
-      const url = `http://localhost:5147/form?id=${id}&data=${JSON.stringify(data)}`;
-      await page.goto(url);
-      const checkLoaded = async (t0) => {
-        try {
-        let td = new Date - t0;
-        if (td > 10000) {
-          console.log("timeout td=" + td);
-          resume("Aborting. Page taking too long to load.");
-          return;
+      // /api/form/1?data=%22hello%22
+      const url = `http://localhost:3000/api/form/${lang}?data=${JSON.stringify(data)}`;
+      console.log("makeSnap() url=" + url);
+      await page.goto(url, {
+        waitUntil: "networkidle0",
+      }).catch((err) => console.log("error loading url", err));
+      const element = await page.$("body");
+      const rect = await element.evaluate(() => {
+        //get the bounding rect for the `body`
+        var rect = document.querySelector('#graffiti').getBoundingClientRect();
+        //pull out `top` and `width`
+        return {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          left: rect.left,
         }
-        let isLoaded = !!(await page.$("svg"));
-        if (isLoaded) {
-          try {
-            const clip = await page.$("svg");
-            const boxModel = await clip.boxModel();
-            const box = boxModel.content[2];
-            const x = 0;
-            const y = 0;
-            const width = box.x;
-            const height = box.y;
-            await page.setViewport({
-              width: width,
-              height: height,
-              deviceScaleFactor: 2,
-            });
-            const base64 = await page.screenshot({
-              encoding: "base64",
-              clip: {
-                x: x,
-                y: y,
-                width: width,
-                height: height,
-              },
-              omitBackground: true,
-            });
-            const filename = id.trim() + '.png';
-            uploadFileToS3(filename, base64, () => {});
-            await page.close();
-            resume(null, filename);
-            browser.close();
-          } catch (x) {
-            browser.close();
-            console.log("ERROR loading " + id + " " + x.stack);
-            resume("ERROR loading " + id, null);
-          }
-        } else {
-          setTimeout(async () => {
-            await checkLoaded(t0);
-          }, 100);
-        }
-        } catch (x) {
-          browser.close();
-          console.log("catch x=" + x);
-        }
-      };
-      checkLoaded(new Date);
+      });
+      console.log("makeSnap() rect=" + JSON.stringify(rect, null, 2));
+      const { x, y, width, height } = rect;
+      await page.setViewport({
+        width,
+        height,
+        deviceScaleFactor: 2,
+      });
+      const base64 = await page.screenshot({
+        encoding: "base64",
+        clip: {x, y, width, height},
+        omitBackground: true,
+      });
+      const filename = id.trim() + '.png';
+      uploadFileToS3(filename, base64, () => {});
+      await page.close();
+      resume(null, filename);
+      browser.close();
     } catch (x) {
       console.log("[2] ERROR loading id=" + id + " " + x.stack);
       resume("ERROR id=" + id);
