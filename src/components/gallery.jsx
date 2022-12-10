@@ -78,8 +78,8 @@ function Tasks({setOpen, setTask, lang}) {
 export default function Gallery({lang}) {
   const [open, setOpen] = useState(false);
   const [task, setTask] = useState();
-  const data = useSelector((state) => state.chart);
   const userId = useSelector(state => state.userId);
+  const id = useSelector(state => state.id);
   const { data: session } = useSession();
   if (!session) {
     return (
@@ -88,8 +88,9 @@ export default function Gallery({lang}) {
       </div>
     );
   } else {
-    const url = `/api/form/${lang}?data=${JSON.stringify(data)}`;
-    console.log("Gallery() url=" + url);
+    const url = `http://localhost:3100/data?id=${id}`;
+    const data = { url };
+    const src = `/api/form/${lang}?data=${JSON.stringify(data)}`;
     return (
     <>
       <Tasks setOpen={setOpen} setTask={setTask} lang={lang}/>
@@ -127,7 +128,7 @@ export default function Gallery({lang}) {
                       <div className="relative mt-6 flex-1 px-4 sm:px-6">
                         <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
                           <Editor userId={userId} task={task} setOpen={setOpen}/>
-                          <iframe src={url} />
+                          <iframe src={src} height="100%"/>
                         </div>
                       </div>
                     </div>

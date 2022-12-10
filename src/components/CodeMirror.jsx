@@ -4,7 +4,7 @@ import { EditorView } from "@codemirror/view";
 import useCodeMirror from "../utils/cm/use-codemirror";
 import { debounce } from "lodash";
 import { useSelector, useDispatch } from 'react-redux'
-import { compileTask } from '../utils/redux/actions'
+import { postTask } from '../utils/redux/actions'
 import { ParseContext } from '@codemirror/language';
 import { graffiticode } from "@graffiticode/lang-graffiticode";
 
@@ -29,7 +29,7 @@ const debouncedStartCompletion = debounce((view, dispatch, lang) => {
   const user = 'public';
   const code = lines.join("\n");
   if (code !== '') {
-    dispatch(compileTask({ user, lang, code }));
+    dispatch(postTask({ user, lang, code }));
   }
 }, 300);
 
@@ -52,7 +52,7 @@ const CodeMirror = ({ setView, lang, code }) => {
   const user = 'public';
   useEffect(() => {
     if (code !== '') {
-      dispatch(compileTask({ user, lang, code }));
+      dispatch(postTask({ user, lang, code }));
     }
   }, [code]);
   const extensions = [

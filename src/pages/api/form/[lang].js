@@ -1,5 +1,5 @@
 //http://localhost:51/form?lang=1&data=%22hellox%22
-//http://localhost:3100/L1/form?lang=1&data=%22hellox%22
+//http://localhost:3100/form?lang=1&data=%22hellox%22
 
 import React from 'react';
 import {

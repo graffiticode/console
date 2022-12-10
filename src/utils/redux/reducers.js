@@ -1,7 +1,7 @@
 import { combineReducers } from 'redux';
 import {
   HELLO,
-  RENDER_TASK,
+  UPDATE_TASK,
   ADD_TASK,
   INIT_TASKS,
   SET_USER_ID,
@@ -16,9 +16,9 @@ const helloReducer = (state = "", { type, data }) => {
   }
 };
 
-const taskReducer = (state = "", { type, data }) => {
+const taskIdReducer = (state = "", { type, data }) => {
   switch (type) {
-  case RENDER_TASK:
+  case UPDATE_TASK:
     return data;
   default:
     return state;
@@ -48,7 +48,7 @@ const userIdReducer = (state = "", { type, data }) => {
 // COMBINED REDUCERS
 const reducers = {
   hello: helloReducer,
-  chart: taskReducer,
+  id: taskIdReducer,
   userId: userIdReducer,
   tasks: addTaskReducer,
 };

@@ -40,9 +40,17 @@ export async function compileTask(auth, task) {
 }
 
 export async function saveTask(authToken, uid, task) {
-  const data = await compileTask(authToken, task);
-  task = {...task, data: JSON.stringify(data)};
-  const { lang } = task;
+  /*
+    TODO
+    We already have a task id so just pass it to makeSnap()
+    to use to pass to the form url.
+    const data = JSON.stringify({id,url,auth});
+    const url = `${baseApiUrl}/form?lang=${lang}&data=${data}`;
+  */
+
+  const imageUrl = postSnap({ authToken, task });
+  //const data = await compileTask(authToken, task);
+  //task = {...task, data: JSON.stringify(data)};
   const auth = { uid };
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const tasks = await normalizeTasksParameter(task);
@@ -57,8 +65,6 @@ export async function saveTask(authToken, uid, task) {
   } else {
     await userRef.update({taskIds: FieldValue.arrayUnion(id)});
   }
-  postSnap({id, lang, data}, (err, val) => {});
-  const imageUrl = `https://cdn.acx.ac/${id}.png`;
   return JSON.stringify({id, imageUrl});
 }
 
@@ -94,12 +100,12 @@ export async function getTask(auth, id) {
 }
 
 export async function postTask(auth, task) {
-  console.log("postTask() task=" + JSON.stringify(task, null, 2));
   try {
     const post = bent('http://localhost:3100/', 'POST', 'json', 200);
     //const post = bent('https://api.graffiticode.org/', 'POST', 'json', 200);
     const { data } = await post('task', {auth, task});
-    return data;
+    console.log("postTask() data=" + JSON.stringify(data));
+    return data.id;
   } catch (x) {
     console.log("POST /task catch " + x);
     return x;
@@ -138,11 +144,16 @@ const uploadFileToS3 = (name, base64data) => {
   });
 };
 
-const postSnap = async ({id, lang, data}, resume) => {
-  const val = makeSnap({id, lang, data}, resume);
+const postSnap = async ({ authToken, task }) => {
+  const { id } = await postTask(authToken, task);
+  const url = `http://localhost:3100/data?id=${id}`;
+  const data = { url };
+  const { lang } = task;
+  makeSnap({ id, lang, data });
+  return `https://cdn.acx.ac/${id}.png`;
 };
 
-const makeSnap = ({id, lang, data}, resume) => {
+const makeSnap = ({ id, lang, data }) => {
   (async() => {
     try {
       const t0 = new Date;
@@ -151,6 +162,7 @@ const makeSnap = ({id, lang, data}, resume) => {
       ]});
       const page = await browser.newPage();
       // /api/form/1?data=%22hello%22
+      // /form?lang=147&data={%22url%22:%22http://localhost:3100/data?id=Oq2F0sg%22}
       const url = `http://localhost:3000/api/form/${lang}?data=${JSON.stringify(data)}`;
       console.log("makeSnap() url=" + url);
       await page.goto(url, {
@@ -159,7 +171,7 @@ const makeSnap = ({id, lang, data}, resume) => {
       const element = await page.$("body");
       const rect = await element.evaluate(() => {
         //get the bounding rect for the `body`
-        var rect = document.querySelector('#graffiti').getBoundingClientRect();
+        var rect = document.querySelector('svg').getBoundingClientRect();
         //pull out `top` and `width`
         return {
           x: rect.x,
@@ -187,11 +199,9 @@ const makeSnap = ({id, lang, data}, resume) => {
       const filename = id.trim() + '.png';
       uploadFileToS3(filename, base64, () => {});
       await page.close();
-      resume(null, filename);
       browser.close();
     } catch (x) {
-      console.log("[2] ERROR loading id=" + id + " " + x.stack);
-      resume("ERROR id=" + id);
+      console.log("[2] ERROR loading lang=" + lang + " " + x.stack);
     }
   })();
 };

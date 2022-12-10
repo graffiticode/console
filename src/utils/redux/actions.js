@@ -1,5 +1,5 @@
 import {
-  RENDER_TASK,
+  UPDATE_TASK,
   SET_USER_ID,
   ADD_TASK,
   INIT_TASKS,
@@ -22,20 +22,22 @@ export const addPayment = () => (dispatch, getState) => {
   getData().catch(console.error);
 };
 
-export const compileTask = ({ user, lang, code }) => (dispatch, getState) => {
-  console.log("compileTask() lang=" + lang);
+export const postTask = ({ user, lang, code }) => (dispatch, getState) => {
+  console.log("postTask() lang=" + lang);
   const query = gql `
     mutation post ($user: String!, $lang: String!, $code: String!) {
-      compileTask(user: $user, lang: $lang, code: $code)
+      postTask(user: $user, lang: $lang, code: $code)
     }
   `;
   const state = getState();
-  const getData = async ({user, lang, code}) => {
+  const post = async ({user, lang, code}) => {
     request('/api', query, { user, lang, code }).then((data) => {
-      dispatch(renderTask(JSON.parse(data.compileTask)));
+      const id = data.postTask;
+      console.log("postTask() id=" + id);
+      dispatch(updateTask(id));
     });
   };
-  getData({ user, lang, code }).catch(console.error);
+  post({ user, lang, code }).catch(console.error);
 };
 
 export const saveTask = ({ user, lang, code, data }) => (dispatch, getState) => {
@@ -45,7 +47,6 @@ export const saveTask = ({ user, lang, code, data }) => (dispatch, getState) => 
     }
   `;
   const state = getState();
-  console.log("saveTask() state=" + JSON.stringify(state, null, 2));
   const post = async ({user, lang, code, data}) => {
     request('/api', query, { user, lang, code }).then((data) => {
       const { id } = JSON.parse(data.saveTask);
@@ -73,7 +74,7 @@ export const loadTasks = ({ uid }) => (dispatch, getState) => {
   get({uid}).catch(console.error);
 };
 
-export const renderTask = (data) => ({ type: RENDER_TASK, data });
+export const updateTask = (data) => ({ type: UPDATE_TASK, data });
 
 export const addTask = (data) => ({ type: ADD_TASK, data });
 

@@ -13,7 +13,8 @@ import {
   createTask,
   getTasks,
   compileTask,
-  saveTask
+  saveTask,
+  postTask,
 } from './resolvers.js';
 
 const clientAddress = process.env.ARTCOMPILER_CLIENT_ADDRESS
@@ -29,7 +30,7 @@ const typeDefs = `
   type Mutation {
     compileTask(user: String!, lang: String!, code: String!): String!
     saveTask(user: String!, lang: String!, code: String!): String!
-    getTask(user: String!, id: String!): String!
+    postTask(user: String!, lang: String!, code: String!): String!
   }
 `;
 
@@ -47,6 +48,11 @@ const resolvers = {
     saveTask: async (_, {user, lang, code}) => {
       const task = createTask(lang, code);
       const id = await saveTask(authToken, user, task);
+      return id;
+    },
+    postTask: async (_, {user, lang, code}) => {
+      const task = createTask(lang, code);
+      const id = await postTask(authToken, task);
       return id;
     },
   },
