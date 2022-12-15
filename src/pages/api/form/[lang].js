@@ -10,12 +10,14 @@ import {
 export default async function handler(req, res) {
   try {
     console.log("GET /form query=" + JSON.stringify(req.query));
-    const { lang, data } = req.query;
-    const baseUrl = getBaseUrlForApi(lang);
+    const { lang, id, persist } = req.query;
+    const baseUrl = getBaseUrlForApi();
+    const dataUrl = `${baseUrl}data?id=${id}`;
+    const data = JSON.stringify({url: dataUrl});
     const path = `form?lang=${lang}&data=${data}`;
-    const url = baseUrl + path;
-    console.log("GET /form url=" + url);
-    res.redirect(url);
+    const formUrl = baseUrl + path;
+    console.log("GET /form formUrl=" + formUrl);
+    res.redirect(formUrl);
   } catch (x) {
     console.log("catch x=" + x);
     res.sendStatus(500);

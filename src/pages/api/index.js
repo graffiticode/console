@@ -12,7 +12,6 @@ import {
 import {
   createTask,
   getTasks,
-  compileTask,
   saveTask,
   postTask,
 } from './resolvers.js';
@@ -22,15 +21,17 @@ const clientAddress = process.env.ARTCOMPILER_CLIENT_ADDRESS
   : "0x0123456789abcdef0123456789abcdef01234567";
 let authToken = process.env.ARTCOMPILER_CLIENT_SECRET || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhZGRyZXNzIjoiMHgwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3IiwiYWNjZXNzIjoiY29tcGlsZSIsImlhdCI6MTY2NTYwNTQ2OH0.PCZIYheoF9682UMTHtVMjDZ79f3aiFGoCf-8CQFGVSM";
 
+global.config = import("./config.json");
+global.config.useLocalCompiles = process.env.LOCAL_COMPILES === "true";
+
 const typeDefs = `
   type Query {
     getTasks(uid: String!): String!
   }
 
   type Mutation {
-    compileTask(user: String!, lang: String!, code: String!): String!
-    saveTask(user: String!, lang: String!, code: String!): String!
-    postTask(user: String!, lang: String!, code: String!): String!
+    saveTask(uid: String!, lang: String!, code: String!): String!
+    postTask(lang: String!, code: String!): String!
   }
 `;
 
@@ -41,18 +42,13 @@ const resolvers = {
     },
   },
   Mutation: {
-    compileTask: async (_, {user, lang, code}) => {
-      const task = createTask(lang, code);
-      return JSON.stringify(await compileTask(authToken, task));
-    },
-    saveTask: async (_, {user, lang, code}) => {
-      const task = createTask(lang, code);
-      const id = await saveTask(authToken, user, task);
+    saveTask: async (_, {uid, lang, code}) => {
+      const id = await saveTask({authToken, uid, lang, code});
       return id;
     },
-    postTask: async (_, {user, lang, code}) => {
+    postTask: async (_, {lang, code}) => {
       const task = createTask(lang, code);
-      const id = await postTask(authToken, task);
+      const { id } = await postTask({authToken, task});
       return id;
     },
   },
@@ -103,12 +99,8 @@ function postAuth(path, data, resume) {
 
 export default async function handler(req, res) {
   // If you don't have NEXTAUTH_SECRET set, you will have to pass your secret as `secret` to `getToken`
-  console.log("handler() headers=" + JSON.stringify(req.headers, null, 2));
-  console.log("handler() body=" + JSON.stringify(req.body, null, 2));
   const token = await getToken({ req });
-  console.log("handler() token=" + token);
   if (token) {
-    console.log("JSON Web Token", JSON.stringify(token, null, 2));
     // Signed in
     const request = {
       body: req.body,

@@ -69,11 +69,9 @@ const moods = [
 export default function Editor({ userId, task, setOpen }) {
   const [selected, setSelected] = useState(moods[5]);
   const [view, setView] = useState();
-  const data = useSelector((state) => state.chart);
   const dispatch = useDispatch();
-  const user = userId;
-  const lang = task && task.lang || '0';
-  const code = task && task.code || '';
+  const uid = userId;
+  const { lang, code } = task || {lang: '0', code: ''};
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
@@ -94,7 +92,7 @@ export default function Editor({ userId, task, setOpen }) {
                 className="inline-flex items-center rounded-none border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700 focus:outline-none"
                 onClick={() => {
                   const code = getCode(view);
-                  dispatch(saveTask({user, lang, code, data}));
+                  dispatch(saveTask({uid, lang, code}));
                   setOpen(false);
                 }}
               >

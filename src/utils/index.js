@@ -9,7 +9,6 @@ export function isNonNullObject(obj) {
 }
 
 export function getApiHost(config) {
-  console.log("getApiHost() config=" + JSON.stringify(typeof config, null, 2));
   config = config || global.config || {};
   if (config.useLocalCompiles) {
     return "localhost";
@@ -30,7 +29,6 @@ export const buildGetLanguageAsset = ({ getBaseUrlForApi, bent }) => {
     const baseUrl = getBaseUrlForApi();
     const url = `${baseUrl}/${lang}/`;
     const getLanguageAsset = bent(url, "string");
-    console.log("getLanguageAsset() url=" + url + " file=" + file);
     const asset = await getLanguageAsset(file);
     return asset;
   };
@@ -38,13 +36,10 @@ export const buildGetLanguageAsset = ({ getBaseUrlForApi, bent }) => {
 
 const buildGetBaseUrlForApi = ({
   env,
+  config,
   getApiHost,
   getApiPort
-}) => (lang) => {
-  const config = global.config || {
-    useLocalCompiles: true
-  };
-  console.log("buildGetBaseUrlForApi() config=" + JSON.stringify(config, null, 2));
+}) => () => {
   const host = getApiHost(config);
   const port = getApiPort(config);
   let protocol;
@@ -60,6 +55,7 @@ const buildGetBaseUrlForApi = ({
 
 export const getBaseUrlForApi = buildGetBaseUrlForApi({
   env: process.env,
+  config: global.config,
   getApiHost,
   getApiPort
 });

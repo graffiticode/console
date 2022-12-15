@@ -22,40 +22,38 @@ export const addPayment = () => (dispatch, getState) => {
   getData().catch(console.error);
 };
 
-export const postTask = ({ user, lang, code }) => (dispatch, getState) => {
-  console.log("postTask() lang=" + lang);
+export const postTask = ({ lang, code }) => (dispatch, getState) => {
   const query = gql `
-    mutation post ($user: String!, $lang: String!, $code: String!) {
-      postTask(user: $user, lang: $lang, code: $code)
+    mutation post ($lang: String!, $code: String!) {
+      postTask(lang: $lang, code: $code)
     }
   `;
   const state = getState();
-  const post = async ({user, lang, code}) => {
-    request('/api', query, { user, lang, code }).then((data) => {
+  const post = async ({lang, code}) => {
+    request('/api', query, { lang, code }).then((data) => {
       const id = data.postTask;
-      console.log("postTask() id=" + id);
       dispatch(updateTask(id));
     });
   };
-  post({ user, lang, code }).catch(console.error);
+  post({ lang, code }).catch(console.error);
 };
 
-export const saveTask = ({ user, lang, code, data }) => (dispatch, getState) => {
+export const saveTask = ({ uid, lang, code }) => (dispatch, getState) => {
   const query = gql `
-    mutation post ($user: String!, $lang: String!, $code: String!) {
-      saveTask(user: $user, lang: $lang, code: $code)
+    mutation post ($uid: String!, $lang: String!, $code: String!) {
+      saveTask(uid: $uid, lang: $lang, code: $code)
     }
   `;
   const state = getState();
-  const post = async ({user, lang, code, data}) => {
-    request('/api', query, { user, lang, code }).then((data) => {
-      const { id } = JSON.parse(data.saveTask);
+  const post = async ({uid, lang, code}) => {
+    request('/api', query, {uid, lang, code}).then((data) => {
+      const { taskId, imageUrl } = JSON.parse(data.saveTask);
       dispatch(addTask({
-        [id]: [{lang, code, data}]
+        [taskId]: [{lang, code, imageUrl}]
       }));
     });
   };
-  post({ user, lang, code, data }).catch(console.error);
+  post({uid, lang, code}).catch(console.error);
 };
 
 export const loadTasks = ({ uid }) => (dispatch, getState) => {
@@ -65,7 +63,6 @@ export const loadTasks = ({ uid }) => (dispatch, getState) => {
     }
   `;
   const get = async ({ uid }) => {
-    console.log("loadTasks() uid=" + uid);
     request('/api', query, { uid }).then((data) => {
       const tasks = JSON.parse(data.getTasks);
       dispatch(initTasks(tasks));

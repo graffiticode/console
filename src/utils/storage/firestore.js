@@ -49,11 +49,13 @@ const appendIds = (id, ...otherIds) => {
   return encodeId({ taskIds });
 };
 
-const buildTaskCreate = ({ db }) => async ({ task, auth }) => {
-  const { lang, code, data = {} } = task;
-  const codeHash = createCodeHash(code);
+const buildTaskCreate = ({ db }) => async ({ id, task, auth }) => {
+  const { lang, code } = task;
+  const codeHash = createCodeHash({ lang, code });
+
   const codeHashRef = db.doc(`code-hashes/${codeHash}`);
   const codeHashDoc = await codeHashRef.get();
+
   let taskId;
   let taskRef;
   if (codeHashDoc.exists) {
@@ -74,13 +76,38 @@ const buildTaskCreate = ({ db }) => async ({ task, auth }) => {
       acls = { public: true, uids: {} };
     }
     const tasksCol = db.collection("tasks");
-    const task = { lang, code, data, codeHash, count: 1, acls };
+    const task = { id, lang, code, codeHash, count: 1, acls };
     const taskRef = await tasksCol.add(task);
     taskId = taskRef.id;
     await codeHashRef.set({ taskId });
   }
-  return encodeId({ taskIds: [taskId] });
+  return taskId;
 };
+
+// const buildTaskCreate = ({ db }) => async ({ id, task, auth }) => {
+//   const { lang, code } = task;
+//   const taskRef = db.doc(`tasks/${id}`);
+//   const taskDoc = await taskRef.get();
+//   if (taskDoc.exists) {
+//     const taskUpdate = { count: admin.firestore.FieldValue.increment(1) };
+//     if (auth) {
+//       taskUpdate[`acls.uids.${auth.uid}`] = true;
+//     } else {
+//       taskUpdate["acls.public"] = true;
+//     }
+//     await taskRef.update(taskUpdate);
+//   } else {
+//     let acls;
+//     if (auth) {
+//       acls = { public: false, uids: { [auth.uid]: true } };
+//     } else {
+//       acls = { public: true, uids: {} };
+//     }
+//     const task = { lang, code, count: 1, acls };
+//     await taskRef.set(task);
+//   }
+//   return encodeId({ taskIds: [id] });
+// };
 
 const buildCheckAuth = () => ({ taskDoc, auth }) => {
   const acls = taskDoc.get("acls");
@@ -102,7 +129,7 @@ const buildCheckAuth = () => ({ taskDoc, auth }) => {
 const buildTaskGet = ({ db }) => {
   const checkAuth = buildCheckAuth();
   return async ({ id, auth }) => {
-    const taskIds = decodeId(id);
+    const taskIds = [id];
     const tasks = await Promise.all(
       taskIds.map(async taskId => {
         const taskRef = db.doc(`tasks/${taskId}`);
@@ -113,8 +140,8 @@ const buildTaskGet = ({ db }) => {
         checkAuth({ taskDoc, auth });
         const lang = taskDoc.get("lang");
         const code = taskDoc.get("code");
-        const data = taskDoc.get("data") || {};
-        return { lang, code, data };
+        const id = taskDoc.get("id");
+        return { lang, code, id };
       })
     );
     return tasks;

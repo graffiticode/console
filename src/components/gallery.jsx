@@ -28,6 +28,9 @@ function getData(task) {
 function Tasks({setOpen, setTask, lang}) {
   let tasks = useSelector(state => state.tasks);
   const tasksIds = Object.keys(tasks).reverse();
+  if (tasksIds.length === 0) {
+    return <div />;
+  }
   tasks = tasksIds.map(taskId => {
     const task = tasks[taskId][0];
     if (task.lang === lang) {
@@ -39,7 +42,7 @@ function Tasks({setOpen, setTask, lang}) {
   });
   tasks = tasks.filter(task => task !== null);
   if (tasks.length === 0) {
-    tasks.push({lang, code: '', data: 'ok', taskId: '0'});
+    tasks.push({lang, code: '', data: 'ok', id: '0'});
   }
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -47,7 +50,7 @@ function Tasks({setOpen, setTask, lang}) {
         if (task === undefined) {
           return;
         }
-        const taskId = task.taskId;
+        const { taskId, id } = task;
         return (
           <li
               key={taskId}
@@ -58,13 +61,13 @@ function Tasks({setOpen, setTask, lang}) {
               setTask(task);
             }}>
             <div className="flex flex-1 flex-col p-8">
-              <img src={`https://cdn.acx.ac/${taskId}.png`} />
+              <img src={`https://cdn.acx.ac/${id}.png`} />
               <dl className="mt-1 flex flex-grow flex-col justify-between">
                 <dt className="sr-only">Title</dt>
                 <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
               </dl>
               <h3 className="mt-6 text-xs font-light text-gray-500">
-                {`...${taskId.slice(taskId.length - 10)}`}
+                {`${id}`}
               </h3>
             </div>
             </button>
@@ -88,9 +91,7 @@ export default function Gallery({lang}) {
       </div>
     );
   } else {
-    const url = `http://localhost:3100/data?id=${id}`;
-    const data = { url };
-    const src = `/api/form/${lang}?data=${JSON.stringify(data)}`;
+    const src = `/api/form/${lang}?id=${id}`;
     return (
     <>
       <Tasks setOpen={setOpen} setTask={setTask} lang={lang}/>
@@ -127,8 +128,8 @@ export default function Gallery({lang}) {
                       </div>
                       <div className="relative mt-6 flex-1 px-4 sm:px-6">
                         <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
-                          <Editor userId={userId} task={task} setOpen={setOpen}/>
-                          <iframe src={src} height="100%"/>
+                          <Editor key="1" userId={userId} task={task} setOpen={setOpen}/>
+                          <iframe key="2" src={src} height="100%"/>
                         </div>
                       </div>
                     </div>

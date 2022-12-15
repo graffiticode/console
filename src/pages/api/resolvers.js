@@ -5,6 +5,8 @@ import { buildTaskDaoFactory } from "../../utils/storage/index.js";
 import { buildGetTaskDaoForStorageType } from "./utils.js";
 import { FieldValue } from 'firebase-admin/firestore';
 import db from '../../utils/db';
+import { getBaseUrlForApi } from '../../utils';
+
 const taskDaoFactory = buildTaskDaoFactory({});
 
 const normalizeTasksParameter = async tasks => {
@@ -28,48 +30,32 @@ export function createTask(lang, code) {
   return task;
 }
 
-export async function compileTask(auth, task) {
-  const resp = await postTask(auth, task);
-  let data;
-  console.log("compileTask() resp=" + JSON.stringify(resp));
-  if (resp && resp.id) {
-    data = await getData(auth, resp.id);
-    console.log("compileTask() data=" + JSON.stringify(data, null, 2));
-  }
-  return data;
-}
+/*
+  TODO
+  [ ] Use api taskId as app taskId. Let api do the hashing.
+  [ ] Add a pipe field to task.
+*/
 
-export async function saveTask(authToken, uid, task) {
-  /*
-    TODO
-    We already have a task id so just pass it to makeSnap()
-    to use to pass to the form url.
-    const data = JSON.stringify({id,url,auth});
-    const url = `${baseApiUrl}/form?lang=${lang}&data=${data}`;
-  */
-
-  const imageUrl = postSnap({ authToken, task });
-  //const data = await compileTask(authToken, task);
-  //task = {...task, data: JSON.stringify(data)};
-  const auth = { uid };
+export async function saveTask({ authToken, uid, lang, code }) {
+  const task = {lang, code};
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-  const tasks = await normalizeTasksParameter(task);
   const taskDao = getTaskDaoForStore("firestore");
-  const ids = await Promise.all(tasks.map(task => taskDao.create({ auth, task })));
-  const id = getIdFromIds(ids);
+  const auth = { uid };
+  const { id } = await postTask({authToken, task, persist: false});
+  const taskId = await taskDao.create({ id, auth, task });
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
   if (userData.taskIds === undefined) {
-    await userRef.update({taskIds: [id]});
+    await userRef.update({taskIds: [taskId]});
   } else {
-    await userRef.update({taskIds: FieldValue.arrayUnion(id)});
+    await userRef.update({taskIds: FieldValue.arrayUnion(taskId)});
   }
-  return JSON.stringify({id, imageUrl});
+  const imageUrl = await postSnap({ auth, task, id });
+  return JSON.stringify({taskId, imageUrl});
 }
 
 export async function getTasks(uid) {
-  console.log("getTasks() uid=" + uid);
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
@@ -99,37 +85,31 @@ export async function getTask(auth, id) {
   return JSON.stringify(tasks[0]);
 }
 
-export async function postTask(auth, task) {
+export async function postTask({ authToken, task, persist }) {
   try {
-    const post = bent('http://localhost:3100/', 'POST', 'json', 200);
-    //const post = bent('https://api.graffiticode.org/', 'POST', 'json', 200);
+    const baseUrl = getBaseUrlForApi();
+    const storageType = persist && "firestore" || "memory";
+    const headers = { "x-graffiticode-storage-type": storageType };
+    const post = bent(baseUrl, 'POST', 'json', 200, headers);
+    const auth = authToken;
     const { data } = await post('task', {auth, task});
-    console.log("postTask() data=" + JSON.stringify(data));
-    return data.id;
+    return data;
   } catch (x) {
-    console.log("POST /task catch " + x);
+    console.trace("POST /task catch " + x);
     return x;
   }
 }
 
 export async function getData(auth, id) {
   try {
-    const get = bent('http://localhost:3100/', 'GET', 'json', 200);
-    //const get = bent('https://api.graffiticode.org/', 'GET', 'json', 200);
+    const baseUrl = getBaseUrlForApi();
+    const get = bent(baseUrl, 'GET', 'json', 200);
     const { data } = await get(`data?id=${id}&auth=${auth}`);
     return data;
   } catch (x) {
     console.log("GET /data catch " + x);
   }
 }
-
-const getAsset = async (lang, path) => {
-  const baseUrl = 'http://localhost:3100/L' + lang;
-  const getLanguageAsset = bent(baseUrl, "string");
-  let asset = await getLanguageAsset(path);
-  asset = asset.slice('export default '.length, asset.lastIndexOf(';'));
-  return asset;
-};
 
 const uploadFileToS3 = (name, base64data) => {
   var s3 = new AWS.S3();
@@ -144,9 +124,9 @@ const uploadFileToS3 = (name, base64data) => {
   });
 };
 
-const postSnap = async ({ authToken, task }) => {
-  const { id } = await postTask(authToken, task);
-  const url = `http://localhost:3100/data?id=${id}`;
+const postSnap = async ({ authToken, task, id }) => {
+  const baseUrl = getBaseUrlForApi();
+  const url = `${baseUrl}data?id=${id}`;
   const data = { url };
   const { lang } = task;
   makeSnap({ id, lang, data });
@@ -154,6 +134,7 @@ const postSnap = async ({ authToken, task }) => {
 };
 
 const makeSnap = ({ id, lang, data }) => {
+  const baseUrl = getBaseUrlForApi();
   (async() => {
     try {
       const t0 = new Date;
@@ -162,8 +143,8 @@ const makeSnap = ({ id, lang, data }) => {
       ]});
       const page = await browser.newPage();
       // /api/form/1?data=%22hello%22
-      // /form?lang=147&data={%22url%22:%22http://localhost:3100/data?id=Oq2F0sg%22}
-      const url = `http://localhost:3000/api/form/${lang}?data=${JSON.stringify(data)}`;
+      // http://localhost:3100/form?lang=1&data={"url":"http://localhost:3100/data?id=WmHjCp"}
+      const url = `${baseUrl}form?lang=${lang}&data=${JSON.stringify(data)}`;
       console.log("makeSnap() url=" + url);
       await page.goto(url, {
         waitUntil: "networkidle0",
@@ -184,7 +165,6 @@ const makeSnap = ({ id, lang, data }) => {
           left: rect.left,
         }
       });
-      console.log("makeSnap() rect=" + JSON.stringify(rect, null, 2));
       const { x, y, width, height } = rect;
       await page.setViewport({
         width,
