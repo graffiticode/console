@@ -54,7 +54,7 @@ const CodeMirror = ({ setView, lang, code }) => {
     if (code !== '') {
       dispatch(postTask({ user, lang, code }));
     }
-  }, [code, lang, dispatch]);
+  }, [code]);
   const extensions = [
     customCompletionDisplay(dispatch, lang),
   ];

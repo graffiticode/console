@@ -49,7 +49,7 @@ export default function useCodeMirror(extensions, setView, doc) {
     setView(view);
     
     return () => view.destroy();    
-  }, [element, doc, extensions, setView]);
+  }, [element]);
 
   return { ref };
 }

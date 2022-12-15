@@ -62,7 +62,7 @@ function Tasks({setOpen, setTask, lang}) {
               setTask(task);
             }}>
             <div className="flex flex-1 flex-col p-8">
-              <img src={`https://cdn.acx.ac/${id}.png`} width="100%" height="100%" alt="thumbnail" />
+              <img src={`https://cdn.acx.ac/${id}.png`} alt="thumbnail" />
               <dl className="mt-1 flex flex-grow flex-col justify-between">
                 <dt className="sr-only">Title</dt>
                 <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
