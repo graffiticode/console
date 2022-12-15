@@ -1,6 +1,6 @@
 import db from '../../utils/db';
 
-export default async (req, res) => {
+const handler = async (req, res) => {
   try {
     console.log("GET /users");
     const users = await db.collection('users').orderBy('created').get();
@@ -13,3 +13,5 @@ export default async (req, res) => {
     res.status(400).end();
   }
 }
+
+export default handler;

@@ -1,4 +1,4 @@
-import { Image } from 'next/image';
+import Image from 'next/image';
 /* This example requires Tailwind CSS v2.0+ */
 import { Fragment, useRef, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
@@ -51,6 +51,7 @@ function Tasks({setOpen, setTask, lang}) {
           return;
         }
         const { taskId, id } = task;
+        console.log("id=" + id);
         return (
           <li
               key={taskId}
@@ -61,7 +62,7 @@ function Tasks({setOpen, setTask, lang}) {
               setTask(task);
             }}>
             <div className="flex flex-1 flex-col p-8">
-              <img src={`https://cdn.acx.ac/${id}.png`} />
+              <img src={`https://cdn.acx.ac/${id}.png`} width="100%" height="100%" alt="thumbnail" />
               <dl className="mt-1 flex flex-grow flex-col justify-between">
                 <dt className="sr-only">Title</dt>
                 <dd className="text-sm text-gray-700">{getTitle(task)}</dd>

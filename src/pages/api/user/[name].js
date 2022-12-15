@@ -1,6 +1,6 @@
 import db from '../../../utils/db';
 
-export default async (req, res) => {
+const handler = async (req, res) => {
   const { name } = req.query;
   console.log("GET /user name=" + name);
   try {
@@ -27,3 +27,5 @@ export default async (req, res) => {
     res.status(400).end();
   }
 }
+
+export default handler;

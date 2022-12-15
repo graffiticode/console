@@ -67,7 +67,7 @@ function SetupApp() {
     };
     // Turn off for now.
     // fetchSecret();
-  }, []);
+  }, [session.user]);
             
   return (
     clientSecret &&

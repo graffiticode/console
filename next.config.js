@@ -12,6 +12,9 @@ const nextConfig = {
     config.experiments = { ...config.experiments, ...{ topLevelAwait: true }};
     return config;
   },
+  images: {
+    domains: ['cdn.acx.ac'],
+  },
 };
 
 module.exports = nextConfig;

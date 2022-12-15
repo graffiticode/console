@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {});
 
-export default async (req, res) => {
+const handler = async (req, res) => {
   try {
     const { name, email } = req.body;
     const users = await db.collection('users').get();
@@ -36,3 +36,5 @@ export default async (req, res) => {
     res.status(400).end();
   }
 }
+
+export default handler;
