@@ -55,7 +55,7 @@ const buildGetBaseUrlForApi = ({
 
 export const getBaseUrlForApi = buildGetBaseUrlForApi({
   env: process.env,
-  config: global.config,
+  config: global.config || {},
   getApiHost,
   getApiPort
 });
