@@ -22,20 +22,21 @@ export const addPayment = () => (dispatch, getState) => {
   getData().catch(console.error);
 };
 
-export const postTask = ({ lang, code }) => (dispatch, getState) => {
+export const postTask = ({ lang, code, ephemeral }) => (dispatch, getState) => {
   const query = gql `
-    mutation post ($lang: String!, $code: String!) {
-      postTask(lang: $lang, code: $code)
+    mutation post ($lang: String!, $code: String!, $ephemeral: Boolean) {
+      postTask(lang: $lang, code: $code, ephemeral: $ephemeral)
     }
   `;
   const state = getState();
-  const post = async ({lang, code}) => {
-    request('/api', query, { lang, code }).then((data) => {
+  const ephemeral = true;
+  const post = async ({lang, code, ephemeral}) => {
+    request('/api', query, {lang, code, ephemeral}).then((data) => {
       const id = data.postTask;
       dispatch(updateTask(id));
     });
   };
-  post({ lang, code }).catch(console.error);
+  post({ lang, code, ephemeral }).catch(console.error);
 };
 
 export const saveTask = ({ uid, lang, code }) => (dispatch, getState) => {
@@ -47,9 +48,9 @@ export const saveTask = ({ uid, lang, code }) => (dispatch, getState) => {
   const state = getState();
   const post = async ({uid, lang, code}) => {
     request('/api', query, {uid, lang, code}).then((data) => {
-      const { taskId, imageUrl } = JSON.parse(data.saveTask);
+      const { id, image, imageUrl } = JSON.parse(data.saveTask);
       dispatch(addTask({
-        [taskId]: [{lang, code, imageUrl}]
+        [id]: [{lang, code, image, imageUrl}]
       }));
     });
   };

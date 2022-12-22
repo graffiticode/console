@@ -15,22 +15,12 @@ function getTitle(task) {
   return task.code.split(`\n`)[0].split('|')[1] || "Untitled";
 }
 
-function getData(task) {
-  let data;
-  try {
-    data = task.data && JSON.parse(task.data) || {};
-  } catch (x) {
-    data = {};
-  }
-  return data;
-}
-
 function Tasks({setOpen, setTask, lang}) {
   let tasks = useSelector(state => state.tasks);
   const tasksIds = Object.keys(tasks).reverse();
-  if (tasksIds.length === 0) {
-    return <div />;
-  }
+  // if (tasksIds.length === 0) {
+  //   return <div />;
+  // }
   tasks = tasksIds.map(taskId => {
     const task = tasks[taskId][0];
     if (task.lang === lang) {
@@ -42,7 +32,7 @@ function Tasks({setOpen, setTask, lang}) {
   });
   tasks = tasks.filter(task => task !== null);
   if (tasks.length === 0) {
-    tasks.push({lang, code: '', data: 'ok', id: '0'});
+    tasks.push({lang, code: ''});
   }
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -50,8 +40,11 @@ function Tasks({setOpen, setTask, lang}) {
         if (task === undefined) {
           return;
         }
-        const { taskId, id } = task;
-        console.log("id=" + id);
+        const { taskId, id, image, imageUrl } = task;
+        const src =
+          image && `data:image/png;base64, ${image}` ||
+          imageUrl ||
+          `https://cdn.acx.ac/${id}.png`;
         return (
           <li
               key={taskId}
@@ -62,7 +55,7 @@ function Tasks({setOpen, setTask, lang}) {
               setTask(task);
             }}>
             <div className="flex flex-1 flex-col p-8">
-              <img src={`https://cdn.acx.ac/${id}.png`} alt="thumbnail" />
+              <img src={src} alt="thumbnail" />
               <dl className="mt-1 flex flex-grow flex-col justify-between">
                 <dt className="sr-only">Title</dt>
                 <dd className="text-sm text-gray-700">{getTitle(task)}</dd>

@@ -10,7 +10,6 @@ import {
   renderGraphiQL,
 } from 'graphql-helix';
 import {
-  createTask,
   getTasks,
   saveTask,
   postTask,
@@ -31,7 +30,7 @@ const typeDefs = `
 
   type Mutation {
     saveTask(uid: String!, lang: String!, code: String!): String!
-    postTask(lang: String!, code: String!): String!
+    postTask(lang: String!, code: String!, ephemeral: Boolean): String!
   }
 `;
 
@@ -46,9 +45,10 @@ const resolvers = {
       const id = await saveTask({authToken, uid, lang, code});
       return id;
     },
-    postTask: async (_, {lang, code}) => {
-      const task = createTask(lang, code);
-      const { id } = await postTask({authToken, task});
+    postTask: async (_, {lang, code, ephemeral}) => {
+      console.log("postTask() ephemeral=" + ephemeral);
+      const task = {lang, code};
+      const { id } = await postTask({authToken, task, ephemeral});
       return id;
     },
   },
