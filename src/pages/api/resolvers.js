@@ -32,7 +32,9 @@ export async function saveTask({ authToken, uid, lang, code }) {
   const taskDao = getTaskDaoForStore("firestore");
   const auth = { uid };
   const { id } = await postTask({authToken, task, ephemeral: false});
+  console.log("saveTask() id=" + id);
   const taskId = await taskDao.create({ id, auth, task });
+  console.log("saveTask() taskId=" + taskId);
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
