@@ -53,7 +53,7 @@ export async function saveTask({ authToken, uid, lang, code }) {
 export async function postTask({ authToken, task, ephemeral }) {
   try {
     const baseUrl = getBaseUrlForApi();
-    const storageType = "ephemeral"; //ephemeral && "ephemeral" || "persistent";
+    const storageType = ephemeral && "ephemeral" || "persistent";
     const headers = { "x-graffiticode-storage-type": storageType };
     const post = bent(baseUrl, 'POST', 'json', 200, headers);
     const auth = authToken;

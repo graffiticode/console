@@ -46,7 +46,6 @@ const resolvers = {
       return id;
     },
     postTask: async (_, {lang, code, ephemeral}) => {
-      console.log("postTask() ephemeral=" + ephemeral);
       const task = {lang, code};
       const { id } = await postTask({authToken, task, ephemeral});
       return id;
