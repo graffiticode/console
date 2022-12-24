@@ -60,9 +60,6 @@ function Tasks({setOpen, setTask, lang}) {
                 <dt className="sr-only">Title</dt>
                 <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
               </dl>
-              <h3 className="mt-6 text-xs font-light text-gray-500">
-                {`${id}`}
-              </h3>
             </div>
             </button>
           </li>
