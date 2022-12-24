@@ -123,7 +123,7 @@ export default function Gallery({lang}) {
                       <div className="relative mt-6 flex-1 px-4 sm:px-6">
                         <div className="h-72 grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
                           <Editor key="1" userId={userId} task={task} setOpen={setOpen}/>
-                          <iframe key="2" src={src} height="100%"/>
+                          <iframe key="2" src={src} width="100%" height="100%"/>
                         </div>
                       </div>
                     </div>
