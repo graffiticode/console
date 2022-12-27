@@ -11,6 +11,7 @@ import {
 } from 'graphql-helix';
 import {
   getTasks,
+  hideTask,
   saveTask,
   postTask,
 } from './resolvers.js';
@@ -29,8 +30,9 @@ const typeDefs = `
   }
 
   type Mutation {
-    saveTask(uid: String!, lang: String!, code: String!): String!
+    hideTask(uid: String!, lang: String!, code: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
+    saveTask(uid: String!, lang: String!, code: String!): String!
   }
 `;
 
@@ -41,6 +43,10 @@ const resolvers = {
     },
   },
   Mutation: {
+    hideTask: async (_, {uid, lang, code}) => {
+      const id = await hideTask({authToken, uid, lang, code});
+      return id;
+    },
     saveTask: async (_, {uid, lang, code}) => {
       const id = await saveTask({authToken, uid, lang, code});
       return id;

@@ -20,11 +20,28 @@ const getIdFromIds = ids => {
   }
 };
 
-/*
-  TODO
-  [x] Use api taskId as app taskId. Let api do the hashing.
-  [ ] Add a pipe field to task.
-*/
+export async function hideTask({ authToken, uid, lang, code }) {
+  const task = {lang, code};
+  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
+  const taskDao = getTaskDaoForStore("firestore");
+  const taskId = await taskDao.create({ id, auth, task });
+  console.log("hideTask() taskId=" + taskId);
+  const userRef = await db.doc(`users/${uid}`);
+  const userDoc = await userRef.get();
+  const userData = userDoc.data();
+  if (userData.taskIds === undefined) {
+    await userRef.update({taskIds: [taskId]});
+  } else {
+    await userRef.update({taskIds: FieldValue.arrayUnion(taskId)});
+  }
+  const { base64 } = await postSnap({auth, lang, id});
+  const data = {
+    id,
+    image: base64,
+    imageUrl: `https://cdn.acx.ac/${id}.png`,
+  };
+  return JSON.stringify(data);
+}
 
 export async function saveTask({ authToken, uid, lang, code }) {
   const task = {lang, code};
@@ -32,12 +49,21 @@ export async function saveTask({ authToken, uid, lang, code }) {
   const taskDao = getTaskDaoForStore("firestore");
   const auth = { uid };
   const { id } = await postTask({authToken, task, ephemeral: false});
-  console.log("saveTask() id=" + id);
   const taskId = await taskDao.create({ id, auth, task });
-  console.log("saveTask() taskId=" + taskId);
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
+
+  try {
+  const taskIdsCol = userRef.collection("taskIds");
+    await taskIdsCol.doc(taskId).set({
+      lang,
+      hide: false,
+    });
+  } catch (x) {
+    console.log("saveTask() x=" + x);
+  }
+
   if (userData.taskIds === undefined) {
     await userRef.update({taskIds: [taskId]});
   } else {
@@ -104,10 +130,15 @@ export async function getTasks(uid) {
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
+  const taskIdsColRef = await userRef.collection('taskIds');
+  const taskIdsDocs = await taskIdsColRef.where('hide', '==', false).get();
+  const taskIds = [];
+  taskIdsDocs.forEach(doc => {
+    taskIds.push(doc.id);
+  });
   const auth = {uid};
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const taskDao = getTaskDaoForStore("firestore");
-  const taskIds = userData.taskIds || [];
   const tasksForIds = await Promise.all(taskIds.map(
     async id => taskDao.get({ id, auth })
   ));

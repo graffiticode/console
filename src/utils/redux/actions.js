@@ -57,6 +57,24 @@ export const saveTask = ({ uid, lang, code }) => (dispatch, getState) => {
   post({uid, lang, code}).catch(console.error);
 };
 
+export const hideTask = ({ uid, lang, code }) => (dispatch, getState) => {
+  const query = gql `
+    mutation post ($uid: String!, $lang: String!, $code: String!) {
+      hideTask(uid: $uid, lang: $lang, code: $code)
+    }
+  `;
+  const state = getState();
+  const post = async ({uid, lang, code}) => {
+    request('/api', query, {uid, lang, code}).then((data) => {
+      const { id } = JSON.parse(data.hideTask);
+      dispatch(hideTask({
+        [id]: [{lang, code, image, imageUrl}]
+      }));
+    });
+  };
+  post({uid, lang, code}).catch(console.error);
+};
+
 export const loadTasks = ({ uid }) => (dispatch, getState) => {
   const query = gql `
     query get($uid: String!) {

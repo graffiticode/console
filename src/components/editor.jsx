@@ -96,7 +96,7 @@ export default function Editor({ userId, task, setOpen }) {
                   setOpen(false);
                 }}
               >
-                Create Task
+                Save Task
               </button>
             </div>
           </div>
