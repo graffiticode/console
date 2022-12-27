@@ -59,10 +59,11 @@ export async function postTask({ authToken, task, ephemeral }) {
     const headers = { "x-graffiticode-storage-type": storageType };
     const post = bent(baseUrl, 'POST', 'json', 200, headers);
     const auth = authToken;
+    console.log("postTask() baseUrl=" + baseUrl);
     const { data } = await post('task', {auth, task});
     return data;
   } catch (x) {
-    console.trace("POST /task catch " + x);
+    console.log("POST /task catch " + x.stack);
     return x;
   }
 }
@@ -70,15 +71,20 @@ export async function postTask({ authToken, task, ephemeral }) {
 const postSnap = async ({ authToken, lang, id }) => {
   const baseUrl = getBaseUrlForApi();
   const dataParam = JSON.stringify({url: `${baseUrl}data?id=${id}`})
+  const url = `${baseUrl}form?lang=${lang}&data=${dataParam}`;
+  console.log("postSnap() url=" + url);
   const code = `
     data {
       id: '${id}',
-      url: '${baseUrl}form?lang=${lang}&data=${dataParam}',
+      url: '${url}',
     }..
   `;
   const task = { lang: "146", code };
+  console.log("postSnap() task=" + JSON.stringify(task, null, 2));
   const { id: taskId } = await postTask({authToken, task, ephemeral: true});
+  console.log("postSnap() taskId=" + taskId);
   const data = await getData({auth: authToken, id: taskId});
+  console.log("postSnap() data=" + JSON.stringify(data, null, 2));
   return data;
 };
 
