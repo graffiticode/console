@@ -22,6 +22,7 @@ import CodeMirror, { getCode } from './CodeMirror';
 import { javascript } from "@codemirror/lang-javascript";
 import { saveTask } from '../utils/redux/actions'
 import { useDispatch, useSelector } from 'react-redux'
+import MarkSelector, { marks } from '../components/mark-selector';
 
 const assignees = [
   { name: 'Unassigned', value: null },
@@ -69,6 +70,7 @@ const moods = [
 export default function Editor({ userId, task, setOpen }) {
   const [selected, setSelected] = useState(moods[5]);
   const [view, setView] = useState();
+  const [mark, setMark] = useState(marks[0])
   const dispatch = useDispatch();
   const uid = userId;
   const { lang, code } = task || {lang: '0', code: ''};
@@ -85,11 +87,12 @@ export default function Editor({ userId, task, setOpen }) {
             />
           </div>
           <div className="flex justify-between pt-2">
-            <div className="flex items-center space-x-5">
+            <div className="flex-shrink-0 w-18 h-8">
+              <MarkSelector mark={mark} setMark={setMark} bgColor="bg-black"/>
             </div>
             <div className="flex-shrink-0">
               <button
-                className="inline-flex items-center rounded-none border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700 focus:outline-none"
+                className="inline-flex items-center rounded-none border border-transparent bg-black px-4 py-2 text-sm font-medium text-gray-300 shadow-sm hover:bg-gray-700 focus:outline-none"
                 onClick={() => {
                   const code = getCode(view);
                   dispatch(saveTask({uid, lang, code}));

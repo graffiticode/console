@@ -99,10 +99,10 @@ export default function Tasks() {
                         ))}
                       </div>
                     </div>
-                    <div className="ml-10 flex-shrink-0 w-24 h-24 pt-2">
+                    <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
                       <LanguageSelector language={language} setLanguage={setLanguage}/>
                     </div>
-                    <div className="ml-10 flex-shrink-0 w-24 h-24 pt-2">
+                    <div className="ml-4 flex-shrink-0 w-18 h-24 pt-7">
                       <MarkSelector mark={mark} setMark={setMark}/>
                     </div>
                   </div>
