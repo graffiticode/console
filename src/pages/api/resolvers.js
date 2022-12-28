@@ -49,6 +49,8 @@ export async function saveTask({ authToken, uid, lang, code }) {
   const taskDao = getTaskDaoForStore("firestore");
   const auth = { uid };
   const { id } = await postTask({authToken, task, ephemeral: false});
+  // TODO if task id already exists, then update code in case its formatting
+  // has changed.
   const taskId = await taskDao.create({ id, auth, task });
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();

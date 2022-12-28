@@ -22,6 +22,7 @@ import { startClock } from '../utils/redux/actions';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
 import LanguageSelector from '../components/language-selector';
+import MarkSelector, { marks } from '../components/mark-selector';
 
 export function Logo(props) {
   return (
@@ -33,12 +34,13 @@ const navigation = [
   { name: 'Home', href: '/', current: false },
   { name: 'Tasks', href: '/tasks', current: true },
   { name: 'Settings', href: '/settings', current: false },
-]
+];
+
 const userNavigation = [
   { name: 'Your Profile', href: '#' },
   { name: 'Settings', href: '#' },
   { name: 'Sign out', href: '#' },
-]
+];
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -47,6 +49,7 @@ function classNames(...classes) {
 export default function Tasks() {
   const dispatch = useDispatch()
   const [language, setLanguage] = useState({id: 1, name: 'L1'})
+  const [mark, setMark] = useState(marks[0])
   const lang = language.name.slice(1);
   return (
     <>
@@ -98,6 +101,9 @@ export default function Tasks() {
                     </div>
                     <div className="ml-10 flex-shrink-0 w-24 h-24 pt-2">
                       <LanguageSelector language={language} setLanguage={setLanguage}/>
+                    </div>
+                    <div className="ml-10 flex-shrink-0 w-24 h-24 pt-2">
+                      <MarkSelector mark={mark} setMark={setMark}/>
                     </div>
                   </div>
                   <div className="hidden md:block">
