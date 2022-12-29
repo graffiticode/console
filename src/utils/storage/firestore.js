@@ -49,10 +49,9 @@ const appendIds = (id, ...otherIds) => {
   return encodeId({ taskIds });
 };
 
-const buildTaskCreate = ({ db }) => async ({ id, task, auth }) => {
+const buildTaskCreate = ({ db }) => async ({ auth, id, task, mark }) => {
   const { lang, code } = task;
-  const codeHash = createCodeHash({ lang, code });
-
+  const codeHash = createCodeHash({lang, code});
   const codeHashRef = db.doc(`code-hashes/${codeHash}`);
   const codeHashDoc = await codeHashRef.get();
 
@@ -61,7 +60,10 @@ const buildTaskCreate = ({ db }) => async ({ id, task, auth }) => {
   if (codeHashDoc.exists) {
     taskId = codeHashDoc.get("taskId");
     taskRef = db.doc(`tasks/${taskId}`);
-    const taskUpdate = { count: admin.firestore.FieldValue.increment(1) };
+    const taskUpdate = {
+      mark,
+      count: admin.firestore.FieldValue.increment(1)
+    };
     if (auth) {
       taskUpdate[`acls.uids.${auth.uid}`] = true;
     } else {
@@ -76,7 +78,7 @@ const buildTaskCreate = ({ db }) => async ({ id, task, auth }) => {
       acls = { public: true, uids: {} };
     }
     const tasksCol = db.collection("tasks");
-    const task = { id, lang, code, codeHash, count: 1, acls };
+    const task = { id, lang, code, mark, codeHash, count: 1, acls };
     const taskRef = await tasksCol.add(task);
     taskId = taskRef.id;
     await codeHashRef.set({ taskId });

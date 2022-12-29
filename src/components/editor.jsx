@@ -77,7 +77,7 @@ export default function Editor({ userId, task, setOpen }) {
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
-          <div className="border-b border-gray-400 focus-within:border-none">
+          <div className="border-b border-r border-gray-300 focus-within:border-none">
             <CodeMirror
               userId={userId}
               setView={setView}
@@ -86,20 +86,20 @@ export default function Editor({ userId, task, setOpen }) {
               code={code}
             />
           </div>
-          <div className="flex justify-between pt-2">
+          <div className="flex justify-between pt-2 bg-gray-200 mt-2 p-2">
             <div className="flex-shrink-0 w-18 h-8">
-              <MarkSelector mark={mark} setMark={setMark} bgColor="bg-black"/>
+              <MarkSelector mark={mark} setMark={setMark}/>
             </div>
             <div className="flex-shrink-0">
               <button
-                className="inline-flex items-center rounded-none border border-transparent bg-black px-4 py-2 text-sm font-medium text-gray-300 shadow-sm hover:bg-gray-700 focus:outline-none"
+                className="inline-flex items-center rounded-none border border-transparent bg-black px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 focus:outline-none"
                 onClick={() => {
                   const code = getCode(view);
-                  dispatch(saveTask({uid, lang, code}));
+                  dispatch(saveTask({uid, lang, code, mark: mark.id}));
                   setOpen(false);
                 }}
               >
-                Save Task
+                Save
               </button>
             </div>
           </div>

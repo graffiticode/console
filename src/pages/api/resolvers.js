@@ -20,15 +20,29 @@ const getIdFromIds = ids => {
   }
 };
 
-export async function hideTask({ authToken, uid, lang, code }) {
+export async function saveTask({ authToken, uid, lang, code, mark }) {
   const task = {lang, code};
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const taskDao = getTaskDaoForStore("firestore");
-  const taskId = await taskDao.create({ id, auth, task });
-  console.log("hideTask() taskId=" + taskId);
+  const auth = { uid };
+  const { id } = await postTask({authToken, task, ephemeral: false});
+  // TODO if task id already exists, then update code in case its formatting
+  // has changed.
+  const taskId = await taskDao.create({ auth, id, task, mark });
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
+
+  try {
+    const taskIdsCol = userRef.collection("taskIds");
+    await taskIdsCol.doc(taskId).set({
+      lang,
+      mark,
+    });
+  } catch (x) {
+    console.log("saveTask() x=" + x);
+  }
+
   if (userData.taskIds === undefined) {
     await userRef.update({taskIds: [taskId]});
   } else {
@@ -43,7 +57,7 @@ export async function hideTask({ authToken, uid, lang, code }) {
   return JSON.stringify(data);
 }
 
-export async function saveTask({ authToken, uid, lang, code }) {
+export async function updateMark({ authToken, uid, lang, code, mark }) {
   const task = {lang, code};
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const taskDao = getTaskDaoForStore("firestore");
@@ -57,21 +71,15 @@ export async function saveTask({ authToken, uid, lang, code }) {
   const userData = userDoc.data();
 
   try {
-  const taskIdsCol = userRef.collection("taskIds");
+    const taskIdsCol = userRef.collection("taskIds");
     await taskIdsCol.doc(taskId).set({
       lang,
-      hide: false,
+      mark,
     });
   } catch (x) {
     console.log("saveTask() x=" + x);
   }
 
-  if (userData.taskIds === undefined) {
-    await userRef.update({taskIds: [taskId]});
-  } else {
-    await userRef.update({taskIds: FieldValue.arrayUnion(taskId)});
-  }
-  const { base64 } = await postSnap({auth, lang, id});
   const data = {
     id,
     image: base64,
@@ -128,12 +136,13 @@ export async function getData({authToken, id}) {
   }
 }
 
-export async function getTasks(uid) {
+export async function getTasks({ uid, mark }) {
+  console.log("getTasks() mark=" + mark);
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
   const taskIdsColRef = await userRef.collection('taskIds');
-  const taskIdsDocs = await taskIdsColRef.where('hide', '==', false).get();
+  const taskIdsDocs = await taskIdsColRef.where('mark', '==', mark).get();
   const taskIds = [];
   taskIdsDocs.forEach(doc => {
     taskIds.push(doc.id);

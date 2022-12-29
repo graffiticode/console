@@ -26,7 +26,8 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function LanguageSelector({language, setLanguage}) {
+export default function LanguageSelector({ language, setLanguage }) {
+  console.log("LanguageSelector() language=" + language);
   const [query, setQuery] = useState('')
   const filteredLanguages =
     query === ''

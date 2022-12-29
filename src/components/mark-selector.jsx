@@ -37,13 +37,12 @@ export const marks = [
   {id: 7, val: BLACK},
 ];
 
-export default function MarkSelector({mark, setMark, bgColor}) {
+export default function MarkSelector({ mark, setMark }) {
   const [selected, setSelected] = useState(marks[0])
-  bgColor = "bg-white"
   return (
       <Listbox value={selected} onChange={setSelected}>
-      <div className={"relative w-20 " + bgColor}>
-          <Listbox.Button className="relative w-full cursor-default rounded-none py-2 pl-3 shadow-md ring-1 ring-gray-500 focus:outline-none focus-visible:border-gray-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-300 sm:text-sm">
+      <div className="relative w-20 bg-white">
+          <Listbox.Button className="relative w-full cursor-default rounded-none py-2 pl-3 shadow-md focus:outline-none focus-visible:border-gray-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-300 sm:text-sm">
             <span className="block truncate">
               <svg width="22" height="22" xmlns="http://www.w3.org/2000/svg">
                 <rect id="mark" width="100%" height="100%" fill={selected?.val}/>

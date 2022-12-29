@@ -11,7 +11,7 @@ import {
 } from 'graphql-helix';
 import {
   getTasks,
-  hideTask,
+  updateMark,
   saveTask,
   postTask,
 } from './resolvers.js';
@@ -26,29 +26,29 @@ global.config.useLocalCompiles = process.env.LOCAL_COMPILES === "true";
 
 const typeDefs = `
   type Query {
-    getTasks(uid: String!): String!
+    getTasks(uid: String!, mark: Int!): String!
   }
 
   type Mutation {
-    hideTask(uid: String!, lang: String!, code: String!): String!
+    updateMark(uid: String!, lang: String!, code: String!, mark: Int!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
-    saveTask(uid: String!, lang: String!, code: String!): String!
+    saveTask(uid: String!, lang: String!, code: String!, mark: Int!): String!
   }
 `;
 
 const resolvers = {
   Query: {
-    getTasks: async (_, { uid }) => {
-      return getTasks(uid);
+    getTasks: async (_, { uid, mark }) => {
+      return getTasks({uid, mark});
     },
   },
   Mutation: {
-    hideTask: async (_, {uid, lang, code}) => {
-      const id = await hideTask({authToken, uid, lang, code});
+    updateMark: async (_, {uid, lang, code, mark}) => {
+      const id = await updateMark({authToken, uid, lang, code, mark});
       return id;
     },
-    saveTask: async (_, {uid, lang, code}) => {
-      const id = await saveTask({authToken, uid, lang, code});
+    saveTask: async (_, {uid, lang, code, mark}) => {
+      const id = await saveTask({authToken, uid, lang, code, mark});
       return id;
     },
     postTask: async (_, {lang, code, ephemeral}) => {

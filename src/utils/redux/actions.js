@@ -1,5 +1,7 @@
 import {
   UPDATE_TASK,
+  UPDATE_LANG,
+  UPDATE_MARK,
   SET_USER_ID,
   ADD_TASK,
   INIT_TASKS,
@@ -39,61 +41,42 @@ export const postTask = ({ lang, code, ephemeral }) => (dispatch, getState) => {
   post({ lang, code, ephemeral }).catch(console.error);
 };
 
-export const saveTask = ({ uid, lang, code }) => (dispatch, getState) => {
+export const saveTask = ({ uid, lang, code, mark }) => (dispatch, getState) => {
   const query = gql `
-    mutation post ($uid: String!, $lang: String!, $code: String!) {
-      saveTask(uid: $uid, lang: $lang, code: $code)
+    mutation post ($uid: String!, $lang: String!, $code: String!, $mark: Int!) {
+      saveTask(uid: $uid, lang: $lang, code: $code, mark: $mark)
     }
   `;
   const state = getState();
-  const post = async ({uid, lang, code}) => {
-    request('/api', query, {uid, lang, code}).then((data) => {
+  const post = async ({uid, lang, code, mark}) => {
+    request('/api', query, {uid, lang, code, mark}).then((data) => {
       const { id, image, imageUrl } = JSON.parse(data.saveTask);
       dispatch(addTask({
-        [id]: [{lang, code, image, imageUrl}]
+        [id]: [{lang, code, mark, image, imageUrl}]
       }));
     });
   };
-  post({uid, lang, code}).catch(console.error);
+  post({uid, lang, code, mark}).catch(console.error);
 };
 
-export const hideTask = ({ uid, lang, code }) => (dispatch, getState) => {
+export const loadTasks = ({ uid, mark }) => (dispatch, getState) => {
   const query = gql `
-    mutation post ($uid: String!, $lang: String!, $code: String!) {
-      hideTask(uid: $uid, lang: $lang, code: $code)
-    }
-  `;
-  const state = getState();
-  const post = async ({uid, lang, code}) => {
-    request('/api', query, {uid, lang, code}).then((data) => {
-      const { id } = JSON.parse(data.hideTask);
-      dispatch(hideTask({
-        [id]: [{lang, code, image, imageUrl}]
-      }));
-    });
-  };
-  post({uid, lang, code}).catch(console.error);
-};
-
-export const loadTasks = ({ uid }) => (dispatch, getState) => {
-  const query = gql `
-    query get($uid: String!) {
-      getTasks(uid: $uid)
+    query get($uid: String!, $mark: Int!) {
+      getTasks(uid: $uid, mark: $mark)
     }
   `;
   const get = async ({ uid }) => {
-    request('/api', query, { uid }).then((data) => {
+    request('/api', query, { uid, mark }).then((data) => {
       const tasks = JSON.parse(data.getTasks);
       dispatch(initTasks(tasks));
     });
   };
-  get({uid}).catch(console.error);
+  get({uid, mark}).catch(console.error);
 };
 
 export const updateTask = (data) => ({ type: UPDATE_TASK, data });
-
+export const updateLang = (data) => ({ type: UPDATE_LANG, data });
+export const updateMark = (data) => ({ type: UPDATE_MARK, data });
 export const addTask = (data) => ({ type: ADD_TASK, data });
-
 export const initTasks = (data) => ({ type: INIT_TASKS, data });
-
 export const setUserId = (data) => ({ type: SET_USER_ID, data });

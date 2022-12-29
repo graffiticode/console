@@ -1,5 +1,6 @@
 import Head from 'next/head'
 import Image from 'next/image';
+import { useDispatch, useSelector } from 'react-redux'
 import { useSession, signIn } from 'next-auth/react'
 import { Fragment, useState } from 'react'
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react'
@@ -17,8 +18,7 @@ import {
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/signin'
 import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { startClock } from '../utils/redux/actions';
+import { updateMark, updateLang } from '../utils/redux/actions';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
 import LanguageSelector from '../components/language-selector';
@@ -46,11 +46,28 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+/*
+
+  Get 'language' and 'mark' from redux. When it changes save it to redux.
+  Also, store it in state for quick access.
+  
+  TODO
+  [ ] Re-load tasks when lang or mark is changed
+*/
+
 export default function Tasks() {
   const dispatch = useDispatch()
   const [language, setLanguage] = useState({id: 1, name: 'L1'})
+  console.log("Tasks() language=" + JSON.stringify(language, null, 2));
   const [mark, setMark] = useState(marks[0])
   const lang = language.name.slice(1);
+  const userId = useSelector(state => state.userId);
+  useEffect(() => {
+    dispatch(updateMark(mark));
+  }, [mark]);
+  useEffect(() => {
+    dispatch(updateLang(lang));
+  }, [language]);
   return (
     <>
       {/*
@@ -100,7 +117,7 @@ export default function Tasks() {
                       </div>
                     </div>
                     <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
-                      <LanguageSelector language={language} setLanguage={setLanguage}/>
+              <LanguageSelector language={language} setLanguage={setLanguage} />
                     </div>
                     <div className="ml-4 flex-shrink-0 w-18 h-24 pt-7">
                       <MarkSelector mark={mark} setMark={setMark}/>
