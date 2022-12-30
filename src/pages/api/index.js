@@ -26,11 +26,11 @@ global.config.useLocalCompiles = process.env.LOCAL_COMPILES === "true";
 
 const typeDefs = `
   type Query {
-    getTasks(uid: String!, mark: Int!): String!
+    getTasks(uid: String!, lang: String!, mark: Int!): String!
   }
 
   type Mutation {
-    updateMark(uid: String!, lang: String!, code: String!, mark: Int!): String!
+    tasksSettings(uid: String!, lang: String!, mark: Int!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
     saveTask(uid: String!, lang: String!, code: String!, mark: Int!): String!
   }
@@ -38,14 +38,14 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
-    getTasks: async (_, { uid, mark }) => {
-      return getTasks({uid, mark});
+    getTasks: async (_, { uid, lang, mark }) => {
+      return getTasks({uid, lang, mark});
     },
   },
   Mutation: {
-    updateMark: async (_, {uid, lang, code, mark}) => {
-      const id = await updateMark({authToken, uid, lang, code, mark});
-      return id;
+    tasksSettings: async (_, {uid, lang, mark}) => {
+      //const id = await updateMark({authToken, uid, lang, code, mark});
+      return JSON.stringify({status: "ok"});
     },
     saveTask: async (_, {uid, lang, code, mark}) => {
       const id = await saveTask({authToken, uid, lang, code, mark});

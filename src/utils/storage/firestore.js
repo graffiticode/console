@@ -86,31 +86,6 @@ const buildTaskCreate = ({ db }) => async ({ auth, id, task, mark }) => {
   return taskId;
 };
 
-// const buildTaskCreate = ({ db }) => async ({ id, task, auth }) => {
-//   const { lang, code } = task;
-//   const taskRef = db.doc(`tasks/${id}`);
-//   const taskDoc = await taskRef.get();
-//   if (taskDoc.exists) {
-//     const taskUpdate = { count: admin.firestore.FieldValue.increment(1) };
-//     if (auth) {
-//       taskUpdate[`acls.uids.${auth.uid}`] = true;
-//     } else {
-//       taskUpdate["acls.public"] = true;
-//     }
-//     await taskRef.update(taskUpdate);
-//   } else {
-//     let acls;
-//     if (auth) {
-//       acls = { public: false, uids: { [auth.uid]: true } };
-//     } else {
-//       acls = { public: true, uids: {} };
-//     }
-//     const task = { lang, code, count: 1, acls };
-//     await taskRef.set(task);
-//   }
-//   return encodeId({ taskIds: [id] });
-// };
-
 const buildCheckAuth = () => ({ taskDoc, auth }) => {
   const acls = taskDoc.get("acls");
   if (!acls) {

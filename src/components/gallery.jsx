@@ -1,13 +1,14 @@
 import Image from 'next/image';
 /* This example requires Tailwind CSS v2.0+ */
-import { Fragment, useRef, useState } from 'react'
+import { useEffect, Fragment, useRef, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import Editor from './editor';
-import { useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
 import { useSession, signIn, signOut } from "next-auth/react";
 import SignInAlert from "./SignInAlert";
+import { loadTasks, updateMark, updateLang } from '../utils/redux/actions';
 
 import { EnvelopeIcon, PhoneIcon } from '@heroicons/react/20/solid'
 
@@ -18,22 +19,14 @@ function getTitle(task) {
 function Tasks({setOpen, setTask, lang}) {
   let tasks = useSelector(state => state.tasks);
   const tasksIds = Object.keys(tasks).reverse();
-  // if (tasksIds.length === 0) {
-  //   return <div />;
-  // }
+  if (tasksIds.length === 0) {
+    return <div />;
+  }
   tasks = tasksIds.map(taskId => {
     const task = tasks[taskId][0];
-    if (task.lang === lang) {
-      task.taskId = taskId;
-      return task;
-    } else {
-      return null;
-    }
+    task.taskId = taskId;
+    return task;
   });
-  tasks = tasks.filter(task => task !== null);
-  if (tasks.length === 0) {
-    tasks.push({lang, code: ''});
-  }
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       {tasks.map((task) => {
@@ -69,12 +62,16 @@ function Tasks({setOpen, setTask, lang}) {
   );
 }
 
-export default function Gallery({lang}) {
+export default function Gallery({lang, mark}) {
+  const dispatch = useDispatch()
   const [open, setOpen] = useState(false);
   const [task, setTask] = useState();
   const userId = useSelector(state => state.userId);
   const id = useSelector(state => state.id);
   const { data: session } = useSession();
+  useEffect(() => {
+    dispatch(loadTasks({uid: userId, lang, mark: mark.id}));
+  });
   if (!session) {
     return (
       <div className="justify-center w-full">
@@ -119,7 +116,7 @@ export default function Gallery({lang}) {
                       </div>
                       <div className="relative mt-6 flex-1 px-4 sm:px-6">
                         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
-                          <Editor key="1" userId={userId} task={task} setOpen={setOpen}/>
+                          <Editor key="1" userId={userId} task={task} mark={mark} setOpen={setOpen}/>
                           <iframe key="2" src={src} width="100%" height="100%"/>
                         </div>
                       </div>

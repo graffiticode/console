@@ -28,24 +28,22 @@ const GRAY = "#BEC9CF"; //"#A0B1BA";
 const BLACK = "#000000"; //"#A0B1BA";
 
 export const marks = [
-  {id: 1, val: GREEN},
-  {id: 2, val: AMBER},
-  {id: 3, val: RED},
-  {id: 4, val: BLUE},
-  {id: 5, val: PURPLE},
-  {id: 6, val: GRAY},
-  {id: 7, val: BLACK},
+  {id: 1, color: GREEN},
+  {id: 2, color: AMBER},
+  {id: 3, color: RED},
+  {id: 4, color: GRAY},
+  {id: 5, color: BLACK},
 ];
 
 export default function MarkSelector({ mark, setMark }) {
-  const [selected, setSelected] = useState(marks[0])
+  const markColor = mark.color;
   return (
-      <Listbox value={selected} onChange={setSelected}>
+    <Listbox value={mark} onChange={setMark}>
       <div className="relative w-20 bg-white">
           <Listbox.Button className="relative w-full cursor-default rounded-none py-2 pl-3 shadow-md focus:outline-none focus-visible:border-gray-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-300 sm:text-sm">
             <span className="block truncate">
               <svg width="22" height="22" xmlns="http://www.w3.org/2000/svg">
-                <rect id="mark" width="100%" height="100%" fill={selected?.val}/>
+                <rect id="mark" width="100%" height="100%" fill={markColor}/>
               </svg>
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
@@ -74,7 +72,7 @@ export default function MarkSelector({ mark, setMark }) {
                 >
                   <span>
                     <svg width="24" height="22" xmlns="http://www.w3.org/2000/svg">
-                      <rect id="mark-rect" width="100%" height="100%" fill={mark?.val}/>
+                      <rect id="mark-rect" width="100%" height="100%" fill={mark.color}/>
                     </svg>
                   </span>
                 </Listbox.Option>

@@ -50,6 +50,7 @@ export async function saveTask({ authToken, uid, lang, code, mark }) {
   }
   const { base64 } = await postSnap({auth, lang, id});
   const data = {
+    taskId,
     id,
     image: base64,
     imageUrl: `https://cdn.acx.ac/${id}.png`,
@@ -95,7 +96,6 @@ export async function postTask({ authToken, task, ephemeral }) {
     const headers = { "x-graffiticode-storage-type": storageType };
     const post = bent(baseUrl, 'POST', 'json', 200, headers);
     const auth = authToken;
-    console.log("postTask() baseUrl=" + baseUrl);
     const { data } = await post('task', {auth, task});
     return data;
   } catch (x) {
@@ -108,7 +108,6 @@ const postSnap = async ({ authToken, lang, id }) => {
   const baseUrl = getBaseUrlForApi();
   const dataParam = JSON.stringify({url: `${baseUrl}data?id=${id}`})
   const url = `${baseUrl}form?lang=${lang}&data=${dataParam}`;
-  console.log("postSnap() url=" + url);
   const code = `
     data {
       id: '${id}',
@@ -116,11 +115,8 @@ const postSnap = async ({ authToken, lang, id }) => {
     }..
   `;
   const task = { lang: "146", code };
-  console.log("postSnap() task=" + JSON.stringify(task, null, 2));
   const { id: taskId } = await postTask({authToken, task, ephemeral: true});
-  console.log("postSnap() taskId=" + taskId);
   const data = await getData({auth: authToken, id: taskId});
-  console.log("postSnap() data=" + JSON.stringify(data, null, 2));
   return data;
 };
 
@@ -136,13 +132,15 @@ export async function getData({authToken, id}) {
   }
 }
 
-export async function getTasks({ uid, mark }) {
-  console.log("getTasks() mark=" + mark);
+export async function getTasks({ uid, lang, mark }) {
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
   const taskIdsColRef = await userRef.collection('taskIds');
-  const taskIdsDocs = await taskIdsColRef.where('mark', '==', mark).get();
+  const taskIdsDocs = await taskIdsColRef
+    .where('lang', '==', lang)
+    .where('mark', '==', mark)
+    .get();
   const taskIds = [];
   taskIdsDocs.forEach(doc => {
     taskIds.push(doc.id);

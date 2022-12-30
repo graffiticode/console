@@ -18,11 +18,13 @@ import {
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/signin'
 import { useEffect } from 'react';
-import { updateMark, updateLang } from '../utils/redux/actions';
+import { loadTasks, updateMark, updateLang } from '../utils/redux/actions';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
 import LanguageSelector from '../components/language-selector';
 import MarkSelector, { marks } from '../components/mark-selector';
+import useSwr from 'swr';
+import { tasksSettings } from '../utils/swr/fetchers';
 
 export function Logo(props) {
   return (
@@ -58,16 +60,11 @@ function classNames(...classes) {
 export default function Tasks() {
   const dispatch = useDispatch()
   const [language, setLanguage] = useState({id: 1, name: 'L1'})
-  console.log("Tasks() language=" + JSON.stringify(language, null, 2));
   const [mark, setMark] = useState(marks[0])
   const lang = language.name.slice(1);
-  const userId = useSelector(state => state.userId);
-  useEffect(() => {
-    dispatch(updateMark(mark));
-  }, [mark]);
-  useEffect(() => {
-    dispatch(updateLang(lang));
-  }, [language]);
+  const uid = useSelector(state => state.userId);
+  //const resp = useSwr({uid, lang, mark: mark.id}, tasksSettings);
+  //console.log("Tasks() resp=" + JSON.stringify(resp.data));
   return (
     <>
       {/*
@@ -117,7 +114,7 @@ export default function Tasks() {
                       </div>
                     </div>
                     <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
-              <LanguageSelector language={language} setLanguage={setLanguage} />
+                      <LanguageSelector language={language} setLanguage={setLanguage} />
                     </div>
                     <div className="ml-4 flex-shrink-0 w-18 h-24 pt-7">
                       <MarkSelector mark={mark} setMark={setMark}/>
@@ -252,7 +249,7 @@ export default function Tasks() {
         */}
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <Gallery lang={lang}/>
+            <Gallery lang={lang} mark={mark}/>
           </div>
         </main>
       </div>

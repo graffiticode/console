@@ -58,19 +58,10 @@ import {
   HeartIcon,
   XMarkIcon,
 } from '@heroicons/react/20/solid'
-const moods = [
-  { name: 'Excited', value: 'excited', icon: FireIcon, iconColor: 'text-white', bgColor: 'bg-red-500' },
-  { name: 'Loved', value: 'loved', icon: HeartIcon, iconColor: 'text-white', bgColor: 'bg-pink-400' },
-  { name: 'Happy', value: 'happy', icon: FaceSmileIconMini, iconColor: 'text-white', bgColor: 'bg-green-400' },
-  { name: 'Sad', value: 'sad', icon: FaceFrownIcon, iconColor: 'text-white', bgColor: 'bg-yellow-400' },
-  { name: 'Thumbsy', value: 'thumbsy', icon: HandThumbUpIcon, iconColor: 'text-white', bgColor: 'bg-blue-500' },
-  { name: 'I feel nothing', value: null, icon: XMarkIcon, iconColor: 'text-gray-400', bgColor: 'bg-transparent' },
-]
 
-export default function Editor({ userId, task, setOpen }) {
-  const [selected, setSelected] = useState(moods[5]);
+export default function Editor({ userId, task, mark: markInit, setOpen }) {
+  const [mark, setMark] = useState(markInit);
   const [view, setView] = useState();
-  const [mark, setMark] = useState(marks[0])
   const dispatch = useDispatch();
   const uid = userId;
   const { lang, code } = task || {lang: '0', code: ''};

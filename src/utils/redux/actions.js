@@ -50,28 +50,31 @@ export const saveTask = ({ uid, lang, code, mark }) => (dispatch, getState) => {
   const state = getState();
   const post = async ({uid, lang, code, mark}) => {
     request('/api', query, {uid, lang, code, mark}).then((data) => {
-      const { id, image, imageUrl } = JSON.parse(data.saveTask);
+      const { taskId, id, image, imageUrl } = JSON.parse(data.saveTask);
       dispatch(addTask({
-        [id]: [{lang, code, mark, image, imageUrl}]
+        [taskId]: [{id, lang, code, mark, image, imageUrl}]
       }));
     });
   };
   post({uid, lang, code, mark}).catch(console.error);
 };
 
-export const loadTasks = ({ uid, mark }) => (dispatch, getState) => {
+export const loadTasks = ({ uid, lang, mark }) => (dispatch, getState) => {
+  if (!uid) {
+    return {};
+  }
   const query = gql `
-    query get($uid: String!, $mark: Int!) {
-      getTasks(uid: $uid, mark: $mark)
+    query get($uid: String!, $lang: String!, $mark: Int!) {
+      getTasks(uid: $uid, lang: $lang, mark: $mark)
     }
   `;
-  const get = async ({ uid }) => {
-    request('/api', query, { uid, mark }).then((data) => {
+  const get = async ({ uid, lang, mark }) => {
+    request('/api', query, { uid, lang, mark }).then((data) => {
       const tasks = JSON.parse(data.getTasks);
       dispatch(initTasks(tasks));
     });
   };
-  get({uid, mark}).catch(console.error);
+  get({uid, lang, mark}).catch(console.error);
 };
 
 export const updateTask = (data) => ({ type: UPDATE_TASK, data });

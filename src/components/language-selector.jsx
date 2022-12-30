@@ -27,7 +27,6 @@ function classNames(...classes) {
 }
 
 export default function LanguageSelector({ language, setLanguage }) {
-  console.log("LanguageSelector() language=" + language);
   const [query, setQuery] = useState('')
   const filteredLanguages =
     query === ''
