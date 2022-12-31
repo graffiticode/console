@@ -121,7 +121,7 @@ export default function Tasks() {
                     </div>
                   </div>
                   <div className="hidden md:block">
-                    <div className="ml-4 flex items-center md:ml-6 text-gray-400 hover:text-white">
+                    <div className="text-sm font-medium ml-4 flex items-center md:ml-6 text-gray-400 hover:text-white">
                       <button
                         type="button"
                         className="bg-gray-800 p-1 rounded-none text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"

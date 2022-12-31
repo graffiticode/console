@@ -40,7 +40,7 @@ export default function MarkSelector({ mark, setMark }) {
   return (
     <Listbox value={mark} onChange={setMark}>
       <div className="relative w-20 bg-white">
-          <Listbox.Button className="relative w-full cursor-default rounded-none py-2 pl-3 shadow-md focus:outline-none focus-visible:border-gray-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-300 sm:text-sm">
+      <Listbox.Button className="relative w-full cursor-default rounded-none ring-1 ring-gray-400 py-2 pl-3 focus:outline-none focus-visible:border-gray-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-300 sm:text-sm hover:ring-2">
             <span className="block truncate">
               <svg width="22" height="22" xmlns="http://www.w3.org/2000/svg">
                 <rect id="mark" width="100%" height="100%" fill={markColor}/>
@@ -59,13 +59,13 @@ export default function MarkSelector({ mark, setMark }) {
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="left-0 absolute mt-1 max-h-60 w-full overflow-auto rounded-none bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+            <Listbox.Options className="left-0 absolute mt-1 max-h-60 w-full overflow-auto rounded-none bg-white py-1 text-base ring-1 ring-black ring-opacity-25 focus:outline-none sm:text-sm">
               {marks.map((mark, index) => (
                 <Listbox.Option
                   key={index}
                   className={({ active }) =>
                     `relative cursor-default select-none py-2 pl-3 pr-4 ${
-                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-900'
+                      active ? 'bg-gray-200 text-gray-900' : 'text-gray-900'
                     }`
                   }
                   value={mark}
