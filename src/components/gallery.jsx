@@ -88,7 +88,7 @@ export default function Gallery({lang, mark}) {
           <div className="fixed inset-0" />
           <div className="fixed inset-0 overflow-hidden">
             <div className="absolute inset-0 overflow-hidden">
-              <div className="pointer-events-none fixed inset-x-0 bottom-0 h-5/6 flex max-w-full">
+              <div className="pointer-events-none fixed inset-x-0 bottom-0 h-full flex max-w-full">
                 <Transition.Child
                   as={Fragment}
                   enter="transform transition ease-in-out duration-500 sm:duration-700"
@@ -115,7 +115,7 @@ export default function Gallery({lang, mark}) {
                         </div>
                       </div>
                       <div className="relative mt-6 flex-1 px-4 sm:px-6">
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl mx-auto sm:px-6 lg:px-8">
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl sm:px-6 lg:px-8">
                           <Editor key="1" userId={userId} task={task} mark={mark} setOpen={setOpen}/>
                           <iframe key="2" src={src} width="100%" height="100%"/>
                         </div>
