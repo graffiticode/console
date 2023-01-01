@@ -68,7 +68,7 @@ export default function Editor({ userId, task, mark: markInit, setOpen }) {
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
-          <div className="border-b border-r border-gray-300 focus-within:border-none">
+          <div className="ring-1 ring-gray-300 focus-within:border-none">
             <CodeMirror
               userId={userId}
               setView={setView}
@@ -77,7 +77,7 @@ export default function Editor({ userId, task, mark: markInit, setOpen }) {
               code={code}
             />
           </div>
-          <div className="flex justify-between pt-2 bg-white ring-gray-300 ring-1 mt-2 p-2">
+          <div className="flex justify-between pt-2 bg-white ring-1 ring-gray-400 ring-1 mt-2 p-2">
             <div className="flex-shrink-0 w-18 h-8">
               <MarkSelector mark={mark} setMark={setMark}/>
             </div>
