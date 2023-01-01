@@ -71,29 +71,6 @@ export default function Example() {
   } else {
   return (
     <div> 
-     <Disclosure as="div" className="relative overflow-hidden bg-sky-700">
-        {({ open }) => (
-          <>
-            <div
-              aria-hidden="true"
-              className={classNames(
-                open ? 'bottom-0' : 'inset-y-0',
-                'absolute inset-x-0 left-1/2 w-full -translate-x-1/2 transform overflow-hidden lg:inset-y-0'
-              )}
-            >
-              <div className="absolute inset-0 flex">
-                <div className="h-full w-1/2" style={{ backgroundColor: '#000' }} />
-                <div className="h-full w-1/2" style={{ backgroundColor: '#000' }} />
-              </div>
-            </div>
-            <header className="relative py-5">
-              <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                <h1 className="text-3xl font-bold tracking-tight text-white">Settings</h1>
-              </div>
-            </header>
-          </>
-        )}
-      </Disclosure>
       <div className="relative pt-10">
         <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
           <aside className="py-6 lg:col-span-3">
