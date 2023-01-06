@@ -30,7 +30,7 @@ function Tasks({setOpen, setTask, lang}) {
   if (tasks.length === 0) {
     tasks.push({
       lang,
-      code: '| blank\n..',
+      code: '..',
     });
   }
   return (
