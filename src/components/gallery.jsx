@@ -19,14 +19,20 @@ function getTitle(task) {
 function Tasks({setOpen, setTask, lang}) {
   let tasks = useSelector(state => state.tasks);
   const tasksIds = Object.keys(tasks).reverse();
-  if (tasksIds.length === 0) {
-    return <div />;
-  }
+  // if (tasksIds.length === 0) {
+  //   return <div />;
+  // }
   tasks = tasksIds.map(taskId => {
     const task = tasks[taskId][0];
     task.taskId = taskId;
     return task;
   });
+  if (tasks.length === 0) {
+    tasks.push({
+      lang,
+      code: '| blank\n..',
+    });
+  }
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       {tasks.map((task) => {
