@@ -8,10 +8,6 @@ import { graffiticode } from "@graffiticode/lang-graffiticode";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { defaultKeymap } from "@codemirror/commands";
 import {tags} from "@lezer/highlight";
-const myHighlightStyle = HighlightStyle.define([
-  {tag: tags.keyword, color: "#fc6"},
-  {tag: tags.comment, color: "#f5d", fontStyle: "italic"}
-]);
 
 export default function useCodeMirror(extensions, setView, doc) {
   const [element, setElement] = useState();
@@ -37,7 +33,6 @@ export default function useCodeMirror(extensions, setView, doc) {
         keymap.of(defaultKeymap),
         theme,
         graffiticode(),
-        syntaxHighlighting(myHighlightStyle),
       ]
     });
 
