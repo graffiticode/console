@@ -16,7 +16,7 @@ import {
   XMarkIcon,
   BellIcon,
 } from '@heroicons/react/24/outline'
-import SignIn from '../components/signin'
+import SignIn from '../components/SignIn'
 import { useEffect } from 'react';
 import { loadTasks, updateMark, updateLang } from '../utils/redux/actions';
 import Link from 'next/link';

@@ -15,7 +15,7 @@ import {
   XMarkIcon,
   BellIcon,
 } from '@heroicons/react/24/outline';
-import SignIn from '../components/signin';
+import SignIn from '../components/SignIn';
 import SettingsForm from '../components/SettingsForm';
 
 export function Logo(props) {
