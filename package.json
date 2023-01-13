@@ -32,7 +32,7 @@
     "c3": "^0.4.24",
     "d3": "^7.6.1",
     "dashify": "^2.0.0",
-    "ethers": "^5.5.1",
+    "firebase": "^9.15.0",
     "firebase-admin": "^11.0.1",
     "graphql": "^16.6.0",
     "graphql-helix": "^1.13.0",
@@ -48,7 +48,6 @@
     "redux-devtools-extension": "^2.13.9",
     "redux-thunk": "^2.4.1",
     "sharp": "^0.31.3",
-    "siwe": "^1.1.6",
     "stripe": "^10.8.0",
     "swr": "^2.0.0",
     "wagmi": "^0.10.4"

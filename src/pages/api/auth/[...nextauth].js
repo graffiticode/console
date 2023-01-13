@@ -1,7 +1,7 @@
+import { stripHexPrefix } from "@ethereumjs/util";
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { SiweMessage } from "siwe";
-import { exchangeEthereum, getUserNonce } from "../../../lib/auth";
+import { exchangeEthereum } from "../../../lib/auth";
 
 export default async function auth(req, res) {
   const providers = [];
@@ -12,8 +12,8 @@ export default async function auth(req, res) {
     providers.push(CredentialsProvider({
       name: "Graffiticode Ethereum",
       credentials: {
-        message: {
-          label: "Message",
+        address: {
+          label: "Address",
           type: "text",
           placeholder: "0x0",
         },
@@ -24,15 +24,14 @@ export default async function auth(req, res) {
         },
       },
       async authorize(credentials) {
+        const address = stripHexPrefix(credentials?.address);
+        const signature = stripHexPrefix(credentials?.signature);
         try {
-          const siwe = new SiweMessage(JSON.parse(credentials?.message || "{}"));
-          console.log({ address: siwe.address, signature: credentials?.signature });
-          await exchangeEthereum({ address: siwe.address, signature: credentials?.signature });
-          return {
-            id: siwe.address,
-          }
+          await exchangeEthereum({ address, signature });
+          return { id: address };
         } catch (e) {
-          return null
+          console.error(e);
+          return null;
         }
       },
     }));
@@ -46,10 +45,9 @@ export default async function auth(req, res) {
     secret: process.env.NEXT_AUTH_SECRET,
     callbacks: {
       async session({ session, token }) {
-        console.log(token);
-        session.address = token.sub
-        session.user.name = token.sub
-        return session
+        session.address = token.sub;
+        session.user.name = token.sub;
+        return session;
       },
     },
   });

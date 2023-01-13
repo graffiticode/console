@@ -1,9 +1,10 @@
-import ethUtil from "@ethereumjs/util";
+import { getIdToken, signInWithCustomToken } from "firebase/auth";
+import { apiAuth as auth } from "./firebase";
 
-const AUTH_URL = "http://localhost:4100";
+const authUrl = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org";
 
 const registerUser = async ({ address }) => {
-  const res = await fetch(`${AUTH_URL}/users/register`, {
+  const res = await fetch(`${authUrl}/users/register`, {
     method: "POST",
     body: JSON.stringify({ uid: address }),
     headers: {
@@ -22,7 +23,7 @@ const registerUser = async ({ address }) => {
 };
 
 const getUser = async ({ address }) => {
-  const res = await fetch(`${AUTH_URL}/users/${address}`);
+  const res = await fetch(`${authUrl}/users/${address}`);
   const body = await res.json();
   if (!res.ok) {
     const err = new Error(`failed to get user: ${res.status} ${res.statusText}`);
@@ -34,7 +35,7 @@ const getUser = async ({ address }) => {
 };
 
 export const exchangeEthereum = async ({ address, signature }) => {
-  const res = await fetch(`${AUTH_URL}/exchange/ethereum/${address}`, {
+  const res = await fetch(`${authUrl}/exchange/ethereum/${address}`, {
     method: "POST",
     body: JSON.stringify({ signature }),
     headers: {
@@ -42,22 +43,20 @@ export const exchangeEthereum = async ({ address, signature }) => {
     },
   });
   const body = await res.json();
-  console.log(body);
   if (!res.ok) {
     const err = new Error(`failed to authenticate with ethereum: ${res.status} ${res.statusText}`);
     err.body = body;
     throw err;
   }
+  const { data: { token: customToken } } = body;
+  // const { user } = await signInWithCustomToken(auth, customToken);
+  // const token = await getIdToken(user);
+  // return token;
+  return customToken;
 };
 
 export const getUserNonce = async ({ address }) => {
   await registerUser({ address });
   const userData = await getUser({ address });
   return userData.nonce;
-};
-
-export const createMessageHash = ({ nonce }) => {
-  const msg = `Nonce: ${nonce}`;
-  const msgBuffer = Buffer.from(msg, "ascii");
-  return ethUtil.hashPersonalMessage(msgBuffer);
 };

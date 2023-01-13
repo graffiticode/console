@@ -1,13 +1,11 @@
-"use client";
-
+import { stripHexPrefix } from "@ethereumjs/util";
 import { useSession, signIn, signOut, } from "next-auth/react";
 import { useCallback, } from "react";
-import { SiweMessage } from "siwe";
 import { useAccount, useConnect, useDisconnect, useNetwork, useSignMessage } from "wagmi";
 import { InjectedConnector } from 'wagmi/connectors/injected'
 import { getUserNonce } from "../lib/auth";
 
-export default function SignIn() {
+export default function SignIn({ label = "Sign in" }) {
   const { data: session } = useSession();
 
   const { signMessageAsync } = useSignMessage();
@@ -31,23 +29,15 @@ export default function SignIn() {
     e.preventDefault();
     try {
       const address = await getAddress();
-      const nonce = await getUserNonce({ address });
-      const message = new SiweMessage({
-        domain: window.location.host,
+      const nonce = await getUserNonce({ address: stripHexPrefix(address) });
+      const signature = await signMessageAsync({ message: `Nonce: ${nonce}` });
+      const r = await signIn("credentials", {
         address,
-        statement: "Sign in with Ethereum to Graffiticode.",
-        uri: window.location.origin,
-        version: "1",
-        chainId: chain?.id,
-        nonce,
-      });
-      const signature = await signMessageAsync({ message: message.prepareMessage() });
-      signIn("credentials", {
-        message: JSON.stringify(message),
         signature,
         redirect: false,
         callbackUrl: "/protected",
       });
+      console.log(r);
     } catch (error) {
       console.error(error);
     }
@@ -62,6 +52,6 @@ export default function SignIn() {
   if (session) {
     return <button onClick={handleSignOut}>{session.user.name} (Sign out)</button>;
   } else {
-    return <button onClick={handleSignIn}>Sign in</button>;
+    return <button onClick={handleSignIn}>{label}</button>;
   }
 }
