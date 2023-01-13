@@ -5,7 +5,7 @@ import { useAccount, useConnect, useDisconnect, useNetwork, useSignMessage } fro
 import { InjectedConnector } from 'wagmi/connectors/injected'
 import { getUserNonce } from "../lib/auth";
 
-export default function SignIn({ label = "Sign in" }) {
+export default function SignInComponent({ label = "Sign in" }) {
   const { data: session } = useSession();
 
   const { signMessageAsync } = useSignMessage();
@@ -31,13 +31,12 @@ export default function SignIn({ label = "Sign in" }) {
       const address = await getAddress();
       const nonce = await getUserNonce({ address: stripHexPrefix(address) });
       const signature = await signMessageAsync({ message: `Nonce: ${nonce}` });
-      const r = await signIn("credentials", {
+      await signIn("credentials", {
         address,
         signature,
         redirect: false,
         callbackUrl: "/protected",
       });
-      console.log(r);
     } catch (error) {
       console.error(error);
     }
