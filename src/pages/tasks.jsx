@@ -76,7 +76,7 @@ export default function Tasks() {
         ```
       */}
       <Head>
-        <title>Graffiticode</title>
+        <title>ChartCompiler</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"
