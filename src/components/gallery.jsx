@@ -13,7 +13,7 @@ import { loadTasks, updateMark, updateLang } from '../utils/redux/actions';
 import { EnvelopeIcon, PhoneIcon } from '@heroicons/react/20/solid'
 
 function getTitle(task) {
-  return task.code.split(`\n`)[0].split('|')[1] || "Untitled";
+  return task.code.split(`\n`)[0].split('|')[1] || undefined;
 }
 
 function Tasks({setOpen, setTask, lang}) {
@@ -27,12 +27,10 @@ function Tasks({setOpen, setTask, lang}) {
     task.taskId = taskId;
     return task;
   });
-  if (tasks.length === 0) {
-    tasks.push({
-      lang,
-      code: '',
-    });
-  }
+  tasks.unshift({
+    lang,
+    code: '',
+  });
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       {tasks.map((task) => {
@@ -43,7 +41,12 @@ function Tasks({setOpen, setTask, lang}) {
         const src =
           image && `data:image/png;base64, ${image}` ||
           imageUrl ||
-          `https://cdn.acx.ac/${id}.png`;
+          id && `https://cdn.acx.ac/${id}.png` ||
+          `data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="rgb(128,128,128)" class="">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+</svg>`;
+        console.log("Tasks() src=" + src);
+
         return (
           <li
               key={taskId}
@@ -53,8 +56,8 @@ function Tasks({setOpen, setTask, lang}) {
               setOpen(true);
               setTask(task);
             }}>
-            <div className="flex flex-1 flex-col p-8">
-              <img src={src} alt="thumbnail" />
+            <div className="flex flex-1 flex-col p-8 place-content-center">
+            <img src={src} className={!id && !image && "mx-16"}/>
               <dl className="mt-1 flex flex-grow flex-col justify-between">
                 <dt className="sr-only">Title</dt>
                 <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
