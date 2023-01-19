@@ -21,13 +21,12 @@ const getIdFromIds = ids => {
 };
 
 export async function saveTask({ authToken, uid, lang, code, mark }) {
+  try {
   const task = {lang, code};
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const taskDao = getTaskDaoForStore("firestore");
   const auth = { uid };
   const { id } = await postTask({authToken, task, ephemeral: false});
-  // TODO if task id already exists, then update code in case its formatting
-  // has changed.
   const taskId = await taskDao.create({ auth, id, task, mark });
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
@@ -48,14 +47,18 @@ export async function saveTask({ authToken, uid, lang, code, mark }) {
   } else {
     await userRef.update({taskIds: FieldValue.arrayUnion(taskId)});
   }
-  const { base64 } = await postSnap({auth, lang, id});
+//  const { base64 } = await postSnap({auth, lang, id});
   const data = {
     taskId,
     id,
-    image: base64,
+//    image: base64,
     imageUrl: `https://cdn.acx.ac/${id}.png`,
   };
-  return JSON.stringify(data);
+  console.log("saveTask() data=" + JSON.stringify(data, null, 2));
+    return JSON.stringify(data);
+  } catch (x) {
+    console.log(x.stack);
+  }
 }
 
 export async function updateMark({ authToken, uid, lang, code, mark }) {
@@ -89,14 +92,17 @@ export async function updateMark({ authToken, uid, lang, code, mark }) {
   return JSON.stringify(data);
 }
 
-export async function postTask({ authToken, task, ephemeral }) {
+export async function postTask({ uid, task, ephemeral }) {
   try {
     const baseUrl = getBaseUrlForApi();
     const storageType = ephemeral && "ephemeral" || "persistent";
     const headers = { "x-graffiticode-storage-type": storageType };
+    console.log("postTask() baseUrl=" + baseUrl);
     const post = bent(baseUrl, 'POST', 'json', 200, headers);
-    const auth = authToken;
+    const auth = uid;
+    console.log("postTask() auth=" + auth + " task=" + JSON.stringify(task, null, 2));
     const { data } = await post('task', {auth, task});
+    console.log("postTask() data=" + JSON.stringify(data, null, 2));
     return data;
   } catch (x) {
     console.log("POST /task catch " + x.stack);

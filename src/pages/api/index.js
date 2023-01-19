@@ -31,7 +31,7 @@ const typeDefs = `
 
   type Mutation {
     tasksSettings(uid: String!, lang: String!, mark: Int!): String!
-    postTask(lang: String!, code: String!, ephemeral: Boolean): String!
+    postTask(uid: String!, lang: String!, code: String!, ephemeral: Boolean): String!
     saveTask(uid: String!, lang: String!, code: String!, mark: Int!): String!
   }
 `;
@@ -48,12 +48,14 @@ const resolvers = {
       return JSON.stringify({status: "ok"});
     },
     saveTask: async (_, {uid, lang, code, mark}) => {
+      console.log("saveTask() code=" + code);
       const id = await saveTask({authToken, uid, lang, code, mark});
+      console.log("saveTask() id=" + id);
       return id;
     },
-    postTask: async (_, {lang, code, ephemeral}) => {
+    postTask: async (_, {uid, lang, code, ephemeral}) => {
       const task = {lang, code};
-      const { id } = await postTask({authToken, task, ephemeral});
+      const { id } = await postTask({uid, task, ephemeral});
       return id;
     },
   },

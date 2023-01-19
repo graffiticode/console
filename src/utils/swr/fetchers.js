@@ -1,20 +1,21 @@
 import { request, gql } from 'graphql-request';
 
-export const tasksSettings = ({ uid, lang, mark }) => {
+export const postTask = async ({ uid, lang, code }) => {
   const query = gql `
-    mutation post ($uid: String!, $lang: String!, $mark: Int!) {
-      tasksSettings(uid: $uid, lang: $lang, mark: $mark)
+    mutation post ($uid: String!, $lang: String!, $code: String!, $ephemeral: Boolean!) {
+      postTask(uid: $uid, lang: $lang, code: $code, ephemeral: $ephemeral)
     }
   `;
-  const post = ({uid, lang, mark}) => {
-    request('/api', query, {uid, lang, mark}).then((data) => console.log(JSON.stringify(data) && data));
-  };
-  return post({uid, lang, mark});
-}
+  const ephemeral = true;
+  return request('/api', query, {uid, lang, code, ephemeral}).then(data => data.postTask);
+};
 
-/*
-function App () {
-  const { data, error } = useSWR({uid, lang, mark}, tasksSettings);
-  // ...
-}
-*/
+export const saveTask = async ({ uid, lang, code, mark }) => {
+  const query = gql `
+    mutation post ($uid: String!, $lang: String!, $code: String!, $mark: Int!) {
+      saveTask(uid: $uid, lang: $lang, code: $code, mark: $mark)
+    }
+  `;
+  return request('/api', query, {uid, lang, code, mark}).then(data => data);
+};
+

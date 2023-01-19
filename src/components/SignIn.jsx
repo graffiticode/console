@@ -6,8 +6,7 @@ import { InjectedConnector } from 'wagmi/connectors/injected'
 import { getUserNonce } from "../lib/auth";
 
 export default function SignInComponent({ label = "Sign in" }) {
-  const { data: session } = useSession();
-
+  const { data: sessionData } = useSession();
   const { signMessageAsync } = useSignMessage();
   const { chain } = useNetwork();
   const { address, isConnected } = useAccount();
@@ -48,8 +47,9 @@ export default function SignInComponent({ label = "Sign in" }) {
     disconnect();
   }, [disconnect]);
 
-  if (session) {
-    return <button onClick={handleSignOut}>{session.user.name} (Sign out)</button>;
+  if (sessionData) {
+    console.log("sessionData=" + JSON.stringify(sessionData, null, 2));
+    return <button onClick={handleSignOut}>{sessionData.user.name} (Sign out)</button>;
   } else {
     return <button onClick={handleSignIn}>{label}</button>;
   }

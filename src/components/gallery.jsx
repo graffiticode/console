@@ -76,7 +76,9 @@ export default function Gallery({ lang, mark }) {
   const [open, setOpen] = useState(false);
   const [task, setTask] = useState();
   const userId = useSelector(state => state.userId);
-  const id = useSelector(state => state.id);
+  console.log("Gallery() userId=" + userId);
+  //const id = useSelector(state => state.id);
+  const [ id, setId ] = useState();
   const { data: session } = useSession();
   useEffect(() => {
     dispatch(loadTasks({ uid: userId, lang, mark: mark.id }));
@@ -128,7 +130,7 @@ export default function Gallery({ lang, mark }) {
                         </div>
                         <div className="relative mt-6 flex-1 px-4 sm:px-6">
                           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl sm:px-6 lg:px-8">
-                            <Editor key="1" userId={userId} task={task} mark={mark} setOpen={setOpen} />
+                            <Editor key="1" userId={userId} task={task} lang={lang} mark={mark} setOpen={setOpen} setId={setId} />
                             <iframe key="2" src={src} width="100%" height="100%" />
                           </div>
                         </div>

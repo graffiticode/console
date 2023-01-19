@@ -3,7 +3,6 @@ import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
-import { useDispatch } from 'react-redux';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
 
@@ -33,12 +32,6 @@ const navigation = [
   { name: 'Settings', href: '/settings', current: false },
 ]
 
-const userNavigation = [
-  { name: 'Your Profile', href: '#' },
-  { name: 'Settings', href: '#' },
-  { name: 'Sign out', href: '#' },
-]
-
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
@@ -51,8 +44,7 @@ const ReduxApplet = () => {
   );
 }
 
-export default function Example() {
-  const dispatch = useDispatch();
+export default function Home() {
   const [userId, setUserId] = useState();
   return (
     <>
@@ -104,52 +96,8 @@ export default function Example() {
                     </div>
                   </div>
                   <div className="hidden md:block">
-                    <div className="ml-4 flex items-center md:ml-6 text-gray-400 hover:text-white">
-                      <button
-                        type="button"
-                        className="bg-gray-800 p-1 rounded-none text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
-                      >
-                        <span className="sr-only">View notifications</span>
-                        <BellIcon className="h-6 w-6" aria-hidden="true" />
-                      </button>
+                    <div className="text-sm font-medium ml-4 flex items-center md:ml-6 text-gray-400 hover:text-white">
                       <SignIn userId={userId} setUserId={setUserId}/>
-                      {/* Profile dropdown
-                      <Menu as="div" className="ml-3 relative">
-                        <div>
-                          <Menu.Button className="max-w-xs bg-gray-800 rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white">
-                          <span className="sr-only">Open user menu</span>
-                          <img className="h-8 w-8 rounded-none" src={user.imageUrl} alt="" />
-                        </Menu.Button>
-                        </div>
-                        <Transition
-                          as={Fragment}
-                          enter="transition ease-out duration-100"
-                          enterFrom="transform opacity-0 scale-95"
-                          enterTo="transform opacity-100 scale-100"
-                          leave="transition ease-in duration-75"
-                          leaveFrom="transform opacity-100 scale-100"
-                          leaveTo="transform opacity-0 scale-95"
-                        >
-                          <Menu.Items className="origin-top-right absolute right-0 mt-2 w-48 rounded-none shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
-                            {userNavigation.map((item) => (
-                              <Menu.Item key={item.name}>
-                                {({ active }) => (
-                                  <a
-                                    href={item.href}
-                                    className={classNames(
-                                      active ? 'bg-gray-100' : '',
-                                      'block px-4 py-2 text-sm text-gray-700'
-                                    )}
-                                  >
-                                    {item.name}
-                                  </a>
-                                )}
-                              </Menu.Item>
-                            ))}
-                          </Menu.Items>
-                        </Transition>
-                      </Menu>
-                      */}
                     </div>
                   </div>
                   <div className="-mr-2 flex md:hidden">
@@ -185,15 +133,6 @@ export default function Example() {
                 </div>
                 <div className="pt-4 pb-3 border-t border-gray-700">
                   <div className="flex items-center px-5 text-gray-400 hover:text-white">
-                    {/*
-                    <div className="flex-shrink-0">
-                      <img className="h-10 w-10 rounded-none" src={user.imageUrl} alt="" />
-                    </div>
-                    <div className="ml-3">
-                      <div className="text-base font-medium leading-none text-white">{user.name}</div>
-                      <div className="text-sm font-medium leading-none text-gray-400">{user.email}</div>
-                    </div>
-                    */}
                     <SignIn />
                     <button
                       type="button"
@@ -203,33 +142,11 @@ export default function Example() {
                       <BellIcon className="h-6 w-6" aria-hidden="true" />
                     </button>
                   </div>
-                  {/*
-                  <div className="mt-3 px-2 space-y-1">
-                    {userNavigation.map((item) => (
-                      <Disclosure.Button
-                        key={item.name}
-                        as="a"
-                        href={item.href}
-                        className="block px-3 py-2 rounded-none text-base font-medium text-gray-400 hover:text-white hover:bg-gray-100"
-                      >
-                        {item.name}
-                      </Disclosure.Button>
-                    ))}
-                  </div>
-                  */}
                 </div>
               </Disclosure.Panel>
             </>
           )}
         </Disclosure>
-
-        {/*
-        <header className="bg-white shadow">
-          <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          </div>
-        </header>
-        */}
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             {/* Replace with your content */}
