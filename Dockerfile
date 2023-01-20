@@ -48,8 +48,6 @@ COPY --from=builder /app/public ./public
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY src/utils/cm/graffiticode-lang-graffiticode-0.1.0.tgz /app/src/utils/cm/graffiticode-lang-graffiticode-0.1.0.tgz
-RUN npm install @graffiticode/tracing
 
 USER nextjs
 
@@ -57,4 +55,4 @@ EXPOSE 3000
 
 ENV PORT 3000
 
-CMD ["node", "-r", "@graffiticode/tracing", "server.js"]
+CMD ["node", "server.js"]

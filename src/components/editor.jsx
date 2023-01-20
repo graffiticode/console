@@ -1,28 +1,13 @@
-/*
-  This example requires Tailwind CSS v2.0+ 
-  
-  This example requires some changes to your config:
-  
-  ```
-  // tailwind.config.js
-  module.exports = {
-    // ...
-    plugins: [
-      // ...
-      require('@tailwindcss/forms'),
-    ],
-  }
-  ```
-*/
 import { Fragment, useState, useEffect } from 'react'
 import { Listbox, Transition } from '@headlessui/react'
 import { CalendarIcon, PaperClipIcon, TagIcon, UserCircleIcon } from '@heroicons/react/24/solid'
 
+import { useSession } from "next-auth/react";
 import CodeMirror, { getCode } from './CodeMirror';
 import { javascript } from "@codemirror/lang-javascript";
-import { saveTask } from '../utils/redux/actions'
-import { useDispatch, useSelector } from 'react-redux'
 import MarkSelector, { marks } from '../components/mark-selector';
+import useSWR from "swr";
+import { saveTask } from '../utils/swr/fetchers';
 
 const assignees = [
   { name: 'Unassigned', value: null },
@@ -59,22 +44,26 @@ import {
   XMarkIcon,
 } from '@heroicons/react/20/solid'
 
-export default function Editor({ userId, task, mark: markInit, setOpen }) {
+export default function Editor({ task, lang, mark: markInit, setOpen, setId }) {
   const [mark, setMark] = useState(markInit);
   const [view, setView] = useState();
-  const dispatch = useDispatch();
-  const uid = userId;
-  const { lang, code } = task || {lang: '0', code: ''};
+  const { data: sessionData } = useSession();
+  const uid = sessionData.address;
+  const [ code, setCode ] = useState(task?.code || "");
+  const [ saving, setSaving ] = useState(false);
+  const { data, error, isLoading } = useSWR(saving ? {uid, lang, code, mark: mark.id} : null, saveTask);
+  console.log("Editor() isLoading=" + isLoading + " data=" + JSON.stringify(data, null, 2));
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
           <div className="ring-1 ring-gray-300 focus-within:border-none">
             <CodeMirror
-              userId={userId}
               setView={setView}
               extensions={[javascript({ jsx: true })]}
               lang={lang}
               code={code}
+              setCode={setCode}
+              setId={setId}
             />
           </div>
           <div className="flex justify-between pt-2 bg-white ring-1 ring-gray-400 ring-1 mt-2 p-2">
@@ -85,8 +74,7 @@ export default function Editor({ userId, task, mark: markInit, setOpen }) {
               <button
     className="inline-flex items-center rounded-none bg-white ring-1 ring-gray-400 px-4 py-2 text-sm font-medium text-gray-700 hover:ring-2 focus:outline-none"
                 onClick={() => {
-                  const code = getCode(view);
-                  dispatch(saveTask({uid, lang, code, mark: mark.id}));
+                  setSaving(true);
                   setOpen(false);
                 }}
               >

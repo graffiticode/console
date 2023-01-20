@@ -23,7 +23,7 @@ import {
 import BillingCard from './BillingCard';
 import APIKeysCard from './APIKeysCard';
 import { useSession, signIn, signOut } from "next-auth/react";
-import SignInAlert from "./SignInAlert";
+import SignIn from "./SignIn";
 const user = {
   name: 'Debbie Lewis',
   handle: 'deblewis',
@@ -38,10 +38,10 @@ const navigation = [
   { name: 'Company', href: '#', current: false },
 ]
 const subNavigation = [
-//  { name: 'Profile', href: '#', icon: UserCircleIcon, current: true },
-//  { name: 'Account', href: '#', icon: CogIcon, current: false },
-//  { name: 'Password', href: '#', icon: KeyIcon, current: false },
-//  { name: 'Notifications', href: '#', icon: BellIcon, current: false },
+  //  { name: 'Profile', href: '#', icon: UserCircleIcon, current: true },
+  //  { name: 'Account', href: '#', icon: CogIcon, current: false },
+  //  { name: 'Password', href: '#', icon: KeyIcon, current: false },
+  //  { name: 'Notifications', href: '#', icon: BellIcon, current: false },
   { name: 'Billing', href: '#', icon: CreditCardIcon, current: false },
   { name: 'API Keys', href: '#', icon: SquaresPlusIcon, current: false },
 ]
@@ -65,33 +65,36 @@ export default function Example() {
   if (!session) {
     return (
       <div className="justify-center w-full">
-        <SignInAlert />
+        <SignIn
+          className="rounded-none border-2 px-3 py-2 text-center hover:border-gray-400 focus:outline-none"
+          label={<span className="block font-medium">Sign in to continue</span>}
+        />
       </div>
     );
   } else {
-  return (
-    <div> 
-      <div className="relative pt-10">
-        <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
-          <aside className="py-6 lg:col-span-3">
-            <span className="mx-5">Billing information</span>
-          </aside>
-          <div className="lg:col-span-9">
-            <BillingCard />
+    return (
+      <div>
+        <div className="relative pt-10">
+          <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
+            <aside className="py-6 lg:col-span-3">
+              <span className="mx-5">Billing information</span>
+            </aside>
+            <div className="lg:col-span-9">
+              <BillingCard />
+            </div>
+          </div>
+        </div>
+        <div className="relative pt-10">
+          <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
+            <aside className="py-6 lg:col-span-3">
+              <span className="mx-5">API Keys</span>
+            </aside>
+            <div className="lg:col-span-9">
+              <APIKeysCard />
+            </div>
           </div>
         </div>
       </div>
-      <div className="relative pt-10">
-        <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
-          <aside className="py-6 lg:col-span-3">
-            <span className="mx-5">API Keys</span>
-          </aside>
-          <div className="lg:col-span-9">
-            <APIKeysCard />
-          </div>
-      </div>
-    </div>
-    </div>
-  )
+    )
   }
 }

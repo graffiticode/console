@@ -24,21 +24,21 @@ export const addPayment = () => (dispatch, getState) => {
   getData().catch(console.error);
 };
 
-export const postTask = ({ lang, code, ephemeral }) => (dispatch, getState) => {
+export const postTask = ({ uid, lang, code }) => (dispatch, getState) => {
   const query = gql `
-    mutation post ($lang: String!, $code: String!, $ephemeral: Boolean) {
-      postTask(lang: $lang, code: $code, ephemeral: $ephemeral)
+    mutation post ($uid: String!, $lang: String!, $code: String!, $ephemeral: Boolean!) {
+      postTask(uid: $uid, lang: $lang, code: $code, ephemeral: $ephemeral)
     }
   `;
   const state = getState();
   const ephemeral = true;
-  const post = async ({lang, code, ephemeral}) => {
-    request('/api', query, {lang, code, ephemeral}).then((data) => {
+  const post = async ({uid, lang, code, ephemeral}) => {
+    request('/api', query, {uid, lang, code, ephemeral}).then((data) => {
       const id = data.postTask;
       dispatch(updateTask(id));
     });
   };
-  post({ lang, code, ephemeral }).catch(console.error);
+  post({uid, lang, code, ephemeral}).catch(console.error);
 };
 
 export const saveTask = ({ uid, lang, code, mark }) => (dispatch, getState) => {
