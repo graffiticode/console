@@ -22,39 +22,35 @@ const getIdFromIds = ids => {
 
 export async function saveTask({ authToken, uid, lang, code, mark }) {
   try {
-  const task = {lang, code};
-  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-  const taskDao = getTaskDaoForStore("firestore");
-  const auth = { uid };
-  const { id } = await postTask({authToken, task, ephemeral: false});
-  const taskId = await taskDao.create({ auth, id, task, mark });
-  const userRef = await db.doc(`users/${uid}`);
-  const userDoc = await userRef.get();
-  const userData = userDoc.data();
+    const task = {lang, code};
+    const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
+    const taskDao = getTaskDaoForStore("firestore");
+    const auth = { uid };
+    const { id } = await postTask({authToken, task, ephemeral: false});
+    const taskId = await taskDao.create({ auth, id, task, mark });
+    const userRef = await db.doc(`users/${uid}`);
+    const userDoc = await userRef.get();
+    const userData = userDoc.data();
 
-  try {
     const taskIdsCol = userRef.collection("taskIds");
     await taskIdsCol.doc(taskId).set({
       lang,
       mark,
     });
-  } catch (x) {
-    console.log("saveTask() x=" + x);
-  }
 
-  if (userData.taskIds === undefined) {
-    await userRef.update({taskIds: [taskId]});
-  } else {
-    await userRef.update({taskIds: FieldValue.arrayUnion(taskId)});
-  }
-//  const { base64 } = await postSnap({auth, lang, id});
-  const data = {
-    taskId,
-    id,
-//    image: base64,
-    imageUrl: `https://cdn.acx.ac/${id}.png`,
-  };
-  console.log("saveTask() data=" + JSON.stringify(data, null, 2));
+    if (userData.taskIds === undefined) {
+      await userRef.update({taskIds: [taskId]});
+    } else {
+      await userRef.update({taskIds: FieldValue.arrayUnion(taskId)});
+    }
+    //  const { base64 } = await postSnap({auth, lang, id});
+    const data = {
+      taskId,
+      id,
+      //    image: base64,
+      imageUrl: `https://cdn.acx.ac/${id}.png`,
+    };
+    console.log("saveTask() data=" + JSON.stringify(data, null, 2));
     return JSON.stringify(data);
   } catch (x) {
     console.log(x.stack);
