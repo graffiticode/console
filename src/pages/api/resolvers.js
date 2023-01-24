@@ -50,7 +50,6 @@ export async function saveTask({ authToken, uid, lang, code, mark }) {
       //    image: base64,
       imageUrl: `https://cdn.acx.ac/${id}.png`,
     };
-    console.log("saveTask() data=" + JSON.stringify(data, null, 2));
     return JSON.stringify(data);
   } catch (x) {
     console.log(x.stack);
@@ -93,12 +92,9 @@ export async function postTask({ uid, task, ephemeral }) {
     const baseUrl = getBaseUrlForApi();
     const storageType = ephemeral && "ephemeral" || "persistent";
     const headers = { "x-graffiticode-storage-type": storageType };
-    console.log("postTask() baseUrl=" + baseUrl);
     const post = bent(baseUrl, 'POST', 'json', 200, headers);
     const auth = uid;
-    console.log("postTask() auth=" + auth + " task=" + JSON.stringify(task, null, 2));
     const { data } = await post('task', {auth, task});
-    console.log("postTask() data=" + JSON.stringify(data, null, 2));
     return data;
   } catch (x) {
     console.log("POST /task catch " + x.stack);

@@ -48,14 +48,16 @@ function customCompletionDisplay({ uid, lang, setCode }) {
 const CodeMirror = ({ setView, lang, code, setCode, setId }) => {
   const { data: sessionData } = useSession();
   const uid = sessionData.address;
-  const { data, error, isLoading } = useSWR({uid, lang, code}, postTask);
-  if (data) {
-    setId(data);
-  }
+  const { data, error, isLoading } = useSWR(code ? {uid, lang, code} : null, postTask);
   const extensions = [
     customCompletionDisplay({uid, lang, setCode}),
   ];
   const { ref } = useCodeMirror(extensions, setView, code);
+  useEffect(() => {
+    if (data) {
+      setId(data);
+    }
+  }, [data]);
   return <div id="editor" ref={ref}/>;
 };
 

@@ -19,3 +19,15 @@ export const saveTask = async ({ uid, lang, code, mark }) => {
   return request('/api', query, {uid, lang, code, mark}).then(data => data);
 };
 
+export const loadTasks = async ({ uid, lang, mark }) => {
+  if (!uid) {
+    return {};
+  }
+  const query = gql `
+    query get($uid: String!, $lang: String!, $mark: Int!) {
+      getTasks(uid: $uid, lang: $lang, mark: $mark)
+    }
+  `;
+  return request('/api', query, { uid, lang, mark }).then(data => data.getTasks);
+};
+
