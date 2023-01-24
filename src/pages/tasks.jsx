@@ -16,7 +16,6 @@ import {
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/SignIn'
 import { useEffect } from 'react';
-import { loadTasks, updateMark, updateLang } from '../utils/redux/actions';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
 import LanguageSelector from '../components/language-selector';
@@ -39,15 +38,6 @@ const navigation = [
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
-
-/*
-
-  Get 'language' and 'mark' from redux. When it changes save it to redux.
-  Also, store it in state for quick access.
-  
-  TODO
-  [ ] Re-load tasks when lang or mark is changed
-*/
 
 export default function Tasks() {
   const [language, setLanguage] = useState({id: 1, name: 'L1'})
