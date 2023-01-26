@@ -52,7 +52,6 @@ export default function Editor({ task, lang, mark: markInit, setOpen, setId }) {
   const [ code, setCode ] = useState(task?.code || "");
   const [ saving, setSaving ] = useState(false);
   const { data, error, isLoading } = useSWR(saving ? {uid, lang, code, mark: mark.id} : null, saveTask);
-  console.log("Editor() isLoading=" + isLoading + " data=" + JSON.stringify(data, null, 2));
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">

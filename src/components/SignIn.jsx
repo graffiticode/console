@@ -48,7 +48,6 @@ export default function SignInComponent({ label = "Sign in" }) {
   }, [disconnect]);
 
   if (sessionData) {
-    console.log("sessionData=" + JSON.stringify(sessionData, null, 2));
     return <button onClick={handleSignOut}>{sessionData.user.name} (Sign out)</button>;
   } else {
     return <button onClick={handleSignIn}>{label}</button>;

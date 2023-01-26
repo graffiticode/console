@@ -1,14 +1,13 @@
+import useSWR from "swr";
 import Image from 'next/image';
-/* This example requires Tailwind CSS v2.0+ */
 import { useEffect, Fragment, useRef, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import Editor from './editor';
-import { useSelector, useDispatch } from 'react-redux'
 import { useSession, signIn, signOut } from "next-auth/react";
 import SignIn from "./SignIn";
-import { loadTasks, updateMark, updateLang } from '../utils/redux/actions';
+import { loadTasks } from '../utils/swr/fetchers';
 
 import { EnvelopeIcon, PhoneIcon } from '@heroicons/react/20/solid'
 
@@ -16,12 +15,9 @@ function getTitle(task) {
   return task.code.split(`\n`)[0].split('|')[1] || undefined;
 }
 
-function Tasks({ setOpen, setTask, lang }) {
-  let tasks = useSelector(state => state.tasks);
+function Tasks({ setOpen, setTask, lang, tasks }) {
+  console.log("Tasks() tasks=" + tasks);
   const tasksIds = Object.keys(tasks).reverse();
-  // if (tasksIds.length === 0) {
-  //   return <div />;
-  // }
   tasks = tasksIds.map(taskId => {
     const task = tasks[taskId][0];
     task.taskId = taskId;
@@ -45,11 +41,10 @@ function Tasks({ setOpen, setTask, lang }) {
           `data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="rgb(128,128,128)" class="">
   <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
 </svg>`;
-        console.log("Tasks() src=" + src);
-
+        let key = 1;
         return (
           <li
-            key={taskId}
+            key={key++}
             className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
           >
             <button onClick={() => {
@@ -57,7 +52,7 @@ function Tasks({ setOpen, setTask, lang }) {
               setTask(task);
             }}>
             <div className="flex flex-1 flex-col p-8 place-content-center">
-            <img src={src} className={!id && !image && "mx-16"}/>
+            <img src={src} className={!id && !image && "mx-16"} alt="thumbnail"/>
               <dl className="mt-1 flex flex-grow flex-col justify-between">
                 <dt className="sr-only">Title</dt>
                 <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
@@ -72,18 +67,17 @@ function Tasks({ setOpen, setTask, lang }) {
 }
 
 export default function Gallery({ lang, mark }) {
-  const dispatch = useDispatch()
-  const [open, setOpen] = useState(false);
-  const [task, setTask] = useState();
-  const userId = useSelector(state => state.userId);
-  console.log("Gallery() userId=" + userId);
-  //const id = useSelector(state => state.id);
+  const [ open, setOpen ] = useState(false);
+  const [ task, setTask ] = useState();
   const [ id, setId ] = useState();
-  const { data: session } = useSession();
-  useEffect(() => {
-    dispatch(loadTasks({ uid: userId, lang, mark: mark.id }));
-  });
-  if (!session) {
+  const { data: sessionData } = useSession();
+  const { data, error, isLoading } =
+    useSWR(
+      !sessionData
+        ? null
+        : {uid: sessionData.address, lang, mark: mark.id}, loadTasks
+    );
+  if (!sessionData) {
     return (
       <div className="justify-center w-full">
         <SignIn
@@ -93,10 +87,12 @@ export default function Gallery({ lang, mark }) {
       </div>
     );
   } else {
+    const { address: uid } = sessionData;
+    const tasks = data || {};
     const src = `/api/form/${lang}?id=${id}`;
     return (
       <>
-        <Tasks setOpen={setOpen} setTask={setTask} lang={lang} />
+        <Tasks setOpen={setOpen} setTask={setTask} lang={lang} tasks={tasks} />
         <Transition.Root show={open} as={Fragment}>
           <Dialog as="div" className="relative z-10" onClose={setOpen}>
             <div className="fixed inset-0" />
@@ -130,8 +126,8 @@ export default function Gallery({ lang, mark }) {
                         </div>
                         <div className="relative mt-6 flex-1 px-4 sm:px-6">
                           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl sm:px-6 lg:px-8">
-                            <Editor key="1" userId={userId} task={task} lang={lang} mark={mark} setOpen={setOpen} setId={setId} />
-                            <iframe key="2" src={src} width="100%" height="100%" />
+                            <Editor key={1} userId={uid} task={task} lang={lang} mark={mark} setOpen={setOpen} setId={setId} />
+                            <iframe key={2} src={src} width="100%" height="100%" />
                           </div>
                         </div>
                       </div>
