@@ -52,7 +52,7 @@ export async function saveTask({ authToken, uid, lang, code, mark }) {
     };
     return JSON.stringify(data);
   } catch (x) {
-    console.log(x.stack);
+    console.log("saveTask() catch " + x.stack);
   }
 }
 

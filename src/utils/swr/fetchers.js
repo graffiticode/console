@@ -20,6 +20,7 @@ export const saveTask = async ({ uid, lang, code, mark }) => {
 };
 
 export const loadTasks = async ({ uid, lang, mark }) => {
+  console.log("loadTasks() uid=" + uid);
   if (!uid) {
     return {};
   }
@@ -28,6 +29,6 @@ export const loadTasks = async ({ uid, lang, mark }) => {
       getTasks(uid: $uid, lang: $lang, mark: $mark)
     }
   `;
-  return request('/api', query, { uid, lang, mark }).then(data => data.getTasks);
+  return request('/api', query, { uid, lang, mark }).then(data => JSON.parse(data.getTasks));
 };
 

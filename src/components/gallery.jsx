@@ -16,6 +16,7 @@ function getTitle(task) {
 }
 
 function Tasks({ setOpen, setTask, lang, tasks }) {
+  console.log("Tasks() tasks=" + tasks);
   const tasksIds = Object.keys(tasks).reverse();
   tasks = tasksIds.map(taskId => {
     const task = tasks[taskId][0];
@@ -51,7 +52,7 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
               setTask(task);
             }}>
             <div className="flex flex-1 flex-col p-8 place-content-center">
-            <img src={src} className={!id && !image && "mx-16"}/>
+            <img src={src} className={!id && !image && "mx-16"} alt="thumbnail"/>
               <dl className="mt-1 flex flex-grow flex-col justify-between">
                 <dt className="sr-only">Title</dt>
                 <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
