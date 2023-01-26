@@ -7,7 +7,7 @@ import CodeMirror, { getCode } from './CodeMirror';
 import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector, { marks } from '../components/mark-selector';
 import useSWR from "swr";
-import { saveTask } from '../utils/swr/fetchers';
+import { buildSaveTask } from '../utils/swr/fetchers';
 
 const assignees = [
   { name: 'Unassigned', value: null },
@@ -44,14 +44,15 @@ import {
   XMarkIcon,
 } from '@heroicons/react/20/solid'
 
-export default function Editor({ task, lang, mark: markInit, setOpen, setId }) {
+export default function Editor({ task, lang, mark: markInit, setOpen, setId, setNewTask }) {
   const [mark, setMark] = useState(markInit);
   const [view, setView] = useState();
   const { data: sessionData } = useSession();
   const uid = sessionData.address;
   const [ code, setCode ] = useState(task?.code || "");
   const [ saving, setSaving ] = useState(false);
-  const { data, error, isLoading } = useSWR(saving ? {uid, lang, code, mark: mark.id} : null, saveTask);
+  const saveTask = buildSaveTask({ setNewTask });
+  useSWR(saving ? {uid, lang, code, mark: mark.id} : null, saveTask);
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">

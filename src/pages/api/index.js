@@ -48,10 +48,8 @@ const resolvers = {
       return JSON.stringify({status: "ok"});
     },
     saveTask: async (_, {uid, lang, code, mark}) => {
-      console.log("saveTask() code=" + code);
-      const id = await saveTask({authToken, uid, lang, code, mark});
-      console.log("saveTask() id=" + id);
-      return id;
+      const data = await saveTask({authToken, uid, lang, code, mark});
+      return JSON.stringify(data);
     },
     postTask: async (_, {uid, lang, code, ephemeral}) => {
       const task = {lang, code};

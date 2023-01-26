@@ -43,14 +43,14 @@ export async function saveTask({ authToken, uid, lang, code, mark }) {
     } else {
       await userRef.update({taskIds: FieldValue.arrayUnion(taskId)});
     }
-    //  const { base64 } = await postSnap({auth, lang, id});
+    const { base64 } = await postSnap({auth, lang, id});
     const data = {
       taskId,
       id,
-      //    image: base64,
+      image: base64,
       imageUrl: `https://cdn.acx.ac/${id}.png`,
     };
-    return JSON.stringify(data);
+    return data;
   } catch (x) {
     console.log("saveTask() catch " + x.stack);
   }

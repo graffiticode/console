@@ -12,24 +12,15 @@ import { loadTasks } from '../utils/swr/fetchers';
 import { EnvelopeIcon, PhoneIcon } from '@heroicons/react/20/solid'
 
 function getTitle(task) {
-  return task.code.split(`\n`)[0].split('|')[1] || undefined;
+  return task.code?.split(`\n`)[0].split('|')[1] || undefined;
 }
 
 function Tasks({ setOpen, setTask, lang, tasks }) {
-  console.log("Tasks() tasks=" + tasks);
-  const tasksIds = Object.keys(tasks).reverse();
-  tasks = tasksIds.map(taskId => {
-    const task = tasks[taskId][0];
-    task.taskId = taskId;
-    return task;
-  });
-  tasks.unshift({
-    lang,
-    code: '',
-  });
+  let key = 1;
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-      {tasks.map((task) => {
+      {
+        tasks.map((task) => {
         if (task === undefined) {
           return;
         }
@@ -41,7 +32,6 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
           `data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="rgb(128,128,128)" class="">
   <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
 </svg>`;
-        let key = 1;
         return (
           <li
             key={key++}
@@ -52,7 +42,7 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
               setTask(task);
             }}>
             <div className="flex flex-1 flex-col p-8 place-content-center">
-            <img src={src} className={!id && !image && "mx-16"} alt="thumbnail"/>
+            <img src={src} className={!id && !image ? "mx-16" : undefined} alt="thumbnail"/>
               <dl className="mt-1 flex flex-grow flex-col justify-between">
                 <dt className="sr-only">Title</dt>
                 <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
@@ -70,12 +60,12 @@ export default function Gallery({ lang, mark }) {
   const [ open, setOpen ] = useState(false);
   const [ task, setTask ] = useState();
   const [ id, setId ] = useState();
+  const [ newTask, setNewTask ] = useState();
   const { data: sessionData } = useSession();
   const { data, error, isLoading } =
     useSWR(
-      !sessionData
-        ? null
-        : {uid: sessionData.address, lang, mark: mark.id}, loadTasks
+      sessionData ? { uid: sessionData.address, lang, mark: mark.id } : null,
+      loadTasks
     );
   if (!sessionData) {
     return (
@@ -88,11 +78,23 @@ export default function Gallery({ lang, mark }) {
     );
   } else {
     const { address: uid } = sessionData;
-    const tasks = data || {};
+    const tasksIds = Object.keys(data || {}).reverse();
+    const tasks = tasksIds.map(taskId => {
+      const task = data[taskId][0];
+      task.taskId = taskId;
+      return task;
+    });
+    if (newTask) {
+      tasks.unshift(newTask);
+    }
+    tasks.unshift({
+      lang,
+      code: '',
+    });
     const src = `/api/form/${lang}?id=${id}`;
     return (
       <>
-        <Tasks setOpen={setOpen} setTask={setTask} lang={lang} tasks={tasks} />
+        <Tasks setOpen={setOpen} setTask={setTask} lang={lang} tasks={tasks} setNewTask={setNewTask} />
         <Transition.Root show={open} as={Fragment}>
           <Dialog as="div" className="relative z-10" onClose={setOpen}>
             <div className="fixed inset-0" />
@@ -126,7 +128,7 @@ export default function Gallery({ lang, mark }) {
                         </div>
                         <div className="relative mt-6 flex-1 px-4 sm:px-6">
                           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl sm:px-6 lg:px-8">
-                            <Editor key={1} userId={uid} task={task} lang={lang} mark={mark} setOpen={setOpen} setId={setId} />
+                            <Editor key={1} userId={uid} task={task} lang={lang} mark={mark} setOpen={setOpen} setId={setId} setNewTask={setNewTask} />
                             <iframe key={2} src={src} width="100%" height="100%" />
                           </div>
                         </div>

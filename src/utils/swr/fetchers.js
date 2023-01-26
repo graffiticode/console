@@ -10,17 +10,21 @@ export const postTask = async ({ uid, lang, code }) => {
   return request('/api', query, {uid, lang, code, ephemeral}).then(data => data.postTask);
 };
 
-export const saveTask = async ({ uid, lang, code, mark }) => {
+export const buildSaveTask = ({ setNewTask }) => async ({ uid, lang, code, mark }) => {
+  try {
   const query = gql `
     mutation post ($uid: String!, $lang: String!, $code: String!, $mark: Int!) {
       saveTask(uid: $uid, lang: $lang, code: $code, mark: $mark)
     }
   `;
-  return request('/api', query, {uid, lang, code, mark}).then(data => data);
+    const task = await request('/api', query, {uid, lang, code, mark}).then(data => JSON.parse(data.saveTask));
+    setNewTask(task);
+  } catch (x) {
+    console.log("buildSaveTask() catch " + x.stack);
+  }
 };
 
 export const loadTasks = async ({ uid, lang, mark }) => {
-  console.log("loadTasks() uid=" + uid);
   if (!uid) {
     return {};
   }
