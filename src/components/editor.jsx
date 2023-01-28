@@ -3,7 +3,7 @@ import { Listbox, Transition } from '@headlessui/react'
 import { CalendarIcon, PaperClipIcon, TagIcon, UserCircleIcon } from '@heroicons/react/24/solid'
 
 import { useSession } from "next-auth/react";
-import CodeMirror, { getCode } from './CodeMirror';
+import CodeMirror from './CodeMirror';
 import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector, { marks } from '../components/mark-selector';
 import useSWR from "swr";

@@ -15,10 +15,15 @@ function getTitle(task) {
   return task.code?.split(`\n`)[0].split('|')[1] || undefined;
 }
 
+function getId(id) {
+//  return id && id.slice(17) || undefined;
+  return id;
+}
+
 function Tasks({ setOpen, setTask, lang, tasks }) {
   let key = 1;
   return (
-    <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+    <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
       {
         tasks.map((task) => {
         if (task === undefined) {
@@ -32,7 +37,27 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
           `data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="rgb(128,128,128)" class="">
   <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
 </svg>`;
-        return (
+          return (
+            <>
+          <li
+            key={key++}
+            className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center"
+          >
+            <button onClick={() => {
+              setOpen(true);
+              setTask(task);
+            }}>
+            <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+            <dl className="mt-1 flex flex-grow flex-col justify-left">
+                <dt className="sr-only">Title</dt>
+            <dd className="my-8 text-lg text-gray-700">{getTitle(task)}</dd>
+            <dd className="text-xs font-mono text-gray-500">
+            {getId(id)}
+            </dd>
+              </dl>
+            </div>
+            </button>
+          </li>
           <li
             key={key++}
             className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
@@ -42,14 +67,11 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
               setTask(task);
             }}>
             <div className="flex flex-1 flex-col p-8 place-content-center">
-            <img src={src} className={!id && !image ? "mx-16" : undefined} alt="thumbnail"/>
-              <dl className="mt-1 flex flex-grow flex-col justify-between">
-                <dt className="sr-only">Title</dt>
-                <dd className="text-sm text-gray-700">{getTitle(task)}</dd>
-              </dl>
+              <img src={src} className={(!id && !image ? "mx-16" : undefined)} alt="thumbnail"/>
             </div>
             </button>
-          </li>
+              </li>
+              </>
         )
       })}
     </ul>

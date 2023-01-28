@@ -8,7 +8,7 @@ import { graffiticode } from "@graffiticode/lang-graffiticode";
 import useSWR from "swr";
 import { postTask } from '../utils/swr/fetchers';
 
-export const getCode = view => {
+const getCode = view => {
   if (view === undefined) {
     return "";
   }
@@ -27,7 +27,7 @@ const debouncedStartCompletion = debounce(({uid, view, lang, setCode}) => {
     lines.push(text);
   }
   const user = 'public';
-  const code = lines.join("\n");
+  const code = getCode(view);
   if (code !== '') {
     setCode(code);
   }
