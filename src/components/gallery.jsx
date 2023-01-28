@@ -26,54 +26,43 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
       {
         tasks.map((task) => {
-        if (task === undefined) {
-          return;
-        }
-        const { taskId, id, image, imageUrl } = task;
-        const src =
-          image && `data:image/png;base64, ${image}` ||
-          imageUrl ||
-          id && `https://cdn.acx.ac/${id}.png` ||
-          `data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="rgb(128,128,128)" class="">
-  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-</svg>`;
+          if (task === undefined) {
+            return;
+          }
+          const { taskId, id, image, imageUrl } = task;
+          const src = `/api/form/${lang}?id=${id}`;
           return (
             <>
-          <li
+              <li
             key={key++}
             className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center"
-          >
-            <button onClick={() => {
-              setOpen(true);
-              setTask(task);
-            }}>
-            <div className="flex flex-1 flex-col p-8 text-left place-content-left">
-            <dl className="mt-1 flex flex-grow flex-col justify-left">
-                <dt className="sr-only">Title</dt>
-            <dd className="my-8 text-lg text-gray-700">{getTitle(task)}</dd>
-            <dd className="text-xs font-mono text-gray-500">
-            {getId(id)}
+              >
+              <button onClick={() => {
+                setOpen(true);
+                setTask(task);
+              }}>
+              <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+              <dl className="mt-1 flex flex-grow flex-col justify-left">
+              <dt className="sr-only">Title</dt>
+              <dd className="my-8 text-lg text-gray-700">{getTitle(task)}</dd>
+              <dd className="text-xs font-mono text-gray-500">
+              {getId(id)}
             </dd>
               </dl>
-            </div>
-            </button>
-          </li>
-          <li
+              </div>
+              </button>
+              </li>
+              <li
             key={key++}
             className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
-          >
-            <button onClick={() => {
-              setOpen(true);
-              setTask(task);
-            }}>
-            <div className="flex flex-1 flex-col p-8 place-content-center">
-              <img src={src} className={(!id && !image ? "mx-16" : undefined)} alt="thumbnail"/>
-            </div>
-            </button>
+              >
+              <div className="flex flex-1 flex-col p-8 place-content-center">
+              <iframe key={key++} src={src} width="100%" height="100%" />
+              </div>
               </li>
               </>
-        )
-      })}
+          )
+        })}
     </ul>
   );
 }
@@ -109,10 +98,12 @@ export default function Gallery({ lang, mark }) {
     if (newTask) {
       tasks.unshift(newTask);
     }
-    tasks.unshift({
-      lang,
-      code: '',
-    });
+    if (tasks.length === 0) {
+      tasks.unshift({
+        lang,
+        code: '',
+      });
+    }
     const src = `/api/form/${lang}?id=${id}`;
     return (
       <>

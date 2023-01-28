@@ -11,7 +11,6 @@ export function isNonNullObject(obj) {
 
 export function getApiHost(config) {
   config = config || global.config || {};
-  console.log("getApiHost() config=" + JSON.stringify(config, null, 2));
   if (config.useLocalCompiles) {
     return "localhost";
   }
@@ -20,7 +19,6 @@ export function getApiHost(config) {
 
 export function getApiPort(config) {
   config = config || global.config || {};
-  console.log("getApiPort() config=" + JSON.stringify(config, null, 2));
   if (config.useLocalCompiles) {
     return '3100';
   }
