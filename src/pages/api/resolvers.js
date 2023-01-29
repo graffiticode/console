@@ -38,15 +38,18 @@ export async function saveTask({ authToken, uid, lang, code, mark }) {
       mark,
     });
 
-    if (userData.taskIds === undefined) {
-      await userRef.update({taskIds: [taskId]});
-    } else {
-      await userRef.update({taskIds: FieldValue.arrayUnion(taskId)});
-    }
+    // if (userData.taskIds === undefined) {
+    //   await userRef.update({taskIds: [taskId]});
+    // } else {
+    //   await userRef.update({taskIds: FieldValue.arrayUnion(taskId)});
+    // }
     // const { base64 } = await postSnap({auth, lang, id});
     const data = {
       taskId,
       id,
+      lang,
+      code,
+      mark,
       // image: base64,
       // imageUrl: `https://cdn.acx.ac/${id}.png`,
     };
