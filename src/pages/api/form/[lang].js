@@ -9,12 +9,11 @@ import {
 
 export default async function handler(req, res) {
   try {
-    console.log("GET /form query=" + JSON.stringify(req.query));
     const { lang, id } = req.query;
     const baseUrl = getBaseUrlForApi();
     const dataUrl = `${baseUrl}data?id=${id}`;
     const data = JSON.stringify({url: dataUrl});
-    const path = `form?lang=${lang}&data=${data}`;
+    const path = `form?id=${id}`;
     const formUrl = baseUrl + path;
     console.log("GET /form formUrl=" + formUrl);
     res.redirect(formUrl);

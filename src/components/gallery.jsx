@@ -17,7 +17,7 @@ function getTitle(task) {
 
 function getId(id) {
 //  return id && id.slice(17) || undefined;
-  return id;
+  return id || "new";
 }
 
 function Tasks({ setOpen, setTask, lang, tasks }) {
@@ -55,7 +55,7 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
             className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
               >
               <div className="flex flex-1 flex-col p-8 place-content-center">
-              <iframe key={key++} src={src} width="100%" height="100%" />
+                <iframe key={key++} src={src} width="100%" height="100%" />
               </div>
               </li>
               </>
@@ -102,7 +102,7 @@ export default function Gallery({ lang, mark }) {
         code: '',
       });
     }
-    const src = `/api/form/${lang}?id=${id}`;
+    const src = id && `/api/form/${lang}?id=${id}` || "";
     return (
       <>
         <Tasks setOpen={setOpen} setTask={setTask} lang={lang} tasks={tasks} setNewTask={setNewTask} />
