@@ -1,7 +1,7 @@
 import { stripHexPrefix } from "@ethereumjs/util";
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { exchangeEthereum } from "../../../lib/auth";
+import { authenticateWithEthereum } from "../../../lib/auth";
 
 export default async function auth(req, res) {
   const providers = [];
@@ -17,6 +17,11 @@ export default async function auth(req, res) {
           type: "text",
           placeholder: "0x0",
         },
+        nonce: {
+          label: "Nonce",
+          type: "text",
+          placeholder: "0x0",
+        },
         signature: {
           label: "Signature",
           type: "text",
@@ -25,9 +30,10 @@ export default async function auth(req, res) {
       },
       async authorize(credentials) {
         const address = stripHexPrefix(credentials?.address);
+        const nonce = stripHexPrefix(credentials?.nonce);
         const signature = stripHexPrefix(credentials?.signature);
         try {
-          await exchangeEthereum({ address, signature });
+          await authenticateWithEthereum({ address, nonce, signature });
           return { id: address };
         } catch (e) {
           console.error(e);
