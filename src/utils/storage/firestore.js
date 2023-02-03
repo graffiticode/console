@@ -1,7 +1,6 @@
 import { createHash } from "crypto";
 import { NotFoundError, DecodeIdError } from "../errors/http.js";
 import admin from "firebase-admin";
-import db from '../db';
 
 const createCodeHash = code =>
   createHash("sha256")
@@ -132,12 +131,12 @@ export const buildFirestoreTaskDao = ({ db }) => {
 };
 
 export const buildCreateFirestoreDb = () => {
-  // let db;
+  let db;
   return () => {
-    // if (!db) {
-    //   admin.initializeApp();
-    //   db = admin.firestore();
-    // }
+    if (!db) {
+      admin.initializeApp();
+      db = admin.firestore();
+    }
     return db;
   };
 };
