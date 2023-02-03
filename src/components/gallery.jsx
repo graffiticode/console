@@ -51,12 +51,12 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
               </button>
               </li>
               <li
-            key={key++}
-            className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
+                key={key++}
+                className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
               >
-              <div className="flex flex-1 flex-col p-8 place-content-center">
-                <iframe key={key++} src={src} width="100%" height="100%" />
-              </div>
+                <div className="flex flex-1 flex-col p-8 place-content-center">
+                  <iframe key={key++} src={src} width="100%" height="100%" />
+                </div>
               </li>
               </>
           )
