@@ -41,13 +41,13 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
                 setOpen(true);
                 setTask(task);
               }}>
-              <div className="flex flex-1 flex-col p-8 text-left place-content-left">
-              <dl className="mt-1 flex flex-grow flex-col justify-left">
-              <dt className="sr-only">Title</dt>
-              <dd className="text-xs font-mono text-gray-500">{getId(id)}</dd>
-              <dd className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
-              </dl>
-              </div>
+                <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+                  <dl className="mt-1 flex flex-grow flex-col justify-left">
+                    <dt key={key++} className="sr-only">Title</dt>
+                    <dd key={key++} className="text-xs font-mono text-gray-500">{getId(id)}</dd>
+                    <dd key={key++} className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
+                  </dl>
+                </div>
               </button>
               </li>
               <li
