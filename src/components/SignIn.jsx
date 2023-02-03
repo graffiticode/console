@@ -3,7 +3,7 @@ import { useSession, signIn, signOut, } from "next-auth/react";
 import { useCallback, } from "react";
 import { useAccount, useConnect, useDisconnect, useNetwork, useSignMessage } from "wagmi";
 import { InjectedConnector } from 'wagmi/connectors/injected'
-import { getUserNonce } from "../lib/auth";
+import { getEthereumNonce } from "../lib/auth";
 
 export default function SignInComponent({ label = "Sign in" }) {
   const { data: sessionData } = useSession();
@@ -28,10 +28,11 @@ export default function SignInComponent({ label = "Sign in" }) {
     e.preventDefault();
     try {
       const address = await getAddress();
-      const nonce = await getUserNonce({ address: stripHexPrefix(address) });
+      const nonce = await getEthereumNonce({ address: stripHexPrefix(address) });
       const signature = await signMessageAsync({ message: `Nonce: ${nonce}` });
       await signIn("credentials", {
         address,
+        nonce,
         signature,
         redirect: false,
         callbackUrl: "/protected",
