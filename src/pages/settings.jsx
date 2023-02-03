@@ -49,7 +49,7 @@ export default function Settings() {
         ```
       */}
       <Head>
-        <title>ChartCompiler</title>
+        <title>Graffiticode</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"
