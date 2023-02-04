@@ -1,9 +1,10 @@
-import db from '../../../utils/db';
+import { getFirestore } from '../../../utils/db';
 
 const handler = async (req, res) => {
   const { name } = req.query;
   console.log("GET /user name=" + name);
   try {
+    const db = getFirestore();
     if (req.method === 'PUT') {
       await db.collection('users').doc(name).update({
         ...req.body,

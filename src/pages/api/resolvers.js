@@ -2,7 +2,7 @@ import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index.js";
 import { buildGetTaskDaoForStorageType } from "./utils.js";
 import { FieldValue } from 'firebase-admin/firestore';
-import db from '../../utils/db';
+import { getFirestore } from '../../utils/db';
 import { getBaseUrlForApi } from '../../utils';
 
 const taskDaoFactory = buildTaskDaoFactory({});
@@ -22,11 +22,12 @@ const getIdFromIds = ids => {
 
 export async function saveTask({ authToken, uid, lang, code, mark }) {
   try {
-    const task = {lang, code};
+    const db = getFirestore();
+    const task = { lang, code };
     const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
     const taskDao = getTaskDaoForStore("firestore");
     const auth = { uid };
-    const { id } = await postTask({authToken, task, ephemeral: false});
+    const { id } = await postTask({ authToken, task, ephemeral: false });
     const taskId = await taskDao.create({ auth, id, task, mark });
     const userRef = await db.doc(`users/${uid}`);
     const userDoc = await userRef.get();
@@ -60,11 +61,12 @@ export async function saveTask({ authToken, uid, lang, code, mark }) {
 }
 
 export async function updateMark({ authToken, uid, lang, code, mark }) {
-  const task = {lang, code};
+  const db = getFirestore();
+  const task = { lang, code };
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const taskDao = getTaskDaoForStore("firestore");
   const auth = { uid };
-  const { id } = await postTask({authToken, task, ephemeral: false});
+  const { id } = await postTask({ authToken, task, ephemeral: false });
   // TODO if task id already exists, then update code in case its formatting
   // has changed.
   const taskId = await taskDao.create({ id, auth, task });
@@ -97,7 +99,7 @@ export async function postTask({ uid, task, ephemeral }) {
     const headers = { "x-graffiticode-storage-type": storageType };
     const post = bent(baseUrl, 'POST', 'json', 200, headers);
     const auth = uid;
-    const { data } = await post('task', {auth, task});
+    const { data } = await post('task', { auth, task });
     return data;
   } catch (x) {
     console.log("POST /task catch " + x.stack);
@@ -107,7 +109,7 @@ export async function postTask({ uid, task, ephemeral }) {
 
 const postSnap = async ({ authToken, lang, id }) => {
   const baseUrl = getBaseUrlForApi();
-  const dataParam = JSON.stringify({url: `${baseUrl}data?id=${id}`})
+  const dataParam = JSON.stringify({ url: `${baseUrl}data?id=${id}` })
   const url = `${baseUrl}form?lang=${lang}&data=${dataParam}`;
   const code = `
     data {
@@ -116,12 +118,12 @@ const postSnap = async ({ authToken, lang, id }) => {
     }..
   `;
   const task = { lang: "146", code };
-  const { id: taskId } = await postTask({authToken, task, ephemeral: true});
-  const data = await getData({auth: authToken, id: taskId});
+  const { id: taskId } = await postTask({ authToken, task, ephemeral: true });
+  const data = await getData({ auth: authToken, id: taskId });
   return data;
 };
 
-export async function getData({authToken, id}) {
+export async function getData({ authToken, id }) {
   try {
     const baseUrl = getBaseUrlForApi();
     const get = bent(baseUrl, 'GET', 'json', 200);
@@ -134,6 +136,7 @@ export async function getData({authToken, id}) {
 }
 
 export async function getTasks({ uid, lang, mark }) {
+  const db = getFirestore();
   const userRef = await db.doc(`users/${uid}`);
   const userDoc = await userRef.get();
   const userData = userDoc.data();
@@ -146,7 +149,7 @@ export async function getTasks({ uid, lang, mark }) {
   taskIdsDocs.forEach(doc => {
     taskIds.push(doc.id);
   });
-  const auth = {uid};
+  const auth = { uid };
   const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
   const taskDao = getTaskDaoForStore("firestore");
   const tasksForIds = await Promise.all(taskIds.map(

@@ -1,10 +1,11 @@
-import db from '../../../utils/db';
+import { getFirestore } from '../../../utils/db';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {});
 
 const handler = async (req, res) => {
   try {
+    const db = getFirestore();
     const { name, email } = req.body;
     const users = await db.collection('users').get();
     let id;

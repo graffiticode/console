@@ -1,8 +1,9 @@
-import db from '../../utils/db';
+import { getFirestore } from '../../utils/db';
 
 const handler = async (req, res) => {
   try {
     console.log("GET /users");
+    const db = getFirestore();
     const users = await db.collection('users').orderBy('created').get();
     const usersData = users.docs.map(entry => ({
       id: entry.id,

@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { NotFoundError, DecodeIdError } from "../errors/http.js";
 import admin from "firebase-admin";
+import { getFirestore } from '../db';
 
 const createCodeHash = code =>
   createHash("sha256")
@@ -50,7 +51,7 @@ const appendIds = (id, ...otherIds) => {
 
 const buildTaskCreate = ({ db }) => async ({ auth, id, task, mark }) => {
   const { lang, code } = task;
-  const codeHash = createCodeHash({lang, code});
+  const codeHash = createCodeHash({ lang, code });
   const codeHashRef = db.doc(`code-hashes/${codeHash}`);
   const codeHashDoc = await codeHashRef.get();
 
@@ -124,20 +125,9 @@ const buildTaskGet = ({ db }) => {
   };
 };
 
-export const buildFirestoreTaskDao = ({ db }) => {
+export const buildFirestoreTaskDao = () => {
+  const db = getFirestore();
   const create = buildTaskCreate({ db });
   const get = buildTaskGet({ db });
   return { create, get, appendIds };
 };
-
-export const buildCreateFirestoreDb = () => {
-  let db;
-  return () => {
-    if (!db) {
-      admin.initializeApp();
-      db = admin.firestore();
-    }
-    return db;
-  };
-};
-export const createFirestoreDb = buildCreateFirestoreDb();

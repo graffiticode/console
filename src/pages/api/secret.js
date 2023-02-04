@@ -1,10 +1,10 @@
-import db from '../../utils/db';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {});
 
 const handler = async (req, res) => {
   console.log("GET /secret");
+  const db = getFirestore();
   const { id } = req.query;
   const client = await db.doc(`users/${id}`).get();
   const { stripeCustomer } = client.data();

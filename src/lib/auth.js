@@ -1,6 +1,3 @@
-import { getIdToken, signInWithCustomToken } from "firebase/auth";
-import { apiAuth as auth } from "./firebase";
-
 const authUrl = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org";
 
 export const getEthereumNonce = async ({ address }) => {

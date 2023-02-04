@@ -1,4 +1,4 @@
-import { buildFirestoreTaskDao, encodeId, createFirestoreDb } from "./firestore.js";
+import { buildFirestoreTaskDao, encodeId } from "./firestore.js";
 import { TASK1, TASK2 } from "../testing/fixture.js";
 import { clearFirestore } from "../testing/firestore.js";
 
@@ -9,7 +9,7 @@ describe("storage/firestore", () => {
 
   let taskDao;
   beforeEach(async () => {
-    taskDao = buildFirestoreTaskDao({ db: createFirestoreDb({}) });
+    taskDao = buildFirestoreTaskDao();
   });
 
   it("should throw NotFoundError if task is not created", async () => {
