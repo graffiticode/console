@@ -1,15 +1,11 @@
 import useSWR from "swr";
-import Image from 'next/image';
-import { useEffect, Fragment, useRef, useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import Editor from './editor';
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import SignIn from "./SignIn";
 import { loadTasks } from '../utils/swr/fetchers';
-
-import { EnvelopeIcon, PhoneIcon } from '@heroicons/react/20/solid'
 
 function getTitle(task) {
   return task.code?.split(`\n`)[0].split('|')[1] || undefined;
@@ -25,16 +21,15 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
   return (
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
       {
-        tasks.map((task) => {
+        tasks.map((task, index) => {
           if (task === undefined) {
             return;
           }
           const { taskId, id, image, imageUrl } = task;
           const src = `/api/form/${lang}?id=${id}`;
           return (
-            <>
+            <div key={`${index}-task`}>
               <li
-                key={key++}
                 className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center"
               >
                 <button onClick={() => {
@@ -43,22 +38,21 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
                 }}>
                   <div className="flex flex-1 flex-col p-8 text-left place-content-left">
                     <dl className="mt-1 flex flex-grow flex-col justify-left">
-                      <dt key={key++} className="sr-only">Title</dt>
-                      <dd key={key++} className="text-xs font-mono text-gray-500">{getId(id)}</dd>
-                      <dd key={key++} className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
+                      <dt className="sr-only">Title</dt>
+                      <dd className="text-xs font-mono text-gray-500">{getId(id)}</dd>
+                      <dd className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
                     </dl>
                   </div>
                 </button>
               </li>
               <li
-                key={key++}
                 className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
               >
                 <div className="flex flex-1 flex-col p-8 place-content-center">
-                  <iframe key={key++} src={src} width="100%" height="100%" />
+                  <iframe src={src} width="100%" height="100%" />
                 </div>
               </li>
-            </>
+            </div>
           )
         })}
     </ul>
@@ -106,7 +100,6 @@ export default function Gallery({ lang, mark }) {
     if (id) {
       src = `/api/form/${lang}?id=${id}`;
     }
-    console.log(id, src);
     return (
       <>
         <Tasks setOpen={setOpen} setTask={setTask} lang={lang} tasks={tasks} setNewTask={setNewTask} />
