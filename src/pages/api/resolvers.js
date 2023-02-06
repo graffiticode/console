@@ -1,43 +1,23 @@
 import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index.js";
 import { buildGetTaskDaoForStorageType } from "./utils.js";
-import { FieldValue } from 'firebase-admin/firestore';
 import { getFirestore } from '../../utils/db';
-import { getBaseUrlForApi } from '../../utils';
+import { getBaseUrlForApi } from "../../lib/api.js";
 
 const taskDaoFactory = buildTaskDaoFactory({});
+const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
+const taskDao = getTaskDaoForStore("firestore");
 
-const normalizeTasksParameter = async tasks => {
-  tasks = !Array.isArray(tasks) && [tasks] || tasks;
-  return tasks;
-};
-
-const getIdFromIds = ids => {
-  if (ids.length === 1) {
-    return ids[0];
-  } else {
-    return ids;
-  }
-};
+const db = getFirestore();
 
 export async function saveTask({ authToken, uid, lang, code, mark }) {
   try {
-    const db = getFirestore();
     const task = { lang, code };
-    const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-    const taskDao = getTaskDaoForStore("firestore");
     const auth = { uid };
     const { id } = await postTask({ authToken, task, ephemeral: false });
-    const taskId = await taskDao.create({ auth, id, task, mark });
-    const userRef = await db.doc(`users/${uid}`);
-    const userDoc = await userRef.get();
-    const userData = userDoc.data();
 
-    const taskIdsCol = userRef.collection("taskIds");
-    await taskIdsCol.doc(taskId).set({
-      lang,
-      mark,
-    });
+    const taskId = await taskDao.create({ auth, id, task, mark });
+    await db.doc(`users/${uid}/taskIds/${taskId}`).set({ lang, mark });
 
     // if (userData.taskIds === undefined) {
     //   await userRef.update({taskIds: [taskId]});
@@ -61,10 +41,7 @@ export async function saveTask({ authToken, uid, lang, code, mark }) {
 }
 
 export async function updateMark({ authToken, uid, lang, code, mark }) {
-  const db = getFirestore();
   const task = { lang, code };
-  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-  const taskDao = getTaskDaoForStore("firestore");
   const auth = { uid };
   const { id } = await postTask({ authToken, task, ephemeral: false });
   // TODO if task id already exists, then update code in case its formatting
@@ -92,14 +69,13 @@ export async function updateMark({ authToken, uid, lang, code, mark }) {
   return JSON.stringify(data);
 }
 
+const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
 export async function postTask({ uid, task, ephemeral }) {
   try {
-    const baseUrl = getBaseUrlForApi();
     const storageType = ephemeral && "ephemeral" || "persistent";
     const headers = { "x-graffiticode-storage-type": storageType };
-    const post = bent(baseUrl, 'POST', 'json', 200, headers);
-    const auth = uid;
-    const { data } = await post('task', { auth, task });
+    const auth = { uid };
+    const { data } = await postApiJSON("/task", { auth, task }, headers);
     return data;
   } catch (x) {
     console.log("POST /task catch " + x.stack);
@@ -136,35 +112,25 @@ export async function getData({ authToken, id }) {
 }
 
 export async function getTasks({ uid, lang, mark }) {
-  const db = getFirestore();
-  const userRef = await db.doc(`users/${uid}`);
-  const userDoc = await userRef.get();
-  const userData = userDoc.data();
-  const taskIdsColRef = await userRef.collection('taskIds');
+  const taskIdsColRef = await db.collection(`users/${uid}/taskIds`);
   const taskIdsDocs = await taskIdsColRef
     .where('lang', '==', lang)
     .where('mark', '==', mark)
     .get();
   const taskIds = [];
-  taskIdsDocs.forEach(doc => {
-    taskIds.push(doc.id);
-  });
+  taskIdsDocs.forEach(doc => taskIds.push(doc.id));
+
   const auth = { uid };
-  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-  const taskDao = getTaskDaoForStore("firestore");
-  const tasksForIds = await Promise.all(taskIds.map(
-    async id => taskDao.get({ id, auth })
-  ));
+  const tasksForIds = await Promise.all(taskIds.map(id => taskDao.get({ id, auth })));
   const tasks = tasksForIds.reduce((tasks, tasksForId, index) => {
     tasks[taskIds[index]] = [...tasksForId];
     return tasks;
   }, {});
+
   return JSON.stringify(tasks);
 }
 
 export async function getTask(auth, id) {
-  const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
-  const taskDao = getTaskDaoForStore("firestore");
   const ids = [].concat(id);
   const tasksForIds = await Promise.all(ids.map(async id => taskDao.get({ id, auth })));
   const tasks = tasksForIds.reduce((tasks, tasksForId) => {

@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
-import { NotFoundError, DecodeIdError } from "../errors/http.js";
 import admin from "firebase-admin";
+
+import { NotFoundError, DecodeIdError } from "../errors/http.js";
 import { getFirestore } from '../db';
 
 const createCodeHash = code =>

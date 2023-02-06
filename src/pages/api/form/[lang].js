@@ -1,24 +1,31 @@
 //http://localhost:51/form?lang=1&data=%22hellox%22
 //http://localhost:3100/form?lang=1&data=%22hellox%22
 
-import React from 'react';
-import {
-  getBaseUrlForApi,
-  getLanguageAsset,
-} from "../../../utils";
+import { getBaseUrlForApi } from "../../../lib/api";
+import { isNonEmptyString } from "../../../utils";
 
 export default async function handler(req, res) {
   try {
     const { lang, id } = req.query;
-    const baseUrl = getBaseUrlForApi();
-    const dataUrl = `${baseUrl}data?id=${id}`;
-    const data = JSON.stringify({url: dataUrl});
-    const path = `form?id=${id}`;
-    const formUrl = baseUrl + path;
+    if (!isNonEmptyString(id)) {
+      res.status(400).send("must provide a task id");
+      return;
+    }
+
+    // const dataUrl = `${apiUrl}/data?id=${id}`;
+    // const data = JSON.stringify({ url: dataUrl });
+    // console.log("GET /form dataUrl=" + dataUrl);
+    const qs = new URLSearchParams();
+    qs.set("id", id);
+    qs.set("lang", lang);
+
+    const apiUrl = getBaseUrlForApi();
+    const formUrl = `${apiUrl}/form?${qs.toString()}`;
     console.log("GET /form formUrl=" + formUrl);
+
     res.redirect(formUrl);
   } catch (x) {
     console.log("catch x=" + x);
-    res.sendStatus(500);
+    res.status(500).send();
   }
 };

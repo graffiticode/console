@@ -16,7 +16,7 @@ function getTitle(task) {
 }
 
 function getId(id) {
-//  return id && id.slice(17) || undefined;
+  //  return id && id.slice(17) || undefined;
   return id || "new";
 }
 
@@ -34,21 +34,21 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
           return (
             <>
               <li
-            key={key++}
-            className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center"
+                key={key++}
+                className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center"
               >
-              <button onClick={() => {
-                setOpen(true);
-                setTask(task);
-              }}>
-                <div className="flex flex-1 flex-col p-8 text-left place-content-left">
-                  <dl className="mt-1 flex flex-grow flex-col justify-left">
-                    <dt key={key++} className="sr-only">Title</dt>
-                    <dd key={key++} className="text-xs font-mono text-gray-500">{getId(id)}</dd>
-                    <dd key={key++} className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
-                  </dl>
-                </div>
-              </button>
+                <button onClick={() => {
+                  setOpen(true);
+                  setTask(task);
+                }}>
+                  <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+                    <dl className="mt-1 flex flex-grow flex-col justify-left">
+                      <dt key={key++} className="sr-only">Title</dt>
+                      <dd key={key++} className="text-xs font-mono text-gray-500">{getId(id)}</dd>
+                      <dd key={key++} className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
+                    </dl>
+                  </div>
+                </button>
               </li>
               <li
                 key={key++}
@@ -58,7 +58,7 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
                   <iframe key={key++} src={src} width="100%" height="100%" />
                 </div>
               </li>
-              </>
+            </>
           )
         })}
     </ul>
@@ -66,10 +66,10 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
 }
 
 export default function Gallery({ lang, mark }) {
-  const [ open, setOpen ] = useState(false);
-  const [ task, setTask ] = useState();
-  const [ id, setId ] = useState();
-  const [ newTask, setNewTask ] = useState();
+  const [open, setOpen] = useState(false);
+  const [task, setTask] = useState();
+  const [id, setId] = useState();
+  const [newTask, setNewTask] = useState();
   const { data: sessionData } = useSession();
   const { data, error, isLoading } =
     useSWR(
@@ -102,7 +102,11 @@ export default function Gallery({ lang, mark }) {
         code: '',
       });
     }
-    const src = id && `/api/form/${lang}?id=${id}` || "";
+    let src = "";
+    if (id) {
+      src = `/api/form/${lang}?id=${id}`;
+    }
+    console.log(id, src);
     return (
       <>
         <Tasks setOpen={setOpen} setTask={setTask} lang={lang} tasks={tasks} setNewTask={setNewTask} />
