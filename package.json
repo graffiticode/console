@@ -36,6 +36,7 @@
     "graphql-helix": "^1.13.0",
     "graphql-request": "^4.3.0",
     "hashids": "^2.2.10",
+    "jose": "^4.11.4",
     "lodash": "^4.17.21",
     "next": "^13.0.7",
     "next-auth": "^4.10.0",

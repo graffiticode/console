@@ -1,7 +1,6 @@
-import { stripHexPrefix } from "@ethereumjs/util";
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { authenticateWithEthereum } from "../../../lib/auth";
+import { verifyAccessToken } from "../../../lib/auth";
 
 export default async function auth(req, res) {
   const providers = [];
@@ -10,33 +9,25 @@ export default async function auth(req, res) {
     req.method === "GET" && req.query.nextauth.includes("signin");
   if (!isDefaultSigninPage) {
     providers.push(CredentialsProvider({
+      id: "graffiticode-ethereum",
       name: "Graffiticode Ethereum",
       credentials: {
-        address: {
-          label: "Address",
-          type: "text",
-          placeholder: "0x0",
-        },
-        nonce: {
-          label: "Nonce",
-          type: "text",
-          placeholder: "0x0",
-        },
-        signature: {
-          label: "Signature",
+        accessToken: {
+          label: "Access Token",
           type: "text",
           placeholder: "0x0",
         },
       },
       async authorize(credentials) {
-        const address = stripHexPrefix(credentials?.address);
-        const nonce = stripHexPrefix(credentials?.nonce);
-        const signature = stripHexPrefix(credentials?.signature);
+        const accessToken = credentials?.accessToken;
+        if (!accessToken) {
+          return null;
+        }
         try {
-          await authenticateWithEthereum({ address, nonce, signature });
-          return { id: address };
-        } catch (e) {
-          console.error(e);
+          const { sub: id } = await verifyAccessToken({ accessToken });
+          return { id, accessToken };
+        } catch (error) {
+          console.error(error);
           return null;
         }
       },
@@ -50,8 +41,15 @@ export default async function auth(req, res) {
     },
     secret: process.env.NEXT_AUTH_SECRET,
     callbacks: {
+      async jwt({ token, account, user }) {
+        if (account?.provider === "graffiticode-ethereum") {
+          token.accessToken = user.accessToken;
+        }
+        return token;
+      },
       async session({ session, token }) {
         session.address = token.sub;
+        session.accessToken = token.accessToken;
         session.user.name = token.sub;
         return session;
       },

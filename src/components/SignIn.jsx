@@ -1,9 +1,9 @@
 import { stripHexPrefix } from "@ethereumjs/util";
 import { useSession, signIn, signOut, } from "next-auth/react";
-import { useCallback, } from "react";
+import { useCallback } from "react";
 import { useAccount, useConnect, useDisconnect, useNetwork, useSignMessage } from "wagmi";
 import { InjectedConnector } from 'wagmi/connectors/injected'
-import { getEthereumNonce } from "../lib/auth";
+import { authenticateWithEthereum, exchangeRefreshToken, getEthereumNonce } from "../lib/auth";
 
 export default function SignInComponent({ label = "Sign in" }) {
   const { data: sessionData } = useSession();
@@ -27,16 +27,11 @@ export default function SignInComponent({ label = "Sign in" }) {
   const handleSignIn = useCallback(async (e) => {
     e.preventDefault();
     try {
-      const address = await getAddress();
+      const address = stripHexPrefix(await getAddress());
       const nonce = await getEthereumNonce({ address: stripHexPrefix(address) });
-      const signature = await signMessageAsync({ message: `Nonce: ${nonce}` });
-      await signIn("credentials", {
-        address,
-        nonce,
-        signature,
-        redirect: false,
-        callbackUrl: "/protected",
-      });
+      const signature = stripHexPrefix(await signMessageAsync({ message: `Nonce: ${nonce}` }));
+      const { accessToken } = await authenticateWithEthereum({ address, nonce, signature });
+      await signIn("graffiticode-ethereum", { accessToken });
     } catch (error) {
       console.error(error);
     }
@@ -44,8 +39,8 @@ export default function SignInComponent({ label = "Sign in" }) {
 
   const handleSignOut = useCallback((e) => {
     e.preventDefault();
-    signOut({ redirect: "/" });
     disconnect();
+    signOut({ redirect: "/" });
   }, [disconnect]);
 
   if (sessionData) {
