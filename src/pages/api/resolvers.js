@@ -2,7 +2,7 @@ import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index.js";
 import { buildGetTaskDaoForStorageType } from "./utils.js";
 import { getFirestore } from '../../utils/db';
-import { getBaseUrlForApi } from "../../lib/api.js";
+import { getApiTask, getBaseUrlForApi } from "../../lib/api.js";
 
 const taskDaoFactory = buildTaskDaoFactory({});
 const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
@@ -10,34 +10,12 @@ const taskDao = getTaskDaoForStore("firestore");
 
 const db = getFirestore();
 
-export async function saveTask({ authToken, uid, lang, code, mark }) {
-  try {
-    const task = { lang, code };
-    const auth = { uid };
-    const { id } = await postTask({ authToken, task, ephemeral: false });
-
-    const taskId = await taskDao.create({ auth, id, task, mark });
-    await db.doc(`users/${uid}/taskIds/${taskId}`).set({ lang, mark });
-
-    // if (userData.taskIds === undefined) {
-    //   await userRef.update({taskIds: [taskId]});
-    // } else {
-    //   await userRef.update({taskIds: FieldValue.arrayUnion(taskId)});
-    // }
-    // const { base64 } = await postSnap({auth, lang, id});
-    const data = {
-      taskId,
-      id,
-      lang,
-      code,
-      mark,
-      // image: base64,
-      // imageUrl: `https://cdn.acx.ac/${id}.png`,
-    };
-    return data;
-  } catch (x) {
-    console.log("saveTask() catch " + x.stack);
-  }
+export async function saveTask({ auth, lang, code, mark }) {
+  const task = { lang, code };
+  const { id: taskId } = await postTask({ auth, task, ephemeral: false });
+  await db.doc(`users/${auth.uid}/taskIds/${taskId}`).set({ lang, mark, src: code });
+  const data = { taskId };
+  return data;
 }
 
 export async function updateMark({ authToken, uid, lang, code, mark }) {
@@ -70,17 +48,14 @@ export async function updateMark({ authToken, uid, lang, code, mark }) {
 }
 
 const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
-export async function postTask({ uid, task, ephemeral }) {
-  try {
-    const storageType = ephemeral && "ephemeral" || "persistent";
-    const headers = { "x-graffiticode-storage-type": storageType };
-    const auth = { uid };
-    const { data } = await postApiJSON("/task", { auth, task }, headers);
-    return data;
-  } catch (x) {
-    console.log("POST /task catch " + x.stack);
-    return x;
-  }
+export async function postTask({ auth, task, ephemeral }) {
+  const storageType = ephemeral && "ephemeral" || "persistent";
+  const headers = {
+    "Authorization": auth.token,
+    "x-graffiticode-storage-type": storageType,
+  };
+  const { data } = await postApiJSON("/task", { auth, task }, headers);
+  return data;
 }
 
 const postSnap = async ({ authToken, lang, id }) => {
@@ -111,19 +86,24 @@ export async function getData({ authToken, id }) {
   }
 }
 
-export async function getTasks({ uid, lang, mark }) {
-  const taskIdsColRef = await db.collection(`users/${uid}/taskIds`);
-  const taskIdsDocs = await taskIdsColRef
+export async function getTasks({ auth, lang, mark }) {
+  const taskIdsDocs = await db.collection(`users/${auth.uid}/taskIds`)
     .where('lang', '==', lang)
     .where('mark', '==', mark)
     .get();
   const taskIds = [];
-  taskIdsDocs.forEach(doc => taskIds.push(doc.id));
+  const userTasks = [];
+  taskIdsDocs.forEach(doc => {
+    taskIds.push(doc.id);
+    userTasks.push({ id: doc.id, ...doc.data() });
+  });
 
-  const auth = { uid };
-  const tasksForIds = await Promise.all(taskIds.map(id => taskDao.get({ id, auth })));
-  const tasks = tasksForIds.reduce((tasks, tasksForId, index) => {
-    tasks[taskIds[index]] = [...tasksForId];
+  const apiTasks = await Promise.all(taskIds.map(id => getApiTask({ id, auth })));
+  const tasks = apiTasks.reduce((tasks, apiTask, index) => {
+    tasks[taskIds[index]] = {
+      userTask: userTasks[index],
+      apiTasks: [...apiTask],
+    };
     return tasks;
   }, {});
 
@@ -131,12 +111,7 @@ export async function getTasks({ uid, lang, mark }) {
 }
 
 export async function getTask(auth, id) {
-  const ids = [].concat(id);
-  const tasksForIds = await Promise.all(ids.map(async id => taskDao.get({ id, auth })));
-  const tasks = tasksForIds.reduce((tasks, tasksForId) => {
-    tasks.push(...tasksForId);
-    return tasks;
-  }, []);
-  return JSON.stringify(tasks[0]);
+  const apiTask = await getApiTask({ id, auth });
+  return { [id]: apiTask };
 }
 

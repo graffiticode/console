@@ -30,8 +30,8 @@ export default function SignInComponent({ label = "Sign in" }) {
       const address = stripHexPrefix(await getAddress());
       const nonce = await getEthereumNonce({ address: stripHexPrefix(address) });
       const signature = stripHexPrefix(await signMessageAsync({ message: `Nonce: ${nonce}` }));
-      const { accessToken } = await authenticateWithEthereum({ address, nonce, signature });
-      await signIn("graffiticode-ethereum", { accessToken });
+      const { refreshToken, accessToken } = await authenticateWithEthereum({ address, nonce, signature });
+      await signIn("graffiticode-ethereum", { refreshToken, accessToken });
     } catch (error) {
       console.error(error);
     }

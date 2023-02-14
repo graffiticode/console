@@ -49,7 +49,8 @@ export default function Editor({ task, lang, mark: markInit, setOpen, setId, set
   const [view, setView] = useState();
   const { data: sessionData } = useSession();
   const uid = sessionData.address;
-  const [ code, setCode ] = useState(task?.code || "");
+  const [ code, setCode ] = useState(task?.src || "");
+  const [ sourceCode, setSourceCode ] = useState(task?.code || "");
   const [ saving, setSaving ] = useState(false);
   const saveTask = buildSaveTask({ setNewTask });
   useSWR(saving ? {uid, lang, code, mark: mark.id} : null, saveTask);

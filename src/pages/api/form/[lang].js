@@ -1,10 +1,19 @@
 //http://localhost:51/form?lang=1&data=%22hellox%22
 //http://localhost:3100/form?lang=1&data=%22hellox%22
 
+import { unstable_getServerSession as getServerSession, } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]";
 import { getBaseUrlForApi } from "../../../lib/api";
 import { isNonEmptyString } from "../../../utils";
 
 export default async function handler(req, res) {
+  const session = await getServerSession(req, res, authOptions);
+  if (!session) {
+    res.status(401).end();
+    return;
+  }
+  const { accessToken: token } = session;
+
   try {
     const { lang, id } = req.query;
     if (!isNonEmptyString(id)) {
@@ -18,11 +27,9 @@ export default async function handler(req, res) {
     const qs = new URLSearchParams();
     qs.set("id", id);
     qs.set("lang", lang);
+    qs.set("access_token", token);
 
-    const apiUrl = getBaseUrlForApi();
-    const formUrl = `${apiUrl}/form?${qs.toString()}`;
-    console.log("GET /form formUrl=" + formUrl);
-
+    const formUrl = `${getBaseUrlForApi()}/form?${qs.toString()}`;
     res.redirect(formUrl);
   } catch (x) {
     console.log("catch x=" + x);
