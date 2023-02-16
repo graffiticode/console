@@ -99,16 +99,7 @@ export default function Gallery({ lang, mark }) {
   const [id, setId] = useState();
   const [newTask, setNewTask] = useState();
   const { user } = useGraffiticodeAuth();
-  const { data: src } = useSWR({ lang, user, id }, async ({ lang, user, id }) => {
-    if (!id) {
-      return "";
-    }
-    const token = await user.getToken();
-    const params = new URLSearchParams();
-    params.set("id", id);
-    params.set("token", token);
-    return `/api/form/${lang}?${params.toString()}`;
-  });
+  const src = useTaskIdFormUrl({ lang, id });
   const { data } =
     useSWR(
       user ? { user, lang, mark: mark.id } : null,
