@@ -52,6 +52,6 @@ export const exchangeRefreshToken = async ({ refreshToken }) => {
 };
 
 export const verifyAccessToken = async ({ accessToken }) => {
-  const { payload } = await jwtVerify(accessToken, JWKS, { issuer: "urn:graffiticode:auth" });
-  return payload;
+  const { payload: { sub: uid } } = await jwtVerify(accessToken, JWKS, { issuer: "urn:graffiticode:auth" });
+  return { uid };
 };

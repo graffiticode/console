@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react';
-import { useSession } from "next-auth/react";
+import { useEffect } from 'react';
 import { EditorView } from "@codemirror/view";
 import useCodeMirror from "../utils/cm/use-codemirror";
 import { debounce } from "lodash";
-import { ParseContext } from '@codemirror/language';
-import { graffiticode } from "@graffiticode/lang-graffiticode";
 import useSWR from "swr";
 import { postTask } from '../utils/swr/fetchers';
+import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 
 const getCode = view => {
   if (view === undefined) {
@@ -20,7 +18,7 @@ const getCode = view => {
   return lines.join("");
 };
 
-const debouncedStartCompletion = debounce(({uid, view, lang, setCode}) => {
+const debouncedStartCompletion = debounce(({ uid, view, lang, setCode }) => {
   const doc = view.state.doc;
   const lines = [];
   for (const text of doc.iter()) {
@@ -40,17 +38,16 @@ function customCompletionDisplay({ uid, lang, setCode }) {
       // completion source function, to avoid it we close any open
       // completion inmediatly.
       //closeCompletion(view);
-      debouncedStartCompletion({uid, view, lang, setCode});
+      debouncedStartCompletion({ uid, view, lang, setCode });
     }
   });
 }
 
 const CodeMirror = ({ setView, lang, code, setCode, setId }) => {
-  const { data: sessionData } = useSession();
-  const uid = sessionData.address;
-  const { data, error, isLoading } = useSWR(code ? {uid, lang, code} : null, postTask);
+  const { user } = useGraffiticodeAuth();
+  const { data } = useSWR(code ? { user, lang, code } : null, postTask);
   const extensions = [
-    customCompletionDisplay({uid, lang, setCode}),
+    customCompletionDisplay({ user, lang, setCode }),
   ];
   const { ref } = useCodeMirror(extensions, setView, code);
   useEffect(() => {
@@ -58,7 +55,7 @@ const CodeMirror = ({ setView, lang, code, setCode, setId }) => {
       setId(data);
     }
   }, [data]);
-  return <div id="editor" ref={ref}/>;
+  return <div id="editor" ref={ref} />;
 };
 
 export default CodeMirror;

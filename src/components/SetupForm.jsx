@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import {useStripe, useElements, PaymentElement} from '@stripe/react-stripe-js';
+import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import axios from 'axios';
+import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 
 const SetupForm = () => {
   const stripe = useStripe();
@@ -22,7 +22,7 @@ const SetupForm = () => {
       return;
     }
 
-    const {error} = await stripe.confirmSetup({
+    const { error } = await stripe.confirmSetup({
       //`Elements` instance that was used to create the Payment Element
       elements,
       confirmParams: {
@@ -55,11 +55,11 @@ const SetupForm = () => {
 const stripePromise = loadStripe('pk_test_51LhI57LUz4JwpsJ6p6lzznvkbFNQj8k9LnAYckCJZ4Tv9AZzYHxKafXTKsTS12F8vUpKyELdBvXtvgSmNOzdqug200VALmBhSl');
 
 function SetupApp() {
-  const { data: session } = useSession();
+  const { user } = useGraffiticodeAuth();
   const [clientSecret, setClientSecret] = useState();
   useEffect(() => {
     const fetchSecret = async () => {
-      const userRes = await axios.post('/api/user', { ...session.user });
+      const userRes = await axios.post('/api/user', { ...user });
       const { id } = userRes.data;
       const secretRes = await axios.get(`/api/secret?id=${id}`);
       const { client_secret: clientSecret } = secretRes.data;
@@ -68,13 +68,13 @@ function SetupApp() {
     // Turn off for now.
     // fetchSecret();
   }, []);
-            
+
   return (
     clientSecret &&
-      <Elements stripe={stripePromise} options={clientSecret}>
-        <SetupForm />
-      </Elements>
-      || <div />
+    <Elements stripe={stripePromise} options={clientSecret}>
+      <SetupForm />
+    </Elements>
+    || <div />
   );
 };
 

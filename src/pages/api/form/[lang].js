@@ -7,15 +7,8 @@ import { getBaseUrlForApi } from "../../../lib/api";
 import { isNonEmptyString } from "../../../utils";
 
 export default async function handler(req, res) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) {
-    res.status(401).end();
-    return;
-  }
-  const { accessToken: token } = session;
-
   try {
-    const { lang, id } = req.query;
+    const { token, lang, id } = req.query;
     if (!isNonEmptyString(id)) {
       res.status(400).send("must provide a task id");
       return;

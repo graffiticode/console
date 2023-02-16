@@ -3,10 +3,10 @@ import { Fragment, useCallback, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import Editor from './editor';
-import { useSession } from "next-auth/react";
 import SignIn from "./SignIn";
 import { loadTasks } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
+import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 
 function getTitle(task) {
   if (isNonEmptyString(task.src)) {
@@ -23,6 +23,52 @@ function getId(id) {
   return id || "new";
 }
 
+const useTaskIdFormUrl = ({ lang, id }) => {
+  const { user } = useGraffiticodeAuth();
+  const { data: src } = useSWR({ lang, user, id }, async ({ lang, user, id }) => {
+    if (!id) {
+      return "";
+    }
+    const token = await user.getToken();
+    const params = new URLSearchParams();
+    params.set("id", id);
+    params.set("token", token);
+    return `/api/form/${lang}?${params.toString()}`;
+  });
+  return src;
+};
+
+function Task({ setOpen, setTask, lang, task }) {
+  const src = useTaskIdFormUrl({ lang, id: task.taskId });
+  return (
+    <div>
+      <li
+        className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center"
+      >
+        <button onClick={() => {
+          setOpen(true);
+          setTask(task);
+        }}>
+          <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+            <dl className="mt-1 flex flex-grow flex-col justify-left">
+              <dt className="sr-only">Title</dt>
+              <dd className="text-xs font-mono text-gray-500">{getId(task.taskId)}</dd>
+              <dd className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
+            </dl>
+          </div>
+        </button>
+      </li>
+      <li
+        className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
+      >
+        <div className="flex flex-1 flex-col p-8 place-content-center">
+          <iframe src={src} width="100%" height="100%" />
+        </div>
+      </li>
+    </div>
+  );
+}
+
 function Tasks({ setOpen, setTask, lang, tasks }) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return (
@@ -35,41 +81,13 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
     <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
       {
         tasks.map((task, index) => {
-          if (task === undefined) {
-            return;
-          }
-          const { taskId } = task;
-          let src = "";
-          if (taskId) {
-            src = `/api/form/${lang}?id=${taskId}`;
-          }
-          return (
-            <div key={`${index}-task`}>
-              <li
-                className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center"
-              >
-                <button onClick={() => {
-                  setOpen(true);
-                  setTask(task);
-                }}>
-                  <div className="flex flex-1 flex-col p-8 text-left place-content-left">
-                    <dl className="mt-1 flex flex-grow flex-col justify-left">
-                      <dt className="sr-only">Title</dt>
-                      <dd className="text-xs font-mono text-gray-500">{getId(taskId)}</dd>
-                      <dd className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
-                    </dl>
-                  </div>
-                </button>
-              </li>
-              <li
-                className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
-              >
-                <div className="flex flex-1 flex-col p-8 place-content-center">
-                  <iframe src={src} width="100%" height="100%" />
-                </div>
-              </li>
-            </div>
-          )
+          return <Task
+            key={`task-${index}`}
+            setOpen={setOpen}
+            setTask={setTask}
+            lang={lang}
+            task={task}
+          />;
         })}
     </ul>
   );
@@ -80,10 +98,20 @@ export default function Gallery({ lang, mark }) {
   const [task, setTask] = useState();
   const [id, setId] = useState();
   const [newTask, setNewTask] = useState();
-  const { data: sessionData } = useSession();
-  const { data, error, isLoading } =
+  const { user } = useGraffiticodeAuth();
+  const { data: src } = useSWR({ lang, user, id }, async ({ lang, user, id }) => {
+    if (!id) {
+      return "";
+    }
+    const token = await user.getToken();
+    const params = new URLSearchParams();
+    params.set("id", id);
+    params.set("token", token);
+    return `/api/form/${lang}?${params.toString()}`;
+  });
+  const { data } =
     useSWR(
-      sessionData ? { uid: sessionData.address, lang, mark: mark.id } : null,
+      user ? { user, lang, mark: mark.id } : null,
       loadTasks
     );
   const handleCreateTask = useCallback(async (e) => {
@@ -92,7 +120,7 @@ export default function Gallery({ lang, mark }) {
   });
 
 
-  if (!sessionData) {
+  if (!user) {
     return (
       <div className="justify-center w-full">
         <SignIn
@@ -103,7 +131,7 @@ export default function Gallery({ lang, mark }) {
     );
   }
 
-  const { address: uid } = sessionData;
+  const { uid } = user;
   const tasksIds = Object.keys(data || {}).reverse();
   const tasks = tasksIds.map(taskId => {
     const task = {
@@ -116,10 +144,6 @@ export default function Gallery({ lang, mark }) {
 
   if (newTask) {
     tasks.unshift(newTask);
-  }
-  let src = "";
-  if (id) {
-    src = `/api/form/${lang}?id=${id}`;
   }
 
   return (
