@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useMemo } from "react";
+import { createContext, useCallback, useContext } from "react";
 import useSWR from "swr";
-import { exchangeRefreshToken, verifyAccessToken } from "../lib/auth";
+import { client } from "../lib/auth";
 import { useSignInWithEthereum } from "./use-ethereum";
 import useLocalStorage from "./use-local-storage";
 
@@ -16,19 +16,16 @@ export function GraffiticodeAuthProvider({ children }) {
       if (!auth) {
         return null;
       }
-      const { uid, refreshToken } = auth;
-      const accessToken = await exchangeRefreshToken({ refreshToken });
-      return { uid, refreshToken, accessToken };
+      const { uid, refresh_token } = auth;
+      const access_token = await client.exchangeRefreshToken(refresh_token);
+      return { uid, refresh_token, access_token };
     }, {
     shouldRetryOnError: false,
-    onError: () => {
+    onError: (err) => {
       console.warn("Failed to init auth", err);
       setAuth(null)
     },
-    onSuccess: (auth) => {
-      console.log("Success", auth);
-      setAuth(auth);
-    },
+    onSuccess: (auth) => setAuth(auth),
   });
 
   const signInWithEthereum = useCallback(async () => {
@@ -36,31 +33,33 @@ export function GraffiticodeAuthProvider({ children }) {
       console.warn(`User ${auth.uid} is already signed in`);
       return auth;
     }
-    const { uid, refreshToken, accessToken } = await siwe();
-    setAuth({ uid, refreshToken, accessToken });
+    const { uid, refresh_token, access_token } = await siwe();
+    setAuth({ uid, refresh_token, access_token });
 
   }, [auth, siwe]);
 
   const signOut = useCallback(async () => {
-    // TODO revoke refreshToken
-    setAuth(null);
+    if (auth) {
+      client.revokeRefreshToken(auth.refresh_token);
+      setAuth(null);
+    }
   }, [auth]);
 
   const getToken = useCallback(async () => {
     if (!auth) {
       throw new Error("auth/not-signed-in");
     }
-    let { refreshToken, accessToken } = auth;
+    let { refresh_token, access_token } = auth;
     try {
-      await verifyAccessToken({ accessToken });
+      await client.verifyAccessToken(access_token);
     } catch (err) {
       if (err.code !== "ERR_JWT_EXPIRED") {
         throw err;
       }
-      accessToken = await exchangeRefreshToken({ refreshToken });
-      setAuth(prev => ({ ...prev, accessToken }));
+      access_token = await client.exchangeRefreshToken(refresh_token);
+      setAuth(prev => ({ ...prev, access_token }));
     }
-    return accessToken;
+    return access_token;
   }, [auth]);
 
   let user = null;

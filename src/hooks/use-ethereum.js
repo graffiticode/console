@@ -1,12 +1,8 @@
 import { stripHexPrefix } from "@ethereumjs/util";
 import { useCallback } from "react";
-import useSWR from "swr";
 import { useAccount, useConnect, useNetwork, useSignMessage } from "wagmi";
 import { InjectedConnector } from "wagmi/connectors/injected";
-import useLocalStorage from "./use-local-storage";
-import { authenticateWithEthereum, exchangeRefreshToken, getEthereumNonce, verifyAccessToken } from "../lib/auth";
-
-const AUTH_KEY = "graffiticode-auth";
+import { client } from "../lib/auth";
 
 export function useSignInWithEthereum() {
   const { signMessageAsync } = useSignMessage();
@@ -27,48 +23,11 @@ export function useSignInWithEthereum() {
 
   const signInWithEthereum = useCallback(async () => {
     const address = stripHexPrefix(await getAddress());
-    const nonce = await getEthereumNonce({ address: stripHexPrefix(address) });
+    const nonce = await client.ethereum.getNonce({ address: stripHexPrefix(address) });
     const signature = stripHexPrefix(await signMessageAsync({ message: `Nonce: ${nonce}` }));
-    const { refreshToken, accessToken } = await authenticateWithEthereum({ address, nonce, signature });
-    return { uid: address, refreshToken, accessToken };
+    const { refresh_token, access_token } = await client.ethereum.authenticate({ address, nonce, signature });
+    return { uid: address, refresh_token, access_token };
   }, [getAddress, signMessageAsync]);
 
   return { signInWithEthereum };
-}
-
-const tokensFetcher = async ({ auth }) => {
-  console.log("Fetching tokens");
-  let { refreshToken, accessToken } = auth;
-  try {
-    await verifyAccessToken({ accessToken });
-  } catch (err) {
-    if (err.code !== "ERR_JWT_EXPIRED") {
-      throw err;
-    }
-    accessToken = await exchangeRefreshToken({ refreshToken });
-  }
-  return { refreshToken, accessToken };
-};
-
-export function useAuth() {
-  const [auth, setAuth] = useLocalStorage(AUTH_KEY, null);
-
-  useSWR({ auth }, tokensFetcher);
-
-  const { signInWithEthereum: siwe } = useSignInWithEthereum();
-  const signInWithEthereum = useCallback(async () => {
-    if (auth) {
-      console.warn("Already signed in");
-      return;
-    }
-    const { uid, refreshToken, accessToken } = await siwe();
-    setAuth({ uid, refreshToken, accessToken });
-    return { uid, refreshToken, accessToken };
-  }, [auth, siwe]);
-
-
-  return {
-    loading: true,
-    signInWithEthereum,
-  };
 }
