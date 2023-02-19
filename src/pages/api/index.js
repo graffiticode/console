@@ -12,7 +12,7 @@ import {
   saveTask,
   postTask,
 } from "./resolvers.js";
-import { verifyAccessToken } from "../../lib/auth";
+import { client } from "../../lib/auth";
 
 const typeDefs = `
   type Query {
@@ -30,7 +30,7 @@ const resolvers = {
   Query: {
     getTasks: async (_, args) => {
       const { token, lang, mark } = args;
-      const { uid } = await verifyAccessToken({ accessToken: token });
+      const { uid } = await client.verifyAccessToken(token);
       return await getTasks({ auth: { uid, token }, lang, mark });
     },
   },
@@ -43,13 +43,13 @@ const resolvers = {
     },
     saveTask: async (_, args) => {
       const { token, lang, code, mark } = args;
-      const { uid } = await verifyAccessToken({ accessToken: token });
+      const { uid } = await client.verifyAccessToken(token);
       const data = await saveTask({ auth: { uid, token }, lang, code, mark });
       return JSON.stringify(data);
     },
     postTask: async (_, args) => {
       const { token, lang, code, ephemeral } = args;
-      const { uid } = await verifyAccessToken({ accessToken: token });
+      const { uid } = await client.verifyAccessToken(token);
       const task = { lang, code };
       const { id } = await postTask({ auth: { uid, token }, task, ephemeral });
       return id;

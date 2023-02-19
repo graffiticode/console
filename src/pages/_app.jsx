@@ -1,4 +1,3 @@
-import { SessionProvider } from "next-auth/react";
 import { WagmiConfig, createClient, configureChains, mainnet } from 'wagmi'
 import { publicProvider } from 'wagmi/providers/public'
 import { GraffiticodeAuthProvider } from "../hooks/use-graffiticode-auth";
@@ -21,11 +20,9 @@ export default function App({
 }) {
   return (
     <WagmiConfig client={client}>
-      <SessionProvider session={session}>
-        <GraffiticodeAuthProvider>
-          <Component {...pageProps} />
-        </GraffiticodeAuthProvider>
-      </SessionProvider>
+      <GraffiticodeAuthProvider>
+        <Component {...pageProps} />
+      </GraffiticodeAuthProvider>
     </WagmiConfig>
   );
 }

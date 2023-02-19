@@ -17,7 +17,7 @@ export function GraffiticodeAuthProvider({ children }) {
         return null;
       }
       const { uid, refresh_token } = auth;
-      const access_token = await client.exchangeRefreshToken(refresh_token);
+      const { access_token } = await client.exchangeRefreshToken(refresh_token);
       return { uid, refresh_token, access_token };
     }, {
     shouldRetryOnError: false,
@@ -56,8 +56,8 @@ export function GraffiticodeAuthProvider({ children }) {
       if (err.code !== "ERR_JWT_EXPIRED") {
         throw err;
       }
-      access_token = await client.exchangeRefreshToken(refresh_token);
-      setAuth(prev => ({ ...prev, access_token }));
+      const exchangeResponse = await client.exchangeRefreshToken(refresh_token);
+      setAuth(prev => ({ ...prev, access_token: exchangeResponse.access_token }));
     }
     return access_token;
   }, [auth]);

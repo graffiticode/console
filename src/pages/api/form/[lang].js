@@ -1,8 +1,5 @@
 //http://localhost:51/form?lang=1&data=%22hellox%22
 //http://localhost:3100/form?lang=1&data=%22hellox%22
-
-import { unstable_getServerSession as getServerSession, } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]";
 import { getBaseUrlForApi } from "../../../lib/api";
 import { isNonEmptyString } from "../../../utils";
 
