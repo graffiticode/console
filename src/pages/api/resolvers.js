@@ -48,13 +48,14 @@ export async function updateMark({ authToken, uid, lang, code, mark }) {
 }
 
 const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
+
 export async function postTask({ auth, task, ephemeral }) {
   const storageType = ephemeral && "ephemeral" || "persistent";
   const headers = {
     "Authorization": auth.token,
     "x-graffiticode-storage-type": storageType,
   };
-  const { data } = await postApiJSON("/task", { auth, task }, headers);
+  const { data } = await postApiJSON("/task", { task }, headers);
   return data;
 }
 
