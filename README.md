@@ -1,17 +1,28 @@
 # Graffiticode APP
 
-## Development
+## Run 
 
-1. Start firebase emulators (_NOTE_: you only to do this once per GCP project).
+## Develop all locally
 
-```bash
-npx firebase emulators:start
-```
+1. Run Graffiticode Auth in terminal
 
-1. Run GC App (in another terminal)
-The sample environment uses local instances of the GC API and Auth applications.
+    This runs the firebase emulators and GC Auth.
 
-```bash
-cp .env.delocal.sample .env.local
-npm run dev
-```
+    ```bash
+    # In the Graffiticode Auth directory
+    npm run dev
+    ```
+
+1. Run Graffiticode API in terminal
+
+    ```bash
+    # In the Graffiticode API directory
+    FIRESTORE_EMULATOR_HOST="localhost:8080" AUTH_URL="http://localhost:4100" npx nodemon src/app.js
+    ```
+
+1. Run Graffiticode APP in terminal
+
+    ```bash
+    # In the Graffiticode APP directory
+    npm run dev
+    ```
