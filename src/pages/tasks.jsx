@@ -22,6 +22,7 @@ import LanguageSelector from '../components/language-selector';
 import MarkSelector, { marks } from '../components/mark-selector';
 import useSwr from 'swr';
 import { tasksSettings } from '../utils/swr/fetchers';
+import useLocalStorage from '../hooks/use-local-storage';
 
 export function Logo(props) {
   return (
@@ -40,8 +41,8 @@ function classNames(...classes) {
 }
 
 export default function Tasks() {
-  const [language, setLanguage] = useState({id: 1, name: 'L1'})
-  const [mark, setMark] = useState(marks[0])
+  const [language, setLanguage] = useLocalStorage("graffiticode:tasks:language", { id: 1, name: 'L1' });
+  const [mark, setMark] = useLocalStorage("graffiticode:tasks:mark", marks[0]);
   const lang = language.name.slice(1);
   //const resp = useSwr({uid, lang, mark: mark.id}, tasksSettings);
   //console.log("Tasks() resp=" + JSON.stringify(resp.data));
@@ -97,7 +98,7 @@ export default function Tasks() {
                       <LanguageSelector language={language} setLanguage={setLanguage} />
                     </div>
                     <div className="ml-4 flex-shrink-0 w-18 h-24 pt-7">
-                      <MarkSelector mark={mark} setMark={setMark}/>
+                      <MarkSelector mark={mark} setMark={setMark} />
                     </div>
                   </div>
                   <div className="hidden md:block">
@@ -154,7 +155,7 @@ export default function Tasks() {
         </Disclosure>
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <Gallery lang={lang} mark={mark}/>
+            <Gallery lang={lang} mark={mark} />
           </div>
         </main>
       </div>
