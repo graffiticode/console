@@ -2,6 +2,7 @@ import { useState } from 'react'
 import CodeMirror from './CodeMirror';
 import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector from '../components/mark-selector';
+import PublicToggle from '../components/public-toggle';
 import useSWR from "swr";
 import { buildSaveTask } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
@@ -34,11 +35,12 @@ function classNames(...classes) {
 export default function Editor({ task, lang, mark: markInit, setOpen, setId, setNewTask }) {
   const [mark, setMark] = useState(markInit);
   const [view, setView] = useState();
+  const [isPublic, setIsPublic] = useState(task.isPublic);
   const { user } = useGraffiticodeAuth();
   const [code, setCode] = useState(task?.src || "");
   const [saving, setSaving] = useState(false);
   const saveTask = buildSaveTask({ setNewTask });
-  useSWR(saving ? { user, lang, code, mark: mark.id } : null, saveTask);
+  useSWR(saving ? { user, lang, code, mark: mark.id, isPublic } : null, saveTask);
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
@@ -56,16 +58,21 @@ export default function Editor({ task, lang, mark: markInit, setOpen, setId, set
           <div className="flex-shrink-0 w-18 h-8">
             <MarkSelector mark={mark} setMark={setMark} />
           </div>
-          <div className="flex-shrink-0">
-            <button
-              className="inline-flex items-center rounded-none bg-white ring-1 ring-gray-400 px-4 py-2 text-sm font-medium text-gray-700 hover:ring-2 focus:outline-none"
-              onClick={() => {
-                setSaving(true);
-                setOpen(false);
-              }}
-            >
-              Save
-            </button>
+          <div className="flex">
+            <div className="flex-shrink-0 w-18 h-8 pr-5">
+              <PublicToggle isPublic={isPublic} setIsPublic={setIsPublic} />
+            </div>
+            <div className="flex-shrink-0">
+              <button
+                className="inline-flex items-center rounded-none bg-white ring-1 ring-gray-400 px-4 py-2 text-sm font-medium text-gray-700 hover:ring-2 focus:outline-none"
+                onClick={() => {
+                  setSaving(true);
+                  setOpen(false);
+                }}
+              >
+                Save
+              </button>
+            </div>
           </div>
         </div>
       </div>

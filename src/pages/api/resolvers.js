@@ -10,10 +10,10 @@ const taskDao = getTaskDaoForStore("firestore");
 
 const db = getFirestore();
 
-export async function saveTask({ auth, lang, code, mark }) {
+export async function saveTask({ auth, lang, code, mark, isPublic }) {
   const task = { lang, code };
-  const { id: taskId } = await postTask({ auth, task, ephemeral: false });
-  await db.doc(`users/${auth.uid}/taskIds/${taskId}`).set({ lang, mark, src: code });
+  const { id: taskId } = await postTask({ auth, task, ephemeral: false, isPublic });
+  await db.doc(`users/${auth.uid}/taskIds/${taskId}`).set({ lang, mark, src: code, isPublic });
   const data = { taskId };
   return data;
 }
@@ -49,12 +49,15 @@ export async function updateMark({ authToken, uid, lang, code, mark }) {
 
 const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
 
-export async function postTask({ auth, task, ephemeral }) {
+export async function postTask({ auth, task, ephemeral, isPublic }) {
   const storageType = ephemeral && "ephemeral" || "persistent";
   const headers = {
     "Authorization": auth.token,
     "x-graffiticode-storage-type": storageType,
   };
+  if (isPublic) {
+    delete headers.Authorization;
+  }
   const { data } = await postApiJSON("/task", { task }, headers);
   return data;
 }

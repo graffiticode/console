@@ -22,7 +22,7 @@ const typeDefs = `
   type Mutation {
     tasksSettings(token: String!, lang: String!, mark: Int!): String!
     postTask(token: String!, lang: String!, code: String!, ephemeral: Boolean): String!
-    saveTask(token: String!, lang: String!, code: String!, mark: Int!): String!
+    saveTask(token: String!, lang: String!, code: String!, mark: Int!, isPublic: Boolean): String!
   }
 `;
 
@@ -42,9 +42,9 @@ const resolvers = {
       return JSON.stringify({ status: "ok" });
     },
     saveTask: async (_, args) => {
-      const { token, lang, code, mark } = args;
+      const { token, lang, code, mark, isPublic } = args;
       const { uid } = await client.verifyAccessToken(token);
-      const data = await saveTask({ auth: { uid, token }, lang, code, mark });
+      const data = await saveTask({ auth: { uid, token }, lang, code, mark, isPublic });
       return JSON.stringify(data);
     },
     postTask: async (_, args) => {
