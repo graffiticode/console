@@ -7,8 +7,8 @@ import {
   renderGraphiQL,
 } from "graphql-helix";
 import {
+  logCompile,
   getTasks,
-  updateMark,
   saveTask,
   postTask,
 } from "./resolvers.js";
@@ -20,7 +20,7 @@ const typeDefs = `
   }
 
   type Mutation {
-    tasksSettings(token: String!, lang: String!, mark: Int!): String!
+    logCompile(token: String!, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(token: String!, lang: String!, code: String!, ephemeral: Boolean): String!
     saveTask(token: String!, lang: String!, code: String!, mark: Int!, isPublic: Boolean): String!
   }
@@ -35,12 +35,6 @@ const resolvers = {
     },
   },
   Mutation: {
-    tasksSettings: async (_, args) => {
-      // const { auth } = ctx;
-      // const { lang, code, mark } = args;
-      // const id = await updateMark({ auth, lang, code, mark });
-      return JSON.stringify({ status: "ok" });
-    },
     saveTask: async (_, args) => {
       const { token, lang, code, mark, isPublic } = args;
       const { uid } = await client.verifyAccessToken(token);
@@ -53,6 +47,12 @@ const resolvers = {
       const task = { lang, code };
       const { id } = await postTask({ auth: { uid, token }, task, ephemeral });
       return id;
+    },
+    logCompile: async (_, args) => {
+      const { token, id, timestamp, status, data } = args;
+      const { uid } = await client.verifyAccessToken(token);
+      const resp = await logCompile({ auth: { uid, token }, id, timestamp, status, data });
+      return resp;
     },
   },
 };

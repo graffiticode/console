@@ -10,41 +10,17 @@ const taskDao = getTaskDaoForStore("firestore");
 
 const db = getFirestore();
 
+export async function logCompile({ auth, id, timestamp, status, data }) {
+  await db.doc(`users/${auth.uid}/compiles/${timestamp}.${id}`).set({ id, timestamp, data });
+  return "ok";
+}
+
 export async function saveTask({ auth, lang, code, mark, isPublic }) {
   const task = { lang, code };
   const { id: taskId } = await postTask({ auth, task, ephemeral: false, isPublic });
   await db.doc(`users/${auth.uid}/taskIds/${taskId}`).set({ lang, mark, src: code, isPublic });
   const data = { taskId };
   return data;
-}
-
-export async function updateMark({ authToken, uid, lang, code, mark }) {
-  const task = { lang, code };
-  const auth = { uid };
-  const { id } = await postTask({ authToken, task, ephemeral: false });
-  // TODO if task id already exists, then update code in case its formatting
-  // has changed.
-  const taskId = await taskDao.create({ id, auth, task });
-  const userRef = await db.doc(`users/${uid}`);
-  const userDoc = await userRef.get();
-  const userData = userDoc.data();
-
-  try {
-    const taskIdsCol = userRef.collection("taskIds");
-    await taskIdsCol.doc(taskId).set({
-      lang,
-      mark,
-    });
-  } catch (x) {
-    console.log("saveTask() x=" + x);
-  }
-
-  const data = {
-    id,
-    image: base64,
-    imageUrl: `https://cdn.acx.ac/${id}.png`,
-  };
-  return JSON.stringify(data);
 }
 
 const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");

@@ -5,6 +5,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
+import Timeline from '../components/timeline';
 
 import {
   CalendarIcon,
@@ -150,10 +151,7 @@ export default function Home() {
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             {/* Replace with your content */}
-            <div className="px-4 py-6 sm:px-0">
-              <div className="border-4 border-dashed border-gray-200 rounded-none h-96">
-              </div>
-            </div>
+            <Timeline />
           </div>
         </main>
       </div>
