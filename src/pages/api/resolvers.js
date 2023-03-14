@@ -11,7 +11,9 @@ const taskDao = getTaskDaoForStore("firestore");
 const db = getFirestore();
 
 export async function logCompile({ auth, id, timestamp, status, data }) {
-  await db.doc(`users/${auth.uid}/compiles/${timestamp}.${id}`).set({ id, timestamp, data });
+  const path = await db.doc(`users/${auth.uid}/compiles/${timestamp}.${id}`);
+  await db.doc(path).set({ id, timestamp, status, data });
+  console.log("logCompile() path=" + path);
   return "ok";
 }
 
