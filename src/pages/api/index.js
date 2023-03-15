@@ -7,6 +7,7 @@ import {
   renderGraphiQL,
 } from "graphql-helix";
 import {
+  getCompiles,
   logCompile,
   getTasks,
   saveTask,
@@ -16,6 +17,7 @@ import { client } from "../../lib/auth";
 
 const typeDefs = `
   type Query {
+    getCompiles(token: String!, type: String!): String!
     getTasks(token: String!, lang: String!, mark: Int!): String!
   }
 
@@ -28,6 +30,11 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
+    getCompiles: async (_, args) => {
+      const { token, type } = args;
+      const { uid } = await client.verifyAccessToken(token);
+      return await getCompiles({ auth: { uid, token }, type });
+    },
     getTasks: async (_, args) => {
       const { token, lang, mark } = args;
       const { uid } = await client.verifyAccessToken(token);

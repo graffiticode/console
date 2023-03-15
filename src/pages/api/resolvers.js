@@ -92,6 +92,19 @@ export async function getTasks({ auth, lang, mark }) {
   return JSON.stringify(tasks);
 }
 
+export async function getCompiles({ auth, type }) {
+  const compilesDocs = await db.collection(`users/${auth.uid}/compiles`)
+//    .where('lang', '==', lang)
+//    .where('mark', '==', mark)
+    .get();
+  const compiles = [];
+  compilesDocs.forEach(doc => {
+    compiles.push(doc.data());
+  });
+  console.log("getCompiles() compiles=" + JSON.stringify(compiles, null, 2));
+  return JSON.stringify(compiles);
+}
+
 export async function getTask(auth, id) {
   const apiTask = await getApiTask({ id, auth });
   return { [id]: apiTask };

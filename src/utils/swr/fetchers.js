@@ -39,3 +39,16 @@ export const loadTasks = async ({ user, lang, mark }) => {
   return request('/api', query, { token, lang, mark }).then(data => JSON.parse(data.getTasks));
 };
 
+export const loadCompiles = async ({ user, type }) => {
+  if (!user) {
+    return {};
+  }
+  const token = await user.getToken();
+  const query = gql`
+    query get($token: String!, $type: String!) {
+      getCompiles(token: $token, type: $type)
+    }
+  `;
+  return request('/api', query, { token, type }).then(data => JSON.parse(data.getCompiles));
+};
+
