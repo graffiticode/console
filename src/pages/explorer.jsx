@@ -5,7 +5,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
-import Timeline from '../components/timeline';
+import GraphQLIde from '../components/graphiql';
 
 import {
   CalendarIcon,
@@ -37,14 +37,6 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-const ReduxApplet = () => {
-  return (
-    <>
-      <Gallery />
-    </>
-  );
-}
-
 export default function Compiles() {
   const [userId, setUserId] = useState();
   return (
@@ -65,7 +57,7 @@ export default function Compiles() {
           content="A software studio"
         />
       </Head>
-      <div className="min-h-full">
+      <div className="w-screen h-screen">
         <Disclosure as="nav" className="bg-gray-800">
           {({ open }) => (
             <>
@@ -149,9 +141,8 @@ export default function Compiles() {
           )}
         </Disclosure>
         <main>
-          <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            {/* Replace with your content */}
-            <Timeline />
+          <div className="mx-auto h-screen">
+            <GraphQLIde />
           </div>
         </main>
       </div>
