@@ -1,29 +1,47 @@
-import { request, gql } from 'graphql-request';
+import bent from "bent";
+import { GraphQLClient, gql } from 'graphql-request';
+
+const buildRequestClient = async ({ token }) => {
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  return client;
+};
 
 export const postTask = async ({ user, lang, code }) => {
   const query = gql`
-    mutation post ($token: String!, $lang: String!, $code: String!, $ephemeral: Boolean!) {
-      postTask(token: $token, lang: $lang, code: $code, ephemeral: $ephemeral)
+    mutation post ($lang: String!, $code: String!, $ephemeral: Boolean!) {
+      postTask(lang: $lang, code: $code, ephemeral: $ephemeral)
     }
   `;
   const token = await user.getToken();
+  //const client = buildRequestClient({ token });
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
   const ephemeral = true;
-  return request('/api', query, { token, lang, code, ephemeral }).then(data => data.postTask);
+  return client.request(query, { lang, code, ephemeral }).then(data => data.postTask);
 };
 
 export const buildSaveTask = ({ setNewTask }) => async ({ user, lang, code, mark, isPublic }) => {
-  try {
-    const query = gql`
+  const query = gql`
     mutation post ($token: String!, $lang: String!, $code: String!, $mark: Int!, $isPublic: Boolean) {
       saveTask(token: $token, lang: $lang, code: $code, mark: $mark, isPublic: $isPublic)
     }
   `;
-    const token = await user.getToken();
-    const task = await request('/api', query, { token, lang, code, mark, isPublic }).then(data => JSON.parse(data.saveTask));
-    setNewTask(task);
-  } catch (x) {
-    console.log("buildSaveTask() catch " + x.stack);
-  }
+  const token = await user.getToken();
+  //const request = buildRequestClient({ token });
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const task = client.request(query, { token, lang, code, mark, isPublic }).then(data => JSON.parse(data.saveTask));
+  setNewTask(task);
 };
 
 export const loadTasks = async ({ user, lang, mark }) => {
@@ -31,12 +49,18 @@ export const loadTasks = async ({ user, lang, mark }) => {
     return {};
   }
   const token = await user.getToken();
+  //const request = buildRequestClient({ token });
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
   const query = gql`
     query get($token: String!, $lang: String!, $mark: Int!) {
       getTasks(token: $token, lang: $lang, mark: $mark)
     }
   `;
-  return request('/api', query, { token, lang, mark }).then(data => JSON.parse(data.getTasks));
+  return client.request(query, { token, lang, mark }).then(data => JSON.parse(data.getTasks));
 };
 
 export const loadCompiles = async ({ user, type }) => {
@@ -44,11 +68,32 @@ export const loadCompiles = async ({ user, type }) => {
     return {};
   }
   const token = await user.getToken();
+  //const request = buildRequestClient({ token });
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
   const query = gql`
     query get($token: String!, $type: String!) {
       getCompiles(token: $token, type: $type)
     }
   `;
-  return request('/api', query, { token, type }).then(data => JSON.parse(data.getCompiles));
+  return client.request(query, { token, type }).then(data => JSON.parse(data.getCompiles));
+};
+
+export const loadGraphiQL = async ({ user }) => {
+  if (!user) {
+    return {};
+  }
+  const token = await user.getToken();
+  //const request = buildRequestClient({ token });
+  const headers = {
+    headers: {
+      authorization: token,
+    }
+  };
+  const get = bent("/api", "GET", "html", 200)
+  return await get({ headers });
 };
 

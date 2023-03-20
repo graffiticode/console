@@ -13,7 +13,6 @@ const db = getFirestore();
 export async function logCompile({ auth, id, timestamp, status, data }) {
   const path = `users/${auth.uid}/compiles/${timestamp}.${id}`;
   await db.doc(path).set({ id, timestamp, status, data });
-  console.log("logCompile() path=" + path);
   return "ok";
 }
 

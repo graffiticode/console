@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { loadCompiles } from '../utils/swr/fetchers';
+import { loadGraphiQL } from '../utils/swr/fetchers';
 import { CheckIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/20/solid'
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { createGraphiQLFetcher } from '@graphiql/toolkit';
@@ -14,13 +14,18 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-import 'graphiql/graphiql.css';
+// import 'graphiql/graphiql.css';
 
-const fetcher = createGraphiQLFetcher({
-  url: 'http://localhost:3000/api/graphql',
-  fetch: request,
-});
+// const fetcher = createGraphiQLFetcher({
+//   url: 'http://localhost:3000/api/graphql',
+//   fetch: request,
+// });
 
-export default function graphiql() {  
-  return <iframe src="/api" width="100%" height="100%" />
+export default function graphiql() {
+  const { user } = useGraffiticodeAuth();
+  try {
+    return useSWR(user, loadGraphiQL);
+  } catch (x) {
+    return <div />;
+  }
 }
