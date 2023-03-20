@@ -22,10 +22,6 @@ function classNames(...classes) {
 // });
 
 export default function graphiql() {
-  const { user } = useGraffiticodeAuth();
-  try {
-    return useSWR(user, loadGraphiQL);
-  } catch (x) {
-    return <div />;
-  }
+  //const { user } = useGraffiticodeAuth();
+  return <div />;
 }
