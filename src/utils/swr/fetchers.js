@@ -87,13 +87,15 @@ export const loadGraphiQL = async ({ user }) => {
     return {};
   }
   const token = await user.getToken();
+  console.log("loadGraphiQL() token=" + token);
   //const request = buildRequestClient({ token });
   const headers = {
-    headers: {
-      authorization: token,
-    }
+    authorization: token,
+    accept: "text/html",
   };
-  const get = bent("/api", "GET", "html", 200)
-  return await get({ headers });
+  const get = bent("http://localhost:3000", "GET", "string", 200);
+  const data = await get("/api", null, headers);
+  console.log("loadGraphiQL() data=" + JSON.stringify(data));
+  return data;
 };
 

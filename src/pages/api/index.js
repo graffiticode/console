@@ -80,13 +80,12 @@ export default async function handler(req, res) {
   };
   if (shouldRenderGraphiQL(request)) {
     const headers = req.headers
-    console.log("handler() headers=" + JSON.stringify(headers, null, 2));
-    res.send(
-      renderGraphiQL({
+    const html = renderGraphiQL({
         endpoint: "/api",
-        //headers,
-      })
-    );
+//        headers,
+    });
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
   } else {
     const { operationName, query, variables } = getGraphQLParameters(request);
     const result = await processRequest({

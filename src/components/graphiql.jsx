@@ -1,27 +1,12 @@
-import useSWR from "swr";
-import { loadGraphiQL } from '../utils/swr/fetchers';
-import { CheckIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/20/solid'
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
-import { createGraphiQLFetcher } from '@graphiql/toolkit';
-import { GraphiQL } from 'graphiql';
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { request } from 'graphql-request';
-
-
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-// import 'graphiql/graphiql.css';
-
-// const fetcher = createGraphiQLFetcher({
-//   url: 'http://localhost:3000/api/graphql',
-//   fetch: request,
-// });
-
-export default function graphiql() {
-  //const { user } = useGraffiticodeAuth();
-  return <div />;
+export default function GraphiQL() {
+  // FIXME add auth to fetch requests.
+  const { user } = useGraffiticodeAuth();
+  console.log("graphiql() user=" + JSON.stringify(user, null, 2));
+  return <embed src="http://localhost:3000/api" width="100%" height="100%"/>
 }
