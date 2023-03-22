@@ -26,5 +26,6 @@ export default function GraphiQL() {
     console.log("token=" + token);
   })(user)
   console.log("token=" + token);
-  return <embed src={`http://localhost:3000/api?auth_token=${token}`} width="100%" height="100%"/>
+  //  return <embed src={`http://localhost:3000/api?auth_token=${token}`} width="100%" height="100%"/>;
+  return <embed src={`https://console.graffiticode.com/api?auth_token=${token}`} width="100%" height="100%"/>;
 }
