@@ -17,7 +17,6 @@ export const postTask = async ({ user, lang, code }) => {
     }
   `;
   const token = await user.getToken();
-  //const client = buildRequestClient({ token });
   const client = new GraphQLClient("/api", {
     headers: {
       authorization: token,
@@ -27,10 +26,10 @@ export const postTask = async ({ user, lang, code }) => {
   return client.request(query, { lang, code, ephemeral }).then(data => data.postTask);
 };
 
-export const buildSaveTask = ({ setNewTask }) => async ({ user, lang, code, mark, isPublic }) => {
+export const buildSaveTask = ({ setNewTask }) => async ({ user, lang, code, mark, isPublic = false }) => {
   const query = gql`
-    mutation post ($token: String!, $lang: String!, $code: String!, $mark: Int!, $isPublic: Boolean) {
-      saveTask(token: $token, lang: $lang, code: $code, mark: $mark, isPublic: $isPublic)
+    mutation post ($lang: String!, $code: String!, $mark: Int!, $isPublic: Boolean) {
+      saveTask(lang: $lang, code: $code, mark: $mark, isPublic: $isPublic)
     }
   `;
   const token = await user.getToken();
@@ -40,7 +39,7 @@ export const buildSaveTask = ({ setNewTask }) => async ({ user, lang, code, mark
       authorization: token,
     }
   });
-  const task = client.request(query, { token, lang, code, mark, isPublic }).then(data => JSON.parse(data.saveTask));
+  const task = client.request(query, { lang, code, mark, isPublic }).then(data => JSON.parse(data.saveTask));
   setNewTask(task);
 };
 
@@ -56,11 +55,11 @@ export const loadTasks = async ({ user, lang, mark }) => {
     }
   });
   const query = gql`
-    query get($token: String!, $lang: String!, $mark: Int!) {
-      getTasks(token: $token, lang: $lang, mark: $mark)
+    query get($lang: String!, $mark: Int!) {
+      tasks(lang: $lang, mark: $mark)
     }
   `;
-  return client.request(query, { token, lang, mark }).then(data => JSON.parse(data.getTasks));
+  return client.request(query, { lang, mark }).then(data => JSON.parse(data.tasks));
 };
 
 export const loadCompiles = async ({ user, type }) => {
@@ -75,11 +74,11 @@ export const loadCompiles = async ({ user, type }) => {
     }
   });
   const query = gql`
-    query get($token: String!, $type: String!) {
-      getCompiles(token: $token, type: $type)
+    query get($type: String!) {
+      compiles(type: $type)
     }
   `;
-  return client.request(query, { token, type }).then(data => JSON.parse(data.getCompiles));
+  return client.request(query, { type }).then(data => JSON.parse(data.compiles));
 };
 
 export const loadGraphiQL = async ({ user }) => {
@@ -93,9 +92,9 @@ export const loadGraphiQL = async ({ user }) => {
     authorization: token,
     accept: "text/html",
   };
-  const get = bent("http://localhost:3000", "GET", "string", 200);
+  const get = bent("http://localhost:3000", "GET", "string");
   const data = await get("/api", null, headers);
   console.log("loadGraphiQL() data=" + JSON.stringify(data));
-  return data;
+  return data.replace(/\n/g, "").slice(15);
 };
 

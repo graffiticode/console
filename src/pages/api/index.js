@@ -7,9 +7,9 @@ import {
   renderGraphiQL,
 } from "graphql-helix";
 import {
-  getCompiles,
+  compiles,
   logCompile,
-  getTasks,
+  tasks,
   saveTask,
   postTask,
 } from "./resolvers.js";
@@ -17,30 +17,30 @@ import { client } from "../../lib/auth";
 
 const typeDefs = `
   type Query {
-    getCompiles(token: String!, type: String!): String!
-    getTasks(token: String!, lang: String!, mark: Int!): String!
+    compiles(type: String!): String!
+    tasks(lang: String!, mark: Int!): String!
   }
 
   type Mutation {
     logCompile(id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
-    saveTask(token: String!, lang: String!, code: String!, mark: Int!, isPublic: Boolean): String!
+    saveTask(lang: String!, code: String!, mark: Int!, isPublic: Boolean): String!
   }
 `;
 
 const resolvers = {
   Query: {
-    getCompiles: async (_, args, ctx) => {
+    compiles: async (_, args, ctx) => {
       const { token } = ctx;
       const { type } = args;
       const { uid } = await client.verifyAccessToken(token);
-      return await getCompiles({ auth: { uid, token }, type });
+      return await compiles({ auth: { uid, token }, type });
     },
-    getTasks: async (_, args, ctx) => {
+    tasks: async (_, args, ctx) => {
       const { token } = ctx;
       const { lang, mark } = args;
       const { uid } = await client.verifyAccessToken(token);
-      return await getTasks({ auth: { uid, token }, lang, mark });
+      return await tasks({ auth: { uid, token }, lang, mark });
     },
   },
   Mutation: {
@@ -78,11 +78,13 @@ export default async function handler(req, res) {
     query: req.query,
     body: req.body,
   };
+  console.log("req.headers=" + JSON.stringify(req.headers, null, 2));
   if (shouldRenderGraphiQL(request)) {
-    const headers = req.headers
+    console.log("handler() req.query=" + JSON.stringify(req.query, null, 2));
+    const { auth_token } = req.query;
     const html = renderGraphiQL({
-        endpoint: "/api",
-//        headers,
+      endpoint: "/api",
+      headers: `{ "authorization": "${auth_token}" }`,
     });
     res.setHeader('Content-Type', 'text/html');
     res.send(html);

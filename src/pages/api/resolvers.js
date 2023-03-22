@@ -67,7 +67,7 @@ export async function getData({ authToken, id }) {
   }
 }
 
-export async function getTasks({ auth, lang, mark }) {
+export async function tasks({ auth, lang, mark }) {
   const taskIdsDocs = await db.collection(`users/${auth.uid}/taskIds`)
     .where('lang', '==', lang)
     .where('mark', '==', mark)
@@ -91,7 +91,7 @@ export async function getTasks({ auth, lang, mark }) {
   return JSON.stringify(tasks);
 }
 
-export async function getCompiles({ auth, type }) {
+export async function compiles({ auth, type }) {
   const compilesDocs = await db.collection(`users/${auth.uid}/compiles`)
 //    .where('lang', '==', lang)
 //    .where('mark', '==', mark)
