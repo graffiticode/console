@@ -102,8 +102,7 @@ export const loadGraphiQL = async ({ user }) => {
     authorization: token,
     accept: "text/html",
   };
-  const get = bent("https://console.graffiticode.com", "GET", "string");
-  // const get = bent("http://localhost:3000", "GET", "string");
+  const get = bent(location.origin, "GET", "string");
   const data = await get("/api", null, headers);
   console.log("loadGraphiQL() data=" + JSON.stringify(data));
   return data.replace(/\n/g, "").slice(15);

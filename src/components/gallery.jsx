@@ -38,7 +38,7 @@ const useTaskIdFormUrl = ({ lang, id }) => {
 };
 
 function Task({ setOpen, setTask, lang, task }) {
-  const src = useTaskIdFormUrl({ lang, id: task.taskId });
+  const src = useTaskIdFormUrl({ lang, id: task.id });
   return (
     <div>
       <li
@@ -104,6 +104,7 @@ export default function Gallery({ lang, mark }) {
       user ? { user, lang, mark: mark.id } : null,
       loadTasks
     );
+  console.log("Gallery() data=" + JSON.stringify(data, null, 2));
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
     setNewTask({ lang, src: `| L${lang}`, ephemeral: true });
@@ -121,7 +122,7 @@ export default function Gallery({ lang, mark }) {
   }
 
   const { uid } = user;
-  const tasks = data;
+  const tasks = data || [];
 
   if (newTask) {
     tasks.unshift(newTask);
