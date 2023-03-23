@@ -93,7 +93,6 @@ export async function tasks({ auth, lang, mark }) {
     });
     return tasks;
   }, []);
-  console.log("tasks() tasks=" + JSON.stringify(tasks, null, 2));
   return tasks;
 }
 
@@ -106,7 +105,6 @@ export async function compiles({ auth, type }) {
   compilesDocs.forEach(doc => {
     data.push(doc.data());
   });
-  console.log("compiles() data=" + JSON.stringify(data, null, 2));
   return data;
 }
 

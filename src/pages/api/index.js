@@ -94,9 +94,7 @@ export default async function handler(req, res) {
     query: req.query,
     body: req.body,
   };
-  console.log("req.headers=" + JSON.stringify(req.headers, null, 2));
   if (shouldRenderGraphiQL(request)) {
-    console.log("handler() req.query=" + JSON.stringify(req.query, null, 2));
     const { auth_token } = req.query;
     const html = renderGraphiQL({
       endpoint: "/api",

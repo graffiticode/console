@@ -11,12 +11,21 @@ function classNames(...classes) {
 export default function Timeline() {
   const { user } = useGraffiticodeAuth();
   const type = "*";  // { "*" | "persistent" | "ephemeral" }
-  const { data } =
+  const { isLoading, data } =
     useSWR(
       user ? { user, type } : null,
       loadCompiles
     );
   const compiles = data || [];
+
+  if (isLoading) {
+    return (
+      <div className="justify-center w-full">
+        Loading...
+      </div>
+    );
+  }
+
   return (
     <div className="flow-root">
       <ul role="list" className="-mb-8">

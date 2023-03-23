@@ -99,12 +99,11 @@ export default function Gallery({ lang, mark }) {
   const [newTask, setNewTask] = useState();
   const { user } = useGraffiticodeAuth();
   const src = useTaskIdFormUrl({ lang, id });
-  const resp =
+  const { isValidating, isLoading, data } =
     useSWR(
       user ? { user, lang, mark: mark.id } : null,
       loadTasks
     );
-  console.log("Gallery() resp=" + JSON.stringify(resp, null, 2));
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
     setTask({ lang, src: `| L${lang}`, ephemeral: true });
@@ -122,8 +121,16 @@ export default function Gallery({ lang, mark }) {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="justify-center w-full">
+        Loading...
+      </div>
+    );
+  }
+
   const { uid } = user;
-  const tasks = resp.data || [];
+  const tasks = data || [];
 
   return (
     <>
