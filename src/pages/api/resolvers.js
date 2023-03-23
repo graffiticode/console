@@ -20,7 +20,7 @@ export async function saveTask({ auth, lang, code, mark, isPublic }) {
   const task = { lang, code };
   const { id: taskId } = await postTask({ auth, task, ephemeral: false, isPublic });
   await db.doc(`users/${auth.uid}/taskIds/${taskId}`).set({ lang, mark, src: code, isPublic });
-  const data = { taskId };
+  const data = { id: taskId };
   return data;
 }
 

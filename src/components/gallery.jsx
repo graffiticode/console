@@ -132,6 +132,10 @@ export default function Gallery({ lang, mark }) {
   const { uid } = user;
   const tasks = data || [];
 
+  if (newTask) {
+    tasks.unshift(newTask);
+  }
+
   return (
     <>
       <button

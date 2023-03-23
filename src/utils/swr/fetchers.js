@@ -39,8 +39,8 @@ export const buildSaveTask = ({ setNewTask }) => async ({ user, lang, code, mark
       authorization: token,
     }
   });
-  const task = client.request(query, { lang, code, mark, isPublic }).then(data => JSON.parse(data.saveTask));
-  setNewTask(task);
+  return await client.request(query, { lang, code, mark, isPublic }).then(data => JSON.parse(data.saveTask));
+  
 };
 
 export const loadTasks = async ({ user, lang, mark }) => {

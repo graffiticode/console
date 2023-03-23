@@ -40,7 +40,11 @@ export default function Editor({ task, lang, mark: markInit, setOpen, setId, set
   const [code, setCode] = useState(task?.src || "");
   const [saving, setSaving] = useState(false);
   const saveTask = buildSaveTask({ setNewTask });
-  useSWR(saving ? { user, lang, code, mark: mark.id, isPublic } : null, saveTask);
+  const { isLoading, data } = useSWR(saving ? { user, lang, code, mark: mark.id, isPublic } : null, saveTask);
+  if (isLoading) {
+    return <div />
+  }
+  setNewTask(data);
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
