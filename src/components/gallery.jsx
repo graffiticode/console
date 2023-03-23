@@ -104,10 +104,10 @@ export default function Gallery({ lang, mark }) {
       user ? { user, lang, mark: mark.id } : null,
       loadTasks
     );
-  console.log("Gallery() data=" + JSON.stringify(data, null, 2));
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
-    setNewTask({ lang, src: `| L${lang}`, ephemeral: true });
+    setTask({ lang, src: `| L${lang}`, ephemeral: true });
+    setOpen(true);
   });
 
   if (!user) {
@@ -123,10 +123,6 @@ export default function Gallery({ lang, mark }) {
 
   const { uid } = user;
   const tasks = data || [];
-
-  if (newTask) {
-    tasks.unshift(newTask);
-  }
 
   return (
     <>
