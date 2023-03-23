@@ -28,8 +28,8 @@ const typeDefs = `
     src: String!
     lang: String!
     code: String!
-    isPublic: Boolean!
     taskId: String!
+    isPublic: Boolean
   }
 
   type Query {
