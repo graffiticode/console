@@ -19,7 +19,6 @@ function getTitle(task) {
 }
 
 function getId(id) {
-  //  return id && id.slice(17) || undefined;
   return id || "new";
 }
 
@@ -52,7 +51,7 @@ function Task({ setOpen, setTask, lang, task }) {
           <div className="flex flex-1 flex-col p-8 text-left place-content-left">
             <dl className="mt-1 flex flex-grow flex-col justify-left">
               <dt className="sr-only">Title</dt>
-              <dd className="text-xs font-mono text-gray-500">{getId(task.taskId)}</dd>
+              <dd className="text-xs font-mono text-gray-500">{getId(task.id)}</dd>
               <dd className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
             </dl>
           </div>
@@ -110,7 +109,6 @@ export default function Gallery({ lang, mark }) {
     setNewTask({ lang, src: `| L${lang}`, ephemeral: true });
   });
 
-
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -123,15 +121,7 @@ export default function Gallery({ lang, mark }) {
   }
 
   const { uid } = user;
-  const tasksIds = Object.keys(data || {}).reverse();
-  const tasks = tasksIds.map(taskId => {
-    const task = {
-      ...data[taskId].apiTasks[0],
-      ...data[taskId].userTask,
-      taskId,
-    };
-    return task;
-  });
+  const tasks = data;
 
   if (newTask) {
     tasks.unshift(newTask);

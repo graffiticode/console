@@ -31,19 +31,12 @@ const navigation = [
   { name: 'Home', href: '/', current: true },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Explorer', href: '/explorer', current: false },
+  { name: 'Events', href: '/events', current: false },
   { name: 'Settings', href: '/settings', current: false },
 ]
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
-}
-
-const ReduxApplet = () => {
-  return (
-    <>
-      <Gallery />
-    </>
-  );
 }
 
 export default function Compiles() {
@@ -152,7 +145,6 @@ export default function Compiles() {
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             {/* Replace with your content */}
-            <Timeline />
           </div>
         </main>
       </div>

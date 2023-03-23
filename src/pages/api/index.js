@@ -16,9 +16,25 @@ import {
 import { client } from "../../lib/auth";
 
 const typeDefs = `
+  type Compile {
+    id: String!
+    data: String!
+    timestamp: String!
+    status: String!
+  }
+
+  type Task {
+    id: String!
+    src: String!
+    lang: String!
+    code: String!
+    isPublic: Boolean!
+    taskId: String!
+  }
+
   type Query {
-    compiles(type: String!): String!
-    tasks(lang: String!, mark: Int!): String!
+    compiles(type: String!): [Compile!]
+    tasks(lang: String!, mark: Int!): [Task!]
   }
 
   type Mutation {

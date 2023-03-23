@@ -56,10 +56,15 @@ export const loadTasks = async ({ user, lang, mark }) => {
   });
   const query = gql`
     query get($lang: String!, $mark: Int!) {
-      tasks(lang: $lang, mark: $mark)
+      tasks(lang: $lang, mark: $mark) {
+        id
+        lang,
+        src
+        isPublic
+      }
     }
   `;
-  return client.request(query, { lang, mark }).then(data => JSON.parse(data.tasks));
+  return client.request(query, { lang, mark }).then(data => data.tasks);
 };
 
 export const loadCompiles = async ({ user, type }) => {
@@ -75,10 +80,15 @@ export const loadCompiles = async ({ user, type }) => {
   });
   const query = gql`
     query get($type: String!) {
-      compiles(type: $type)
+      compiles(type: $type) {
+        id
+        data
+        status
+        timestamp
+      }
     }
   `;
-  return client.request(query, { type }).then(data => JSON.parse(data.compiles));
+  return client.request(query, { type }).then(data => data.compiles);
 };
 
 export const loadGraphiQL = async ({ user }) => {

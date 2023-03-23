@@ -81,14 +81,20 @@ export async function tasks({ auth, lang, mark }) {
 
   const apiTasks = await Promise.all(taskIds.map(id => getApiTask({ id, auth })));
   const tasks = apiTasks.reduce((tasks, apiTask, index) => {
-    tasks[taskIds[index]] = {
-      userTask: userTasks[index],
-      apiTasks: [...apiTask],
-    };
+    const userTask = userTasks[index];
+    apiTask = apiTask[0] || apiTask;
+    tasks.push({
+      id: userTask.id,
+      lang: userTask.lang,
+      code: JSON.stringify(apiTask.code),
+      src: userTask.src,
+      isPublic: userTask.isPublic,
+      taskId: taskIds[index],
+    });
     return tasks;
-  }, {});
+  }, []);
 
-  return JSON.stringify(tasks);
+  return tasks;
 }
 
 export async function compiles({ auth, type }) {
@@ -96,12 +102,12 @@ export async function compiles({ auth, type }) {
 //    .where('lang', '==', lang)
 //    .where('mark', '==', mark)
     .get();
-  const compiles = [];
+  const data = [];
   compilesDocs.forEach(doc => {
-    compiles.push(doc.data());
+    data.push(doc.data());
   });
-  console.log("getCompiles() compiles=" + JSON.stringify(compiles, null, 2));
-  return JSON.stringify(compiles);
+  console.log("compiles() data=" + JSON.stringify(data, null, 2));
+  return data;
 }
 
 export async function getTask(auth, id) {
