@@ -93,7 +93,7 @@ export async function tasks({ auth, lang, mark }) {
     });
     return tasks;
   }, []);
-
+  console.log("tasks() tasks=" + JSON.stringify(tasks, null, 2));
   return tasks;
 }
 
