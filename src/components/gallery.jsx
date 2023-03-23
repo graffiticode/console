@@ -124,6 +124,7 @@ export default function Gallery({ lang, mark }) {
   const { uid } = user;
   const tasks = data || [];
 
+  console.log("Gallery() tasks=" + JSON.stringify(tasks, null, 2));
   return (
     <>
       <button
