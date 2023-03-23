@@ -13,7 +13,7 @@ export default function GraphiQL() {
   // FIXME add auth to fetch requests.
   const { user } = useGraffiticodeAuth();
   (async (user) => {
-    token = await user.getToken();
+    token = user && await user.getToken();
     console.log("token=" + token);
   })(user)
   // return <embed src={`http://localhost:3000/api?auth_token=${token}`} width="100%" height="100%"/>;
