@@ -132,7 +132,7 @@ export default function Gallery({ lang, mark }) {
   const { uid } = user;
   const tasks = data || [];
 
-  if (newTask) {
+  if (newTask && !tasks.some(task => task.id === newTask.id)) {
     tasks.unshift(newTask);
   }
 
