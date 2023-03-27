@@ -3,6 +3,7 @@ import { buildTaskDaoFactory } from "../../utils/storage/index.js";
 import { buildGetTaskDaoForStorageType } from "./utils.js";
 import { getFirestore } from '../../utils/db';
 import { getApiTask, getBaseUrlForApi } from "../../lib/api.js";
+// import { buildDynamicSchema } from "./schemas.js";
 
 const taskDaoFactory = buildTaskDaoFactory({});
 const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
@@ -12,7 +13,7 @@ const db = getFirestore();
 
 export async function logCompile({ auth, id, timestamp, status, data }) {
   const path = `users/${auth.uid}/compiles/${timestamp}.${id}`;
-  await db.doc(path).set({ id, timestamp, status, data });
+  await db.doc(path).set({ id, timestamp, status, data: JSON.parse(data) });
   return "ok";
 }
 

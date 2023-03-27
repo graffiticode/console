@@ -12,6 +12,7 @@ import {
   tasks,
   saveTask,
   postTask,
+  data,
 } from "./resolvers.js";
 import { client } from "../../lib/auth";
 
