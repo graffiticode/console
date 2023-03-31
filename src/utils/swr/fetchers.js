@@ -82,7 +82,6 @@ export const loadCompiles = async ({ user, type }) => {
     query get($type: String!) {
       compiles(type: $type) {
         id
-        data
         status
         timestamp
       }

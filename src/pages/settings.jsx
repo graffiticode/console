@@ -28,7 +28,7 @@ const navigation = [
   { name: 'Home', href: '/', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Explorer', href: '/explorer', current: false },
-  { name: 'Events', href: '/events', current: false },
+  { name: 'Compiles', href: '/compiles', current: false },
   { name: 'Settings', href: '/settings', current: true },
 ]
 function classNames(...classes) {

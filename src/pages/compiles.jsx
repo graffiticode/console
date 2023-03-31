@@ -28,10 +28,10 @@ export function Logo(props) {
 }
 
 const navigation = [
-  { name: 'Home', href: '/', current: true },
+  { name: 'Home', href: '/', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Explorer', href: '/explorer', current: false },
-  { name: 'Events', href: '/events', current: true },
+  { name: 'Compiles', href: '/compiles', current: true },
   { name: 'Settings', href: '/settings', current: false },
 ]
 

@@ -19,7 +19,6 @@ import { client } from "../../lib/auth";
 const typeDefs = `
   type Compile {
     id: String!
-    data: String!
     timestamp: String!
     status: String!
   }
