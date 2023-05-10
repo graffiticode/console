@@ -32,17 +32,21 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Editor({ task, lang, mark: markInit, setOpen, setId, setNewTask }) {
+export default function Editor({ task, lang, mark: markInit, setOpen, setTaskId, setNewTask, dataId, setDataId }) {
   const [mark, setMark] = useState(markInit);
   const [view, setView] = useState();
   const [isPublic, setIsPublic] = useState(task.isPublic);
   const { user } = useGraffiticodeAuth();
   const [code, setCode] = useState(task?.src || "");
   const [saving, setSaving] = useState(false);
-  const saveTask = buildSaveTask({ setNewTask });
+  const saveTask = buildSaveTask();
   const { isLoading, data } = useSWR(saving ? { user, lang, code, mark: mark.id, isPublic } : null, saveTask);
   if (isLoading) {
-    return <div />
+    return <div>Compiling...</div>
+  }
+  if (data && dataId) {
+    // id = taskId+dataId
+    data.id = `${data.id}+${dataId}`;
   }
   setNewTask(data);
   return (
@@ -55,12 +59,16 @@ export default function Editor({ task, lang, mark: markInit, setOpen, setId, set
             lang={lang}
             code={code}
             setCode={setCode}
-            setId={setId}
+            setTaskId={setTaskId}
           />
         </div>
         <div className="flex justify-between pt-2 bg-white ring-1 ring-gray-400 ring-1 mt-2 p-2">
           <div className="flex-shrink-0 w-18 h-8">
             <MarkSelector mark={mark} setMark={setMark} />
+          </div>
+          <div className="grow px-4">
+            <input type="text" id="name" name="name" onBlur={(e) => setDataId(e.target.value)}
+                   className="h-full w-full items-center rounded-none bg-white ring-1 ring-gray-400 text-sm font-medium text-gray-700 focus:outline-none" />
           </div>
           <div className="flex">
             <div className="flex-shrink-0 w-18 h-8 pr-5">

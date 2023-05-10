@@ -18,8 +18,8 @@ function getTitle(task) {
   return "";
 }
 
-function getId(id) {
-  return id || "new";
+function getId({ taskId, dataId }) {
+  return taskId + (dataId && `+${dataId}` || "");
 }
 
 const useTaskIdFormUrl = ({ lang, id }) => {
@@ -37,8 +37,9 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-function Task({ setOpen, setTask, lang, task }) {
-  const src = useTaskIdFormUrl({ lang, id: task.id });
+function Task({ setOpen, setTask, lang, task, dataId }) {
+  const id = getId({ taskId: task.id, dataId });
+  const src = useTaskIdFormUrl({ lang, id });
   return (
     <div>
       <li
@@ -51,7 +52,7 @@ function Task({ setOpen, setTask, lang, task }) {
           <div className="flex flex-1 flex-col p-8 text-left place-content-left">
             <dl className="mt-1 flex flex-grow flex-col justify-left">
               <dt className="sr-only">Title</dt>
-              <dd className="text-xs font-mono text-gray-500">{getId(task.id)}</dd>
+              <dd className="text-xs font-mono text-gray-500">{id}</dd>
               <dd className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
             </dl>
           </div>
@@ -95,10 +96,13 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
 export default function Gallery({ lang, mark }) {
   const [open, setOpen] = useState(false);
   const [task, setTask] = useState();
-  const [id, setId] = useState();
+  const [taskId, setTaskId] = useState();
   const [newTask, setNewTask] = useState();
+  const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
+  const id = getId({ taskId, dataId });
   const src = useTaskIdFormUrl({ lang, id });
+  console.log("Gallery() src=" + src);
   const { isValidating, isLoading, data } =
     useSWR(
       user ? { user, lang, mark: mark.id } : null,
@@ -177,7 +181,17 @@ export default function Gallery({ lang, mark }) {
                       </div>
                       <div className="relative mt-6 flex-1 px-4 sm:px-6">
                         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl sm:px-6 lg:px-8">
-                          <Editor key={1} userId={uid} task={task} lang={lang} mark={mark} setOpen={setOpen} setId={setId} setNewTask={setNewTask} />
+                          <Editor
+                            key={1}
+                            userId={uid}
+                            task={task}
+                            lang={lang}
+                            mark={mark}
+                            setOpen={setOpen}
+                            setTaskId={setTaskId}
+                            setNewTask={setNewTask}
+                            dataId={dataId}
+                            setDataId={setDataId} />
                           <iframe key={2} src={src} width="100%" height="100%" />
                         </div>
                       </div>

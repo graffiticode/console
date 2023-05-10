@@ -26,7 +26,7 @@ export const postTask = async ({ user, lang, code }) => {
   return client.request(query, { lang, code, ephemeral }).then(data => data.postTask);
 };
 
-export const buildSaveTask = ({ setNewTask }) => async ({ user, lang, code, mark, isPublic = false }) => {
+export const buildSaveTask = () => async ({ user, lang, code, mark, isPublic = false }) => {
   const query = gql`
     mutation post ($lang: String!, $code: String!, $mark: Int!, $isPublic: Boolean) {
       saveTask(lang: $lang, code: $code, mark: $mark, isPublic: $isPublic)
