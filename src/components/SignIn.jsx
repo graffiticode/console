@@ -12,7 +12,7 @@ export default function SignInComponent({ label = "Sign in" }) {
   };
 
   if (user) {
-    return <button disabled={loading} onClick={signOut}>{user?.uid} (Sign out)</button>;
+    return <button disabled={loading} onClick={signOut}>{`${user.uid.slice(0, 7)}...${user.uid.slice(33)}`} (Sign out)</button>;
   } else {
     return <button disabled={loading} onClick={handleSignIn}>{label}</button>;
   }

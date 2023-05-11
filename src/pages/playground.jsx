@@ -4,8 +4,7 @@ import { useSession } from 'next-auth/react';
 import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
-import Gallery from '../components/gallery';
-import Timeline from '../components/timeline';
+import GraphQLIde from '../components/graphiql';
 
 import {
   CalendarIcon,
@@ -30,22 +29,14 @@ export function Logo(props) {
 const navigation = [
   { name: 'Home', href: '/', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
-  { name: 'Compiles', href: '/compiles', current: true },
+  { name: 'Compiles', href: '/compiles', current: false },
   { name: 'Events', href: '/events', current: false },
-  { name: 'Playground', href: '/playground', current: false },
+  { name: 'Playground', href: '/playground', current: true },
   { name: 'Settings', href: '/settings', current: false },
 ]
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
-}
-
-const ReduxApplet = () => {
-  return (
-    <>
-      <Gallery />
-    </>
-  );
 }
 
 export default function Compiles() {
@@ -68,7 +59,7 @@ export default function Compiles() {
           content="A software studio"
         />
       </Head>
-      <div className="min-h-full">
+      <div className="w-screen h-screen">
         <Disclosure as="nav" className="bg-gray-800">
           {({ open }) => (
             <>
@@ -152,9 +143,8 @@ export default function Compiles() {
           )}
         </Disclosure>
         <main>
-          <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            {/* Replace with your content */}
-            <Timeline />
+          <div className="mx-auto h-screen">
+            <GraphQLIde />
           </div>
         </main>
       </div>
