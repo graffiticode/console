@@ -14,7 +14,6 @@ const db = getFirestore();
 export async function logCompile({ auth, id, timestamp, status, data }) {
   const path = `users/${auth.uid}/compiles/${timestamp}.${id}`;
   data = JSON.parse(data);
-  console.log("logCompile() data=" + JSON.stringify(data, null, 2));
   await db.doc(path).set({ id, timestamp, status, data });
   return "ok";
 }

@@ -30,9 +30,10 @@ const useTaskIdFormUrl = ({ lang, id }) => {
     }
     const token = await user.getToken();
     const params = new URLSearchParams();
-    params.set("id", id);
-    params.set("token", token);
-    return `/api/form/${lang}?${params.toString()}`;
+    if (token) {
+      params.set("token", token);
+    }
+    return `/api/form/${id}?${params.toString()}`;
   });
   return src;
 };
