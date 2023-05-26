@@ -21,7 +21,7 @@ function typeFromValue(name, val) {
 
 function typeFromArrayOfValues(name, vals) {
   // Create a subtype or union type from an array of values.
-  const obj = {};
+  let obj = {};
   if (false && vals.length > 1) {
     vals.forEach(val => {
       // For now, assume elements are objects.
