@@ -1,12 +1,20 @@
 import useSWR from "swr";
 import { Fragment, useCallback, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
-import { XMarkIcon } from '@heroicons/react/24/outline'
+import {
+  XMarkIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRight
+} from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
 import { loadTasks } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+
+function classNames(...classes) {
+  return classes.filter(Boolean).join(' ')
+}
 
 function getTitle(task) {
   if (isNonEmptyString(task.src)) {
@@ -38,7 +46,7 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-function Task({ setOpen, setTask, lang, task, dataId }) {
+function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
   const id = getId({ taskId: task.id, dataId });
   const src = useTaskIdFormUrl({ lang, id });
   return (
@@ -47,8 +55,9 @@ function Task({ setOpen, setTask, lang, task, dataId }) {
         className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center"
       >
         <button onClick={() => {
-          setOpen(true);
-          setTask(task);
+                  setOpen(true);
+                  setHideEditor(false);
+                  setTask(task);
         }}>
           <div className="flex flex-1 flex-col p-8 text-left place-content-left">
             <dl className="mt-1 flex flex-grow flex-col justify-left">
@@ -70,7 +79,7 @@ function Task({ setOpen, setTask, lang, task, dataId }) {
   );
 }
 
-function Tasks({ setOpen, setTask, lang, tasks }) {
+function Tasks({ setOpen, setHideEditor, setTask, lang, tasks }) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return (
       <div className="flex flex-1 flex-col p-8 text-left place-content-left">
@@ -85,6 +94,7 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
           return <Task
             key={`task-${index}`}
             setOpen={setOpen}
+            setHideEditor={setHideEditor}
             setTask={setTask}
             lang={lang}
             task={task}
@@ -96,6 +106,7 @@ function Tasks({ setOpen, setTask, lang, tasks }) {
 
 export default function Gallery({ lang, mark }) {
   const [open, setOpen] = useState(false);
+  const [hideEditor, setHideEditor] = useState(false);
   const [task, setTask] = useState();
   const [taskId, setTaskId] = useState();
   const [newTask, setNewTask] = useState();
@@ -113,6 +124,7 @@ export default function Gallery({ lang, mark }) {
     e.preventDefault();
     setTask({ lang, src: `| L${lang}`, ephemeral: true });
     setOpen(true);
+    hideEditor(false);
   });
 
   if (!user) {
@@ -140,7 +152,7 @@ export default function Gallery({ lang, mark }) {
   if (newTask && !tasks.some(task => task.id === newTask.id)) {
     tasks.unshift(newTask);
   }
-
+  const hideForm = false;
   return (
     <>
       <button
@@ -148,7 +160,7 @@ export default function Gallery({ lang, mark }) {
         onClick={handleCreateTask}>
         Create New Task
       </button>
-      <Tasks setOpen={setOpen} setTask={setTask} lang={lang} tasks={tasks} setNewTask={setNewTask} />
+      <Tasks setOpen={setOpen} setHideEditor={setHideEditor} setTask={setTask} lang={lang} tasks={tasks} setNewTask={setNewTask} />
       <Transition.Root show={open} as={Fragment}>
         <Dialog as="div" className="relative z-10" onClose={setOpen}>
           <div className="fixed inset-0" />
@@ -174,26 +186,51 @@ export default function Gallery({ lang, mark }) {
                               className="rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
                               onClick={() => setOpen(false)}
                             >
-                              <span className="sr-only">Close panel</span>
+                              <span className="sr-only">Hide editor panel</span>
                               <XMarkIcon className="h-6 w-6" aria-hidden="true" />
                             </button>
                           </div>
                         </div>
                       </div>
                       <div className="relative mt-6 flex-1 px-4 sm:px-6">
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 max-w-7xl sm:px-6 lg:px-8">
-                          <Editor
-                            key={1}
-                            userId={uid}
-                            task={task}
-                            lang={lang}
-                            mark={mark}
-                            setOpen={setOpen}
-                            setTaskId={setTaskId}
-                            setNewTask={setNewTask}
-                            dataId={dataId}
-                            setDataId={setDataId} />
-                          <iframe key={2} src={src} width="100%" height="100%" />
+                        <div className={classNames(
+                               hideEditor ? "lg:grid-cols-1" : "lg:grid-cols-2",
+                               "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
+                             )}>
+                          { !hideEditor &&
+                            <div className="">
+                              <div className="w-full h-7 place-items-end">
+                                <button
+                                  type="button"
+                                  title="Hide editor"
+                                  className="rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
+                                  onClick={() => setHideEditor(true)}
+                                >
+                                  <span className="sr-only">Hide editor panel</span>
+                                  <ChevronDoubleLeftIcon className="h-6 w-6" aria-hidden="true" />
+                                </button>
+                              </div>
+                              
+                              <Editor
+                                key={1}
+                              userId={uid}
+                              task={task}
+                              lang={lang}
+                              mark={mark}
+                              setOpen={setOpen}
+                              setTaskId={setTaskId}
+                              setNewTask={setNewTask}
+                              dataId={dataId}
+                                setDataId={setDataId} />
+                              </div>
+                          }
+                          { !hideForm &&
+                            <iframe
+                              key={2}
+                              src={src}
+                              className="w-full h-screen"
+                            />
+                          }
                         </div>
                       </div>
                     </div>

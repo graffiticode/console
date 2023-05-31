@@ -52,7 +52,7 @@ export default function Editor({ task, lang, mark: markInit, setOpen, setTaskId,
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
-        <div className="ring-1 ring-gray-300 focus-within:border-none">
+        <div className="ring-1 ring-gray-300 focus-within:border-none w-full">
           <CodeMirror
             setView={setView}
             extensions={[javascript({ jsx: true })]}
