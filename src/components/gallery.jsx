@@ -124,7 +124,7 @@ export default function Gallery({ lang, mark }) {
     e.preventDefault();
     setTask({ lang, src: `| L${lang}`, ephemeral: true });
     setOpen(true);
-    hideEditor(false);
+    setHideEditor(false);
   });
 
   if (!user) {

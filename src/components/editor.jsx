@@ -66,10 +66,6 @@ export default function Editor({ task, lang, mark: markInit, setOpen, setTaskId,
           <div className="flex-shrink-0 w-18 h-8">
             <MarkSelector mark={mark} setMark={setMark} />
           </div>
-          <div className="grow px-4">
-            <input type="text" id="name" name="name" onBlur={(e) => setDataId(e.target.value)}
-                   className="h-full w-full items-center rounded-none bg-white ring-1 ring-gray-400 text-sm font-medium text-gray-700 focus:outline-none" />
-          </div>
           <div className="flex">
             <div className="flex-shrink-0 w-18 h-8 pr-5">
               <PublicToggle isPublic={isPublic} setIsPublic={setIsPublic} />
