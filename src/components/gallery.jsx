@@ -114,7 +114,6 @@ export default function Gallery({ lang, mark }) {
   const { user } = useGraffiticodeAuth();
   const id = getId({ taskId, dataId });
   const src = useTaskIdFormUrl({ lang, id });
-  console.log("Gallery() src=" + src);
   const { isValidating, isLoading, data } =
     useSWR(
       user ? { user, lang, mark: mark.id } : null,
