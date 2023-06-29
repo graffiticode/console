@@ -30,6 +30,7 @@ const typeDefs = `
     code: String!
     taskId: String!
     isPublic: Boolean
+    created: Int
   }
 
   type Query {

@@ -22,7 +22,13 @@ export async function logCompile({ auth, id, timestamp, status, data }) {
 export async function saveTask({ auth, lang, code, mark, isPublic }) {
   const task = { lang, code };
   const { id: taskId } = await postTask({ auth, task, ephemeral: false, isPublic });
-  await db.doc(`users/${auth.uid}/taskIds/${taskId}`).set({ lang, mark, src: code, isPublic });
+  await db.doc(`users/${auth.uid}/taskIds/${taskId}`).set({
+    lang,
+    mark,
+    src: code,
+    isPublic,
+    created: Date.now(),
+  });
   const data = { id: taskId };
   return data;
 }
@@ -81,7 +87,6 @@ export async function tasks({ auth, lang, mark }) {
     taskIds.push(doc.id);
     userTasks.push({ id: doc.id, ...doc.data() });
   });
-
   const apiTasks = await Promise.all(taskIds.map(id => getApiTask({ id, auth })));
   const tasks = apiTasks.reduce((tasks, apiTask, index) => {
     const userTask = userTasks[index];
@@ -93,6 +98,7 @@ export async function tasks({ auth, lang, mark }) {
       src: userTask.src,
       isPublic: userTask.isPublic,
       taskId: taskIds[index],
+      created: userTask.created,
     });
     return tasks;
   }, []);
