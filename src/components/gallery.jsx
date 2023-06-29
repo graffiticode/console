@@ -89,9 +89,10 @@ function Tasks({ setOpen, setHideEditor, setTask, lang, tasks }) {
   }
   tasks = tasks.sort((a, b) => {
     // Sort descending.
-    return +b.created - +a.created;
+    const at = +a.created || 0;
+    const bt = +b.created || 0;
+    return bt - at;
   });
-  console.log("tasks=" + JSON.stringify(tasks, null, 2));
   return (
     <ol role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
       {

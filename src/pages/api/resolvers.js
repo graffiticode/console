@@ -98,7 +98,7 @@ export async function tasks({ auth, lang, mark }) {
       src: userTask.src,
       isPublic: userTask.isPublic,
       taskId: taskIds[index],
-      created: userTask.created,
+      created: "" + userTask.created,
     });
     return tasks;
   }, []);
