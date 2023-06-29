@@ -87,8 +87,13 @@ function Tasks({ setOpen, setHideEditor, setTask, lang, tasks }) {
       </div>
     );
   }
+  tasks = tasks.sort((a, b) => {
+    // Sort descending.
+    return +b.created - +a.created;
+  });
+  console.log("tasks=" + JSON.stringify(tasks, null, 2));
   return (
-    <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
+    <ol role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
       {
         tasks.map((task, index) => {
           return <Task
@@ -100,7 +105,7 @@ function Tasks({ setOpen, setHideEditor, setTask, lang, tasks }) {
             task={task}
           />;
         })}
-    </ul>
+    </ol>
   );
 }
 

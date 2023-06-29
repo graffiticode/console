@@ -16,7 +16,10 @@ export default function Timeline() {
       user ? { user, type } : null,
       loadCompiles
     );
-  const compiles = data || [];
+  const compiles = data && data.sort((a, b) => {
+    // Sort descending.
+    return +b.timestamp - +a.timestamp;
+  }) || [];
 
   if (isLoading) {
     return (
@@ -28,7 +31,7 @@ export default function Timeline() {
 
   return (
     <div className="flow-root">
-      <ul role="list" className="-mb-8">
+      <ol role="list" className="-mb-8">
         {compiles.map((compile, eventIdx) => (
           <li key={compile.timestamp}>
             <div className="relative pb-4">
@@ -46,11 +49,11 @@ export default function Timeline() {
                     <CheckIcon className="h-4 w-4 text-white" aria-hidden="true" />
                   </span>
                 </div>
-                <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-0 font-medium text-sm text-gray-500 hover:text-black">
+                <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-0 font-medium text-xs text-mono text-gray-500 hover:text-black">
                   <div>
                     <p className="">
                       <a href={compile.id} className="">
-                        {compile.id}
+                        {compile.id.split("+").join(" + ")}
                       </a>
                     </p>
                   </div>
@@ -62,7 +65,7 @@ export default function Timeline() {
             </div>
           </li>
         ))}
-      </ul>
+      </ol>
     </div>
   )
 }

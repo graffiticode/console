@@ -62,7 +62,7 @@ function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
           <div className="flex flex-1 flex-col p-8 text-left place-content-left">
             <dl className="mt-1 flex flex-grow flex-col justify-left">
               <dt className="sr-only">Title</dt>
-              <dd className="text-xs font-mono text-gray-500">{id}</dd>
+              <dd className="text-xs font-mono text-gray-500">{id.split("+").join(" + ")}</dd>
               <dd className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
             </dl>
           </div>
@@ -87,8 +87,12 @@ function Tasks({ setOpen, setHideEditor, setTask, lang, tasks }) {
       </div>
     );
   }
+  tasks = tasks.sort((a, b) => {
+    // Sort descending.
+    return +b.timestamp - +a.timestamp;
+  });
   return (
-    <ul role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
+    <ol role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
       {
         tasks.map((task, index) => {
           return <Task
@@ -100,7 +104,7 @@ function Tasks({ setOpen, setHideEditor, setTask, lang, tasks }) {
             task={task}
           />;
         })}
-    </ul>
+    </ol>
   );
 }
 
