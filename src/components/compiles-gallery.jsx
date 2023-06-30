@@ -116,7 +116,6 @@ export default function Gallery({ lang, mark }) {
   const [newTask, setNewTask] = useState();
   const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
-  console.log("Compile Gallery() task=" + JSON.stringify(task));
   const id = task && task.id;
   const type = "*";  // { "*" | "persistent" | "ephemeral" }
   const { isLoading, data } =
@@ -125,8 +124,6 @@ export default function Gallery({ lang, mark }) {
       loadCompiles
     );
   const src = useTaskIdFormUrl({ lang, id });
-  console.log("Compile Gallery() lang=" + lang + " id=" + id + " src=" + src);
-
   if (!user) {
     return (
       <div className="justify-center w-full">
