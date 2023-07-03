@@ -208,5 +208,4 @@ export default function Gallery({ lang, mark }) {
       </Transition.Root>
     </>
   );
-
 }

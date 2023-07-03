@@ -1,7 +1,12 @@
-import Head from 'next/head'
+import Head from 'next/head';
 import Image from 'next/image';
-import { Fragment, useState } from 'react'
-import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react'
+import { useSession } from 'next-auth/react';
+import { useState, useEffect, Fragment } from 'react';
+import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
+import Link from 'next/link';
+import Gallery from '../components/gallery';
+import Timeline from '../components/timeline';
+
 import {
   CalendarIcon,
   CashIcon,
@@ -15,40 +20,36 @@ import {
   BellIcon,
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/SignIn'
-import { useEffect } from 'react';
-import Link from 'next/link';
-import Gallery from '../components/compiles-gallery';
-import LanguageSelector from '../components/language-selector';
-import MarkSelector, { marks } from '../components/mark-selector';
-import useSwr from 'swr';
-import { tasksSettings } from '../utils/swr/fetchers';
-import useLocalStorage from '../hooks/use-local-storage';
 
 export function Logo(props) {
   return (
     <Image src='/logo.png' alt='Artcompiler logo' width='30' height='30' />
-  )
+  );
 }
 
 const navigation = [
   { name: 'Home', href: '/', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: true },
-  { name: 'Events', href: '/events', current: false },
+//  { name: 'Events', href: '/events', current: false },
   { name: 'Playground', href: '/playground', current: false },
   { name: 'Settings', href: '/settings', current: false },
-];
+]
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Tasks() {
-  const [language, setLanguage] = useLocalStorage("graffiticode:tasks:language", { id: 1, name: 'L1' });
-  const [mark, setMark] = useLocalStorage("graffiticode:tasks:mark", marks[0]);
-  const lang = language.name.slice(1);
-  //const resp = useSwr({uid, lang, mark: mark.id}, tasksSettings);
-  //console.log("Tasks() resp=" + JSON.stringify(resp.data));
+const ReduxApplet = () => {
+  return (
+    <>
+      <Gallery />
+    </>
+  );
+}
+
+export default function Compiles() {
+  const [userId, setUserId] = useState();
   return (
     <>
       {/*
@@ -97,16 +98,10 @@ export default function Tasks() {
                         ))}
                       </div>
                     </div>
-                    <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
-                      <LanguageSelector language={language} setLanguage={setLanguage} />
-                    </div>
-                    <div className="ml-4 flex-shrink-0 w-18 h-24 pt-7">
-                      <MarkSelector mark={mark} setMark={setMark} />
-                    </div>
                   </div>
                   <div className="hidden md:block">
                     <div className="text-sm font-medium ml-4 flex items-center md:ml-6 text-gray-400 hover:text-white">
-                      <SignIn />
+                      <SignIn userId={userId} setUserId={setUserId}/>
                     </div>
                   </div>
                   <div className="-mr-2 flex md:hidden">
@@ -158,7 +153,8 @@ export default function Tasks() {
         </Disclosure>
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            <Gallery lang={lang} mark={mark} />
+            {/* Replace with your content */}
+            <Timeline />
           </div>
         </main>
       </div>

@@ -31,7 +31,7 @@ const navigation = [
   { name: 'Home', href: '/', current: true },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: false },
-  { name: 'Events', href: '/events', current: false },
+//  { name: 'Events', href: '/events', current: false },
   { name: 'Playground', href: '/playground', current: false },
   { name: 'Settings', href: '/settings', current: false },
 ]

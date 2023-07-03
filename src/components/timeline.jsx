@@ -8,6 +8,12 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+async function handleClick({ user, id }) {
+  const access_token = await user.getToken();
+  const dataUrl = `http://localhost:3100/data?id=${id}&access_token=${access_token}`;
+  window.open(dataUrl, '_blank').focus();
+}
+
 export default function Timeline() {
   const { user } = useGraffiticodeAuth();
   const type = "*";  // { "*" | "persistent" | "ephemeral" }
@@ -32,39 +38,43 @@ export default function Timeline() {
   return (
     <div className="flow-root">
       <ol role="list" className="-mb-8">
-        {compiles.map((compile, eventIdx) => (
-          <li key={compile.timestamp}>
-            <div className="relative pb-4">
-              {false && eventIdx !== timeline.length - 1 ? (
-                <span className="absolute top-4 left-2 -ml-px h-full w-0.5 bg-green-500" aria-hidden="true" />
-              ) : null}
-              <div className="relative flex space-x-3">
-                <div>
-                  <span
-                    className={classNames(
-                      'bg-green-500',
-                      'h-4 w-4 rounded-full flex items-center justify-center ring-8 ring-white'
-                    )}
-                  >
-                    <CheckIcon className="h-4 w-4 text-white" aria-hidden="true" />
-                  </span>
-                </div>
-                <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-0 font-medium text-xs text-mono text-gray-500 hover:text-black">
+        {
+          compiles.map((compile, eventIdx) => {
+            return (
+              <li key={compile.timestamp}>
+                <div className="relative pb-4">
+                  {false && eventIdx !== timeline.length - 1 ? (
+                    <span className="absolute top-4 left-2 -ml-px h-full w-0.5 bg-green-500" aria-hidden="true" />
+                  ) : null}
+                  <div className="relative flex space-x-3">
+                    <div>
+                      <span
+                        className={classNames(
+                          'bg-green-500',
+                          'h-4 w-4 rounded-full flex items-center justify-center ring-8 ring-white'
+                        )}
+                      >
+                        <CheckIcon className="h-4 w-4 text-white" aria-hidden="true" />
+                      </span>
+                    </div>
+                    <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-0 font-medium text-xs text-mono text-gray-500 hover:text-black">
                   <div>
                     <p className="">
-                      <a href={compile.id} className="">
+                      <a href="#" onClick={() => handleClick({ user, id: compile.id })} className="">
                         {compile.id.split("+").join(" + ")}
                       </a>
                     </p>
                   </div>
-                  <div className="whitespace-nowrap text-right">
-                    <time dateTime={compile.timestamp}>{new Date(+compile.timestamp).toUTCString()}</time>
+                      <div className="whitespace-nowrap text-right">
+                        <time dateTime={compile.timestamp}>{new Date(+compile.timestamp).toUTCString()}</time>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </li>
-        ))}
+              </li>
+            )
+          })
+        }
       </ol>
     </div>
   )
