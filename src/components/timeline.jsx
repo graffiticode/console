@@ -13,9 +13,8 @@ async function handleClick({ user, id }) {
   const [ protocol, host ] =
         document.location.host.indexOf("localhost") === 0 && ["http", "localhost:3100"] ||
         ["https", "api.graffiticode.com"];
-  const dataUrl = `${protocol}://${host}/data?id=${id}&access_token=${access_token}`;
-  console.log("dataUrl=" + dataUrl);
-  window.open(dataUrl, '_blank').focus();
+  const url = `${protocol}://${host}/data?id=${id}&access_token=${access_token}`;
+  window.open(url, '_blank').focus();
 }
 
 export default function Timeline() {
