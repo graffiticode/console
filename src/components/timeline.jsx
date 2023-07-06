@@ -45,7 +45,7 @@ export default function Timeline() {
           compiles.map((compile, eventIdx) => {
             return (
               <li key={compile.timestamp}>
-                <div className="relative pb-4">
+                <div className="relative pb-4 text-xs font-mono text-gray-500 hover:text-black">
                   {false && eventIdx !== timeline.length - 1 ? (
                     <span className="absolute top-4 left-2 -ml-px h-full w-0.5 bg-green-500" aria-hidden="true" />
                   ) : null}
@@ -60,7 +60,7 @@ export default function Timeline() {
                         <CheckIcon className="h-4 w-4 text-white" aria-hidden="true" />
                       </span>
                     </div>
-                    <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-0 font-medium text-xs text-mono text-gray-500 hover:text-black">
+                    <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-0 font-medium">
                   <div>
                     <p className="">
                       <a href="#" onClick={() => handleClick({ user, id: compile.id })} className="">
