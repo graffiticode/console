@@ -1,17 +1,19 @@
-/* This example requires Tailwind CSS v2.0+ */
-import { PaperClipIcon } from '@heroicons/react/20/solid'
+import { client } from "../lib/auth";
+import { useToken } from "../hooks/use-graffiticode-auth";
 
-export default function Example() {
+export default function APIKeysCard() {
+  const { data: token } = useToken();
+
   return (
     <div className="overflow-hidden bg-white">
       <div className="px-4 py-5 sm:p-0">
         <dl className="">
           <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-            <dt className="text-sm font-medium text-gray-500">
-              <i>Coming soon...</i>
-            </dt>
-            <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"> 
-            </dd>
+            <button onClick={async () => {
+              // const { apiKey } = await client.apiKeys.create(token);
+              // const { access_token } = await client.apiKeys.authenticate({ apiKey });
+              // console.log(access_token);
+            }}>Create API Key</button>
           </div>
         </dl>
       </div>
