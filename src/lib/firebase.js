@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { getAuth } from "firebase/auth";
 
-const apiFirebaseConfig = {
+export const apiFirebaseConfig = {
   apiKey: "AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I",
   authDomain: "graffiticode.firebaseapp.com",
   databaseURL: "https://graffiticode.firebaseio.com",
