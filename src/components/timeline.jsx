@@ -3,7 +3,6 @@ import { loadCompiles } from '../utils/swr/fetchers';
 import { CheckIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/20/solid'
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 
-
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
