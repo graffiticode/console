@@ -28,7 +28,6 @@ export function Logo(props) {
 }
 
 const navigation = [
-  { name: 'Home', href: '/', current: true },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: false },
 //  { name: 'Events', href: '/events', current: false },
@@ -68,7 +67,12 @@ export default function Compiles() {
                 <div className="flex items-center justify-between h-16">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
-                      <Logo />
+                          <a
+                            href="/"
+                            className='px-3 py-2 rounded-none text-sm font-medium'
+                          >
+                            <Logo />
+                          </a>
                     </div>
                     <div className="hidden md:block">
                       <div className="ml-10 flex items-baseline space-x-4">
@@ -145,6 +149,7 @@ export default function Compiles() {
         </Disclosure>
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            Home
             {/* Replace with your content */}
           </div>
         </main>

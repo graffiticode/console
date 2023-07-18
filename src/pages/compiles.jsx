@@ -28,7 +28,7 @@ export function Logo(props) {
 }
 
 const navigation = [
-  { name: 'Home', href: '/', current: false },
+//  { name: 'Home', href: '/', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: true },
 //  { name: 'Events', href: '/events', current: false },
@@ -61,7 +61,7 @@ export default function Compiles() {
         ```
       */}
       <Head>
-        <title>Graffiticode</title>
+        <title>Compiles \ Graffiticode</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"
@@ -76,7 +76,12 @@ export default function Compiles() {
                 <div className="flex items-center justify-between h-16">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
-                      <Logo />
+                          <a
+                            href="/"
+                            className='px-3 py-2 rounded-none text-sm font-medium'
+                          >
+                            <Logo />
+                          </a>
                     </div>
                     <div className="hidden md:block">
                       <div className="ml-10 flex items-baseline space-x-4">
