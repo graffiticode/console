@@ -27,9 +27,9 @@ export function Logo(props) {
 }
 
 const navigation = [
+  { name: 'Languages', href: '/languages', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: false },
-//  { name: 'Events', href: '/events', current: false },
   { name: 'Explorer', href: '/explorer', current: true },
   { name: 'Settings', href: '/settings', current: false },
 ]

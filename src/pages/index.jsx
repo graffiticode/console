@@ -28,9 +28,9 @@ export function Logo(props) {
 }
 
 const navigation = [
+  { name: 'Languages', href: '/languages', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: false },
-//  { name: 'Events', href: '/events', current: false },
   { name: 'Explorer', href: '/explorer', current: false },
   { name: 'Settings', href: '/settings', current: false },
 ]
@@ -149,8 +149,9 @@ export default function Compiles() {
         </Disclosure>
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            Home
-            {/* Replace with your content */}
+            This is the home screen. This is where we help the developer get
+            oriented. There should be guides and links to various documents
+            as well as quick start tutorials.
           </div>
         </main>
       </div>

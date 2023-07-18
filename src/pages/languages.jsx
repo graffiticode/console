@@ -28,23 +28,15 @@ export function Logo(props) {
 }
 
 const navigation = [
+  { name: 'Languages', href: '/languages', current: true },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: false },
-  { name: 'Events', href: '/events', current: true },
   { name: 'Explorer', href: '/explorer', current: false },
   { name: 'Settings', href: '/settings', current: false },
 ]
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
-}
-
-const ReduxApplet = () => {
-  return (
-    <>
-      <Gallery />
-    </>
-  );
 }
 
 export default function Compiles() {
@@ -60,7 +52,7 @@ export default function Compiles() {
         ```
       */}
       <Head>
-        <title>Events \ Graffiticode</title>
+        <title>Languages \ Graffiticode</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"
@@ -157,8 +149,7 @@ export default function Compiles() {
         </Disclosure>
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-            {/* Replace with your content */}
-            <Timeline />
+            Here is where we list and provide quick access to all the languages.
           </div>
         </main>
       </div>
