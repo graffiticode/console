@@ -66,17 +66,17 @@ export default function Settings() {
                 <div className="flex items-center justify-between h-16">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
-                          <a
+                          <Link
                             href="/"
                             className='px-3 py-2 rounded-none text-sm font-medium'
                           >
                             <Logo />
-                          </a>
+                          </Link>
                     </div>
                     <div className="hidden md:block">
                       <div className="ml-10 flex items-baseline space-x-4">
                         {navigation.map((item) => (
-                          <a
+                          <Link
                             key={item.name}
                             href={item.href}
                             target={item.target}
@@ -89,7 +89,7 @@ export default function Settings() {
                             aria-current={item.current ? 'page' : undefined}
                           >
                             {item.name}
-                          </a>
+                          </Link>
                         ))}
                       </div>
                     </div>
