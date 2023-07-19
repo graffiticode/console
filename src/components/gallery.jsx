@@ -83,7 +83,7 @@ function Tasks({ setOpen, setHideEditor, setTask, lang, tasks }) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return (
       <div className="flex flex-1 flex-col p-8 text-left place-content-left">
-        <h1>No Tasks</h1>
+        <h1>No tasks</h1>
       </div>
     );
   }

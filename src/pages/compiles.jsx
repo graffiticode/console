@@ -6,6 +6,7 @@ import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
 import Timeline from '../components/timeline';
+import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 
 import {
   CalendarIcon,
@@ -49,6 +50,7 @@ const ReduxApplet = () => {
 
 export default function Compiles() {
   const [userId, setUserId] = useState();
+
   return (
     <>
       {/*

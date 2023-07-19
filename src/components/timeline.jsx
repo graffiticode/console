@@ -2,6 +2,7 @@ import useSWR from "swr";
 import { loadCompiles } from '../utils/swr/fetchers';
 import { CheckIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/20/solid'
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import SignIn from '../components/SignIn'
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -29,10 +30,29 @@ export default function Timeline() {
     return +b.timestamp - +a.timestamp;
   }) || [];
 
+  if (!user) {
+    return (
+      <div className="justify-center w-full">
+        <SignIn
+          className="rounded-none border-2 px-3 py-2 text-center hover:border-gray-400 focus:outline-none"
+          label={<span className="block font-medium">Sign in to continue</span>}
+        />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="justify-center w-full">
         Loading...
+      </div>
+    );
+  }
+
+  if (!Array.isArray(compiles) || compiles.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+        <h1>No compiles</h1>
       </div>
     );
   }
