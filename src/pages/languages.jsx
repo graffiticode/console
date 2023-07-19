@@ -45,7 +45,7 @@ import { EllipsisVerticalIcon } from '@heroicons/react/20/solid'
 const GREEN = "#2DC937";
 
 const projects = [
-  { name: 'Generic language', initials: 'L1', href: '#', tasks: 16, bgColor: 'bg-gray-800' },
+  { name: 'Base language', initials: 'L1', href: '#', tasks: 16, bgColor: 'bg-gray-800' },
   { name: 'Scraping SVG', initials: 'L146', href: '#', tasks: 12, bgColor: 'bg-gray-800' },
   { name: 'Rendering charts', initials: 'L147', href: '#', tasks: 16, bgColor: 'bg-gray-800' },
   { name: 'Scoring prose', initials: 'L149', href: '#', tasks: 8, bgColor: 'bg-gray-800' },
