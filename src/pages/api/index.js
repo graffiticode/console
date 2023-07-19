@@ -7,12 +7,13 @@ import {
   renderGraphiQL,
 } from "graphql-helix";
 import {
+  compile,
   compiles,
   logCompile,
   tasks,
   saveTask,
   postTask,
-  data,
+  getData,
 } from "./resolvers.js";
 import { client } from "../../lib/auth";
 
@@ -34,6 +35,7 @@ const typeDefs = `
   }
 
   type Query {
+    data(id: String!): String!
     compiles(type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
   }
@@ -47,6 +49,13 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
+    data: async (_, args, ctx) => {
+      const { token } = ctx;
+      const { id } = args;
+      const { uid } = await client.verifyAccessToken(token);
+      const data = await getData({ authToken: token, id });
+      return JSON.stringify(data);
+    },
     compiles: async (_, args, ctx) => {
       const { token } = ctx;
       const { type } = args;

@@ -68,9 +68,8 @@ export async function getData({ authToken, id }) {
   try {
     const baseUrl = getBaseUrlForApi();
     const get = bent(baseUrl, 'GET', 'json', 200);
-    const resp = await get(`data?id=${id}&auth=${authToken}`);
-    const { data } = resp;
-    return data;
+    const resp = await get(`/data?id=${id}&access_token=${authToken}`);
+    return resp.data;
   } catch (x) {
     console.log("GET /data catch " + x);
   }
