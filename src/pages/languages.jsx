@@ -73,10 +73,11 @@ function LanguageList() {
       <ul role="list" className="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
         {projects.map((project) => (
           <Link
+            key={project.name}            
             href="/tasks"
             onClick={() => setLanguage({ name: project.initials })}
           >
-          <li key={project.name} className="col-span-1 flex rounded-none shadow-sm">
+          <li className="col-span-1 flex rounded-none shadow-sm">
             <div
               className={classNames(
                 project.bgColor,
