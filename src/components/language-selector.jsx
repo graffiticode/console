@@ -18,7 +18,7 @@ import { Combobox } from '@headlessui/react'
 
 const languages = [
   {id: 1, name: 'L1'},
-  {id: 2, name: 'L146'},
+  // {id: 2, name: 'L146'},
   {id: 3, name: 'L147'},
   {id: 4, name: 'L149'},
   {id: 5, name: 'L150'},
