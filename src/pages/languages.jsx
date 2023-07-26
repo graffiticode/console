@@ -49,6 +49,7 @@ const projects = [
   { name: 'Scraping SVG', initials: 'L146', href: '#', tasks: 12, bgColor: 'bg-gray-800' },
   { name: 'Rendering charts', initials: 'L147', href: '#', tasks: 16, bgColor: 'bg-gray-800' },
   { name: 'Scoring prose', initials: 'L149', href: '#', tasks: 8, bgColor: 'bg-gray-800' },
+  { name: 'Calculating shipping', initials: 'L150', href: '#', tasks: 8, bgColor: 'bg-gray-800' },
 ]
 
 import useLocalStorage from '../hooks/use-local-storage';
