@@ -46,6 +46,16 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
+const FormIframe =
+      ({key, src, className}) => (
+        <iframe
+          key={key}
+          className={className}
+          src={src}
+          width="100%"
+          height="100%"
+        />);
+
 function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
   const id = getId({ taskId: task.id, dataId });
   const src = useTaskIdFormUrl({ lang, id });
@@ -72,7 +82,7 @@ function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
         className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
       >
         <div className="flex flex-1 flex-col p-8 place-content-center">
-          <iframe src={src} width="100%" height="100%" />
+          <FormIframe src={src} />
         </div>
       </li>
     </div>
@@ -122,8 +132,8 @@ export default function Gallery({ lang, mark }) {
   const src = useTaskIdFormUrl({ lang, id });
   const { isValidating, isLoading, data } =
     useSWR(
-      user ? { user, lang, mark: mark.id } : null,
-      loadTasks
+      !open && user ? { user, lang, mark: mark.id } : null,
+      loadTasks,
     );
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
@@ -230,7 +240,7 @@ export default function Gallery({ lang, mark }) {
                               </div>
                           }
                           { !hideForm &&
-                            <iframe
+                            <FormIframe
                               key={2}
                               src={src}
                               className="w-full h-screen"
