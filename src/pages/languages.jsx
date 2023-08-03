@@ -1,6 +1,5 @@
 import Head from 'next/head';
 import Image from 'next/image';
-import { useSession } from 'next-auth/react';
 import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
