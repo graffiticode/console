@@ -1,82 +1,44 @@
 import { createContext, useCallback, useContext } from "react";
 import useSWR from "swr";
-import { client } from "../lib/auth";
 import { useSignInWithEthereum } from "./use-ethereum";
-import useLocalStorage from "./use-local-storage";
+import { useAuth, useUser } from "reactfire";
+import { signInWithCustomToken, signOut } from "firebase/auth";
 
 const GraffiticodeAuthContext = createContext({ loading: true });
 
 export function GraffiticodeAuthProvider({ children }) {
+  const auth = useAuth();
+  const { status: firebaseUserStatus, data: firebaseUser } = useUser();
   const { signInWithEthereum: siwe } = useSignInWithEthereum();
-  const [auth, setAuth] = useLocalStorage("graffiticode:auth", null);
-
-  const { isLoading: loadingInitial } = useSWR(
-    "graffiticode_auth_init",
-    async () => {
-      if (!auth) {
-        return null;
-      }
-      const { uid, refresh_token } = auth;
-      const { access_token } = await client.exchangeRefreshToken(refresh_token);
-      return { uid, refresh_token, access_token };
-    }, {
-    shouldRetryOnError: false,
-    onError: (err) => {
-      console.warn("Failed to init auth", err);
-      setAuth(null)
-    },
-    onSuccess: (auth) => setAuth(auth),
-  });
 
   const signInWithEthereum = useCallback(async () => {
-    if (auth) {
-      console.warn(`User ${auth.uid} is already signed in`);
+    if (firebaseUser) {
+      console.warn(`User ${firebaseUser.uid} is already signed in`);
       return auth;
     }
-    const { uid, refresh_token, access_token } = await siwe();
-    setAuth({ uid, refresh_token, access_token });
+    const { firebaseCustomToken } = await siwe();
+    await signInWithCustomToken(auth, firebaseCustomToken);
 
-  }, [auth, siwe]);
-
-  const signOut = useCallback(async () => {
-    if (auth) {
-      client.revokeRefreshToken(auth.refresh_token);
-      setAuth(null);
-    }
-  }, [auth]);
-
-  const getToken = useCallback(async () => {
-    if (!auth) {
-      throw new Error("auth/not-signed-in");
-    }
-    let { refresh_token, access_token } = auth;
-    try {
-      await client.verifyAccessToken(access_token);
-    } catch (err) {
-      if (err.code !== "ERR_JWT_EXPIRED") {
-        throw err;
-      }
-      const exchangeResponse = await client.exchangeRefreshToken(refresh_token);
-      setAuth(prev => ({ ...prev, access_token: exchangeResponse.access_token }));
-    }
-    return access_token;
-  }, [auth]);
+  }, [firebaseUser, siwe]);
 
   let user = null;
-  if (auth) {
-    user = { uid: auth.uid, getToken };
+  if (firebaseUser) {
+    user = {
+      uid: firebaseUser.uid,
+      getToken: () => firebaseUser.getIdToken(),
+    };
   }
 
   const value = {
-    loading: loadingInitial,
+    loading: firebaseUserStatus === "loading",
     user,
     signInWithEthereum,
-    signOut,
+    signOut: () => signOut(auth),
   };
 
   return (
     <GraffiticodeAuthContext.Provider value={value}>
-      {!loadingInitial && children}
+      {firebaseUserStatus !== "loading" && children}
     </GraffiticodeAuthContext.Provider>
   );
 }

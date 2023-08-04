@@ -25,8 +25,8 @@ export function useSignInWithEthereum() {
     const address = stripHexPrefix(await getAddress());
     const nonce = await client.ethereum.getNonce({ address: stripHexPrefix(address) });
     const signature = stripHexPrefix(await signMessageAsync({ message: `Nonce: ${nonce}` }));
-    const { refresh_token, access_token } = await client.ethereum.authenticate({ address, nonce, signature });
-    return { uid: address, refresh_token, access_token };
+    const authContext = await client.ethereum.authenticate({ address, nonce, signature });
+    return { ...authContext, uid: address };
   }, [getAddress, signMessageAsync]);
 
   return { signInWithEthereum };
