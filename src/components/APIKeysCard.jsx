@@ -10,9 +10,9 @@ export default function APIKeysCard() {
         <dl className="">
           <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
             <button onClick={async () => {
-              // const { apiKey } = await client.apiKeys.create(token);
-              // const { access_token } = await client.apiKeys.authenticate({ apiKey });
-              // console.log(access_token);
+              const { apiKey } = await client.apiKeys.create(token);
+              const { access_token } = await client.apiKeys.authenticate({ apiKey });
+              console.log(access_token);
             }}>Create API Key</button>
           </div>
         </dl>
