@@ -30,6 +30,7 @@ export async function saveTask({ auth, lang, code, mark, isPublic }) {
     created: Date.now(),
   });
   const data = { id: taskId };
+  console.log("saveTask() data=" + JSON.stringify(data));
   return data;
 }
 

@@ -40,6 +40,7 @@ export default function Editor({ task, lang, mark: markInit, setOpen, setTaskId,
   const [code, setCode] = useState(task?.src || "");
   const [saving, setSaving] = useState(false);
   const saveTask = buildSaveTask();
+  console.log("saveTask() lang=" + lang + " saving=" + saving);  
   const { isLoading, data } = useSWR(saving ? { user, lang, code, mark: mark.id, isPublic } : null, saveTask);
   if (isLoading) {
     return <div>Compiling...</div>
@@ -74,6 +75,7 @@ export default function Editor({ task, lang, mark: markInit, setOpen, setTaskId,
               <button
                 className="inline-flex items-center rounded-none bg-white ring-1 ring-gray-400 px-4 py-2 text-sm font-medium text-gray-700 hover:ring-2 focus:outline-none"
                 onClick={() => {
+                  console.log("onClick() save");
                   setSaving(true);
                   setOpen(false);
                 }}
