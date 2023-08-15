@@ -2,6 +2,8 @@
 const colors = require('tailwindcss/colors');
 module.exports = {
   content: [
+    "./node_modules/tw-elements/dist/js/**/*.js",
+    "./src/**/*.{html,js}",
     "./src/pages/**/*.{js,ts,jsx,tsx}",
     "./src/components/**/*.{js,ts,jsx,tsx}",
   ],
@@ -16,5 +18,7 @@ module.exports = {
   plugins: [
     require('@tailwindcss/forms'),
     require('@tailwindcss/aspect-ratio'),
+    require("tw-elements/dist/plugin.cjs"),
   ],
-}
+  darkMode: "class"
+};

@@ -39,7 +39,7 @@ export default function Example() {
         <div className="relative pt-10">
           <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
             <aside className="py-6 lg:col-span-3">
-              <span className="mx-5">API Key</span>
+              <span className="mx-5 text-xl font-bold">API Keys</span>
             </aside>
             <div className="lg:col-span-9">
               <APIKeysCard />
