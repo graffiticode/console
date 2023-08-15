@@ -2,20 +2,25 @@ import { client } from "../lib/auth";
 import { useToken } from "../hooks/use-graffiticode-auth";
 
 export default function APIKeysCard() {
-  const { data: token } = useToken();
+  const { data: userToken } = useToken();
+
+  const handleCreate = () => {
+    
+  };
 
   return (
-    <div className="overflow-hidden bg-white">
-      <div className="px-4 py-5 sm:p-0">
-        <dl className="">
-          <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-            <button onClick={async () => {
-              const { apiKey } = await client.apiKeys.create(token);
-              const { access_token } = await client.apiKeys.authenticate({ apiKey });
-              console.log(access_token);
-            }}>Create API Key</button>
-          </div>
-        </dl>
+    <div className="overflow-hidden bg-white grid grid-col-1 gap-4">
+      <div className="">
+        <button type="button" className="inline-block rounded bg-primary px-6" onClick={async () => {
+          const { token } = await client.apiKeys.create(userToken);
+          const authContext = await client.apiKeys.authenticate({ token });
+          console.log(authContext);
+        }}>Create API Key</button>
+        <button
+          type="button"
+          class="inline-block rounded bg-success px-6 pb-2 pt-2.5 text-xs font-medium uppercase leading-normal text-white shadow-[0_4px_9px_-4px_#14a44d] transition duration-150 ease-in-out hover:bg-success-600 hover:shadow-[0_8px_9px_-4px_rgba(20,164,77,0.3),0_4px_18px_0_rgba(20,164,77,0.2)] focus:bg-success-600 focus:shadow-[0_8px_9px_-4px_rgba(20,164,77,0.3),0_4px_18px_0_rgba(20,164,77,0.2)] focus:outline-none focus:ring-0 active:bg-success-700 active:shadow-[0_8px_9px_-4px_rgba(20,164,77,0.3),0_4px_18px_0_rgba(20,164,77,0.2)] dark:shadow-[0_4px_9px_-4px_rgba(20,164,77,0.5)] dark:hover:shadow-[0_8px_9px_-4px_rgba(20,164,77,0.2),0_4px_18px_0_rgba(20,164,77,0.1)] dark:focus:shadow-[0_8px_9px_-4px_rgba(20,164,77,0.2),0_4px_18px_0_rgba(20,164,77,0.1)] dark:active:shadow-[0_8px_9px_-4px_rgba(20,164,77,0.2),0_4px_18px_0_rgba(20,164,77,0.1)]">
+          Create API Key
+        </button>
       </div>
     </div>
   )
