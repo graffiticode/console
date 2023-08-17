@@ -28,17 +28,18 @@ const useTaskIdFormUrl = ({ id }) => {
   return src;
 };
 
-const FormIframe = ({key, src, className}) => (
-  <iframe
-    key={key}
-    className={className}
-    src={src}
-    width="100%"
-    height="100%"
-  />);
+const FormIframe = ({src, className}) => {
+  return (
+    <iframe
+      src={src}
+      className={className}
+      width="100%"
+      height="100%"
+    />
+  );
+};
 
 export default function FormView({ id }) {
-  console.log("FormView() id=" + id);
   const [open, setOpen] = useState(true);
   const [hideEditor, setHideEditor] = useState(true);
   const [task, setTask] = useState();
@@ -47,7 +48,6 @@ export default function FormView({ id }) {
   const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
   const src = useTaskIdFormUrl({ id });
-
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -61,8 +61,6 @@ export default function FormView({ id }) {
 
   const { uid } = user;
   // const tasks = data || [];
-
-  // console.log("FormView() tasks=" + JSON.stringify(tasks, null, 2));
 
   if (newTask && !tasks.some(task => task.id === newTask.id)) {
     tasks.unshift(newTask);
