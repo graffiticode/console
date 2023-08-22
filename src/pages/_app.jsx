@@ -19,6 +19,7 @@ export default function App({
   Component,
   pageProps: { session, ...pageProps },
 }) {
+  console.log("App()");
   return (
     <GraffiticodeFirebaseProvider>
       <WagmiConfig client={client}>

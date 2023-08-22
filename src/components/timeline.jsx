@@ -10,10 +10,10 @@ function classNames(...classes) {
 
 async function handleClick({ user, id }) {
   const access_token = await user.getToken();
-  const [ protocol, host ] =
-        document.location.host.indexOf("localhost") === 0 && ["http", "localhost:3100"] ||
-        ["https", "api.graffiticode.com"];
-  const url = `/form?id=${id}`;
+  const [ protocol ] =
+        document.location.host.indexOf("localhost") === 0 && ["http"] ||
+        ["https"];
+  const url = `/api/data/${id}?access_token=${access_token}`;
   window.open(url, '_blank').focus();
 }
 

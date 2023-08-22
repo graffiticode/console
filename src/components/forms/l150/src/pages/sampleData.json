@@ -1,0 +1,18 @@
+[
+  {"item": "Item 1", "quantity": 1, "profit": "$3.09", "margin":"206%"},
+  {"item": "Item 1", "quantity": 2, "profit": "$6.63", "margin":"221%"},
+  {"item": "Item 1", "quantity": 3, "profit": "$11.34", "margin":"252%"},
+  {"item": "Item 1", "quantity": 4, "profit": "$15.71", "margin":"262%"},
+  {"item": "Item 1", "quantity": 5, "profit": "$6.43", "margin":"107%"},
+  {"item": "Item 1", "quantity": 6, "profit": "$4.13", "margin":"46%"},
+  {"item": "Item 1", "quantity": 7, "profit": "$6.13", "margin":"58%"},
+  {"item": "Item 1", "quantity": 8, "profit": "$8.70", "margin":"73%"},
+  {"item": "Item 2", "quantity": 1, "profit": "$7.41", "margin":"89%"},
+  {"item": "Item 2", "quantity": 2, "profit": "$4.83", "margin":"29%"},
+  {"item": "Item 2", "quantity": 3, "profit": "$14.06", "margin":"56%"},
+  {"item": "Item 2", "quantity": 4, "profit": "$21.44", "margin":"64%"},
+  {"item": "Item 2", "quantity": 5, "profit": "$30.84", "margin":"93%"},
+  {"item": "Item 2", "quantity": 6, "profit": "$23.78", "margin":"48%"},
+  {"item": "Item 2", "quantity": 7, "profit": "$30.31", "margin":"52%"},
+  {"item": "Item 2", "quantity": 8, "profit": "$37.13", "margin":"56%"}
+]

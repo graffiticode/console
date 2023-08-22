@@ -23,7 +23,7 @@ const useTaskIdFormUrl = ({ id }) => {
     if (token) {
       params.set("token", token);
     }
-    return `/api/form/${id}?${params.toString()}`;
+    return `/api/data/${id}?${params.toString()}`;
   });
   return src;
 };
@@ -39,7 +39,17 @@ const FormIframe = ({src, className}) => {
   );
 };
 
+import { Form as l150Form } from "./forms/l150/src/pages/[type].jsx";
+
+const FormFrame = ({ id, url, user }) => {
+  // const Form = import(src);
+  //const Form = await import("./forms/l150/src/pages/[type].jsx");
+  //console.log("FormFrame() Form=" + Form);
+  return l150Form({ id, url, user });
+};
+
 export default function FormView({ id }) {
+  console.log("FormView()");
   const [open, setOpen] = useState(true);
   const [hideEditor, setHideEditor] = useState(true);
   const [task, setTask] = useState();
@@ -47,7 +57,7 @@ export default function FormView({ id }) {
   const [newTask, setNewTask] = useState();
   const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
-  const src = useTaskIdFormUrl({ id });
+  const url = useTaskIdFormUrl({ id });
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -67,9 +77,10 @@ export default function FormView({ id }) {
   }
   const hideForm = false;
   return (
-    <FormIframe
-      key={2}
-      src={src}
+    <FormFrame
+      id={id}
+      url={url}
+      user={user}
       className="w-full h-screen"
     />
   );

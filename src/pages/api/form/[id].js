@@ -8,10 +8,6 @@ export default async function handler(req, res) {
       res.status(400).send("must provide a task id");
       return;
     }
-
-    // const dataUrl = `${apiUrl}/data?id=${id}`;
-    // const data = JSON.stringify({ url: dataUrl });
-    // console.log("GET /form dataUrl=" + dataUrl);
     const qs = new URLSearchParams();
     qs.set("id", id);
     if (token) {
