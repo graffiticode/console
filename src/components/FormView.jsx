@@ -42,9 +42,6 @@ const FormIframe = ({src, className}) => {
 import { Form as l150Form } from "./forms/l150/src/pages/[type].jsx";
 
 const FormFrame = ({ id, url, user }) => {
-  // const Form = import(src);
-  //const Form = await import("./forms/l150/src/pages/[type].jsx");
-  //console.log("FormFrame() Form=" + Form);
   return l150Form({ id, url, user });
 };
 
@@ -77,11 +74,12 @@ export default function FormView({ id }) {
   }
   const hideForm = false;
   return (
-    <FormFrame
-      id={id}
-      url={url}
-      user={user}
-      className="w-full h-screen"
-    />
+    <div className="justify-center min-w-full">
+      <FormFrame
+        id={id}
+        url={url}
+        user={user}
+      />
+    </div>
   );
 }

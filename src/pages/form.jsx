@@ -81,11 +81,9 @@ export default function Form() {
         />
       </Head>
       <div className="min-h-full">
-        <main>
-          <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="min-w-full mx-auto py-6 sm:px-6 lg:px-8">
             <FormView id={id} />
           </div>
-        </main>
       </div>
     </>
   )
