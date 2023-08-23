@@ -436,7 +436,7 @@ function makeProfitsTable({ data }) {
 const PlaygroundForm = ({ setState, isLoading, data }) => {
   const { items, prices, profits, yAxisName = "Net Margin" } = data;
   if (profits === undefined) {
-    return <div />;
+    return <div>Loading...</div>;
   }
   return (
     <div key={ticket++}>
@@ -506,17 +506,17 @@ const PlaygroundForm = ({ setState, isLoading, data }) => {
 const ItemsForm = ({ setState, isLoading, data }) => {
   const { items } = data;
   if (items === undefined) {
-    return <div />;
+    return <div>Loading...</div>;
   }
   const { table_name, row_name, desc, cols, rows } = items;
   return (
     <div key={ticket++} className="">
       <div className="grid grid-cols-2 my-0 divide-x-2">
         <div className="col-span-1 ml-10 rounded-md">
-          <EditableTable name="items" data={data} setState={setState} />
+          <StaticTable name="items" data={data} setState={setState} />
         </div>
         <div className="col-span-1 mr-10 rounded-md">
-          <EditableTable name="prices" data={data} setState={setState} />
+          <StaticTable name="prices" data={data} setState={setState} />
         </div>
       </div>
     </div>
@@ -526,12 +526,12 @@ const ItemsForm = ({ setState, isLoading, data }) => {
 const ShippingForm = ({ setState, isLoading, data }) => {
   const { shipping } = data;
   if (shipping === undefined) {
-    return <div />;
+    return <div>Loading...</div>;
   }
   const { table_name, row_name, desc, cols, rows } = shipping;
   return (
     <div key={ticket++} className="w-96">
-      <EditableTable name="shipping" data={data} setState={setState} />
+      <StaticTable name="shipping" data={data} setState={setState} />
     </div>
   );
 }
@@ -558,18 +558,17 @@ export const Form = ({ id, url, user, access_token }) => {
     compile
   );
 
-  const isLoading = resp.isLoading;
-  // If isLoading, then 'state' is still current.
+  if (resp.data?.status === "error") {
+    console.log("[type].js error=" + resp.data.error);
+    return <div />;
+  }
+
   const data = {
     ...state,
     ...resp.data?.data,
   };
 
-  if (data.error) {
-    // TODO verify that this works.
-    return <div />;
-  }
-
+  const isLoading = resp.isLoading;
   if (!isLoading && resp.data?.id && resp.data.id !== lastId) {
     router.push(router.pathname + "?id=" + resp.data.id, null, { shallow: true });
     setLastId(resp.data.id);
