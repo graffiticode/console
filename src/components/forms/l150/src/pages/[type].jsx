@@ -214,7 +214,7 @@ function DollarInput({ name, label, data, setState }) {
             name={name}
             id={name}
             defaultValue={value}
-o            className="my-0 py-0 w-auto border-none focus:ring-0 outline-none focus:outline-none px-0.5 mr-2 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6"
+            className="my-0 py-0 w-auto border-none focus:ring-0 outline-none focus:outline-none px-0.5 mr-2 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6"
             onBlur={() => {
               setState({
                 ...data,
