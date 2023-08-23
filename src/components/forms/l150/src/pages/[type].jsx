@@ -565,6 +565,13 @@ export const Form = ({ id, url, user, access_token }) => {
     ...resp.data?.data,
   };
 
+  console.log("Form() data=" + JSON.stringify(data));
+
+  if (data.error) {
+    // TODO verify that this works.
+    return <div />;
+  }
+
   if (typeof window !== "undefined" && !isLoading && resp.data?.id) {
     window.parent.postMessage(JSON.stringify({ id: resp.data.id }), "*");
   }

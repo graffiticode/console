@@ -183,5 +183,4 @@ export default function Form({ lang, mark }) {
       <Tasks setOpen={setOpen} setHideEditor={setHideEditor} setTask={setTask} lang={lang} tasks={tasks} setNewTask={setNewTask} />
     </>
   );
-
 }
