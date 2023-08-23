@@ -13,7 +13,9 @@ async function handleClick({ user, id }) {
   const [ protocol ] =
         document.location.host.indexOf("localhost") === 0 && ["http"] ||
         ["https"];
-  const url = `/api/data/${id}?access_token=${access_token}`;
+//  const url = `/api/data/${id}?access_token=${access_token}`;
+//  const url = `/form?id=${id}&access_token=${access_token}`;
+  const url = `/form?id=${id}`;
   window.open(url, '_blank').focus();
 }
 

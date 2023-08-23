@@ -214,7 +214,7 @@ function DollarInput({ name, label, data, setState }) {
             name={name}
             id={name}
             defaultValue={value}
-            className="w-auto focus:outline-none px-0.5 mr-2 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6"
+o            className="my-0 py-0 w-auto border-none focus:ring-0 outline-none focus:outline-none px-0.5 mr-2 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6"
             onBlur={() => {
               setState({
                 ...data,
@@ -223,20 +223,6 @@ function DollarInput({ name, label, data, setState }) {
             }}
           />
         </span>
-        {/*
-        <button
-          type="button"
-          className="rounded-md bg-white px-3 text-sm font-semibold text-gray-600 ring-1 ring-inset ring-gray-600 hover:bg-gray-50"
-          onClick={() => {
-            setState({
-              ...data,
-              [name]: document.getElementById(name).value,
-            })
-          }}
-        >
-          Apply
-          </button>
-         */}
       </div>
     </div>
   )

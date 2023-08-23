@@ -252,7 +252,7 @@ const buildStaticTable = ({ name, data, cols }) => {
                             <td key={index}
                                 className={classNames(
                                   row.styles && row.styles[col] || "",
-                                  "whitespace-nowrap ml-2 my-1 py-2 pl-4 pr-3 text-xs font-medium text-gray-900 sm:pl-2"
+                                  "whitespace-nowrap ml-0 my-0 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-0"
                                 )}
                             >
                               {
@@ -263,8 +263,11 @@ const buildStaticTable = ({ name, data, cols }) => {
                                     min="1"
                                     max="10"
                                     defaultValue="1"
+                                    className="ring-inset hover:ring-2 ring-gray-400 text-xs py-2 my-0 border-0 outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400"
                                   />
-                                || row[col]
+                                  || <div className="whitespace-nowrap ml-0 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-2">
+                                       {row[col]}
+                                     </div>
                               }
                             </td>
                           ))
