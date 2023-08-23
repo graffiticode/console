@@ -219,7 +219,32 @@ const buildTable = ({ name, data, cols }) => {
   }
 }
 
-const buildStaticTable = ({ name, data, cols }) => {
+function SelectQty({ qty, setQty }) {
+  return <div>{qty}</div>;
+  return (
+    <div className="">
+      <select
+        id="select-qty"
+        className="ring-inset hover:ring-2 ring-gray-400 text-xs py-2 my-0 border-0 outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400"
+        defaultValue={qty}
+        onChange={(e) => setQty(((document?.getElementById("select-qty")) as any).value)}
+      >
+        <option>1</option>
+        <option>2</option>
+        <option>3</option>
+        <option>4</option>
+        <option>5</option>
+        <option>6</option>
+        <option>7</option>
+        <option>8</option>
+        <option>9</option>
+        <option>10</option>
+      </select>
+    </div>
+  )
+}
+
+const buildStaticTable = ({ name, data, cols, qty, setQty }) => {
   return function Table() {
     const { table_name, row_name, desc, rows = [] } = data[name];
     cols = cols || data[name].cols;
@@ -236,8 +261,14 @@ const buildStaticTable = ({ name, data, cols }) => {
                   <tr>
                     {
                       cols.map((col, index) => (
-                        <th key={index} scope="col" className="pb-1 pt-5 pl-4 pr-3 text-left text-xs font-semibold text-gray-900 sm:pl-2">
-                          {col.toUpperCase()}
+                        <th key={index} scope="col" className="w-48 pb-1 pt-5 pr-3 text-left text-xs font-semibold text-gray-900 sm:pl-2">
+                          {
+                            col === "QTY" &&
+                              <div className="">
+                                QTY
+                              </div>
+                              || <div className="">{col.toUpperCase()}</div>
+                          }
                         </th>
                       ))
                     }
@@ -256,15 +287,7 @@ const buildStaticTable = ({ name, data, cols }) => {
                                 )}
                             >
                               {
-                                col === "QTY" &&
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    min="1"
-                                    max="10"
-                                    defaultValue="1"
-                                    className="ring-inset hover:ring-2 ring-gray-400 text-xs py-2 my-0 border-0 outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400"
-                                  />
+                                col === "QTY" && qty
                                   || <div className="whitespace-nowrap ml-0 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-2">
                                        {row[col]}
                                      </div>
