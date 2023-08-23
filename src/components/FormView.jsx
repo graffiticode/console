@@ -46,7 +46,6 @@ const FormFrame = ({ id, url, user }) => {
 };
 
 export default function FormView({ id }) {
-  console.log("FormView()");
   const [open, setOpen] = useState(true);
   const [hideEditor, setHideEditor] = useState(true);
   const [task, setTask] = useState();

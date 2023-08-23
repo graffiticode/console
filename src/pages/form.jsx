@@ -43,25 +43,18 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+const getIdFromQuery =
+      query => ({ id: query.id && query.id.split(/[ ]/g).join("+") });
+
 export default function Form() {
-  console.log("form()");
   const router = useRouter();
-  const { id } = router.query;
+  let { id } = getIdFromQuery(router.query);
   const [language, setLanguage] = useLocalStorage("graffiticode:tasks:language", { id: 1, name: 'L1' });
   const [mark, setMark] = useLocalStorage("graffiticode:tasks:mark", marks[0]);
   const lang = language.name.slice(1);
-  // useEffect(() => {
-  //   window.addEventListener('message', function(event) {
-  //     try {
-  //       const { id } = JSON.parse(event.data);
-  //       if (id) {
-  //         const href = window.location.href.split("?")[0] + "?id=" + id;
-  //         router.push(href);
-  //       }
-  //     } catch (x) {
-  //     }
-  //   });
-  // }, []);
+  if (id === undefined) {
+    return <div />;
+  }
   return (
     <>
       {/*

@@ -434,7 +434,6 @@ function makeProfitsTable({ data }) {
 }
 
 const PlaygroundForm = ({ setState, isLoading, data }) => {
-  console.log("PlaygroundForm()");
   const { items, prices, profits, yAxisName = "Net Margin" } = data;
   if (profits === undefined) {
     return <div />;
@@ -544,11 +543,12 @@ const DefaultForm = () => {
 }
 
 export const Form = ({ id, url, user, access_token }) => {
-  console.log("Form()");
+  const router = useRouter();
   const [ tab, setTab] = useState(2);
   const [ state, setState] = useState({});
+  const [ lastId, setLastId ] = useState(id);
   const resp = useSWR(
-    (access_token || user) && id && url && state && {
+    (access_token || user) && id && url && {
       access_token,
       user,
       url,
@@ -565,15 +565,14 @@ export const Form = ({ id, url, user, access_token }) => {
     ...resp.data?.data,
   };
 
-  console.log("Form() data=" + JSON.stringify(data));
-
   if (data.error) {
     // TODO verify that this works.
     return <div />;
   }
 
-  if (typeof window !== "undefined" && !isLoading && resp.data?.id) {
-    window.parent.postMessage(JSON.stringify({ id: resp.data.id }), "*");
+  if (!isLoading && resp.data?.id && resp.data.id !== lastId) {
+    router.push(router.pathname + "?id=" + resp.data.id, null, { shallow: true });
+    setLastId(resp.data.id);
   }
 
   let elts;
