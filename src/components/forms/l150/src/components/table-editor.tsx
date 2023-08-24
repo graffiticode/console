@@ -224,7 +224,7 @@ function SelectQty({ qty, setQty }) {
     <div className="">
       <select
         id="select-qty"
-        className="ring-inset hover:ring-0 ring-gray-400 text-xs py-0 my-0 border-0 outline-none focus:ring-0 focus:ring-inset focus:ring-gray-400"
+        className="ring-inset hover:ring-2 ring-gray-400 text-xs py-1 border-0 outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400"
         defaultValue={qty}
         onChange={(e) => setQty(((document?.getElementById("select-qty")) as any).value)}
       >
@@ -260,13 +260,13 @@ const buildStaticTable = ({ name, data, cols, qty, setQty }) => {
                   <tr>
                     {
                       cols.map((col, index) => (
-                        <th key={index} scope="col" className="w-48 pb-1 pt-5 text-left text-xs font-semibold text-gray-900 sm:pl-0">
+                        <th key={index} scope="col" className="pb-1 w-48 text-left text-xs font-semibold text-gray-900 sm:pl-0">
                           {
                             col === "QTY" &&
-                              <div className="">
+                              <div className="pt-3">
                                 <SelectQty qty={qty} setQty={setQty} />
                               </div>
-                              || <div className="">{col.toUpperCase()}</div>
+                              || <div className="pt-5">{col.toUpperCase()}</div>
                           }
                         </th>
                       ))
@@ -276,7 +276,7 @@ const buildStaticTable = ({ name, data, cols, qty, setQty }) => {
                 <tbody className="divide-y divide-gray-200">
                   {
                     rows.map((row, index) => (
-                      <tr key={index} className="mx-2 px-0">
+                      <tr key={index} className="mx-2 px-2">
                         {
                           cols.map((col, index) => (
                             <td key={index}
@@ -287,10 +287,10 @@ const buildStaticTable = ({ name, data, cols, qty, setQty }) => {
                             >
                               {
                                 col === "QTY" &&
-                                  <div className="whitespace-nowrap ml-0 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-2">
+                                  <div className="whitespace-nowrap ml-0 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-0">
                                     {qty}
                                     </div>
-                                  || <div className="whitespace-nowrap ml-0 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-2">
+                                  || <div className="whitespace-nowrap ml-0 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-0">
                                        {row[col]}
                                      </div>
                               }
