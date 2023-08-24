@@ -224,7 +224,7 @@ function SelectQty({ qty, setQty }) {
     <div className="">
       <select
         id="select-qty"
-        className="ring-inset hover:ring-2 ring-gray-400 text-xs py-1 border-0 outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400"
+        className="ring-inset hover:ring-2 ring-gray-400 w-12 px-1 text-xs py-1 border-0 outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400"
         defaultValue={qty}
         onChange={(e) => setQty(((document?.getElementById("select-qty")) as any).value)}
       >
