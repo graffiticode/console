@@ -102,12 +102,17 @@ const computeProfit = ({ shipping, items, prices, shippingFee, shippingBreak }) 
     //  const   orderPrice + shippingPrice - shippingCost - itemCost;
     // margin = profit / (lcogs * qty)
     const itemPM = itemProfits.map((itemProfit, index) => {
+      const shipping =
+            isNaN(itemProfit) && "Overweight" ||
+            shippingPrices[index] === 0 && "Free" ||
+            "Flat";
+      console.log("shipping=" + shipping);
       return {
         item: item.Desc,
         quantity: index + 1,
         profit: itemProfit,
         margin: itemProfit / itemCogs[index],
-        shipping: shippingPrices[index] === 0 && "Free" || "Flat",
+        shipping,
       };
     });
     return itemPM;

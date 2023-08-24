@@ -404,19 +404,21 @@ function ChartDropdown({ data, setState }) {
 
 // {rows: data.profits, cols: ["item", "profit", "margin", "shipping"] }
 
-function makeProfitsTable({ data }) {
+function makeProfitsTable({ data, qty }) {
   const rows = [];
   data.profits && data.profits.forEach(row => {
-    if (row.quantity === 1) {
+    if (+row.quantity === +qty) {
       rows.push({
-        "QTY": "1",
+        "QTY": qty,
         "PROFIT": row.profit && `$${row.profit.toFixed(2)}` || "",
         "MARGIN": row.margin && `${(row.margin * 100).toFixed(2)}%` || "",
         "SHIPPING": row.shipping,
         styles: {
           PROFIT: row.profit < 0 && "text-red-500" || "",
           MARGIN: row.margin < 0 && "text-red-500" || row.margin < 0.5 && "text-yellow-500" || "",
-          SHIPPING: row.shipping === "Free" && "bg-green-100" || "",
+          SHIPPING: row.shipping === "Free" && "bg-green-100" ||
+            row.shipping === "Overweight" && "bg-red-100" ||
+            "",
         },
       });
     }
@@ -435,6 +437,8 @@ function makeProfitsTable({ data }) {
 
 const PlaygroundForm = ({ setState, isLoading, data }) => {
   const { items, prices, profits, yAxisName = "Net Margin" } = data;
+  const storedQty = typeof window !== "undefined" && window.localStorage.getItem("selectedQty");
+  const [ qty, setQty ] = useState(storedQty || "1");
   if (profits === undefined) {
     return <div>Loading...</div>;
   }
@@ -483,15 +487,17 @@ const PlaygroundForm = ({ setState, isLoading, data }) => {
             <div className="col-span-1">
               <StaticTable
                 name="profits"
-                data={makeProfitsTable({ data })}
+                data={makeProfitsTable({ data, qty })}
                 cols={["QTY"]}
                 setState={setState}
+                qty={qty}
+                setQty={setQty}                
               />
             </div>
             <div className="col-span-5">
               <StaticTable
                 name="profits"
-                data={makeProfitsTable({ data })}
+                data={makeProfitsTable({ data, qty })}
                 cols={["PROFIT", "MARGIN", "SHIPPING"]}
                 setState={setState}
               />

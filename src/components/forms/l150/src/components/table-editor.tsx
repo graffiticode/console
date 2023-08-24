@@ -124,7 +124,7 @@ function dataFromContent(ctx, content) {
       break;
     }
   });
-  return data;             
+  return data;
 }
 
 function TableEditor({ reactNodeViews, name, data, setState }) {
@@ -220,12 +220,11 @@ const buildTable = ({ name, data, cols }) => {
 }
 
 function SelectQty({ qty, setQty }) {
-  return <div>{qty}</div>;
   return (
     <div className="">
       <select
         id="select-qty"
-        className="ring-inset hover:ring-2 ring-gray-400 text-xs py-2 my-0 border-0 outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400"
+        className="ring-inset hover:ring-0 ring-gray-400 text-xs py-0 my-0 border-0 outline-none focus:ring-0 focus:ring-inset focus:ring-gray-400"
         defaultValue={qty}
         onChange={(e) => setQty(((document?.getElementById("select-qty")) as any).value)}
       >
@@ -261,11 +260,11 @@ const buildStaticTable = ({ name, data, cols, qty, setQty }) => {
                   <tr>
                     {
                       cols.map((col, index) => (
-                        <th key={index} scope="col" className="w-48 pb-1 pt-5 pr-3 text-left text-xs font-semibold text-gray-900 sm:pl-2">
+                        <th key={index} scope="col" className="w-48 pb-1 pt-5 text-left text-xs font-semibold text-gray-900 sm:pl-0">
                           {
                             col === "QTY" &&
                               <div className="">
-                                QTY
+                                <SelectQty qty={qty} setQty={setQty} />
                               </div>
                               || <div className="">{col.toUpperCase()}</div>
                           }
@@ -277,7 +276,7 @@ const buildStaticTable = ({ name, data, cols, qty, setQty }) => {
                 <tbody className="divide-y divide-gray-200">
                   {
                     rows.map((row, index) => (
-                      <tr key={index} className="mx-2 px-2">
+                      <tr key={index} className="mx-2 px-0">
                         {
                           cols.map((col, index) => (
                             <td key={index}
@@ -287,7 +286,10 @@ const buildStaticTable = ({ name, data, cols, qty, setQty }) => {
                                 )}
                             >
                               {
-                                col === "QTY" && qty
+                                col === "QTY" &&
+                                  <div className="whitespace-nowrap ml-0 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-2">
+                                    {qty}
+                                    </div>
                                   || <div className="whitespace-nowrap ml-0 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-2">
                                        {row[col]}
                                      </div>
@@ -333,6 +335,6 @@ export function EditableTable({ name, data, setState, cols }) {
   );
 }
 
-export function StaticTable({ name, data, setState, cols }) {
-  return buildStaticTable({ name, data, cols })();
+export function StaticTable({ name, data, setState, cols, qty, setQty }) {
+  return buildStaticTable({ name, data, cols, qty, setQty })();
 }
