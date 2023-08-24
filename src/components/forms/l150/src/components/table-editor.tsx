@@ -266,7 +266,7 @@ const buildStaticTable = ({ name, data, cols, qty, setQty }) => {
                               <div className="pt-3">
                                 <SelectQty qty={qty} setQty={setQty} />
                               </div>
-                              || <div className="pt-5">{col.toUpperCase()}</div>
+                              || <div className="ml-1 pt-5">{col.toUpperCase()}</div>
                           }
                         </th>
                       ))
@@ -287,10 +287,10 @@ const buildStaticTable = ({ name, data, cols, qty, setQty }) => {
                             >
                               {
                                 col === "QTY" &&
-                                  <div className="whitespace-nowrap ml-0 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-0">
+                                  <div className="whitespace-nowrap ml-1 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-0">
                                     {qty}
                                     </div>
-                                  || <div className="whitespace-nowrap ml-0 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-0">
+                                  || <div className="whitespace-nowrap ml-1 my-2 py-0 pl-0 pr-3 text-xs font-medium text-gray-900 sm:pl-0">
                                        {row[col]}
                                      </div>
                               }
