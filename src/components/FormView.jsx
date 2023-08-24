@@ -11,6 +11,7 @@ import SignIn from "./SignIn";
 import { loadTasks } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import { Form as FormFrame } from "./forms/l150/src/pages/[type].jsx";
 
 const useTaskIdFormUrl = ({ id }) => {
   const { user } = useGraffiticodeAuth();
@@ -39,15 +40,8 @@ const FormIframe = ({src, className}) => {
   );
 };
 
-import { Form as l150Form } from "./forms/l150/src/pages/[type].jsx";
-
-const FormFrame = ({ id, url, user }) => {
-  return l150Form({ id, url, user });
-};
-
 export default function FormView({ id }) {
   const [open, setOpen] = useState(true);
-  const [hideEditor, setHideEditor] = useState(true);
   const [task, setTask] = useState();
   const [taskId, setTaskId] = useState();
   const [newTask, setNewTask] = useState();
@@ -71,7 +65,6 @@ export default function FormView({ id }) {
   if (newTask && !tasks.some(task => task.id === newTask.id)) {
     tasks.unshift(newTask);
   }
-  const hideForm = false;
   return (
     <div className="justify-center min-w-full">
       <FormFrame

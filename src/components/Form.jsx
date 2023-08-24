@@ -56,11 +56,6 @@ const FormIframe =
           height="100%"
         />);
 
-const FormFrame = ({key, src, className}) => {
-  const Form = import(src);
-  return Form;
-};
-
 function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
   const id = getId({ taskId: task.id, dataId });
   const src = useTaskIdFormUrl({ lang, id });
