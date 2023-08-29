@@ -19,12 +19,15 @@ const useTaskIdFormUrl = ({ lang, id, user }) => {
     if (!id) {
       return "";
     }
+    const [ protocol, host ] =
+          document.location.host.indexOf("localhost") === 0 && ["http", "localhost:3100"] ||
+          ["https", "api.graffiticode.org"];
     const token = await user.getToken();
     const params = new URLSearchParams();
     if (token) {
       params.set("access_token", token);
     }
-    return `http://localhost:3100/form?id=${id}&${params.toString()}`;
+    return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
   });
   return src;
 };
