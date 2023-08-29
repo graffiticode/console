@@ -1,4 +1,5 @@
 import useSWR from "swr";
+import { useState, useEffect } from 'react';
 import { loadCompiles } from '../utils/swr/fetchers';
 import { CheckIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/20/solid'
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
@@ -13,8 +14,6 @@ async function handleClick({ user, id, lang }) {
   const [ protocol ] =
         document.location.host.indexOf("localhost") === 0 && ["http"] ||
         ["https"];
-//  const url = `/api/data/${id}?access_token=${access_token}`;
-//  const url = `/form?id=${id}&access_token=${access_token}`;
   const url = `/form?lang=${lang}&id=${id}`;
   window.open(url, '_blank').focus();
 }
@@ -22,18 +21,13 @@ async function handleClick({ user, id, lang }) {
 export default function Timeline() {
   const { user } = useGraffiticodeAuth();
   const type = "*";  // { "*" | "persistent" | "ephemeral" }
+  const [compiles, setCompiles] = useState([]);
   const { isLoading, data } =
     useSWR(
       user ? { user, type } : null,
       loadCompiles
     );
-  const compiles = data && data.sort((a, b) => {
-    // Sort descending.
-    return +b.timestamp - +a.timestamp;
-  }) || [];
 
-  console.log("Timeline() compiles=" + JSON.stringify(compiles.slice(0, 5), null, 2));
-  
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -45,20 +39,28 @@ export default function Timeline() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="justify-center w-full">
-        Loading...
-      </div>
-    );
-  }
+  useEffect(() => {
+    const compiles = data && data.sort((a, b) => {
+      // Sort descending.
+      return +b.timestamp - +a.timestamp;
+    }) || [];
+    setCompiles(compiles);
+  }, [data]);
 
-  if (!Array.isArray(compiles) || compiles.length === 0) {
-    return (
-      <div className="flex flex-1 flex-col p-8 text-left place-content-left">
-        <h1>No compiles</h1>
-      </div>
-    );
+  if (compiles.length === 0) {
+    if (isLoading) {
+      return (
+        <div className="justify-center w-full">
+          Loading...
+        </div>
+      );
+    } else {
+      return (
+        <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+          <h1>No compiles</h1>
+        </div>
+      );
+    }
   }
 
   return (
