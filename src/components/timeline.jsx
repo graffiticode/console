@@ -28,6 +28,14 @@ export default function Timeline() {
       loadCompiles
     );
 
+  useEffect(() => {
+    const compiles = data && data.sort((a, b) => {
+      // Sort descending.
+      return +b.timestamp - +a.timestamp;
+    }) || [];
+    setCompiles(compiles);
+  }, [data]);
+
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -38,14 +46,6 @@ export default function Timeline() {
       </div>
     );
   }
-
-  useEffect(() => {
-    const compiles = data && data.sort((a, b) => {
-      // Sort descending.
-      return +b.timestamp - +a.timestamp;
-    }) || [];
-    setCompiles(compiles);
-  }, [data]);
 
   if (compiles.length === 0) {
     if (isLoading) {
