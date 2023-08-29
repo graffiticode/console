@@ -23,6 +23,7 @@ const languages = [
   {id: 4, name: 'L149'},
   {id: 5, name: 'L150'},
   {id: 6, name: 'L151'},
+  {id: 7, name: 'L152'},
 ];
 
 function classNames(...classes) {

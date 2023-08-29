@@ -85,6 +85,7 @@ export const loadCompiles = async ({ user, type }) => {
         id
         status
         timestamp
+        lang
       }
     }
   `;

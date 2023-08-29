@@ -8,14 +8,14 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-async function handleClick({ user, id }) {
+async function handleClick({ user, id, lang }) {
   const access_token = await user.getToken();
   const [ protocol ] =
         document.location.host.indexOf("localhost") === 0 && ["http"] ||
         ["https"];
 //  const url = `/api/data/${id}?access_token=${access_token}`;
 //  const url = `/form?id=${id}&access_token=${access_token}`;
-  const url = `/form?id=${id}`;
+  const url = `/form?lang=${lang}&id=${id}`;
   window.open(url, '_blank').focus();
 }
 
@@ -32,6 +32,8 @@ export default function Timeline() {
     return +b.timestamp - +a.timestamp;
   }) || [];
 
+  console.log("Timeline() compiles=" + JSON.stringify(compiles.slice(0, 5), null, 2));
+  
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -84,7 +86,7 @@ export default function Timeline() {
                     <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-0 font-medium">
                   <div>
                     <p className="">
-                      <a href="#" onClick={() => handleClick({ user, id: compile.id })} className="">
+                      <a href="#" onClick={() => handleClick({ user, id: compile.id, lang: compile.lang })} className="">
                         {compile.id.split("+").join(" + ")}
                       </a>
                     </p>

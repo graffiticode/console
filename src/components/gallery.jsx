@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { Fragment, useCallback, useState } from 'react'
+import { Fragment, useCallback, useState, useEffect } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import {
   XMarkIcon,
@@ -46,7 +46,7 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-const FormIframe =
+const FormIFrame =
       ({key, src, className}) => (
         <iframe
           key={key}
@@ -55,6 +55,19 @@ const FormIframe =
           width="100%"
           height="100%"
         />);
+
+const ReactForm = ({ src }) => {
+  console.log("ReactForm() src=" + src);
+  let Form;
+  useEffect(() => {
+    if (src) {
+      (async () => {
+        Form = await import(src);
+      })();
+    }
+  }, []);        
+  return Form || <div />;
+}
 
 function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
   const id = getId({ taskId: task.id, dataId });
@@ -82,7 +95,9 @@ function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
         className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
       >
         <div className="flex flex-1 flex-col p-8 place-content-center">
-          <FormIframe src={src} />
+          <FormIFrame
+            src={src}
+          />
         </div>
       </li>
     </div>
@@ -240,7 +255,7 @@ export default function Gallery({ lang, mark }) {
                               </div>
                           }
                           { !hideForm &&
-                            <FormIframe
+                            <FormIFrame
                               key={2}
                               src={src}
                               className="w-full h-screen"

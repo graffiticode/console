@@ -546,7 +546,7 @@ const DefaultForm = () => {
   return Form({ id, url, access_token });
 }
 
-export const Form = ({ id, url, user, access_token }) => {
+export const Form = ({ id, user, access_token }) => {
   const router = useRouter();
   const [ tab, setTab] = useState(2);
   const [ state, setState] = useState({});
@@ -554,10 +554,9 @@ export const Form = ({ id, url, user, access_token }) => {
   const storedQty = typeof window !== "undefined" && window.localStorage.getItem("selectedQty") || 1;
   const [ qty, setQty ] = useState(storedQty);
   const resp = useSWR(
-    (access_token || user) && id && url && {
+    (access_token || user) && id && {
       access_token,
       user,
-      url,
       id,
       data: state,
     },

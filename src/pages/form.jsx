@@ -1,3 +1,4 @@
+import useSWR from "swr";
 import { useRouter } from 'next/router';
 import Head from 'next/head'
 import Image from 'next/image';
@@ -24,6 +25,7 @@ import MarkSelector, { marks } from '../components/mark-selector';
 import useSwr from 'swr';
 import { tasksSettings } from '../utils/swr/fetchers';
 import useLocalStorage from '../hooks/use-local-storage';
+import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 
 export function Logo(props) {
   return (
@@ -43,28 +45,37 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-const getIdFromQuery =
-      query => ({ id: query.id && query.id.split(/[ ]/g).join("+") });
+const parseQuery =
+      query => ({
+        lang: query.lang,
+        id: query.id && query.id.split(/[ ]/g).join("+")
+      });
+
+const useTaskIdFormUrl = ({ id }) => {
+  const { user } = useGraffiticodeAuth();
+  const { data: src } = useSWR({ user, id }, async ({ user, id }) => {
+    if (!id) {
+      return "";
+    }
+    const token = await user.getToken();
+    const params = new URLSearchParams();
+    if (token) {
+      params.set("token", token);
+    }
+    return `/api/data/${id}?${params.toString()}`;
+  });
+  return src;
+};
 
 export default function Form() {
   const router = useRouter();
-  let { id } = getIdFromQuery(router.query);
-  const [language, setLanguage] = useLocalStorage("graffiticode:tasks:language", { id: 1, name: 'L1' });
+  const { lang, id } = parseQuery(router.query);
   const [mark, setMark] = useLocalStorage("graffiticode:tasks:mark", marks[0]);
-  const lang = language.name.slice(1);
   if (id === undefined) {
     return <div />;
   }
   return (
     <>
-      {/*
-        This example requires updating your template:
-
-        ```
-        <html class="h-full bg-gray-100">
-        <body class="h-full">
-        ```
-      */}
       <Head>
         <title>Form \ Graffiticode</title>
         <link rel="icon" type="image/png" href="favicon.png" />
@@ -75,7 +86,7 @@ export default function Form() {
       </Head>
       <div className="min-h-full">
           <div className="min-w-full mx-auto py-6 sm:px-6 lg:px-8">
-            <FormView id={id} />
+            <FormView lang={lang} id={id} />
           </div>
       </div>
     </>

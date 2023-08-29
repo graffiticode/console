@@ -22,6 +22,7 @@ const typeDefs = `
     id: String!
     timestamp: String!
     status: String!
+    lang: String
   }
 
   type Task {

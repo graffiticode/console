@@ -11,10 +11,10 @@ import SignIn from "./SignIn";
 import { loadTasks } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
-import { Form as FormFrame } from "./forms/l150/src/pages/[type].jsx";
+import { Form as l150Form } from "./forms/l150/src/pages/[type].jsx";
+import { Form as l1Form } from "./forms/l1/src/pages/[type].jsx";
 
-const useTaskIdFormUrl = ({ id }) => {
-  const { user } = useGraffiticodeAuth();
+const useTaskIdFormUrl = ({ lang, id, user }) => {
   const { data: src } = useSWR({ user, id }, async ({ user, id }) => {
     if (!id) {
       return "";
@@ -22,17 +22,18 @@ const useTaskIdFormUrl = ({ id }) => {
     const token = await user.getToken();
     const params = new URLSearchParams();
     if (token) {
-      params.set("token", token);
+      params.set("access_token", token);
     }
-    return `/api/data/${id}?${params.toString()}`;
+    return `http://localhost:3100/form?id=${id}&${params.toString()}`;
   });
   return src;
 };
 
-const FormIframe = ({src, className}) => {
+const FormIFrame = ({url, className}) => {
+  console.log("FormIFrame() url=" + url);
   return (
     <iframe
-      src={src}
+      src={url}
       className={className}
       width="100%"
       height="100%"
@@ -40,14 +41,32 @@ const FormIframe = ({src, className}) => {
   );
 };
 
-export default function FormView({ id }) {
+const FormFrame = ({ user, id, lang }) => {
+  console.log("FormFrame() lang=" + lang + " id=" + id);
+  let Form;
+  switch (lang) {
+  case "150":
+    Form = l150Form;
+    break;
+  case "1":
+  default:
+    Form = l1Form;
+    break;
+  }
+  return <Form user={user} lang={lang} id={id} />
+};
+
+const staticForms = ["150"];
+
+export default function FormView({ lang, id }) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [taskId, setTaskId] = useState();
   const [newTask, setNewTask] = useState();
   const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
-  const url = useTaskIdFormUrl({ id });
+  const url = useTaskIdFormUrl({ lang, id, user });
+  console.log("FormView() url=" + url);
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -65,12 +84,16 @@ export default function FormView({ id }) {
   if (newTask && !tasks.some(task => task.id === newTask.id)) {
     tasks.unshift(newTask);
   }
+
+  const Form = staticForms.includes(lang) && FormFrame || FormIFrame;
   return (
     <div className="justify-center min-w-full">
-      <FormFrame
+      <Form
+        lang={lang}
         id={id}
         url={url}
         user={user}
+        className="w-full h-screen"
       />
     </div>
   );
