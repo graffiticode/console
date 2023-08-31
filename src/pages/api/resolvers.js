@@ -108,9 +108,9 @@ export async function tasks({ auth, lang, mark }) {
   return tasks;
 }
 
-export async function compiles({ auth, type }) {
+export async function compiles({ auth, lang, type }) {
   const compilesDocs = await db.collection(`users/${auth.uid}/compiles`)
-//    .where('lang', '==', lang)
+    .where('lang', '==', lang)
 //    .where('mark', '==', mark)
     .get();
   const data = [];

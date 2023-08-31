@@ -18,13 +18,13 @@ async function handleClick({ user, id, lang }) {
   window.open(url, '_blank').focus();
 }
 
-export default function Timeline() {
+export default function Timeline({ lang }) {
   const { user } = useGraffiticodeAuth();
   const type = "*";  // { "*" | "persistent" | "ephemeral" }
   const [compiles, setCompiles] = useState([]);
   const { isLoading, data } =
     useSWR(
-      user ? { user, type } : null,
+      user ? { user, lang, type } : null,
       loadCompiles
     );
 

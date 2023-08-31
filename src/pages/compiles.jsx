@@ -7,7 +7,8 @@ import Link from 'next/link';
 import Gallery from '../components/gallery';
 import Timeline from '../components/timeline';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
-
+import LanguageSelector from '../components/language-selector';
+import useLocalStorage from '../hooks/use-local-storage';
 import {
   CalendarIcon,
   CashIcon,
@@ -50,7 +51,8 @@ const ReduxApplet = () => {
 
 export default function Compiles() {
   const [userId, setUserId] = useState();
-
+  const [language, setLanguage] = useLocalStorage("graffiticode:compiles:language", { id: 1, name: 'L1' });
+  const lang = language.name.slice(1);
   return (
     <>
       {/*
@@ -103,6 +105,9 @@ export default function Compiles() {
                           </Link>
                         ))}
                       </div>
+                    </div>
+                    <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
+                      <LanguageSelector language={language} setLanguage={setLanguage} />
                     </div>
                   </div>
                   <div className="hidden md:block">
@@ -160,7 +165,7 @@ export default function Compiles() {
         <main>
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             {/* Replace with your content */}
-            <Timeline />
+            <Timeline lang={lang} />
           </div>
         </main>
       </div>

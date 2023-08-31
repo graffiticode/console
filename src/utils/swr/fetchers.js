@@ -68,20 +68,19 @@ export const loadTasks = async ({ user, lang, mark }) => {
   return client.request(query, { lang, mark }).then(data => data.tasks);
 };
 
-export const loadCompiles = async ({ user, type }) => {
+export const loadCompiles = async ({ user, lang, type }) => {
   if (!user) {
     return {};
   }
   const token = await user.getToken();
-  //const request = buildRequestClient({ token });
   const client = new GraphQLClient("/api", {
     headers: {
       authorization: token,
     }
   });
   const query = gql`
-    query get($type: String!) {
-      compiles(type: $type) {
+    query get($lang: String!, $type: String!) {
+      compiles(lang: $lang, type: $type) {
         id
         status
         timestamp
@@ -89,7 +88,7 @@ export const loadCompiles = async ({ user, type }) => {
       }
     }
   `;
-  return client.request(query, { type }).then(data => data.compiles);
+  return client.request(query, { lang, type }).then(data => data.compiles);
 };
 
 export const loadGraphiQL = async ({ user }) => {

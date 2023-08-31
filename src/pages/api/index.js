@@ -37,7 +37,7 @@ const typeDefs = `
 
   type Query {
     data(id: String!): String!
-    compiles(type: String!): [Compile!]
+    compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
   }
 
@@ -59,9 +59,9 @@ const resolvers = {
     },
     compiles: async (_, args, ctx) => {
       const { token } = ctx;
-      const { type } = args;
+      const { lang, type } = args;
       const { uid } = await client.verifyAccessToken(token);
-      return await compiles({ auth: { uid, token }, type });
+      return await compiles({ auth: { uid, token }, lang, type });
     },
     tasks: async (_, args, ctx) => {
       const { token } = ctx;
