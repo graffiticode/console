@@ -43,7 +43,7 @@ function classNames(...classes) {
 }
 
 export default function Tasks() {
-  const [language, setLanguage] = useLocalStorage("graffiticode:tasks:language", { id: 1, name: 'L1' });
+  const [language, setLanguage] = useLocalStorage("graffiticode:language", { id: 1, name: 'L1' });
   const [mark, setMark] = useLocalStorage("graffiticode:tasks:mark", marks[0]);
   const lang = language.name.slice(1);
   //const resp = useSwr({uid, lang, mark: mark.id}, tasksSettings);

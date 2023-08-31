@@ -51,7 +51,7 @@ const ReduxApplet = () => {
 
 export default function Compiles() {
   const [userId, setUserId] = useState();
-  const [language, setLanguage] = useLocalStorage("graffiticode:compiles:language", { id: 1, name: 'L1' });
+  const [language, setLanguage] = useLocalStorage("graffiticode:language", { id: 1, name: 'L1' });
   const lang = language.name.slice(1);
   return (
     <>
