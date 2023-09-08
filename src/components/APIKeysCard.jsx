@@ -15,16 +15,16 @@ function APIKeyListItem({ user, apiKey }) {
   };
 
   return (
-    <li className="flex items-center justify-between border border-gray-900 shadow px-4 py-1 rounded">
+    <li className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
       <div className="flex flex-col">
         <span>{apiKey.id}</span>
-        <small className="mb-4 text-base text-neutral-500 dark:text-neutral-400 font-light italic">
-          {moment(apiKey.createdAt.toDate()).format("MMMM Do YYYY")}
+        <small className="mb-2 text-sm text-neutral-500 dark:text-neutral-400 font-light italic">
+          Created {moment(apiKey.createdAt.toDate()).format("MMMM Do YYYY")}
         </small>
       </div>
       <button
         type="button"
-        className="inline-block rounded"
+        className="inline-block rounded-none"
         onClick={buildHandleDelete(apiKey)}>
         <TrashIcon className="h-6 w-6 text-blue-500" />
       </button>
@@ -61,11 +61,11 @@ export default function APIKeysCard() {
   }
 
   return (
-    <div className="overflow-hidden bg-white grid grid-col-1 gap-4">
+    <div className="overflow-hidden bg-white grid grid-col-1 m-2">
       <div className="m-1">
       <button
         type="button"
-        className="inline-block rounded bg-primary pt-2.5 text-xs font-medium uppercase leading-normal text-white px-6 pb-2"
+        className="inline-block rounded-none bg-gray-400 pt-2.5 text-xs font-medium uppercase leading-normal text-white px-6 pb-2"
         onClick={handleCreate}>
         Create API Key
       </button>
