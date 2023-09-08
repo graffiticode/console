@@ -53,20 +53,20 @@ const resolvers = {
     data: async (_, args, ctx) => {
       const { token } = ctx;
       const { id } = args;
-      const { uid } = await client.verifyAccessToken(token);
+      const { uid } = await client.verifyToken(token);
       const data = await getData({ authToken: token, id });
       return JSON.stringify(data);
     },
     compiles: async (_, args, ctx) => {
       const { token } = ctx;
       const { lang, type } = args;
-      const { uid } = await client.verifyAccessToken(token);
+      const { uid } = await client.verifyToken(token);
       return await compiles({ auth: { uid, token }, lang, type });
     },
     tasks: async (_, args, ctx) => {
       const { token } = ctx;
       const { lang, mark } = args;
-      const { uid } = await client.verifyAccessToken(token);
+      const { uid } = await client.verifyToken(token);
       return await tasks({ auth: { uid, token }, lang, mark });
     },
   },
@@ -74,14 +74,14 @@ const resolvers = {
     saveTask: async (_, args, ctx) => {
       const { token } = ctx;
       const { lang, code, mark, isPublic } = args;
-      const { uid } = await client.verifyAccessToken(token);
+      const { uid } = await client.verifyToken(token);
       const data = await saveTask({ auth: { uid, token }, lang, code, mark, isPublic });
       return JSON.stringify(data);
     },
     postTask: async (_, args, ctx) => {
       const { token } = ctx;
       const { lang, code, ephemeral } = args;
-      const { uid } = await client.verifyAccessToken(token);
+      const { uid } = await client.verifyToken(token);
       const task = { lang, code };
       const { id } = await postTask({ auth: { uid, token }, task, ephemeral });
       return id;
@@ -89,7 +89,7 @@ const resolvers = {
     logCompile: async (_, args, ctx) => {
       const { token } = ctx;
       const { id, timestamp, status, data } = args;
-      const { uid } = await client.verifyAccessToken(token);
+      const { uid } = await client.verifyToken(token);
       const resp = await logCompile({ auth: { uid, token }, id, timestamp, status, data });
       return resp;
     },
