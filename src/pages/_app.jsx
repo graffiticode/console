@@ -6,6 +6,7 @@ import "../styles/globals.css";
 import "../styles/prosemirror.css";
 import GraffiticodeFirebaseProvider from '../components/GraffiticodeFirebaseProvider';
 import Layout from '../components/layout';
+import { useEffect } from "react";
 
 const { provider, webSocketProvider } = configureChains(
   [mainnet],
@@ -18,8 +19,6 @@ const client = createClient({
   webSocketProvider,
 })
 
-
-
 export default function App({
   Component,
   pageProps: { session, ...pageProps },
@@ -28,14 +27,16 @@ export default function App({
   const pathName = router.pathname.slice(1);
   console.log("App() pathName=" + pathName + " session=" + JSON.stringify(session, null, 2));
   return (
-    <GraffiticodeFirebaseProvider>
-      <WagmiConfig client={client}>
-        <GraffiticodeAuthProvider>
-          <Layout pathName={pathName}>
-            <Component {...pageProps} />
-          </Layout>
-        </GraffiticodeAuthProvider>
-      </WagmiConfig>
-    </GraffiticodeFirebaseProvider>
+    <div id="gc-root">
+      <GraffiticodeFirebaseProvider>
+        <WagmiConfig client={client}>
+          <GraffiticodeAuthProvider>
+            <Layout pathName={pathName}>
+              <Component {...pageProps} />
+            </Layout>
+          </GraffiticodeAuthProvider>
+        </WagmiConfig>
+      </GraffiticodeFirebaseProvider>
+    </div>
   );
 }
