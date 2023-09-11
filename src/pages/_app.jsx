@@ -26,7 +26,7 @@ export default function App({
 }) {
   const router = useRouter();
   const pathName = router.pathname.slice(1);
-  console.log("App() pathName=" + pathName);
+  console.log("App() pathName=" + pathName + " session=" + JSON.stringify(session, null, 2));
   return (
     <GraffiticodeFirebaseProvider>
       <WagmiConfig client={client}>
