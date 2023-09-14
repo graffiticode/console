@@ -7,7 +7,6 @@ import GraphQLIde from '../components/graphiql';
 
 import {
   CalendarIcon,
-  CashIcon,
   ChartBarIcon,
   FolderIcon,
   HomeIcon,

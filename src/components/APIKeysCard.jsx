@@ -13,13 +13,12 @@ function APIKeyListItem({ user, apiKey }) {
     const token = await getIdToken(user);
     await client.apiKeys.remove({ token, id });
   };
-
   return (
     <li className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
       <div className="flex flex-col">
         <span>{apiKey.id}</span>
         <small className="mb-2 text-sm text-neutral-500 dark:text-neutral-400 font-light italic">
-          Created {moment(apiKey.createdAt.toDate()).format("MMMM Do YYYY")}
+          Created {moment(apiKey.createdAt.toDate()).format("MMMM Do YYYY, h:mm:ss a")}
         </small>
       </div>
       <button

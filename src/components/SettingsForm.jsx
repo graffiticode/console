@@ -25,17 +25,7 @@ export default function Example() {
     );
   } else {
     return (
-      <div> {/*
-        <div className="relative pt-10">
-          <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
-            <aside className="py-6 lg:col-span-3">
-              <span className="mx-5">Billing information</span>
-            </aside>
-            <div className="lg:col-span-9">
-              <BillingCard />
-            </div>
-          </div>
-          </div> */}
+      <div>
         <div className="relative pt-10">
           <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
             <aside className="py-6 lg:col-span-3">

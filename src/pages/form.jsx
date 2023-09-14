@@ -6,7 +6,6 @@ import { Fragment, useState } from 'react'
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react'
 import {
   CalendarIcon,
-  CashIcon,
   ChartBarIcon,
   FolderIcon,
   HomeIcon,

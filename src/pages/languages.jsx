@@ -9,7 +9,6 @@ import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 
 import {
   CalendarIcon,
-  CashIcon,
   ChartBarIcon,
   FolderIcon,
   HomeIcon,
@@ -35,16 +34,15 @@ const projects = [
   { name: 'Chart renderers', initials: 'L147', href: '#', tasks: 16, bgColor: 'bg-gray-800' },
   { name: 'Essay scorers', initials: 'L149', href: '#', tasks: 8, bgColor: 'bg-gray-800' },
   { name: 'Shipping calculators', initials: 'L150', href: '#', tasks: 8, bgColor: 'bg-gray-800' },
+  { name: 'Rotating sphere questions', initials: 'L152', href: '#', tasks: 8, bgColor: 'bg-gray-800' },
 ]
 
 import useLocalStorage from '../hooks/use-local-storage';
-function LanguageList() {
+function LanguageList({ language, setLanguage }) {
   const { user } = useGraffiticodeAuth();
   useEffect(() => {
     document.title = "Languages \\ Graffiticode";
   }, []);
-  const [language, setLanguage] = useLocalStorage("graffiticode:tasks:language", { id: 1, name: 'L1' });
-
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -99,11 +97,10 @@ function LanguageList() {
 }
 
 
-export default function Languages() {
-  const [userId, setUserId] = useState();
+export default function Languages(props) {
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      <LanguageList />
+      <LanguageList {...props} />
     </div>
   )
 }

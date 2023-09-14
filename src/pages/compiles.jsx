@@ -10,7 +10,6 @@ import LanguageSelector from '../components/language-selector';
 import useLocalStorage from '../hooks/use-local-storage';
 import {
   CalendarIcon,
-  CashIcon,
   ChartBarIcon,
   FolderIcon,
   HomeIcon,
@@ -26,9 +25,8 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Compiles() {
+export default function Compiles({ language }) {
   const [userId, setUserId] = useState();
-  const [language, setLanguage] = useLocalStorage("graffiticode:language", { id: 1, name: 'L1' });
   useEffect(() => {
     document.title = "Compiles \\ Graffiticode";
   }, []);

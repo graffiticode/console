@@ -3,8 +3,7 @@ import { Fragment, useCallback, useState, useEffect } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import {
   XMarkIcon,
-  ChevronDoubleLeftIcon,
-  ChevronDoubleRight
+  ChevronDoubleLeftIcon
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";

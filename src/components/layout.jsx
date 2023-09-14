@@ -10,7 +10,6 @@ import LanguageSelector from '../components/language-selector';
 import useLocalStorage from '../hooks/use-local-storage';
 import {
   CalendarIcon,
-  CashIcon,
   ChartBarIcon,
   FolderIcon,
   HomeIcon,
@@ -40,10 +39,8 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Layout({ children, pathName }) {
-  console.log("Layout() pathName=" + pathName);
+export default function Layout({ children, pathName, language, setLanguage }) {
   const [userId, setUserId] = useState();
-  const [language, setLanguage] = useLocalStorage("graffiticode:language", { id: 1, name: 'L1' });
   const lang = language.name.slice(1);
   return (
     <>
@@ -83,7 +80,6 @@ export default function Layout({ children, pathName }) {
                         {
                           navigation.map((item) => {
                             const currentName = item.name.toLowerCase();
-                            console.log("currentName=" + currentName);
                             return (
                               <Link
                                 key={item.name}

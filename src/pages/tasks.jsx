@@ -4,7 +4,6 @@ import { Fragment, useState } from 'react'
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react'
 import {
   CalendarIcon,
-  CashIcon,
   ChartBarIcon,
   FolderIcon,
   HomeIcon,
@@ -28,15 +27,12 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Tasks() {
-  const [language, setLanguage] = useLocalStorage("graffiticode:language", { id: 1, name: 'L1' });
+export default function Tasks({ language }) {
   const [mark, setMark] = useLocalStorage("graffiticode:tasks:mark", marks[0]);
   useEffect(() => {
     document.title = "Tasks \\ Graffiticode";
   }, []);
   const lang = language.name.slice(1);
-  //const resp = useSwr({uid, lang, mark: mark.id}, tasksSettings);
-  //console.log("Tasks() resp=" + JSON.stringify(resp.data));
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <Gallery lang={lang} mark={mark} />
