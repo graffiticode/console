@@ -4,6 +4,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import GraphQLIde from '../components/graphiql';
+import { getTitle } from '../lib/utils';
 
 import {
   CalendarIcon,
@@ -49,7 +50,7 @@ export default function Compiles() {
         ```
       */}
       <Head>
-        <title>Explorer \ Graffiticode</title>
+        <title>Explorer \ {getTitle()}</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"

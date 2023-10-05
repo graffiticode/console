@@ -20,6 +20,7 @@ import {
   BellIcon,
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/SignIn'
+import { getTitle } from '../lib/utils';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -28,7 +29,7 @@ function classNames(...classes) {
 export default function Compiles({ language }) {
   const [userId, setUserId] = useState();
   useEffect(() => {
-    document.title = "Compiles \\ Graffiticode";
+    document.title = `Compiles \\ ${getTitle()}`;
   }, []);
   const lang = language.name.slice(1);
   return (

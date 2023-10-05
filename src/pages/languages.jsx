@@ -19,6 +19,7 @@ import {
   BellIcon,
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/SignIn'
+import { getTitle } from '../lib/utils';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -41,7 +42,7 @@ import useLocalStorage from '../hooks/use-local-storage';
 function LanguageList({ language, setLanguage }) {
   const { user } = useGraffiticodeAuth();
   useEffect(() => {
-    document.title = "Languages \\ Graffiticode";
+    document.title = `Languages \\ ${getTitle()}`;
   }, []);
   if (!user) {
     return (

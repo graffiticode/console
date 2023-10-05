@@ -25,6 +25,7 @@ import useSwr from 'swr';
 import { tasksSettings } from '../utils/swr/fetchers';
 import useLocalStorage from '../hooks/use-local-storage';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import { getTitle } from '../lib/utils';
 
 export function Logo(props) {
   return (
@@ -76,7 +77,7 @@ export default function Form() {
   return (
     <>
       <Head>
-        <title>Form \ Graffiticode</title>
+        <title>Form \ {getTitle()}</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"

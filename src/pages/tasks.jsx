@@ -22,6 +22,7 @@ import MarkSelector, { marks } from '../components/mark-selector';
 import useSwr from 'swr';
 import { tasksSettings } from '../utils/swr/fetchers';
 import useLocalStorage from '../hooks/use-local-storage';
+import { getTitle } from '../lib/utils';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -30,7 +31,7 @@ function classNames(...classes) {
 export default function Tasks({ language }) {
   const [mark, setMark] = useLocalStorage("graffiticode:tasks:mark", marks[0]);
   useEffect(() => {
-    document.title = "Tasks \\ Graffiticode";
+    document.title = `Tasks \\ ${getTitle()}`;
   }, []);
   const lang = language.name.slice(1);
   return (
