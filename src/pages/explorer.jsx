@@ -39,6 +39,9 @@ function classNames(...classes) {
 
 export default function Compiles() {
   const [userId, setUserId] = useState();
+  useEffect(() => {
+    document.title = `Languages \\ ${getTitle()}`;
+  }, []);
   return (
     <>
       {/*
@@ -50,7 +53,6 @@ export default function Compiles() {
         ```
       */}
       <Head>
-        <title>Explorer \ {getTitle()}</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"

@@ -43,7 +43,9 @@ function classNames(...classes) {
 export default function Layout({ children, pathName, language, setLanguage }) {
   const [userId, setUserId] = useState();
   const lang = language.name.slice(1);
-  const title = getTitle();
+  useEffect(() => {
+    document.title = `Languages \\ ${getTitle()}`;
+  }, []);
   return (
     <>
       {/*
@@ -55,7 +57,6 @@ export default function Layout({ children, pathName, language, setLanguage }) {
         ```
       */}
       <Head>
-        <title>{title}</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"
