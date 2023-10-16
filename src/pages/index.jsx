@@ -11,9 +11,9 @@ export default function Compiles() {
   }, []);
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      This is the home screen. This is where we help the developer get
-      oriented. There should be guides and links to various documents
-      as well as quick start tutorials.
+      Welcome to the { getTitle() } console. Get started by navigating to&nbsp; 
+      <a href="/languages"><b>Languages</b></a> tab, selecting a language, and creating
+      a task.
     </div>
   );
 }
