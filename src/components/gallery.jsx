@@ -3,7 +3,7 @@ import { Fragment, useCallback, useState, useEffect } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import {
   XMarkIcon,
-  ChevronDoubleLeftIcon
+  ChevronDoubleLeftIcon,
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
@@ -56,7 +56,6 @@ const FormIFrame =
         />);
 
 const ReactForm = ({ src }) => {
-  console.log("ReactForm() src=" + src);
   let Form;
   useEffect(() => {
     if (src) {
@@ -181,7 +180,7 @@ export default function Gallery({ lang, mark }) {
   if (newTask && !tasks.some(task => task.id === newTask.id)) {
     tasks.unshift(newTask);
   }
-  const hideForm = false;
+  const hideForm = id === "undefined";
   return (
     <>
       <button
