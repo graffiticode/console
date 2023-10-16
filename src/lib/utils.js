@@ -1,6 +1,5 @@
 export function getTitle() {
-  const hostnameParts = document.location.hostname.split(/[.]/g);
-  console.log("Layout() hostnameParts=" + JSON.stringify(hostnameParts));
+  const hostnameParts = typeof document === "undefined" && ["Graffiticode"] || document.location.hostname.split(/[.]/g);
   const title = hostnameParts.length === 1 && hostnameParts[0] || hostnameParts[hostnameParts.length - 2];
   switch (title) {
   case "questioncompiler":
