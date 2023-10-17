@@ -28,6 +28,8 @@ export function Logo(props) {
   );
 }
 
+const env = typeof process !== "undefined" && process.env;
+console.log("App() env keys=" + JSON.stringify(Object.keys(env), null, 2));
 const config = JSON.parse(process.env.NEXT_PUBLIC_GC_CONSOLE_CONFIG || "{}");
 console.log("App() config=" + JSON.stringify(config, null, 2));
 
