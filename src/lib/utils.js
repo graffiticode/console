@@ -4,6 +4,10 @@ export function getTitle() {
   switch (title) {
   case "questioncompiler":
     return "QuestionCompiler";
+  case "chartcompiler":
+    return "ChartCompiler";
+  case "hikingxxx":
+    return "HikingX";
   case "graffiticode":
   default:
     return "Graffiticode";
