@@ -28,14 +28,8 @@ export function Logo(props) {
   );
 }
 
-const env = typeof process !== "undefined" && process.env;
-console.log("App() env keys=" + JSON.stringify(Object.keys(env), null, 2));
-console.log("App() env.NEXT_PUBLIC_GC_CONSOLE_CONFIG=" + env.NEXT_PUBLIC_GC_CONSOLE_CONFIG);
-const config = JSON.parse(process.env.NEXT_PUBLIC_GC_CONSOLE_CONFIG || "{}");
-console.log("App() config=" + JSON.stringify(config, null, 2));
-
 const navigation = [
-  { name: config.questioncompiler && 'Question Type' || 'Languages', href: '/languages', current: false },
+  { name: 'Languages', href: '/languages', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: false },
   { name: 'Explorer', href: '/explorer', current: false },
@@ -111,7 +105,7 @@ export default function Layout({ children, pathName, language, setLanguage }) {
                       </div>
                     </div>
                     <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
-                      <LanguageSelector language={language} setLanguage={setLanguage} />
+                      <LanguageSelector domain={getTitle()} language={language} setLanguage={setLanguage} />
                     </div>
                   </div>
                   <div className="hidden md:block">

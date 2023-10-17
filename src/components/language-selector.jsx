@@ -15,32 +15,47 @@
 import { useState } from 'react'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
 import { Combobox } from '@headlessui/react'
+import { getTitle } from '../lib/utils';
 
 const languages = [
-  {id: 1, name: 'L1'},
-  // {id: 2, name: 'L146'},
-  {id: 3, name: 'L147'},
-  {id: 4, name: 'L149'},
-  {id: 5, name: 'L150'},
-  {id: 6, name: 'L151'},
-  {id: 7, name: 'L152'},
-  {id: 8, name: 'L153'},
-  {id: 9, name: 'L154'},
+  {id: 1, name: 'L1', desc: "Base language", domains: ["graffiticode"]},
+  {id: 2, name: 'L146', desc: "SVG scrapers", domains: ["hide"]},
+  {id: 3, name: 'L147', desc: "Chart renderers", domains: ["chartcompiler"]},
+  {id: 4, name: 'L149', desc: "Short text questions", domains: ["questioncompiler"]},
+  {id: 5, name: 'L150', desc: "Free shipping calculators", domains: ["shipfree"]},
+  {id: 6, name: 'L151', desc: "", domains: ["hide"]},
+  {id: 7, name: 'L152', desc: "Interactive map questions", domains: ["questioncompiler"]},
+  {id: 8, name: 'L153', desc: "unused", domains: ["hide"]},
+  {id: 9, name: 'L154', desc: "Walking routes", domains: ["hikingparis"]},
 ];
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function LanguageSelector({ language, setLanguage }) {
-  const [query, setQuery] = useState('')
-  const filteredLanguages =
-    query === ''
-      ? languages
-      : languages.filter((language) => {
-          return language.name.toLowerCase().includes(query.toLowerCase())
-        })
+export function selectLanguages() {
+  const domain = getTitle().toLowerCase();
+  return languages.filter(language =>
+    domain === "graffiticode" && !language.domains.includes("hide") ||
+      language.domains.length === 0 ||
+      language.domains.includes(domain.toLowerCase())
+  );
+}
 
+export default function LanguageSelector({ domain, language, setLanguage }) {
+  domain = domain.toLowerCase();
+  const [query, setQuery] = useState('')
+  const domainLanguages =
+        languages.filter(language =>
+          domain === "graffiticode" && !language.domains.includes("hide") ||
+            language.domains.length === 0 ||
+            language.domains.includes(domain.toLowerCase())
+        );
+  const filteredLanguages =
+        query === "" && domainLanguages ||
+        domainLanguages.filter(language =>
+          language.name.toLowerCase().includes(query.toLowerCase())
+        );
   return (
     <Combobox as="div" value={language} onChange={setLanguage}>
       <div className="relative">
