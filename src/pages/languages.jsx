@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Image from 'next/image';
+import useSWR from "swr";
 import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
@@ -7,7 +8,6 @@ import Gallery from '../components/gallery';
 import Timeline from '../components/timeline';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { selectLanguages } from "../components/language-selector";
-
 import {
   CalendarIcon,
   ChartBarIcon,
@@ -25,19 +25,27 @@ import { getTitle } from '../lib/utils';
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
-
 import { EllipsisVerticalIcon } from '@heroicons/react/20/solid'
+import { countTasks } from '../utils/swr/fetchers';
 
 const GREEN = "#2DC937";
 
 const languages = selectLanguages();
 
 import useLocalStorage from '../hooks/use-local-storage';
+
 function LanguageList({ language, setLanguage }) {
   const { user } = useGraffiticodeAuth();
+  const { isValidating, isLoading, data } =
+    useSWR(
+      user ? { user, langs: languages, mark: 1 } : null,
+      countTasks,
+    );
+
   useEffect(() => {
     document.title = `Languages \\ ${getTitle()}`;
   }, []);
+
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -71,7 +79,7 @@ function LanguageList({ language, setLanguage }) {
             <div className="flex flex-1 items-center justify-between truncate rounded-none border-b border-r border-t border-gray-200 bg-white">
               <div className="flex-1 truncate px-4 py-2 text-sm">
                 {language.desc}
-                   <p className="text-gray-500">{language.tasks || "0"} Tasks</p>
+                   <p className="text-gray-500">{data && data[language.name] || "0"} Tasks</p>
               </div>
               <div className="flex-shrink-0 pr-2">
                 <button

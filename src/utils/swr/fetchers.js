@@ -43,6 +43,8 @@ export const buildSaveTask = () => async ({ user, lang, code, mark, isPublic = f
   
 };
 
+
+
 export const loadTasks = async ({ user, lang, mark }) => {
   if (!user) {
     return {};
@@ -66,6 +68,21 @@ export const loadTasks = async ({ user, lang, mark }) => {
     }
   `;
   return client.request(query, { lang, mark }).then(data => data.tasks);
+};
+
+export const countTasks = async ({ user, langs, mark }) => {
+  if (!user) {
+    return {};
+  }
+  const token = await user.getToken();
+  const groups = await Promise.all(langs.map(lang => {
+    return loadTasks({user, lang: lang.name.slice(1), mark});
+  }));
+  const counts = {};
+  groups.forEach((group, index) => {
+    counts[langs[index].name] = group.length;
+  });
+  return counts;
 };
 
 export const loadCompiles = async ({ user, lang, type }) => {
