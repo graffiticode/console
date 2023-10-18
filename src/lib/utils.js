@@ -8,7 +8,7 @@ export function getTitle() {
   case "chartcompiler":
     return "ChartCompiler";
   case "hikingxxx":
-    return "HikingX";
+    return "HikingXXX";
   case "graffiticode":
   default:
     return "Graffiticode";
