@@ -21,10 +21,10 @@ const languages = [
   {id: 1, name: 'L1', desc: "Base language", domains: ["graffiticode"]},
   {id: 2, name: 'L146', desc: "SVG scrapers", domains: ["hide"]},
   {id: 3, name: 'L147', desc: "Chart renderers", domains: ["chartcompiler"]},
-  {id: 4, name: 'L149', desc: "Short text questions", domains: ["questioncompiler"]},
+  {id: 4, name: 'L149', desc: "Short text", domains: ["questioncompiler"]},
   {id: 5, name: 'L150', desc: "Free shipping calculators", domains: ["shipfree"]},
   {id: 6, name: 'L151', desc: "", domains: ["hide"]},
-  {id: 7, name: 'L152', desc: "Interactive map questions", domains: ["questioncompiler"]},
+  {id: 7, name: 'L152', desc: "Interactive map", domains: ["questioncompiler"]},
   {id: 8, name: 'L153', desc: "unused", domains: ["hide"]},
   {id: 9, name: 'L154', desc: "Walking routes", domains: ["hikingxxx"]},
 ];
