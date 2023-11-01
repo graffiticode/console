@@ -27,6 +27,7 @@ const languages = [
   {id: 7, name: 'L152', desc: "Interactive map questions", domains: ["questioncompiler"]},
   {id: 8, name: 'L153', desc: "unused", domains: ["hide"]},
   {id: 9, name: 'L154', desc: "Walking routes", domains: ["hikingxxx"]},
+  {id: 10, name: 'L155', desc: "Multiple choice questions", domains: ["questioncompiler"]},
 ];
 
 function classNames(...classes) {
