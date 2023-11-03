@@ -7,6 +7,7 @@ import Gallery from '../components/gallery';
 import Timeline from '../components/timeline';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import LanguageSelector from '../components/language-selector';
+import MarkSelector from '../components/mark-selector';
 import useLocalStorage from '../hooks/use-local-storage';
 import {
   CalendarIcon,
@@ -41,7 +42,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Layout({ children, pathName, language, setLanguage }) {
+export default function Layout({ children, pathName, language, setLanguage, mark, setMark }) {
   const [userId, setUserId] = useState();
   const lang = language.name.slice(1);
   useEffect(() => {
@@ -104,9 +105,18 @@ export default function Layout({ children, pathName, language, setLanguage }) {
                         }
                       </div>
                     </div>
-                    <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
-                      <LanguageSelector domain={getTitle()} language={language} setLanguage={setLanguage} />
-                    </div>
+                    { ["tasks", "compiles"].includes(pathName)
+                      ? <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
+                          <LanguageSelector domain={getTitle()} language={language} setLanguage={setLanguage} />
+                        </div>
+                      : <div />
+                    }
+                    { pathName === "tasks" 
+                      ? <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
+                          <MarkSelector domain={getTitle()} mark={mark} setMark={setMark} />
+                        </div>
+                      : <div />
+                    }
                   </div>
                   <div className="hidden md:block">
                     <div className="text-sm font-medium ml-4 flex items-center md:ml-6 text-gray-400 hover:text-white">

@@ -17,8 +17,6 @@ import SignIn from '../components/SignIn'
 import { useEffect } from 'react';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
-import LanguageSelector from '../components/language-selector';
-import MarkSelector, { marks } from '../components/mark-selector';
 import useSwr from 'swr';
 import { tasksSettings } from '../utils/swr/fetchers';
 import useLocalStorage from '../hooks/use-local-storage';
@@ -28,8 +26,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Tasks({ language }) {
-  const [mark, setMark] = useLocalStorage("graffiticode:tasks:mark", marks[0]);
+export default function Tasks({ language, mark }) {
   useEffect(() => {
     document.title = `Tasks \\ ${getTitle()}`;
   }, []);

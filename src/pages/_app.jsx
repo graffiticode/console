@@ -8,6 +8,7 @@ import GraffiticodeFirebaseProvider from '../components/GraffiticodeFirebaseProv
 import Layout from '../components/layout';
 import { useState, useEffect } from "react";
 import useLocalStorage from '../hooks/use-local-storage';
+import { marks } from "../components/mark-selector";
 const { provider, webSocketProvider } = configureChains(
   [mainnet],
   [publicProvider()],
@@ -24,6 +25,7 @@ export default function App({
   pageProps: { session, ...pageProps },
 }) {
   const [language, setLanguage] = useLocalStorage("graffiticode:language", {id: 1, name: "L1"});
+  const [mark, setMark] = useLocalStorage("graffiticode:tasks:mark", marks[0]);
   const router = useRouter();
   const pathName = router.pathname.slice(1);
   return (
@@ -41,8 +43,14 @@ export default function App({
       <GraffiticodeFirebaseProvider>
         <WagmiConfig client={client}>
           <GraffiticodeAuthProvider>
-            <Layout pathName={pathName} language={language} setLanguage={setLanguage}>
-              <Component {...{...pageProps, language, setLanguage}} />
+            <Layout
+              pathName={pathName}
+              language={language}
+              setLanguage={setLanguage}
+              mark={mark}
+              setMark={setMark}
+            >
+              <Component {...{...pageProps, language, setLanguage, mark}} />
             </Layout>
           </GraffiticodeAuthProvider>
         </WagmiConfig>
