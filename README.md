@@ -1,8 +1,6 @@
 # Graffiticode APP
 
-## Run 
-
-## Develop all locally
+## Local development
 
 1. Run Graffiticode App in terminal
 
