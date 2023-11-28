@@ -4,12 +4,12 @@
 
 ## Develop all locally
 
-1. Run Graffiticode Auth in terminal
+1. Run Graffiticode App in terminal
 
     This runs the firebase emulators and GC Auth.
 
     ```bash
-    # In the Graffiticode Auth directory
+    # In the Graffiticode App root directory
     npm run dev
     ```
 
