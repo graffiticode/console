@@ -6,8 +6,6 @@
 
 1. Run Graffiticode App in terminal
 
-    This runs the firebase emulators and GC Auth.
-
     ```bash
     # In the Graffiticode App root directory
     npm run dev
