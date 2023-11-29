@@ -18,7 +18,7 @@ import { Combobox } from '@headlessui/react'
 import { getTitle } from '../lib/utils';
 
 const languages = [
-  {id: 1, name: 'L1', desc: "Base language", domains: ["graffiticode"]},
+  {id: 1, name: 'L0001', desc: "Base language", domains: ["graffiticode"]},
   {id: 2, name: 'L146', desc: "SVG scrapers", domains: ["hide"]},
   {id: 3, name: 'L147', desc: "Chart renderers", domains: ["chartcompiler"]},
   {id: 4, name: 'L149', desc: "Short text questions", domains: ["questioncompiler"]},
@@ -28,6 +28,7 @@ const languages = [
   {id: 8, name: 'L153', desc: "unused", domains: ["hide"]},
   {id: 9, name: 'L154', desc: "Walking routes", domains: ["hikingxxx"]},
   {id: 10, name: 'L155', desc: "Multiple choice questions", domains: ["questioncompiler"]},
+  {id: 11, name: 'L156', desc: "Mult-step math questions", domains: ["questioncompiler"]},
 ];
 
 function classNames(...classes) {

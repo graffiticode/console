@@ -32,9 +32,9 @@ const useTaskIdFormUrl = ({ lang, id, user }) => {
 };
 
 const FormIFrame = ({url, className}) => {
-  console.log("FormIFrame() url=" + url);
   return (
     <iframe
+      key="1"
       src={url}
       className={className}
       width="100%"
