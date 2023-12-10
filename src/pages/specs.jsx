@@ -6,13 +6,18 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Compiles() {
+export default function Spec({ language }) {
+  const langId = language.name.slice(1);
   useEffect(() => {
     document.title = getTitle();
   }, []);
   return (
-    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      Here is where was put the language specs.
-    </div>
+    <iframe
+      type="text/html"
+      className="w-full h-screen"
+      width="100%"
+      height="100%"
+      src="http://localhost:3100/L0001/spec.html"
+      />
   );
 }
