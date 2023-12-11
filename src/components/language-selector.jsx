@@ -38,7 +38,7 @@ function classNames(...classes) {
 export function selectLanguages() {
   const domain = getTitle().toLowerCase();
   return languages.filter(language =>
-    domain === "dev" && !language.domains.includes("hide") ||
+    domain === "artcompiler" && !language.domains.includes("hide") ||
       language.domains.length === 0 ||
       language.domains.includes(domain.toLowerCase())
   );

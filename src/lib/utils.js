@@ -12,6 +12,6 @@ export function getTitle() {
   case "hikingxxx":
     return "HikingXXX";
   default:
-    return "Dev";
+    return "Artcompiler";
   }
 }
