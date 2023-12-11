@@ -1,6 +1,6 @@
 /*
   This example requires some changes to your config:
-  
+
   ```
   // tailwind.config.js
   module.exports = {
@@ -38,7 +38,7 @@ function classNames(...classes) {
 export function selectLanguages() {
   const domain = getTitle().toLowerCase();
   return languages.filter(language =>
-    domain === "graffiticode" && !language.domains.includes("hide") ||
+    domain === "dev" && !language.domains.includes("hide") ||
       language.domains.length === 0 ||
       language.domains.includes(domain.toLowerCase())
   );
