@@ -28,7 +28,7 @@ function classNames(...classes) {
 
 export default function Tasks({ language, mark }) {
   useEffect(() => {
-    document.title = `Tasks \\ ${getTitle()}`;
+    document.title = getTitle();
   }, []);
   const lang = language.name.slice(1);
   return (

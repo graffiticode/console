@@ -43,7 +43,7 @@ function LanguageList({ language, setLanguage }) {
     );
 
   useEffect(() => {
-    document.title = `Languages \\ ${getTitle()}`;
+    document.title = getTitle();
   }, []);
 
   if (!user) {

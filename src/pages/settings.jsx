@@ -28,7 +28,7 @@ import Gallery from '../components/gallery';
 
 export default function Settings(props) {
   useEffect(() => {
-    document.title = `Settings \\ ${getTitle()}`;
+    document.title = getTitle();
   }, []);
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">

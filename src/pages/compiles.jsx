@@ -29,7 +29,7 @@ function classNames(...classes) {
 export default function Compiles({ language }) {
   const [userId, setUserId] = useState();
   useEffect(() => {
-    document.title = `Compiles \\ ${getTitle()}`;
+    document.title = getTitle();
   }, []);
   const lang = language.name.slice(1);
   return (

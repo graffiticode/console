@@ -40,7 +40,7 @@ function classNames(...classes) {
 export default function Compiles() {
   const [userId, setUserId] = useState();
   useEffect(() => {
-    document.title = `Languages \\ ${getTitle()}`;
+    document.title = getTitle();
   }, []);
   return (
     <div className="w-full h-screen">
