@@ -7,9 +7,11 @@ import {
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
-import { loadTasks } from '../utils/swr/fetchers';
+import { loadTasks, getAccessToken } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import Form from "./FormView.jsx";
+import L0001Form from "./l0001/src/pages/[type].jsx";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -45,31 +47,14 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-const FormIFrame =
-      ({key, src, className}) => (
-        <iframe
-          key={key}
-          className={className}
-          src={src}
-          width="100%"
-          height="100%"
-        />);
-
-const ReactForm = ({ src }) => {
-  let Form;
-  useEffect(() => {
-    if (src) {
-      (async () => {
-        Form = await import(src);
-      })();
-    }
-  }, []);        
-  return Form || <div />;
-}
-
 function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
   const id = getId({ taskId: task.id, dataId });
-  const src = useTaskIdFormUrl({ lang, id });
+  const { user } = useGraffiticodeAuth();
+  const { isValidating, isLoading, data: accessToken } = useSWR(
+    user && { user } || null,
+    getAccessToken,
+  );
+  //const src = useTaskIdFormUrl({ lang, id });
   return (
     <div>
       <li
@@ -93,9 +78,7 @@ function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
         className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
       >
         <div className="flex flex-1 flex-col p-8 place-content-center">
-          <FormIFrame
-            src={src}
-          />
+          <Form accessToken={accessToken} lang={lang} id={id} />
         </div>
       </li>
     </div>
@@ -141,8 +124,12 @@ export default function Gallery({ lang, mark }) {
   const [newTask, setNewTask] = useState();
   const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
+  const { data: accessToken } = useSWR(
+    user && { user } || null,
+    getAccessToken,
+  );
   const id = getId({ taskId, dataId });
-  const src = useTaskIdFormUrl({ lang, id });
+  //const src = useTaskIdFormUrl({ lang, id });
   const { isValidating, isLoading, data } =
     useSWR(
       !open && user ? { user, lang, mark: mark.id } : null,
@@ -253,11 +240,7 @@ export default function Gallery({ lang, mark }) {
                               </div>
                           }
                           { !hideForm &&
-                            <FormIFrame
-                              key={2}
-                              src={src}
-                              className="w-full h-screen"
-                            />
+                            <Form accessToken={accessToken} lang={lang} id={id} />
                           }
                         </div>
                       </div>

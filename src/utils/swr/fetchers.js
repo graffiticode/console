@@ -108,6 +108,13 @@ export const loadCompiles = async ({ user, lang, type }) => {
   return client.request(query, { lang, type }).then(data => data.compiles);
 };
 
+export const getAccessToken = async ({ user }) => {
+  if (!user) {
+    return null;
+  }
+  return await user.getToken();
+};
+
 export const loadGraphiQL = async ({ user }) => {
   if (!user) {
     return {};

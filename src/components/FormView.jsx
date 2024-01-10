@@ -10,8 +10,7 @@ import SignIn from "./SignIn";
 import { loadTasks } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
-import { Form as l150Form } from "./forms/l150/src/pages/[type].jsx";
-import { Form as l1Form } from "./forms/l1/src/pages/[type].jsx";
+import L0001Form from "./l0001/src/pages/[type].jsx";
 
 const useTaskIdFormUrl = ({ lang, id, user }) => {
   const { data: src } = useSWR({ user, id }, async ({ user, id }) => {
@@ -43,32 +42,43 @@ const FormIFrame = ({url, className}) => {
   );
 };
 
-const FormFrame = ({ user, id, lang }) => {
-  console.log("FormFrame() lang=" + lang + " id=" + id);
-  let Form;
+const ReactForm = ({ accessToken, lang, id, data }) => {
   switch (lang) {
-  case "150":
-    Form = l150Form;
-    break;
-  case "1":
+  case "0001":
+    return (
+      <L0001Form
+        accessToken={accessToken}
+        lang={lang}
+        id={id}
+        data={data}
+      />
+    );
   default:
-    Form = l1Form;
-    break;
+    return <div>Form not found: {lang}</div>
   }
-  return <Form user={user} lang={lang} id={id} />
-};
+}
 
-const staticForms = ["150"];
+const DynamicReactForm = ({ src }) => {
+  let Form;
+  useEffect(() => {
+    if (src) {
+      (async () => {
+        Form = await import(src);
+      })();
+    }
+  }, []);
+  return Form || <div />;
+}
 
-export default function FormView({ lang, id }) {
+const staticForms = ["0001"];
+
+export default function FormView({ accessToken, lang, id }) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [taskId, setTaskId] = useState();
   const [newTask, setNewTask] = useState();
   const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
-  const url = useTaskIdFormUrl({ lang, id, user });
-  console.log("FormView() url=" + url);
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -87,15 +97,15 @@ export default function FormView({ lang, id }) {
     tasks.unshift(newTask);
   }
 
-  const Form = staticForms.includes(lang) && FormFrame || FormIFrame;
+  console.log("FormView() lang=" + lang);
+
+  const Form = staticForms.includes(lang) && ReactForm || FormIFrame;
   return (
     <div className="justify-center min-w-full">
       <Form
+        accessToken={accessToken}
         lang={lang}
         id={id}
-        url={url}
-        user={user}
-        className="w-full h-screen"
       />
     </div>
   );
