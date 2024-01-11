@@ -7,35 +7,35 @@ import {
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
-import { loadTasks } from '../utils/swr/fetchers';
+import { loadTasks, getAccessToken } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import L0001Form from "./l0001/src/pages/[type].jsx";
 
-const useTaskIdFormUrl = ({ lang, id, user }) => {
-  const { data: src } = useSWR({ user, id }, async ({ user, id }) => {
+const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
+  const { data: src } = useSWR({ accessToken, id }, async ({ accessToken, id }) => {
     if (!id) {
       return "";
     }
     const [ protocol, host ] =
           document.location.host.indexOf("localhost") === 0 && ["http", "localhost:3100"] ||
           ["https", "api.graffiticode.org"];
-    const token = await user.getToken();
     const params = new URLSearchParams();
     if (token) {
-      params.set("access_token", token);
+      params.set("access_token", accessToken);
     }
     return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
   });
   return src;
 };
 
-const FormIFrame = ({url, className}) => {
+const FormIFrame = ({ accessToken, lang, id, data }) => {
+  console.log("FormIFrame() lang=" + lang);
+  const url = useTaskIdFormUrl({ lang, id, accessToken });
   return (
     <iframe
       key="1"
       src={url}
-      className={className}
       width="100%"
       height="100%"
     />
@@ -72,13 +72,18 @@ const DynamicReactForm = ({ src }) => {
 
 const staticForms = ["0001"];
 
-export default function FormView({ accessToken, lang, id }) {
+export default function FormView({ lang, id }) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [taskId, setTaskId] = useState();
   const [newTask, setNewTask] = useState();
   const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
+  const { isValidating, isLoading, data: accessToken } = useSWR(
+    user && { user } || null,
+    getAccessToken,
+  );
+  console.log("FormView() user=" + JSON.stringify(user));
   if (!user) {
     return (
       <div className="justify-center w-full">

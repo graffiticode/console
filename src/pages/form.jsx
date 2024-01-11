@@ -27,45 +27,11 @@ import useLocalStorage from '../hooks/use-local-storage';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { getTitle } from '../lib/utils';
 
-export function Logo(props) {
-  return (
-    <Image src='/logo.png' alt='Artcompiler logo' width='30' height='30' />
-  )
-}
-
-const navigation = [
-  { name: 'Languages', href: '/languages', current: false },
-  { name: 'Tasks', href: '/tasks', current: false },
-  { name: 'Compiles', href: '/compiles', current: false },
-  { name: 'Explorer', href: '/explorer', current: false },
-  { name: 'Settings', href: '/settings', current: false },
-];
-
-function classNames(...classes) {
-  return classes.filter(Boolean).join(' ')
-}
-
 const parseQuery =
       query => ({
         lang: query.lang,
         id: query.id && query.id.split(/[ ]/g).join("+")
       });
-
-const useTaskIdFormUrl = ({ id }) => {
-  const { user } = useGraffiticodeAuth();
-  const { data: src } = useSWR({ user, id }, async ({ user, id }) => {
-    if (!id) {
-      return "";
-    }
-    const token = await user.getToken();
-    const params = new URLSearchParams();
-    if (token) {
-      params.set("token", token);
-    }
-    return `/api/data/${id}?${params.toString()}`;
-  });
-  return src;
-};
 
 export default function Form() {
   const router = useRouter();
