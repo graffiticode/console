@@ -13,32 +13,30 @@ import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import L0001Form from "./l0001/src/pages/[type].jsx";
 
 const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
-  const { data: src } = useSWR({ accessToken, id }, async ({ accessToken, id }) => {
-    if (!id) {
-      return "";
-    }
-    const [ protocol, host ] =
-          document.location.host.indexOf("localhost") === 0 && ["http", "localhost:3100"] ||
-          ["https", "api.graffiticode.org"];
-    const params = new URLSearchParams();
-    if (token) {
-      params.set("access_token", accessToken);
-    }
-    return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
-  });
-  return src;
+  if (!id) {
+    return "";
+  }
+  const [ protocol, host ] =
+        document.location.host.indexOf("localhost") === 0 && ["http", "localhost:3100"] ||
+        ["https", "api.graffiticode.org"];
+  const params = new URLSearchParams();
+  if (accessToken) {
+    params.set("access_token", accessToken);
+  }
+  return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
 };
 
 const FormIFrame = ({ accessToken, lang, id, data }) => {
-  console.log("FormIFrame() lang=" + lang);
-  const url = useTaskIdFormUrl({ lang, id, accessToken });
+  const url = useTaskIdFormUrl({ accessToken, lang, id });
   return (
+    <div className="h-screen">
     <iframe
       key="1"
       src={url}
       width="100%"
       height="100%"
     />
+    </div>
   );
 };
 
@@ -83,7 +81,6 @@ export default function FormView({ lang, id }) {
     user && { user } || null,
     getAccessToken,
   );
-  console.log("FormView() user=" + JSON.stringify(user));
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -101,8 +98,6 @@ export default function FormView({ lang, id }) {
   if (newTask && !tasks.some(task => task.id === newTask.id)) {
     tasks.unshift(newTask);
   }
-
-  console.log("FormView() lang=" + lang + " id=" + id + " accessToken=" + accessToken);
 
   const Form = staticForms.includes(lang) && ReactForm || FormIFrame;
   return (
