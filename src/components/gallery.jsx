@@ -77,7 +77,7 @@ function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
       <li
         className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
       >
-        <div className="flex flex-1 flex-col p-8 place-content-center">
+        <div className="flex flex-1 flex-col p-8">
           <Form accessToken={accessToken} lang={lang} id={id} />
         </div>
       </li>

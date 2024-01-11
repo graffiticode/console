@@ -97,7 +97,7 @@ export default function FormView({ accessToken, lang, id }) {
     tasks.unshift(newTask);
   }
 
-  console.log("FormView() lang=" + lang);
+  console.log("FormView() lang=" + lang + " id=" + id + " accessToken=" + accessToken);
 
   const Form = staticForms.includes(lang) && ReactForm || FormIFrame;
   return (
