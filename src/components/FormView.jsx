@@ -26,17 +26,16 @@ const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
   return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
 };
 
-const FormIFrame = ({ accessToken, lang, id, data }) => {
+const FormIFrame = ({ accessToken, lang, id, data, className }) => {
   const url = useTaskIdFormUrl({ accessToken, lang, id });
   return (
-    <div className="h-screen">
     <iframe
       key="1"
       src={url}
       width="100%"
       height="100%"
+      className={className}
     />
-    </div>
   );
 };
 
@@ -70,7 +69,7 @@ const DynamicReactForm = ({ src }) => {
 
 const staticForms = ["0001"];
 
-export default function FormView({ lang, id }) {
+export default function FormView({ lang, id, className }) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [taskId, setTaskId] = useState();
@@ -106,6 +105,7 @@ export default function FormView({ lang, id }) {
         accessToken={accessToken}
         lang={lang}
         id={id}
+        className={className}
       />
     </div>
   );
