@@ -5,6 +5,14 @@ import useSWR from 'swr';
 import { Form } from "../components/form";
 import { createState } from "../lib/state";
 
+function isNonNullNonEmptyObject(obj) {
+  return (
+    typeof obj === "object" &&
+      obj !== null &&
+      Object.keys(obj).length > 0
+  );
+}
+
 const View = ({ accessToken, id }) => {
   const [ recompile, setRecompile ] = useState(true);
   useEffect(() => {
@@ -49,7 +57,9 @@ const View = ({ accessToken, id }) => {
   }
 
   return (
-    <Form state={state} />
+    isNonNullNonEmptyObject(state) &&
+      <Form state={state} /> ||
+      <div />
   );
 }
 
