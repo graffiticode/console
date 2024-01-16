@@ -10,7 +10,7 @@ import SignIn from "./SignIn";
 import { loadTasks, getAccessToken } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
-import Form from "./FormView.jsx";
+import FormView from "./FormView.jsx";
 import L0001Form from "./l0001/src/pages/[type].jsx";
 
 function classNames(...classes) {
@@ -78,7 +78,7 @@ function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
         className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
       >
         <div className="h-24 flex flex-1 flex-col p-8">
-          <Form accessToken={accessToken} lang={lang} id={id} />
+          <FormView accessToken={accessToken} lang={lang} id={id} />
         </div>
       </li>
     </div>
@@ -240,7 +240,7 @@ export default function Gallery({ lang, mark }) {
                               </div>
                           }
                           { !hideForm &&
-                            <Form accessToken={accessToken} lang={lang} id={id} className="w-full h-screen" />
+                            <FormView accessToken={accessToken} lang={lang} id={id} className="w-full h-screen" />
                           }
                         </div>
                       </div>
