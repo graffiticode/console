@@ -58,7 +58,7 @@ function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
   return (
     <div>
       <li
-        className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center"
+        className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white"
       >
         <button onClick={() => {
                   setOpen(true);
@@ -75,7 +75,7 @@ function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
         </button>
       </li>
       <li
-        className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white text-center shadow"
+        className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white shadow"
       >
         <div className="h-24 flex flex-1 flex-col p-8">
           <FormView accessToken={accessToken} lang={lang} id={id} />
