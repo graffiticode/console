@@ -15,7 +15,7 @@ const getTask = async ({ auth, id }) => await getApiTask({ id, auth });
 
 export async function logCompile({ auth, id, timestamp, status, data }) {
   const [{ lang }] = await getTask({ auth, id });
-  console.log("logCompile() id=" + id + " lang=" + lang);
+  console.log("logCompile() lang=" + lang + " id=" + id);
   const path = `users/${auth.uid}/compiles/${id}`;
   data = JSON.parse(data);
   await db.doc(path).set({ id, timestamp, status, lang, data });
