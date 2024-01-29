@@ -21,14 +21,14 @@ const languages = [
   {id: 1, name: 'L0001', desc: "Base language", domains: ["graffiticode"]},
   {id: 2, name: 'L146', desc: "SVG scrapers", domains: ["hide"]},
   {id: 3, name: 'L147', desc: "Chart renderers", domains: ["chartcompiler"]},
-  {id: 4, name: 'L149', desc: "Short text questions", domains: ["questioncompiler"]},
+//  {id: 4, name: 'L149', desc: "Short text questions", domains: ["questioncompiler"]},
   {id: 5, name: 'L150', desc: "Free shipping calculators", domains: ["shipfree"]},
   {id: 6, name: 'L0151', desc: "Table editors", domains: ["graffiticode"]},
-  {id: 7, name: 'L152', desc: "Interactive map questions", domains: ["questioncompiler"]},
+  {id: 7, name: 'L0152', desc: "Interactive map questions", domains: ["questioncompiler"]},
   {id: 8, name: 'L0153', desc: "ProseMirror editors", domains: ["graffiticode"]},
   {id: 9, name: 'L154', desc: "Walking routes", domains: ["hikingxxx"]},
   {id: 10, name: 'L0155', desc: "Multiple choice questions", domains: ["questioncompiler"]},
-  {id: 11, name: 'L156', desc: "Mult-step math questions", domains: ["questioncompiler"]},
+//  {id: 11, name: 'L156', desc: "Mult-step math questions", domains: ["questioncompiler"]},
 ];
 
 function classNames(...classes) {
