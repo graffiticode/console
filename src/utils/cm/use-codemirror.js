@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap} from "@codemirror/view";
 import { Extension, Compartment } from "@codemirror/state";
-import { graffiticode } from "@graffiticode/lang-graffiticode";
+// import { graffiticode } from "@graffiticode/lang-graffiticode";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { defaultKeymap } from "@codemirror/commands";
 import {tags} from "@lezer/highlight";
@@ -35,7 +35,7 @@ export default function useCodeMirror(extensions, setView, doc) {
         ...extensions,
         keymap.of(defaultKeymap),
         theme,
-        graffiticode(),
+        // graffiticode(),
       ]
     });
 

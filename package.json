@@ -16,7 +16,6 @@
     "@codemirror/view": "^6.2.3",
     "@ethereumjs/util": "^8.0.3",
     "@graffiticode/auth": "^2.1.2",
-    "@graffiticode/lang-graffiticode": "file:src/utils/cm/graffiticode-lang-graffiticode-0.1.0.tgz",
     "@graphiql/toolkit": "^0.8.2",
     "@graphql-tools/schema": "^9.0.1",
     "@headlessui/react": "^1.7.16",
