@@ -89,7 +89,7 @@ export default function Timeline({ lang }) {
                   <div>
                     <p className="">
                       <a href="#" onClick={() => handleClick({ user, id: compile.id, lang: compile.lang })} className="">
-                        {compile.id.split("+").join(" + ")}
+                        {compile.id}
                       </a>
                     </p>
                   </div>

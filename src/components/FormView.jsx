@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { Fragment, useCallback, useState } from 'react'
+import { Fragment, useCallback, useState, useRef } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import {
   XMarkIcon,
@@ -27,14 +27,27 @@ const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
 };
 
 const FormIFrame = ({ accessToken, lang, id, data, className }) => {
+  const ref = useRef();
+  const [height, setHeight] = useState("640px");
   const url = useTaskIdFormUrl({ accessToken, lang, id });
+  window.addEventListener(
+    "message",
+    (event) => {
+      const { height } = event.data;
+      if (height) {
+        setHeight(height + "px");
+      }
+    },
+    false,
+  );
   return (
     <iframe
       key="1"
       src={url}
-      width="100%"
-      height="100%"
       className={className}
+      width="100%"
+      height={height}
+      ref={ref}
     />
   );
 };
@@ -67,7 +80,7 @@ const DynamicReactForm = ({ src }) => {
   return Form || <div />;
 }
 
-const staticForms = ["0001"];
+const staticForms = []; //["0001"];
 
 export default function FormView({ lang, id, className }) {
   const [open, setOpen] = useState(true);

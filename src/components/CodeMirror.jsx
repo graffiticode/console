@@ -43,18 +43,19 @@ function customCompletionDisplay({ uid, lang, setCode }) {
   });
 }
 
-const CodeMirror = ({ setView, lang, code, setCode, setTaskId }) => {
-  const { user } = useGraffiticodeAuth();
-  const { data: taskId } = useSWR(code ? { user, lang, code } : null, postTask);
+const CodeMirror = ({
+  code,
+  lang,
+  setCode,
+  setTaskId,
+  setView,
+  user
+}) => {
+  console.log("CodeMirror() code=" + code);
   const extensions = [
     customCompletionDisplay({ user, lang, setCode }),
   ];
   const { ref } = useCodeMirror(extensions, setView, code);
-  useEffect(() => {
-    if (taskId) {
-      setTaskId(taskId);
-    }
-  }, [taskId]);
   return <div id="editor" ref={ref} />;
 };
 

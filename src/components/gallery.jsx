@@ -47,6 +47,109 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
+import { Disclosure } from '@headlessui/react'
+import { ChevronRightIcon } from '@heroicons/react/20/solid'
+
+function TasksNav({ setOpen, setHideEditor, setTask, setTaskId, lang, tasks }) {
+  const [ items, setItems ] = useState([]);
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+        <h1>No tasks</h1>
+      </div>
+    );
+  }
+  useEffect(() => {
+    if (tasks) {
+      tasks = tasks.sort((a, b) => {
+        // Sort descending.
+        const at = +a.created || 0;
+        const bt = +b.created || 0;
+        return bt - at;
+      });
+      const items = tasks.map((task, index) => {
+        return {
+          id: task.id,
+          name: task.id.slice(17).slice(0,27),
+          task,
+        };
+      });
+      setTaskId(items[0].id);
+      setItems(items);
+      items[0].current = true;
+    }
+  }, []);
+  return (
+    <div className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white pt-4">
+      <nav className="flex flex-1 flex-col">
+        <ul role="list" className="flex flex-1 flex-col gap-y-7">
+          <li>
+            <ul role="list" className="-mx-2 space-y-1">
+              {items.map((item) => (
+                <li key={item.name}>
+                  {!item.children ? (
+                    <button
+                      onClick={() => {
+                        setTask(item.task);
+                        setTaskId(item.task.id);
+                        items.map(item => item.current = false);
+                        item.current = true;
+                      }}
+                      className={classNames(
+                        item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                        'block rounded-md py-0 pr-2 pl-10 text-sm leading-6 font-mono text-xs text-gray-500 hover:text-gray-900'
+                      )}
+                    >
+                      {item.name}
+                    </button>
+                  ) : (
+                    <Disclosure as="div">
+                      {({ open }) => (
+                        <>
+                          <Disclosure.Button
+                            className={classNames(
+                              item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                              'flex items-center w-full text-left rounded-md p-2 gap-x-3 text-sm leading-6 font-semibold text-gray-700'
+                            )}
+                          >
+                            <ChevronRightIcon
+                              className={classNames(
+                                open ? 'rotate-90 text-gray-500' : 'text-gray-400',
+                                'h-5 w-5 shrink-0'
+                              )}
+                              aria-hidden="true"
+                            />
+                            {item.name}
+                          </Disclosure.Button>
+                          <Disclosure.Panel as="ul" className="mt-1 px-2">
+                            {item.children.map((subItem) => (
+                              <li key={subItem.name}>
+                                <Disclosure.Button
+                                  as="a"
+                                  className={classNames(
+                                    subItem.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                    'block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-700'
+                                  )}
+                                >
+                                  {subItem.name}
+                                </Disclosure.Button>
+                              </li>
+                            ))}
+                          </Disclosure.Panel>
+                        </>
+                      )}
+                    </Disclosure>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  )
+}
+
 function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
   const id = getId({ taskId: task.id, dataId });
   const { user } = useGraffiticodeAuth();
@@ -85,42 +188,11 @@ function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
   );
 }
 
-function Tasks({ setOpen, setHideEditor, setTask, lang, tasks }) {
-  if (!Array.isArray(tasks) || tasks.length === 0) {
-    return (
-      <div className="flex flex-1 flex-col p-8 text-left place-content-left">
-        <h1>No tasks</h1>
-      </div>
-    );
-  }
-  tasks = tasks.sort((a, b) => {
-    // Sort descending.
-    const at = +a.created || 0;
-    const bt = +b.created || 0;
-    return bt - at;
-  });
-  return (
-    <ol role="list" className="grid grid-cols-1 gap-6 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
-      {
-        tasks.map((task, index) => {
-          return <Task
-            key={`task-${index}`}
-            setOpen={setOpen}
-            setHideEditor={setHideEditor}
-            setTask={setTask}
-            lang={lang}
-            task={task}
-          />;
-        })}
-    </ol>
-  );
-}
-
 export default function Gallery({ lang, mark }) {
   const [open, setOpen] = useState(false);
   const [hideEditor, setHideEditor] = useState(false);
-  const [task, setTask] = useState();
-  const [taskId, setTaskId] = useState();
+  const [task, setTask] = useState({});
+  const [taskId, setTaskId] = useState(0);
   const [newTask, setNewTask] = useState();
   const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
@@ -137,7 +209,7 @@ export default function Gallery({ lang, mark }) {
     );
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
-    setTask({ lang, src: `| L${lang}`, ephemeral: true });
+    // setTask({ lang, src: `| L${lang}`, ephemeral: true });
     setOpen(true);
     setHideEditor(false);
   });
@@ -168,90 +240,42 @@ export default function Gallery({ lang, mark }) {
     tasks.unshift(newTask);
   }
   const hideForm = id === "undefined";
+  console.log("Gallery() taskId=" + taskId);
   return (
-    <>
-      <button
-        className="rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-        onClick={handleCreateTask}>
-        Create New Task
-      </button>
-      <Tasks setOpen={setOpen} setHideEditor={setHideEditor} setTask={setTask} lang={lang} tasks={tasks} setNewTask={setNewTask} />
-      <Transition.Root show={open} as={Fragment}>
-        <Dialog as="div" className="relative z-10" onClose={setOpen}>
-          <div className="fixed inset-0" />
-          <div className="fixed inset-0 overflow-hidden">
-            <div className="absolute inset-0 overflow-hidden">
-              <div className="pointer-events-none fixed inset-x-0 bottom-0 h-full flex max-w-full">
-                <Transition.Child
-                  as={Fragment}
-                  enter="transform transition ease-in-out duration-500 sm:duration-700"
-                  enterFrom="translate-y-full"
-                  enterTo="translate-y-0"
-                  leave="transform transition ease-in-out duration-500 sm:duration-700"
-                  leaveFrom="translate-y-0"
-                  leaveTo="translate-y-full"
-                >
-                  <Dialog.Panel className="pointer-events-auto w-screen">
-                    <div className="flex h-full flex-col overflow-y-scroll bg-white py-6 border-2">
-                      <div className="px-4 sm:px-6">
-                        <div className="flex items-start justify-between">
-                          <div className="ml-3 flex h-7 items-center">
-                            <button
-                              type="button"
-                              className="rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-                              onClick={() => setOpen(false)}
-                            >
-                              <span className="sr-only">Hide editor panel</span>
-                              <XMarkIcon className="h-6 w-6" aria-hidden="true" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="relative mt-6 flex-1 px-4 sm:px-6">
-                        <div className={classNames(
-                               hideEditor ? "lg:grid-cols-1" : "lg:grid-cols-2",
-                               "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
-                             )}>
-                          { !hideEditor &&
-                            <div className="">
-                              <div className="w-full h-7 place-items-end">
-                                <button
-                                  type="button"
-                                  title="Hide editor"
-                                  className="rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-                                  onClick={() => setHideEditor(true)}
-                                >
-                                  <span className="sr-only">Hide editor panel</span>
-                                  <ChevronDoubleLeftIcon className="h-6 w-6" aria-hidden="true" />
-                                </button>
-                              </div>
-                              
-                              <Editor
-                                key={1}
-                              userId={uid}
-                              task={task}
-                              lang={lang}
-                              mark={mark}
-                              setOpen={setOpen}
-                              setTaskId={setTaskId}
-                              setNewTask={setNewTask}
-                              dataId={dataId}
-                                setDataId={setDataId} />
-                              </div>
-                          }
-                          { !hideForm &&
-                            <FormView accessToken={accessToken} lang={lang} id={id} className="w-full h-screen" />
-                          }
-                        </div>
-                      </div>
-                    </div>
-                  </Dialog.Panel>
-                </Transition.Child>
+    <div className="flex">
+      <div className="colspan-1">
+        <button
+          className="rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
+          onClick={handleCreateTask}>
+          Create New Task
+        </button>
+        <TasksNav setTaskId={setTaskId} setOpen={setOpen} setHideEditor={setHideEditor} setTask={setTask} lang={lang} tasks={tasks} setNewTask={setNewTask} />
+      </div>
+      <div className="flex flex-col grow mt-6 px-4 sm:px-6">
+        <div className={classNames(
+               hideEditor ? "lg:grid-cols-1" : "lg:grid-cols-1",
+               "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
+             )}>
+          { !hideForm &&
+            <FormView accessToken={accessToken} lang={lang} id={id} />
+          }
+          {
+            !hideEditor &&
+              <div className="">
+                <Editor
+                  dataId={dataId}
+                  lang={lang}
+                  mark={mark}
+                  setNewTask={setNewTask}
+                  setOpen={setOpen}
+                  setTaskId={setTaskId}
+                  taskId={taskId}
+                  task={task}
+                />
               </div>
-            </div>
-          </div>
-        </Dialog>
-      </Transition.Root>
-    </>
+          }
+        </div>
+      </div>
+    </div>
   );
 }

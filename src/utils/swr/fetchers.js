@@ -43,8 +43,6 @@ export const buildSaveTask = () => async ({ user, lang, code, mark, isPublic = f
   
 };
 
-
-
 export const loadTasks = async ({ user, lang, mark }) => {
   if (!user) {
     return {};
@@ -68,6 +66,34 @@ export const loadTasks = async ({ user, lang, mark }) => {
     }
   `;
   return client.request(query, { lang, mark }).then(data => data.tasks);
+};
+
+export const getData = async ({ user, id, data }) => {
+  console.log("getData() id=" + id + " data=" + JSON.stringify(data, null, 2));
+  if (!user) {
+    return {};
+  }
+
+  let dataId = 0;
+  if (data && Object.keys(data).length > 0) {
+    const code = `${JSON.stringify(data)}..`;
+    console.log("getData() code=" + code);
+    dataId = await postTask({user, lang: "0001", code});
+    id = `${id}+${dataId}`;
+  }
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const query = gql`
+    query get($id: String!) {
+      data(id: $id)
+    }
+  `;
+  console.log("getData() id=" + id);
+  return client.request(query, { id }).then(data => JSON.parse(data.data));
 };
 
 export const countTasks = async ({ user, langs, mark }) => {
