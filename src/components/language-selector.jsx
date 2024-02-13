@@ -19,8 +19,9 @@ import { getTitle } from '../lib/utils';
 
 const languages = [
   {id: 1, name: 'L0001', desc: "Base language", domains: ["graffiticode"]},
-  {id: 2, name: 'L146', desc: "SVG scrapers", domains: ["hide"]},
-  {id: 3, name: 'L147', desc: "Chart renderers", domains: ["chartcompiler"]},
+  {id: 2, name: 'L0011', desc: "Property editors", domains: ["graffiticode"]},
+  {id: 3, name: 'L146', desc: "SVG scrapers", domains: ["hide"]},
+  {id: 4, name: 'L147', desc: "Chart renderers", domains: ["chartcompiler"]},
 //  {id: 4, name: 'L149', desc: "Short text questions", domains: ["questioncompiler"]},
   {id: 5, name: 'L150', desc: "Free shipping calculators", domains: ["shipfree"]},
   {id: 6, name: 'L0151', desc: "Table editors", domains: ["graffiticode"]},

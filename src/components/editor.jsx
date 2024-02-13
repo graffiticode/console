@@ -106,9 +106,6 @@ export default function Editor({
   useEffect(() => {
     setNewTask(data);
   }, [data?.id]);
-  if (isLoading) {
-    return <div>Compiling...</div>
-  }
 
   useEffect(() => {
     setDoPostTask(true);
@@ -141,6 +138,10 @@ export default function Editor({
       setPropsId(taskId);
     }
   }, [propsId]);
+
+  if (isLoading) {
+    return <div>Compiling...</div>
+  }
 
   return (
     <div className="flex items-start space-x-4">

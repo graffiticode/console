@@ -52,13 +52,6 @@ import { ChevronRightIcon } from '@heroicons/react/20/solid'
 
 function TasksNav({ setOpen, setHideEditor, setTask, setTaskId, lang, tasks }) {
   const [ items, setItems ] = useState([]);
-  if (!Array.isArray(tasks) || tasks.length === 0) {
-    return (
-      <div className="flex flex-1 flex-col p-8 text-left place-content-left">
-        <h1>No tasks</h1>
-      </div>
-    );
-  }
   useEffect(() => {
     if (tasks) {
       tasks = tasks.sort((a, b) => {
@@ -79,6 +72,13 @@ function TasksNav({ setOpen, setHideEditor, setTask, setTaskId, lang, tasks }) {
       items[0].current = true;
     }
   }, []);
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+        <h1>No tasks</h1>
+      </div>
+    );
+  }
   return (
     <div className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white pt-4">
       <nav className="flex flex-1 flex-col">
