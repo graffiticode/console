@@ -18,6 +18,7 @@ import { createState } from "../lib/state";
 import { getLanguageAsset } from "../lib/api";
 import useSWR from 'swr';
 import { getData } from '../utils/swr/fetchers';
+import FormView from "./FormView.jsx";
 
 const stateOptions = [
   { type: 'initial', available: true },
@@ -294,8 +295,6 @@ export const Properties = ({ id, lang, setCode, user }) => {
     }
   }));
 
-  console.log("Properties() recompile=" + recompile + " user=" + user + " id=" + id + " state=" + JSON.stringify(state.data, null, 2));
-  
   const resp = useSWR(
     recompile && user && id && {
       user,
@@ -314,6 +313,6 @@ export const Properties = ({ id, lang, setCode, user }) => {
   }
 
   return (
-    <Props propDefs={propDefs} state={state} />
+    <FormView lang="0011" id={id} setCode={setCode}/>
   );
 }

@@ -240,7 +240,6 @@ export default function Gallery({ lang, mark }) {
     tasks.unshift(newTask);
   }
   const hideForm = id === "undefined";
-  console.log("Gallery() taskId=" + taskId);
   return (
     <div className="flex">
       <div className="colspan-1">

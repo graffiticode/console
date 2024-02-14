@@ -51,7 +51,6 @@ const CodeMirror = ({
   setView,
   user
 }) => {
-  console.log("CodeMirror() code=" + code);
   const extensions = [
     customCompletionDisplay({ user, lang, setCode }),
   ];

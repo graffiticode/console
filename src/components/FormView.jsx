@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { Fragment, useCallback, useState, useRef } from 'react'
+import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import {
   XMarkIcon,
@@ -26,24 +26,30 @@ const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
   return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
 };
 
-const FormIFrame = ({ accessToken, lang, id, data, className }) => {
+const IFrameForm = ({ accessToken, lang, id: initialId, data, className }) => {
   const ref = useRef();
   const [height, setHeight] = useState("640px");
-  const url = useTaskIdFormUrl({ accessToken, lang, id });
+  const [id, setId] = useState(initialId);
   window.addEventListener(
     "message",
     (event) => {
-      const { height } = event.data;
+      const { height, id } = event.data;
       if (height) {
         setHeight(height + "px");
+      } else if (id) {
+        setId(id);
       }
     },
     false,
   );
+  useEffect(() => {
+    setId(initialId);
+  }, [initialId]);
+  const src = useTaskIdFormUrl({ accessToken, lang, id });
   return (
     <iframe
       key="1"
-      src={url}
+      src={src}
       className={className}
       width="100%"
       height={height}
@@ -111,7 +117,7 @@ export default function FormView({ lang, id, className }) {
     tasks.unshift(newTask);
   }
 
-  const Form = staticForms.includes(lang) && ReactForm || FormIFrame;
+  const Form = staticForms.includes(lang) && ReactForm || IFrameForm;
   return (
     <div className="justify-center min-w-full">
       <Form
