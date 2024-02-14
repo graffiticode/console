@@ -47,7 +47,6 @@ const CodeMirror = ({
   code,
   lang,
   setCode,
-  setTaskId,
   setView,
   user
 }) => {

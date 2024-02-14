@@ -26,14 +26,15 @@ const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
   return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
 };
 
-const IFrameForm = ({ accessToken, lang, id: initialId, data, className }) => {
+const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
   const ref = useRef();
   const [height, setHeight] = useState("640px");
-  const [id, setId] = useState(initialId);
+  console.log("[1] IFrameForm() id=" + id);
   window.addEventListener(
     "message",
     (event) => {
       const { height, id } = event.data;
+      console.log("[2] IFrameForm() id=" + id);
       if (height) {
         setHeight(height + "px");
       } else if (id) {
@@ -42,9 +43,6 @@ const IFrameForm = ({ accessToken, lang, id: initialId, data, className }) => {
     },
     false,
   );
-  useEffect(() => {
-    setId(initialId);
-  }, [initialId]);
   const src = useTaskIdFormUrl({ accessToken, lang, id });
   return (
     <iframe
@@ -88,7 +86,7 @@ const DynamicReactForm = ({ src }) => {
 
 const staticForms = []; //["0001"];
 
-export default function FormView({ lang, id, className }) {
+export default function FormView({ lang, id, setId, className }) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [taskId, setTaskId] = useState();
@@ -124,6 +122,7 @@ export default function FormView({ lang, id, className }) {
         accessToken={accessToken}
         lang={lang}
         id={id}
+        setId={setId}
         className={className}
       />
     </div>

@@ -50,10 +50,10 @@ const useTaskIdFormUrl = ({ lang, id }) => {
 import { Disclosure } from '@headlessui/react'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
 
-function TasksNav({ setOpen, setHideEditor, setTask, setTaskId, lang, tasks }) {
+function TasksNav({ setId, tasks }) {
   const [ items, setItems ] = useState([]);
   useEffect(() => {
-    if (tasks) {
+    if (tasks.length) {
       tasks = tasks.sort((a, b) => {
         // Sort descending.
         const at = +a.created || 0;
@@ -67,7 +67,7 @@ function TasksNav({ setOpen, setHideEditor, setTask, setTaskId, lang, tasks }) {
           task,
         };
       });
-      setTaskId(items[0].id);
+      setId(items[0].id);
       setItems(items);
       items[0].current = true;
     }
@@ -90,8 +90,7 @@ function TasksNav({ setOpen, setHideEditor, setTask, setTaskId, lang, tasks }) {
                   {!item.children ? (
                     <button
                       onClick={() => {
-                        setTask(item.task);
-                        setTaskId(item.task.id);
+                        setId(item.task.id);
                         items.map(item => item.current = false);
                         item.current = true;
                       }}
@@ -150,67 +149,59 @@ function TasksNav({ setOpen, setHideEditor, setTask, setTaskId, lang, tasks }) {
   )
 }
 
-function Task({ setOpen, setHideEditor, setTask, lang, task, dataId }) {
-  const id = getId({ taskId: task.id, dataId });
-  const { user } = useGraffiticodeAuth();
-  const { isValidating, isLoading, data: accessToken } = useSWR(
-    user && { user } || null,
-    getAccessToken,
-  );
-  //const src = useTaskIdFormUrl({ lang, id });
-  return (
-    <div>
-      <li
-        className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white"
-      >
-        <button onClick={() => {
-                  setOpen(true);
-                  setHideEditor(false);
-                  setTask(task);
-        }}>
-          <div className="flex flex-1 flex-col p-8 text-left place-content-left">
-            <dl className="mt-1 flex flex-grow flex-col justify-left">
-              <dt className="sr-only">Title</dt>
-              <dd className="text-xs font-mono text-gray-500">{id}</dd>
-              <dd className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
-            </dl>
-          </div>
-        </button>
-      </li>
-      <li
-        className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white shadow"
-      >
-        <div className="h-24 flex flex-1 flex-col p-8">
-          <FormView accessToken={accessToken} lang={lang} id={id} />
-        </div>
-      </li>
-    </div>
-  );
-}
+// function Task({ setOpen, setHideEditor, lang, task, dataId }) {
+//   const id = getId({ taskId: task.id, dataId });
+//   const { user } = useGraffiticodeAuth();
+//   const { isValidating, isLoading, data: accessToken } = useSWR(
+//     user && { user } || null,
+//     getAccessToken,
+//   );
+//   //const src = useTaskIdFormUrl({ lang, id });
+//   return (
+//     <div>
+//       <li
+//         className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white"
+//       >
+//         <button onClick={() => {
+//                   setOpen(true);
+//                   setHideEditor(false);
+//         }}>
+//           <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+//             <dl className="mt-1 flex flex-grow flex-col justify-left">
+//               <dt className="sr-only">Title</dt>
+//               <dd className="text-xs font-mono text-gray-500">{id}</dd>
+//               <dd className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
+//             </dl>
+//           </div>
+//         </button>
+//       </li>
+//       <li
+//         className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white shadow"
+//       >
+//         <div className="h-24 flex flex-1 flex-col p-8">
+//           <FormView accessToken={accessToken} lang={lang} id={id} />
+//         </div>
+//       </li>
+//     </div>
+//   );
+// }
 
 export default function Gallery({ lang, mark }) {
-  const [open, setOpen] = useState(false);
   const [hideEditor, setHideEditor] = useState(false);
-  const [task, setTask] = useState({});
-  const [taskId, setTaskId] = useState(0);
   const [newTask, setNewTask] = useState();
-  const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,
   );
-  const id = getId({ taskId, dataId });
-  //const src = useTaskIdFormUrl({ lang, id });
+  const [id, setId] = useState(0);
   const { isValidating, isLoading, data } =
     useSWR(
-      !open && user ? { user, lang, mark: mark.id } : null,
+      user ? { user, lang, mark: mark.id } : null,
       loadTasks,
     );
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
-    // setTask({ lang, src: `| L${lang}`, ephemeral: true });
-    setOpen(true);
     setHideEditor(false);
   });
 
@@ -248,7 +239,7 @@ export default function Gallery({ lang, mark }) {
           onClick={handleCreateTask}>
           Create New Task
         </button>
-        <TasksNav setTaskId={setTaskId} setOpen={setOpen} setHideEditor={setHideEditor} setTask={setTask} lang={lang} tasks={tasks} setNewTask={setNewTask} />
+        <TasksNav setId={setId} tasks={tasks} />
       </div>
       <div className="flex flex-col grow mt-6 px-4 sm:px-6">
         <div className={classNames(
@@ -256,20 +247,17 @@ export default function Gallery({ lang, mark }) {
                "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
              )}>
           { !hideForm &&
-            <FormView accessToken={accessToken} lang={lang} id={id} />
+            <FormView accessToken={accessToken} lang={lang} id={id} setId={setId} />
           }
           {
             !hideEditor &&
               <div className="">
                 <Editor
-                  dataId={dataId}
                   lang={lang}
                   mark={mark}
                   setNewTask={setNewTask}
-                  setOpen={setOpen}
-                  setTaskId={setTaskId}
-                  taskId={taskId}
-                  task={task}
+                  setId={setId}
+                  id={id}
                 />
               </div>
           }

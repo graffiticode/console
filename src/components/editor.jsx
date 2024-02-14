@@ -68,24 +68,21 @@ function Tabs({ setTab }) {
 }
 
 export default function Editor({
-  dataId,
+  id,
   lang,
   mark: markInit,
   setNewTask,
   setOpen,
-  setTaskId,
+  setId,
   task,
-  taskId,
 }) {
   const [ mark, setMark ] = useState(markInit);
   const [ view, setView ] = useState();
   const [ isPublic, setIsPublic ] = useState(task?.isPublic);
   const { user } = useGraffiticodeAuth();
   const [ code, setCode ] = useState(task?.src || "");
-  const [ props, setProps ] = useState({});
   const [ saving, setSaving ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
-  const [ doPostProps, setDoPostProps ] = useState(false);
   const [ tab, setTab ] = useState("Properties");
   const saveTask = buildSaveTask();
   useEffect(() => {
@@ -99,45 +96,30 @@ export default function Editor({
     saveTask
   );
 
-  if (data && dataId) {
-    // id = taskId+dataId
-    data.id = `${data.id}+${dataId}`;
-  }
   useEffect(() => {
+    // We have successfully saved a task so addit to the task list.
     setNewTask(data);
   }, [data?.id]);
 
-  useEffect(() => {
-    setDoPostTask(true);
-  }, [code]);
+  // useEffect(() => {
+  //   setDoPostTask(true);
+  // }, [code]);
 
-  const { data: postTaskId } = useSWR(
-    doPostTask && code ? { user, lang, code } : null,
-    postTask
-  );
+  // const { data: postTaskId } = useSWR(
+  //   doPostTask && code ? { user, lang, code } : null,
+  //   postTask
+  // );
 
-  if (postTaskId) {
-    taskId = postTaskId;
-  }
+  // if (postTaskId) {
+  //   taskId = postTaskId;
+  // }
 
-  const { data: propsId } = useSWR(
-    doPostProps && props ? { user, lang: "0001", code: JSON.stringify(props) } : null,
-    postTask
-  );
-
-  useEffect(() => {
-    setDoPostTask(false);
-    if (taskId) {
-      setTaskId(taskId);
-    }
-  }, [taskId]);
-
-  useEffect(() => {
-    setDoPostProps(false);
-    if (propsId) {
-      setPropsId(taskId);
-    }
-  }, [propsId]);
+  // useEffect(() => {
+  //   setDoPostTask(false);
+  //   if (postTaskId) {
+  //     setId(postTaskId);
+  //   }
+  // }, [postTaskId]);
 
   if (isLoading) {
     return <div>Compiling...</div>
@@ -152,7 +134,7 @@ export default function Editor({
             tab === "Properties" &&
               <Properties
                 lang={lang}
-                id={taskId}
+                id={id}
                 setCode={setCode}
                 user={user}
               /> ||
@@ -161,7 +143,7 @@ export default function Editor({
                 extensions={[javascript({ jsx: true })]}
                 lang={lang}
                 setCode={setCode}
-                setTaskId={setTaskId}
+                setId={setId}
                 setView={setView}
                 user={user}
               />
