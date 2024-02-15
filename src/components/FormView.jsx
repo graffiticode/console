@@ -27,18 +27,18 @@ const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
 };
 
 const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
-  const ref = useRef();
-  const [height, setHeight] = useState("640px");
-  console.log("[1] IFrameForm() id=" + id);
+//  console.log("[1] IFrameForm() id=" + id);
+  const [ height, setHeight ] = useState("640px");
   window.addEventListener(
     "message",
     (event) => {
       const { height, id } = event.data;
-      console.log("[2] IFrameForm() id=" + id);
+//      console.log("[2] IFrameForm() id=" + id);
       if (height) {
         setHeight(height + "px");
-      } else if (id) {
-        setId(id);
+      }
+      if (id) {
+        setId && setId(id);
       }
     },
     false,
@@ -51,7 +51,6 @@ const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
       className={className}
       width="100%"
       height={height}
-      ref={ref}
     />
   );
 };
@@ -86,17 +85,16 @@ const DynamicReactForm = ({ src }) => {
 
 const staticForms = []; //["0001"];
 
-export default function FormView({ lang, id, setId, className }) {
+export default function FormView({ lang, id, setId, setNewTask, className }) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
-  const [taskId, setTaskId] = useState();
-  const [newTask, setNewTask] = useState();
   const [dataId, setDataId] = useState();
   const { user } = useGraffiticodeAuth();
   const { isValidating, isLoading, data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,
   );
+
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -109,11 +107,6 @@ export default function FormView({ lang, id, setId, className }) {
   }
 
   const { uid } = user;
-  // const tasks = data || [];
-
-  if (newTask && !tasks.some(task => task.id === newTask.id)) {
-    tasks.unshift(newTask);
-  }
 
   const Form = staticForms.includes(lang) && ReactForm || IFrameForm;
   return (

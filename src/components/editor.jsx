@@ -5,8 +5,9 @@ import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
 import useSWR from "swr";
-import { buildSaveTask, postTask } from '../utils/swr/fetchers';
+import { buildSaveTask, compile, postTask } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import { createState } from "../lib/state";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -67,63 +68,140 @@ function Tabs({ setTab }) {
   )
 }
 
+const getId = ({ taskId, dataId }) => dataId && `${taskId}+${dataId}` || taskId;
+const parseId = id => {
+  if (id === undefined) {
+    return {};
+  }
+  const parts = id.split("+");
+  return {
+    taskId: parts[0],
+    dataId: parts.slice(1).join("+"),
+  };
+};
+
 export default function Editor({
   id,
   lang,
-  mark: markInit,
-  setNewTask,
-  setOpen,
+  mark: initMark,
   setId,
+  setNewTask,
   task,
 }) {
-  const [ mark, setMark ] = useState(markInit);
+  // Use task as initial code for the editor.
+  // Use id as the initial taskId and dataId.
+  // Update taskId from code editor.
+  // Update dataId from property editor.
+  // Use global schema from schema.json
+  // Get values for props editor from compile.
+  // Recompile with code or data changes.
+  // Save task saves current id.
+  const [ code, setCode ] = useState(task?.src || task?.code || "");
   const [ view, setView ] = useState();
+  const [ mark, setMark ] = useState(initMark);
   const [ isPublic, setIsPublic ] = useState(task?.isPublic);
   const { user } = useGraffiticodeAuth();
-  const [ code, setCode ] = useState(task?.src || "");
   const [ saving, setSaving ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ tab, setTab ] = useState("Properties");
   const saveTask = buildSaveTask();
+  const [ doCompile, setDoCompile ] = useState(true);
+  const [ taskId, setTaskId ] = useState("");
+  const [ dataId, setDataId ] = useState("");
   useEffect(() => {
-    if (task) {
-      setCode(task.src);
+    const { taskId, dataId } = parseId(id);
+    setTaskId(taskId);
+    setDataId(dataId);
+  }, [id]);
+  const [ state ] = useState(createState({
+    lang,
+  }, (data, { type, args }) => {
+    console.log("Editor/state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+    switch (type) {
+    case "compile":
+      setDoCompile(false);
+      return {
+        ...data,
+        ...args,
+      };
+    case "codeChange":
+      // TODO don't post if no code change.
+      if (code !== args.code) {
+        setCode(args.code);
+        setDoPostTask(true);
+      }
+      return {
+        ...data,
+        ...args,
+      };
+    case "dataChange":
+      setDoCompile(true);
+      return {
+        ...data,
+        ...args,
+      };
+    default:
+      console.error(false, `Unimplemented action type: ${type}`);
+      return data;
     }
-  }, [task?.src]);
+  }));
 
-  const { isLoading, data } = useSWR(
-    saving ? { user, lang, code, mark: mark.id, isPublic } : null,
-    saveTask
+  useEffect(() => {
+    console.log("Editor task=" + JSON.stringify(task, null, 2));
+    setCode(task.src);
+  }, [id, task.src]);
+
+  // Post task.
+  
+  const { data: postTaskId } = useSWR(
+    doPostTask && { user, lang, code } || null,
+    postTask
   );
 
-  useEffect(() => {
-    // We have successfully saved a task so addit to the task list.
-    setNewTask(data);
-  }, [data?.id]);
+  if (postTaskId) {
+    console.log("Editor() postTaskId=" + postTaskId);
+    setDoPostTask(false);
+    setTaskId(postTaskId);
+  }
 
-  // useEffect(() => {
-  //   setDoPostTask(true);
-  // }, [code]);
+  // Compile task.
+  
+  const compileResp = useSWR(
+    doCompile && user && {
+      user,
+      id: getId({taskId, dataId}),
+      data: state.data,
+    },
+    compile
+  );
 
-  // const { data: postTaskId } = useSWR(
-  //   doPostTask && code ? { user, lang, code } : null,
-  //   postTask
+  if (compileResp.data) {
+    const { id, data } = compileResp.data;
+    console.log("Editor() id=" + id);
+    const { taskId, dataId } = parseId(id);
+    setTaskId(taskId);
+    setDataId(dataId);
+    state.apply({
+      type: "compile",
+      args: data,
+    });
+  }
+
+  // Save task.
+  
+  // const { isLoading, data } = useSWR(
+  //   saving ? { user, lang, code, mark: mark.id, isPublic } : null,
+  //   saveTask
   // );
 
-  // if (postTaskId) {
-  //   taskId = postTaskId;
-  // }
-
   // useEffect(() => {
-  //   setDoPostTask(false);
-  //   if (postTaskId) {
-  //     setId(postTaskId);
-  //   }
-  // }, [postTaskId]);
+  //   // We have successfully saved a task so add it to the task list.
+  //   setNewTask(data);
+  // }, [data?.id]);
 
-  if (isLoading) {
-    return <div>Compiling...</div>
-  }
+  // if (isLoading) {
+  //   return <div>Compiling...</div>
+  // }
 
   return (
     <div className="flex items-start space-x-4">
@@ -131,21 +209,21 @@ export default function Editor({
         <Tabs setTab={setTab} />
         <div className="ring-1 ring-gray-300 focus-within:border-none w-full">
           {
-            tab === "Properties" &&
-              <Properties
-                lang={lang}
-                id={id}
-                setCode={setCode}
-                user={user}
-              /> ||
+            // tab === "Properties" &&
+              // <Properties
+              //   lang={lang}
+              //   id={id}
+              //   setId={setId}
+              //   user={user}
+              // /> ||
               <CodeMirror
                 code={code}
                 extensions={[javascript({ jsx: true })]}
                 lang={lang}
-                setCode={setCode}
                 setId={setId}
-                setView={setView}
                 user={user}
+                setView={setView}
+                state={state}
               />
           }
         </div>

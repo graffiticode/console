@@ -20,3 +20,24 @@ export const getApiTask = async ({ auth, id }) => {
     throw err;
   }
 };
+
+export const postApiCompile = async ({ accessToken, id, data }) => {
+  console.log("postApiCompile() accessToken=" + accessToken);
+  console.log("postApiCompile() id=" + id);
+  console.log("postApiCompile() data=" + JSON.stringify(data, null, 2));
+  try {
+    const headers = {
+      authorization: accessToken,
+      "x-graffiticode-storage-type": "persistent",
+    };
+    const post = bent(apiUrl, "POST", "json", headers);
+    const body = { id, data };
+    const resp = await post('/compile', body);
+    if (resp.status !== "success") {
+      throw new Error(`failed to post compile ${id}: ${error.message}`);
+    }
+    return resp;
+  } catch (err) {
+    throw err;
+  }
+};

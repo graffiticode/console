@@ -1,5 +1,6 @@
 import bent from "bent";
 import { GraphQLClient, gql } from 'graphql-request';
+import { postApiCompile } from "../../lib/api";
 
 const buildRequestClient = async ({ token }) => {
   const client = new GraphQLClient("/api", {
@@ -8,6 +9,20 @@ const buildRequestClient = async ({ token }) => {
     }
   });
   return client;
+};
+
+export const compile = async ({ user, id, data }) => {
+  try {
+    const token = await user.getToken();
+    const index = Object.keys(data).length > 0 && 1 || 2; // Empty data so use full id.
+    id = id.split("+").slice(0, index).join("+");  // Re-compile state with code id.
+    const accessToken = await user.getToken();
+    const resp = await postApiCompile({ accessToken, id, data });
+    return resp;
+  } catch (x) {
+    console.log("./swr/fetchers/compile()");
+    console.log(x.stack);
+  }
 };
 
 export const postTask = async ({ user, lang, code }) => {

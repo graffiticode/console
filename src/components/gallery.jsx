@@ -50,7 +50,7 @@ const useTaskIdFormUrl = ({ lang, id }) => {
 import { Disclosure } from '@headlessui/react'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
 
-function TasksNav({ setId, tasks }) {
+function TasksNav({ setId, setTask, tasks }) {
   const [ items, setItems ] = useState([]);
   useEffect(() => {
     if (tasks.length) {
@@ -90,6 +90,7 @@ function TasksNav({ setId, tasks }) {
                   {!item.children ? (
                     <button
                       onClick={() => {
+                        setTask(item.task);
                         setId(item.task.id);
                         items.map(item => item.current = false);
                         item.current = true;
@@ -149,52 +150,16 @@ function TasksNav({ setId, tasks }) {
   )
 }
 
-// function Task({ setOpen, setHideEditor, lang, task, dataId }) {
-//   const id = getId({ taskId: task.id, dataId });
-//   const { user } = useGraffiticodeAuth();
-//   const { isValidating, isLoading, data: accessToken } = useSWR(
-//     user && { user } || null,
-//     getAccessToken,
-//   );
-//   //const src = useTaskIdFormUrl({ lang, id });
-//   return (
-//     <div>
-//       <li
-//         className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white"
-//       >
-//         <button onClick={() => {
-//                   setOpen(true);
-//                   setHideEditor(false);
-//         }}>
-//           <div className="flex flex-1 flex-col p-8 text-left place-content-left">
-//             <dl className="mt-1 flex flex-grow flex-col justify-left">
-//               <dt className="sr-only">Title</dt>
-//               <dd className="text-xs font-mono text-gray-500">{id}</dd>
-//               <dd className="mt-4 text-xl text-gray-700">{getTitle(task)}</dd>
-//             </dl>
-//           </div>
-//         </button>
-//       </li>
-//       <li
-//         className="col-span-1 flex flex-col divide-y divide-gray-200 rounded-none bg-white shadow"
-//       >
-//         <div className="h-24 flex flex-1 flex-col p-8">
-//           <FormView accessToken={accessToken} lang={lang} id={id} />
-//         </div>
-//       </li>
-//     </div>
-//   );
-// }
-
 export default function Gallery({ lang, mark }) {
-  const [hideEditor, setHideEditor] = useState(false);
-  const [newTask, setNewTask] = useState();
+  const [ hideEditor, setHideEditor ] = useState(false);
+  const [ task, setTask ] = useState({});
+  const [ newTask, setNewTask ] = useState();
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,
   );
-  const [id, setId] = useState(0);
+  const [ id, setId ] = useState("");
   const { isValidating, isLoading, data } =
     useSWR(
       user ? { user, lang, mark: mark.id } : null,
@@ -239,25 +204,32 @@ export default function Gallery({ lang, mark }) {
           onClick={handleCreateTask}>
           Create New Task
         </button>
-        <TasksNav setId={setId} tasks={tasks} />
+        <TasksNav setId={setId} setTask={setTask} tasks={tasks} />
       </div>
       <div className="flex flex-col grow mt-6 px-4 sm:px-6">
         <div className={classNames(
                hideEditor ? "lg:grid-cols-1" : "lg:grid-cols-1",
                "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
              )}>
-          { !hideForm &&
-            <FormView accessToken={accessToken} lang={lang} id={id} setId={setId} />
+          {
+            false && !hideForm &&
+              <FormView
+                accessToken={accessToken}
+                lang={lang}
+                id={id}
+                setNewTask={setNewTask}
+              />
           }
           {
             !hideEditor &&
               <div className="">
                 <Editor
+                  id={id}
                   lang={lang}
                   mark={mark}
-                  setNewTask={setNewTask}
                   setId={setId}
-                  id={id}
+                  setNewTask={setNewTask}
+                  task={task}
                 />
               </div>
           }

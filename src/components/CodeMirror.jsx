@@ -1,9 +1,7 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from "react";
 import { EditorView } from "@codemirror/view";
 import useCodeMirror from "../utils/cm/use-codemirror";
 import { debounce } from "lodash";
-import useSWR from "swr";
-import { postTask } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 
 const getCode = view => {
@@ -18,7 +16,7 @@ const getCode = view => {
   return lines.join("");
 };
 
-const debouncedStartCompletion = debounce(({ uid, view, lang, setCode }) => {
+const debouncedStartCompletion = debounce(({ view, state }) => {
   const doc = view.state.doc;
   const lines = [];
   for (const text of doc.iter()) {
@@ -27,33 +25,52 @@ const debouncedStartCompletion = debounce(({ uid, view, lang, setCode }) => {
   const user = 'public';
   const code = getCode(view);
   if (code !== '') {
-    setCode(code);
+    // setCode(code);
+    state.apply({
+      type: "codeChange",
+      args: { code },
+    });
   }
 }, 300);
 
-function customCompletionDisplay({ uid, lang, setCode }) {
+function customCompletionDisplay({ state }) {
   return EditorView.updateListener.of(({ view, docChanged, transactions }) => {
     if (docChanged) {
       // when a completion is active each keystroke triggers the
       // completion source function, to avoid it we close any open
       // completion inmediatly.
       //closeCompletion(view);
-      debouncedStartCompletion({ uid, view, lang, setCode });
+      debouncedStartCompletion({ view, state });
     }
   });
 }
 
 const CodeMirror = ({
   code,
-  lang,
-  setCode,
-  setView,
-  user
+  state,
 }) => {
+  const [ view, setView ] = useState();
   const extensions = [
-    customCompletionDisplay({ user, lang, setCode }),
+    customCompletionDisplay({ state }),
   ];
+//  const { code } = state.data;
+  console.log("CodeMirror() code=" + code);
   const { ref } = useCodeMirror(extensions, setView, code);
+  useEffect(() => {
+    if (view) {
+      const editorValue = view.state.doc.toString();
+
+      if (code !== editorValue) {
+        view.dispatch({
+          changes: {
+            from: 0,
+            to: editorValue.length,
+            insert: code || "",
+          },
+        });
+      }
+    }
+  }, [code, view]);
   return <div id="editor" ref={ref} />;
 };
 

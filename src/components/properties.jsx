@@ -259,7 +259,7 @@ function isNonNullNonEmptyObject(obj) {
   from the data from the current id.
  */
 
-export const Properties = ({ id, lang, setCode, user }) => {
+export const Properties = ({ id, lang, setCode, setId, user }) => {
   const [ recompile, setRecompile ] = useState(true);
   const [ propDefs, setPropDefs ] = useState({});
   const [ height, setHeight ] = useState(0);
@@ -313,6 +313,6 @@ export const Properties = ({ id, lang, setCode, user }) => {
   }
 
   return (
-    <FormView lang="0011" id={id} setCode={setCode}/>
+    <FormView lang="0011" id={id} setId={setId} setCode={setCode}/>
   );
 }
