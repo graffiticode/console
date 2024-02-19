@@ -84,7 +84,6 @@ export const loadTasks = async ({ user, lang, mark }) => {
 };
 
 export const getData = async ({ user, id, data }) => {
-  console.log("getData() id=" + id + " data=" + JSON.stringify(data, null, 2));
   if (!user) {
     return {};
   }
@@ -92,7 +91,6 @@ export const getData = async ({ user, id, data }) => {
   let dataId = 0;
   if (data && Object.keys(data).length > 0) {
     const code = `${JSON.stringify(data)}..`;
-    console.log("getData() code=" + code);
     dataId = await postTask({user, lang: "0001", code});
     id = `${id}+${dataId}`;
   }
@@ -107,7 +105,6 @@ export const getData = async ({ user, id, data }) => {
       data(id: $id)
     }
   `;
-  console.log("getData() id=" + id);
   return client.request(query, { id }).then(data => JSON.parse(data.data));
 };
 

@@ -161,7 +161,7 @@ function Props({ propDefs, state }) {
       input: {type: "Text", values: data[key] || ""},
     };
   });
-  const handleChange = args => (console.log("handleChange() args=" + JSON.stringify(args), state.apply({type: "change", args})))
+  const handleChange = args => state.apply({type: "change", args});
   return (
     <div className="p-2">
       <div className="px-4 py-6 font-light grid grid-cols-1 lg:grid-cols-5 text-sm">
@@ -272,11 +272,17 @@ export const Properties = ({ id, lang, setCode, setId, user }) => {
     (async () => {
       const schema = await getLanguageAsset(`L${lang}`, "schema.json") || "{}";
       setPropDefs(JSON.parse(schema).properties);
+      state.apply({
+        type: "change",
+        args: {
+          schema: JSON.parse(schema),
+        },
+      });
     })();
   }, []);
 
   const [ state ] = useState(createState({}, (data, { type, args }) => {
-    console.log("state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+    // console.log("state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
     case "compiled":
       return {
@@ -313,6 +319,6 @@ export const Properties = ({ id, lang, setCode, setId, user }) => {
   }
 
   return (
-    <FormView lang="0011" id={id} setId={setId} setCode={setCode}/>
+    <FormView key="props" lang="0011" id="eyJ0YXNrSWRzIjpbIjF5bEo4VFM2MzFseVpvWnBSYXRyIl19" setId={setId} setCode={setCode}/>
   );
 }

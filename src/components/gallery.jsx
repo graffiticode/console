@@ -196,6 +196,7 @@ export default function Gallery({ lang, mark }) {
     tasks.unshift(newTask);
   }
   const hideForm = id === "undefined";
+  console.log("Gallery() lang=" + lang + " id=" + id);
   return (
     <div className="flex">
       <div className="colspan-1">
@@ -212,12 +213,12 @@ export default function Gallery({ lang, mark }) {
                "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
              )}>
           {
-            false && !hideForm &&
+            !hideForm &&
               <FormView
+                key="form"
                 accessToken={accessToken}
-                lang={lang}
                 id={id}
-                setNewTask={setNewTask}
+                lang={lang}
               />
           }
           {
@@ -229,7 +230,7 @@ export default function Gallery({ lang, mark }) {
                   mark={mark}
                   setId={setId}
                   setNewTask={setNewTask}
-                  task={task}
+                  tasks={tasks}
                 />
               </div>
           }

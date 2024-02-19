@@ -27,18 +27,16 @@ const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
 };
 
 const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
-//  console.log("[1] IFrameForm() id=" + id);
-  const [ height, setHeight ] = useState("640px");
+  const [ height, setHeight ] = useState("480px");
   window.addEventListener(
     "message",
     (event) => {
       const { height, id } = event.data;
-//      console.log("[2] IFrameForm() id=" + id);
       if (height) {
-        setHeight(height + "px");
+//        setHeight(height + "px");
       }
       if (id) {
-        setId && setId(id);
+//        setId && setId(id);
       }
     },
     false,
@@ -85,7 +83,7 @@ const DynamicReactForm = ({ src }) => {
 
 const staticForms = []; //["0001"];
 
-export default function FormView({ lang, id, setId, setNewTask, className }) {
+export default function FormView({ key, lang, id, setId, setNewTask, className }) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [dataId, setDataId] = useState();
@@ -110,7 +108,7 @@ export default function FormView({ lang, id, setId, setNewTask, className }) {
 
   const Form = staticForms.includes(lang) && ReactForm || IFrameForm;
   return (
-    <div className="justify-center min-w-full">
+    <div key={key} className="justify-center min-w-full">
       <Form
         accessToken={accessToken}
         lang={lang}

@@ -53,8 +53,6 @@ const CodeMirror = ({
   const extensions = [
     customCompletionDisplay({ state }),
   ];
-//  const { code } = state.data;
-  console.log("CodeMirror() code=" + code);
   const { ref } = useCodeMirror(extensions, setView, code);
   useEffect(() => {
     if (view) {
