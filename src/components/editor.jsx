@@ -108,11 +108,19 @@ export default function Editor({
   const [ doCompile, setDoCompile ] = useState(false);
   const [ taskId, setTaskId ] = useState("");
   const [ dataId, setDataId ] = useState("");
+  const [ props, setProps ] = useState({});
   useEffect(() => {
     const { taskId, dataId } = parseId(id);
     setTaskId(taskId);
     setDataId(dataId);
   }, [id]);
+  useEffect(() => {
+    state.apply({
+      type: "dataChange",
+      args: props,
+    });
+  }, [JSON.stringify(props)]);
+  console.log("Editor() props=" + JSON.stringify(props, null, 2));
   const [ state ] = useState(createState({
     lang,
   }, (data, { type, args }) => {
@@ -214,8 +222,8 @@ export default function Editor({
               <Properties
                 lang={lang}
                 id={id}
-                setId={setId}
                 user={user}
+                setProps={setProps}
               /> ||
               <CodeMirror
                 code={code}

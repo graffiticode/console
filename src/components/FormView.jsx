@@ -36,7 +36,8 @@ const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
 //        setHeight(height + "px");
       }
       if (id) {
-//        setId && setId(id);
+        console.log("IFrameForm() id=" + id);
+        setId && setId(id);
       }
     },
     false,

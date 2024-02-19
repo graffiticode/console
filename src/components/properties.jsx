@@ -259,10 +259,11 @@ function isNonNullNonEmptyObject(obj) {
   from the data from the current id.
  */
 
-export const Properties = ({ id, lang, setCode, setId, user }) => {
+export const Properties = ({ id: initId, lang, user, setProps }) => {
   const [ recompile, setRecompile ] = useState(true);
   const [ propDefs, setPropDefs ] = useState({});
   const [ height, setHeight ] = useState(0);
+  const [ id, setId ] = useState(initId);
   useEffect(() => {
     // If `id` changes, then recompile.
     setRecompile(true);
@@ -282,13 +283,17 @@ export const Properties = ({ id, lang, setCode, setId, user }) => {
   }, []);
 
   const [ state ] = useState(createState({}, (data, { type, args }) => {
-    // console.log("state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+    console.log("Properties state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
-    case "compiled":
-      return {
+    case "compile":
+      setRecompile(false);
+      const props = {
         ...data,
         ...args,
       };
+      delete props.schema;
+      setProps(props);
+      return props;
     case "change":
       setRecompile(true);
       return {
@@ -312,13 +317,12 @@ export const Properties = ({ id, lang, setCode, setId, user }) => {
 
   if (resp.data) {
     state.apply({
-      type: "compiled",
+      type: "compile",
       args: resp.data,
     });
-    setRecompile(false);
   }
 
   return (
-    <FormView key="props" lang="0011" id="eyJ0YXNrSWRzIjpbIjF5bEo4VFM2MzFseVpvWnBSYXRyIl19" setId={setId} setCode={setCode}/>
+    <FormView key="props" lang="0011" id="eyJ0YXNrSWRzIjpbIjF5bEo4VFM2MzFseVpvWnBSYXRyIl19" setId={setId} />
   );
 }
