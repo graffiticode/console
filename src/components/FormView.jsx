@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
+import { Fragment, memo, useCallback, useEffect, useState, useRef } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import {
   XMarkIcon,
@@ -10,7 +10,6 @@ import SignIn from "./SignIn";
 import { loadTasks, getAccessToken } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
-import L0001Form from "./l0001/src/pages/[type].jsx";
 
 const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
   if (!id) {
@@ -26,11 +25,21 @@ const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
   return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
 };
 
-const HEIGHTS = [120, 240, 360, 480, 640, 860, 1020];
+const HEIGHTS = [150, 240, 360, 480, 640, 860, 1020];
+
+const IFrame = ({ id, key, src, className, width, height }) =>
+  <iframe
+    id="iframeform"
+    src={src}
+    key="1"
+    className={className}
+    width="100%"
+    height={height}
+  />;
+
 
 const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
-  const [ height, setHeight ] = useState("480px");
-  const getHeight = newHeight => {
+  const getHeight = (height, newHeight) => {
     if (newHeight === height) {
       return height;
     } else if (newHeight > HEIGHTS[HEIGHTS.length - 1]) {
@@ -38,13 +47,14 @@ const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
     }
     return HEIGHTS.find((h, i) => newHeight < h && h);
   };
+  const [ height, setHeight ] = useState(getHeight(0, 1));
 
   window.addEventListener(
     "message",
     (event) => {
-      const { height, id } = event.data;
+      const { height: newHeight, id } = event.data;
       if (height) {
-        setHeight(getHeight(height) + "px");
+        setHeight(getHeight(height, newHeight) + "px");
       }
       if (id) {
         setId && setId(id);
@@ -52,10 +62,10 @@ const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
     },
     false,
   );
+
   const src = useTaskIdFormUrl({ accessToken, lang, id });
   return (
-    <iframe
-      key="1"
+    <IFrame
       src={src}
       className={className}
       width="100%"
@@ -66,15 +76,6 @@ const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
 
 const ReactForm = ({ accessToken, lang, id, data }) => {
   switch (lang) {
-  case "0001":
-    return (
-      <L0001Form
-        accessToken={accessToken}
-        lang={lang}
-        id={id}
-        data={data}
-      />
-    );
   default:
     return <div>Form not found: {lang}</div>
   }

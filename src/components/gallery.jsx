@@ -1,3 +1,5 @@
+// TODO fix create new task button
+// TODO list child tasks for tasks with properties
 import useSWR from "swr";
 import { Fragment, useCallback, useState, useEffect } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
@@ -11,7 +13,6 @@ import { loadTasks, getAccessToken } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView.jsx";
-import L0001Form from "./l0001/src/pages/[type].jsx";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')

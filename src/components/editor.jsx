@@ -1,3 +1,6 @@
+// TODO save task to task nav
+// TODO load code from id
+
 import { useState, useEffect } from 'react'
 import CodeMirror from './CodeMirror';
 import { Properties } from "./properties";
@@ -14,8 +17,8 @@ function classNames(...classes) {
 }
 
 const tabs = [
-  { name: 'Properties', current: true },
-  { name: 'Code', current: false },
+  { name: 'Code', current: true },
+  { name: 'Properties', current: false },
 //  { name: 'Data', current: false },
 ]
 
@@ -103,7 +106,7 @@ export default function Editor({
   const { user } = useGraffiticodeAuth();
   const [ saving, setSaving ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
-  const [ tab, setTab ] = useState("Properties");
+  const [ tab, setTab ] = useState("Code");
   const saveTask = buildSaveTask();
   const [ doCompile, setDoCompile ] = useState(false);
   const [ taskId, setTaskId ] = useState("");
@@ -115,15 +118,16 @@ export default function Editor({
     setDataId(dataId);
   }, [id]);
   useEffect(() => {
-    state.apply({
-      type: "dataChange",
-      args: props,
-    });
+    setDoCompile(true);
+    // state.apply({
+    //   type: "dataChange",
+    //   args: props,
+    // });
   }, [JSON.stringify(props)]);
   const [ state ] = useState(createState({
     lang,
   }, (data, { type, args }) => {
-    // console.log("Editor/state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+    //console.log("Editor/state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
     case "compile":
       setDoCompile(false);
@@ -132,7 +136,6 @@ export default function Editor({
         ...args,
       };
     case "codeChange":
-      // TODO don't post if no code change.
       if (code != args.code) {
         setCode(args.code);
         setDoPostTask(true);
@@ -179,7 +182,7 @@ export default function Editor({
     doCompile && user && {
       user,
       id: getId({taskId, dataId}),
-      data: state.data,
+      data: props,
     },
     compile
   );
@@ -189,7 +192,7 @@ export default function Editor({
     const { taskId, dataId } = parseId(id);
     setTaskId(taskId);
     setDataId(dataId);
-    //setId(id);
+    setId(getId({taskId, dataId}));
     state.apply({
       type: "compile",
       args: data,
@@ -222,8 +225,9 @@ export default function Editor({
               <Properties
                 lang={lang}
                 id={id}
-                user={user}
+                setId={setId}
                 setProps={setProps}
+                user={user}
               /> ||
               <CodeMirror
                 code={code}

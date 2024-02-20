@@ -12,6 +12,7 @@ const buildRequestClient = async ({ token }) => {
 };
 
 export const compile = async ({ user, id, data }) => {
+  data = data || {};
   try {
     const token = await user.getToken();
     const index = Object.keys(data).length > 0 && 1 || 2; // Empty data so use full id.
@@ -20,7 +21,7 @@ export const compile = async ({ user, id, data }) => {
     const resp = await postApiCompile({ accessToken, id, data });
     return resp;
   } catch (x) {
-    console.log("./swr/fetchers/compile()");
+    console.trace("./swr/fetchers/compile()");
     console.log(x.stack);
   }
 };
