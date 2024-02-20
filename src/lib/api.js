@@ -22,9 +22,6 @@ export const getApiTask = async ({ auth, id }) => {
 };
 
 export const postApiCompile = async ({ accessToken, id, data }) => {
-  console.log("postApiCompile() accessToken=" + accessToken);
-  console.log("postApiCompile() id=" + id);
-  console.log("postApiCompile() data=" + JSON.stringify(data, null, 2));
   try {
     const headers = {
       authorization: accessToken,

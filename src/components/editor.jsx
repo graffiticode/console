@@ -120,11 +120,10 @@ export default function Editor({
       args: props,
     });
   }, [JSON.stringify(props)]);
-  console.log("Editor() props=" + JSON.stringify(props, null, 2));
   const [ state ] = useState(createState({
     lang,
   }, (data, { type, args }) => {
-    console.log("Editor/state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+    // console.log("Editor/state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
     case "compile":
       setDoCompile(false);
@@ -170,7 +169,8 @@ export default function Editor({
     const id = postTaskResp.data;
     setDoPostTask(false);
     setTaskId(id);
-    setId(getId({taskId: id, dataId}));
+    setDataId("");
+    setId(getId({taskId: id, dataId: ""}));
   }
 
   // Compile task.
@@ -244,7 +244,6 @@ export default function Editor({
                 className="inline-flex items-center rounded-none bg-white ring-1 ring-gray-400 px-4 py-2 text-sm font-medium text-gray-700 hover:ring-2 focus:outline-none"
                 onClick={() => {
                   setSaving(true);
-                  setOpen(false);
                 }}
               >
                 Save

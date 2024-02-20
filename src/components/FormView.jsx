@@ -26,17 +26,27 @@ const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
   return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
 };
 
+const HEIGHTS = [120, 240, 360, 480, 640, 860, 1020];
+
 const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
   const [ height, setHeight ] = useState("480px");
+  const getHeight = newHeight => {
+    if (newHeight === height) {
+      return height;
+    } else if (newHeight > HEIGHTS[HEIGHTS.length - 1]) {
+      return HEIGHTS[HEIGHTS.length - 1];
+    }
+    return HEIGHTS.find((h, i) => newHeight < h && h);
+  };
+
   window.addEventListener(
     "message",
     (event) => {
       const { height, id } = event.data;
       if (height) {
-//        setHeight(height + "px");
+        setHeight(getHeight(height) + "px");
       }
       if (id) {
-        console.log("IFrameForm() id=" + id);
         setId && setId(id);
       }
     },

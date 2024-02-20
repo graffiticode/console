@@ -17,7 +17,7 @@ import { Combobox } from '@headlessui/react'
 import { createState } from "../lib/state";
 import { getLanguageAsset } from "../lib/api";
 import useSWR from 'swr';
-import { getData } from '../utils/swr/fetchers';
+import { compile } from '../utils/swr/fetchers';
 import FormView from "./FormView.jsx";
 
 const stateOptions = [
@@ -149,61 +149,6 @@ function Combo({value, options, onChange}) {
   )
 }
 
-function Props({ propDefs, state }) {
-  const field = [];
-  const data = state.data;
-  const fields = Object.keys(propDefs).map(key => {
-    const propDef = propDefs[key];
-    return {
-      name: key,
-      desc: propDef.description,
-      type: propDef.type,
-      input: {type: "Text", values: data[key] || ""},
-    };
-  });
-  const handleChange = args => state.apply({type: "change", args});
-  return (
-    <div className="p-2">
-      <div className="px-4 py-6 font-light grid grid-cols-1 lg:grid-cols-5 text-sm">
-        {
-          fields.map(field => {
-            const propDef = propDefs[field.name];
-            const Input = field.input;
-            return (
-              <>
-                <div className="font-mono pb-10">{field.name}</div>
-                <div className="col-span-1 lg:col-span-3 text-gray-500">{field.desc}<br/><span className="font-mono p-1 rounded-md bg-gray-100 text-xs">{field.type}</span></div>
-                <div className="col-span-1">
-                  {
-                    propDef.enum &&
-                      <Combo
-                        options={optionsFromEnum(propDef.enum)}
-                        value={field.input.values}
-                        onChange={(value) => handleChange({[field.name]: value})}
-                      /> ||
-                      field.input.type === "Toggle" &&
-                      <Toggle type={field.name}
-                              onChange={(value) => handleChange({[field.name]: value})}
-                      /> ||
-                      <Text value={field.input.values} />
-                  }
-                </div>
-              </>
-            );
-          })
-        }
-      </div>
-    </div>
-  )
-}
-
-const people = [
-  { name: 'map', description: 'Select a geographic region', value: 'US States' },
-  { name: 'correctResponse', description: 'Choose the correct response', value: 'California' },
-  { name: 'problem', description: 'Write a problem statement for the question', value: 'Where is ${correctResponse}?' },
-  { name: 'projection', description: 'Select the map style', value: 'AlbersUsa' },
-]
-
 function Toggle({ type, disabled, enabled, onChange }) {
   const [checked, setChecked] = useState(enabled)
   useEffect(() => {
@@ -261,29 +206,31 @@ function isNonNullNonEmptyObject(obj) {
 
 export const Properties = ({ id: initId, lang, user, setProps }) => {
   const [ recompile, setRecompile ] = useState(true);
-  const [ propDefs, setPropDefs ] = useState({});
   const [ height, setHeight ] = useState(0);
-  const [ id, setId ] = useState(initId);
+  const [ id, setId ] = useState("eyJ0YXNrSWRzIjpbIkFaNGh2RmxQVWp3eGVscmxIWHcwIl19");
   useEffect(() => {
     // If `id` changes, then recompile.
-    setRecompile(true);
+    //setRecompile(true);
   }, [id]);
 
   useEffect(() => {
     (async () => {
-      const schema = await getLanguageAsset(`L${lang}`, "schema.json") || "{}";
-      setPropDefs(JSON.parse(schema).properties);
-      state.apply({
-        type: "change",
-        args: {
-          schema: JSON.parse(schema),
-        },
-      });
+      try {
+        const schema = await getLanguageAsset(`L${lang}`, "schema.json") || "{}";
+        state.apply({
+          type: "change",
+          args: {
+            schema: JSON.parse(schema),
+          },
+        });
+      } catch (x) {
+        console.error(`No schema available for L${lang}.`);
+      }
     })();
   }, []);
 
   const [ state ] = useState(createState({}, (data, { type, args }) => {
-    console.log("Properties state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+    // console.log("Properties state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
     case "compile":
       setRecompile(false);
@@ -291,8 +238,6 @@ export const Properties = ({ id: initId, lang, user, setProps }) => {
         ...data,
         ...args,
       };
-      delete props.schema;
-      setProps(props);
       return props;
     case "change":
       setRecompile(true);
@@ -312,17 +257,18 @@ export const Properties = ({ id: initId, lang, user, setProps }) => {
       id,
       data: state.data,
     },
-    getData
+    compile
   );
 
   if (resp.data) {
     state.apply({
       type: "compile",
-      args: resp.data,
+      args: resp.data.data,
     });
+    setId(resp.data.id);
   }
-
+  
   return (
-    <FormView key="props" lang="0011" id="eyJ0YXNrSWRzIjpbIjF5bEo4VFM2MzFseVpvWnBSYXRyIl19" setId={setId} />
+    <FormView key="props" lang="0011" id={id} setId={setId} />
   );
 }
