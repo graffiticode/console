@@ -113,9 +113,15 @@ export default function Editor({
   const [ dataId, setDataId ] = useState("");
   const [ props, setProps ] = useState({});
   useEffect(() => {
-    const { taskId, dataId } = parseId(id);
-    setTaskId(taskId);
-    setDataId(dataId);
+    if (id === "") {
+      setCode("");  // New task.
+    } else {
+      const { taskId, dataId } = parseId(id);
+      setTaskId(taskId);
+      setDataId(dataId);
+      const task = tasks.find(task => task.id === id);
+      task && setCode(task.src);
+    }
   }, [id]);
   useEffect(() => {
     setDoCompile(true);
@@ -155,11 +161,6 @@ export default function Editor({
       return data;
     }
   }));
-
-  useEffect(() => {
-    const task = tasks.find(task => task.id === id);
-    task && setCode(task.src);
-  }, [id]);
 
   // Post task.
 

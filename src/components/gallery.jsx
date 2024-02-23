@@ -169,8 +169,8 @@ export default function Gallery({ lang, mark }) {
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
     setHideEditor(false);
+    setId("");
   });
-
   if (!user) {
     return (
       <div className="justify-center w-full">
