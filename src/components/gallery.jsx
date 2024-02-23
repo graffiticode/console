@@ -1,4 +1,3 @@
-// TODO fix create new task button
 // TODO list child tasks for tasks with properties
 import useSWR from "swr";
 import { Fragment, useCallback, useState, useEffect } from 'react'
@@ -72,7 +71,7 @@ function TasksNav({ setId, setTask, tasks }) {
       setItems(items);
       items[0].current = true;
     }
-  }, []);
+  }, [tasks]);
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return (
       <div className="flex flex-1 flex-col p-8 text-left place-content-left">
@@ -153,6 +152,7 @@ function TasksNav({ setId, setTask, tasks }) {
 
 export default function Gallery({ lang, mark }) {
   const [ hideEditor, setHideEditor ] = useState(false);
+  const [ tasks, setTasks ] = useState([]);
   const [ task, setTask ] = useState({});
   const [ newTask, setNewTask ] = useState();
   const { user } = useGraffiticodeAuth();
@@ -161,16 +161,27 @@ export default function Gallery({ lang, mark }) {
     getAccessToken,
   );
   const [ id, setId ] = useState("");
-  const { isValidating, isLoading, data } =
-    useSWR(
-      user ? { user, lang, mark: mark.id } : null,
-      loadTasks,
-    );
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
     setHideEditor(false);
     setId("");
   });
+  const { isValidating, isLoading, data: loadTasksData } =
+    useSWR(
+      user ? { user, lang, mark: mark.id } : null,
+      loadTasks,
+    );
+  useEffect(() => {
+    setTasks(loadTasksData || []);
+  }, [loadTasksData]);
+
+  useEffect(() => {
+    if (newTask && !tasks.some(task => task.id === newTask.id)) {
+      tasks.unshift(newTask);
+      setTasks(tasks);
+    }
+  }, [newTask]);
+
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -191,11 +202,7 @@ export default function Gallery({ lang, mark }) {
   }
 
   const { uid } = user;
-  const tasks = data || [];
 
-  if (newTask && !tasks.some(task => task.id === newTask.id)) {
-    tasks.unshift(newTask);
-  }
   const hideForm = id === "undefined";
   return (
     <div className="flex">

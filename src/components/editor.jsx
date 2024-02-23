@@ -1,6 +1,3 @@
-// TODO save task to task nav
-// TODO load code from id
-
 import { useState, useEffect } from 'react'
 import CodeMirror from './CodeMirror';
 import { Properties } from "./properties";
@@ -133,7 +130,6 @@ export default function Editor({
   const [ state ] = useState(createState({
     lang,
   }, (data, { type, args }) => {
-    //console.log("Editor/state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
     case "compile":
       setDoCompile(false);
@@ -202,15 +198,15 @@ export default function Editor({
 
   // Save task.
   
-  // const { isLoading, data } = useSWR(
-  //   saving ? { user, lang, code, mark: mark.id, isPublic } : null,
-  //   saveTask
-  // );
+  const { isLoading, data } = useSWR(
+    saving ? { user, lang, code, mark: mark.id, isPublic } : null,
+    saveTask
+  );
 
-  // useEffect(() => {
-  //   // We have successfully saved a task so add it to the task list.
-  //   setNewTask(data);
-  // }, [data?.id]);
+  useEffect(() => {
+    // We have successfully saved a task so add it to the task list.
+    setNewTask(data);
+  }, [data?.id]);
 
   // if (isLoading) {
   //   return <div>Compiling...</div>
