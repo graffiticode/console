@@ -42,10 +42,10 @@ export const postTask = async ({ user, lang, code }) => {
   return client.request(query, { lang, code, ephemeral }).then(data => data.postTask);
 };
 
-export const buildSaveTask = () => async ({ user, lang, code, mark, isPublic = false }) => {
+export const buildSaveTask = () => async ({ user, id, lang, code, mark, isPublic = false }) => {
   const query = gql`
-    mutation post ($lang: String!, $code: String!, $mark: Int!, $isPublic: Boolean) {
-      saveTask(lang: $lang, code: $code, mark: $mark, isPublic: $isPublic)
+    mutation post ($id: String, $lang: String!, $code: String!, $mark: Int!, $isPublic: Boolean) {
+      saveTask(id: $id, lang: $lang, code: $code, mark: $mark, isPublic: $isPublic)
     }
   `;
   const token = await user.getToken();
@@ -55,7 +55,7 @@ export const buildSaveTask = () => async ({ user, lang, code, mark, isPublic = f
       authorization: token,
     }
   });
-  return await client.request(query, { lang, code, mark, isPublic }).then(data => JSON.parse(data.saveTask));
+  return await client.request(query, { id, lang, code, mark, isPublic }).then(data => JSON.parse(data.saveTask));
   
 };
 

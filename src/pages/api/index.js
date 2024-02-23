@@ -44,7 +44,7 @@ const typeDefs = `
   type Mutation {
     logCompile(id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
-    saveTask(lang: String!, code: String!, mark: Int!, isPublic: Boolean): String!
+    saveTask(id: String, lang: String!, code: String!, mark: Int!, isPublic: Boolean): String!
   }
 `;
 
@@ -73,9 +73,9 @@ const resolvers = {
   Mutation: {
     saveTask: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, code, mark, isPublic } = args;
+      const { id, lang, code, mark, isPublic } = args;
       const { uid } = await client.verifyToken(token);
-      const data = await saveTask({ auth: { uid, token }, lang, code, mark, isPublic });
+      const data = await saveTask({ auth: { uid, token }, id, lang, code, mark, isPublic });
       return JSON.stringify(data);
     },
     postTask: async (_, args, ctx) => {

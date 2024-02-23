@@ -88,14 +88,6 @@ export default function Editor({
   setNewTask,
   tasks,
 }) {
-  // Use task as initial code for the editor.
-  // Use id as the initial taskId and dataId.
-  // Update taskId from code editor.
-  // Update dataId from property editor.
-  // Use global schema from schema.json
-  // Get values for props editor from compile.
-  // Recompile with code or data changes.
-  // Save task saves current id.
   const [ code, setCode ] = useState("");
   const [ view, setView ] = useState();
   const [ mark, setMark ] = useState(initMark);
@@ -199,7 +191,7 @@ export default function Editor({
   // Save task.
   
   const { isLoading, data } = useSWR(
-    saving ? { user, lang, code, mark: mark.id, isPublic } : null,
+    saving && { user, id, lang, code, mark: mark.id, isPublic } || null,
     saveTask
   );
 

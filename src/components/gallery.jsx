@@ -1,4 +1,6 @@
-// TODO list child tasks for tasks with properties
+// TODO save and load code + data tasks
+// TODO refresh tasks nav when new task is saved
+
 import useSWR from "swr";
 import { Fragment, useCallback, useState, useEffect } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
@@ -50,6 +52,8 @@ const useTaskIdFormUrl = ({ lang, id }) => {
 import { Disclosure } from '@headlessui/react'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
 
+const sliceName = name => name.slice(17).slice(0,27);
+
 function TasksNav({ setId, setTask, tasks }) {
   const [ items, setItems ] = useState([]);
   useEffect(() => {
@@ -61,15 +65,42 @@ function TasksNav({ setId, setTask, tasks }) {
         return bt - at;
       });
       const items = tasks.map((task, index) => {
-        return {
-          id: task.id,
-          name: task.id.slice(17).slice(0,27),
-          task,
-        };
+        // Group by head.
+        const [hd0, tl0] = task.id.split("+");
+        console.log("TaskNav() hd0=" + hd0 + " tl0=" + tl0);
+        let children;
+        if (tl0 === undefined) {
+          // Only compute kids for root tasks.
+          tasks.forEach(task => {
+            const [hd1, tl1] = task.id.split("+");
+            if (hd0 === hd1 && tl1 !== undefined) {
+              if (children === undefined) {
+                children = [];
+              }
+              children.push({
+                id: tl1,
+                name: sliceName(tl1),
+                task,
+              });
+            };
+          });
+        }
+        if (tl0 === undefined) {
+          return {
+            id: task.id,
+            name: sliceName(task.id),
+            children,
+            task,
+          };
+        } else {
+          return undefined;
+        }
       });
-      setId(items[0].id);
-      setItems(items);
-      items[0].current = true;
+      const nestedItems = items.filter(item => item !== undefined);
+      console.log("TasksNav() nestedItems=" + JSON.stringify(nestedItems, null, 2));
+      nestedItems[0].current = true;
+      setId(nestedItems[0].id);
+      setItems(nestedItems);
     }
   }, [tasks]);
   if (!Array.isArray(tasks) || tasks.length === 0) {
@@ -82,7 +113,7 @@ function TasksNav({ setId, setTask, tasks }) {
   return (
     <div className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white pt-4">
       <nav className="flex flex-1 flex-col">
-        <ul role="list" className="flex flex-1 flex-col gap-y-7">
+        <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
           <li>
             <ul role="list" className="-mx-2 space-y-1">
               {items.map((item) => (
@@ -92,12 +123,12 @@ function TasksNav({ setId, setTask, tasks }) {
                       onClick={() => {
                         setTask(item.task);
                         setId(item.task.id);
-                        items.map(item => item.current = false);
+                        items.forEach(item => item.current = false);
                         item.current = true;
                       }}
                       className={classNames(
                         item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                        'block rounded-md py-0 pr-2 pl-10 text-sm leading-6 font-mono text-xs text-gray-500 hover:text-gray-900'
+                        'block rounded-md py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900'
                       )}
                     >
                       {item.name}
@@ -107,9 +138,15 @@ function TasksNav({ setId, setTask, tasks }) {
                       {({ open }) => (
                         <>
                           <Disclosure.Button
+                            onClick={() => {
+                              setTask(item.task);
+                              setId(item.task.id);
+                              items.forEach(item => item.current = false);
+                              item.current = true;
+                            }}
                             className={classNames(
                               item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                              'flex items-center w-full text-left rounded-md p-2 gap-x-3 text-sm leading-6 font-semibold text-gray-700'
+                              'flex items-center w-full text-xs text-left rounded-md px-2 gap-x-3 text-sm leading-6 font-bold text-gray-700'
                             )}
                           >
                             <ChevronRightIcon
@@ -124,15 +161,21 @@ function TasksNav({ setId, setTask, tasks }) {
                           <Disclosure.Panel as="ul" className="mt-1 px-2">
                             {item.children.map((subItem) => (
                               <li key={subItem.name}>
-                                <Disclosure.Button
+                                <button
                                   as="a"
+                                  onClick={() => {
+                                    setTask(subItem.task);
+                                    setId(subItem.task.id);
+                                    items.forEach(subItem => subItem.current = false);
+                                    subItem.current = true;
+                                  }}
                                   className={classNames(
                                     subItem.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                                    'block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-700'
+                                    'font-normal block rounded-md py-0 pr-2 pl-8 text-xs leading-6 text-gray-700'
                                   )}
                                 >
                                   {subItem.name}
-                                </Disclosure.Button>
+                                </button>
                               </li>
                             ))}
                           </Disclosure.Panel>
