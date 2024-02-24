@@ -97,10 +97,11 @@ function TasksNav({ setId, setTask, tasks }) {
         }
       });
       const nestedItems = items.filter(item => item !== undefined);
-      console.log("TasksNav() nestedItems=" + JSON.stringify(nestedItems, null, 2));
-      nestedItems[0].current = true;
-      setId(nestedItems[0].id);
-      setItems(nestedItems);
+      if (nestedItems.length) {
+        nestedItems[0].current = true;
+        setId(nestedItems[0].id);
+        setItems(nestedItems);
+      }
     }
   }, [tasks]);
   if (!Array.isArray(tasks) || tasks.length === 0) {
