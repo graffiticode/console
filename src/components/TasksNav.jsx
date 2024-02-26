@@ -12,7 +12,6 @@ const getNestedItems = ({ setId, tasks }) => {
   const items = tasks.map((task, index) => {
     // Group by head.
     const [hd0, tl0] = task.id.split("+");
-    console.log("TaskNav() hd0=" + hd0 + " tl0=" + tl0);
     let children;
     if (tl0 === undefined) {
       // Only compute kids for root tasks.
@@ -127,7 +126,7 @@ export default function TasksNav({ setId, setTask, tasks }) {
                                   onClick={() => {
                                     setTask(subItem.task);
                                     setId(subItem.task.id);
-                                    items.forEach(subItem => subItem.current = false);
+                                    item.children.forEach(subItem => subItem.current = false);
                                     subItem.current = true;
                                   }}
                                   className={classNames(

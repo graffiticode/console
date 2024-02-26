@@ -10,15 +10,17 @@ import FormView from "./FormView.jsx";
 
 const getId = ({ taskId, dataId }) => dataId && `${taskId}+${dataId}` || taskId;
 
-export const Properties = ({ id, setId, lang, user, setProps }) => {
-  const [ doCompile, setDoCompile ] = useState(false);
+export const Properties = ({ id, lang, setId: setOuterId, user }) => {
   const [ schema, setSchema ] = useState({});
   const [ taskId, setTaskId ] = useState("");
-  const [ dataId ] = useState(id);
+  const [ dataId, setDataId ] = useState(id);
   const [ doPostTask, setDoPostTask ] = useState(false);
 
-  const setDataId = dataId => {
-    setId(`${id.split("+")[0]}+${dataId.split("+").slice(1)}`);
+  const setId = newDataId => {
+    //  setDataId(dataId.split("+").slice(1));
+    // Only set outer id if this change is from the props editor.
+    const newId = `${id.split("+")[0]}+${newDataId.split("+").slice(1)}`;
+    setOuterId(newId);
   };
 
   useEffect(() => {
@@ -48,29 +50,7 @@ export const Properties = ({ id, setId, lang, user, setProps }) => {
     }
   }, [postTaskResp?.data]);
 
-  useEffect(() => {
-    if (taskId) {
-      setDoCompile(true);
-    }
-  }, [taskId]);
-
-  // Get data for id = taskId+dataId
-
-  // const compileResp = useSWR(
-  //   doCompile && user && id && {
-  //     user,
-  //     id,
-  //     data: {}, // The id represents the `code+data`.
-  //   },
-  //   compile
-  // );
-
-  // useEffect(() => {
-  //   setDoCompile(false);
-  //   setProps(compileResp?.data);
-  // }, [compileResp?.data]);
-
   return (
-    <FormView key="props" lang="0011" id={`${taskId}+${dataId}`} setId={setDataId} />
+    <FormView key="props" lang="0011" id={`${taskId}+${dataId}`} setId={setId} />
   );
 }

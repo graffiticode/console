@@ -16,7 +16,6 @@ function classNames(...classes) {
 const tabs = [
   { name: 'Code', current: true },
   { name: 'Properties', current: false },
-//  { name: 'Data', current: false },
 ]
 
 function Tabs({ setTab }) {
@@ -100,28 +99,21 @@ export default function Editor({
   const [ doCompile, setDoCompile ] = useState(false);
   const [ taskId, setTaskId ] = useState("");
   const [ dataId, setDataId ] = useState("");
-  const [ props, setProps ] = useState({});
+
   useEffect(() => {
     if (id === "") {
       setCode("");  // New task.
     } else {
       const { taskId, dataId } = parseId(id);
-      setTaskId(taskId);
-      setDataId(dataId);
       const task = tasks.find(task => task.id === id);
       task && setCode(task.src);
     }
   }, [id]);
-  useEffect(() => {
-    setDoCompile(true);
-    // state.apply({
-    //   type: "dataChange",
-    //   args: props,
-    // });
-  }, [JSON.stringify(props)]);
+
   const [ state ] = useState(createState({
     lang,
   }, (data, { type, args }) => {
+    console.log("Editor() state.apply() type=" + type);
     switch (type) {
     case "compile":
       setDoCompile(false);
@@ -165,29 +157,6 @@ export default function Editor({
     setId(getId({taskId: id, dataId: ""}));
   }
 
-  // Compile task.
-
-  const compileResp = useSWR(
-    doCompile && user && {
-      user,
-      id: getId({taskId, dataId}),
-      data: props,
-    },
-    compile
-  );
-
-  if (compileResp.data) {
-    const { id, data } = compileResp.data;
-    const { taskId, dataId } = parseId(id);
-    setTaskId(taskId);
-    setDataId(dataId);
-    setId(getId({taskId, dataId}));
-    state.apply({
-      type: "compile",
-      args: data,
-    });
-  }
-
   // Save task.
   
   const { isLoading, data } = useSWR(
@@ -198,11 +167,8 @@ export default function Editor({
   useEffect(() => {
     // We have successfully saved a task so add it to the task list.
     setNewTask(data);
+    setSaving(false);
   }, [data?.id]);
-
-  // if (isLoading) {
-  //   return <div>Compiling...</div>
-  // }
 
   return (
     <div className="flex items-start space-x-4">
@@ -212,10 +178,9 @@ export default function Editor({
           {
             tab === "Properties" &&
               <Properties
-                lang={lang}
                 id={id}
+                lang={lang}
                 setId={setId}
-                setProps={setProps}
                 user={user}
               /> ||
               <CodeMirror
