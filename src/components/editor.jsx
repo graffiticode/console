@@ -91,14 +91,14 @@ export default function Editor({
   const [ view, setView ] = useState();
   const [ mark, setMark ] = useState(initMark);
   const [ isPublic, setIsPublic ] = useState(false);
-  const { user } = useGraffiticodeAuth();
   const [ saving, setSaving ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ tab, setTab ] = useState("Code");
-  const saveTask = buildSaveTask();
   const [ doCompile, setDoCompile ] = useState(false);
   const [ taskId, setTaskId ] = useState("");
   const [ dataId, setDataId ] = useState("");
+  const { user } = useGraffiticodeAuth();
+  const saveTask = buildSaveTask();
 
   useEffect(() => {
     if (id === "") {
@@ -158,7 +158,7 @@ export default function Editor({
   }
 
   // Save task.
-  
+
   const { isLoading, data } = useSWR(
     saving && { user, id, lang, code, mark: mark.id, isPublic } || null,
     saveTask

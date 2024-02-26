@@ -10,18 +10,39 @@ import FormView from "./FormView.jsx";
 
 const getId = ({ taskId, dataId }) => dataId && `${taskId}+${dataId}` || taskId;
 
+const parseId = id => {
+  if (id === undefined) {
+    return {};
+  }
+  const parts = id.split("+");
+  return {
+    taskId: parts[0],
+    dataId: parts.slice(1).join("+"),
+  };
+};
+
+// TODO getData(id) => props; postTask(props) => propId; id=taskId+propId
+
 export const Properties = ({ id, lang, setId: setOuterId, user }) => {
   const [ schema, setSchema ] = useState({});
   const [ taskId, setTaskId ] = useState("");
+  const [ outerTaskId, setOuterTaskId ] = useState("");
   const [ dataId, setDataId ] = useState(id);
   const [ doPostTask, setDoPostTask ] = useState(false);
 
   const setId = newDataId => {
-    //  setDataId(dataId.split("+").slice(1));
     // Only set outer id if this change is from the props editor.
-    const newId = `${id.split("+")[0]}+${newDataId.split("+").slice(1)}`;
+    const newId = getId({taskId: outerTaskId, dataId: newDataId.split("+").slice(1)});
     setOuterId(newId);
   };
+
+  useEffect(() => {
+    if (id) {
+      const { taskId, dataId } = parseId(id);
+      setOuterTaskId(taskId);
+      setDataId(dataId || taskId);
+    }
+  }, [id]);
 
   useEffect(() => {
     (async () => {
@@ -51,6 +72,6 @@ export const Properties = ({ id, lang, setId: setOuterId, user }) => {
   }, [postTaskResp?.data]);
 
   return (
-    <FormView key="props" lang="0011" id={`${taskId}+${dataId}`} setId={setId} />
+    <FormView key="props" lang="0011" id={getId({taskId, dataId})} setId={setId} />
   );
 }
