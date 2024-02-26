@@ -122,7 +122,6 @@ export default function TasksNav({ setId, setTask, tasks }) {
                             {item.children.map((subItem) => (
                               <li key={subItem.name}>
                                 <button
-                                  as="a"
                                   onClick={() => {
                                     setTask(subItem.task);
                                     setId(subItem.task.id);
