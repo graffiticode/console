@@ -9,11 +9,13 @@ function classNames(...classes) {
 }
 
 const getNestedItems = ({ setId, tasks }) => {
+  const ids = [];
   const items = tasks.map((task, index) => {
     // Group by head.
     const [hd0, tl0] = task.id.split("+");
     let children;
-    if (tl0 === undefined) {
+    if (ids.find(id => id === hd0) === undefined) {
+      ids.push(hd0);
       // Only compute kids for root tasks.
       tasks.forEach(task => {
         const [hd1, tl1] = task.id.split("+");
@@ -28,15 +30,17 @@ const getNestedItems = ({ setId, tasks }) => {
           });
         };
       });
-    }
-    if (tl0 === undefined) {
       return {
-        id: task.id,
-        name: sliceName(task.id),
+        id: hd0,
+        name: sliceName(hd0),
+        task: {
+          ...task,
+          id: hd0,
+        },
         children,
-        task,
       };
     } else {
+      // Not a root so return undefined to be filtered out.
       return undefined;
     }
   });
