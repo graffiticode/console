@@ -72,6 +72,12 @@ export const Properties = ({ id, lang, setId: setOuterId, user }) => {
   }, [postTaskResp?.data]);
 
   return (
-    <FormView key="props" lang="0011" id={getId({taskId, dataId})} setId={setId} />
+    <FormView
+      key="props"
+      lang="0011"
+      id={getId({taskId, dataId})}
+      setId={setId}
+      height="300"
+    />
   );
 }

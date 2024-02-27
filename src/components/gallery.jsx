@@ -180,6 +180,7 @@ export default function Gallery({ lang, mark }) {
                 accessToken={accessToken}
                 id={id}
                 lang={lang}
+                height="640"
               />
           }
         </div>

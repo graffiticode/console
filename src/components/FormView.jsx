@@ -49,15 +49,15 @@ const getHeight = (height, newHeight) => {
   return HEIGHTS.find((h, i) => newHeight < h && h);
 };
 
-const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
-  const [ height, setHeight ] = useState(640);
+const IFrameForm = ({ accessToken, lang, id, setId, data, className, height: initialHeight }) => {
+  const [ height, setHeight ] = useState(initialHeight);
 
   window.addEventListener(
     "message",
     (event) => {
       const { height: newHeight, id } = event.data;
-      if (height) {
-//        setHeight(getHeight(height, newHeight));
+      if (newHeight) {
+        setHeight(getHeight(height, newHeight));
       }
       if (id) {
         setId && setId(id);
@@ -99,7 +99,7 @@ const DynamicReactForm = ({ src }) => {
 
 const staticForms = []; //["0001"];
 
-export default function FormView({ key, lang, id, setId, setNewTask, className }) {
+export default function FormView({ key, lang, id, setId, setNewTask, className, height }) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [dataId, setDataId] = useState();
@@ -131,6 +131,7 @@ export default function FormView({ key, lang, id, setId, setNewTask, className }
         id={id}
         setId={setId}
         className={className}
+        height={height}
       />
     </div>
   );
