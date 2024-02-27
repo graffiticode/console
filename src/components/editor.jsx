@@ -79,6 +79,28 @@ const parseId = id => {
   };
 };
 
+const Toolbar = ({ setSaving, mark, setMark, isPublic, setIsPublic }) =>
+<div className="flex justify-between pt-2 bg-white ring-1 ring-gray-400 ring-1 mt-2 p-2">
+  <div className="flex-shrink-0 w-18 h-8">
+    <MarkSelector mark={mark} setMark={setMark} />
+  </div>
+  <div className="flex">
+    <div className="flex-shrink-0 w-18 h-8 pr-5">
+      <PublicToggle isPublic={isPublic} setIsPublic={setIsPublic} />
+    </div>
+    <div className="flex-shrink-0">
+      <button
+        className="inline-flex items-center rounded-none bg-white ring-1 ring-gray-400 px-4 py-2 text-sm font-medium text-gray-700 hover:ring-2 focus:outline-none"
+        onClick={() => {
+          setSaving(true);
+        }}
+      >
+        Save
+      </button>
+    </div>
+  </div>
+</div>
+
 export default function Editor({
   id,
   lang,
@@ -173,6 +195,13 @@ export default function Editor({
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
+        <Toolbar
+          mark={mark}
+          setSaving={setSaving}
+          setMark={setMark}
+          isPublic={isPublic}
+          setIsPublic={setIsPublic}
+        />
         <Tabs setTab={setTab} />
         <div className="ring-1 ring-gray-300 focus-within:border-none w-full">
           {
@@ -188,26 +217,6 @@ export default function Editor({
                 state={state}
               />
           }
-        </div>
-        <div className="flex justify-between pt-2 bg-white ring-1 ring-gray-400 ring-1 mt-2 p-2">
-          <div className="flex-shrink-0 w-18 h-8">
-            <MarkSelector mark={mark} setMark={setMark} />
-          </div>
-          <div className="flex">
-            <div className="flex-shrink-0 w-18 h-8 pr-5">
-              <PublicToggle isPublic={isPublic} setIsPublic={setIsPublic} />
-            </div>
-            <div className="flex-shrink-0">
-              <button
-                className="inline-flex items-center rounded-none bg-white ring-1 ring-gray-400 px-4 py-2 text-sm font-medium text-gray-700 hover:ring-2 focus:outline-none"
-                onClick={() => {
-                  setSaving(true);
-                }}
-              >
-                Save
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

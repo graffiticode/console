@@ -29,7 +29,7 @@ const HEIGHTS = [150, 240, 360, 480, 640, 860, 1020];
 
 const IFrame = ({ id, key, src, className, width, height }) =>
   <iframe
-    id="iframeform"
+    id={id}
     src={src}
     key="1"
     className={className}
@@ -38,23 +38,26 @@ const IFrame = ({ id, key, src, className, width, height }) =>
   />;
 
 
+const getHeight = (height, newHeight) => {
+  console.log("getHeight() height=" + height + " newHeight=" + newHeight);
+  return height;
+  if (newHeight === height) {
+    return height;
+  } else if (newHeight > HEIGHTS[HEIGHTS.length - 1]) {
+    return HEIGHTS[HEIGHTS.length - 1];
+  }
+  return HEIGHTS.find((h, i) => newHeight < h && h);
+};
+
 const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
-  const getHeight = (height, newHeight) => {
-    if (newHeight === height) {
-      return height;
-    } else if (newHeight > HEIGHTS[HEIGHTS.length - 1]) {
-      return HEIGHTS[HEIGHTS.length - 1];
-    }
-    return HEIGHTS.find((h, i) => newHeight < h && h);
-  };
-  const [ height, setHeight ] = useState(getHeight(0, 1));
+  const [ height, setHeight ] = useState(640);
 
   window.addEventListener(
     "message",
     (event) => {
       const { height: newHeight, id } = event.data;
       if (height) {
-        setHeight(getHeight(height, newHeight) + "px");
+//        setHeight(getHeight(height, newHeight));
       }
       if (id) {
         setId && setId(id);
@@ -66,6 +69,7 @@ const IFrameForm = ({ accessToken, lang, id, setId, data, className }) => {
   const src = useTaskIdFormUrl({ accessToken, lang, id });
   return (
     <IFrame
+      id={id}
       src={src}
       className={className}
       width="100%"

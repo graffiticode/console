@@ -161,15 +161,6 @@ export default function Gallery({ lang, mark }) {
                "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
              )}>
           {
-            !hideForm &&
-              <FormView
-                key="form"
-                accessToken={accessToken}
-                id={id}
-                lang={lang}
-              />
-          }
-          {
             !hideEditor &&
               <div className="">
                 <Editor
@@ -181,6 +172,15 @@ export default function Gallery({ lang, mark }) {
                   tasks={tasks}
                 />
               </div>
+          }
+          {
+            !hideForm &&
+              <FormView
+                key="form"
+                accessToken={accessToken}
+                id={id}
+                lang={lang}
+              />
           }
         </div>
       </div>
