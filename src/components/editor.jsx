@@ -18,7 +18,7 @@ const tabs = [
   { name: 'Properties', current: false },
 ]
 
-function Tabs({ setTab, setSaving }) {
+function Tabs({ setTab, setSaving, setShowSaving }) {
   const handleClick = (name) => {
     tabs.find(tab => tab.current).current = false;
     tabs.find(tab => tab.name === name).current = true;
@@ -44,7 +44,7 @@ function Tabs({ setTab, setSaving }) {
       </div>
       <div className="hidden sm:block">
         <div className="m-2">
-          <nav className="-mb-px flex justify-between space-x-4 border-gray-200 border-b text-xs pb-1" aria-label="Tabs">
+          <nav className="-mb-px flex justify-between space-x-4 border-b text-xs pb-1" aria-label="Tabs">
             <div>
             {tabs.map((tab) => (
               <a
@@ -66,6 +66,7 @@ function Tabs({ setTab, setSaving }) {
               className="bg-white px-4 font-medium text-gray-700"
               onClick={() => {
                 setSaving(true);
+                setShowSaving(true);
               }}
             >
               Save
@@ -110,6 +111,7 @@ export default function Editor({
   setId,
   setNewTask,
   tasks,
+  setShowSaving,
 }) {
   const [ code, setCode ] = useState("");
   const [ view, setView ] = useState();
@@ -197,8 +199,8 @@ export default function Editor({
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
-        <Tabs setTab={setTab} setSaving={setSaving} />
-        <div className="w-full">
+        <Tabs setTab={setTab} setSaving={setSaving} setShowSaving={setShowSaving} />
+        <div>
           {
             tab === "Properties" &&
               <Properties

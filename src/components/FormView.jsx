@@ -39,7 +39,6 @@ const IFrame = ({ id, key, src, className, width, height }) =>
 
 
 const getHeight = (height, newHeight) => {
-  console.log("getHeight() height=" + height + " newHeight=" + newHeight);
   return height;
   if (newHeight === height) {
     return height;

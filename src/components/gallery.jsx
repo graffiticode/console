@@ -96,6 +96,7 @@ export default function Gallery({ lang, mark }) {
   const [ tasks, setTasks ] = useState([]);
   const [ task, setTask ] = useState({});
   const [ newTask, setNewTask ] = useState();
+  const [ showSaving, setShowSaving ] = useState(false);
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
@@ -121,6 +122,7 @@ export default function Gallery({ lang, mark }) {
       tasks.unshift(newTask);
       setTasks(tasks);
     }
+    setShowSaving(false);
   }, [newTask]);
 
   if (!user) {
@@ -162,7 +164,12 @@ export default function Gallery({ lang, mark }) {
              )}>
           {
             !hideEditor &&
-              <div className="w-full border border-gray-300 rounded-md  overflow-auto resize-y">
+              <div
+                className={classNames(
+                  showSaving && "ring-8 ring-green-100" || "ring-0 ring-green-100 tranisition-all duration-1000",
+                  "w-full border border-gray-200 rounded-md overflow-auto resize-y"
+                )}
+              >
                 <Editor
                   id={id}
                   lang={lang}
@@ -170,6 +177,7 @@ export default function Gallery({ lang, mark }) {
                   setId={setId}
                   setNewTask={setNewTask}
                   tasks={tasks}
+                  setShowSaving={setShowSaving}
                 />
               </div>
           }
