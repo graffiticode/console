@@ -162,7 +162,7 @@ export default function Gallery({ lang, mark }) {
              )}>
           {
             !hideEditor &&
-              <div className="overflow-auto resize-y">
+              <div className="w-full border border-gray-300 rounded-md  overflow-auto resize-y">
                 <Editor
                   id={id}
                   lang={lang}
@@ -181,7 +181,7 @@ export default function Gallery({ lang, mark }) {
                 id={id}
                 lang={lang}
                 height="640"
-                className="overflow-auto resize-y"
+                className="border border-gray-300 rounded-md overflow-auto resize-y"
               />
           }
         </div>
