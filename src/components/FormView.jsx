@@ -49,8 +49,6 @@ const getHeight = (height, newHeight) => {
 
 const IFrameForm = ({ accessToken, lang, id, setId, data, className, height: initialHeight }) => {
   const [ height, setHeight ] = useState(initialHeight);
-  console.log("IFrameForm() height=" + height);
-
   window.addEventListener(
     "message",
     (event) => {

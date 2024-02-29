@@ -18,14 +18,15 @@ const tabs = [
   { name: 'Properties', current: false },
 ]
 
-function Tabs({ setTab, setSaving, setShowSaving }) {
+function Tabs({ setTab, setSaving, setShowSaving, saveDisabled }) {
   const handleClick = (name) => {
     tabs.find(tab => tab.current).current = false;
     tabs.find(tab => tab.name === name).current = true;
     setTab(name);
   };
+  console.log("Tabs() saveDisabled=" + saveDisabled);
   return (
-    <div className="py-2">
+    <div className="pt-4">
       <div className="sm:hidden">
         <label htmlFor="tabs" className="sr-only">
           Select a tab
@@ -43,9 +44,9 @@ function Tabs({ setTab, setSaving, setShowSaving }) {
         </select>
       </div>
       <div className="hidden sm:block">
-        <div className="m-2">
+        <div className="">
           <nav className="-mb-px flex justify-between space-x-4 border-b text-xs pb-1" aria-label="Tabs">
-            <div>
+            <div className="">
             {tabs.map((tab) => (
               <a
                 key={tab.name}
@@ -63,12 +64,18 @@ function Tabs({ setTab, setSaving, setShowSaving }) {
             ))}
             </div>
             <button
-              className="bg-white px-4 font-medium text-gray-700"
+              className={
+                classNames(
+                  saveDisabled && "text-gray-400 font-medium" || "font-semibold text-gray-700",
+                  "bg-white px-4"
+                )
+              }
               onClick={() => {
                 setSaving(true);
                 setTimeout(() => setShowSaving(true), 100);
                 setTimeout(() => setShowSaving(false), 1500);
               }}
+              disabled={saveDisabled}
             >
               Save
             </button>
@@ -91,7 +98,7 @@ const parseId = id => {
   };
 };
 
-const Toolbar = ({ setSaving, mark, setMark, isPublic, setIsPublic }) =>
+const Toolbar = ({ setSaving, mark, setMark, isPublic, setIsPublic, saveDisabled }) =>
 <div className="flex justify-end bg-white ring-gray-400 px-1 py-2">
   <div className="flex-shrink-0">
     <button
@@ -99,6 +106,7 @@ const Toolbar = ({ setSaving, mark, setMark, isPublic, setIsPublic }) =>
       onClick={() => {
         setSaving(true);
       }}
+      disabled={saveDisabled}
       >
       Save
     </button>
@@ -124,6 +132,7 @@ export default function Editor({
   const [ doCompile, setDoCompile ] = useState(false);
   const [ taskId, setTaskId ] = useState("");
   const [ dataId, setDataId ] = useState("");
+  const [ saveDisabled, setSaveDisabled ] = useState(true);
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
 
@@ -182,6 +191,7 @@ export default function Editor({
     setTaskId(id);
     setDataId("");
     setId(getId({taskId: id, dataId: ""}));
+    setSaveDisabled(false);
   }
 
   // Save task.
@@ -195,13 +205,19 @@ export default function Editor({
     // We have successfully saved a task so add it to the task list.
     setNewTask(data);
     setSaving(false);
+    setSaveDisabled(true);
   }, [data?.id]);
 
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
-        <Tabs setTab={setTab} setSaving={setSaving} setShowSaving={setShowSaving} />
-        <div>
+        <Tabs
+          setTab={setTab}
+          setSaving={setSaving}
+          setShowSaving={setShowSaving}
+          saveDisabled={saveDisabled}
+        />
+        <div className="">
           {
             tab === "Properties" &&
               <Properties

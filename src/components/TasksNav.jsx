@@ -8,6 +8,9 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+const scrubTitle = title => title.indexOf("|") >= 0 && title.slice(title.indexOf("|") + 1).trim();
+const getTitleFromTask = task => scrubTitle(task.src.split("\n").slice(0, 1).join());
+
 const getNestedItems = ({ setId, tasks }) => {
   const ids = [];
   const items = tasks.map((task, index) => {
@@ -32,7 +35,7 @@ const getNestedItems = ({ setId, tasks }) => {
       });
       return {
         id: hd0,
-        name: sliceName(hd0),
+        name: task && getTitleFromTask(task) || "untitled",
         task: {
           ...task,
           id: hd0,
@@ -69,7 +72,7 @@ export default function TasksNav({ setId, setTask, tasks }) {
   
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return (
-      <div className="flex flex-1 flex-col p-8 text-left place-content-left">
+      <div className="w-64 flex flex-1 flex-col p-8 text-left place-content-left">
         <h1>No tasks</h1>
       </div>
     );
@@ -121,6 +124,9 @@ export default function TasksNav({ setId, setTask, tasks }) {
                               aria-hidden="true"
                             />
                             {item.name}
+                            {/*
+                              item.current && <span>XXX</span>
+                            */}
                           </Disclosure.Button>
                           <Disclosure.Panel as="ul" className="mt-1 px-2">
                             {item.children.map((subItem) => (
@@ -129,6 +135,7 @@ export default function TasksNav({ setId, setTask, tasks }) {
                                   onClick={() => {
                                     setTask(subItem.task);
                                     setId(subItem.task.id);
+                                    items.forEach(item => item.current = false);
                                     item.children.forEach(subItem => subItem.current = false);
                                     subItem.current = true;
                                   }}
@@ -138,6 +145,9 @@ export default function TasksNav({ setId, setTask, tasks }) {
                                   )}
                                 >
                                   {subItem.name}
+                                  {/*
+                                     subItem.current && <span>XXX</span>
+                                   */}
                                 </button>
                               </li>
                             ))}

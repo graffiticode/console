@@ -52,6 +52,7 @@ export const Properties = ({ id, lang, setId: setOuterId, user }) => {
         setDoPostTask(true);
       } catch (x) {
         console.error(`No schema available for L${lang}.`);
+        setSchema(undefined);
       }
     })();
   }, []);
@@ -71,13 +72,18 @@ export const Properties = ({ id, lang, setId: setOuterId, user }) => {
     }
   }, [postTaskResp?.data]);
 
+  console.log("properties() taskId=" + taskId + " dataId=" + dataId);
   return (
-    <FormView
-      key="props"
-      lang="0011"
-      id={getId({taskId, dataId})}
-      setId={setId}
-      height="300"
-    />
+    !schema &&
+      <div className="px-2 text-sm">No schema available.</div> ||
+      !taskId &&
+      <div /> ||
+      <FormView
+        key="props"
+        lang="0011"
+        id={getId({taskId, dataId})}
+        setId={setId}
+        height="300"
+      />
   );
 }
