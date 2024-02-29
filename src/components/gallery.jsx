@@ -169,7 +169,7 @@ export default function Gallery({ lang, mark }) {
                   showSaving &&
                     "ring-8" ||
                     "ring-0",
-                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-md overflow-auto resize-y"
+                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-md overflow-auto resize-y h-48"
                 )}
               >
                 <Editor

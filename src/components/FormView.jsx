@@ -39,7 +39,6 @@ const IFrame = ({ id, key, src, className, width, height }) =>
 
 
 const getHeight = (height, newHeight) => {
-  return height;
   if (newHeight === height) {
     return height;
   } else if (newHeight > HEIGHTS[HEIGHTS.length - 1]) {
@@ -50,6 +49,7 @@ const getHeight = (height, newHeight) => {
 
 const IFrameForm = ({ accessToken, lang, id, setId, data, className, height: initialHeight }) => {
   const [ height, setHeight ] = useState(initialHeight);
+  console.log("IFrameForm() height=" + height);
 
   window.addEventListener(
     "message",

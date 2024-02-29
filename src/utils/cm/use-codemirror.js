@@ -22,11 +22,10 @@ export default function useCodeMirror(extensions, setView, doc) {
     }
     const theme = EditorView.theme({
       "&": {
-        minHeight: "300px",
+        minHeight: "150px",
         height: "auto",
       },
       ".cm-scroller": {overflow: "auto"},
-      ".cm-scroller": {"box-shadow": "none"},
       "class": "mx-4",
     });
 
