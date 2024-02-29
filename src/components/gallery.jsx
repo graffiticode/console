@@ -191,7 +191,7 @@ export default function Gallery({ lang, mark }) {
                 id={id}
                 lang={lang}
                 height="640"
-                className="border border-gray-300 rounded-md overflow-auto m-2 resize-y"
+                className="border border-gray-300 rounded-md overflow-auto p-2 resize-y"
               />
           }
         </div>
