@@ -66,7 +66,8 @@ function Tabs({ setTab, setSaving, setShowSaving }) {
               className="bg-white px-4 font-medium text-gray-700"
               onClick={() => {
                 setSaving(true);
-                setShowSaving(true);
+                setTimeout(() => setShowSaving(true), 100);
+                setTimeout(() => setShowSaving(false), 1500);
               }}
             >
               Save

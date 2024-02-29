@@ -166,8 +166,10 @@ export default function Gallery({ lang, mark }) {
             !hideEditor &&
               <div
                 className={classNames(
-                  showSaving && "ring-8 ring-green-100" || "ring-0 ring-green-100 tranisition-all duration-1000",
-                  "w-full border border-gray-200 rounded-md overflow-auto resize-y"
+                  showSaving &&
+                    "ring-8" ||
+                    "ring-0",
+                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-md overflow-auto resize-y"
                 )}
               >
                 <Editor
