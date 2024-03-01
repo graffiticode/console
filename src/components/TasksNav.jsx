@@ -110,7 +110,7 @@ export default function TasksNav({ setId, setTask, tasks }) {
                         item.current &&
                           <button onClick={() => alert("clicked")}>
                             <EllipsisVerticalIcon
-                              className="pt-1 h-5 fill-gray-500"
+                              className="pt-0 h-4 fill-gray-500"
                             />
                           </button> ||
                           <div />
