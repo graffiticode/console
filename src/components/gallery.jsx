@@ -180,7 +180,8 @@ export default function Gallery({ lang, mark }) {
                   setNewTask={setNewTask}
                   tasks={tasks}
                   setShowSaving={setShowSaving}
-                  style={{formHeight}}
+                  style={{height: formHeight}}
+                  height={formHeight}
                   setHeight={setFormHeight}
                 />
               </div>
@@ -194,7 +195,7 @@ export default function Gallery({ lang, mark }) {
                 lang={lang}
                 height={formHeight}
                 className="border border-gray-300 rounded-md overflow-auto p-2 resize-y"
-                style={{formHeight}}
+                style={{height: formHeight}}
                 setHeight={setFormHeight}
               />
           }

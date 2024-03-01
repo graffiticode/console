@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { Disclosure } from '@headlessui/react'
-import { ChevronRightIcon } from '@heroicons/react/20/solid'
+import { useEffect, useState } from 'react';
+import { Disclosure } from '@headlessui/react';
+import { ChevronRightIcon } from '@heroicons/react/20/solid';
+import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 
 const sliceName = name => name.slice(17).slice(0,27);
 
@@ -86,7 +87,12 @@ export default function TasksNav({ setId, setTask, tasks }) {
               {items.map((item) => (
                 <li key={item.name}>
                   {!item.children ? (
-                    <button
+                    <div className={classNames(
+                           item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                           "flex flex-row justify-between pr-2"
+                         )}
+                      >
+                      <button
                       onClick={() => {
                         setTask(item.task);
                         setId(item.task.id);
@@ -99,7 +105,17 @@ export default function TasksNav({ setId, setTask, tasks }) {
                       )}
                     >
                       {item.name}
-                    </button>
+                      </button>
+                      {
+                        item.current &&
+                          <button onClick={() => alert("clicked")}>
+                            <EllipsisVerticalIcon
+                              className="pt-1 h-5 fill-gray-500"
+                            />
+                          </button> ||
+                          <div />
+                      }
+                      </div>
                   ) : (
                     <Disclosure as="div">
                       {({ open }) => (
@@ -124,9 +140,6 @@ export default function TasksNav({ setId, setTask, tasks }) {
                               aria-hidden="true"
                             />
                             {item.name}
-                            {/*
-                              item.current && <span>XXX</span>
-                            */}
                           </Disclosure.Button>
                           <Disclosure.Panel as="ul" className="mt-1 px-2">
                             {item.children.map((subItem) => (
