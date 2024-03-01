@@ -180,6 +180,8 @@ export default function Gallery({ lang, mark }) {
                   setNewTask={setNewTask}
                   tasks={tasks}
                   setShowSaving={setShowSaving}
+                  style={{formHeight}}
+                  setHeight={setFormHeight}
                 />
               </div>
           }

@@ -121,6 +121,7 @@ export default function Editor({
   setNewTask,
   tasks,
   setShowSaving,
+  setHeight,
 }) {
   const [ code, setCode ] = useState("");
   const [ view, setView ] = useState();
@@ -225,6 +226,7 @@ export default function Editor({
                 lang={lang}
                 setId={setId}
                 user={user}
+                setHeight={setHeight}
               /> ||
               <CodeMirror
                 code={code}

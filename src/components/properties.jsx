@@ -23,7 +23,7 @@ const parseId = id => {
 
 // TODO getData(id) => props; postTask(props) => propId; id=taskId+propId
 
-export const Properties = ({ id, lang, setId: setOuterId, user }) => {
+export const Properties = ({ id, lang, setId: setOuterId, user, setHeight }) => {
   const [ schema, setSchema ] = useState({});
   const [ taskId, setTaskId ] = useState("");
   const [ outerTaskId, setOuterTaskId ] = useState("");
@@ -84,6 +84,7 @@ export const Properties = ({ id, lang, setId: setOuterId, user }) => {
         id={getId({taskId, dataId})}
         setId={setId}
         height="300"
+        setHeight={setHeight}
       />
   );
 }
