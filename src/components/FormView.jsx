@@ -44,8 +44,9 @@ const getHeight = (height, newHeight) => {
     return height;
   } else if (newHeight > HEIGHTS[HEIGHTS.length - 1]) {
     return HEIGHTS[HEIGHTS.length - 1];
+  } else {
+    return HEIGHTS.find((h, i) => newHeight < h && h);
   }
-  return HEIGHTS.find((h, i) => newHeight < h && h);
 };
 
 const IFrameForm = ({ accessToken, lang, id, setId, data, className, height, setHeight }) => {

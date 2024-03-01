@@ -58,7 +58,6 @@ const getNestedItems = ({ setId, setItems, tasks }) => {
   const items = tasks.map((task, index) => {
     // Group by head.
     const [hd0, tl0] = task.id.split("+");
-    console.log("TaskNav() hd0=" + hd0 + " tl0=" + tl0);
     let children;
     if (tl0 === undefined) {
       // Only compute kids for root tasks.
@@ -193,6 +192,7 @@ export default function Gallery({ lang, mark }) {
                 lang={lang}
                 height={formHeight}
                 className="border border-gray-300 rounded-md overflow-auto p-2 resize-y"
+                style={{formHeight}}
                 setHeight={setFormHeight}
               />
           }
