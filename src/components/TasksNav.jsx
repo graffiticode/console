@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Disclosure } from '@headlessui/react';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
-
+import MarkSelector from './mark-selector.jsx';
 const sliceName = name => name.slice(17).slice(0,27);
 
 function classNames(...classes) {
@@ -56,7 +56,7 @@ function EllipsisMenu() {
                     'block px-4 py-2 text-xs'
                   )}
                 >
-                  Hide
+                  <MarkSelector mark={{id: 1, color: '#2DC937'}} setMark={() => {}} />
                 </a>
               )}
             </Menu.Item>
