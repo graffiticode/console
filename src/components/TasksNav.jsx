@@ -91,20 +91,20 @@ export default function TasksNav({ setId, setTask, tasks }) {
                            item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
                            "flex flex-row justify-between pr-2"
                          )}
-                      >
-                      <button
-                      onClick={() => {
-                        setTask(item.task);
-                        setId(item.task.id);
-                        items.forEach(item => item.current = false);
-                        item.current = true;
-                      }}
-                      className={classNames(
-                        item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                        'block rounded-md py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900'
-                      )}
                     >
-                      {item.name}
+                      <button
+                        onClick={() => {
+                          setTask(item.task);
+                          setId(item.task.id);
+                          items.forEach(item => item.current = false);
+                          item.current = true;
+                        }}
+                        className={classNames(
+                          item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                          'block rounded-md py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900'
+                        )}
+                      >
+                        {item.name}
                       </button>
                       {
                         item.current &&
@@ -120,48 +120,75 @@ export default function TasksNav({ setId, setTask, tasks }) {
                     <Disclosure as="div">
                       {({ open }) => (
                         <>
-                          <Disclosure.Button
-                            onClick={() => {
-                              setTask(item.task);
-                              setId(item.task.id);
-                              items.forEach(item => item.current = false);
-                              item.current = true;
-                            }}
-                            className={classNames(
-                              item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                              'flex items-center w-full text-xs text-left rounded-md px-2 gap-x-3 text-sm leading-6 font-bold text-gray-700'
-                            )}
+                          <div className={classNames(
+                                 item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                 "flex flex-row justify-between pr-2"
+                               )}
                           >
-                            <ChevronRightIcon
+                            <Disclosure.Button
+                              onClick={() => {
+                                setTask(item.task);
+                                setId(item.task.id);
+                                items.forEach(item => item.current = false);
+                                item.current = true;
+                              }}
                               className={classNames(
-                                open ? 'rotate-90 text-gray-500' : 'text-gray-400',
-                                'h-5 w-5 shrink-0'
+                                item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                'flex items-center w-full text-xs text-left rounded-md px-2 gap-x-3 text-sm leading-6 font-bold text-gray-700'
                               )}
-                              aria-hidden="true"
-                            />
-                            {item.name}
-                          </Disclosure.Button>
+                            >
+                              <ChevronRightIcon
+                                className={classNames(
+                                  open ? 'rotate-90 text-gray-500' : 'text-gray-400',
+                                  'h-5 w-5 shrink-0'
+                                )}
+                                aria-hidden="true"
+                              />
+                              {item.name}
+                            </Disclosure.Button>
+                            {
+                              item.current &&
+                                <button onClick={() => alert("clicked")}>
+                                  <EllipsisVerticalIcon
+                                    className="pt-0 h-4 fill-gray-500"
+                                  />
+                                </button> ||
+                                <div />
+                            }
+                          </div>
                           <Disclosure.Panel as="ul" className="mt-1 px-2">
                             {item.children.map((subItem) => (
                               <li key={subItem.name}>
-                                <button
-                                  onClick={() => {
-                                    setTask(subItem.task);
-                                    setId(subItem.task.id);
-                                    items.forEach(item => item.current = false);
-                                    item.children.forEach(subItem => subItem.current = false);
-                                    subItem.current = true;
-                                  }}
-                                  className={classNames(
-                                    subItem.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                                    'font-normal block rounded-md py-0 pr-2 pl-8 text-xs leading-6 text-gray-700'
-                                  )}
+                                <div className={classNames(
+                                       item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                       "flex flex-row justify-between pr-2"
+                                     )}
                                 >
-                                  {subItem.name}
-                                  {/*
-                                     subItem.current && <span>XXX</span>
-                                   */}
-                                </button>
+                                  <button
+                                    onClick={() => {
+                                      setTask(subItem.task);
+                                      setId(subItem.task.id);
+                                      items.forEach(item => item.current = false);
+                                      item.children.forEach(subItem => subItem.current = false);
+                                      subItem.current = true;
+                                    }}
+                                    className={classNames(
+                                      subItem.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                      'font-normal block rounded-md py-0 pr-2 pl-8 text-xs leading-6 text-gray-700'
+                                    )}
+                                  >
+                                    {subItem.name}
+                                  </button>
+                                  {
+                                    subItem.current &&
+                                      <button onClick={() => alert("clicked")}>
+                                        <EllipsisVerticalIcon
+                                          className="pt-0 h-4 fill-gray-500"
+                                        />
+                                      </button> ||
+                                      <div />
+                                  }
+                                </div>
                               </li>
                             ))}
                           </Disclosure.Panel>
