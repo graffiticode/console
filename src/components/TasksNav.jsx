@@ -137,7 +137,7 @@ export default function TasksNav({ setId, setTask, tasks }) {
     );
   }
   return (
-    <div className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white pt-4">
+    <div className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white pt-4 h-full">
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
           <li>
@@ -166,7 +166,8 @@ export default function TasksNav({ setId, setTask, tasks }) {
                       </button>
                       {
                         item.current &&
-                          <EllipsisMenu />
+                          <EllipsisMenu /> ||
+                          <div />
                       }
                       </div>
                   ) : (
@@ -201,7 +202,8 @@ export default function TasksNav({ setId, setTask, tasks }) {
                             </Disclosure.Button>
                             {
                               item.current &&
-                                <EllipsisMenu />
+                                <EllipsisMenu /> ||
+                                <div />
                             }
                           </div>
                           <Disclosure.Panel as="ul" className="mt-1 px-2">
@@ -229,7 +231,8 @@ export default function TasksNav({ setId, setTask, tasks }) {
                                   </button>
                                   {
                                     subItem.current &&
-                                      <EllipsisMenu />
+                                      <EllipsisMenu /> ||
+                                      <div />
                                   }
                                 </div>
                               </li>
