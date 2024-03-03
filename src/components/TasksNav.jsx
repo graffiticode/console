@@ -79,7 +79,7 @@ const getNestedItems = ({ setId, tasks }) => {
       });
       return {
         id: hd0,
-        name: task && getTitleFromTask(task) || "untitled",
+        name: task && getTitleFromTask(task) || sliceName(hd0),
         task: {
           ...task,
           id: hd0,
