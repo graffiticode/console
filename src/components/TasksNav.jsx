@@ -97,6 +97,7 @@ const getNestedItems = ({ setId, tasks }) => {
 
 export default function TasksNav({ setId, setTask, tasks }) {
   const [ items, setItems ] = useState([]);
+  const [ showId, setShowId ] = useState("");
   useEffect(() => {
     if (tasks.length) {
       tasks = tasks.sort((a, b) => {
@@ -122,18 +123,26 @@ export default function TasksNav({ setId, setTask, tasks }) {
     );
   }
   return (
-    <div className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white pt-4 h-full">
+    <div
+      className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto bg-white pt-4 h-full"
+    >
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
           <li>
             <ul role="list" className="-mx-2 space-y-1">
               {items.map((item) => (
-                <li key={item.name}>
+                <li key={item.id}>
                   {!item.children ? (
-                    <div className={classNames(
-                           item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                           "flex flex-row justify-between pr-2"
-                         )}
+                    <div
+                      className={classNames(
+                        item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                        "flex flex-row justify-between pr-2"
+                      )}
+                      onMouseOver={() => {
+                        if (showId !== item.task.id) {
+                          setShowId(item.task.id);
+                        }
+                      }}
                     >
                       <button
                         onClick={() => {
@@ -149,7 +158,7 @@ export default function TasksNav({ setId, setTask, tasks }) {
                       >
                         {item.name}
                       </button>
-                      <EllipsisMenu />
+                      { item.task.id === showId && <EllipsisMenu /> || <div /> }
                       </div>
                   ) : (
                     <Disclosure as="div">
@@ -167,11 +176,16 @@ export default function TasksNav({ setId, setTask, tasks }) {
                                 items.forEach(item => item.current = false);
                                 item.current = true;
                               }}
+                              onMouseOver={() => {
+                                if (showId !== item.task.id) {
+                                  setShowId(item.task.id);
+                                }
+                              }}
                               className={classNames(
                                 item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
                                 'flex items-center w-full text-xs text-left rounded-md px-2 gap-x-3 text-sm leading-6 font-bold text-gray-700'
                               )}
-                            >
+                              >
                               <ChevronRightIcon
                                 className={classNames(
                                   open ? 'rotate-90 text-gray-500' : 'text-gray-400',
@@ -180,12 +194,12 @@ export default function TasksNav({ setId, setTask, tasks }) {
                                 aria-hidden="true"
                               />
                               {item.name}
-                            </Disclosure.Button>
-                            <EllipsisMenu />
-                          </div>
-                          <Disclosure.Panel as="ul" className="mt-1 px-2">
-                            {item.children.map((subItem) => (
-                              <li key={subItem.name}>
+                              </Disclosure.Button>
+                              { showId === item.task.id && <EllipsisMenu /> || <div /> }
+                              </div>
+                              <Disclosure.Panel as="ul" className="mt-1 px-2">
+                                {item.children.map((subItem) => (
+                              <li key={subItem.id}>
                                 <div className={classNames(
                                        item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
                                        "flex flex-row justify-between"
@@ -199,6 +213,11 @@ export default function TasksNav({ setId, setTask, tasks }) {
                                       item.children.forEach(subItem => subItem.current = false);
                                       subItem.current = true;
                                     }}
+                                    onMouseOver={() => {
+                                      if (showId !== subItem.task.id) {
+                                        setShowId(subItem.task.id);
+                                      }
+                                    }}
                                     className={classNames(
                                       subItem.current ? 'bg-gray-50' : 'hover:bg-gray-50',
                                       'font-normal block rounded-md py-0 pr-2 pl-8 text-xs leading-6 text-gray-700'
@@ -206,7 +225,7 @@ export default function TasksNav({ setId, setTask, tasks }) {
                                   >
                                     {subItem.name}
                                   </button>
-                                  <EllipsisMenu />
+                                  { subItem.task.id === showId && <EllipsisMenu /> || <div /> }
                                 </div>
                               </li>
                             ))}
