@@ -164,11 +164,7 @@ export default function TasksNav({ setId, setTask, tasks }) {
                       >
                         {item.name}
                       </button>
-                      {
-                        item.current &&
-                          <EllipsisMenu /> ||
-                          <div />
-                      }
+                      <EllipsisMenu />
                       </div>
                   ) : (
                     <Disclosure as="div">
@@ -200,18 +196,14 @@ export default function TasksNav({ setId, setTask, tasks }) {
                               />
                               {item.name}
                             </Disclosure.Button>
-                            {
-                              item.current &&
-                                <EllipsisMenu /> ||
-                                <div />
-                            }
+                            <EllipsisMenu />
                           </div>
                           <Disclosure.Panel as="ul" className="mt-1 px-2">
                             {item.children.map((subItem) => (
                               <li key={subItem.name}>
                                 <div className={classNames(
                                        item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                                       "flex flex-row justify-between pr-2"
+                                       "flex flex-row justify-between"
                                      )}
                                 >
                                   <button
@@ -229,11 +221,7 @@ export default function TasksNav({ setId, setTask, tasks }) {
                                   >
                                     {subItem.name}
                                   </button>
-                                  {
-                                    subItem.current &&
-                                      <EllipsisMenu /> ||
-                                      <div />
-                                  }
+                                  <EllipsisMenu />
                                 </div>
                               </li>
                             ))}

@@ -151,9 +151,10 @@ export default function Gallery({ lang, mark }) {
     <div className="flex">
       <div className="colspan-1">
         <button
-          className="rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
+          className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
+          title="New Task"
           onClick={handleCreateTask}>
-          Create New Task
+          +
         </button>
         <TasksNav setId={setId} setTask={setTask} tasks={tasks} />
       </div>
