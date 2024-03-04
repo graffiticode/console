@@ -40,7 +40,7 @@ export default function MarkSelector({ mark, setMark }) {
   return (
     <Listbox value={mark} onChange={setMark}>
       <div className="relative w-20 bg-white">
-        <Listbox.Button className="relative w-full cursor-default rounded-none ring-1 ring-gray-400 py-2 pl-3 focus:outline-none focus-visible:border-gray-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-300 sm:text-sm hover:ring-2">
+        <Listbox.Button className="relative w-full cursor-default rounded-none ring-1 ring-gray-300 py-2 pl-3 focus:outline-none focus-visible:border-gray-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-300 sm:text-sm hover:ring-2">
           <span className="block truncate">
             <svg width="22" height="22" xmlns="http://www.w3.org/2000/svg">
               <rect id="mark" width="100%" height="100%" fill={markColor} />

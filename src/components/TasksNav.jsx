@@ -1,5 +1,6 @@
+import { Disclosure, Menu, Popover, Transition } from '@headlessui/react'
+import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import { Fragment, useEffect, useState } from 'react';
-import { Disclosure } from '@headlessui/react';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import MarkSelector from './mark-selector.jsx';
@@ -9,14 +10,35 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-import { Menu, Transition } from '@headlessui/react'
+function Text({ value, onChange }) {
+  const [ currentValue, setCurrentValue ] = useState(value);
+  useEffect(() => {
+    onChange(currentValue);
+  }, [currentValue]);
+  return (
+    <div>
+      <label htmlFor="email" className="sr-only">
+        Text
+      </label>
+      <input
+        type="text"
+        name="text"
+        id="text"
+        className="block w-full rounded-none border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-inset focus:ring-gray-600 sm:text-sm sm:leading-6 px-3 focus:outline-none"
+        defaultValue={currentValue}
+        onChange={(e) => setCurrentValue(e.target.value)}
+      />
+    </div>
+  )
+}
 
 function EllipsisMenu() {
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
-        <Menu.Button className="flex items-center mt-1 text-gray-400 hover:text-gray-600">
-          <span className="sr-only">Open options</span>
+        <Menu.Button
+          className="flex items-center mt-1 text-gray-400 hover:text-gray-600"
+        >
           <EllipsisVerticalIcon className="h-4" aria-hidden="true" />
         </Menu.Button>
       </div>
@@ -31,18 +53,17 @@ function EllipsisMenu() {
         leaveTo="transform opacity-0 scale-95"
       >
         <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-          <div className="py-1">
+          <div className="p-2">
             <Menu.Item>
               {({ active }) => (
-                <a
-                  href="#"
-                  className={classNames(
-                    active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
-                    'block px-4 py-2 text-xs'
-                  )}
-                >
+                  <Text value="foo" onChange={(value) => console.log("Text value=" + value)} />
+              )}
+            </Menu.Item>
+            <Menu.Item>
+              {({ active }) => (
+                <div className="pt-2">
                   <MarkSelector mark={{id: 1, color: '#2DC937'}} setMark={() => {}} />
-                </a>
+                </div>
               )}
             </Menu.Item>
           </div>
