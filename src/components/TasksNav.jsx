@@ -4,7 +4,7 @@ import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import { Fragment, useEffect, useState } from 'react';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
-//import { updateTask } from '../utils/swr/fetchers';
+import { updateTask } from '../utils/swr/fetchers';
 import MarkSelector from './mark-selector.jsx';
 const sliceName = name => name.slice(17).slice(0,27);
 
@@ -118,7 +118,7 @@ const getNestedItems = ({ setId, tasks }) => {
   return nestedItems;
 }
 
-export default function TasksNav({ setId, setTask, tasks }) {
+export default function TasksNav({ user, setId, setTask, tasks }) {
   const [ items, setItems ] = useState([]);
   const [ showId, setShowId ] = useState("");
   const [ taskMetadata, setTaskMetadata ] = useState({});
@@ -140,15 +140,15 @@ export default function TasksNav({ setId, setTask, tasks }) {
     }
   }, [tasks]);
   
-  // const { isLoading, data } = useSWR(
-  //   updatingTask && {
-  //     user,
-  //     id,
-  //     name: taskMetadata.name,
-  //     mark: taskMetadata.mark.id
-  //   } || null,
-  //   updateTask
-  // );
+  const { isLoading, data } = useSWR(
+    updatingTask && {
+      user,
+      id: taskMetadata.id,
+      name: taskMetadata.name,
+      mark: taskMetadata.mark?.id
+    } || null,
+    updateTask
+  );
 
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return (

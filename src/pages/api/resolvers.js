@@ -40,13 +40,17 @@ export async function saveTask({ auth, id, lang, code, mark, isPublic }) {
   return data;
 }
 
-export async function updateTaskMetadata({ auth, id, metadata }) {
-  console.log("updateTaskMetadata() id=" + id + " metadata=" + JSON.stringify(metadata, null, 2));
-  const task = { lang, code };
-  //const { id: taskId } = await postTask({ auth, task, ephemeral: false, isPublic });
-  await db.doc(`users/${auth.uid}/taskIds/${id}`).update(metadata);
-  const data = { id };
-  return data;
+export async function updateTask({ auth, id, name, mark }) {
+  const task = { name, mark };
+  Object.keys(task).forEach(key => task[key] === undefined && delete task[key]);
+  console.log("updateTask() id=" + id + " task=" + JSON.stringify(task));
+  try {
+    await db.doc(`users/${auth.uid}/taskIds/${id}`).update(task);
+    const data = { id };
+    return data;
+  } catch (x) {
+    console.error(x.stack);
+  }
 }
 
 const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
@@ -114,9 +118,12 @@ export async function tasks({ auth, lang, mark }) {
       isPublic: userTask.isPublic,
       taskId: taskIds[index],
       created: "" + userTask.created,
+      name: userTask.name,
+      mark: userTask.mark,
     });
     return tasks;
   }, []);
+  console.log("tasks() tasks=" + JSON.stringify(tasks, null, 2));
   return tasks;
 }
 

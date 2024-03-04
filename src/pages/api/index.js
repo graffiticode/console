@@ -86,7 +86,7 @@ const resolvers = {
       const { token } = ctx;
       const { id, name, mark } = args;
       const { uid } = await client.verifyToken(token);
-      const data = await updateTask({ auth: { uid, token }, id, data: { name, mark } });
+      const data = await updateTask({ auth: { uid, token }, id, name, mark });
       return JSON.stringify(data);
     },
     postTask: async (_, args, ctx) => {

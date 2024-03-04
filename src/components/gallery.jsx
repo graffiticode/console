@@ -144,8 +144,6 @@ export default function Gallery({ lang, mark }) {
     );
   }
 
-  const { uid } = user;
-
   const hideForm = id === "undefined";
   return (
     <div className="flex">
@@ -156,7 +154,7 @@ export default function Gallery({ lang, mark }) {
           onClick={handleCreateTask}>
           +
         </button>
-        <TasksNav setId={setId} setTask={setTask} tasks={tasks} />
+        <TasksNav user={user} setId={setId} setTask={setTask} tasks={tasks} />
       </div>
       <div className="flex flex-col grow mt-6 px-4 sm:px-6">
         <div className={classNames(

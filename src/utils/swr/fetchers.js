@@ -60,21 +60,21 @@ export const buildSaveTask = () => async ({ user, id, lang, code, mark, isPublic
     }).then(data => JSON.parse(data.saveTask));
 };
 
-// export const updateTask = async ({ user, id, name, mark }) => {
-//   console.log("updateTask() id=" + id);
-//   const query = gql`
-//     mutation post ($id: String, $lang: String!, $code: String!, $mark: Int!, $isPublic: Boolean) {
-//       updateTask(id: $id, name: $name, mark: $mark)
-//     }
-//   `;
-//   const token = await user.getToken();
-//   const client = new GraphQLClient("/api", {
-//     headers: {
-//       authorization: token,
-//     }
-//   });
-//   return await client.request(query, {id, name, mark}).then(data => JSON.parse(data.updateTask));
-// };
+export const updateTask = async ({ user, id, name, mark }) => {
+  console.log("updateTask() id=" + id);
+  const query = gql`
+    mutation post ($id: String, $name: String, $mark: Int) {
+      updateTask(id: $id, name: $name, mark: $mark)
+    }
+  `;
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  return await client.request(query, {id, name, mark}).then(data => JSON.parse(data.updateTask));
+};
 
 export const loadTasks = async ({ user, lang, mark }) => {
   console.log("loadTasks() lang=" + lang + " mark=" + mark);
