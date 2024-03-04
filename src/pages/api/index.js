@@ -38,12 +38,6 @@ const typeDefs = `
     name: String
   }
 
-  type TaskMetadata {
-    id: String!
-    name: String
-    mark: Int
-  }
-
   type Query {
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
@@ -54,7 +48,7 @@ const typeDefs = `
     logCompile(id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
     saveTask(id: String, lang: String!, code: String!, mark: Int!, isPublic: Boolean): String!
-    updateTask(id: String, data: TaskMetadata): String!
+    updateTask(id: String, name: String, mark: Int): String!
   }
 `;
 
