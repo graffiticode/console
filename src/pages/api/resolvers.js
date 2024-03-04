@@ -25,7 +25,6 @@ export async function logCompile({ auth, id, timestamp, status, data }) {
 // TODO reuse id from previous postTask
 // TODO store code in doc with atomic task id
 export async function saveTask({ auth, id, lang, code, mark, isPublic }) {
-  console.log("saveTask() id=" + id);
   const task = { lang, code };
   //const { id: taskId } = await postTask({ auth, task, ephemeral: false, isPublic });
   await db.doc(`users/${auth.uid}/taskIds/${id}`).set({
@@ -36,14 +35,12 @@ export async function saveTask({ auth, id, lang, code, mark, isPublic }) {
     created: Date.now(),
   });
   const data = { id };
-  console.log("saveTask() mark=" + mark + " data=" + JSON.stringify(data));
   return data;
 }
 
 export async function updateTask({ auth, id, name, mark }) {
   const task = { name, mark };
   Object.keys(task).forEach(key => task[key] === undefined && delete task[key]);
-  console.log("updateTask() id=" + id + " task=" + JSON.stringify(task));
   try {
     await db.doc(`users/${auth.uid}/taskIds/${id}`).update(task);
     const data = { id };
@@ -123,7 +120,6 @@ export async function tasks({ auth, lang, mark }) {
     });
     return tasks;
   }, []);
-  console.log("tasks() tasks=" + JSON.stringify(tasks, null, 2));
   return tasks;
 }
 

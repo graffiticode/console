@@ -85,24 +85,30 @@ const getNestedItems = ({ setId, tasks }) => {
     const [hd0, tl0] = task.id.split("+");
     let children;
     if (ids.find(id => id === hd0) === undefined) {
+      let rootName;
+      // We have a new hd that is a root id.
       ids.push(hd0);
       // Only compute kids for root tasks.
       tasks.forEach(task => {
         const [hd1, tl1] = task.id.split("+");
-        if (hd0 === hd1 && tl1 !== undefined) {
-          if (children === undefined) {
-            children = [];
+        if (hd0 === hd1) {
+          if (tl1 !== undefined) {
+            if (children === undefined) {
+              children = [];
+            }
+            children.push({
+              id: tl1,
+              name: task.name || sliceName(tl1),
+              task,
+            });
+          } else {
+            rootName = task.name || sliceName(hd1);
           }
-          children.push({
-            id: tl1,
-            name: sliceName(tl1),
-            task,
-          });
-        };
+        }
       });
       return {
         id: hd0,
-        name: task && getTitleFromTask(task) || sliceName(hd0),
+        name: rootName,
         task: {
           ...task,
           id: hd0,
@@ -123,6 +129,7 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
   const [ showId, setShowId ] = useState("");
   const [ taskMetadata, setTaskMetadata ] = useState({});
   const [ updatingTask, setUpdatingTask ] = useState(false);
+
   useEffect(() => {
     if (tasks.length) {
       tasks = tasks.sort((a, b) => {
@@ -158,7 +165,6 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
     );
   }
   const onChange = data => (
-    console.log("onChange data=" + JSON.stringify(data, null, 2)),
     setUpdatingTask(true),
     setTaskMetadata(data)
   );

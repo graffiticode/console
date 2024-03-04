@@ -61,7 +61,6 @@ export const buildSaveTask = () => async ({ user, id, lang, code, mark, isPublic
 };
 
 export const updateTask = async ({ user, id, name, mark }) => {
-  console.log("updateTask() id=" + id);
   const query = gql`
     mutation post ($id: String, $name: String, $mark: Int) {
       updateTask(id: $id, name: $name, mark: $mark)
@@ -77,7 +76,6 @@ export const updateTask = async ({ user, id, name, mark }) => {
 };
 
 export const loadTasks = async ({ user, lang, mark }) => {
-  console.log("loadTasks() lang=" + lang + " mark=" + mark);
   if (!user) {
     return {};
   }
@@ -96,6 +94,8 @@ export const loadTasks = async ({ user, lang, mark }) => {
         src
         isPublic
         created
+        name
+        mark
       }
     }
   `;
