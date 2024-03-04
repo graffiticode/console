@@ -12,6 +12,7 @@ import {
   logCompile,
   tasks,
   saveTask,
+  updateTask,
   postTask,
   getData,
 } from "./resolvers.js";
@@ -33,6 +34,14 @@ const typeDefs = `
     taskId: String!
     isPublic: Boolean
     created: String
+    mark: Int
+    name: String
+  }
+
+  type TaskMetadata {
+    id: String!
+    name: String
+    mark: Int
   }
 
   type Query {
@@ -45,6 +54,7 @@ const typeDefs = `
     logCompile(id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
     saveTask(id: String, lang: String!, code: String!, mark: Int!, isPublic: Boolean): String!
+    updateTask(id: String, data: TaskMetadata): String!
   }
 `;
 
@@ -76,6 +86,13 @@ const resolvers = {
       const { id, lang, code, mark, isPublic } = args;
       const { uid } = await client.verifyToken(token);
       const data = await saveTask({ auth: { uid, token }, id, lang, code, mark, isPublic });
+      return JSON.stringify(data);
+    },
+    updateTask: async (_, args, ctx) => {
+      const { token } = ctx;
+      const { id, name, mark } = args;
+      const { uid } = await client.verifyToken(token);
+      const data = await updateTask({ auth: { uid, token }, id, data: { name, mark } });
       return JSON.stringify(data);
     },
     postTask: async (_, args, ctx) => {

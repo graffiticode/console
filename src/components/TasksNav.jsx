@@ -1,8 +1,10 @@
+import useSWR from "swr";
 import { Disclosure, Menu, Popover, Transition } from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import { Fragment, useEffect, useState } from 'react';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
+//import { updateTask } from '../utils/swr/fetchers';
 import MarkSelector from './mark-selector.jsx';
 const sliceName = name => name.slice(17).slice(0,27);
 
@@ -10,29 +12,24 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function Text({ value, onChange }) {
-  const [ currentValue, setCurrentValue ] = useState(value);
-  useEffect(() => {
-    onChange(currentValue);
-  }, [currentValue]);
+function NameText({ name, setName }) {
+  const [ currentValue, setCurrentValue ] = useState(name);
   return (
     <div>
-      <label htmlFor="email" className="sr-only">
-        Text
-      </label>
       <input
         type="text"
         name="text"
         id="text"
-        className="block w-full rounded-none border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-inset focus:ring-gray-600 sm:text-sm sm:leading-6 px-3 focus:outline-none"
+        className="block w-full rounded-none border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-inset focus:ring-gray-600 text-xs sm:leading-6 px-3 focus:outline-none"
         defaultValue={currentValue}
         onChange={(e) => setCurrentValue(e.target.value)}
+        onBlur={() => setName(currentValue)}
       />
     </div>
   )
 }
 
-function EllipsisMenu() {
+function EllipsisMenu({ id, name, mark, onChange }) {
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
@@ -52,17 +49,22 @@ function EllipsisMenu() {
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+        <Menu.Items className="absolute right-0 z-10 mt-2 w-64 origin-top-right rounded-none bg-white focus:outline-none">
           <div className="p-2">
             <Menu.Item>
               {({ active }) => (
-                  <Text value="foo" onChange={(value) => console.log("Text value=" + value)} />
+                <NameText
+                  name={name}
+                  setName={name => onChange({id, name})} />
               )}
             </Menu.Item>
             <Menu.Item>
               {({ active }) => (
                 <div className="pt-2">
-                  <MarkSelector mark={{id: 1, color: '#2DC937'}} setMark={() => {}} />
+                  <MarkSelector
+                    mark={{id: 1, color: '#2DC937'}}
+                    setMark={mark => onChange({id, mark})}
+                  />
                 </div>
               )}
             </Menu.Item>
@@ -119,6 +121,8 @@ const getNestedItems = ({ setId, tasks }) => {
 export default function TasksNav({ setId, setTask, tasks }) {
   const [ items, setItems ] = useState([]);
   const [ showId, setShowId ] = useState("");
+  const [ taskMetadata, setTaskMetadata ] = useState({});
+  const [ updatingTask, setUpdatingTask ] = useState(false);
   useEffect(() => {
     if (tasks.length) {
       tasks = tasks.sort((a, b) => {
@@ -136,6 +140,16 @@ export default function TasksNav({ setId, setTask, tasks }) {
     }
   }, [tasks]);
   
+  // const { isLoading, data } = useSWR(
+  //   updatingTask && {
+  //     user,
+  //     id,
+  //     name: taskMetadata.name,
+  //     mark: taskMetadata.mark.id
+  //   } || null,
+  //   updateTask
+  // );
+
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return (
       <div className="w-64 flex flex-1 flex-col p-8 text-left place-content-left">
@@ -143,6 +157,12 @@ export default function TasksNav({ setId, setTask, tasks }) {
       </div>
     );
   }
+  const onChange = data => (
+    console.log("onChange data=" + JSON.stringify(data, null, 2)),
+    setUpdatingTask(true),
+    setTaskMetadata(data)
+  );
+  
   return (
     <div
       className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto bg-white pt-4 h-full"
@@ -174,12 +194,18 @@ export default function TasksNav({ setId, setTask, tasks }) {
                         }}
                         className={classNames(
                           item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                          'block rounded-md py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900'
+                          'block rounded-none py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900'
                         )}
                       >
                         {item.name}
                       </button>
-                      { item.task.id === showId && <EllipsisMenu /> || <div /> }
+                      { item.task.id === showId &&
+                        <EllipsisMenu
+                          id={item.task.id}
+                          name={item.name}
+                          onChange={onChange}
+                        /> || <div />
+                      }
                       </div>
                   ) : (
                     <Disclosure as="div">
@@ -204,7 +230,7 @@ export default function TasksNav({ setId, setTask, tasks }) {
                               }}
                               className={classNames(
                                 item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                                'flex items-center w-full text-xs text-left rounded-md px-2 gap-x-3 text-sm leading-6 font-bold text-gray-700'
+                                'flex items-center w-full text-xs text-left rounded-none px-2 gap-x-3 text-sm leading-6 font-bold text-gray-700'
                               )}
                               >
                               <ChevronRightIcon
@@ -216,7 +242,13 @@ export default function TasksNav({ setId, setTask, tasks }) {
                               />
                               {item.name}
                               </Disclosure.Button>
-                              { showId === item.task.id && <EllipsisMenu /> || <div /> }
+                            { showId === item.task.id &&
+                              <EllipsisMenu
+                                id={item.task.id}
+                                name={item.name}
+                                onChange={onChange}
+                              /> || <div />
+                            }
                               </div>
                               <Disclosure.Panel as="ul" className="mt-1 px-2">
                                 {item.children.map((subItem) => (
@@ -241,12 +273,17 @@ export default function TasksNav({ setId, setTask, tasks }) {
                                     }}
                                     className={classNames(
                                       subItem.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                                      'font-normal block rounded-md py-0 pr-2 pl-8 text-xs leading-6 text-gray-700'
+                                      'font-normal block rounded-none py-0 pr-2 pl-8 text-xs leading-6 text-gray-700'
                                     )}
                                   >
                                     {subItem.name}
                                   </button>
-                                  { subItem.task.id === showId && <EllipsisMenu /> || <div /> }
+                                  { subItem.task.id === showId &&
+                                    <EllipsisMenu
+                                      id={subItem.task.id}
+                                      name={subItem.name}
+                                      onChange={onChange}
+                                    /> || <div /> }
                                 </div>
                               </li>
                             ))}

@@ -23,7 +23,6 @@ export async function logCompile({ auth, id, timestamp, status, data }) {
 }
 
 // TODO reuse id from previous postTask
-// TODO allow compound task ids
 // TODO store code in doc with atomic task id
 export async function saveTask({ auth, id, lang, code, mark, isPublic }) {
   console.log("saveTask() id=" + id);
@@ -38,6 +37,15 @@ export async function saveTask({ auth, id, lang, code, mark, isPublic }) {
   });
   const data = { id };
   console.log("saveTask() mark=" + mark + " data=" + JSON.stringify(data));
+  return data;
+}
+
+export async function updateTaskMetadata({ auth, id, metadata }) {
+  console.log("updateTaskMetadata() id=" + id + " metadata=" + JSON.stringify(metadata, null, 2));
+  const task = { lang, code };
+  //const { id: taskId } = await postTask({ auth, task, ephemeral: false, isPublic });
+  await db.doc(`users/${auth.uid}/taskIds/${id}`).update(metadata);
+  const data = { id };
   return data;
 }
 
