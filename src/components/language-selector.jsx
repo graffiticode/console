@@ -39,7 +39,7 @@ function classNames(...classes) {
 export function selectLanguages() {
   const domain = getTitle().toLowerCase();
   return languages.filter(language =>
-    domain === "artcompiler" && !language.domains.includes("hide") ||
+    domain === "graffiticode" && !language.domains.includes("hide") ||
       language.domains.length === 0 ||
       language.domains.includes(domain.toLowerCase())
   );
@@ -50,7 +50,7 @@ export default function LanguageSelector({ domain, language, setLanguage }) {
   const [query, setQuery] = useState('')
   const domainLanguages =
         languages.filter(language =>
-          domain === "artcompiler" && !language.domains.includes("hide") ||
+          domain === "graffiticode" && !language.domains.includes("hide") ||
             language.domains.length === 0 ||
             language.domains.includes(domain.toLowerCase())
         );
