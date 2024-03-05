@@ -24,7 +24,6 @@ function Tabs({ setTab, setSaving, setShowSaving, saveDisabled }) {
     tabs.find(tab => tab.name === name).current = true;
     setTab(name);
   };
-  console.log("Tabs() saveDisabled=" + saveDisabled);
   return (
     <div className="pt-4">
       <div className="sm:hidden">
@@ -35,7 +34,7 @@ function Tabs({ setTab, setSaving, setShowSaving, saveDisabled }) {
         <select
           id="tabs"
           name="tabs"
-          className="block w-full rounded-md py-2 pl-3 pr-10 text-base focus:border-gray-500 focus:outline-none focus:ring-gray-500 sm:text-sm"
+          className="block w-full rounded-none py-2 pl-3 pr-10 text-base focus:border-gray-500 focus:outline-none focus:ring-gray-500 sm:text-sm"
           defaultValue={tabs.find((tab) => tab.current).name}
         >
           {tabs.map((tab) => (
@@ -136,6 +135,8 @@ export default function Editor({
   const [ saveDisabled, setSaveDisabled ] = useState(true);
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
+
+  console.log("Editor() code=" + code);
 
   useEffect(() => {
     if (id === "") {
