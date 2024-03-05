@@ -5,7 +5,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { updateTask } from '../utils/swr/fetchers';
-import MarkSelector from './mark-selector.jsx';
+import MarkSelector, { marks } from './mark-selector.jsx';
 const sliceName = name => name.slice(17).slice(0,27);
 
 function classNames(...classes) {
@@ -30,6 +30,7 @@ function NameText({ name, setName }) {
 }
 
 function EllipsisMenu({ id, name, mark, onChange }) {
+  console.log("EllipsisMenu() mark=" + mark);
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
@@ -62,7 +63,7 @@ function EllipsisMenu({ id, name, mark, onChange }) {
               {({ active }) => (
                 <div className="pt-2">
                   <MarkSelector
-                    mark={{id: 1, color: '#2DC937'}}
+                    mark={marks[mark - 1]}  // FIXME too brittle.
                     setMark={mark => onChange({id, mark})}
                   />
                 </div>
@@ -97,9 +98,9 @@ const getNestedItems = ({ setId, tasks }) => {
               children = [];
             }
             children.push({
-              id: tl1,
+              ...task,
+              id: task.id,
               name: task.name || sliceName(tl1),
-              task,
             });
           } else {
             rootName = task.name || sliceName(hd1);
@@ -107,12 +108,9 @@ const getNestedItems = ({ setId, tasks }) => {
         }
       });
       return {
+        ...task,
         id: hd0,
         name: rootName,
-        task: {
-          ...task,
-          id: hd0,
-        },
         children,
       };
     } else {
@@ -145,8 +143,8 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
       setId(nestedItems[0].id);
       setItems(nestedItems);
     }
-  }, [tasks]);
-  
+  }, [tasks.length]);
+
   const { isLoading, data } = useSWR(
     updatingTask && {
       user,
@@ -164,11 +162,53 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
       </div>
     );
   }
-  const onChange = data => (
-    setUpdatingTask(true),
-    setTaskMetadata(data)
-  );
-  
+
+  const updateItems = ({items, data}) => {
+    const [hd, tl] = data.id.split("+");
+    const rootIndex = items.findIndex(item => item.id === hd);
+    const rootItem = items[rootIndex];
+    if (tl === undefined) {
+      const item = rootItem;
+      const index = rootIndex
+      if (data.mark !== undefined && data.mark !== item.mark) {
+        delete items[index];
+        items = items.filter(item => item !== undefined)
+      } else {
+        items[index] = {
+          ...item,
+          ...data,
+        };
+      }
+      items = items.filter(item => item !== undefined)
+    } else {
+      const items = rootItem.children;
+      const index = items.findIndex(item => item.id === data.id);
+      const item = items[index];
+      console.log("updateItems() index=" + index + " data.id=" + data.id);
+      if (data.mark !== undefined && data.mark !== item.mark) {
+        delete items[index];
+        rootItem.children = items.filter(item => item !== undefined)
+        if (items.length === 0) {
+          delete rootItem.children;
+        }
+      } else {
+        items[index] = {
+          ...item,
+          ...data,
+        };
+      }
+    }
+    setItems(items);
+  };
+
+  const onChange = data => {
+    setUpdatingTask(true);
+    setTaskMetadata(data);
+    console.log("onChange() data=" + JSON.stringify(data, null, 2));
+    updateItems({items, data});
+    console.log("onChange() items=" + JSON.stringify(items, null, 2));
+  };
+
   return (
     <div
       className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto bg-white pt-4 h-full"
@@ -186,15 +226,15 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                         "flex flex-row justify-between pr-2"
                       )}
                       onMouseOver={() => {
-                        if (showId !== item.task.id) {
-                          setShowId(item.task.id);
+                        if (showId !== item.id) {
+                          setShowId(item.id);
                         }
                       }}
                     >
                       <button
                         onClick={() => {
-                          setTask(item.task);
-                          setId(item.task.id);
+                          setTask(item);
+                          setId(item.id);
                           items.forEach(item => item.current = false);
                           item.current = true;
                         }}
@@ -205,10 +245,11 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                       >
                         {item.name}
                       </button>
-                      { item.task.id === showId &&
+                      { item.id === showId &&
                         <EllipsisMenu
-                          id={item.task.id}
+                          id={item.id}
                           name={item.name}
+                          mark={item.mark}
                           onChange={onChange}
                         /> || <div />
                       }
@@ -224,14 +265,14 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                           >
                             <Disclosure.Button
                               onClick={() => {
-                                setTask(item.task);
-                                setId(item.task.id);
+                                setTask(item);
+                                setId(item.id);
                                 items.forEach(item => item.current = false);
                                 item.current = true;
                               }}
                               onMouseOver={() => {
-                                if (showId !== item.task.id) {
-                                  setShowId(item.task.id);
+                                if (showId !== item.id) {
+                                  setShowId(item.id);
                                 }
                               }}
                               className={classNames(
@@ -248,10 +289,11 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                               />
                               {item.name}
                               </Disclosure.Button>
-                            { showId === item.task.id &&
+                            { showId === item.id &&
                               <EllipsisMenu
-                                id={item.task.id}
+                                id={item.id}
                                 name={item.name}
+                                mark={item.mark}
                                 onChange={onChange}
                               /> || <div />
                             }
@@ -267,14 +309,14 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                                   <button
                                     onClick={() => {
                                       setTask(subItem.task);
-                                      setId(subItem.task.id);
+                                      setId(subItem.id);
                                       items.forEach(item => item.current = false);
                                       item.children.forEach(subItem => subItem.current = false);
                                       subItem.current = true;
                                     }}
                                     onMouseOver={() => {
-                                      if (showId !== subItem.task.id) {
-                                        setShowId(subItem.task.id);
+                                      if (showId !== subItem.id) {
+                                        setShowId(subItem.id);
                                       }
                                     }}
                                     className={classNames(
@@ -284,10 +326,11 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                                   >
                                     {subItem.name}
                                   </button>
-                                  { subItem.task.id === showId &&
+                                  { subItem.id === showId &&
                                     <EllipsisMenu
-                                      id={subItem.task.id}
+                                      id={subItem.id}
                                       name={subItem.name}
+                                      mark={subItem.mark}
                                       onChange={onChange}
                                     /> || <div /> }
                                 </div>

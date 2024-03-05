@@ -135,7 +135,6 @@ export default function Editor({
   const [ saveDisabled, setSaveDisabled ] = useState(true);
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
-
   useEffect(() => {
     if (id === "") {
       setCode("");  // New task.
@@ -149,7 +148,6 @@ export default function Editor({
   const [ state ] = useState(createState({
     lang,
   }, (data, { type, args }) => {
-    console.log("Editor() state.apply() type=" + type);
     switch (type) {
     case "compile":
       setDoCompile(false);
@@ -196,14 +194,19 @@ export default function Editor({
 
   // Save task.
 
+  const task = { id, lang, code, mark: mark.id, isPublic };
   const { isLoading, data } = useSWR(
-    saving && { user, id, lang, code, mark: mark.id, isPublic } || null,
+    saving && { user, ...task } || null,
     saveTask
   );
 
   useEffect(() => {
     // We have successfully saved a task so add it to the task list.
-    setNewTask(data);
+    setNewTask({
+      ...data,
+      ...task,
+      created: Date.now(),
+    });
     setSaving(false);
     setSaveDisabled(true);
   }, [data?.id]);
@@ -226,6 +229,7 @@ export default function Editor({
                 setId={setId}
                 user={user}
                 setHeight={setHeight}
+                setSaveDisabled={setSaveDisabled}
               /> ||
               <CodeMirror
                 code={code}

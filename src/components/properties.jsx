@@ -23,7 +23,7 @@ const parseId = id => {
 
 // TODO getData(id) => props; postTask(props) => propId; id=taskId+propId
 
-export const Properties = ({ id, lang, setId: setOuterId, user, setHeight }) => {
+export const Properties = ({ id, lang, setId: setOuterId, user, setHeight, setSaveDisabled }) => {
   const [ schema, setSchema ] = useState({});
   const [ taskId, setTaskId ] = useState("");
   const [ outerTaskId, setOuterTaskId ] = useState("");
@@ -34,6 +34,7 @@ export const Properties = ({ id, lang, setId: setOuterId, user, setHeight }) => 
     // Only set outer id if this change is from the props editor.
     const newId = getId({taskId: outerTaskId, dataId: newDataId.split("+").slice(1)});
     setOuterId(newId);
+    setSaveDisabled(false);
   };
 
   useEffect(() => {
@@ -72,7 +73,6 @@ export const Properties = ({ id, lang, setId: setOuterId, user, setHeight }) => 
     }
   }, [postTaskResp?.data]);
 
-  console.log("properties() taskId=" + taskId + " dataId=" + dataId);
   return (
     !schema &&
       <div className="px-2 text-sm">No schema available.</div> ||

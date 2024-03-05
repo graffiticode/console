@@ -103,22 +103,26 @@ export default function Gallery({ lang, mark }) {
     getAccessToken,
   );
   const [ id, setId ] = useState("");
+
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
     setHideEditor(false);
     setId("");
   });
+
   const { isValidating, isLoading, data: loadTasksData } =
     useSWR(
       user ? { user, lang, mark: mark.id } : null,
       loadTasks,
     );
+
   useEffect(() => {
     setTasks(loadTasksData || []);
   }, [loadTasksData]);
 
   useEffect(() => {
     if (newTask && !tasks.some(task => task.id === newTask.id)) {
+      console.log("Gallery() newTask=" + JSON.stringify(newTask, null, 2));
       tasks.unshift(newTask);
       setTasks(tasks);
     }
@@ -144,7 +148,6 @@ export default function Gallery({ lang, mark }) {
     );
   }
 
-  const hideForm = id === "undefined";
   return (
     <div className="flex">
       <div className="colspan-1">
@@ -186,17 +189,16 @@ export default function Gallery({ lang, mark }) {
               </div>
           }
           {
-            !hideForm &&
-              <FormView
-                key="form"
-                accessToken={accessToken}
-                id={id}
-                lang={lang}
-                height={formHeight}
-                className="border border-gray-300 rounded-none overflow-auto p-2 resize"
-                style={{height: formHeight}}
-                setHeight={setFormHeight}
-              />
+            <FormView
+              key="form"
+              accessToken={accessToken}
+              id={id}
+              lang={lang}
+              height={formHeight}
+              className="border border-gray-300 rounded-none overflow-auto p-2 resize"
+              style={{height: formHeight}}
+              setHeight={setFormHeight}
+            />
           }
         </div>
       </div>
