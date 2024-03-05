@@ -136,7 +136,7 @@ export default function Editor({
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
 
-  console.log("Editor() code=" + code);
+  console.log("Editor() tasks=" + JSON.stringify(tasks, null, 2));
 
   useEffect(() => {
     if (id === "") {
