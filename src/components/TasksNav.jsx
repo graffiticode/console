@@ -30,7 +30,6 @@ function NameText({ name, setName }) {
 }
 
 function EllipsisMenu({ id, name, mark, onChange }) {
-  console.log("EllipsisMenu() mark=" + mark);
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
@@ -184,7 +183,6 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
       const items = rootItem.children;
       const index = items.findIndex(item => item.id === data.id);
       const item = items[index];
-      console.log("updateItems() index=" + index + " data.id=" + data.id);
       if (data.mark !== undefined && data.mark !== item.mark) {
         delete items[index];
         rootItem.children = items.filter(item => item !== undefined)
@@ -204,9 +202,7 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
   const onChange = data => {
     setUpdatingTask(true);
     setTaskMetadata(data);
-    console.log("onChange() data=" + JSON.stringify(data, null, 2));
     updateItems({items, data});
-    console.log("onChange() items=" + JSON.stringify(items, null, 2));
   };
 
   return (

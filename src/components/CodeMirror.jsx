@@ -69,7 +69,12 @@ const CodeMirror = ({
       }
     }
   }, [code, view]);
-  return <div id="editor" ref={ref} />;
+  return (
+    <div
+      id="editor"
+      ref={ref}
+    />
+  );
 };
 
 export default CodeMirror;

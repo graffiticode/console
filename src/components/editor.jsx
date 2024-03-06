@@ -97,21 +97,6 @@ const parseId = id => {
   };
 };
 
-const Toolbar = ({ setSaving, mark, setMark, isPublic, setIsPublic, saveDisabled }) =>
-<div className="flex justify-end bg-white ring-gray-400 px-1 py-2">
-  <div className="flex-shrink-0">
-    <button
-      className="inline-flex items-center rounded-none bg-white ring-1 ring-gray-400 px-4 py-2 text-sm font-medium text-gray-700 hover:ring-2 focus:outline-none"
-      onClick={() => {
-        setSaving(true);
-      }}
-      disabled={saveDisabled}
-      >
-      Save
-    </button>
-  </div>
-</div>
-
 export default function Editor({
   id,
   lang,
@@ -121,6 +106,7 @@ export default function Editor({
   tasks,
   setShowSaving,
   setHeight,
+  height,
 }) {
   const [ code, setCode ] = useState("");
   const [ view, setView ] = useState();
@@ -129,7 +115,6 @@ export default function Editor({
   const [ saving, setSaving ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ tab, setTab ] = useState("Code");
-  const [ doCompile, setDoCompile ] = useState(false);
   const [ taskId, setTaskId ] = useState("");
   const [ dataId, setDataId ] = useState("");
   const [ saveDisabled, setSaveDisabled ] = useState(true);
@@ -150,7 +135,6 @@ export default function Editor({
   }, (data, { type, args }) => {
     switch (type) {
     case "compile":
-      setDoCompile(false);
       return {
         ...data,
         ...args,
@@ -159,13 +143,8 @@ export default function Editor({
       if (code != args.code) {
         setCode(args.code);
         setDoPostTask(true);
+        setSaveDisabled(false);
       }
-      return {
-        ...data,
-        ...args,
-      };
-    case "dataChange":
-      setDoCompile(true);
       return {
         ...data,
         ...args,
@@ -189,7 +168,6 @@ export default function Editor({
     setTaskId(id);
     setDataId("");
     setId(getId({taskId: id, dataId: ""}));
-    setSaveDisabled(false);
   }
 
   // Save task.
@@ -201,12 +179,14 @@ export default function Editor({
   );
 
   useEffect(() => {
-    // We have successfully saved a task so add it to the task list.
-    setNewTask({
-      ...data,
-      ...task,
-      created: Date.now(),
-    });
+    if (data?.id) {
+      // We have successfully saved a task so add it to the task list.
+      setNewTask({
+        ...data,
+        ...task,
+        created: Date.now(),
+      });
+    }
     setSaving(false);
     setSaveDisabled(true);
   }, [data?.id]);
@@ -220,7 +200,9 @@ export default function Editor({
           setShowSaving={setShowSaving}
           saveDisabled={saveDisabled}
         />
-        <div className="">
+        <div
+          style={{height}}
+        >
           {
             tab === "Properties" &&
               <Properties

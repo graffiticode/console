@@ -2,7 +2,7 @@
 // TODO refresh tasks nav when new task is saved
 
 import useSWR from "swr";
-import { Fragment, useCallback, useState, useEffect } from 'react'
+import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import {
   XMarkIcon,
@@ -97,12 +97,20 @@ export default function Gallery({ lang, mark }) {
   const [ newTask, setNewTask ] = useState();
   const [ showSaving, setShowSaving ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(640);
+  const [ editorHeight, setEditorHeight ] = useState(640);
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,
   );
   const [ id, setId ] = useState("");
+  const editorRef = useRef();
+
+  useEffect(() => {
+    if (editorRef?.current?.offsetHeight) {
+      setEditorHeight(editorRef.current.offsetHeight);
+    }
+  }, [editorRef?.current?.offsetHeight]);
 
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
@@ -167,11 +175,12 @@ export default function Gallery({ lang, mark }) {
           {
             !hideEditor &&
               <div
+                ref={editorRef}
                 className={classNames(
                   showSaving &&
                     "ring-8" ||
                     "ring-0",
-                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-none overflow-auto resize h-48"
+                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-none overflow-auto resize-y h-48"
                 )}
               >
                 <Editor
@@ -182,8 +191,7 @@ export default function Gallery({ lang, mark }) {
                   setNewTask={setNewTask}
                   tasks={tasks}
                   setShowSaving={setShowSaving}
-                  style={{height: formHeight}}
-                  height={formHeight}
+                  height={editorHeight - 150}
                   setHeight={setFormHeight}
                 />
               </div>
