@@ -21,7 +21,7 @@ function NameText({ name, setName }) {
         name="text"
         id="text"
         className="block w-full rounded-none border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-inset focus:ring-gray-600 text-xs sm:leading-6 px-3 focus:outline-none"
-        defaultValue={currentValue}
+        defaultValue={currentValue === "unnamed" && undefined}
         onChange={(e) => setCurrentValue(e.target.value)}
         onBlur={() => setName(currentValue)}
       />
@@ -99,10 +99,10 @@ const getNestedItems = ({ setId, tasks }) => {
             children.push({
               ...task,
               id: task.id,
-              name: task.name || sliceName(tl1),
+              name: task.name || "unnamed",
             });
           } else {
-            rootName = task.name || sliceName(hd1);
+            rootName = task.name || "unnamed";
           }
         }
       });
