@@ -60,7 +60,7 @@ export const buildSaveTask = () => async ({ user, id, lang, code, mark, isPublic
     }).then(data => JSON.parse(data.saveTask));
 };
 
-export const updateTask = async ({ user, id, name, mark }) => {
+export const postTaskUpdates = async ({ user, tasks }) => {
   const query = gql`
     mutation post ($id: String, $name: String, $mark: Int) {
       updateTask(id: $id, name: $name, mark: $mark)
@@ -72,7 +72,10 @@ export const updateTask = async ({ user, id, name, mark }) => {
       authorization: token,
     }
   });
-  return await client.request(query, {id, name, mark}).then(data => JSON.parse(data.updateTask));
+  await Promise.all(tasks.forEach(async ({id, name, mark }) => {
+    await client.request(query, {id, name, mark}).then(data => JSON.parse(data.updateTask));
+  }));
+  return {};
 };
 
 export const loadTasks = async ({ user, lang, mark }) => {

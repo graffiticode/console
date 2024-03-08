@@ -4,7 +4,7 @@ import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import { Fragment, useEffect, useState } from 'react';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
-import { updateTask } from '../utils/swr/fetchers';
+import { postTaskUpdates } from '../utils/swr/fetchers';
 import MarkSelector, { marks } from './mark-selector.jsx';
 const sliceName = name => name.slice(17).slice(0,27);
 
@@ -124,9 +124,8 @@ const getNestedItems = ({ setId, tasks }) => {
 export default function TasksNav({ user, setId, setTask, tasks }) {
   const [ items, setItems ] = useState([]);
   const [ showId, setShowId ] = useState("");
-  const [ taskMetadata, setTaskMetadata ] = useState({});
-  const [ updatingTask, setUpdatingTask ] = useState(false);
-
+  const [ updatedTasks, setUpdatedTasks ] = useState([]);
+  const [ updatingTasks, setUpdatingTasks ] = useState(false);
   useEffect(() => {
     if (tasks.length) {
       tasks = tasks.sort((a, b) => {
@@ -136,7 +135,7 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
         return bt - at;
       });
     }
-    const nestedItems = getNestedItems({setId, setItems, tasks});
+    const nestedItems = getNestedItems({setId, tasks});
     if (nestedItems.length) {
       nestedItems[0].current = true;
       setId(nestedItems[0].id);
@@ -145,16 +144,17 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
   }, [tasks.length]);
 
   const { isLoading, data } = useSWR(
-    updatingTask && {
+    // TODO make into a batch operation.
+    updatingTasks && {
       user,
-      id: taskMetadata.id,
-      name: taskMetadata.name,
-      mark: taskMetadata.mark?.id
+      tasks: updatedTasks,
     } || null,
-    updateTask
+    postTaskUpdates
   );
 
-  if (!Array.isArray(tasks) || tasks.length === 0) {
+//  console.log("TasksNav() items=" + JSON.stringify(items, null, 2));
+  if (!Array.isArray(tasks) || tasks.length === 0 ||
+      !Array.isArray(items) || items.length === 0) {
     return (
       <div className="w-64 flex flex-1 flex-col p-8 text-left place-content-left">
         <h1>No tasks</h1>
@@ -162,47 +162,56 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
     );
   }
 
-  const updateItems = ({items, data}) => {
-    const [hd, tl] = data.id.split("+");
-    const rootIndex = items.findIndex(item => item.id === hd);
+  const updateTasks = ({ id, name, mark }) => {
+    // Gather tasks to update. Update the items to reflect those changes. Set
+    // the updated tasks for posting.
+    const [hd, tl] = id.split("+");
+    const rootIndex = items.findIndex(item => (
+      item.id === hd
+    ));
     const rootItem = items[rootIndex];
+    const updatedTasks = [];
     if (tl === undefined) {
-      const item = rootItem;
-      const index = rootIndex
-      if (data.mark !== undefined && data.mark !== item.mark) {
-        delete items[index];
-        items = items.filter(item => item !== undefined)
-      } else {
-        items[index] = {
-          ...item,
-          ...data,
-        };
+      // Got a root id.
+      if (mark !== undefined && mark.id !== rootItem.mark) {
+        // Updating mark. Do the kids too.
+        console.log("updateTasks() tasks=" + JSON.stringify(tasks, null, 2));
+        const taskIndex = tasks.findIndex(task => task.id === rootItem.id);
+        delete tasks[taskIndex];
+        rootItem.children && rootItem.children.forEach(child => {
+          const { id } = tasks.find(task => task.id === child.id);
+          updatedTasks.push({id, name, mark: mark.id});
+          const taskIndex = tasks.findIndex(task => task.id === child.id);
+          delete tasks[taskIndex];
+        });
+        updatedTasks.push({ id, mark: mark.id });
+        delete items[rootIndex];
+        setItems(items.filter(item => item !== undefined));
+        tasks = tasks.filter(task => task !== undefined);
       }
-      items = items.filter(item => item !== undefined)
+      if (name !== undefined) {
+        updatedTasks.push({ id, name });
+        items[rootIndex].name = name;
+      }
     } else {
-      const items = rootItem.children;
-      const index = items.findIndex(item => item.id === data.id);
-      const item = items[index];
-      if (data.mark !== undefined && data.mark !== item.mark) {
-        delete items[index];
-        rootItem.children = items.filter(item => item !== undefined)
-        if (items.length === 0) {
-          delete rootItem.children;
-        }
-      } else {
-        items[index] = {
-          ...item,
-          ...data,
-        };
+      const children = rootItem.children;
+      const childIndex = children.findIndex(child => child.id === id);
+      const childItem = children[childIndex];
+      if (mark !== undefined && mark.id !== childItem.mark) {
+        updatedTasks.push({ id, mark: mark.id });
+        delete children[childIndex];
+        rootItem.children = children.filter(child => child !== undefined);
+        const taskIndex = tasks.findIndex(task => task.id === id);
+        delete tasks[taskIndex];
+        tasks = tasks.filter(task => task !== undefined);
+      }
+      if (name !== undefined) {
+        updatedTasks.push({id, name});
+        children[childIndex].name = name;
       }
     }
-    setItems(items);
-  };
-
-  const onChange = data => {
-    setUpdatingTask(true);
-    setTaskMetadata(data);
-    updateItems({items, data});
+    setUpdatingTasks(true);
+    setUpdatedTasks(updatedTasks);
   };
 
   return (
@@ -246,7 +255,7 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                           id={item.id}
                           name={item.name}
                           mark={item.mark}
-                          onChange={onChange}
+                          onChange={updateTasks}
                         /> || <div />
                       }
                       </div>
@@ -290,7 +299,7 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                                 id={item.id}
                                 name={item.name}
                                 mark={item.mark}
-                                onChange={onChange}
+                                onChange={updateTasks}
                               /> || <div />
                             }
                               </div>
@@ -327,7 +336,7 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                                       id={subItem.id}
                                       name={subItem.name}
                                       mark={subItem.mark}
-                                      onChange={onChange}
+                                      onChange={updateTasks}
                                     /> || <div /> }
                                 </div>
                               </li>
