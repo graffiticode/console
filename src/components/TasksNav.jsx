@@ -171,23 +171,23 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
     ));
     const rootItem = items[rootIndex];
     const updatedTasks = [];
+    console.log("[1] updateTasks() tasks=" + JSON.stringify(tasks, null, 2));
     if (tl === undefined) {
       // Got a root id.
       if (mark !== undefined && mark.id !== rootItem.mark) {
         // Updating mark. Do the kids too.
-        console.log("updateTasks() tasks=" + JSON.stringify(tasks, null, 2));
         const taskIndex = tasks.findIndex(task => task.id === rootItem.id);
-        delete tasks[taskIndex];
+        // delete tasks[taskIndex];
         rootItem.children && rootItem.children.forEach(child => {
           const { id } = tasks.find(task => task.id === child.id);
           updatedTasks.push({id, name, mark: mark.id});
           const taskIndex = tasks.findIndex(task => task.id === child.id);
-          delete tasks[taskIndex];
+          // delete tasks[taskIndex];
         });
         updatedTasks.push({ id, mark: mark.id });
         delete items[rootIndex];
         setItems(items.filter(item => item !== undefined));
-        tasks = tasks.filter(task => task !== undefined);
+        // tasks = tasks.filter(task => task !== undefined);
       }
       if (name !== undefined) {
         updatedTasks.push({ id, name });
@@ -202,8 +202,8 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
         delete children[childIndex];
         rootItem.children = children.filter(child => child !== undefined);
         const taskIndex = tasks.findIndex(task => task.id === id);
-        delete tasks[taskIndex];
-        tasks = tasks.filter(task => task !== undefined);
+        // delete tasks[taskIndex];
+        // tasks = tasks.filter(task => task !== undefined);
       }
       if (name !== undefined) {
         updatedTasks.push({id, name});
@@ -212,6 +212,7 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
     }
     setUpdatingTasks(true);
     setUpdatedTasks(updatedTasks);
+    console.log("[2] updateTasks() tasks=" + JSON.stringify(tasks, null, 2));
   };
 
   return (
