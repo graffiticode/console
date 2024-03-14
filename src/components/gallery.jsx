@@ -106,12 +106,6 @@ export default function Gallery({ lang, mark }) {
   const [ id, setId ] = useState("");
   const editorRef = useRef();
 
-  useEffect(() => {
-    if (editorRef?.current?.offsetHeight) {
-      setEditorHeight(editorRef.current.offsetHeight);
-    }
-  }, [editorRef?.current?.offsetHeight]);
-
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
     setHideEditor(false);
@@ -130,7 +124,6 @@ export default function Gallery({ lang, mark }) {
 
   useEffect(() => {
     if (newTask && !tasks.some(task => task.id === newTask.id)) {
-      console.log("Gallery() newTask=" + JSON.stringify(newTask, null, 2));
       tasks.unshift(newTask);
       setTasks(tasks);
     }
@@ -192,7 +185,6 @@ export default function Gallery({ lang, mark }) {
                   tasks={tasks}
                   setShowSaving={setShowSaving}
                   height={editorHeight - 150}
-                  setHeight={setFormHeight}
                 />
               </div>
           }
@@ -205,7 +197,6 @@ export default function Gallery({ lang, mark }) {
               height={formHeight}
               className="border border-gray-300 rounded-none overflow-auto p-2 resize"
               style={{height: formHeight}}
-              setHeight={setFormHeight}
             />
           }
         </div>
