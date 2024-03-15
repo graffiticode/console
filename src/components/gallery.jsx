@@ -195,7 +195,7 @@ export default function Gallery({ lang, mark }) {
               id={id}
               lang={lang}
               height={formHeight}
-              className="border bg-gray-50 border-gray-300 rounded-none overflow-auto p-2 resize"
+              className="border border-gray-300 rounded-none overflow-auto p-2 resize"
               style={{height: formHeight}}
             />
           }
