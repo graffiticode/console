@@ -1,3 +1,5 @@
+// TODO On save, replace expectedValue with responseValue and clear responseValue.
+// TODO Use full formId+dataId from proerties to make a new id.
 import { useState, useEffect } from 'react'
 import CodeMirror from './CodeMirror';
 import { Properties } from "./properties";

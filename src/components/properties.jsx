@@ -25,8 +25,8 @@ const parseId = id => {
 
 export const Properties = ({ id, lang, setId: setOuterId, user, setHeight, setSaveDisabled }) => {
   const [ schema, setSchema ] = useState({});
-  const [ taskId, setTaskId ] = useState("");
-  const [ outerTaskId, setOuterTaskId ] = useState("");
+  const [ taskId, setTaskId ] = useState();
+  const [ outerTaskId, setOuterTaskId ] = useState();
   const [ dataId, setDataId ] = useState(id);
   const [ doPostTask, setDoPostTask ] = useState(false);
 
@@ -38,9 +38,11 @@ export const Properties = ({ id, lang, setId: setOuterId, user, setHeight, setSa
   };
 
   useEffect(() => {
+    const { taskId, dataId } = parseId(id);
     if (id) {
-      const { taskId, dataId } = parseId(id);
       setOuterTaskId(taskId);
+    }
+    if (taskId !== outerTaskId) {
       setDataId(dataId || taskId);
     }
   }, [id]);
@@ -84,7 +86,6 @@ export const Properties = ({ id, lang, setId: setOuterId, user, setHeight, setSa
         id={getId({taskId, dataId})}
         setId={setId}
         height="300"
-        setHeight={setHeight}
       />
   );
 }
