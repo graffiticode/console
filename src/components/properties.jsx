@@ -23,7 +23,7 @@ const parseId = id => {
 
 // TODO getData(id) => props; postTask(props) => propId; id=taskId+propId
 
-export const Properties = ({ id, lang, setId: setOuterId, user, setHeight, setSaveDisabled }) => {
+export const Properties = ({ id, lang, height, setId: setOuterId, user, setSaveDisabled }) => {
   const [ schema, setSchema ] = useState({});
   const [ taskId, setTaskId ] = useState();
   const [ outerTaskId, setOuterTaskId ] = useState();
@@ -81,11 +81,11 @@ export const Properties = ({ id, lang, setId: setOuterId, user, setHeight, setSa
       !taskId &&
       <div /> ||
       <FormView
+        height={height}
         key="props"
         lang="0011"
         id={getId({taskId, dataId})}
         setId={setId}
-        height="300"
       />
   );
 }

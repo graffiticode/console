@@ -27,14 +27,14 @@ const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
 
 const HEIGHTS = [150, 240, 360, 480, 640, 860, 1020];
 
-const IFrame = ({ id, key, src, className, width, height }) =>
+const IFrame = ({ id, src, className, width, height }) =>
   <iframe
     id={id}
     src={src}
     key="1"
     className={className}
     width="100%"
-    height="640px"
+    height={height}
   />;
 
 const getHeight = (height, newHeight) => {
@@ -92,7 +92,7 @@ const DynamicReactForm = ({ src }) => {
 
 const staticForms = []; //["0001"];
 
-export default function FormView({ key, lang, id, setId, setNewTask, className, height }) {
+export default function FormView({ lang, id, setId, setNewTask, className, height }) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [dataId, setDataId] = useState();
@@ -117,7 +117,7 @@ export default function FormView({ key, lang, id, setId, setNewTask, className, 
 
   const Form = staticForms.includes(lang) && ReactForm || IFrameForm;
   return (
-    <div key={key} className="justify-center min-w-full">
+    <div className="justify-center min-w-full">
       <Form
         accessToken={accessToken}
         lang={lang}

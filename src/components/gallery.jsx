@@ -96,8 +96,8 @@ export default function Gallery({ lang, mark }) {
   const [ task, setTask ] = useState({});
   const [ newTask, setNewTask ] = useState();
   const [ showSaving, setShowSaving ] = useState(false);
-  const [ formHeight, setFormHeight ] = useState(640);
-  const [ editorHeight, setEditorHeight ] = useState(640);
+  const [ formHeight, setFormHeight ] = useState(480);
+  const [ editorHeight, setEditorHeight ] = useState(480);
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
@@ -166,29 +166,6 @@ export default function Gallery({ lang, mark }) {
                "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
              )}>
           {
-            !hideEditor &&
-              <div
-                ref={editorRef}
-                className={classNames(
-                  showSaving &&
-                    "ring-8" ||
-                    "ring-0",
-                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-none overflow-auto resize-y h-48"
-                )}
-              >
-                <Editor
-                  id={id}
-                  lang={lang}
-                  mark={mark}
-                  setId={setId}
-                  setNewTask={setNewTask}
-                  tasks={tasks}
-                  setShowSaving={setShowSaving}
-                  height={editorHeight - 150}
-                />
-              </div>
-          }
-          {
             <FormView
               key="form"
               accessToken={accessToken}
@@ -198,6 +175,30 @@ export default function Gallery({ lang, mark }) {
               className="border border-gray-300 rounded-none overflow-auto p-2 resize"
               style={{height: formHeight}}
             />
+          }
+          {
+            !hideEditor &&
+              <div
+                ref={editorRef}
+                className={classNames(
+                  showSaving &&
+                    "ring-8" ||
+                    "ring-0",
+                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-none overflow-auto resize-y"
+                )}
+                style={{height: editorHeight}}
+              >
+                <Editor
+                  id={id}
+                  lang={lang}
+                  mark={mark}
+                  setId={setId}
+                  setNewTask={setNewTask}
+                  tasks={tasks}
+                  setShowSaving={setShowSaving}
+                  height={editorHeight}
+                />
+              </div>
           }
         </div>
       </div>

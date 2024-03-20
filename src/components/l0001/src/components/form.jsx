@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
 function isNonNullObject(obj) {
   return (typeof obj === "object" && obj !== null);
@@ -10,19 +11,30 @@ function renderJSON(data, depth = 0) {
   );
 }
 
-function render({state}) {
-  const { data } = state;
-  if (data.val) {
-    return data.val;
+function render(props) {
+  const { value } = props;
+  console.log("render() value=|" + value + "|");
+  if (value) {
+    return value;
   } else {
-    return renderJSON(data);
+    return renderJSON(props);
   }
 }
 
 export const Form = ({ state }) => {
   return (
     <div className="bg-gray-100 p-2">
-      { render({state}) }
+      {
+        render(state)
+      }
     </div>
   );
 }
+
+Form.propTypes = {
+  state: PropTypes.object.required,
+};
+
+Form.defaultProps = {
+  state: {},
+};

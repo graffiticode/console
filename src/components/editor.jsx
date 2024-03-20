@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import CodeMirror from './CodeMirror';
 import { Properties } from "./properties";
+import { StatePanel } from "./state-panel";
 import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
@@ -17,7 +18,8 @@ function classNames(...classes) {
 
 const tabs = [
   { name: 'Code', current: true },
-  { name: 'Properties', current: false },
+  { name: 'Settings', current: false },
+  { name: 'State', current: false },
 ]
 
 function Tabs({ setTab, setSaving, setShowSaving, saveDisabled }) {
@@ -107,7 +109,6 @@ export default function Editor({
   setNewTask,
   tasks,
   setShowSaving,
-  setHeight,
   height,
 }) {
   const [ code, setCode ] = useState("");
@@ -197,6 +198,7 @@ export default function Editor({
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1">
         <Tabs
+          tab={tab}
           setTab={setTab}
           setSaving={setSaving}
           setShowSaving={setShowSaving}
@@ -206,19 +208,29 @@ export default function Editor({
           style={{height}}
         >
           {
-            tab === "Properties" &&
+            tab === "Settings" &&
               <Properties
+                height={height}
                 id={id}
                 lang={lang}
                 setId={setId}
                 user={user}
-                setHeight={setHeight}
+                setSaveDisabled={setSaveDisabled}
+              /> ||
+              tab === "State" &&
+              <StatePanel
+                height={height}
+                id={id}
+                lang={lang}
+                setId={setId}
+                user={user}
                 setSaveDisabled={setSaveDisabled}
               /> ||
               <CodeMirror
                 code={code}
                 state={state}
               />
+              
           }
         </div>
       </div>
