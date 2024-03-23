@@ -43,7 +43,7 @@ export default function Form() {
   return (
     <>
       <Head>
-        <title>Form \ {getTitle()}</title>
+        <title>{getTitle()}</title>
         <link rel="icon" type="image/png" href="favicon.png" />
         <meta
           name="description"

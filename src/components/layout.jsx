@@ -46,8 +46,8 @@ export default function Layout({ children, pathName, language, setLanguage, mark
   const [userId, setUserId] = useState();
   const lang = language.name.slice(1);
   useEffect(() => {
-    document.title = `Languages \\ ${getTitle()}`;
-  }, []);
+    document.title = getTitle();
+  }, [document.location?.hostname]);
   return (
     <>
       {/*
