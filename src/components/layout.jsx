@@ -47,7 +47,7 @@ export default function Layout({ children, pathName, language, setLanguage, mark
   const lang = language.name.slice(1);
   useEffect(() => {
     document.title = getTitle();
-  }, [document.location?.hostname]);
+  }, []);
   return (
     <>
       {/*
