@@ -19,7 +19,7 @@ export const compile = async ({ user, id, data }) => {
     id = id.split("+").slice(0, index).join("+");  // Re-compile state with code id.
     const accessToken = await user.getToken();
     const resp = await postApiCompile({ accessToken, id, data });
-    return resp;
+    return resp.data;
   } catch (x) {
     console.trace("./swr/fetchers/compile()");
     console.log(x.stack);

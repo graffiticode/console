@@ -10,87 +10,10 @@ import SignIn from "./SignIn";
 import { loadTasks, getAccessToken } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import { FormIFrame } from "./FormIFrame";
+import { FormReact } from "./FormReact";
 
-const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
-  if (!id) {
-    return "";
-  }
-  const [ protocol, host ] =
-        document.location.host.indexOf("localhost") === 0 && ["http", "localhost:3100"] ||
-        ["https", "api.graffiticode.org"];
-  const params = new URLSearchParams();
-  if (accessToken) {
-    params.set("access_token", accessToken);
-  }
-  return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
-};
-
-const HEIGHTS = [150, 240, 360, 480, 640, 860, 1020];
-
-const IFrame = ({ id, src, className, width, height }) =>
-  <iframe
-    id={id}
-    src={src}
-    key="1"
-    className={className}
-    width="100%"
-    height={height}
-  />;
-
-const getHeight = (height, newHeight) => {
-  if (newHeight === height) {
-    return height;
-  } else if (newHeight > HEIGHTS[HEIGHTS.length - 1]) {
-    return HEIGHTS[HEIGHTS.length - 1];
-  } else {
-    return HEIGHTS.find((h, i) => newHeight < h && h);
-  }
-};
-
-const IFrameForm = ({ accessToken, lang, id, setId, data, className, height }) => {
-  window.addEventListener(
-    "message",
-    (event) => {
-      const { id } = event.data;
-      if (id) {
-        setId && setId(id);
-      }
-    },
-    false,
-  );
-
-  const src = useTaskIdFormUrl({ accessToken, lang, id });
-  return (
-    <IFrame
-      id={id}
-      src={src}
-      className={className}
-      width="100%"
-      height={height}
-    />
-  );
-};
-
-const ReactForm = ({ accessToken, lang, id, data }) => {
-  switch (lang) {
-  default:
-    return <div>Form not found: {lang}</div>
-  }
-}
-
-const DynamicReactForm = ({ src }) => {
-  let Form;
-  useEffect(() => {
-    if (src) {
-      (async () => {
-        Form = await import(src);
-      })();
-    }
-  }, []);
-  return Form || <div />;
-}
-
-const staticForms = []; //["0001"];
+const reactForms = [];
 
 export default function FormView({ lang, id, setId, setNewTask, className, height }) {
   const [open, setOpen] = useState(true);
@@ -101,7 +24,6 @@ export default function FormView({ lang, id, setId, setNewTask, className, heigh
     user && { user } || null,
     getAccessToken,
   );
-
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -115,7 +37,7 @@ export default function FormView({ lang, id, setId, setNewTask, className, heigh
 
   const { uid } = user;
 
-  const Form = staticForms.includes(lang) && ReactForm || IFrameForm;
+  const Form = reactForms.includes(lang) && FormReact || FormIFrame;
   return (
     <div className="justify-center min-w-full">
       <Form
@@ -125,6 +47,7 @@ export default function FormView({ lang, id, setId, setNewTask, className, heigh
         setId={setId}
         className={className}
         height={height}
+        user={user}
       />
     </div>
   );
