@@ -147,6 +147,7 @@ export default function Editor({
         setCode(args.code);
         setDoPostTask(true);
         setSaveDisabled(false);
+        setDataId("");
       }
       return {
         ...data,
@@ -169,7 +170,6 @@ export default function Editor({
     const id = postTaskResp.data;
     setDoPostTask(false);
     setTaskId(id);
-    setDataId("");
     setId(getId({taskId: id, dataId: ""}));
   }
 

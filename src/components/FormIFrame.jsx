@@ -45,7 +45,15 @@ const getHeight = (height, newHeight) => {
   }
 };
 
-export const FormIFrame = ({ accessToken, lang, id, setId, data, className, height }) => {
+export const FormIFrame = ({
+  accessToken,
+  lang,
+  id,
+  setId,
+  data,
+  className,
+  height
+}) => {
   window.addEventListener(
     "message",
     (event) => {

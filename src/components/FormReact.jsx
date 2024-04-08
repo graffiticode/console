@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+"use client"
+
+import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
-//import { Form } from "@graffiticode/l0002";
-import { Form } from "../dist/index.js";
-//import { Button } from "../../../l0002/packages/rollup-react-library-starter/dist/cjs/bundle.js";
-//import { Button } from "../../../l0002/packages/parcel/dist/index.js";
+import { Form as L0002Form } from "@graffiticode/l0002";
 import { createState } from "../lib/state";
 import { compile } from '../utils/swr/fetchers';
 
@@ -24,20 +23,21 @@ export const FormReact = ({
   height,
   user,
 }) => {
-  console.log("FormReact() id=" + id);
-  return <Form label="foo" />;
   const [ recompile, setRecompile ] = useState(true);
   useEffect(() => {
     // If `id` changes, then recompile.
     if (id) {
       setRecompile(true);
+      state.apply({
+        type: "reset"
+      });
     }
   }, [id]);
 
   const [ state ] = useState(createState({}, (data, { type, args }) => {
-    console.log("FormReact() type=" + type + " args=" + JSON.stringify(args));
+    // console.log("FormReact() apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
-    case "compiled":
+    case "compile":
       return {
         ...data,
         ...args,
@@ -48,6 +48,8 @@ export const FormReact = ({
         ...data,
         ...args,
       };
+    case "reset":
+      return {};
     default:
       console.error(false, `Unimplemented action type: ${type}`);
       return data;
@@ -65,13 +67,23 @@ export const FormReact = ({
 
   if (resp.data) {
     state.apply({
-      type: "compiled",
-      args: resp.data,
+      type: "compile",
+      args: resp.data.data,
     });
     setRecompile(false);
   }
 
-  console.log("FormReact() state=" + JSON.stringify(state, null, 2));
+  let Form;
+
+  switch(lang) {
+  case "0002":
+    Form = L0002Form;
+    break;
+  default:
+    Form = <div>Internal error: no form defined for language {lang}</div>;
+    break;
+  }
+
   return (
     isNonNullNonEmptyObject(state.data) &&
       <Form state={state} /> ||
