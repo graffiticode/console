@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { Form as L0002Form } from "@graffiticode/l0002";
 import { createState } from "../lib/state";
 import { compile } from '../utils/swr/fetchers';
+import "../../node_modules/@graffiticode/l0002/dist/style.css";
 
 function isNonNullNonEmptyObject(obj) {
   return (
