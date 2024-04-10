@@ -13,7 +13,7 @@ import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { FormIFrame } from "./FormIFrame";
 import { FormReact } from "./FormReact";
 
-const reactForms = []; //["0002"];
+const reactForms = ["0002"];
 
 export default function FormView({ lang, id, setId, setNewTask, className, height }) {
   const [open, setOpen] = useState(true);
@@ -38,7 +38,6 @@ export default function FormView({ lang, id, setId, setNewTask, className, heigh
   const { uid } = user;
 
   const Form = reactForms.includes(lang) && FormReact || FormIFrame;
-  console.log("Form() id=" + id);
   return (
     <div className="justify-center min-w-full">
       <Form
