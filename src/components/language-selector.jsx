@@ -23,7 +23,7 @@ const languages = [
   {id: 3, name: 'L0011', desc: "Property editors", domains: ["graffiticode"]},
   {id: 4, name: 'L146', desc: "SVG scrapers", domains: ["hide"]},
   {id: 5, name: 'L147', desc: "Chart renderers", domains: ["chartcompiler"]},
-//  {id: 4, name: 'L149', desc: "Short text questions", domains: ["questioncompiler"]},
+  {id: 4, name: 'L149', desc: "Short text questions", domains: ["questioncompiler"]},
   {id: 6, name: 'L150', desc: "Free shipping calculators", domains: ["shipfree"]},
   {id: 7, name: 'L0151', desc: "Table editors", domains: ["graffiticode"]},
   {id: 8, name: 'L0152', desc: "Interactive map questions", domains: ["questioncompiler"]},
