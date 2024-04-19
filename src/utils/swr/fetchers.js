@@ -62,8 +62,8 @@ export const buildSaveTask = () => async ({ user, id, lang, code, mark, isPublic
 
 export const postTaskUpdates = async ({ user, tasks }) => {
   const query = gql`
-    mutation post ($id: String, $name: String, $mark: Int) {
-      updateTask(id: $id, name: $name, mark: $mark)
+    mutation post ($id: String, $name: String, $mark: Int, $isPublic: Boolean) {
+      updateTask(id: $id, name: $name, mark: $mark, isPublic: $isPublic)
     }
   `;
   const token = await user.getToken();
@@ -72,8 +72,8 @@ export const postTaskUpdates = async ({ user, tasks }) => {
       authorization: token,
     }
   });
-  await Promise.all(tasks.forEach(async ({id, name, mark }) => {
-    await client.request(query, {id, name, mark}).then(data => JSON.parse(data.updateTask));
+  await Promise.all(tasks.forEach(async ({id, name, mark, isPublic }) => {
+    await client.request(query, {id, name, mark, isPublic}).then(data => JSON.parse(data.updateTask));
   }));
   return {};
 };

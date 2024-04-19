@@ -48,7 +48,7 @@ const typeDefs = `
     logCompile(id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
     saveTask(id: String, lang: String!, code: String!, mark: Int!, isPublic: Boolean): String!
-    updateTask(id: String, name: String, mark: Int): String!
+    updateTask(id: String, name: String, mark: Int, isPublic: Boolean): String!
   }
 `;
 
@@ -83,10 +83,11 @@ const resolvers = {
       return JSON.stringify(data);
     },
     updateTask: async (_, args, ctx) => {
+      console.log("updateTask() args=" + JSON.stringify(args, null, 2));
       const { token } = ctx;
-      const { id, name, mark } = args;
+      const { id, name, mark, isPublic } = args;
       const { uid } = await client.verifyToken(token);
-      const data = await updateTask({ auth: { uid, token }, id, name, mark });
+      const data = await updateTask({ auth: { uid, token }, id, name, mark, isPublic });
       return JSON.stringify(data);
     },
     postTask: async (_, args, ctx) => {

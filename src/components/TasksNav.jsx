@@ -6,6 +6,8 @@ import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { postTaskUpdates } from '../utils/swr/fetchers';
 import MarkSelector, { marks } from './mark-selector.jsx';
+import PublicToggle from "./public-toggle.jsx";
+
 const sliceName = name => name.slice(17).slice(0,27);
 
 function classNames(...classes) {
@@ -29,7 +31,7 @@ function NameText({ name, setName }) {
   )
 }
 
-function EllipsisMenu({ id, name, mark, onChange }) {
+function EllipsisMenu({ id, name, mark, isPublic, onChange }) {
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
@@ -64,6 +66,16 @@ function EllipsisMenu({ id, name, mark, onChange }) {
                   <MarkSelector
                     mark={marks[mark - 1]}  // FIXME too brittle.
                     setMark={mark => onChange({id, mark})}
+                  />
+                </div>
+              )}
+            </Menu.Item>
+            <Menu.Item>
+              {({ active }) => (
+                <div className="pt-2">
+                  <PublicToggle
+                    isPublic={isPublic}
+                    setIsPublic={isPublic => onChange({id, isPublic})}
                   />
                 </div>
               )}
@@ -144,7 +156,6 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
   }, [tasks.length]);
 
   const { isLoading, data } = useSWR(
-    // TODO make into a batch operation.
     updatingTasks && {
       user,
       tasks: updatedTasks,
@@ -152,7 +163,6 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
     postTaskUpdates
   );
 
-//  console.log("TasksNav() items=" + JSON.stringify(items, null, 2));
   if (!Array.isArray(tasks) || tasks.length === 0 ||
       !Array.isArray(items) || items.length === 0) {
     return (
@@ -162,7 +172,7 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
     );
   }
 
-  const updateTasks = ({ id, name, mark }) => {
+  const updateTasks = ({ id, name, mark, isPublic }) => {
     // Gather tasks to update. Update the items to reflect those changes. Set
     // the updated tasks for posting.
     const [hd, tl] = id.split("+");
@@ -171,34 +181,35 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
     ));
     const rootItem = items[rootIndex];
     const updatedTasks = [];
-    console.log("[1] updateTasks() tasks=" + JSON.stringify(tasks, null, 2));
+    console.log("[1] updateTasks() isPublic=" + isPublic + " tasks=" + JSON.stringify(tasks, null, 2));
     if (tl === undefined) {
       // Got a root id.
       if (mark !== undefined && mark.id !== rootItem.mark) {
         // Updating mark. Do the kids too.
         const taskIndex = tasks.findIndex(task => task.id === rootItem.id);
-        // delete tasks[taskIndex];
         rootItem.children && rootItem.children.forEach(child => {
           const { id } = tasks.find(task => task.id === child.id);
-          updatedTasks.push({id, name, mark: mark.id});
+          updatedTasks.push({id, name, mark: mark.id, isPublic});
           const taskIndex = tasks.findIndex(task => task.id === child.id);
-          // delete tasks[taskIndex];
         });
-        updatedTasks.push({ id, mark: mark.id });
+        updatedTasks.push({ id, mark: mark.id, isPublic });
         delete items[rootIndex];
         setItems(items.filter(item => item !== undefined));
-        // tasks = tasks.filter(task => task !== undefined);
       }
       if (name !== undefined) {
-        updatedTasks.push({ id, name });
+        updatedTasks.push({ id, name, isPublic });
         items[rootIndex].name = name;
+      }
+      if (isPublic !== undefined) {
+        updatedTasks.push({ id, name, isPublic });
+        items[rootIndex].isPublic = isPublic;
       }
     } else {
       const children = rootItem.children;
       const childIndex = children.findIndex(child => child.id === id);
       const childItem = children[childIndex];
       if (mark !== undefined && mark.id !== childItem.mark) {
-        updatedTasks.push({ id, mark: mark.id });
+        updatedTasks.push({ id, mark: mark.id, isPublic });
         delete children[childIndex];
         rootItem.children = children.filter(child => child !== undefined);
         const taskIndex = tasks.findIndex(task => task.id === id);
@@ -206,8 +217,12 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
         // tasks = tasks.filter(task => task !== undefined);
       }
       if (name !== undefined) {
-        updatedTasks.push({id, name});
+        updatedTasks.push({id, name, isPublic});
         children[childIndex].name = name;
+      }
+      if (isPublic !== undefined) {
+        updatedTasks.push({id, name, isPublic});
+        children[childIndex].isPublic = isPublic;
       }
     }
     setUpdatingTasks(true);
@@ -256,6 +271,7 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                           id={item.id}
                           name={item.name}
                           mark={item.mark}
+                          isPublic={item.isPublic}
                           onChange={updateTasks}
                         /> || <div />
                       }

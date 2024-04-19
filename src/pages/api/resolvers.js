@@ -38,11 +38,26 @@ export async function saveTask({ auth, id, lang, code, mark, isPublic }) {
   return data;
 }
 
-export async function updateTask({ auth, id, name, mark }) {
-  const task = { name, mark };
+export async function updateTask({ auth, id, name, mark, isPublic }) {
+  const task = { name, mark, isPublic };
   Object.keys(task).forEach(key => task[key] === undefined && delete task[key]);
   try {
-    await db.doc(`users/${auth.uid}/taskIds/${id}`).update(task);
+    const taskRef = await db.doc(`users/${auth.uid}/taskIds/${id}`);
+    taskRef.update(task);
+    if (isPublic) {
+      // TODO get lang and code from stored task to send to the api with isPublic
+      const taskDoc = await taskRef.get();
+      const task = {
+        lang: taskDoc.get("lang"),
+        code: taskDoc.get("src"),
+      };
+      console.log("updateTask() id=" + id + " task=" + JSON.stringify(task, null, 2));
+      // Let the api know this item is now public. This can't be undone!
+      const headers = {
+        // "x-graffiticode-storage-type": "persistent",
+      };
+      const { data } = await postApiJSON("/task", { task }, headers);
+    }
     const data = { id };
     return data;
   } catch (x) {

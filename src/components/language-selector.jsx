@@ -30,7 +30,7 @@ const languages = [
   {id: 9, name: 'L0153', desc: "ProseMirror editors", domains: ["graffiticode"]},
   {id: 10, name: 'L154', desc: "Walking routes", domains: ["hikingxxx"]},
   {id: 11, name: 'L0155', desc: "Multiple choice questions", domains: ["questioncompiler"]},
-//  {id: 11, name: 'L156', desc: "Mult-step math questions", domains: ["questioncompiler"]},
+  {id: 12, name: 'L0156', desc: "Short text scorers", domains: ["questioncompiler"]},
 ];
 
 function classNames(...classes) {
