@@ -27,7 +27,7 @@ const languages = [
   {id: 6, name: 'L150', desc: "Free shipping calculators", domains: ["shipfree"]},
   {id: 7, name: 'L0151', desc: "Table editors", domains: ["graffiticode"]},
   {id: 8, name: 'L0152', desc: "Interactive map questions", domains: ["questioncompiler"]},
-  {id: 9, name: 'L0153', desc: "ProseMirror editors", domains: ["graffiticode"]},
+  {id: 9, name: 'L0153', desc: "ProseMirror editors", domains: ["questioncompiler"]},
   {id: 10, name: 'L154', desc: "Walking routes", domains: ["hikingxxx"]},
   {id: 11, name: 'L0155', desc: "Multiple choice questions", domains: ["questioncompiler"]},
   {id: 12, name: 'L0156', desc: "Short text scorers", domains: ["questioncompiler"]},
