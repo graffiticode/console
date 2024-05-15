@@ -18,7 +18,7 @@ function classNames(...classes) {
 
 const tabs = [
   { name: 'Code', current: true },
-  { name: 'Settings', current: false },
+  { name: 'Props', current: false },
   { name: 'State', current: false },
 ]
 
