@@ -208,7 +208,7 @@ export default function Editor({
           style={{height}}
         >
           {
-            tab === "Settings" &&
+            tab === "Props" &&
               <Properties
                 height={height}
                 id={id}
