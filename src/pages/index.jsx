@@ -87,7 +87,7 @@ export default function Compiles() {
       </p>
       <p>
         <b>Compiles.</b> Code and data are compiled to data by being posted to a
-        language's GraphQL service. Compiles are idemponent and are guaranteed
+        language&apos;s GraphQL service. Compiles are idemponent and are guaranteed
         yield the same ouput given the same inputs. This allows us to identify
         and cache the output of compiles by a hash for their task language and
         code and data. The&nbsp;
