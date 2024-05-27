@@ -73,9 +73,11 @@ export default function Compiles() {
       </p>
       <p>
         <b>Languages.</b> Thinking of language as an abstract model that is made
-        concrete by code helps to clarify the power of the language-oriented
-        programming paradigm. It allows us to create a meta-model for a class of
-        models that are selected for using high level code.
+        concrete by code helps to illuminate the power of the language-oriented
+        programming paradigm. It allows us to create meta-models for a class of
+        models that are selected from later in the development process. It also
+        makes model building more accessible to the non-developers who are often
+        more proximate the problem spaces for which the models are being created.
       </p>
       <p>
         <b>Tasks.</b> The components and apis are programmed with the&nbsp;
