@@ -12,25 +12,33 @@ export default function Compiles() {
   }, []);
   return (
     <div className="flex flex-col text-md leading-7 max-w-2xl font-light mx-auto py-6 sm:px-6 lg:px-8 gap-4">
-      <p>
-        Welcome to the { getTitle() } console.
-      </p>
+      <h2 className="font-semibold">
+        Welcome to the { getTitle() } console
+      </h2>
       <p>
         Graffiticode is a tool for programming web components and apis through
-        task specific languages. It is first and foremost a collection of task
-        specific languages with runtimes that are React components and GraphQL
-        services.
+        task specific languages. It is first and foremost a collection of
+        end-user programming languages with runtimes that are React components
+        and GraphQL services.
       </p>
       <p>
-        The components and apis are programmed with the&nbsp;
-        <Link href="/tasks"><b>Tasks</b></Link>
-        &nbsp;editor. Once programmed, the static state of the component or api
-        is used to initialize them whereever they may be hosted.
+        By <i>end-user</i> we don't mean non-technical,
+        but rather the consumer of the thing being programmed. Just as
+        accountants are the end-users of the spreadsheets they create to do work
+        for their customers, the designers and developers or whoever else are
+        making software with Graffiticode are its end-users.
+      </p>
+      <h2 className="font-semibold">
+        Getting started
+      </h2>
+      <p>
+        Get started by signing in the Graffiticode using your preferred Ethereum
+        wallet. MetaMask and Coinbase are two of the more popular wallets.
       </p>
       <p>
-        Get started by navigating to the&nbsp;
+        After signing in, you can start building by navigating to the&nbsp;
         <Link href="/languages"><b>Languages</b></Link>
-        &nbsp;tab, selecting a language, and get programming.
+        &nbsp;tab, selecting a language, and start writing code.
       </p>
       <div className="bg-green-50 p-4 font-normal border border-1 rounded-lg grid grid-cols-12">
         <div className="col-span-1 mt-1 ml-1">
@@ -40,12 +48,46 @@ export default function Compiles() {
         </div>
         <div className="col-span-11 pr-4 font-light">
           <span className="font-medium">What's missing? </span>
-            There are of course many many more languages we could add to the current
-            collection. What programmable components and apis would you like to see
-            here?&nbsp;
-            <a href="mailto: jeff@artcompiler.com?subject=Graffiticode language idea"><b>Send us a note!</b></a>
-          </div>
+          There are of course many many more languages we could add to the current
+          collection. What programmable components and apis would you like to see
+          here?&nbsp;
+          <a href="mailto: jeff@artcompiler.com?subject=Graffiticode language idea"><b>Send us a note!</b></a>
         </div>
+      </div>
+      <h2 className="font-semibold">
+        Main ideas
+      </h2>
+      <p>
+        Graffiticode is a <b>language-oriented</b> programming tool. At the
+        core of every component and api is a task-oriented language that is used
+        to customize its feel and function. On the frontend, code defines the
+        initial state of React components. On the backend, code defines how data
+        is transformed by GraphQL services.
+      </p>
+      <p>
+        Framed using <b>MVC</b> ideas, you can think of the language as an
+        abstract <b>model</b>, the frontend as the <b>view</b>, and the
+        integration between them as the <b>controller</b>. Without specifying
+        an implementation, the language defines an infinite class of models that
+        is selected from by code in that language.
+      </p>
+      <p>
+        <b>Languages.</b> Thinking of language as an abstract model that is made
+        concrete by code helps to clarify the power of the language-oriented
+        programming paradigm. It allows us to create a meta-model for a class of
+        models that are selected for using high level code.
+      </p>
+      <p>
+        <b>Tasks.</b> The components and apis are programmed with the&nbsp;
+        <Link href="/tasks"><b>Tasks</b></Link>
+        &nbsp;editor. Once programmed, the static state of the component or api
+        is used to initialize them whereever and however they may be hosted.
+      </p>
+      <p>
+        <b>Hosting.</b> React components are installed using your chosen <i>npm</i> package
+        installer. GraphQL services are either self-hosted or managed by an
+        hosting provider such as Graffiticode.
+      </p>
     </div>
   );
 }
