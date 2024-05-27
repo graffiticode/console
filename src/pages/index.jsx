@@ -13,7 +13,7 @@ export default function Compiles() {
   return (
     <div className="flex flex-col text-md leading-7 max-w-2xl font-light mx-auto py-6 sm:px-6 lg:px-8 gap-4">
       <h2 className="font-semibold">
-        Welcome to the { getTitle() } console
+        Welcome to { getTitle() }
       </h2>
       <p>
         Graffiticode is a tool for programming web components and apis through
@@ -33,7 +33,7 @@ export default function Compiles() {
       </h2>
       <p>
         Get started by signing in the Graffiticode using your preferred Ethereum
-        wallet. MetaMask and Coinbase are two of the more popular wallets.
+        wallet. <i>MetaMask</i> and <i>Coinbase</i> are two of the more popular wallets.
       </p>
       <p>
         After signing in, you can start building by navigating to the&nbsp;
@@ -86,7 +86,20 @@ export default function Compiles() {
         is used to initialize them whereever and however they may be hosted.
       </p>
       <p>
-        <b>Hosting.</b> React components are installed using your chosen <i>npm</i> package
+        <b>Compiles.</b> Code and data are compiled to data by being posted to a
+        language's GraphQL service. Compiles are idemponent and are guaranteed
+        yield the same ouput given the same inputs. This allows us to identify
+        and cache the output of compiles by a hash for their task language and
+        code and data. The&nbsp;
+        <Link href="/compiles"><b>Compiles</b></Link>
+        &nbsp;tab shows the cached compiles performed through the
+        <i> Graffiticode Console</i> and <i>API Gateway</i>.
+      </p>
+      <h2 className="font-semibold">
+        Hosting
+      </h2>
+      <p>
+        React components are installed using your chosen <i>npm</i> package
         installer. GraphQL services are either self-hosted or managed by an
         hosting provider such as Graffiticode.
       </p>
