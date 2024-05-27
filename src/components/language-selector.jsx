@@ -22,14 +22,13 @@ const languages = [
   {id: 2, name: 'L0002', desc: "Base language, 2nd ed", domains: ["graffiticode"]},
   {id: 3, name: 'L0011', desc: "Property editors", domains: ["graffiticode"]},
   {id: 4, name: 'L146', desc: "SVG scrapers", domains: ["hide"]},
-  {id: 5, name: 'L147', desc: "Chart renderers", domains: ["chartcompiler"]},
-//  {id: 4, name: 'L149', desc: "Short text questions", domains: ["questioncompiler"]},
-  {id: 6, name: 'L150', desc: "Free shipping calculators", domains: ["shipfree"]},
+  {id: 5, name: 'L147', desc: "Chart renderers", domains: ["hide"]},
+  {id: 6, name: 'L150', desc: "Free shipping calculators", domains: ["hide"]},
   {id: 7, name: 'L0151', desc: "Table editors", domains: ["graffiticode"]},
   {id: 8, name: 'L0152', desc: "Interactive map questions", domains: ["questioncompiler"]},
   {id: 9, name: 'L0153', desc: "Area model questions", domains: ["questioncompiler"]},
-  {id: 10, name: 'L154', desc: "Walking routes", domains: ["hikingxxx"]},
-  {id: 11, name: 'L0155', desc: "Demo questions", domains: ["questioncompiler"]},
+  {id: 10, name: 'L154', desc: "Walking routes", domains: ["hide"]},
+  {id: 11, name: 'L0155', desc: "Demo questions", domains: ["hide"]},
   {id: 12, name: 'L0156', desc: "Short text scorers", domains: ["questioncompiler"]},
 ];
 
@@ -51,7 +50,7 @@ export default function LanguageSelector({ domain, language, setLanguage }) {
   const [query, setQuery] = useState('')
   const domainLanguages =
         languages.filter(language =>
-          domain === "graffiticode" && !language.domains.includes("hide") ||
+          !language.domains.includes("hide") ||
             language.domains.length === 0 ||
             language.domains.includes(domain.toLowerCase())
         );
