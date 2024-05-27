@@ -22,7 +22,7 @@ export default function Compiles() {
         and GraphQL services.
       </p>
       <p>
-        By <i>end-user</i> we don't mean non-technical,
+        By <i>end-user</i> we don&apos;t mean non-technical,
         but rather the consumer of the thing being programmed. Just as
         accountants are the end-users of the spreadsheets they create to do work
         for their customers, the designers and developers or whoever else are
@@ -47,7 +47,7 @@ export default function Compiles() {
           </svg>
         </div>
         <div className="col-span-11 pr-4 font-light">
-          <span className="font-medium">What's missing? </span>
+          <span className="font-medium">What&apos;s missing? </span>
           There are of course many many more languages we could add to the current
           collection. What programmable components and apis would you like to see
           here?&nbsp;
