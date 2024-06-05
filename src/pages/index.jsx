@@ -87,10 +87,9 @@ export default function Compiles() {
       </p>
       <p>
         <b>Compiles.</b> Code and data are compiled to data by being posted to a
-        language&apos;s GraphQL service. Compiles are idemponent and are guaranteed
-        yield the same ouput given the same inputs. This allows us to identify
-        and cache the output of compiles by a hash for their task language and
-        code and data. The&nbsp;
+        language service. Compiles are idemponent and thus yield the same output
+        given the same input. This allows us to identify and cache the output of
+        compiles by a hash for their task language and code and data. The&nbsp;
         <Link href="/compiles"><b>Compiles</b></Link>
         &nbsp;tab shows the cached compiles performed through the
         <i> Graffiticode Console</i> and <i>API Gateway</i>.

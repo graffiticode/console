@@ -127,6 +127,7 @@ export default async function handler(req, res) {
     res.send(html);
   } else {
     const { operationName, query, variables } = getGraphQLParameters(request);
+    console.log("handler() query=" + query);
     const result = await processRequest({
       operationName,
       query,
