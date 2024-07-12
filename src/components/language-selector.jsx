@@ -28,9 +28,9 @@ const languages = [
   {id: 8, name: 'L0152', desc: "Interactive map questions", domains: ["questioncompiler"]},
   {id: 9, name: 'L0153', desc: "Area model questions", domains: ["questioncompiler"]},
   {id: 10, name: 'L154', desc: "Walking routes", domains: ["hide"]},
-  {id: 11, name: 'L0155', desc: "Demo questions", domains: ["hide"]},
+  {id: 11, name: 'L0155', desc: "Demo questions", domains: ["graffiticode"]},
   {id: 12, name: 'L0156', desc: "Short text scorers", domains: ["questioncompiler"]},
-  {id: 13, name: 'L0157', desc: "Math manipulatives", domains: ["graffiticode"]},
+  {id: 13, name: 'L0157', desc: "Geoboard manipulative", domains: ["graffiticode"]},
 ];
 
 function classNames(...classes) {
