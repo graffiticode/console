@@ -31,6 +31,7 @@ const languages = [
   {id: 11, name: 'L0155', desc: "Demo questions", domains: ["graffiticode"]},
   {id: 12, name: 'L0156', desc: "Short text scorers", domains: ["questioncompiler"]},
   {id: 13, name: 'L0157', desc: "Geoboard manipulative", domains: ["graffiticode"]},
+  {id: 14, name: 'L0158', desc: "Learnosity integration", domains: ["graffiticode"]},
 ];
 
 function classNames(...classes) {
