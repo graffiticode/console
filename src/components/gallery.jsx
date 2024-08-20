@@ -119,6 +119,9 @@ export default function Gallery({ lang, mark }) {
     );
 
   useEffect(() => {
+    if (loadTasksData === undefined || loadTasksData.length === 0) {
+      setId("");
+    }
     setTasks(loadTasksData || []);
   }, [loadTasksData]);
 
