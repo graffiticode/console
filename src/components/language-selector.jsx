@@ -27,7 +27,7 @@ const languages = [
   {id: 7, name: 'L0151', desc: "Table editors", domains: ["graffiticode"]},
   {id: 8, name: 'L0152', desc: "Interactive map questions", domains: ["questioncompiler"]},
   {id: 9, name: 'L0153', desc: "Area model questions", domains: ["questioncompiler"]},
-  {id: 10, name: 'L154', desc: "Walking routes", domains: ["hide"]},
+  {id: 10, name: 'L0154', desc: "Magic square questions", domains: ["graffiticode"]},
   {id: 11, name: 'L0155', desc: "Demo questions", domains: ["graffiticode"]},
   {id: 12, name: 'L0156', desc: "Short text scorers", domains: ["questioncompiler"]},
   {id: 13, name: 'L0157', desc: "Geoboard manipulatives", domains: ["graffiticode"]},
