@@ -33,7 +33,7 @@ const navigation = [
   { name: 'Languages', href: '/languages', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: false },
-  { name: 'Specs', href: '/specs', current: false },
+  { name: 'Docs', href: '/docs', current: false },
 //  { name: 'Explorer', href: '/explorer', current: false },
   { name: 'Settings', href: '/settings', current: false },
 ]
@@ -105,7 +105,7 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                         }
                       </div>
                     </div>
-                    { ["tasks", "compiles", "specs"].includes(pathName)
+                    { ["tasks", "compiles", "docs"].includes(pathName)
                       ? <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
                           <LanguageSelector domain={getTitle()} language={language} setLanguage={setLanguage} />
                         </div>
