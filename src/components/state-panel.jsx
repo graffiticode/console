@@ -24,6 +24,7 @@ const parseId = id => {
 // TODO getData(id) => props; postTask(props) => propId; id=taskId+propId
 
 export const StatePanel = ({ id, lang, height, setId: setOuterId, user, setSaveDisabled }) => {
+  console.log("StatePanel() id=" + id);
   const [ taskId, setTaskId ] = useState();
   const [ outerTaskId, setOuterTaskId ] = useState();
   const [ dataId, setDataId ] = useState(id);

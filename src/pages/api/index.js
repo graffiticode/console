@@ -58,7 +58,9 @@ const resolvers = {
       const { token } = ctx;
       const { id } = args;
       const { uid } = await client.verifyToken(token);
+      console.log("data() id=" + id + " uid=" + uid);
       const data = await getData({ authToken: token, id });
+      console.log("data() data=" + JSON.stringify(data, null, 2));
       return JSON.stringify(data);
     },
     compiles: async (_, args, ctx) => {

@@ -192,6 +192,7 @@ export default function Gallery({ lang, mark }) {
                 style={{height: editorHeight}}
               >
                 <Editor
+                  accessToken={accessToken}
                   id={id}
                   lang={lang}
                   mark={mark}

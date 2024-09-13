@@ -33,6 +33,7 @@ export const postApiCompile = async ({ accessToken, id, data }) => {
     if (resp.status !== "success") {
       throw new Error(`failed to post compile ${id}: ${error.message}`);
     }
+    console.log("postApiCompile() resp=" + JSON.stringify(resp, null, 2));
     return resp;
   } catch (err) {
     throw err;

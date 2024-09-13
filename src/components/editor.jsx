@@ -18,8 +18,8 @@ function classNames(...classes) {
 
 const tabs = [
   { name: 'Code', current: true },
-  { name: 'Props', current: false },
-  { name: 'State', current: false },
+  { name: 'Settings', current: false },
+  { name: 'Data', current: false },
 ]
 
 function Tabs({ setTab, setSaving, setShowSaving, saveDisabled }) {
@@ -102,6 +102,7 @@ const parseId = id => {
 };
 
 export default function Editor({
+  accessToken,
   id,
   lang,
   mark: initMark,
@@ -142,6 +143,14 @@ export default function Editor({
         ...data,
         ...args,
       };
+    case "change":
+      setDoPostTask(true);
+      setSaveDisabled(false);
+      setDataId("");
+      return {
+        ...data,
+        ...args,
+      };
     case "codeChange":
       if (code != args.code) {
         setCode(args.code);
@@ -176,7 +185,7 @@ export default function Editor({
   // Save task.
 
   const task = { id, lang, code, mark: mark.id, isPublic };
-  const { isLoading, data } = useSWR(
+    const { isLoading, data } = useSWR(
     saving && { user, ...task } || null,
     saveTask
   );
@@ -208,8 +217,9 @@ export default function Editor({
           style={{height}}
         >
           {
-            tab === "Props" &&
+            tab === "Settings" &&
               <Properties
+                state={state}
                 height={height}
                 id={id}
                 lang={lang}
@@ -217,7 +227,7 @@ export default function Editor({
                 user={user}
                 setSaveDisabled={setSaveDisabled}
               /> ||
-              tab === "State" &&
+              tab === "Data" &&
               <StatePanel
                 height={height}
                 id={id}

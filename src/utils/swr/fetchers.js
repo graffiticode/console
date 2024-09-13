@@ -12,6 +12,7 @@ const buildRequestClient = async ({ token }) => {
 };
 
 export const compile = async ({ user, id, data }) => {
+  console.log("compile() id=" + id);
   data = data || {};
   try {
     const token = await user.getToken();
