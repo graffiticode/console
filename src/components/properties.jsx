@@ -34,7 +34,6 @@ export const Properties = ({
   setSaveDisabled,
   state: editorState,
 }) => {
-  console.log("Properties() id=" + id + " user=" + JSON.stringify(user));
   const [ schema, setSchema ] = useState({});
   const [ taskId, setTaskId ] = useState();
   // const [ outerTaskId, setOuterTaskId ] = useState();
@@ -45,7 +44,7 @@ export const Properties = ({
   //const { taskId, dataId } = editorState.data;
 
   const [ state ] = useState(createState({}, (data, { type, args }) => {
-    console.log("Properties() state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+    // console.log("Properties() state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
     case "compile":
       // we have new properties
@@ -58,7 +57,7 @@ export const Properties = ({
       // A setting has changed, so recompile to get a new id.
       setDoRecompile(true);
       editorState.apply({
-        type: "change",
+        type: "dataChange",
         args,
       });
       return {
@@ -75,8 +74,6 @@ export const Properties = ({
     (async () => {
       try {
         const schema = await getLanguageAsset(`L${lang}`, "schema.json") || "{}";
-        console.log("Properties() schema=" + schema);
-        console.log("Properties() state=" + JSON.stringify(state, null, 2));
         setSchema(schema);
         setDoPostTask(true);
       } catch (x) {
@@ -87,18 +84,9 @@ export const Properties = ({
   }, []);
 
   useEffect(() => {
-    // const { taskId, dataId } = parseId(id);
-    // console.log("Properties() taskId=" + taskId + " dataId=" + dataId);
-    // if (id) {
-    //   setOuterTaskId(taskId);
-    // }
-    // if (taskId !== outerTaskId) {
-    //   setDataId(dataId || taskId);
-    // }
     setDoGetData(true);
   }, [id]);
 
-  console.log("Properties() id=" + id + " taskId=" + taskId);
   const getDataResp = useSWR(
     doGetData && taskId && id && user && {
       id: `${taskId}+${id}`,
@@ -106,8 +94,6 @@ export const Properties = ({
     },
     getData
   );
-  
-  console.log("Properties() getDataResp=" + JSON.stringify(getDataResp, null, 2));
   
   if (getDataResp.data) {
     setDoGetData(false);
@@ -133,10 +119,8 @@ export const Properties = ({
   useEffect(() => {
     if (postTaskResp.data) {
       const taskId = postTaskResp.data;
-      console.log("Properties() taskId=" + taskId);
       setTaskId(taskId);
       setDoPostTask(false);
-//      setDoRecompile(true);
     }
   }, [postTaskResp?.data]);
 

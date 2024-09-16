@@ -8,7 +8,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
 import useSWR from "swr";
-import { buildSaveTask, compile, postTask } from '../utils/swr/fetchers';
+import { buildSaveTask, postTask } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { createState } from "../lib/state";
 
@@ -113,11 +113,13 @@ export default function Editor({
   height,
 }) {
   const [ code, setCode ] = useState("");
+  const [ dataCode, setDataCode ] = useState("");
   const [ view, setView ] = useState();
   const [ mark, setMark ] = useState(initMark);
   const [ isPublic, setIsPublic ] = useState(false);
   const [ saving, setSaving ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
+  const [ doPostDataTask, setDoPostDataTask ] = useState(false);
   const [ tab, setTab ] = useState("Code");
   const [ taskId, setTaskId ] = useState("");
   const [ dataId, setDataId ] = useState("");
@@ -127,6 +129,7 @@ export default function Editor({
   useEffect(() => {
     if (id === "") {
       setCode("");  // New task.
+      setDataCode("");  // New task.
     } else {
       const { taskId, dataId } = parseId(id);
       const task = tasks.find(task => task.id === id);
@@ -143,10 +146,10 @@ export default function Editor({
         ...data,
         ...args,
       };
-    case "change":
-      setDoPostTask(true);
+    case "dataChange":
+      setDoPostDataTask(true);
       setSaveDisabled(false);
-      setDataId("");
+      setDataCode(`${JSON.stringify(args)}..`);
       return {
         ...data,
         ...args,
@@ -180,6 +183,18 @@ export default function Editor({
     setDoPostTask(false);
     setTaskId(id);
     setId(getId({taskId: id, dataId: ""}));
+  }
+
+  const postDataTaskResp = useSWR(
+    doPostDataTask && { user, lang: "0001", code: dataCode } || null,
+    postTask
+  );
+
+  if (postDataTaskResp.data) {
+    const id = postDataTaskResp.data;
+    setDoPostDataTask(false);
+    setDataId(id);
+    setId(getId({taskId, dataId: id}));
   }
 
   // Save task.
