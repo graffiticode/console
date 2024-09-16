@@ -36,13 +36,9 @@ export const Properties = ({
 }) => {
   const [ schema, setSchema ] = useState({});
   const [ taskId, setTaskId ] = useState();
-  // const [ outerTaskId, setOuterTaskId ] = useState();
-  // const [ dataId, setDataId ] = useState(id);
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ doRecompile, setDoRecompile ] = useState(false);
   const [ doGetData, setDoGetData ] = useState(false);
-  //const { taskId, dataId } = editorState.data;
-
   const [ state ] = useState(createState({}, (data, { type, args }) => {
     // console.log("Properties() state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
@@ -102,13 +98,6 @@ export const Properties = ({
       args: getDataResp.data,
     })
   }
-
-  // const setId = newDataId => {
-  //   // Only set outer id if this change is from the props editor.
-  //   const newId = getId({taskId: outerTaskId, dataId: newDataId.split("+").slice(1)});
-  //   setOuterId(newId);
-  //   setSaveDisabled(false);
-  // };
 
   // Get taskId from schema as L0011 code.
   const postTaskResp = useSWR(
