@@ -21,7 +21,7 @@
     "@graffiticode/auth": "^2.1.2",
     "@graffiticode/component-test": "file:../l0002/packages/component-test",
     "@graffiticode/l0002": "^0.0.6",
-    "@graffiticode/l0011": "file:graffiticode-l0011-0.0.3.tgz",
+    "@graffiticode/l0011": "file:lib/graffiticode-l0011-0.0.3.tgz",
     "@graphiql/toolkit": "^0.8.2",
     "@graphql-tools/schema": "^9.0.1",
     "@headlessui/react": "^1.7.16",
