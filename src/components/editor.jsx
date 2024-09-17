@@ -18,7 +18,7 @@ function classNames(...classes) {
 
 const tabs = [
   { name: 'Code', current: true },
-  { name: 'Settings', current: false },
+  { name: 'Inits', current: false },
   { name: 'Data', current: false },
 ]
 
@@ -89,7 +89,10 @@ function Tabs({ setTab, setSaving, setShowSaving, saveDisabled }) {
   )
 }
 
-const getId = ({ taskId, dataId }) => dataId && `${taskId}+${dataId}` || taskId;
+const getId = ({ taskId, dataId }) => (
+  taskId && dataId && `${taskId}+${dataId}` || taskId || dataId
+);
+
 const parseId = id => {
   if (id === undefined) {
     return {};
@@ -121,8 +124,6 @@ export default function Editor({
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ doPostDataTask, setDoPostDataTask ] = useState(false);
   const [ tab, setTab ] = useState("Code");
-  const [ taskId, setTaskId ] = useState("");
-  const [ dataId, setDataId ] = useState("");
   const [ saveDisabled, setSaveDisabled ] = useState(true);
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
@@ -132,16 +133,25 @@ export default function Editor({
       setDataCode("");  // New task.
     } else {
       const { taskId, dataId } = parseId(id);
-      const task = tasks.find(task => task.id === id);
+      const task = tasks.find(task => task.id === taskId);
       task && setCode(task.src);
+      state.apply({
+        type: "compile",
+        args: {taskId, dataId},
+      });
     }
   }, [id]);
 
   const [ state ] = useState(createState({
     lang,
   }, (data, { type, args }) => {
+    // console.log("Editor() state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
     case "compile":
+      setId(getId({
+        ...data,
+        ...args,
+      }));
       return {
         ...data,
         ...args,
@@ -152,18 +162,15 @@ export default function Editor({
       setDataCode(`${JSON.stringify(args)}..`);
       return {
         ...data,
-        ...args,
       };
     case "codeChange":
       if (code != args.code) {
         setCode(args.code);
         setDoPostTask(true);
         setSaveDisabled(false);
-        setDataId("");
       }
       return {
         ...data,
-        ...args,
       };
     default:
       console.error(false, `Unimplemented action type: ${type}`);
@@ -179,10 +186,14 @@ export default function Editor({
   );
 
   if (postTaskResp.data) {
-    const id = postTaskResp.data;
+    const taskId = postTaskResp.data;
     setDoPostTask(false);
-    setTaskId(id);
-    setId(getId({taskId: id, dataId: ""}));
+    state.apply({
+      type: "compile",
+      args: {
+        taskId,
+      },
+    });
   }
 
   const postDataTaskResp = useSWR(
@@ -191,10 +202,15 @@ export default function Editor({
   );
 
   if (postDataTaskResp.data) {
-    const id = postDataTaskResp.data;
+    const dataId = postDataTaskResp.data;
+    const { taskId } = state.data;
     setDoPostDataTask(false);
-    setDataId(id);
-    setId(getId({taskId, dataId: id}));
+    state.apply({
+      type: "compile",
+      args: {
+        dataId,
+      },
+    });
   }
 
   // Save task.
@@ -232,13 +248,12 @@ export default function Editor({
           style={{height}}
         >
           {
-            tab === "Settings" &&
+            tab === "Inits" &&
               <Properties
                 state={state}
                 height={height}
                 id={id}
                 lang={lang}
-                setId={setId}
                 user={user}
                 setSaveDisabled={setSaveDisabled}
               /> ||
@@ -247,7 +262,6 @@ export default function Editor({
                 height={height}
                 id={id}
                 lang={lang}
-                setId={setId}
                 user={user}
                 setSaveDisabled={setSaveDisabled}
               /> ||

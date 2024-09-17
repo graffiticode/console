@@ -29,7 +29,6 @@ export const Properties = ({
   id,   // current state of the view
   lang,
   height,
-  setId: setOuterId,
   user,
   setSaveDisabled,
   state: editorState,

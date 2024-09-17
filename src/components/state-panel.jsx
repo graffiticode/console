@@ -21,46 +21,20 @@ const parseId = id => {
   };
 };
 
-// TODO getData(id) => props; postTask(props) => propId; id=taskId+propId
-
-export const StatePanel = ({ id, lang, height, setId: setOuterId, user, setSaveDisabled }) => {
-  console.log("StatePanel() id=" + id);
-  const [ taskId, setTaskId ] = useState();
-  const [ outerTaskId, setOuterTaskId ] = useState();
-  const [ dataId, setDataId ] = useState(id);
+export const StatePanel = ({ id, lang, height, user, setSaveDisabled }) => {
+  const [ taskId, setTaskId ] = useState("");
   const [ doPostTask, setDoPostTask ] = useState(true);
-
-  const setId = newDataId => {
-    // Only set outer id if this change is from the props editor.
-    const newId = getId({taskId: outerTaskId, dataId: newDataId.split("+").slice(1)});
-    setOuterId(newId);
-    setSaveDisabled(false);
-  };
-
-  useEffect(() => {
-    const { taskId, dataId } = parseId(id);
-    if (id) {
-      setOuterTaskId(taskId);
-    }
-    if (taskId !== outerTaskId) {
-      setDataId(dataId || taskId);
-    }
-  }, [id]);
-
-  // Get taskId from schema as L0011 code.
 
   const postTaskResp = useSWR(
     doPostTask && { user, lang: "0001", code: "data {}.." } || null,
     postTask
   );
 
-  useEffect(() => {
-    if (postTaskResp.data) {
-      const taskId = postTaskResp.data;
-      setTaskId(taskId);
-      setDoPostTask(false);
-    }
-  }, [postTaskResp?.data]);
+  if (postTaskResp.data) {
+    const taskId = postTaskResp.data;
+    setTaskId(taskId);
+    setDoPostTask(false);
+  }
 
   return (
     !taskId &&
@@ -69,8 +43,7 @@ export const StatePanel = ({ id, lang, height, setId: setOuterId, user, setSaveD
         height={height}
         key="props"
         lang="0001"
-        id={getId({taskId, dataId})}
-        setId={setId}
+        id={getId({taskId, dataId: id})}
       />
   );
 }
