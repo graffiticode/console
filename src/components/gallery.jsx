@@ -94,7 +94,7 @@ export default function Gallery({ lang, mark }) {
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ tasks, setTasks ] = useState([]);
   const [ task, setTask ] = useState({});
-  const [ newTask, setNewTask ] = useState();
+  const [ newTask, setNewTask ] = useState(null);
   const [ showSaving, setShowSaving ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(480);
   const [ editorHeight, setEditorHeight ] = useState(480);

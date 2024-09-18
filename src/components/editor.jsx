@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import CodeMirror from './CodeMirror';
 import { Properties } from "./properties";
-import { StatePanel } from "./state-panel";
+import { StatePanel } from "./StatePanel";
 import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
@@ -18,7 +18,7 @@ function classNames(...classes) {
 
 const tabs = [
   { name: 'Code', current: true },
-  { name: 'Inits', current: false },
+  { name: 'Edit', current: false },
   { name: 'Data', current: false },
 ]
 
@@ -248,7 +248,7 @@ export default function Editor({
           style={{height}}
         >
           {
-            tab === "Inits" &&
+            tab === "Edit" &&
               <Properties
                 state={state}
                 height={height}
