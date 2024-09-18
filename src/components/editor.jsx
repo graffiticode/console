@@ -192,6 +192,7 @@ export default function Editor({
       type: "compile",
       args: {
         taskId,
+        dataId: "",
       },
     });
   }
