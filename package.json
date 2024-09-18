@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "refresh": "rm -rf node_modules; rm package-lock.json; npm i @graffiticode/l0002; npm i @graffiticode/l0011",
+    "refresh": "npm i @graffiticode/l0002@latest; npm i @graffiticode/l0011@latest",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -21,7 +21,7 @@
     "@graffiticode/auth": "^2.1.2",
     "@graffiticode/component-test": "file:../l0002/packages/component-test",
     "@graffiticode/l0002": "^0.0.8",
-    "@graffiticode/l0011": "^0.0.3",
+    "@graffiticode/l0011": "^0.0.4",
     "@graphiql/toolkit": "^0.8.2",
     "@graphql-tools/schema": "^9.0.1",
     "@headlessui/react": "^1.7.16",
