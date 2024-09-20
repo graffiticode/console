@@ -178,7 +178,7 @@ export default function Editor({
         >
           {
             tab === "Edit" &&
-              <Properties
+              <EditPanel
                 state={state}
                 height={height}
                 id={id}
@@ -187,14 +187,14 @@ export default function Editor({
                 setSaveDisabled={setSaveDisabled}
               /> ||
               tab === "Data" &&
-              <StatePanel
+              <DataPanel
                 height={height}
                 id={id}
                 lang={lang}
                 user={user}
                 setSaveDisabled={setSaveDisabled}
               /> ||
-              <CodeMirror
+              <CodePanel
                 code={code}
                 state={state}
               />

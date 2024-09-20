@@ -5,7 +5,7 @@ import { Form } from "@graffiticode/l0002";
 
 const isNullOrEmptyObject = (obj) => !obj || Object.keys(obj).length === 0;
 
-export const StatePanel = ({
+export const DataPanel = ({
   id,
   user,
 }) => {
