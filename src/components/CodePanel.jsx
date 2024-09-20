@@ -45,7 +45,7 @@ function customCompletionDisplay({ state }) {
   });
 }
 
-const CodeMirror = ({
+export const CodePanel = ({
   code,
   state,
 }) => {
@@ -76,5 +76,3 @@ const CodeMirror = ({
     />
   );
 };
-
-export default CodeMirror;

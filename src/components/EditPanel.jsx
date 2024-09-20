@@ -22,10 +22,7 @@ const parseId = id => {
   };
 };
 
-// TODO getData(id) => props; postTask(props) => propId; id=taskId+propId
-// L0011 compile just merges schema (code) with props (data)
-
-export const Properties = ({
+export const EditPanel = ({
   id,   // current state of the view
   lang,
   height,

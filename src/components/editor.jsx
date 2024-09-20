@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import CodeMirror from './CodeMirror';
-import { Properties } from "./properties";
-import { StatePanel } from "./StatePanel";
+import { CodePanel } from './CodePanel';
+import { EditPanel } from "./EditPanel";
+import { DataPanel } from "./DataPanel";
 import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
