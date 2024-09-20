@@ -1,5 +1,3 @@
-// TODO On save, replace expectedValue with responseValue and clear responseValue.
-// TODO Use full formId+dataId from proerties to make a new id.
 import { useState, useEffect } from 'react'
 import CodeMirror from './CodeMirror';
 import { Properties } from "./properties";
@@ -11,82 +9,10 @@ import useSWR from "swr";
 import { buildSaveTask, postTask } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { createState } from "../lib/state";
+import { Tabs } from "./Tabs";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
-}
-
-const tabs = [
-  { name: 'Code', current: true },
-  { name: 'Edit', current: false },
-  { name: 'Data', current: false },
-]
-
-function Tabs({ setTab, setSaving, setShowSaving, saveDisabled }) {
-  const handleClick = (name) => {
-    tabs.find(tab => tab.current).current = false;
-    tabs.find(tab => tab.name === name).current = true;
-    setTab(name);
-  };
-  return (
-    <div className="pt-4">
-      <div className="sm:hidden">
-        <label htmlFor="tabs" className="sr-only">
-          Select a tab
-        </label>
-        {/* Use an "onChange" listener to redirect the user to the selected tab URL. */}
-        <select
-          id="tabs"
-          name="tabs"
-          className="block w-full rounded-none py-2 pl-3 pr-10 text-base focus:border-gray-500 focus:outline-none focus:ring-gray-500 sm:text-sm"
-          defaultValue={tabs.find((tab) => tab.current).name}
-        >
-          {tabs.map((tab) => (
-            <option key={tab.name}>{tab.name}</option>
-          ))}
-        </select>
-      </div>
-      <div className="hidden sm:block">
-        <div className="">
-          <nav className="-mb-px flex justify-between space-x-4 border-b text-xs pb-1" aria-label="Tabs">
-            <div className="">
-            {tabs.map((tab) => (
-              <a
-                key={tab.name}
-                onClick={() => handleClick(tab.name)}
-                className={classNames(
-                  tab.current
-                    ? 'border-gray-500 text-gray-700 font-semibold'
-                    : 'border-transparent font-light text-gray-500 hover:border-gray-300 hover:text-gray-700',
-                  'whitespace-nowrap border-b py-1 mb-0 mx-2 px-1'
-                )}
-                aria-current={tab.current ? 'page' : undefined}
-              >
-                {tab.name}
-              </a>
-            ))}
-            </div>
-            <button
-              className={
-                classNames(
-                  saveDisabled && "text-gray-400 font-medium" || "font-semibold text-gray-700",
-                  "bg-white px-4"
-                )
-              }
-              onClick={() => {
-                setSaving(true);
-                setTimeout(() => setShowSaving(true), 100);
-                setTimeout(() => setShowSaving(false), 1500);
-              }}
-              disabled={saveDisabled}
-            >
-              Save
-            </button>
-          </nav>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 const getId = ({ taskId, dataId }) => (
@@ -94,8 +20,8 @@ const getId = ({ taskId, dataId }) => (
 );
 
 const parseId = id => {
-  if (id === undefined) {
-    return {};
+  if (!id) {
+    return {taskId: ""};
   }
   const parts = id.split("+");
   return {
@@ -127,12 +53,13 @@ export default function Editor({
   const [ saveDisabled, setSaveDisabled ] = useState(true);
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
+  const { taskId, dataId } = parseId(id);
   useEffect(() => {
-    if (id === "") {
-      setCode("");  // New task.
-      setDataCode("");  // New task.
+    if (taskId === "") {
+      // New task.
+      setCode("");
+      setDataCode("");
     } else {
-      const { taskId, dataId } = parseId(id);
       const task = tasks.find(task => task.id === taskId);
       task && setCode(task.src);
       state.apply({
@@ -140,7 +67,8 @@ export default function Editor({
         args: {taskId, dataId},
       });
     }
-  }, [id]);
+    setTab("Code");
+  }, [taskId]);
 
   const [ state ] = useState(createState({
     lang,

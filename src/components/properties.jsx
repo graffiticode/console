@@ -6,8 +6,8 @@ import { createState } from "../lib/state";
 import { getLanguageAsset } from "../lib/api";
 import useSWR from 'swr';
 import { compile, getData, postTask } from '../utils/swr/fetchers';
-//import FormView from "./FormView.jsx";
 import { Form } from "@graffiticode/l0011";
+//import { Form } from "./l0011";
 
 const getId = ({ taskId, dataId }) => dataId && `${taskId}+${dataId}` || taskId;
 
@@ -22,18 +22,14 @@ const parseId = id => {
   };
 };
 
-// TODO getData(id) => props; postTask(props) => propId; id=taskId+propId
-// L0011 compile just merges schema (code) with props (data)
-
 export const Properties = ({
   id,   // current state of the view
   lang,
-  height,
   user,
-  setSaveDisabled,
   state: editorState,
 }) => {
-  const [ schema, setSchema ] = useState({});
+  const [ data, setData ] = useState({});
+  const [ schema, setSchema ] = useState(null);
   const [ taskId, setTaskId ] = useState();
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ doRecompile, setDoRecompile ] = useState(false);
@@ -69,11 +65,11 @@ export const Properties = ({
     (async () => {
       try {
         const schema = await getLanguageAsset(`L${lang}`, "schema.json") || "{}";
-        setSchema(schema);
+        setSchema(JSON.parse(schema));
         setDoPostTask(true);
       } catch (x) {
         console.error(`No schema available for L${lang}.`);
-        setSchema(undefined);
+        setSchema(null);
       }
     })();
   }, []);
@@ -91,16 +87,18 @@ export const Properties = ({
   );
   
   if (getDataResp.data) {
+    const data = getDataResp.data;
+    setData(data);
     setDoGetData(false);
     state.apply({
       type: "compile",
-      args: getDataResp.data,
+      args: data,
     })
   }
 
   // Get taskId from schema as L0011 code.
   const postTaskResp = useSWR(
-    doPostTask && schema && { user, lang: "0011", code: `{schema: ${schema}}..` } || null,
+    doPostTask && schema && { user, lang: "0011", code: `{schema: ${JSON.stringify(schema)}}..` } || null,
     postTask
   );
 
@@ -132,6 +130,6 @@ export const Properties = ({
   return (
     !schema &&
       <div className="px-2 text-sm">No schema available.</div> ||
-      <Form state={state} />
+      <Form state={state} schema={schema} />
   );
 }
