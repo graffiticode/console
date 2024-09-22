@@ -2,6 +2,9 @@
   "name": "artcompiler-console",
   "version": "0.2.0",
   "private": true,
+  "engines": {
+    "node": ">=v18.17.0"
+  },
   "scripts": {
     "refresh": "npm i @graffiticode/l0002@latest; npm i @graffiticode/l0011@latest",
     "dev": "next dev",
