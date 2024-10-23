@@ -9,7 +9,7 @@ import SignIn from "./SignIn";
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 
-const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
+const useTaskIdFormUrl = ({ accessToken, lang, id, origin }) => {
   if (!id) {
     return "";
   }
@@ -20,12 +20,24 @@ const useTaskIdFormUrl = ({ accessToken, lang, id }) => {
   if (accessToken) {
     params.set("access_token", accessToken);
   }
+  if (origin) {
+    params.set("origin", origin);
+  }
   return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
 };
 
 const HEIGHTS = [150, 240, 360, 480, 640, 860, 1020];
 
-const IFrame = ({ id, src, className, width, height }) =>
+const IFrame = ({ id, src, className, width, height }) => (
+  useEffect(() => {
+    const handleMessage = (event) => {
+      console.log('Received message from iframe:', event.data);
+    };
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []),
   <iframe
     id={id}
     src={src}
@@ -33,7 +45,8 @@ const IFrame = ({ id, src, className, width, height }) =>
     className={className}
     width="100%"
     height={height}
-  />;
+  />
+);
 
 const getHeight = (height, newHeight) => {
   if (newHeight === height) {
@@ -61,11 +74,11 @@ export const FormIFrame = ({
       if (id) {
         setId && setId(id);
       }
-    },
-    false,
+    }
   );
 
-  const src = useTaskIdFormUrl({ accessToken, lang, id });
+  const origin = window.location.origin;
+  const src = useTaskIdFormUrl({accessToken, lang, id, origin});
   return (
     <IFrame
       id={id}
