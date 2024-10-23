@@ -31,7 +31,11 @@ const HEIGHTS = [150, 240, 360, 480, 640, 860, 1020];
 const IFrame = ({ id, src, className, width, height }) => (
   useEffect(() => {
     const handleMessage = (event) => {
-      console.log('Received message from iframe:', event.data);
+      if (event.origin === window.location.origin) {
+        // TODO Refine this filter
+        return;
+      }
+      console.log("Data from", event.origin, "=", JSON.stringify(event.data, null, 2));
     };
     window.addEventListener('message', handleMessage);
     return () => {
