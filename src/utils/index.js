@@ -5,3 +5,11 @@ export function isNonEmptyString(str) {
 export function isNonNullObject(obj) {
   return (typeof obj === "object" && obj !== null);
 }
+
+export function isNonNullNonEmptyObject(obj) {
+  return (
+    typeof obj === "object" &&
+      obj !== null &&
+      Object.keys(obj).length > 0
+  );
+}

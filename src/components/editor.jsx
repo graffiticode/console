@@ -10,6 +10,7 @@ import { buildSaveTask, postTask } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
+import { isNonNullNonEmptyObject } from "../utils";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -20,6 +21,7 @@ const getId = ({ taskId, dataId }) => (
 );
 
 const parseId = id => {
+  console.log("parseId() id=" + JSON.stringify(id));
   if (!id) {
     return {taskId: ""};
   }
@@ -60,8 +62,8 @@ export default function Editor({
   const [ saveDisabled, setSaveDisabled ] = useState(true);
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
-//  const [ taskId, setTaskId ] = useState(parseId(id).taskId);
-  const taskId = parseId(id).taskId;
+  const [ taskId, setTaskId ] = useState(parseId(id).taskId);
+//  const taskId = parseId(id).taskId;
   useEffect(() => {
     if (taskId === "") {
       // New task.
@@ -79,15 +81,19 @@ export default function Editor({
   }, [taskId]);
 
   useEffect(() => {
-    console.log("Editor() code=" + code);
-    setDoPostTask(true);
-    setSaveDisabled(false);
+    if (code) {
+      console.log("Editor() code=" + code);
+      setDoPostTask(true);
+      setSaveDisabled(false);
+    }
   }, [code]);
 
   useEffect(() => {
-    console.log("Editor() data=" + JSON.stringify(data, null, 2));
-    setDoPostDataTask(true);
-    setSaveDisabled(false);
+    if (isNonNullNonEmptyObject(data)) {
+      console.log("Editor() data=" + JSON.stringify(data, null, 2));
+      setDoPostDataTask(true);
+      setSaveDisabled(false);
+    }
   }, [data]);
 
   // const [ state ] = useState(createState({
@@ -112,6 +118,7 @@ export default function Editor({
 
   // Post task.
 
+  console.log("lang=" + lang + " code=" + code);
   const postTaskResp = useSWR(
     doPostTask && { user, lang, code } || null,
     postTask
@@ -119,8 +126,9 @@ export default function Editor({
 
   if (postTaskResp.data) {
     const taskId = postTaskResp.data;
+    console.log("postTaskResp() taskId=" + taskId);
     setDoPostTask(false);
-//    setTaskId(taskId);
+    setTaskId(taskId);
     setId(taskId);
     // state.apply({
     //   type: "compile",
@@ -144,7 +152,7 @@ export default function Editor({
     const dataId = postDataTaskResp.data;
     // const { taskId } = state.data;
     setDoPostDataTask(false);
-    setId(`${taskId}+${dataId}`);
+    setId(getId({taskId, dataId}));
     // state.apply({
     //   type: "compile",
     //   args: {
