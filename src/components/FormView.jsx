@@ -12,11 +12,10 @@ import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { FormIFrame } from "./FormIFrame";
 import { FormReact } from "./FormReact";
-
 //const reactForms = ["0002"];
 const reactForms = [];
 
-export default function FormView({ lang, id, setId, setNewTask, className, height }) {
+export default function FormView({ lang, id, setData, setId, setNewTask, className, height }) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [dataId, setDataId] = useState();
@@ -45,6 +44,7 @@ export default function FormView({ lang, id, setId, setNewTask, className, heigh
         accessToken={accessToken}
         lang={lang}
         id={id}
+        setData={setData}
         setId={setId}
         className={className}
         height={height}

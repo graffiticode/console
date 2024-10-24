@@ -28,7 +28,8 @@ const useTaskIdFormUrl = ({ accessToken, lang, id, origin }) => {
 
 const HEIGHTS = [150, 240, 360, 480, 640, 860, 1020];
 
-const IFrame = ({ id, src, className, width, height }) => (
+const IFrame = ({ id, src, setData, className, width, height }) => (
+  console.log("IFrame() id=" + id),
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.origin === window.location.origin) {
@@ -36,6 +37,7 @@ const IFrame = ({ id, src, className, width, height }) => (
         return;
       }
       console.log("Data from", event.origin, "=", JSON.stringify(event.data, null, 2));
+      setData && setData(event.data);
     };
     window.addEventListener('message', handleMessage);
     return () => {
@@ -66,27 +68,28 @@ export const FormIFrame = ({
   accessToken,
   lang,
   id,
+  setData,
   setId,
   data,
   className,
   height
 }) => {
-  window.addEventListener(
-    "message",
-    (event) => {
-      const { id } = event.data;
-      if (id) {
-        setId && setId(id);
-      }
-    }
-  );
-
+  // window.addEventListener(
+  //   "message",
+  //   (event) => {
+  //     const { id } = event.data;
+  //     if (id) {
+  //       setId && setId(id);
+  //     }
+  //   }
+  // );
   const origin = window.location.origin;
   const src = useTaskIdFormUrl({accessToken, lang, id, origin});
   return (
     <IFrame
       id={id}
       src={src}
+      setData={setData}
       className={className}
       width="100%"
       height={height}

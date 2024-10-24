@@ -30,6 +30,12 @@ const parseId = id => {
   };
 };
 
+/*
+  The job of the Editor is to provide code and props editors and to compile the
+  edited code and props to get a task id for the current state of the view.
+ */
+
+
 export default function Editor({
   accessToken,
   id,
@@ -42,6 +48,7 @@ export default function Editor({
   height,
 }) {
   const [ code, setCode ] = useState("");
+  const [ data, setData ] = useState({});
   const [ dataCode, setDataCode ] = useState("");
   const [ view, setView ] = useState();
   const [ mark, setMark ] = useState(initMark);
@@ -53,58 +60,55 @@ export default function Editor({
   const [ saveDisabled, setSaveDisabled ] = useState(true);
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
-  const { taskId, dataId } = parseId(id);
+//  const [ taskId, setTaskId ] = useState(parseId(id).taskId);
+  const taskId = parseId(id).taskId;
   useEffect(() => {
     if (taskId === "") {
       // New task.
       setCode("");
-      setDataCode("");
+      setData({});
     } else {
       const task = tasks.find(task => task.id === taskId);
       task && setCode(task.src);
-      state.apply({
-        type: "compile",
-        args: {taskId, dataId},
-      });
+      // state.apply({
+      //   type: "compile",
+      //   args: {taskId, dataId},
+      // });
     }
     setTab("Code");
   }, [taskId]);
 
-  const [ state ] = useState(createState({
-    lang,
-  }, (data, { type, args }) => {
-    // console.log("Editor() state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
-    switch (type) {
-    case "compile":
-      setId(getId({
-        ...data,
-        ...args,
-      }));
-      return {
-        ...data,
-        ...args,
-      };
-    case "dataChange":
-      setDoPostDataTask(true);
-      setSaveDisabled(false);
-      setDataCode(`${JSON.stringify(args)}..`);
-      return {
-        ...data,
-      };
-    case "codeChange":
-      if (code != args.code) {
-        setCode(args.code);
-        setDoPostTask(true);
-        setSaveDisabled(false);
-      }
-      return {
-        ...data,
-      };
-    default:
-      console.error(false, `Unimplemented action type: ${type}`);
-      return data;
-    }
-  }));
+  useEffect(() => {
+    console.log("Editor() code=" + code);
+    setDoPostTask(true);
+    setSaveDisabled(false);
+  }, [code]);
+
+  useEffect(() => {
+    console.log("Editor() data=" + JSON.stringify(data, null, 2));
+    setDoPostDataTask(true);
+    setSaveDisabled(false);
+  }, [data]);
+
+  // const [ state ] = useState(createState({
+  //   lang,
+  // }, (data, { type, args }) => {
+  //   console.log("Editor() state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+  //   switch (type) {
+  //   case "compile":
+  //     setId(getId({
+  //       ...data,
+  //       ...args,
+  //     }));
+  //     return {
+  //       ...data,
+  //       ...args,
+  //     };
+  //   default:
+  //     console.error(false, `Unimplemented action type: ${type}`);
+  //     return data;
+  //   }
+  // }));
 
   // Post task.
 
@@ -116,41 +120,50 @@ export default function Editor({
   if (postTaskResp.data) {
     const taskId = postTaskResp.data;
     setDoPostTask(false);
-    state.apply({
-      type: "compile",
-      args: {
-        taskId,
-        dataId: "",
-      },
-    });
+//    setTaskId(taskId);
+    setId(taskId);
+    // state.apply({
+    //   type: "compile",
+    //   args: {
+    //     taskId,
+    //     dataId: "",
+    //   },
+    // });
   }
 
   const postDataTaskResp = useSWR(
-    doPostDataTask && { user, lang: "0001", code: dataCode } || null,
+    doPostDataTask && {
+      user,
+      lang: "0001",
+      code: `${JSON.stringify(data)}..`
+    } || null,
     postTask
   );
 
   if (postDataTaskResp.data) {
     const dataId = postDataTaskResp.data;
-    const { taskId } = state.data;
+    // const { taskId } = state.data;
     setDoPostDataTask(false);
-    state.apply({
-      type: "compile",
-      args: {
-        dataId,
-      },
-    });
+    setId(`${taskId}+${dataId}`);
+    // state.apply({
+    //   type: "compile",
+    //   args: {
+    //     dataId,
+    //   },
+    // });
   }
 
   // Save task.
 
   const task = { id, lang, code, mark: mark.id, isPublic };
-    const { isLoading, data } = useSWR(
+//  const { isLoading, data } = useSWR(
+  const saveTaskResp = useSWR(
     saving && { user, ...task } || null,
     saveTask
   );
 
   useEffect(() => {
+    const data = saveTaskResp.data;
     if (data?.id) {
       // We have successfully saved a task so add it to the task list.
       setNewTask({
@@ -161,7 +174,7 @@ export default function Editor({
     }
     setSaving(false);
     setSaveDisabled(true);
-  }, [data?.id]);
+  }, [saveTaskResp.data?.id]);
 
   return (
     <div className="flex items-start space-x-4">
@@ -179,7 +192,8 @@ export default function Editor({
           {
             tab === "Edit" &&
               <EditPanel
-                state={state}
+                accessToken={accessToken}
+                setData={setData}
                 height={height}
                 id={id}
                 lang={lang}
@@ -196,7 +210,7 @@ export default function Editor({
               /> ||
               <CodePanel
                 code={code}
-                state={state}
+                setCode={setCode}
               />
               
           }

@@ -16,7 +16,7 @@ const getCode = view => {
   return lines.join("");
 };
 
-const debouncedStartCompletion = debounce(({ view, state }) => {
+const debouncedStartCompletion = debounce(({ view, setCode }) => {
   const doc = view.state.doc;
   const lines = [];
   for (const text of doc.iter()) {
@@ -25,33 +25,29 @@ const debouncedStartCompletion = debounce(({ view, state }) => {
   const user = 'public';
   const code = getCode(view);
   if (code !== '') {
-    // setCode(code);
-    state.apply({
-      type: "codeChange",
-      args: { code },
-    });
+    setCode(code);
   }
 }, 300);
 
-function customCompletionDisplay({ state }) {
+function customCompletionDisplay({ setCode }) {
   return EditorView.updateListener.of(({ view, docChanged, transactions }) => {
     if (docChanged) {
       // when a completion is active each keystroke triggers the
       // completion source function, to avoid it we close any open
       // completion inmediatly.
       //closeCompletion(view);
-      debouncedStartCompletion({ view, state });
+      debouncedStartCompletion({ view, setCode });
     }
   });
 }
 
 export const CodePanel = ({
   code,
-  state,
+  setCode,
 }) => {
   const [ view, setView ] = useState();
   const extensions = [
-    customCompletionDisplay({ state }),
+    customCompletionDisplay({ setCode }),
   ];
   const { ref } = useCodeMirror(extensions, setView, code);
   useEffect(() => {
