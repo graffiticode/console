@@ -28,22 +28,33 @@ const useTaskIdFormUrl = ({ accessToken, lang, id, origin }) => {
 
 const HEIGHTS = [150, 240, 360, 480, 640, 860, 1020];
 
+const cache = {};
+
 const IFrame = ({ id, src, setData, className, width, height }) => (
-  console.log("IFrame() id=" + id),
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.origin === window.location.origin) {
-        // TODO Refine this filter
         return;
       }
-      console.log("Data from", event.origin, "=", JSON.stringify(event.data, null, 2));
-      setData && setData(event.data);
+      const data = event.data[id];
+      // console.log("IFrame() id=" + id),
+      // console.log("IFrame() event.orgin=" + event.origin);
+      // console.log("IFrame() event.data=" + JSON.stringify(event.data, null, 2));
+      if (!data) {
+        return;
+      }
+      console.log("IFrame() data=" + JSON.stringify(data, null, 2));
+      const hash = JSON.stringify(data);
+      if (cache[id] !== hash) {
+        cache[id] = hash;
+        setData && setData(data);
+      }
     };
     window.addEventListener('message', handleMessage);
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, []),
+  }, [id]),
   <iframe
     id={id}
     src={src}
@@ -74,15 +85,6 @@ export const FormIFrame = ({
   className,
   height
 }) => {
-  // window.addEventListener(
-  //   "message",
-  //   (event) => {
-  //     const { id } = event.data;
-  //     if (id) {
-  //       setId && setId(id);
-  //     }
-  //   }
-  // );
   const origin = window.location.origin;
   const src = useTaskIdFormUrl({accessToken, lang, id, origin});
   return (

@@ -63,7 +63,6 @@ export default function Editor({
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
   const [ taskId, setTaskId ] = useState(parseId(id).taskId);
-//  const taskId = parseId(id).taskId;
   useEffect(() => {
     if (taskId === "") {
       // New task.
@@ -72,10 +71,6 @@ export default function Editor({
     } else {
       const task = tasks.find(task => task.id === taskId);
       task && setCode(task.src);
-      // state.apply({
-      //   type: "compile",
-      //   args: {taskId, dataId},
-      // });
     }
     setTab("Code");
   }, [taskId]);
@@ -89,32 +84,12 @@ export default function Editor({
   }, [code]);
 
   useEffect(() => {
+    console.log("Editor() data=" + JSON.stringify(data, null, 2));
     if (isNonNullNonEmptyObject(data)) {
-      console.log("Editor() data=" + JSON.stringify(data, null, 2));
       setDoPostDataTask(true);
       setSaveDisabled(false);
     }
   }, [data]);
-
-  // const [ state ] = useState(createState({
-  //   lang,
-  // }, (data, { type, args }) => {
-  //   console.log("Editor() state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
-  //   switch (type) {
-  //   case "compile":
-  //     setId(getId({
-  //       ...data,
-  //       ...args,
-  //     }));
-  //     return {
-  //       ...data,
-  //       ...args,
-  //     };
-  //   default:
-  //     console.error(false, `Unimplemented action type: ${type}`);
-  //     return data;
-  //   }
-  // }));
 
   // Post task.
 
@@ -130,13 +105,6 @@ export default function Editor({
     setDoPostTask(false);
     setTaskId(taskId);
     setId(taskId);
-    // state.apply({
-    //   type: "compile",
-    //   args: {
-    //     taskId,
-    //     dataId: "",
-    //   },
-    // });
   }
 
   const postDataTaskResp = useSWR(
@@ -150,21 +118,13 @@ export default function Editor({
 
   if (postDataTaskResp.data) {
     const dataId = postDataTaskResp.data;
-    // const { taskId } = state.data;
     setDoPostDataTask(false);
     setId(getId({taskId, dataId}));
-    // state.apply({
-    //   type: "compile",
-    //   args: {
-    //     dataId,
-    //   },
-    // });
   }
 
   // Save task.
 
   const task = { id, lang, code, mark: mark.id, isPublic };
-//  const { isLoading, data } = useSWR(
   const saveTaskResp = useSWR(
     saving && { user, ...task } || null,
     saveTask

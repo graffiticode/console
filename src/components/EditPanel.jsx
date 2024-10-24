@@ -8,7 +8,10 @@ import useSWR from 'swr';
 import { compile, getData, postTask } from '../utils/swr/fetchers';
 import FormView from "./FormView.jsx";
 
-const getId = ({ taskId, dataId }) => dataId && `${taskId}+${dataId}` || taskId;
+const getId = ({ taskId, dataId }) =>
+      taskId && dataId && `${taskId}+${dataId}` ||
+      taskId ||
+      "";
 
 const parseId = id => {
   if (id === undefined) {
@@ -41,34 +44,6 @@ export const EditPanel = ({
   const [ schema, setSchema ] = useState({});
   const [ taskId, setTaskId ] = useState();
   const [ doPostTask, setDoPostTask ] = useState(false);
-  // const [ doRecompile, setDoRecompile ] = useState(false);
-  // const [ doGetData, setDoGetData ] = useState(false);
-  // const [ state ] = useState(createState({}, (data, { type, args }) => {
-  //   // console.log("Properties() state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
-  //   switch (type) {
-  //   case "compile":
-  //     // we have new properties
-  //     setDoRecompile(false);
-  //     return {
-  //       ...data,
-  //       ...args,
-  //     };
-  //   case "change":
-  //     // A setting has changed, so recompile to get a new id.
-  //     setDoRecompile(true);
-  //     editorState.apply({
-  //       type: "dataChange",
-  //       args,
-  //     });
-  //     return {
-  //       ...data,
-  //       ...args,
-  //     };
-  //   default:
-  //     console.error(false, `Unimplemented action type: ${type}`);
-  //     return data;
-  //   }
-  // }));
 
   useEffect(() => {
     (async () => {
@@ -82,26 +57,6 @@ export const EditPanel = ({
       }
     })();
   }, []);
-
-  // useEffect(() => {
-  //   setDoGetData(true);
-  // }, [id]);
-
-  // const getDataResp = useSWR(
-  //   doGetData && taskId && id && user && {
-  //     id: `${taskId}+${id}`,
-  //     user,
-  //   },
-  //   getData
-  // );
-  
-  // if (getDataResp.data) {
-  //   setDoGetData(false);
-  //   state.apply({
-  //     type: "compile",
-  //     args: getDataResp.data,
-  //   })
-  // }
 
   // Get taskId from schema as L0011 code.
   const postTaskResp = useSWR(
@@ -117,30 +72,13 @@ export const EditPanel = ({
     }
   }, [postTaskResp?.data]);
 
-  // const compileResp = useSWR(
-  //   doRecompile && taskId && user && {
-  //     id: taskId,
-  //     data: state.data,
-  //     user,
-  //   },
-  //   compile
-  // );
-
-  // if (compileResp.data) {
-  //   state.apply({
-  //     type: "compile",
-  //     args: compileResp.data.data,
-  //   });
-  //   setDoRecompile(false);
-  // }
-
   return (
     !schema &&
       <div className="px-2 text-sm">No schema available.</div> ||
       <FormView
         key="form"
         accessToken={accessToken}
-        id={`${taskId}+${id}`}
+        id={getId({taskId: taskId, dataId: id})}
         lang={lang}
         setData={setData}
         className="border border-gray-300 rounded-none overflow-auto p-2 resize"

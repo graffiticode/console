@@ -1,6 +1,3 @@
-// TODO save and load code + data tasks
-// TODO refresh tasks nav when new task is saved
-
 import useSWR from "swr";
 import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
