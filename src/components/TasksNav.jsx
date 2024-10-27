@@ -133,7 +133,7 @@ const getNestedItems = ({ setId, tasks }) => {
   return nestedItems;
 }
 
-export default function TasksNav({ user, setId, setTask, tasks }) {
+export default function TasksNav({ user, setId, tasks }) {
   const [ items, setItems ] = useState([]);
   const [ showId, setShowId ] = useState("");
   const [ updatedTasks, setUpdatedTasks ] = useState([]);
@@ -287,7 +287,6 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                           >
                             <Disclosure.Button
                               onClick={() => {
-                                setTask(item);
                                 setId(item.id);
                                 items.forEach(item => item.current = false);
                                 item.current = true;
@@ -330,7 +329,6 @@ export default function TasksNav({ user, setId, setTask, tasks }) {
                                 >
                                   <button
                                     onClick={() => {
-                                      setTask(subItem.task);
                                       setId(subItem.id);
                                       items.forEach(item => item.current = false);
                                       item.children.forEach(subItem => subItem.current = false);

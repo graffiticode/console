@@ -6,7 +6,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
 import useSWR from "swr";
-import { buildSaveTask, postTask } from '../utils/swr/fetchers';
+import { buildSaveTask, postTask, getData } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
@@ -21,7 +21,6 @@ const getId = ({ taskId, dataId }) => (
 );
 
 const parseId = id => {
-  console.log("parseId() id=" + JSON.stringify(id));
   if (!id) {
     return {taskId: ""};
   }
@@ -58,11 +57,23 @@ export default function Editor({
   const [ saving, setSaving ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ doPostDataTask, setDoPostDataTask ] = useState(false);
+  const [ doGetData, setDoGetData ] = useState(false);
   const [ tab, setTab ] = useState("Code");
   const [ saveDisabled, setSaveDisabled ] = useState(true);
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
-  const [ taskId, setTaskId ] = useState(parseId(id).taskId);
+  const ids = parseId(id);
+  const [ taskId, setTaskId ] = useState(ids.taskId);
+  const [ dataId, setDataId ] = useState(ids.dataId);
+
+  useEffect(() => {
+    const { taskId } = parseId(id);
+    if (taskId) {
+      setTaskId(taskId);
+    }
+    setDoGetData(true);
+  }, [id]);
+
   useEffect(() => {
     if (taskId === "") {
       // New task.
@@ -77,23 +88,18 @@ export default function Editor({
 
   useEffect(() => {
     if (code) {
-      console.log("Editor() code=" + code);
       setDoPostTask(true);
       setSaveDisabled(false);
     }
   }, [code]);
 
   useEffect(() => {
-    console.log("Editor() data=" + JSON.stringify(data, null, 2));
     if (isNonNullNonEmptyObject(data)) {
       setDoPostDataTask(true);
       setSaveDisabled(false);
     }
-  }, [data]);
+  }, [JSON.stringify(data)]);
 
-  // Post task.
-
-  console.log("lang=" + lang + " code=" + code);
   const postTaskResp = useSWR(
     doPostTask && { user, lang, code } || null,
     postTask
@@ -101,7 +107,6 @@ export default function Editor({
 
   if (postTaskResp.data) {
     const taskId = postTaskResp.data;
-    console.log("postTaskResp() taskId=" + taskId);
     setDoPostTask(false);
     setTaskId(taskId);
     setId(taskId);
@@ -119,7 +124,22 @@ export default function Editor({
   if (postDataTaskResp.data) {
     const dataId = postDataTaskResp.data;
     setDoPostDataTask(false);
+    setDataId(dataId);
     setId(getId({taskId, dataId}));
+  }
+
+  const getDataResp = useSWR(
+    doGetData && {
+      user,
+      id,
+    } || null,
+    getData
+  );
+
+  if (getDataResp.data) {
+    const data = getDataResp.data;
+    setDoGetData(false);
+    setData(data);
   }
 
   // Save task.
@@ -130,7 +150,7 @@ export default function Editor({
     saveTask
   );
 
-  useEffect(() => {
+  if (saveTaskResp.data?.id) {
     const data = saveTaskResp.data;
     if (data?.id) {
       // We have successfully saved a task so add it to the task list.
@@ -142,7 +162,7 @@ export default function Editor({
     }
     setSaving(false);
     setSaveDisabled(true);
-  }, [saveTaskResp.data?.id]);
+  }
 
   return (
     <div className="flex items-start space-x-4">
@@ -160,13 +180,10 @@ export default function Editor({
           {
             tab === "Edit" &&
               <EditPanel
-                accessToken={accessToken}
-                setData={setData}
-                height={height}
-                id={id}
+                data={data}
                 lang={lang}
+                setData={setData}
                 user={user}
-                setSaveDisabled={setSaveDisabled}
               /> ||
               tab === "Data" &&
               <DataPanel
@@ -180,7 +197,6 @@ export default function Editor({
                 code={code}
                 setCode={setCode}
               />
-              
           }
         </div>
       </div>

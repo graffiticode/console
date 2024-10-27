@@ -1,5 +1,5 @@
-import useSWR from "swr";
 import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
+import useSWR from "swr";
 import { Dialog, Transition } from '@headlessui/react'
 import {
   XMarkIcon,
@@ -90,17 +90,16 @@ const getNestedItems = ({ setId, setItems, tasks }) => {
 export default function Gallery({ lang, mark }) {
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ tasks, setTasks ] = useState([]);
-  const [ task, setTask ] = useState({});
   const [ newTask, setNewTask ] = useState(null);
   const [ showSaving, setShowSaving ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(480);
   const [ editorHeight, setEditorHeight ] = useState(480);
+  const [ id, setId ] = useState("");
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,
   );
-  const [ id, setId ] = useState("");
   const editorRef = useRef();
 
   const handleCreateTask = useCallback(async (e) => {
@@ -158,7 +157,7 @@ export default function Gallery({ lang, mark }) {
           onClick={handleCreateTask}>
           +
         </button>
-        <TasksNav user={user} setId={setId} setTask={setTask} tasks={tasks} />
+        <TasksNav user={user} setId={setId} tasks={tasks} />
       </div>
       <div className="flex flex-col grow mt-6 px-4 sm:px-6">
         <div className={classNames(

@@ -6,12 +6,13 @@ import { createState } from "../lib/state";
 import { getLanguageAsset } from "../lib/api";
 import useSWR from 'swr';
 import { compile, getData, postTask } from '../utils/swr/fetchers';
-import FormView from "./FormView.jsx";
+import { Form } from "@graffiticode/l0011";
 
-const getId = ({ taskId, dataId }) =>
-      taskId && dataId && `${taskId}+${dataId}` ||
-      taskId ||
-      "";
+const getId = ({ taskId, dataId }) => (
+  taskId && dataId && `${taskId}+${dataId}` ||
+    taskId ||
+    ""
+);
 
 const parseId = id => {
   if (id === undefined) {
@@ -33,25 +34,58 @@ const parseId = id => {
  */
 
 export const EditPanel = ({
-  accessToken,
-  id,   // current state of the view
+  data,
   lang,
-  height,
-  user,
-  setSaveDisabled,
   setData,
+  user,
 }) => {
   const [ schema, setSchema ] = useState({});
   const [ taskId, setTaskId ] = useState();
   const [ doPostTask, setDoPostTask ] = useState(false);
+  const [ state, setState ] = useState(createState({}, (data, { type, args }) => {
+    // console.log("EditPanel() apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+    switch (type) {
+    case "init":
+      return {
+        ...args,
+      };
+    case "compile":
+      return {
+        ...data,
+        ...args,
+      };
+    case "update":
+      const updatedData = {
+        ...data,
+        ...args,
+      };
+      setData(updatedData);
+      return updatedData;
+    default:
+      console.error(false, `EditPanel() unimplemented action type: ${type}`);
+      return data;
+    }
+  }));
+
+  useEffect(() => {
+    state.apply({
+      type: "update",
+      args: data,
+    });
+  }, [JSON.stringify(data)]);
 
   useEffect(() => {
     (async () => {
       try {
-        const schema = await getLanguageAsset(`L${lang}`, "schema.json") || "{}";
+        const schema = JSON.parse(await getLanguageAsset(`L${lang}`, "schema.json") || "{}");
         setSchema(schema);
         setDoPostTask(true);
+        state.apply({
+          type: "update",
+          args: { schema },
+        });
       } catch (x) {
+        console.log(x.stack);
         console.error(`No schema available for L${lang}.`);
         setSchema(undefined);
       }
@@ -64,24 +98,15 @@ export const EditPanel = ({
     postTask
   );
 
-  useEffect(() => {
-    if (postTaskResp.data) {
-      const taskId = postTaskResp.data;
-      setTaskId(taskId);
-      setDoPostTask(false);
-    }
-  }, [postTaskResp?.data]);
+  if (postTaskResp?.data) {
+    const taskId = postTaskResp.data;
+    setTaskId(taskId);
+    setDoPostTask(false);
+  }
 
   return (
     !schema &&
       <div className="px-2 text-sm">No schema available.</div> ||
-      <FormView
-        key="form"
-        accessToken={accessToken}
-        id={getId({taskId: taskId, dataId: id})}
-        lang={lang}
-        setData={setData}
-        className="border border-gray-300 rounded-none overflow-auto p-2 resize"
-      />
+      <Form state={state} />
   );
 }

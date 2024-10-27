@@ -6,7 +6,7 @@
     "node": ">=18.17.0"
   },
   "scripts": {
-    "refresh": "npm i @graffiticode/l0002@latest; npm i @graffiticode/l0011@latest",
+    "refresh": "rm graffiticode*.tgz; cp ../l0002/graffiticode*.tgz .; cp ../l0011/graffiticode*.tgz .; npm i graffiticode*.tgz",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -24,7 +24,7 @@
     "@graffiticode/auth": "^2.1.2",
     "@graffiticode/component-test": "file:../l0002/packages/component-test",
     "@graffiticode/l0002": "file:graffiticode-l0002-0.1.0.tgz",
-    "@graffiticode/l0011": "file:graffiticode-l0011-0.0.4.tgz",
+    "@graffiticode/l0011": "file:graffiticode-l0011-0.0.6.tgz",
     "@graphiql/toolkit": "^0.8.2",
     "@graphql-tools/schema": "^9.0.1",
     "@headlessui/react": "^1.7.16",
