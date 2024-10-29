@@ -25,7 +25,7 @@ const parseId = id => {
   };
 };
 
-export const EditPanel = ({
+export const PropPanel = ({
   data,
   lang,
   setData,
@@ -35,7 +35,7 @@ export const EditPanel = ({
   const [ taskId, setTaskId ] = useState();
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ state ] = useState(createState({}, (data, { type, args }) => {
-    // console.log("EditPanel() apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+    // console.log("PropPanel() apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
     case "update":
       const updatedData = {
@@ -45,7 +45,7 @@ export const EditPanel = ({
       setData(updatedData);
       return updatedData;
     default:
-      console.error(false, `EditPanel() unimplemented action type: ${type}`);
+      console.error(false, `PropPanel() unimplemented action type: ${type}`);
       return data;
     }
   }));

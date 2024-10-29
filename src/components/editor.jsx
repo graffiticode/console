@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { CodePanel } from './CodePanel';
-import { EditPanel } from "./EditPanel";
+import { PropPanel } from "./PropPanel";
 import { DataPanel } from "./DataPanel";
 import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector from '../components/mark-selector';
@@ -177,14 +177,14 @@ export default function Editor({
           style={{height}}
         >
           {
-            tab === "Edit" &&
-              <EditPanel
+            tab === "Properties" &&
+              <PropPanel
                 data={data}
                 lang={lang}
                 setData={setProps}
                 user={user}
               /> ||
-              tab === "Data" &&
+              tab === "State" &&
               <DataPanel
                 height={height}
                 id={id}
