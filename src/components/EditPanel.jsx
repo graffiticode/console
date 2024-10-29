@@ -5,7 +5,7 @@ import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
 import { createState } from "../lib/state";
 import { getLanguageAsset } from "../lib/api";
 import useSWR from 'swr';
-import { compile, getData, postTask } from '../utils/swr/fetchers';
+import { getData, postTask } from '../utils/swr/fetchers';
 import { Form } from "@graffiticode/l0011";
 
 const getId = ({ taskId, dataId }) => (
@@ -25,14 +25,6 @@ const parseId = id => {
   };
 };
 
-/*
-  -- get task id for l0011 + schema
-  -- use subject id as data id
-  -- render the form view using task and data ids
-  -- listen for data updates from form view
-  -- 
- */
-
 export const EditPanel = ({
   data,
   lang,
@@ -42,18 +34,9 @@ export const EditPanel = ({
   const [ schema, setSchema ] = useState({});
   const [ taskId, setTaskId ] = useState();
   const [ doPostTask, setDoPostTask ] = useState(false);
-  const [ state, setState ] = useState(createState({}, (data, { type, args }) => {
+  const [ state ] = useState(createState({}, (data, { type, args }) => {
     // console.log("EditPanel() apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
-    case "init":
-      return {
-        ...args,
-      };
-    case "compile":
-      return {
-        ...data,
-        ...args,
-      };
     case "update":
       const updatedData = {
         ...data,

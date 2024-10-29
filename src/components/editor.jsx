@@ -27,13 +27,13 @@ const parseId = id => {
   const parts = id.split("+");
   return {
     taskId: parts[0],
-    dataId: parts.slice(1).join("+"),
+    dataId: parts.length > 1 && parts.slice(1).join("+"),
   };
 };
 
 /*
   The job of the Editor is to provide code and props editors and to compile the
-  edited code and props to get a task id for the current state of the view.
+  edited code and props to get an id for the current state of the view.
  */
 
 
@@ -50,6 +50,7 @@ export default function Editor({
 }) {
   const [ code, setCode ] = useState("");
   const [ data, setData ] = useState({});
+  const [ props, setProps ] = useState({});
   const [ dataCode, setDataCode ] = useState("");
   const [ view, setView ] = useState();
   const [ mark, setMark ] = useState(initMark);
@@ -64,15 +65,6 @@ export default function Editor({
   const saveTask = buildSaveTask();
   const ids = parseId(id);
   const [ taskId, setTaskId ] = useState(ids.taskId);
-  const [ dataId, setDataId ] = useState(ids.dataId);
-
-  useEffect(() => {
-    const { taskId } = parseId(id);
-    if (taskId) {
-      setTaskId(taskId);
-    }
-    setDoGetData(true);
-  }, [id]);
 
   useEffect(() => {
     if (taskId === "") {
@@ -87,46 +79,12 @@ export default function Editor({
   }, [taskId]);
 
   useEffect(() => {
-    if (code) {
-      setDoPostTask(true);
-      setSaveDisabled(false);
+    const { taskId } = parseId(id);
+    if (taskId) {
+      setTaskId(taskId);
     }
-  }, [code]);
-
-  useEffect(() => {
-    if (isNonNullNonEmptyObject(data)) {
-      setDoPostDataTask(true);
-      setSaveDisabled(false);
-    }
-  }, [JSON.stringify(data)]);
-
-  const postTaskResp = useSWR(
-    doPostTask && { user, lang, code } || null,
-    postTask
-  );
-
-  if (postTaskResp.data) {
-    const taskId = postTaskResp.data;
-    setDoPostTask(false);
-    setTaskId(taskId);
-    setId(taskId);
-  }
-
-  const postDataTaskResp = useSWR(
-    doPostDataTask && {
-      user,
-      lang: "0001",
-      code: `${JSON.stringify(data)}..`
-    } || null,
-    postTask
-  );
-
-  if (postDataTaskResp.data) {
-    const dataId = postDataTaskResp.data;
-    setDoPostDataTask(false);
-    setDataId(dataId);
-    setId(getId({taskId, dataId}));
-  }
+    setDoGetData(true);
+  }, [id]);
 
   const getDataResp = useSWR(
     doGetData && {
@@ -140,6 +98,47 @@ export default function Editor({
     const data = getDataResp.data;
     setDoGetData(false);
     setData(data);
+  }
+
+  useEffect(() => {
+    if (code) {
+      setDoPostTask(true);
+      setSaveDisabled(false);
+    }
+  }, [code]);
+
+  const postTaskResp = useSWR(
+    doPostTask && { user, lang, code } || null,
+    postTask
+  );
+
+  if (postTaskResp.data) {
+    const taskId = postTaskResp.data;
+    setDoPostTask(false);
+    setTaskId(taskId);
+    setId(taskId);
+  }
+
+  useEffect(() => {
+    if (isNonNullNonEmptyObject(props)) {
+      setDoPostDataTask(true);
+      setSaveDisabled(false);
+    }
+  }, [JSON.stringify(props)]);
+
+  const postDataTaskResp = useSWR(
+    doPostDataTask && {
+      user,
+      lang: "0001",
+      code: `${JSON.stringify(props)}..`
+    } || null,
+    postTask
+  );
+
+  if (postDataTaskResp.data) {
+    const dataId = postDataTaskResp.data;
+    setDoPostDataTask(false);
+    setId(getId({taskId, dataId}));
   }
 
   // Save task.
@@ -182,7 +181,7 @@ export default function Editor({
               <EditPanel
                 data={data}
                 lang={lang}
-                setData={setData}
+                setData={setProps}
                 user={user}
               /> ||
               tab === "Data" &&
