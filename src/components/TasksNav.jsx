@@ -254,7 +254,6 @@ export default function TasksNav({ user, setId, tasks }) {
                     >
                       <button
                         onClick={() => {
-                          setTask(item);
                           setId(item.id);
                           items.forEach(item => item.current = false);
                           item.current = true;
