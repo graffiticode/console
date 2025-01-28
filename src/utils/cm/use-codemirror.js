@@ -2,12 +2,11 @@
 // https://app.codiga.io/hub/snippet/8008/useCodeMirror
 import React, { useCallback, useEffect, useState } from "react";
 import { EditorState } from "@codemirror/state";
+import { basicSetup } from "codemirror";
 import { EditorView, keymap} from "@codemirror/view";
-import { Extension, Compartment } from "@codemirror/state";
-// import { graffiticode } from "@graffiticode/lang-graffiticode";
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { javascript } from "@codemirror/lang-javascript";
 import { defaultKeymap } from "@codemirror/commands";
-import {tags} from "@lezer/highlight";
+import { indentWithTab } from "@codemirror/commands"
 
 export default function useCodeMirror(extensions, setView, doc) {
   const [element, setElement] = useState();
@@ -20,22 +19,14 @@ export default function useCodeMirror(extensions, setView, doc) {
     if (!element) {
       return undefined;
     }
-    const theme = EditorView.theme({
-      "&": {
-        //minHeight: "150px",
-        height: "auto",
-      },
-      ".cm-scroller": {overflow: "auto"},
-      "class": "mx-4",
-    });
-
     const startState = EditorState.create({
       doc: doc || '',
       extensions: [
         ...extensions,
         keymap.of(defaultKeymap),
-        theme,
-        // graffiticode(),
+        javascript(),
+        keymap.of([indentWithTab]),
+        basicSetup,
       ]
     });
 

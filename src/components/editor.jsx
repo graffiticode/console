@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { CodePanel } from './CodePanel';
 import { PropPanel } from "./PropPanel";
 import { DataPanel } from "./DataPanel";
-import { javascript } from "@codemirror/lang-javascript";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
 import useSWR from "swr";

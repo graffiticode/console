@@ -36,6 +36,7 @@ const languages = [
   {id: 16, name: 'L0160', desc: "XML parsers", domains: ["graffiticode"]},
   {id: 17, name: 'L0161', desc: "Spreadsheet expression evaluators", domains: ["graffiticode"]},
   {id: 18, name: 'L0162', desc: "Walking routes", domains: ["graffiticode"]},
+  {id: 19, name: 'L0163', desc: "Code editors", domains: ["graffiticode"]},
 ];
 
 function classNames(...classes) {

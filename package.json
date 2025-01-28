@@ -15,11 +15,9 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
-    "@codemirror/basic-setup": "^0.20.0",
-    "@codemirror/commands": "^6.1.0",
-    "@codemirror/lang-javascript": "^6.0.2",
-    "@codemirror/state": "^6.1.1",
-    "@codemirror/view": "^6.2.3",
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/state": "^6.5.1",
+    "@codemirror/view": "^6.36.2",
     "@ethereumjs/util": "^8.0.3",
     "@graffiticode/auth": "^2.1.2",
     "@graffiticode/component-test": "file:../l0002/packages/component-test",
@@ -41,6 +39,7 @@
     "bent": "^7.3.12",
     "c3": "^0.4.24",
     "classnames": "^2.5.1",
+    "codemirror": "^6.0.1",
     "d3": "^7.6.1",
     "dashify": "^2.0.0",
     "firebase": "^9.23.0",
