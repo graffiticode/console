@@ -4,9 +4,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { EditorState } from "@codemirror/state";
 import { basicSetup } from "codemirror";
 import { EditorView, keymap} from "@codemirror/view";
-import { javascript } from "@codemirror/lang-javascript";
-import { defaultKeymap } from "@codemirror/commands";
-import { indentWithTab } from "@codemirror/commands"
+import { defaultKeymap, indentWithTab } from "@codemirror/commands";
+import { graffiticode } from "@graffiticode/lang-graffiticode";
 
 export default function useCodeMirror(extensions, setView, doc) {
   const [element, setElement] = useState();
@@ -24,7 +23,7 @@ export default function useCodeMirror(extensions, setView, doc) {
       extensions: [
         ...extensions,
         keymap.of(defaultKeymap),
-        javascript(),
+        graffiticode(),
         keymap.of([indentWithTab]),
         basicSetup,
       ]

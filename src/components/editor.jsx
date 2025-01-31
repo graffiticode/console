@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { CodePanel } from './CodePanel';
 import { PropPanel } from "./PropPanel";
 import { DataPanel } from "./DataPanel";
+import { HelpPanel } from "./HelpPanel";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
 import useSWR from "swr";
@@ -176,15 +177,15 @@ export default function Editor({
           style={{height}}
         >
           {
-            tab === "Properties" &&
+            tab === "Data" &&
               <PropPanel
                 data={data}
                 lang={lang}
                 setData={setProps}
                 user={user}
               /> ||
-              tab === "State" &&
-              <DataPanel
+            tab === "Help" &&
+              <HelpPanel
                 height={height}
                 id={id}
                 lang={lang}
