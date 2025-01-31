@@ -6,7 +6,6 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
-COPY src/utils/cm/graffiticode-lang-graffiticode-0.1.0.tgz /app/src/utils/cm/graffiticode-lang-graffiticode-0.1.0.tgz
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
   elif [ -f package-lock.json ]; then npm ci; \
