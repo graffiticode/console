@@ -178,10 +178,8 @@ export default function Editor({
         >
           {
             tab === "Data" &&
-              <PropPanel
-                data={data}
-                lang={lang}
-                setData={setProps}
+              <DataPanel
+                id={id}
                 user={user}
               /> ||
             tab === "Help" &&
