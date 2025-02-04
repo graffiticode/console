@@ -85,8 +85,8 @@ export const HelpPanel = ({
     <div>
       <TextEditor state={state} />
       {
-        prompts.map(prompt => (
-          <div className="">
+        prompts.map((prompt, index) => (
+          <div key={index} className="">
             <p className="text-left text-sm font-sans rounded-lg p-4 m-2 mt-4 bg-gray-100">
             {prompt.user}
             </p>
