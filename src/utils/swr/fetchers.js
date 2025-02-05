@@ -26,10 +26,10 @@ export const compile = async ({ user, id, data }) => {
   }
 };
 
-export const postTask = async ({ user, lang, code }) => {
+export const postTask = async ({ user, lang, code, help }) => {
   const query = gql`
-    mutation post ($lang: String!, $code: String!, $ephemeral: Boolean!) {
-      postTask(lang: $lang, code: $code, ephemeral: $ephemeral)
+    mutation post ($lang: String!, $code: String!, $help: String!, $ephemeral: Boolean!) {
+      postTask(lang: $lang, code: $code, help: $help, ephemeral: $ephemeral)
     }
   `;
   const token = await user.getToken();
@@ -39,13 +39,17 @@ export const postTask = async ({ user, lang, code }) => {
     }
   });
   const ephemeral = true;
-  return client.request(query, { lang, code, ephemeral }).then(data => data.postTask);
+  console.log(
+    "postTask()",
+    "help=" + JSON.stringify(help, null, 2),
+  );
+  return client.request(query, { lang, code, help: JSON.stringify(help), ephemeral }).then(data => data.postTask);
 };
 
-export const buildSaveTask = () => async ({ user, id, lang, code, mark, isPublic = false }) => {
+export const buildSaveTask = () => async ({ user, id, lang, code, help, mark, isPublic = false }) => {
   const query = gql`
-    mutation post ($id: String, $lang: String!, $code: String!, $mark: Int!, $isPublic: Boolean) {
-      saveTask(id: $id, lang: $lang, code: $code, mark: $mark, isPublic: $isPublic)
+    mutation post ($id: String, $lang: String!, $code: String!, $help: String!, $mark: Int!, $isPublic: Boolean) {
+      saveTask(id: $id, lang: $lang, code: $code, help: $help, mark: $mark, isPublic: $isPublic)
     }
   `;
   const token = await user.getToken();
@@ -56,14 +60,18 @@ export const buildSaveTask = () => async ({ user, id, lang, code, mark, isPublic
   });
   return await client.request(
     query, {
-      id, lang, code, mark, isPublic
+      id, lang, code, help: JSON.stringify(help), mark, isPublic
     }).then(data => JSON.parse(data.saveTask));
 };
 
 export const postTaskUpdates = async ({ user, tasks }) => {
+  console.log(
+    "postTaskUpdates()",
+    "tasks=" + JSON.stringify(tasks, null, 2),
+  );
   const query = gql`
-    mutation post ($id: String, $name: String, $mark: Int, $isPublic: Boolean) {
-      updateTask(id: $id, name: $name, mark: $mark, isPublic: $isPublic)
+    mutation post ($id: String, $name: String, $help: String, $mark: Int, $isPublic: Boolean) {
+      updateTask(id: $id, name: $name, help: $help, mark: $mark, isPublic: $isPublic)
     }
   `;
   const token = await user.getToken();
@@ -72,8 +80,8 @@ export const postTaskUpdates = async ({ user, tasks }) => {
       authorization: token,
     }
   });
-  await Promise.all(tasks.forEach(async ({id, name, mark, isPublic }) => {
-    await client.request(query, {id, name, mark, isPublic}).then(data => JSON.parse(data.updateTask));
+  await Promise.all(tasks.forEach(async ({id, name, help, mark, isPublic }) => {
+    await client.request(query, {id, name, help: JSON.stringify(help), mark, isPublic}).then(data => JSON.parse(data.updateTask));
   }));
   return {};
 };
@@ -95,6 +103,7 @@ export const loadTasks = async ({ user, lang, mark }) => {
         id
         lang,
         src
+        help
         isPublic
         created
         name

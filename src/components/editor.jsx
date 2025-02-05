@@ -11,6 +11,7 @@ import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
 import { isNonNullNonEmptyObject } from "../utils";
+import { postTaskUpdates } from '../utils/swr/fetchers';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -49,6 +50,7 @@ export default function Editor({
   height,
 }) {
   const [ code, setCode ] = useState("");
+  const [ help, setHelp ] = useState([]);
   const [ data, setData ] = useState({});
   const [ props, setProps ] = useState({});
   const [ dataCode, setDataCode ] = useState("");
@@ -57,6 +59,7 @@ export default function Editor({
   const [ isPublic, setIsPublic ] = useState(false);
   const [ saving, setSaving ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
+  const [ doPostTaskUpdates, setDoPostTaskUpdates ] = useState(false);
   const [ doPostDataTask, setDoPostDataTask ] = useState(false);
   const [ doGetData, setDoGetData ] = useState(false);
   const [ tab, setTab ] = useState("Code");
@@ -70,10 +73,16 @@ export default function Editor({
     if (taskId === "") {
       // New task.
       setCode("");
+      setHelp([]);
       setData({});
     } else {
       const task = tasks.find(task => task.id === taskId);
+      console.log(
+        "Editor()",
+        "task=" + JSON.stringify(task, null, 2),
+      );
       task && setCode(task.src);
+      task && setHelp(typeof task.help === "string" && JSON.parse(task.help) || task.help || []);
     }
     setTab("Code");
   }, [taskId]);
@@ -108,7 +117,7 @@ export default function Editor({
   }, [code]);
 
   const postTaskResp = useSWR(
-    doPostTask && { user, lang, code } || null,
+    doPostTask && { user, lang, code, help } || null,
     postTask
   );
 
@@ -117,6 +126,28 @@ export default function Editor({
     setDoPostTask(false);
     setTaskId(taskId);
     setId(taskId);
+  }
+
+  useEffect(() => {
+    if (id && help) {
+      setDoPostTaskUpdates(true);
+    }
+  }, [id, help]);
+
+//  const task = { id, lang, code, help, mark: mark.id, isPublic };
+  const postTaskUpdatesResp = useSWR(
+    doPostTaskUpdates && {
+      user,
+      tasks: [{
+        id,
+        help,
+      }],
+    } || null,
+    postTaskUpdates
+  );
+
+  if (postTaskUpdatesResp.data) {
+    setDoPostTaskUpdates(false);
   }
 
   useEffect(() => {
@@ -143,7 +174,7 @@ export default function Editor({
 
   // Save task.
 
-  const task = { id, lang, code, mark: mark.id, isPublic };
+  const task = { id, lang, code, help, mark: mark.id, isPublic };
   const saveTaskResp = useSWR(
     saving && { user, ...task } || null,
     saveTask
@@ -184,11 +215,8 @@ export default function Editor({
               /> ||
             tab === "Help" &&
               <HelpPanel
-                height={height}
-                id={id}
-                lang={lang}
-                user={user}
-                setSaveDisabled={setSaveDisabled}
+                help={help}
+                setHelp={setHelp}
               /> ||
               <CodePanel
                 code={code}

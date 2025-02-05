@@ -31,6 +31,7 @@ const typeDefs = `
     src: String!
     lang: String!
     code: String!
+    help: String!
     taskId: String!
     isPublic: Boolean
     created: String
@@ -46,9 +47,9 @@ const typeDefs = `
 
   type Mutation {
     logCompile(id: String!, status: String!, timestamp: String!, data: String!): String!
-    postTask(lang: String!, code: String!, ephemeral: Boolean): String!
-    saveTask(id: String, lang: String!, code: String!, mark: Int!, isPublic: Boolean): String!
-    updateTask(id: String, name: String, mark: Int, isPublic: Boolean): String!
+    postTask(lang: String!, code: String!, help: String!, ephemeral: Boolean): String!
+    saveTask(id: String, lang: String!, code: String!, help: String!, mark: Int!, isPublic: Boolean): String!
+    updateTask(id: String, name: String, help: String, mark: Int, isPublic: Boolean): String!
   }
 `;
 
@@ -79,24 +80,32 @@ const resolvers = {
   Mutation: {
     saveTask: async (_, args, ctx) => {
       const { token } = ctx;
-      const { id, lang, code, mark, isPublic } = args;
+      const { id, lang, code, help, mark, isPublic } = args;
+      console.log(
+        "saveTask()",
+        "help=" + help,
+      );
       const { uid } = await client.verifyToken(token);
-      const data = await saveTask({ auth: { uid, token }, id, lang, code, mark, isPublic });
+      const data = await saveTask({ auth: { uid, token }, id, lang, code, help, mark, isPublic });
       return JSON.stringify(data);
     },
     updateTask: async (_, args, ctx) => {
       console.log("updateTask() args=" + JSON.stringify(args, null, 2));
       const { token } = ctx;
-      const { id, name, mark, isPublic } = args;
+      const { id, name, help, mark, isPublic } = args;
       const { uid } = await client.verifyToken(token);
-      const data = await updateTask({ auth: { uid, token }, id, name, mark, isPublic });
+      const data = await updateTask({ auth: { uid, token }, id, name, help, mark, isPublic });
+      console.log(
+        "updateTask()",
+        "data=" + JSON.stringify(data, null, 2),
+      );
       return JSON.stringify(data);
     },
     postTask: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, code, ephemeral } = args;
+      const { lang, code, help, ephemeral } = args;
       const { uid } = await client.verifyToken(token);
-      const task = { lang, code };
+      const task = { lang, code, help };
       const { id } = await postTask({ auth: { uid, token }, task, ephemeral });
       return id;
     },
@@ -129,7 +138,10 @@ export default async function handler(req, res) {
     res.send(html);
   } else {
     const { operationName, query, variables } = getGraphQLParameters(request);
-    console.log("handler() query=" + query);
+    console.log(
+      "handler()",
+      "query=" + query,
+    );
     const result = await processRequest({
       operationName,
       query,
