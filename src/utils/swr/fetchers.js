@@ -21,8 +21,11 @@ export const compile = async ({ user, id, data }) => {
     const resp = await postApiCompile({ accessToken, id, data });
     return resp;
   } catch (x) {
-    console.trace("./swr/fetchers/compile()");
-    console.log(x.stack);
+    // console.trace("./swr/fetchers/compile()");
+    console.log(
+      "swr/compile",
+      "Error " + x.stack,
+    );
   }
 };
 
@@ -39,10 +42,6 @@ export const postTask = async ({ user, lang, code, help }) => {
     }
   });
   const ephemeral = true;
-  console.log(
-    "postTask()",
-    "help=" + JSON.stringify(help, null, 2),
-  );
   return client.request(query, { lang, code, help: JSON.stringify(help), ephemeral }).then(data => data.postTask);
 };
 

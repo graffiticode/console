@@ -227,7 +227,10 @@ export default function TasksNav({ user, setId, tasks }) {
     }
     setUpdatingTasks(true);
     setUpdatedTasks(updatedTasks);
-    console.log("[2] updateTasks() tasks=" + JSON.stringify(tasks, null, 2));
+    console.log(
+      "[2] updateTasks()",
+      "tasks=" + JSON.stringify(tasks, null, 2)
+    );
   };
 
   return (

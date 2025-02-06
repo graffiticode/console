@@ -12,6 +12,7 @@ import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
 import { isNonNullNonEmptyObject } from "../utils";
 import { postTaskUpdates } from '../utils/swr/fetchers';
+import useLocalStorage from '../hooks/use-local-storage';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -62,32 +63,34 @@ export default function Editor({
   const [ doPostTaskUpdates, setDoPostTaskUpdates ] = useState(false);
   const [ doPostDataTask, setDoPostDataTask ] = useState(false);
   const [ doGetData, setDoGetData ] = useState(false);
-  const [ tab, setTab ] = useState("Code");
+  const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Help");
   const [ saveDisabled, setSaveDisabled ] = useState(true);
   const { user } = useGraffiticodeAuth();
   const saveTask = buildSaveTask();
   const ids = parseId(id);
   const [ taskId, setTaskId ] = useState(ids.taskId);
 
+  useEffect(() => setTab("Help"), []);
+
   useEffect(() => {
     if (taskId === "") {
       // New task.
-      setCode("");
+      setCode("{}..");
       setHelp([]);
       setData({});
+      setDoPostTask(true);
     } else {
       const task = tasks.find(task => task.id === taskId);
-      console.log(
-        "Editor()",
-        "task=" + JSON.stringify(task, null, 2),
-      );
       task && setCode(task.src);
       task && setHelp(typeof task.help === "string" && JSON.parse(task.help) || task.help || []);
     }
-    setTab("Code");
   }, [taskId]);
 
   useEffect(() => {
+    console.log(
+      "Editor()",
+      "id=" + id,
+    );
     const { taskId } = parseId(id);
     if (taskId) {
       setTaskId(taskId);
@@ -129,14 +132,13 @@ export default function Editor({
   }
 
   useEffect(() => {
-    if (id && help) {
+    if (help?.length > 0) {
       setDoPostTaskUpdates(true);
     }
-  }, [id, help]);
+  }, [help]);
 
-//  const task = { id, lang, code, help, mark: mark.id, isPublic };
   const postTaskUpdatesResp = useSWR(
-    doPostTaskUpdates && {
+    doPostTaskUpdates && id && {
       user,
       tasks: [{
         id,

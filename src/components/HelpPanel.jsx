@@ -1,7 +1,5 @@
 import React, { useState, useEffect} from 'react';
 import useSWR from 'swr';
-//import { getData } from '../utils/swr/fetchers';
-//import { Form } from "@grafticode/l0002";
 import { TextEditor } from "./TextEditor";
 import { createState } from "../lib/state";
 
@@ -21,8 +19,6 @@ export const HelpPanel = ({
   setHelp,
 }) => {
   const [ data, setData ] = useState({});
-//  const [ prompts, setPrompts ] = useState([]);
-  // const [ doGetData, setDoGetData ] = useState(false);
   const [ doRecompile, setDoRecompile ] = useState(false);
   const [ state ] = useState(createState({}, (data, { type, args }) => {
     // console.log("HelpPanel state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));

@@ -59,9 +59,7 @@ const resolvers = {
       const { token } = ctx;
       const { id } = args;
       const { uid } = await client.verifyToken(token);
-      console.log("data() id=" + id + " uid=" + uid);
       const data = await getData({ authToken: token, id });
-      console.log("data() data=" + JSON.stringify(data, null, 2));
       return JSON.stringify(data);
     },
     compiles: async (_, args, ctx) => {
@@ -81,24 +79,19 @@ const resolvers = {
     saveTask: async (_, args, ctx) => {
       const { token } = ctx;
       const { id, lang, code, help, mark, isPublic } = args;
-      console.log(
-        "saveTask()",
-        "help=" + help,
-      );
       const { uid } = await client.verifyToken(token);
       const data = await saveTask({ auth: { uid, token }, id, lang, code, help, mark, isPublic });
       return JSON.stringify(data);
     },
     updateTask: async (_, args, ctx) => {
-      console.log("updateTask() args=" + JSON.stringify(args, null, 2));
+      console.log(
+        "updateTask()",
+        "args=" + JSON.stringify(args, null, 2),
+      );
       const { token } = ctx;
       const { id, name, help, mark, isPublic } = args;
       const { uid } = await client.verifyToken(token);
       const data = await updateTask({ auth: { uid, token }, id, name, help, mark, isPublic });
-      console.log(
-        "updateTask()",
-        "data=" + JSON.stringify(data, null, 2),
-      );
       return JSON.stringify(data);
     },
     postTask: async (_, args, ctx) => {
@@ -138,10 +131,10 @@ export default async function handler(req, res) {
     res.send(html);
   } else {
     const { operationName, query, variables } = getGraphQLParameters(request);
-    console.log(
-      "handler()",
-      "query=" + query,
-    );
+    // console.log(
+    //   "handler()",
+    //   "query=" + query,
+    // );
     const result = await processRequest({
       operationName,
       query,

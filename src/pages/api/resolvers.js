@@ -15,7 +15,6 @@ const getTask = async ({ auth, id }) => await getApiTask({ id, auth });
 
 export async function logCompile({ auth, id, timestamp, status, data }) {
   const [{ lang }] = await getTask({ auth, id });
-  console.log("logCompile() lang=" + lang + " id=" + id);
   const path = `users/${auth.uid}/compiles/${id}`;
   data = JSON.parse(data);
   await db.doc(path).set({ id, timestamp, status, lang, data });
@@ -25,10 +24,6 @@ export async function logCompile({ auth, id, timestamp, status, data }) {
 // TODO reuse id from previous postTask
 // TODO store code in doc with atomic task id
 export async function saveTask({ auth, id, lang, help, code, mark, isPublic }) {
-  console.log(
-    "saveTask()",
-    "help=" + help,
-  );
   const task = { lang, code };
   //const { id: taskId } = await postTask({ auth, task, ephemeral: false, isPublic });
   await db.doc(`users/${auth.uid}/taskIds/${id}`).set({
@@ -56,11 +51,6 @@ export async function updateTask({ auth, id, name, help, mark, isPublic }) {
         lang: taskDoc.get("lang"),
         code: taskDoc.get("src"),
       };
-      console.log(
-        "updateTask()",
-        "id=" + id,
-        "task=" + JSON.stringify(task, null, 2)
-      );
       // Let the api know this item is now public. This can't be undone!
       const headers = {
         // "x-graffiticode-storage-type": "persistent",
@@ -77,10 +67,6 @@ export async function updateTask({ auth, id, name, help, mark, isPublic }) {
 const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
 
 export async function postTask({ auth, task, ephemeral, isPublic }) {
-  console.log(
-    "postTask()",
-    "task=" + JSON.stringify(task, null, 2),
-  );
   const storageType = ephemeral && "ephemeral" || "persistent";
   const headers = {
     "Authorization": auth.token,
@@ -149,10 +135,10 @@ export async function tasks({ auth, lang, mark }) {
     });
     return tasks;
   }, []);
-  console.log(
-    "tasks()",
-    "tasks=" + JSON.stringify(tasks, null, 2),
-  );
+  // console.log(
+  //   "tasks()",
+  //   "tasks=" + JSON.stringify(tasks, null, 2),
+  // );
   return tasks;
 }
 
