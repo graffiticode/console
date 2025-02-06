@@ -64,7 +64,7 @@ function EllipsisMenu({ id, name, mark, isPublic, onChange }) {
               {({ active }) => (
                 <div className="pt-2">
                   <MarkSelector
-                    mark={marks[mark - 1]}  // FIXME too brittle.
+                    mark={marks[mark - 1]}
                     setMark={mark => onChange({id, mark})}
                   />
                 </div>
@@ -88,6 +88,7 @@ function EllipsisMenu({ id, name, mark, isPublic, onChange }) {
 }
 
 const scrubTitle = title => title.indexOf("|") >= 0 && title.slice(title.indexOf("|") + 1).trim();
+
 const getTitleFromTask = task => scrubTitle(task.src.split("\n").slice(0, 1).join());
 
 const getNestedItems = ({ setId, tasks }) => {
@@ -277,7 +278,7 @@ export default function TasksNav({ user, setId, tasks }) {
                           onChange={updateTasks}
                         /> || <div />
                       }
-                      </div>
+                    </div>
                   ) : (
                     <Disclosure as="div">
                       {({ open }) => (
@@ -302,7 +303,7 @@ export default function TasksNav({ user, setId, tasks }) {
                                 item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
                                 'flex items-center w-full text-xs text-left rounded-none px-2 gap-x-3 text-sm leading-6 font-bold text-gray-700'
                               )}
-                              >
+                            >
                               <ChevronRightIcon
                                 className={classNames(
                                   open ? 'rotate-90 text-gray-500' : 'text-gray-400',
@@ -311,7 +312,7 @@ export default function TasksNav({ user, setId, tasks }) {
                                 aria-hidden="true"
                               />
                               {item.name}
-                              </Disclosure.Button>
+                            </Disclosure.Button>
                             { showId === item.id &&
                               <EllipsisMenu
                                 id={item.id}
@@ -320,9 +321,9 @@ export default function TasksNav({ user, setId, tasks }) {
                                 onChange={updateTasks}
                               /> || <div />
                             }
-                              </div>
-                              <Disclosure.Panel as="ul" className="mt-1 px-2">
-                                {item.children.map((subItem) => (
+                          </div>
+                          <Disclosure.Panel as="ul" className="mt-1 px-2">
+                            {item.children.map((subItem) => (
                               <li key={subItem.id}>
                                 <div className={classNames(
                                        item.current ? 'bg-gray-50' : 'hover:bg-gray-50',

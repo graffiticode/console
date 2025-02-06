@@ -35,7 +35,7 @@ export const PropPanel = ({
   const [ taskId, setTaskId ] = useState();
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ state ] = useState(createState({}, (data, { type, args }) => {
-    // console.log("PropPanel() apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
+    console.log("PropPanel() apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
     switch (type) {
     case "update":
       const updatedData = {

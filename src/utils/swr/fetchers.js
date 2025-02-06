@@ -12,6 +12,9 @@ const buildRequestClient = async ({ token }) => {
 };
 
 export const compile = async ({ user, id, data }) => {
+  // console.log(
+  //   "compile()",
+  // );
   data = data || {};
   try {
     const token = await user.getToken();
@@ -21,7 +24,6 @@ export const compile = async ({ user, id, data }) => {
     const resp = await postApiCompile({ accessToken, id, data });
     return resp;
   } catch (x) {
-    // console.trace("./swr/fetchers/compile()");
     console.log(
       "swr/compile",
       "Error " + x.stack,
@@ -29,7 +31,10 @@ export const compile = async ({ user, id, data }) => {
   }
 };
 
-export const postTask = async ({ user, lang, code, help }) => {
+export const postTask = async ({ user, lang, code }) => {  
+  // console.log(
+  //   "postTask()",
+  // );
   const query = gql`
     mutation post ($lang: String!, $code: String!, $help: String!, $ephemeral: Boolean!) {
       postTask(lang: $lang, code: $code, help: $help, ephemeral: $ephemeral)
@@ -42,10 +47,13 @@ export const postTask = async ({ user, lang, code, help }) => {
     }
   });
   const ephemeral = true;
-  return client.request(query, { lang, code, help: JSON.stringify(help), ephemeral }).then(data => data.postTask);
+  return client.request(query, { lang, code, help: JSON.stringify([]), ephemeral }).then(data => data.postTask);
 };
 
 export const buildSaveTask = () => async ({ user, id, lang, code, help, mark, isPublic = false }) => {
+  // console.log(
+  //   "buildSaveTask()",
+  // );
   const query = gql`
     mutation post ($id: String, $lang: String!, $code: String!, $help: String!, $mark: Int!, $isPublic: Boolean) {
       saveTask(id: $id, lang: $lang, code: $code, help: $help, mark: $mark, isPublic: $isPublic)
@@ -64,10 +72,10 @@ export const buildSaveTask = () => async ({ user, id, lang, code, help, mark, is
 };
 
 export const postTaskUpdates = async ({ user, tasks }) => {
-  console.log(
-    "postTaskUpdates()",
-    "tasks=" + JSON.stringify(tasks, null, 2),
-  );
+  // console.log(
+  //   "postTaskUpdates()",
+  //   "tasks=" + JSON.stringify(tasks, null, 2),
+  // );
   const query = gql`
     mutation post ($id: String, $name: String, $help: String, $mark: Int, $isPublic: Boolean) {
       updateTask(id: $id, name: $name, help: $help, mark: $mark, isPublic: $isPublic)
@@ -86,6 +94,9 @@ export const postTaskUpdates = async ({ user, tasks }) => {
 };
 
 export const loadTasks = async ({ user, lang, mark }) => {
+  // console.log(
+  //   "loadTasks()",
+  // );
   if (!user) {
     return {};
   }
@@ -114,6 +125,10 @@ export const loadTasks = async ({ user, lang, mark }) => {
 };
 
 export const getData = async ({ user, id, data }) => {
+  // console.log(
+  //   "getData()",
+  //   "id=" + id,
+  // );
   if (!user) {
     return {};
   }
@@ -139,6 +154,9 @@ export const getData = async ({ user, id, data }) => {
 };
 
 export const countTasks = async ({ user, langs, mark }) => {
+  // console.log(
+  //   "countTasks()",
+  // );
   if (!user) {
     return {};
   }
@@ -154,6 +172,9 @@ export const countTasks = async ({ user, langs, mark }) => {
 };
 
 export const loadCompiles = async ({ user, lang, type }) => {
+  // console.log(
+  //   "loadCompiles()",
+  // );
   if (!user) {
     return {};
   }

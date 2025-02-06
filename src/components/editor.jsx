@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { CodePanel } from './CodePanel';
-import { PropPanel } from "./PropPanel";
 import { DataPanel } from "./DataPanel";
+import { PropPanel } from "./PropPanel";
 import { HelpPanel } from "./HelpPanel";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
@@ -75,22 +75,26 @@ export default function Editor({
   useEffect(() => {
     if (taskId === "") {
       // New task.
-      setCode("{}..");
+      setCode("");
       setHelp([]);
       setData({});
       setDoPostTask(true);
     } else {
       const task = tasks.find(task => task.id === taskId);
+      // console.log(
+      //   "Editor()",
+      //   "task=" + JSON.stringify(task, null, 2),
+      // );
       task && setCode(task.src);
       task && setHelp(typeof task.help === "string" && JSON.parse(task.help) || task.help || []);
     }
   }, [taskId]);
 
   useEffect(() => {
-    console.log(
-      "Editor()",
-      "id=" + id,
-    );
+    // console.log(
+    //   "Editor()",
+    //   "id=" + id,
+    // );
     const { taskId } = parseId(id);
     if (taskId) {
       setTaskId(taskId);
@@ -134,6 +138,14 @@ export default function Editor({
   useEffect(() => {
     if (help?.length > 0) {
       setDoPostTaskUpdates(true);
+      // FIXME avoid mutation.
+      // console.log(
+      //   "Editor",
+      //   "id=" + id,
+      //   "help=" + JSON.stringify(help, null, 2),
+      // );
+      const task = tasks.find(task => task.id === id);
+      task?.help && (task.help = help);
     }
   }, [help]);
 
@@ -170,6 +182,10 @@ export default function Editor({
 
   if (postDataTaskResp.data) {
     const dataId = postDataTaskResp.data;
+    // console.log(
+    //   "Editor()",
+    //   "dataId=" + dataId,
+    // );
     setDoPostDataTask(false);
     setId(getId({taskId, dataId}));
   }
@@ -211,10 +227,16 @@ export default function Editor({
         >
           {
             tab === "Data" &&
-              <DataPanel
-                id={id}
+              <PropPanel
+                data={data}
+                lang={lang}
+                setData={setProps}
                 user={user}
               /> ||
+              // <DataPanel
+              //   id={id}
+              //   user={user}
+              // /> ||
             tab === "Help" &&
               <HelpPanel
                 help={help}

@@ -92,6 +92,10 @@ const resolvers = {
       const { id, name, help, mark, isPublic } = args;
       const { uid } = await client.verifyToken(token);
       const data = await updateTask({ auth: { uid, token }, id, name, help, mark, isPublic });
+      console.log(
+        "updateTask()",
+        "data=" + JSON.stringify(data, null, 2),
+      );
       return JSON.stringify(data);
     },
     postTask: async (_, args, ctx) => {
@@ -115,6 +119,9 @@ const resolvers = {
 const schema = makeExecutableSchema({ typeDefs, resolvers });
 
 export default async function handler(req, res) {
+  console.log(
+    "handler()",
+  );
   const request = {
     method: req.method,
     headers: req.headers,
