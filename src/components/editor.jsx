@@ -70,8 +70,6 @@ export default function Editor({
   const ids = parseId(id);
   const [ taskId, setTaskId ] = useState(ids.taskId);
 
-  useEffect(() => setTab("Help"), []);
-
   useEffect(() => {
     if (taskId === "") {
       // New task.
@@ -227,16 +225,16 @@ export default function Editor({
         >
           {
             tab === "Data" &&
-              <PropPanel
-                data={data}
-                lang={lang}
-                setData={setProps}
-                user={user}
-              /> ||
-              // <DataPanel
-              //   id={id}
+              // <PropPanel
+              //   data={data}
+              //   lang={lang}
+              //   setData={setProps}
               //   user={user}
               // /> ||
+              <DataPanel
+                id={id}
+                user={user}
+              /> ||
             tab === "Help" &&
               <HelpPanel
                 help={help}

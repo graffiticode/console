@@ -1,3 +1,11 @@
+/*
+  -- Add a delete button to each text box so the user can prune the dialog
+  -- On save record the mapping from inputs to outputs in a vector database
+  -- Use the vector database to generate a few-shot context for the prompt
+  -- share the vector database across languages
+  -- use compiler errors to give feedback to the lm
+ */
+
 import React, { useState, useEffect} from 'react';
 import useSWR from 'swr';
 import { TextEditor } from "./TextEditor";
@@ -19,6 +27,7 @@ export const HelpPanel = ({
   setHelp,
 }) => {
   const [ data, setData ] = useState({});
+  // const [ doGetData, setDoGetData ] = useState(false);
   const [ doRecompile, setDoRecompile ] = useState(false);
   const [ state ] = useState(createState({}, (data, { type, args }) => {
     // console.log("HelpPanel state.apply() type=" + type + " args=" + JSON.stringify(args, null, 2));
