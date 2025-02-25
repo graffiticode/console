@@ -23,7 +23,7 @@ export default function Compiles() {
       </p>
       <p>
         By <i>end-user</i> we don&apos;t mean non-technical,
-        but rather the consumer of the thing being programmed. Just as
+        but rather the user of the thing being programmed. Just as
         accountants are the end-users of the spreadsheets they create to do work
         for their customers, the designers and developers or whoever else are
         making software with Graffiticode are its end-users.
@@ -61,8 +61,8 @@ export default function Compiles() {
         Graffiticode is a <b>language-oriented</b> programming tool. At the
         core of every component and api is a task-oriented language that is used
         to customize its feel and function. On the frontend, code defines the
-        initial state of React components. On the backend, code defines how data
-        is transformed by GraphQL services.
+        initial state of user interface components. On the backend, code defines
+        how data is transformed.
       </p>
       <p>
         Framed using <b>MVC</b> ideas, you can think of the language as an
