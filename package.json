@@ -24,6 +24,7 @@
     "@graffiticode/component-test": "file:../l0002/packages/component-test",
     "@graffiticode/l0002": "^0.1.0",
     "@graffiticode/l0011": "^0.0.6",
+    "@graffiticode/l0012": "^0.1.0",
     "@graffiticode/lang-graffiticode": "^0.0.7",
     "@graffiticode/lezer-graffiticode": "^0.0.6",
     "@graphiql/toolkit": "^0.8.2",
