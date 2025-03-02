@@ -5,9 +5,9 @@ function classNames(...classes) {
 }
 
 const tabs = [
-  { name: 'Help', current: false },
   { name: 'Code', current: true },
   { name: 'Data', current: false },
+  { name: 'Help', current: false },
 ];
 
 export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisabled }) {
