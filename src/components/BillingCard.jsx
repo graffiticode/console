@@ -21,7 +21,7 @@ className="inline-flex items-center bg-gray-600 px-2.5 py-1.5 text-xs font-mediu
     </dd>
   </>;
 
-const NoPaymentInfo = ({setMode}) => 
+const NoPaymentInfo = ({setMode}) =>
       <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
     <dt className="text-sm font-medium text-gray-500">No card on file</dt>
     <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">

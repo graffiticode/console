@@ -111,7 +111,7 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                         </div>
                       : <div />
                     }
-                    { pathName === "tasks" 
+                    { pathName === "tasks"
                       ? <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
                           <MarkSelector domain={getTitle()} mark={mark} setMark={setMark} />
                         </div>

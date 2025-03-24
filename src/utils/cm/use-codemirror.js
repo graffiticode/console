@@ -35,8 +35,8 @@ export default function useCodeMirror(extensions, setView, doc) {
     });
 
     setView(view);
-    
-    return () => view.destroy();    
+
+    return () => view.destroy();
   }, [element]);
 
   return { ref };

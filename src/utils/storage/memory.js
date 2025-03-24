@@ -65,12 +65,12 @@ const buildTaskGet = ({ objectFromId, aclsById }) => {
         if (!code) {
           throw new NotFoundError();
         }
-        
+
         const subTaskId = encodeID([langId, codeId, 0]);
         checkAuth({ id: subTaskId, auth });
 
         tasks.push({ lang, code });
-        
+
         ids = dataIds;
       }
       return tasks;

@@ -26,7 +26,7 @@ export default function PublicToggle({ isPublic, setIsPublic }) {
         <span
           aria-hidden="true"
           className={classNames(
-            isPublic ? 'translate-x-5' : 'translate-x-0',            
+            isPublic ? 'translate-x-5' : 'translate-x-0',
             'pointer-events-none inline-block h-5 w-5 transform rounded-none bg-white shadow ring-0 transition duration-200 ease-in-out'
           )}
         />
