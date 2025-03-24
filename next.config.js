@@ -15,6 +15,10 @@ const nextConfig = {
   images: {
     domains: ["cdn.acx.ac"],
   },
+  // Make environment variables available to the client
+  env: {
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+  },
 };
 
 module.exports = nextConfig;

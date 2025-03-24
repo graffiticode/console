@@ -219,3 +219,45 @@ export const loadGraphiQL = async ({ user }) => {
   return data.replace(/\n/g, "").slice(15);
 };
 
+/**
+ * Generate code using the GraphQL API
+ *
+ * @param {Object} params - Parameters for code generation
+ * @param {string} params.prompt - The code description or requirements
+ * @param {string} [params.language] - Optional target programming language
+ * @param {Object} [params.options] - Additional generation options
+ * @returns {Promise<Object>} - Generated code and metadata
+ */
+export const generateCode = async ({ prompt, language, options }) => {
+  const client = new GraphQLClient("/api");
+  
+  const query = gql`
+    mutation GenerateCode($prompt: String!, $language: String, $options: CodeGenerationOptions) {
+      generateCode(prompt: $prompt, language: $language, options: $options) {
+        code
+        language
+        model
+        usage {
+          input_tokens
+          output_tokens
+        }
+      }
+    }
+  `;
+  
+  // Prepare the variables
+  const variables = {
+    prompt,
+    language,
+    options
+  };
+  
+  try {
+    const result = await client.request(query, variables);
+    return result.generateCode;
+  } catch (error) {
+    console.error("Error in generateCode fetcher:", error);
+    throw new Error(`Failed to generate code: ${error.message}`);
+  }
+};
+

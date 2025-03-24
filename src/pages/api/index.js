@@ -15,6 +15,7 @@ import {
   updateTask,
   postTask,
   getData,
+  generateCode,
 } from "./resolvers.js";
 import { client } from "../../lib/auth";
 
@@ -39,6 +40,18 @@ const typeDefs = `
     name: String
   }
 
+  type GeneratedCode {
+    code: String!
+    language: String
+    model: String
+    usage: UsageInfo
+  }
+
+  type UsageInfo {
+    input_tokens: Int
+    output_tokens: Int
+  }
+
   type Query {
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
@@ -50,6 +63,13 @@ const typeDefs = `
     postTask(lang: String!, code: String!, help: String!, ephemeral: Boolean): String!
     saveTask(id: String, lang: String!, code: String!, help: String!, mark: Int!, isPublic: Boolean): String!
     updateTask(id: String, name: String, help: String, mark: Int, isPublic: Boolean): String!
+    generateCode(prompt: String!, language: String, options: CodeGenerationOptions): GeneratedCode!
+  }
+
+  input CodeGenerationOptions {
+    model: String
+    temperature: Float
+    maxTokens: Int
   }
 `;
 
@@ -76,6 +96,19 @@ const resolvers = {
     },
   },
   Mutation: {
+    generateCode: async (_, args) => {
+      const { prompt, language, options } = args;
+      console.log("generateCode mutation called", prompt.substring(0, 30) + "...");
+
+      try {
+        // No authentication required for code generation
+        return await generateCode({ prompt, language, options });
+      } catch (error) {
+        console.error("Error in generateCode mutation:", error);
+        throw error;
+      }
+    },
+
     saveTask: async (_, args, ctx) => {
       const { token } = ctx;
       const { id, lang, code, help, mark, isPublic } = args;

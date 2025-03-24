@@ -3,6 +3,7 @@ import { buildTaskDaoFactory } from "../../utils/storage/index.js";
 import { buildGetTaskDaoForStorageType } from "./utils.js";
 import { getFirestore } from '../../utils/db';
 import { getApiTask, getBaseUrlForApi } from "../../lib/api.js";
+import { generateCode as codeGenerationService } from "../../lib/code-generation-service.js";
 // import { buildDynamicSchema } from "./schemas.js";
 
 const taskDaoFactory = buildTaskDaoFactory({});
@@ -213,5 +214,47 @@ export async function compiles({ auth, lang, type }) {
       "ERROR",
       x,
     );
+  }
+}
+
+/**
+ * Generate code using the Claude LLM
+ *
+ * @param {Object} params - Parameters for code generation
+ * @param {string} params.prompt - The code description or requirements
+ * @param {string} [params.language] - Optional target programming language
+ * @param {Object} [params.options] - Additional generation options
+ * @returns {Promise<Object>} - Generated code and metadata
+ */
+export async function generateCode({ prompt, language, options }) {
+  try {
+    console.log(
+      "generateCode()",
+      "prompt=", prompt.substring(0, 50) + (prompt.length > 50 ? "..." : ""),
+      "language=", language || "not specified"
+    );
+
+    // This is just a placeholder for now - in production, this would call Claude API
+    const result = await codeGenerationService({
+      prompt,
+      language,
+      options: {
+        model: options?.model,
+        temperature: options?.temperature,
+        maxTokens: options?.maxTokens
+      }
+    });
+
+    console.log(
+      "generateCode()",
+      "model=", result.model,
+      "language=", result.language
+    );
+
+    return result;
+  } catch (error) {
+    console.error("generateCode()", "ERROR", error);
+
+    throw new Error(`Failed to generate code: ${error.message}`);
   }
 }

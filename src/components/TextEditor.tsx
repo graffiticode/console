@@ -61,7 +61,19 @@ const clearEditor = (view) => {
   dispatch(tr);
 };
 
-export const TextEditor = ({ state }) => {
+// Add a placeholder plugin with correct prosemirror decoration
+const createPlaceholderPlugin = (placeholder) => {
+  return new Plugin({
+    props: {
+      // Using a simpler approach without decorations
+      attributes: {
+        class: 'prosemirror-editor',
+      }
+    }
+  });
+};
+
+export const TextEditor = ({ state, placeholder = "Type your message...", disabled = false }) => {
   const [ editorView, setEditorView ] = useState(null);
   const editorRef = useRef(null);
   const plugins = [
@@ -69,6 +81,12 @@ export const TextEditor = ({ state }) => {
     keymap({"Mod-z": undo, "Mod-y": redo}),
     keymap(baseKeymap),
   ];
+  
+  // Add placeholder plugin if placeholder is provided
+  if (placeholder) {
+    plugins.push(createPlaceholderPlugin(placeholder));
+  }
+  
   useEffect(() => {
     if (!editorRef.current) {
       return;
@@ -76,12 +94,16 @@ export const TextEditor = ({ state }) => {
     const enterKeyPlugin = new Plugin({
       props: {
         handleKeyDown(view, event) {
+          if (disabled) return false;
+          
           if (event.key === "Enter") {
             if (event.shiftKey) {
               const { state, dispatch } = view;
               dispatch(state.tr.split(state.selection.from));
             } else {
               const content = getEditorContent(view);
+              if (!content || content.trim() === "") return true;
+              
               clearEditor(view);
               state.apply({
                 type: "update",
@@ -95,6 +117,7 @@ export const TextEditor = ({ state }) => {
         }
       }
     });
+    
     const editorView = new EditorView(editorRef.current, {
       state: EditorState.create({
         schema,
@@ -104,25 +127,48 @@ export const TextEditor = ({ state }) => {
         ],
       }),
       dispatchTransaction(transaction) {
+        if (disabled) return;
+        
         const editorState = editorView.state.apply(transaction);
         editorView.updateState(editorState);
         // debouncedStateUpdate({
         //   state,
         //   editorState: editorState.toJSON()
         // });
+      },
+      // Add attributes for styling disabled state
+      attributes: {
+        class: disabled ? 'editor-disabled' : '',
       }
     });
+    
     setEditorView(editorView);
-    editorView.focus();
+    if (!disabled) {
+      editorView.focus();
+    }
+    
     return () => {
       if (editorView) {
         editorView.destroy();
       }
     };
-  }, []);
+  }, [disabled]);
+  
+  // Update editor when disabled prop changes
+  useEffect(() => {
+    if (editorView) {
+      editorView.dom.classList.toggle('editor-disabled', disabled);
+      if (disabled) {
+        editorView.dom.setAttribute('contenteditable', 'false');
+      } else {
+        editorView.dom.setAttribute('contenteditable', 'true');
+      }
+    }
+  }, [disabled, editorView]);
+  
   const { editorState } = state.data;
   useEffect(() => {
-    if (editorState) {
+    if (editorState && editorView) {
       const newEditorState = EditorState.fromJSON({
         schema,
         plugins,
@@ -130,11 +176,27 @@ export const TextEditor = ({ state }) => {
       editorView.updateState(newEditorState);
     }
   }, [editorState]);
+  
   return (
-    <div
-      ref={editorRef}
-      className="rounded-lg border border-gray-300 m-2 bg-white text-sm font-sans"
-    >
+    <div className="relative">
+      <div
+        ref={editorRef}
+        className={`rounded-lg border border-gray-300 m-2 p-2 bg-white text-sm font-sans min-h-[60px] ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+      />
+      {/* Show placeholder manually instead of using ProseMirror decorations */}
+      {placeholder && (
+        <div 
+          className="absolute top-[14px] left-[16px] text-gray-400 pointer-events-none"
+          style={{ display: editorView && editorView.state.doc.textContent.length > 0 ? 'none' : 'block' }}
+        >
+          {placeholder}
+        </div>
+      )}
+      <style jsx global>{`
+        .editor-disabled {
+          background-color: #f9f9f9;
+        }
+      `}</style>
     </div>
   );
 };
