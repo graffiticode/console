@@ -155,12 +155,12 @@ export const HelpPanel = ({
     <div className="flex flex-col h-full">
       {/* Input field at the top, aligned with output boxes */}
       <div className="px-4 mb-4 py-2">
-        <span className="text-sm font-bold text-gray-500 mb-2 block">
-          Ask me anything.&nbsp;
-          <span className="text-xs font-normal">
+        <div className="text-sm font-bold text-gray-500 block">
+          How can I help you write Graffiticode?&nbsp;
+        </div>
+        <div className="text-xs font-light text-gray-500 mb-2">
             Press Enter to send. Use Shift+Enter for a new line.
-          </span>
-        </span>
+        </div>
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="p-1 pb-0">
             <TextEditor

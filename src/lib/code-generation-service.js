@@ -114,26 +114,9 @@ async function callClaudeAPI(prompt, options) {
   }
 }
 
-/**
- * Get a fallback response when the API call fails
- * @param {string} prompt - The formatted prompt
- * @param {Object} options - The API options
- * @returns {Object} - A fallback response
- */
 function getFallbackResponse(prompt, options) {
   console.warn("Using fallback response for Claude API");
-
-  // Create a simple OCaml fallback response
-  const sampleCode = `(* Fallback response - Claude API unavailable *)
-let example () =
-  print_endline "This is a fallback response because the Claude API could not be reached.";
-  print_endline "Please check your ANTHROPIC_API_KEY environment variable.";
-  "Fallback response"
-
-let () = 
-  let result = example () in
-  print_endline result`;
-
+  const sampleCode = `(* Fallback response - Claude API unavailable *)`;
   return {
     id: "fallback-" + Math.random().toString(36).substring(2, 12),
     model: options.model || CLAUDE_MODELS.DEFAULT,
@@ -146,14 +129,6 @@ let () =
   };
 }
 
-/**
- * Generate OCaml code based on a prompt using Claude
- * @param {Object} params - Parameters for code generation
- * @param {string} params.prompt - The user's prompt describing the code to generate
- * @param {string} [params.language] - Ignored - always generates OCaml
- * @param {Object} [params.options] - Additional generation options
- * @returns {Promise<Object>} Generated OCaml code and metadata
- */
 export async function generateCode({ prompt, language = null, options = {} }) {
   try {
     // Always use OCaml

@@ -180,12 +180,12 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
     <div className="relative">
       <div
         ref={editorRef}
-        className={`rounded p-2 bg-white text-sm font-sans min-h-[40px] ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+        className={`rounded p-1 bg-white text-sm font-sans min-h-[32px] ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
       />
       {/* Show placeholder manually instead of using ProseMirror decorations */}
       {placeholder && (
         <div
-          className="absolute top-[10px] left-[10px] text-gray-400 pointer-events-none"
+          className="absolute top-[8px] left-[8px] text-gray-400 pointer-events-none"
           style={{ display: editorView && editorView.state.doc.textContent.length > 0 ? 'none' : 'block' }}
         >
           {placeholder}
