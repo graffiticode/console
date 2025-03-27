@@ -156,7 +156,7 @@ export const HelpPanel = ({
       {/* Input field at the top, aligned with output boxes */}
       <div className="px-4 mb-4 py-2">
         <div className="text-sm font-semibold text-gray-500 block">
-          How can I help you write some Graffiticode.
+          What do you want to make.
         </div>
         <div className="text-xs font-light text-gray-500 mt-1 mb-2">
           Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
