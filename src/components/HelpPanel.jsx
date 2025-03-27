@@ -155,11 +155,12 @@ export const HelpPanel = ({
     <div className="flex flex-col h-full">
       {/* Input field at the top, aligned with output boxes */}
       <div className="px-4 mb-4 py-2">
-        <div className="text-sm font-bold text-gray-500 block">
-          How can I help you write Graffiticode?&nbsp;
+        <div className="text-sm font-semibold text-gray-500 block">
+          Ask me anything.
         </div>
-        <div className="text-xs font-light text-gray-500 mb-2">
-            Press Enter to send. Use Shift+Enter for a new line.
+        <div className="text-xs font-light text-gray-500 mt-1 mb-2">
+          Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
+          Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for a new line.
         </div>
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="p-1 pb-0">
@@ -178,7 +179,7 @@ export const HelpPanel = ({
             <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
             <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
             <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-            <span className="text-gray-500 ml-2 text-xs">Generating OCaml code...</span>
+            <span className="text-gray-500 ml-2 text-xs">Generating Graffiticode...</span>
           </div>
         </div>
       )}
@@ -193,21 +194,20 @@ export const HelpPanel = ({
               </div>
             ) : item.help.type === 'code' ? (
               <div className="bg-gray-100 rounded-lg p-3 shadow-sm">
+                {/*
                 <div className="flex justify-between mb-2">
                   <div className="flex items-center">
-                    <span className="text-xs font-semibold bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                      OCaml
-                    </span>
                     {item.help.model && (
                       <span className="text-xs text-gray-500 ml-2">
-                        via {item.help.model}
+                        {item.help.model}
                       </span>
                     )}
                   </div>
                   <span className="text-xs text-gray-500">
                     {item.help.usage && formatTokenUsage(item.help.usage)}
                   </span>
-                </div>
+                  </div>
+                 */}
                 <div className="relative">
                   <pre className="bg-gray-800 text-gray-100 p-3 rounded overflow-x-auto text-xs font-mono">
                     {item.help.text}
