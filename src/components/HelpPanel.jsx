@@ -151,12 +151,45 @@ export const HelpPanel = ({
     return `Input: ${usage.input_tokens} | Output: ${usage.output_tokens} | Total: ${usage.input_tokens + usage.output_tokens}`;
   };
 
+  // Function to handle deleting a message pair (prompt and response)
+  const handleDeleteMessagePair = (index) => {
+    setHelp(prev => {
+      const newHelp = [...prev];
+      // Check if this is a user message and if the previous message is a bot response
+      // In reversed chronological order, the bot response comes before the user message
+      if (newHelp[index].type === 'user' && index - 1 >= 0 && newHelp[index - 1].type === 'bot') {
+        // Remove both the user message and the corresponding bot response
+        newHelp.splice(index - 1, 2);
+      } else {
+        // Just remove the single message as fallback
+        newHelp.splice(index, 1);
+      }
+      return newHelp;
+    });
+  };
+
+  // Function to clear all messages
+  const handleClearAll = () => {
+    setHelp([]);
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Input field at the top, aligned with output boxes */}
       <div className="px-4 mb-4 py-2">
-        <div className="text-sm font-semibold text-gray-500 block">
-          What do you want to make.
+        <div className="flex justify-between items-center mb-1">
+          <div className="text-sm font-semibold text-gray-500">
+            What do you want to make today?
+          </div>
+          {help.length > 0 && (
+            <button
+              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors"
+              onClick={handleClearAll}
+              title="Clear all messages"
+            >
+              Clear All
+            </button>
+          )}
         </div>
         <div className="text-xs font-light text-gray-500 mt-1 mb-2">
           Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
@@ -187,7 +220,20 @@ export const HelpPanel = ({
       {/* Messages in reverse chronological order */}
       <div className="flex-grow overflow-auto px-4">
         {help.map((item, index) => (
-          <div key={index} className={`mb-4 ${item.type === 'user' ? 'text-right' : 'text-left'}`}>
+          <div key={index} className={`mb-4 ${item.type === 'user' ? 'text-right' : 'text-left'} relative group`}>
+            {/* Only show delete button on user messages */}
+            {item.type === 'user' && (
+              <button
+                className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
+                onClick={() => handleDeleteMessagePair(index)}
+                title="Delete conversation"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+
             {item.type === 'user' ? (
               <div className="inline-block max-w-3/4 bg-blue-100 rounded-lg p-3 text-left">
                 <p className="text-sm">{item.user}</p>
