@@ -27,6 +27,65 @@ function detectLanguage(prompt) {
   return "ocaml";
 }
 
+const claudePrompt = {
+  system: `
+You are a programming assistant that translates natural language requests into code written in a functional DSL called Graffiticode.
+
+Graffiticode is a minimal, prefix, expression-oriented language. Key features:
+- \`let\` bindings with syntax: \`let name = value..\`
+- No infix operators; use prefix calls like \`add 1 2\`
+- Function application is prefix: \`fn arg1 arg2\`
+- Use parentheses to control application order: \`map (double) [1 2 3]\`
+- Anonymous lambdas use angle brackets: \`<x y: expr>\`
+- Lists: \`[1 2 3]\`
+- Records: \`{ name: "Alice" age: 30 }\`
+- Access via \`get\`, \`nth\`, \`hd\`, \`tl\`, etc.
+- Conditionals use \`if condition then x else y\`
+- Includes built-in functions: \`map\`, \`filter\`, \`reduce\`
+- Recursion is common; loops are not used
+- Whitespace separates tokens; no commas required
+
+Your job is to:
+- Output only valid, idiomatic Graffiticode
+- Use readable names and structure
+- Return only code unless asked for explanation
+  `.trim(),
+
+  messages: [
+    {
+      role: "user",
+      content: "Generate code that doubles every number in the list [1, 2, 3]."
+    },
+    {
+      role: "assistant",
+      content: `
+let double = <x: add x x>..
+let result = map (double) [1 2 3]..
+      `.trim()
+    },
+    {
+      role: "user",
+      content: "Get the total price of all in-stock items in a product list with a 10% discount."
+    },
+    {
+      role: "assistant",
+      content: `
+let inStock = <item: gt get item "stock" 0>..
+let applyDiscount = <item discount: {
+  id: get item "id"
+  name: get item "name"
+  price: mul get item "price" sub 1 discount
+  stock: get item "stock"
+}>..
+let calculateTotal = <items: reduce (<item total: add total get item "price">) 0 items>..
+let availableItems = filter (inStock) products..
+let discountedItems = map (<item: applyDiscount item 0.1>) availableItems..
+let total = calculateTotal discountedItems..
+      `.trim()
+    },
+  ]
+};
+
 /**
  * Create a prompt for Claude that will generate high-quality code
  * @param {string} userPrompt - The user's original prompt
@@ -34,19 +93,15 @@ function detectLanguage(prompt) {
  * @returns {string} - A well-formatted prompt for Claude
  */
 function createCodeGenerationPrompt(userPrompt, language) {
-  return `You are a senior ${language} developer tasked with writing high-quality, production-ready code. Write only the code without any explanations or markdown formatting.
-
-User request: ${userPrompt}
-
-Guidelines:
-- Write clean, well-organized, and properly documented code
-- Follow best practices and conventions for ${language}
-- Include appropriate error handling
-- Use descriptive variable and function names
-- Only output executable code with no additional text before or after
-- Do not include markdown code block syntax like \`\`\`${language} or \`\`\`
-
-Code:`;
+  return JSON.stringify({
+    ...claudePrompt,
+    messages: [
+      ...claudePrompt.messages,
+      {role: "user",
+       content: userPrompt,
+      },
+    ],
+  }, null, 2)
 }
 
 /**
@@ -131,8 +186,7 @@ function getFallbackResponse(prompt, options) {
 
 export async function generateCode({ prompt, language = null, options = {} }) {
   try {
-    // Always use OCaml
-    const targetLanguage = "ocaml";
+    const targetLanguage = "graffiticode";
 
     // Create a well-formatted prompt for Claude to generate OCaml code
     const formattedPrompt = createCodeGenerationPrompt(prompt, targetLanguage);
