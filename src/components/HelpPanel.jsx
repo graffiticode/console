@@ -179,7 +179,7 @@ export const HelpPanel = ({
       <div className="px-4 mb-4 py-2">
         <div className="flex justify-between items-center mb-1">
           <div className="text-sm font-semibold text-gray-500">
-            What do you want to make today?
+            What do you want to make?
           </div>
           {help.length > 0 && (
             <button
