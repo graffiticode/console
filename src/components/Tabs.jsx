@@ -10,11 +10,16 @@ const tabs = [
   { name: 'Help', current: false },
 ];
 
-export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisabled }) {
+export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisabled, setSaveDisabled }) {
   const handleClick = (name) => {
     tabs.find(t => t.current).current = false;
     tabs.find(t => t.name === name).current = true;
     setTab(name);
+
+    // Enable the Save button when user clicks on the Help tab
+    if (name === 'Help' && setSaveDisabled) {
+      setSaveDisabled(false);
+    }
   };
   return (
     <div className="pt-4">

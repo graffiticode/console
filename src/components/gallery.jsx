@@ -1,3 +1,4 @@
+import assert from "assert";
 import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
 import useSWR from "swr";
 import { Dialog, Transition } from '@headlessui/react'
@@ -94,7 +95,11 @@ export default function Gallery({ lang, mark }) {
   const [ showSaving, setShowSaving ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(480);
   const [ editorHeight, setEditorHeight ] = useState(480);
-  const [ id, setId ] = useState("");
+  const [ id, _setId ] = useState("");
+  // Wrapped setId with debug logging
+  const setId = (newId) => {
+    _setId(newId);
+  };
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
@@ -118,10 +123,23 @@ export default function Gallery({ lang, mark }) {
     if (loadTasksData === undefined || loadTasksData.length === 0) {
       setId("");
     }
-    setTasks(loadTasksData || []);
+    if (loadTasksData && loadTasksData.length > 0) {
+      const processedTasks = loadTasksData.map(task => {
+        if (task.help) {
+          assert(typeof task.help === "string", typeof task.help);
+          task.help = task.help && JSON.parse(task.help) || [];
+        }
+        return task;
+      });
+      setTasks(processedTasks);
+    } else {
+      setTasks([]);
+    }
   }, [loadTasksData]);
 
   useEffect(() => {
+    // If this is indeed a new task, then add it to the list. Otherwise, nothing
+    // to see here.
     if (newTask && !tasks.some(task => task.id === newTask.id)) {
       tasks.unshift(newTask);
       setTasks(tasks);

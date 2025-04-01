@@ -231,10 +231,10 @@ export async function generateCode({ prompt, language, options }) {
     console.log(
       "generateCode()",
       "prompt=", prompt.substring(0, 50) + (prompt.length > 50 ? "..." : ""),
-      "language=", language || "not specified"
+      "language=", language || "graffiticode"
     );
 
-    // This is just a placeholder for now - in production, this would call Claude API
+    // Call the code generation service to generate Graffiticode
     const result = await codeGenerationService({
       prompt,
       language,

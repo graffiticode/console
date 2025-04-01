@@ -60,7 +60,7 @@ const typeDefs = `
 
   type Mutation {
     logCompile(id: String!, status: String!, timestamp: String!, data: String!): String!
-    postTask(lang: String!, code: String!, help: String!, ephemeral: Boolean): String!
+    postTask(lang: String!, code: String!, ephemeral: Boolean): String!
     saveTask(id: String, lang: String!, code: String!, help: String!, mark: Int!, isPublic: Boolean): String!
     updateTask(id: String, name: String, help: String, mark: Int, isPublic: Boolean): String!
     generateCode(prompt: String!, language: String, options: CodeGenerationOptions): GeneratedCode!
@@ -133,9 +133,9 @@ const resolvers = {
     },
     postTask: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, code, help, ephemeral } = args;
+      const { lang, code, ephemeral } = args;
       const { uid } = await client.verifyToken(token);
-      const task = { lang, code, help };
+      const task = { lang, code };
       const { id } = await postTask({ auth: { uid, token }, task, ephemeral });
       return id;
     },

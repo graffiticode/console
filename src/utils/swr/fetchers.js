@@ -36,8 +36,8 @@ export const postTask = async ({ user, lang, code }) => {
   //   "postTask()",
   // );
   const query = gql`
-    mutation post ($lang: String!, $code: String!, $help: String!, $ephemeral: Boolean!) {
-      postTask(lang: $lang, code: $code, help: $help, ephemeral: $ephemeral)
+    mutation post ($lang: String!, $code: String!, $ephemeral: Boolean!) {
+      postTask(lang: $lang, code: $code, ephemeral: $ephemeral)
     }
   `;
   const token = await user.getToken();
@@ -47,13 +47,14 @@ export const postTask = async ({ user, lang, code }) => {
     }
   });
   const ephemeral = true;
-  return client.request(query, { lang, code, help: JSON.stringify([]), ephemeral }).then(data => data.postTask);
+  return client.request(query, { lang, code, ephemeral }).then(data => data.postTask);
 };
 
 export const buildSaveTask = () => async ({ user, id, lang, code, help, mark, isPublic = false }) => {
-  // console.log(
-  //   "buildSaveTask()",
-  // );
+  console.log(
+    "buildSaveTask()",
+    "help=" + JSON.stringify(help, null, 2),    
+  );
   const query = gql`
     mutation post ($id: String, $lang: String!, $code: String!, $help: String!, $mark: Int!, $isPublic: Boolean) {
       saveTask(id: $id, lang: $lang, code: $code, help: $help, mark: $mark, isPublic: $isPublic)
@@ -72,10 +73,10 @@ export const buildSaveTask = () => async ({ user, id, lang, code, help, mark, is
 };
 
 export const postTaskUpdates = async ({ user, tasks }) => {
-  // console.log(
-  //   "postTaskUpdates()",
-  //   "tasks=" + JSON.stringify(tasks, null, 2),
-  // );
+  console.log(
+    "postTaskUpdates()",
+    "tasks=" + JSON.stringify(tasks, null, 2),
+  );
   const query = gql`
     mutation post ($id: String, $name: String, $help: String, $mark: Int, $isPublic: Boolean) {
       updateTask(id: $id, name: $name, help: $help, mark: $mark, isPublic: $isPublic)

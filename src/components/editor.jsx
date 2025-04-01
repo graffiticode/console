@@ -60,7 +60,7 @@ export default function Editor({
   const [ isPublic, setIsPublic ] = useState(false);
   const [ saving, setSaving ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
-  const [ doPostTaskUpdates, setDoPostTaskUpdates ] = useState(false);
+  // No longer using postTaskUpdates for help changes
   const [ doPostDataTask, setDoPostDataTask ] = useState(false);
   const [ doGetData, setDoGetData ] = useState(false);
   const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Help");
@@ -72,27 +72,24 @@ export default function Editor({
 
   useEffect(() => {
     if (taskId === "") {
-      // New task.
       setCode("");
       setHelp([]);
       setData({});
       setDoPostTask(true);
     } else {
       const task = tasks.find(task => task.id === taskId);
-      // console.log(
-      //   "Editor()",
-      //   "task=" + JSON.stringify(task, null, 2),
-      // );
-      task && setCode(task.src);
-      task && setHelp(typeof task.help === "string" && JSON.parse(task.help) || task.help || []);
+      if (task) {
+        setCode(task.src);
+        setHelp(task.help && (
+          typeof task.help === "string" && JSON.parse(task.help) ||
+            task.help ||
+            []
+        ))
+      }
     }
-  }, [taskId]);
+  }, [taskId, tasks]);
 
   useEffect(() => {
-    // console.log(
-    //   "Editor()",
-    //   "id=" + id,
-    // );
     const { taskId } = parseId(id);
     if (taskId) {
       setTaskId(taskId);
@@ -121,8 +118,26 @@ export default function Editor({
     }
   }, [code]);
 
+  // Enable save button when help changes
+  useEffect(() => {
+    if (help && help.length > 0) {
+      setSaveDisabled(false);
+    }
+  }, [help]);
+
+  // This is the critical fix - when a user clicks on a task in the list,
+  // we need to force the task ID to update and help to be reloaded
+  useEffect(() => {
+    if (id && id !== getId({taskId})) {
+      const { taskId: newTaskId } = parseId(id);
+      if (newTaskId) {
+        setTaskId(newTaskId);
+      }
+    }
+  }, [id, taskId]);
+
   const postTaskResp = useSWR(
-    doPostTask && { user, lang, code, help } || null,
+    doPostTask && { user, lang, code } || null,
     postTask
   );
 
@@ -131,35 +146,6 @@ export default function Editor({
     setDoPostTask(false);
     setTaskId(taskId);
     setId(taskId);
-  }
-
-  useEffect(() => {
-    if (help?.length > 0) {
-      setDoPostTaskUpdates(true);
-      // FIXME avoid mutation.
-      // console.log(
-      //   "Editor",
-      //   "id=" + id,
-      //   "help=" + JSON.stringify(help, null, 2),
-      // );
-      const task = tasks.find(task => task.id === id);
-      task?.help && (task.help = help);
-    }
-  }, [help]);
-
-  const postTaskUpdatesResp = useSWR(
-    doPostTaskUpdates && id && {
-      user,
-      tasks: [{
-        id,
-        help,
-      }],
-    } || null,
-    postTaskUpdates
-  );
-
-  if (postTaskUpdatesResp.data) {
-    setDoPostTaskUpdates(false);
   }
 
   useEffect(() => {
@@ -180,19 +166,21 @@ export default function Editor({
 
   if (postDataTaskResp.data) {
     const dataId = postDataTaskResp.data;
-    // console.log(
-    //   "Editor()",
-    //   "dataId=" + dataId,
-    // );
     setDoPostDataTask(false);
     setId(getId({taskId, dataId}));
   }
 
   // Save task.
-
-  const task = { id, lang, code, help, mark: mark.id, isPublic };
   const saveTaskResp = useSWR(
-    saving && { user, ...task } || null,
+    saving && {
+      user,
+      id,
+      lang,
+      code,
+      help, //: JSON.stringify(help), // Explicitly stringify help here for saving
+      mark: mark.id,
+      isPublic
+    } || null,
     saveTask
   );
 
@@ -202,7 +190,12 @@ export default function Editor({
       // We have successfully saved a task so add it to the task list.
       setNewTask({
         ...data,
-        ...task,
+        id,
+        lang,
+        code,
+        help,
+        mark: mark.id,
+        isPublic,
         created: Date.now(),
       });
     }
@@ -219,31 +212,40 @@ export default function Editor({
           setSaving={setSaving}
           setShowSaving={setShowSaving}
           saveDisabled={saveDisabled}
+          setSaveDisabled={setSaveDisabled}
         />
         <div
           style={{height}}
         >
           {
-            tab === "Data" &&
-              // <PropPanel
-              //   data={data}
-              //   lang={lang}
-              //   setData={setProps}
-              //   user={user}
-              // /> ||
-              <DataPanel
-                id={id}
-                user={user}
-              /> ||
-            tab === "Help" &&
-              <HelpPanel
-                help={help}
-                setHelp={setHelp}
-              /> ||
-              <CodePanel
-                code={code}
-                setCode={setCode}
-              />
+            (() => {
+              if (tab === "Data") {
+                return (
+                  <DataPanel
+                    id={id}
+                    user={user}
+                  />
+                );
+              } else if (tab === "Help") {
+                return (
+                  <HelpPanel
+                    help={help}
+                    setHelp={setHelp}
+                    accessToken={accessToken}
+                    language={lang}
+                    code={code}
+                    setCode={setCode}
+                  />
+                );
+              } else {
+                return (
+                  <CodePanel
+                    code={code}
+                    setCode={setCode}
+                  />
+                );
+              }
+            })()
           }
         </div>
       </div>

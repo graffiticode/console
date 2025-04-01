@@ -151,6 +151,7 @@ export default function TasksNav({ user, setId, tasks }) {
     const nestedItems = getNestedItems({setId, tasks});
     if (nestedItems.length) {
       nestedItems[0].current = true;
+      console.log("HELP_DEBUG [TasksNav] - Setting initial task id:", nestedItems[0].id);
       setId(nestedItems[0].id);
       setItems(nestedItems);
     }

@@ -18,13 +18,13 @@ const CLAUDE_MODELS = {
 };
 
 /**
- * Always returns OCaml as the language
+ * Always returns Graffiticode as the language
  * @param {string} prompt - User's input prompt (ignored)
- * @returns {string} Always returns "ocaml"
+ * @returns {string} Always returns "graffiticode"
  */
 function detectLanguage(prompt) {
-  // Always return OCaml regardless of prompt content
-  return "ocaml";
+  // Always return Graffiticode regardless of prompt content
+  return "graffiticode";
 }
 
 const claudePrompt = {
@@ -44,11 +44,14 @@ Graffiticode is a minimal, prefix, expression-oriented language. Key features:
 - Includes built-in functions: \`map\`, \`filter\`, \`reduce\`
 - Recursion is common; loops are not used
 - Whitespace separates tokens; no commas required
+- Line comments start with the pipe character: \`| This is a comment\`
+- All non-code commentary should be written as line comments
 
 Your job is to:
 - Output only valid, idiomatic Graffiticode
 - Use readable names and structure
 - Return only code unless asked for explanation
+- Add line comments starting with | to explain your code where appropriate
   `.trim(),
 
   messages: [
@@ -59,7 +62,9 @@ Your job is to:
     {
       role: "assistant",
       content: `
+| Define a function to double a number
 let double = <x: add x x>..
+| Apply the double function to each number in the list
 let result = map (double) [1 2 3]..
       `.trim()
     },
@@ -70,16 +75,28 @@ let result = map (double) [1 2 3]..
     {
       role: "assistant",
       content: `
+| Function to check if an item is in stock
 let inStock = <item: gt get item "stock" 0>..
+
+| Function to apply a discount to an item's price
 let applyDiscount = <item discount: {
   id: get item "id"
   name: get item "name"
+  | Multiply price by (1 - discount)
   price: mul get item "price" sub 1 discount
   stock: get item "stock"
 }>..
+
+| Function to calculate the total price of all items
 let calculateTotal = <items: reduce (<item total: add total get item "price">) 0 items>..
+
+| Filter for only in-stock items
 let availableItems = filter (inStock) products..
+
+| Apply a 10% discount to all available items
 let discountedItems = map (<item: applyDiscount item 0.1>) availableItems..
+
+| Calculate the final total price
 let total = calculateTotal discountedItems..
       `.trim()
     },
@@ -171,7 +188,7 @@ async function callClaudeAPI(prompt, options) {
 
 function getFallbackResponse(prompt, options) {
   console.warn("Using fallback response for Claude API");
-  const sampleCode = `(* Fallback response - Claude API unavailable *)`;
+  const sampleCode = `let message = "Fallback response - Claude API unavailable"..`;
   return {
     id: "fallback-" + Math.random().toString(36).substring(2, 12),
     model: options.model || CLAUDE_MODELS.DEFAULT,
@@ -188,10 +205,10 @@ export async function generateCode({ prompt, language = null, options = {} }) {
   try {
     const targetLanguage = "graffiticode";
 
-    // Create a well-formatted prompt for Claude to generate OCaml code
+    // Create a well-formatted prompt for Claude to generate Graffiticode
     const formattedPrompt = createCodeGenerationPrompt(prompt, targetLanguage);
 
-    // Use the most capable model for OCaml code generation
+    // Use the most capable model for Graffiticode generation
     const model = options.model || CLAUDE_MODELS.OPUS;
 
     // Set up API call options
@@ -204,10 +221,10 @@ export async function generateCode({ prompt, language = null, options = {} }) {
     // Call the Claude API
     const response = await callClaudeAPI(formattedPrompt, apiOptions);
 
-    // Return formatted response with OCaml language
+    // Return formatted response with Graffiticode language
     return {
       code: response.content,
-      language: targetLanguage, // Always OCaml
+      language: targetLanguage, // Always Graffiticode
       model: response.model,
       usage: {
         input_tokens: response.usage.prompt_tokens,
@@ -215,7 +232,7 @@ export async function generateCode({ prompt, language = null, options = {} }) {
       }
     };
   } catch (error) {
-    console.error("Error generating OCaml code:", error);
-    throw new Error(`Failed to generate OCaml code: ${error.message}`);
+    console.error("Error generating Graffiticode:", error);
+    throw new Error(`Failed to generate Graffiticode: ${error.message}`);
   }
 }

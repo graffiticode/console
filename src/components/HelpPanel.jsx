@@ -28,7 +28,9 @@ export const HelpPanel = ({
   help,
   setHelp,
   accessToken,
-  language
+  language,
+  code,
+  setCode
 }) => {
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
@@ -46,7 +48,7 @@ export const HelpPanel = ({
   // Custom function to handle code generation specifically
   const handleCodeGeneration = async (content) => {
     try {
-      // Call the generateCode API for OCaml
+      // Call the generateCode API for Graffiticode
       const result = await generateCode({
         prompt: content,
         options: {
@@ -59,7 +61,7 @@ export const HelpPanel = ({
         text: result.code,
         type: 'code',
         model: result.model,
-        language: result.language || 'ocaml',
+        language: result.language || 'graffiticode',
         usage: result.usage
       };
     } catch (error) {
@@ -173,13 +175,25 @@ export const HelpPanel = ({
     setHelp([]);
   };
 
+  if (typeof help === "string" && help.trim() !== "") {
+    console.log("[1] Parsing help: " + help);
+    help = JSON.parse(help);
+    if (typeof help === "string" && help.trim() !== "") {
+      console.log("[2] Parsing help: " + help);
+      help = JSON.parse(help);
+    }
+  }
+  console.log(
+    "HelpPanel",
+    "help=" + JSON.stringify(help, null, 2),
+  );
   return (
     <div className="flex flex-col h-full">
       {/* Input field at the top, aligned with output boxes */}
       <div className="px-4 mb-4 py-2">
         <div className="flex justify-between items-center mb-1">
           <div className="text-sm font-semibold text-gray-500">
-            What do you want to make?
+            What would you like to make with Graffiticode?
           </div>
           {help.length > 0 && (
             <button
@@ -238,7 +252,7 @@ export const HelpPanel = ({
               <div className="inline-block max-w-3/4 bg-blue-100 rounded-lg p-3 text-left">
                 <p className="text-sm">{item.user}</p>
               </div>
-            ) : item.help.type === 'code' ? (
+            ) : item.help?.type === 'code' ? (
               <div className="bg-gray-100 rounded-lg p-3 shadow-sm">
                 {/*
                 <div className="flex justify-between mb-2">
@@ -256,20 +270,50 @@ export const HelpPanel = ({
                  */}
                 <div className="relative">
                   <pre className="bg-gray-800 text-gray-100 p-3 rounded overflow-x-auto text-xs font-mono">
-                    {item.help.text}
+                    {item.help?.text}
                   </pre>
-                  <button
-                    className="absolute top-2 right-2 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded p-1"
-                    onClick={() => {
-                      navigator.clipboard.writeText(item.help.text);
-                      // Optional: Show a toast or notification that code was copied
-                    }}
-                    title="Copy code"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
+                  <div className="absolute top-2 right-2 flex space-x-1">
+                    <button
+                      className="text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded p-1"
+                      onClick={() => {
+                        // Get the current code from the help message
+                        const codeFromHelp = item.help.text;
+                        // Update the code in the code panel
+                        if (typeof setCode === 'function') {
+                          setCode(codeFromHelp);
+                        }
+                      }}
+                      title="Copy to Code Panel"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                      </svg>
+                    </button>
+                    <button
+                      className="text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded p-1"
+                      onClick={() => {
+                        if (code) {
+                          // Update this message with the current code from the code panel
+                          setHelp(prev => prev.map((msg, idx) =>
+                            idx === index ? {
+                              ...msg,
+                              help: {
+                                ...msg.help,
+                                text: code
+                              },
+                              user: code
+                            } : msg
+                          ));
+                        }
+                      }}
+                      title="Copy from Code Panel"
+                      disabled={!code}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transform rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -282,4 +326,4 @@ export const HelpPanel = ({
       </div>
     </div>
   );
-}
+};

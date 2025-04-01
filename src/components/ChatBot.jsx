@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { generateCode } from "../utils/swr/fetchers";
 
 /**
- * Function to generate OCaml code responses using the generateCode function
+ * Function to generate Graffiticode responses using the generateCode function
  */
 const generateBotResponse = async (message, accessToken) => {
   try {
@@ -19,7 +19,7 @@ const generateBotResponse = async (message, accessToken) => {
     return {
       text: result.code,
       type: 'code',
-      language: result.language || 'ocaml',
+      language: result.language || 'graffiticode',
       model: result.model,
       usage: result.usage
     };
@@ -35,38 +35,28 @@ const generateBotResponse = async (message, accessToken) => {
 const fallbackResponse = (message) => {
   if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
     return {
-      text: 'Hello! How can I help you with OCaml today?',
+      text: 'Hello! How can I help you with Graffiticode today?',
       type: 'text'
     };
   } else if (message.toLowerCase().includes('help')) {
     return {
-      text: 'I can help you write OCaml code. What specific functionality would you like me to implement?',
+      text: 'I can help you write Graffiticode. What specific functionality would you like me to implement?',
       type: 'text'
     };
   } else if (message.toLowerCase().includes('example')) {
     return {
-      text: `(* Here's a simple OCaml example *)
-let sum_list lst =
-  List.fold_left (+) 0 lst
-
-let () =
-  let result = sum_list [1; 2; 3; 4; 5] in
-  Printf.printf "Sum: %d\\n" result`,
+      text: `let double = <x: add x x>..
+let result = map (double) [1 2 3]..`,
       type: 'code',
-      language: 'ocaml'
+      language: 'graffiticode'
     };
   } else {
     return {
-      text: `(* OCaml fallback response *)
-(* You asked about: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}" *)
-(* Here's a simple OCaml function *)
-
-let greet name =
-  Printf.printf "Hello, %s! I'll help you with OCaml code.\\n" name
-
-let () = greet "user"`,
+      text: `let message = "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"..
+let greeting = <name: concat "Hello, " name>..
+greeting "user"..`,
       type: 'code',
-      language: 'ocaml'
+      language: 'graffiticode'
     };
   }
 };
