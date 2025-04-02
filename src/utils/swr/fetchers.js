@@ -53,7 +53,7 @@ export const postTask = async ({ user, lang, code }) => {
 export const buildSaveTask = () => async ({ user, id, lang, code, help, mark, isPublic = false }) => {
   console.log(
     "buildSaveTask()",
-    "help=" + JSON.stringify(help, null, 2),    
+    "help=" + JSON.stringify(help, null, 2),
   );
   const query = gql`
     mutation post ($id: String, $lang: String!, $code: String!, $help: String!, $mark: Int!, $isPublic: Boolean) {
