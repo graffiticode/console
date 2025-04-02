@@ -126,7 +126,7 @@ export default function Gallery({ lang, mark }) {
     if (loadTasksData && loadTasksData.length > 0) {
       const processedTasks = loadTasksData.map(task => {
         if (task.help) {
-          assert(typeof task.help === "string", typeof task.help);
+          assert(!task.help || typeof task.help === "string", typeof task.help);
           task.help = task.help && JSON.parse(task.help) || [];
         }
         return task;
