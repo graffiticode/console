@@ -242,6 +242,7 @@ export default function Editor({
                   <CodePanel
                     code={code}
                     setCode={setCode}
+                    compiledData={data}
                   />
                 );
               }
