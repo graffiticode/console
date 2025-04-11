@@ -236,32 +236,32 @@ async function verifyCode(code, authToken) {
       "verifyCode()",
       "data=" + JSON.stringify(compileResponse, null, 2),
     );
-    
+
     // Check if the response indicates an error but doesn't have a standardized error format
     if (compileResponse.status === "error" && !compileResponse.error) {
       // Provide a standardized error object
-      compileResponse.error = { 
-        message: "Compilation failed", 
-        details: compileResponse.data?.errors || "Unknown error" 
+      compileResponse.error = {
+        message: "Compilation failed",
+        details: compileResponse.data?.errors || "Unknown error"
       };
     }
-    
+
     // Check for specific error patterns in the response data
     if (/*compileResponse.status === "success" &&*/ compileResponse.data) {
       // Sometimes errors are embedded in the data object
       if (compileResponse.data.errors && compileResponse.data.errors.length > 0) {
         compileResponse.status = "error";
-        compileResponse.errors = { 
+        compileResponse.errors = {
           message: "Compilation succeeded but found errors in code",
           details: compileResponse.data.errors
         };
       }
-    }    
+    }
     return compileResponse;
   } catch (error) {
     console.error("Error verifying Graffiticode:", error);
-    return { 
-      status: "error", 
+    return {
+      status: "error",
       error: { message: error.message },
       data: null
     };
@@ -275,43 +275,43 @@ async function verifyCode(code, authToken) {
  */
 function parseGraffiticodeErrors(errorInfo) {
   let formattedErrors = '';
-  
+
   // Handle different error formats
   if (errorInfo.error && errorInfo.error.message) {
     formattedErrors = errorInfo.error.message;
   } else if (errorInfo.data && errorInfo.data.errors) {
     // Extract and format each error
-    const errors = Array.isArray(errorInfo.data.errors) 
-      ? errorInfo.data.errors 
+    const errors = Array.isArray(errorInfo.data.errors)
+      ? errorInfo.data.errors
       : [errorInfo.data.errors];
-    
+
     formattedErrors = errors.map(err => {
       let errMsg = '';
-      
+
       if (typeof err === 'string') {
         return err;
       }
-      
+
       if (err.message) {
         errMsg += err.message;
       }
-      
+
       if (err.line) {
         errMsg += ` at line ${err.line}`;
       }
-      
+
       if (err.col) {
         errMsg += `, column ${err.col}`;
       }
-      
+
       if (err.expected) {
         errMsg += `\nExpected: ${err.expected}`;
       }
-      
+
       if (err.found) {
         errMsg += `\nFound: ${err.found}`;
       }
-      
+
       return errMsg;
     }).join('\n\n');
   } else if (typeof errorInfo === 'string') {
@@ -319,7 +319,7 @@ function parseGraffiticodeErrors(errorInfo) {
   } else {
     formattedErrors = JSON.stringify(errorInfo, null, 2);
   }
-  
+
   return formattedErrors;
 }
 
@@ -332,7 +332,7 @@ function parseGraffiticodeErrors(errorInfo) {
 function createErrorFixPrompt(code, errorInfo) {
   // Parse and format the error information
   const formattedErrors = parseGraffiticodeErrors(errorInfo);
-  
+
   return JSON.stringify({
     system: `You are an expert Graffiticode programmer tasked with fixing code errors. 
 Graffiticode is a minimal, prefix, expression-oriented language with these key features:
@@ -410,7 +410,7 @@ export async function generateCode({ auth, prompt, language = null, options = {}
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
     let finalUsage = { ...response.usage };
-    
+
     // Verify the code if an access token is provided
     if (accessToken) {
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
@@ -420,33 +420,33 @@ export async function generateCode({ auth, prompt, language = null, options = {}
           "generatedCode=" + generatedCode,
         );
         verificationResult = await verifyCode(generatedCode, accessToken);
-        
+
         // If compilation was successful, break the loop
         if (verificationResult.status === "success" && !verificationResult.error) {
           break;
         }
-        
+
         // If there were errors, try to fix them
         if (verificationResult.errors || verificationResult.status === "error") {
           console.log(`Code has errors, attempting fix (${fixAttempts + 1}/${MAX_FIX_ATTEMPTS})...`);
-          
+
           // Create a prompt to fix the errors
           const fixPrompt = createErrorFixPrompt(generatedCode, verificationResult);
-          
+
           // Call the Claude API again to fix the code
           const fixResponse = await callClaudeAPI(fixPrompt, {
             ...apiOptions,
             temperature: 0.1 // Lower temperature for more deterministic fixes
           });
-          
+
           // Update the generated code with the fixed version
           generatedCode = fixResponse.content;
-          
+
           // Add fix attempt usage to total
           finalUsage.prompt_tokens += fixResponse.usage.prompt_tokens;
           finalUsage.completion_tokens += fixResponse.usage.completion_tokens;
           finalUsage.total_tokens += fixResponse.usage.total_tokens;
-          
+
           fixAttempts++;
           console.log(
             "generateCode()",
