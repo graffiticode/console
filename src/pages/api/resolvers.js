@@ -110,6 +110,8 @@ export async function postTask({ auth, task, ephemeral, isPublic }) {
   try {
     console.log(
       "postTask()",
+      "auth=" + JSON.stringify(auth),
+      "task=" + JSON.stringify(task, null, 2),
     );
     const storageType = ephemeral && "ephemeral" || "persistent";
     const headers = {
@@ -134,10 +136,15 @@ export async function getData({ authToken, id }) {
   try {
     console.log(
       "getData()",
+      "authToken=" + authToken,
     );
     const baseUrl = getBaseUrlForApi();
     const get = bent(baseUrl, 'GET', 'json', 200);
     const resp = await get(`/data?id=${id}&access_token=${authToken}`);
+    console.log(
+      "getData()",
+      "resp=" + JSON.stringify(resp, null, 2),
+    );
     return resp.data;
   } catch (x) {
     console.log(
@@ -226,7 +233,8 @@ export async function compiles({ auth, lang, type }) {
  * @param {Object} [params.options] - Additional generation options
  * @returns {Promise<Object>} - Generated code and metadata
  */
-export async function generateCode({ prompt, language, options }) {
+export async function generateCode({ auth, prompt, language, options }) {
+  // TODO add support for calling the compiler to check generated code.
   try {
     console.log(
       "generateCode()",
@@ -236,6 +244,7 @@ export async function generateCode({ prompt, language, options }) {
 
     // Call the code generation service to generate Graffiticode
     const result = await codeGenerationService({
+      auth,
       prompt,
       language,
       options: {

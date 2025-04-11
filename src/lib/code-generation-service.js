@@ -5,9 +5,13 @@
  * 1. Language detection from prompts
  * 2. API calls to Claude for code generation
  * 3. Token usage tracking
+ * 4. Code verification via Graffiticode API
+ * 5. Error correction via Claude
  */
 
-import axios from 'axios';
+import axios from "axios";
+import { postApiCompile } from "./api";
+import { postTask, getData } from "../pages/api/resolvers";
 
 // Define available Claude models
 const CLAUDE_MODELS = {
@@ -42,10 +46,13 @@ Graffiticode is a minimal, prefix, expression-oriented language. Key features:
 - Access via \`get\`, \`nth\`, \`hd\`, \`tl\`, etc.
 - Conditionals use \`if condition then x else y\`
 - Includes built-in functions: \`map\`, \`filter\`, \`reduce\`
+- The build-in function \`range\` takes three arguments
 - Recursion is common; loops are not used
 - Whitespace separates tokens; no commas required
 - Line comments start with the pipe character: \`| This is a comment\`
 - All non-code commentary should be written as line comments
+- \`print\` is a builtin function for printing a value
+
 
 Your job is to:
 - Output only valid, idiomatic Graffiticode
@@ -98,7 +105,11 @@ let discountedItems = map (<item: applyDiscount item 0.1>) availableItems..
 
 | Calculate the final total price
 let total = calculateTotal discountedItems..
-      `.trim()
+
+| Print the text 'hello, world!'
+print "hello, world!"..
+
+`.trim()
     },
   ]
 };
@@ -201,7 +212,181 @@ function getFallbackResponse(prompt, options) {
   };
 }
 
-export async function generateCode({ prompt, language = null, options = {} }) {
+/**
+ * Verify the generated code using the Graffiticode API
+ * @param {string} code - The generated code to verify
+ * @param {string} accessToken - Authentication token for the API
+ * @returns {Promise<Object>} - Compilation results including any errors
+ */
+async function verifyCode(code, authToken) {
+  try {
+    const task = {lang: "0002", code};
+    console.log(
+      "verifyCode()",
+      "auth=" + JSON.stringify(authToken),
+      "task=" + JSON.stringify(task, null, 2),
+    );
+    const { id } = await postTask({auth: {token: authToken}, task, ephemeral: true});
+    console.log(
+      "verifyCode()",
+      "id=" + id,
+    );
+    const  compileResponse = await getData({authToken, id});
+    console.log(
+      "verifyCode()",
+      "data=" + JSON.stringify(compileResponse, null, 2),
+    );
+    
+    // Check if the response indicates an error but doesn't have a standardized error format
+    if (compileResponse.status === "error" && !compileResponse.error) {
+      // Provide a standardized error object
+      compileResponse.error = { 
+        message: "Compilation failed", 
+        details: compileResponse.data?.errors || "Unknown error" 
+      };
+    }
+    
+    // Check for specific error patterns in the response data
+    if (/*compileResponse.status === "success" &&*/ compileResponse.data) {
+      // Sometimes errors are embedded in the data object
+      if (compileResponse.data.errors && compileResponse.data.errors.length > 0) {
+        compileResponse.status = "error";
+        compileResponse.errors = { 
+          message: "Compilation succeeded but found errors in code",
+          details: compileResponse.data.errors
+        };
+      }
+    }    
+    return compileResponse;
+  } catch (error) {
+    console.error("Error verifying Graffiticode:", error);
+    return { 
+      status: "error", 
+      error: { message: error.message },
+      data: null
+    };
+  }
+}
+
+/**
+ * Parse error information from Graffiticode compilation results
+ * @param {Object} errorInfo - Error information from the API
+ * @returns {string} - Formatted error details
+ */
+function parseGraffiticodeErrors(errorInfo) {
+  let formattedErrors = '';
+  
+  // Handle different error formats
+  if (errorInfo.error && errorInfo.error.message) {
+    formattedErrors = errorInfo.error.message;
+  } else if (errorInfo.data && errorInfo.data.errors) {
+    // Extract and format each error
+    const errors = Array.isArray(errorInfo.data.errors) 
+      ? errorInfo.data.errors 
+      : [errorInfo.data.errors];
+    
+    formattedErrors = errors.map(err => {
+      let errMsg = '';
+      
+      if (typeof err === 'string') {
+        return err;
+      }
+      
+      if (err.message) {
+        errMsg += err.message;
+      }
+      
+      if (err.line) {
+        errMsg += ` at line ${err.line}`;
+      }
+      
+      if (err.col) {
+        errMsg += `, column ${err.col}`;
+      }
+      
+      if (err.expected) {
+        errMsg += `\nExpected: ${err.expected}`;
+      }
+      
+      if (err.found) {
+        errMsg += `\nFound: ${err.found}`;
+      }
+      
+      return errMsg;
+    }).join('\n\n');
+  } else if (typeof errorInfo === 'string') {
+    formattedErrors = errorInfo;
+  } else {
+    formattedErrors = JSON.stringify(errorInfo, null, 2);
+  }
+  
+  return formattedErrors;
+}
+
+/**
+ * Create a prompt for Claude to fix code based on compilation errors
+ * @param {string} code - The original code that had errors
+ * @param {Object} errorInfo - Information about the errors from compilation
+ * @returns {string} - A prompt for Claude to fix the code
+ */
+function createErrorFixPrompt(code, errorInfo) {
+  // Parse and format the error information
+  const formattedErrors = parseGraffiticodeErrors(errorInfo);
+  
+  return JSON.stringify({
+    system: `You are an expert Graffiticode programmer tasked with fixing code errors. 
+Graffiticode is a minimal, prefix, expression-oriented language with these key features:
+- \`let\` bindings with syntax: \`let name = value..\`
+- No infix operators; use prefix calls like \`add 1 2\`
+- Function application is prefix: \`fn arg1 arg2\`
+- Use parentheses to control application order: \`map (double) [1 2 3]\`
+- Anonymous lambdas use angle brackets: \`<x y: expr>\`
+- Lists: \`[1 2 3]\`
+- Records: \`{ name: "Alice" age: 30 }\`
+- Access via \`get\`, \`nth\`, \`hd\`, \`tl\`, etc.
+- Conditionals use \`if condition then x else y\`
+- Includes built-in functions: \`map\`, \`filter\`, \`reduce\`
+- Recursion is common; loops are not used
+- Whitespace separates tokens; no commas required
+- Line comments start with the pipe character: \`| This is a comment\`
+- IMPORTANT: All let statements MUST end with a double dot (..)
+
+Common Graffiticode errors and solutions:
+1. Missing double dot (..) at the end of a let statement
+2. Missing parentheses around function references: use (functionName) not functionName
+3. Incorrect function application: use prefix notation like "add x y" not "x + y"
+4. Improper lambda syntax: use angle brackets like <x: body> not other formats
+
+When fixing code:
+1. Carefully analyze the error messages
+2. Make minimal changes to fix the issues
+3. Return ONLY the corrected code with no additional commentary
+4. Ensure all code is syntactically valid
+5. Add helpful comments where appropriate with the pipe character |`,
+    messages: [
+      {
+        role: "user",
+        content: `The following Graffiticode has compilation errors:\n\n${code}\n\nError details:\n${formattedErrors}\n\nPlease fix the code and return only the corrected version.`
+      }
+    ]
+  }, null, 2);
+}
+
+/**
+ * Generate code, verify it, and fix if needed
+ * @param {Object} params - Parameters for code generation
+ * @param {string} params.prompt - The user's prompt
+ * @param {string} params.language - The target language (ignored, always uses Graffiticode)
+ * @param {Object} params.options - Options for the API call
+ * @param {Object} params.auth - Authentication object containing token for verification
+ * @returns {Promise<Object>} - The final code response
+ */
+export async function generateCode({ auth, prompt, language = null, options = {} }) {
+  console.log(
+    "generateCode()",
+    "auth=" + JSON.stringify(auth, null, 2),
+  );
+  const accessToken = auth?.token;
   try {
     const targetLanguage = "graffiticode";
 
@@ -220,16 +405,71 @@ export async function generateCode({ prompt, language = null, options = {} }) {
 
     // Call the Claude API
     const response = await callClaudeAPI(formattedPrompt, apiOptions);
+    let generatedCode = response.content;
+    let verificationResult = null;
+    let fixAttempts = 0;
+    const MAX_FIX_ATTEMPTS = 2;
+    let finalUsage = { ...response.usage };
+    
+    // Verify the code if an access token is provided
+    if (accessToken) {
+      // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
+      while (fixAttempts < MAX_FIX_ATTEMPTS) {
+        console.log(
+          "generateCode()",
+          "generatedCode=" + generatedCode,
+        );
+        verificationResult = await verifyCode(generatedCode, accessToken);
+        
+        // If compilation was successful, break the loop
+        if (verificationResult.status === "success" && !verificationResult.error) {
+          break;
+        }
+        
+        // If there were errors, try to fix them
+        if (verificationResult.errors || verificationResult.status === "error") {
+          console.log(`Code has errors, attempting fix (${fixAttempts + 1}/${MAX_FIX_ATTEMPTS})...`);
+          
+          // Create a prompt to fix the errors
+          const fixPrompt = createErrorFixPrompt(generatedCode, verificationResult);
+          
+          // Call the Claude API again to fix the code
+          const fixResponse = await callClaudeAPI(fixPrompt, {
+            ...apiOptions,
+            temperature: 0.1 // Lower temperature for more deterministic fixes
+          });
+          
+          // Update the generated code with the fixed version
+          generatedCode = fixResponse.content;
+          
+          // Add fix attempt usage to total
+          finalUsage.prompt_tokens += fixResponse.usage.prompt_tokens;
+          finalUsage.completion_tokens += fixResponse.usage.completion_tokens;
+          finalUsage.total_tokens += fixResponse.usage.total_tokens;
+          
+          fixAttempts++;
+          console.log(
+            "generateCode()",
+            "generatedCode=" + generatedCode,
+          );
+        } else {
+          // No errors found, break the loop
+          break;
+        }
+      }
+    }
 
     // Return formatted response with Graffiticode language
     return {
-      code: response.content,
+      code: generatedCode,
       language: targetLanguage, // Always Graffiticode
       model: response.model,
       usage: {
-        input_tokens: response.usage.prompt_tokens,
-        output_tokens: response.usage.completion_tokens
-      }
+        input_tokens: finalUsage.prompt_tokens,
+        output_tokens: finalUsage.completion_tokens
+      },
+      verification: verificationResult,
+      fixAttempts
     };
   } catch (error) {
     console.error("Error generating Graffiticode:", error);

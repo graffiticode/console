@@ -229,9 +229,16 @@ export const loadGraphiQL = async ({ user }) => {
  * @param {Object} [params.options] - Additional generation options
  * @returns {Promise<Object>} - Generated code and metadata
  */
-export const generateCode = async ({ prompt, language, options }) => {
-  const client = new GraphQLClient("/api");
-
+export const generateCode = async ({ user, prompt, language, options }) => {
+  if (!user) {
+    return {};
+  }
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
   const query = gql`
     mutation GenerateCode($prompt: String!, $language: String, $options: CodeGenerationOptions) {
       generateCode(prompt: $prompt, language: $language, options: $options) {

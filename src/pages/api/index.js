@@ -96,13 +96,16 @@ const resolvers = {
     },
   },
   Mutation: {
-    generateCode: async (_, args) => {
+    generateCode: async (_, args, ctx) => {
+      const { token } = ctx;
+      const { uid } = await client.verifyToken(token);
+      const auth = {uid, token};
       const { prompt, language, options } = args;
       console.log("generateCode mutation called", prompt.substring(0, 30) + "...");
 
       try {
         // No authentication required for code generation
-        return await generateCode({ prompt, language, options });
+        return await generateCode({ auth, prompt, language, options });
       } catch (error) {
         console.error("Error in generateCode mutation:", error);
         throw error;
