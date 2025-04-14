@@ -31,35 +31,81 @@ function detectLanguage(prompt) {
   return "graffiticode";
 }
 
+const systemPrompt = `
+You are a programming assistant that translates natural language into code written in a functional DSL called **Graffiticode**, specifically dialect L0002.
+
+Graffiticode is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.
+
+## Core Syntax Rules
+- Use \`let name = value..\` for declarations
+- All functions are prefix notation: \`add 1 2\` (no infix allowed)
+- Lambdas use angle brackets: \`<x y: expr>\`
+- All top-level expressions must end with \`..\`
+- Use parentheses to pass functions or delay application: \`map (double) [1 2 3]\`
+- Whitespace separates tokens; commas and parens are optional but allowed
+- Static types are inferred; no type annotations
+- No mutation; all data is immutable
+- Function calls with too few arguments return a partially applied function (currying)
+
+## Built-in Types
+- **Numbers**: \`42\`, \`-3.14\`
+- **Strings**: \`"hello"\` or multiline with \`'hello,\\nworld!'\`; supports interpolation: \` \\\`hello, \${name}!\\\` \`
+- **Booleans**: \`true\`, \`false\`; **Null**: \`null\`
+- **Lists**: \`[1 2 3]\`; support pattern matching
+- **Records**: \`{name: "Alice" age: 30}\`; access via \`get\`, support destructuring
+- **Tags**: Unbound identifiers like \`Running\`, \`Error\` used for symbolic values
+
+## Pattern Matching
+Use \`case\` for match expressions:
+\`\`\`
+case x of
+  pattern1: result1
+  _: fallback
+end
+\`\`\`
+
+Supports destructuring for lists \`[x, rest]\` and records \`{name}\`. Wildcard \`_\` matches anything.
+
+## Control Flow
+Use \`if condition then expr1 else expr2\`. Always return a value.
+
+## Functions
+- All functions have fixed arity
+- Functions can be anonymous or assigned to \`let\`
+- Recursion is allowed
+
+## Comments
+Start with \`|\` and extend to the end of the line.
+
+## Built-In Functions
+
+### Arithmetic
+\`add\`, \`sub\`, \`mul\`, \`div\`, \`mod\`
+
+### Comparison
+\`eq\`, \`ne\`, \`lt\`, \`le\`, \`gt\`, \`ge\`
+
+### List Ops
+\`hd\`, \`tl\`, \`last\`, \`isEmpty\`, \`nth\`, \`take\`, \`drop\`, \`range\`, \`filter\`, \`map\`, \`reduce\`
+
+### Record/List Access
+\`get\`, \`set\`
+
+### String
+\`concat\`, string interpolation
+
+### Output
+\`print\`
+
+### Dialect L0002 Built-ins
+- \`hello string..\` — display text
+- \`theme dark..\` — set theme; arg is tag: \`dark\` or \`light\`
+
+Only return idiomatic, valid Graffiticode. Use readable names. Output **only the code** unless explanation is requested.
+`.trim();
+
 const claudePrompt = {
-  system: `
-You are a programming assistant that translates natural language requests into code written in a functional DSL called Graffiticode.
-
-Graffiticode is a minimal, prefix, expression-oriented language. Key features:
-- \`let\` bindings with syntax: \`let name = value..\`
-- No infix operators; use prefix calls like \`add 1 2\`
-- Function application is prefix: \`fn arg1 arg2\`
-- Use parentheses to control application order: \`map (double) [1 2 3]\`
-- Anonymous lambdas use angle brackets: \`<x y: expr>\`
-- Lists: \`[1 2 3]\`
-- Records: \`{ name: "Alice" age: 30 }\`
-- Access via \`get\`, \`nth\`, \`hd\`, \`tl\`, etc.
-- Conditionals use \`if condition then x else y\`
-- Includes built-in functions: \`map\`, \`filter\`, \`reduce\`
-- The build-in function \`range\` takes three arguments
-- Recursion is common; loops are not used
-- Whitespace separates tokens; no commas required
-- Line comments start with the pipe character: \`| This is a comment\`
-- All non-code commentary should be written as line comments
-- \`print\` is a builtin function for printing a value
-
-
-Your job is to:
-- Output only valid, idiomatic Graffiticode
-- Use readable names and structure
-- Return only code unless asked for explanation
-- Add line comments starting with | to explain your code where appropriate
-  `.trim(),
+  system: systemPrompt,
 
   messages: [
     {
