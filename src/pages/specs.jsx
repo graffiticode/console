@@ -5,8 +5,7 @@ import { getBaseUrlForApi } from "../lib/api";
 
 export default function Spec({ language }) {
   const langId = language.name.slice(1);
-  const src = `${getBaseUrlForApi()}/L${langId}/docs.html`;
-  console.log("Spec() src=" + src);
+  const src = `${getBaseUrlForApi()}/L${langId}/spec.html`;
   useEffect(() => {
     document.title = getTitle();
   }, []);

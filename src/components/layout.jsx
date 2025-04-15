@@ -105,7 +105,7 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                         }
                       </div>
                     </div>
-                    { ["tasks", "compiles", "docs"].includes(pathName)
+                    { ["tasks", "compiles", "specs"].includes(pathName)
                       ? <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
                           <LanguageSelector domain={getTitle()} language={language} setLanguage={setLanguage} />
                         </div>
