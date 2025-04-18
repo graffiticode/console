@@ -237,7 +237,7 @@ export default function TasksNav({ user, setId, tasks }) {
 
   return (
     <div
-      className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto bg-white pt-4 h-full"
+      className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto bg-white pt-4 max-h-screen"
     >
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">

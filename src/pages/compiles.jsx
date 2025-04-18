@@ -16,7 +16,8 @@ import {
   UsersIcon,
   XMarkIcon,
   BellIcon,
-} from '@heroicons/react/24/outline'
+  ChevronRightIcon,
+} from '@heroicons/react/20/solid'
 import SignIn from '../components/SignIn'
 import { getTitle } from '../lib/utils';
 import FormView from '../components/FormView';
@@ -28,12 +29,70 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+// Helper to elide task IDs, showing only characters 18-25
+const elideTaskId = (id) => {
+  return id.length > 25 ? id.substring(17, 25) : id;
+}
+
+// Helper to elide compound IDs (with +), eliding each part separately
+const elideCompoundId = (id) => {
+  if (!id.includes('+')) {
+    return elideTaskId(id);
+  }
+  
+  const parts = id.split('+');
+  const elided = parts.map(part => elideTaskId(part));
+  return elided.join('+');
+}
+
+// Helper to create nested navigation structure
+const getNestedCompiles = (compiles) => {
+  const nestedCompiles = [];
+  const taskIds = [];
+  
+  // First pass: identify unique task IDs (before the '+' if present)
+  compiles.forEach(compile => {
+    const [taskId, dataId] = compile.id.split('+');
+    if (!taskIds.includes(taskId)) {
+      taskIds.push(taskId);
+    }
+  });
+  
+  // Second pass: create nested structure
+  taskIds.forEach(taskId => {
+    const taskCompiles = compiles.filter(compile => {
+      const [compileTaskId] = compile.id.split('+');
+      return compileTaskId === taskId;
+    });
+    
+    // Find the root compile (without data ID)
+    const rootCompile = taskCompiles.find(compile => !compile.id.includes('+')) || taskCompiles[0];
+    
+    // Find children (compiles with data IDs)
+    const children = taskCompiles.filter(compile => {
+      const [compileTaskId, dataId] = compile.id.split('+');
+      return dataId !== undefined;
+    });
+    
+    nestedCompiles.push({
+      ...rootCompile,
+      taskId,
+      children: children.length > 0 ? children : undefined,
+      current: false,
+    });
+  });
+  
+  return nestedCompiles.sort((a, b) => +b.timestamp - +a.timestamp);
+};
+
 export default function Compiles({ language }) {
   const [userId, setUserId] = useState();
   const [id, setId] = useState('');
   const [formHeight, setFormHeight] = useState(280);
   const [dataHeight, setDataHeight] = useState(280);
   const [compiles, setCompiles] = useState([]);
+  const [nestedCompiles, setNestedCompiles] = useState([]);
+  const [showId, setShowId] = useState("");
   
   useEffect(() => {
     document.title = getTitle();
@@ -59,9 +118,16 @@ export default function Compiles({ language }) {
     }) || [];
     setCompiles(compilesData);
     
+    // Create nested structure for the navigation
+    const nested = getNestedCompiles(compilesData);
+    setNestedCompiles(nested);
+    
     // Set the first compile as selected by default if there are any
     if (compilesData.length > 0 && !id) {
       setId(compilesData[0].id);
+      if (nested.length > 0) {
+        nested[0].current = true;
+      }
     }
   }, [data]);
 
@@ -87,26 +153,118 @@ export default function Compiles({ language }) {
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <div className="flex">
-        {/* Left sidebar with compiles list */}
+        {/* Left sidebar with nested compiles list */}
         <div className="colspan-1">
-          <div className="overflow-y-auto max-h-screen px-2">
-            <ul role="list" className="divide-y divide-gray-200">
-              {compiles.map((compile) => (
-                <li 
-                  key={compile.id} 
-                  className={classNames(
-                    "py-2 cursor-pointer text-xs font-mono",
-                    id === compile.id ? "text-gray-700 font-semibold" : "text-gray-500 hover:text-gray-700"
-                  )}
-                  onClick={() => setId(compile.id)}
-                >
-                  {compile.id}
-                  <div className="text-xs text-gray-400">
-                    {new Date(+compile.timestamp).toLocaleString()}
-                  </div>
+          <div className="w-64 flex shrink flex-col overflow-y-auto bg-white pt-4 max-h-screen">
+            <nav className="flex flex-1 flex-col">
+              <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
+                <li>
+                  <ul role="list" className="-mx-2 space-y-1">
+                    {nestedCompiles.map((item) => (
+                      <li key={item.taskId}>
+                        {!item.children ? (
+                          <div
+                            className={classNames(
+                              item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                              "flex flex-row justify-between pr-2"
+                            )}
+                            onMouseOver={() => {
+                              if (showId !== item.id) {
+                                setShowId(item.id);
+                              }
+                            }}
+                          >
+                            <button
+                              onClick={() => {
+                                setId(item.id);
+                                nestedCompiles.forEach(c => c.current = false);
+                                item.current = true;
+                              }}
+                              className={classNames(
+                                item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                'block rounded-none py-1 pr-2 pl-2 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900'
+                              )}
+                            >
+                              {elideCompoundId(item.id)}
+                            </button>
+                          </div>
+                        ) : (
+                          <Disclosure as="div" defaultOpen={false}>
+                            {({ open }) => (
+                              <>
+                                <div className={classNames(
+                                       item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                       "flex flex-row justify-between pr-2"
+                                     )}
+                                >
+                                  <Disclosure.Button
+                                    onClick={() => {
+                                      setId(item.id);
+                                      nestedCompiles.forEach(c => c.current = false);
+                                      item.current = true;
+                                    }}
+                                    onMouseOver={() => {
+                                      if (showId !== item.id) {
+                                        setShowId(item.id);
+                                      }
+                                    }}
+                                    className={classNames(
+                                      item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                      'flex items-center w-full text-xs text-left rounded-none px-2 gap-x-3 text-sm leading-6 font-bold text-gray-700'
+                                    )}
+                                  >
+                                    <ChevronRightIcon
+                                      className={classNames(
+                                        open ? 'rotate-90 text-gray-500' : 'text-gray-400',
+                                        'h-5 w-5 shrink-0'
+                                      )}
+                                      aria-hidden="true"
+                                    />
+                                    <div>
+                                      {elideTaskId(item.taskId)}
+                                    </div>
+                                  </Disclosure.Button>
+                                </div>
+                                <Disclosure.Panel as="ul" className="mt-1 px-2">
+                                  {item.children.map((subItem) => (
+                                    <li key={subItem.id}>
+                                      <div className={classNames(
+                                             id === subItem.id ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                             "flex flex-row justify-between"
+                                           )}
+                                      >
+                                        <button
+                                          onClick={() => {
+                                            setId(subItem.id);
+                                            nestedCompiles.forEach(c => c.current = false);
+                                            item.current = true;
+                                          }}
+                                          onMouseOver={() => {
+                                            if (showId !== subItem.id) {
+                                              setShowId(subItem.id);
+                                            }
+                                          }}
+                                          className={classNames(
+                                            id === subItem.id ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                            'font-normal block rounded-none py-1 pr-2 pl-8 text-xs leading-6 text-gray-700'
+                                          )}
+                                        >
+                                          {elideCompoundId(subItem.id)}
+                                        </button>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </Disclosure.Panel>
+                              </>
+                            )}
+                          </Disclosure>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 </li>
-              ))}
-            </ul>
+              </ul>
+            </nav>
           </div>
         </div>
 
