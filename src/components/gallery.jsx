@@ -94,7 +94,7 @@ export default function Gallery({ lang, mark }) {
   const [ newTask, setNewTask ] = useState(null);
   const [ showSaving, setShowSaving ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(480);
-  const [ editorHeight, setEditorHeight ] = useState(480);
+  const [ editorHeight, setEditorHeight ] = useState(360);
   const [ id, _setId ] = useState("");
   // Wrapped setId with debug logging
   const setId = (newId) => {
@@ -183,17 +183,6 @@ export default function Gallery({ lang, mark }) {
                "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
              )}>
           {
-            <FormView
-              key="form"
-              accessToken={accessToken}
-              id={id}
-              lang={lang}
-              height={formHeight}
-              className="border border-gray-300 rounded-none overflow-auto p-2 resize"
-              style={{height: formHeight}}
-            />
-          }
-          {
             !hideEditor &&
               <div
                 ref={editorRef}
@@ -217,6 +206,17 @@ export default function Gallery({ lang, mark }) {
                   height={editorHeight}
                 />
               </div>
+          }
+          {
+            <FormView
+              key="form"
+              accessToken={accessToken}
+              id={id}
+              lang={lang}
+              height={formHeight}
+              className="border border-gray-300 rounded-none overflow-auto p-2 resize"
+              style={{height: formHeight}}
+            />
           }
         </div>
       </div>
