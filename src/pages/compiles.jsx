@@ -39,7 +39,7 @@ const elideCompoundId = (id) => {
   if (!id.includes('+')) {
     return elideTaskId(id);
   }
-  
+
   const parts = id.split('+');
   const elided = parts.map(part => elideTaskId(part));
   return elided.join('+');
@@ -49,7 +49,7 @@ const elideCompoundId = (id) => {
 const getNestedCompiles = (compiles) => {
   const nestedCompiles = [];
   const taskIds = [];
-  
+
   // First pass: identify unique task IDs (before the '+' if present)
   compiles.forEach(compile => {
     const [taskId, dataId] = compile.id.split('+');
@@ -57,23 +57,23 @@ const getNestedCompiles = (compiles) => {
       taskIds.push(taskId);
     }
   });
-  
+
   // Second pass: create nested structure
   taskIds.forEach(taskId => {
     const taskCompiles = compiles.filter(compile => {
       const [compileTaskId] = compile.id.split('+');
       return compileTaskId === taskId;
     });
-    
+
     // Find the root compile (without data ID)
     const rootCompile = taskCompiles.find(compile => !compile.id.includes('+')) || taskCompiles[0];
-    
+
     // Find children (compiles with data IDs)
     const children = taskCompiles.filter(compile => {
       const [compileTaskId, dataId] = compile.id.split('+');
       return dataId !== undefined;
     });
-    
+
     nestedCompiles.push({
       ...rootCompile,
       taskId,
@@ -81,7 +81,7 @@ const getNestedCompiles = (compiles) => {
       current: false,
     });
   });
-  
+
   return nestedCompiles.sort((a, b) => +b.timestamp - +a.timestamp);
 };
 
@@ -93,11 +93,11 @@ export default function Compiles({ language }) {
   const [compiles, setCompiles] = useState([]);
   const [nestedCompiles, setNestedCompiles] = useState([]);
   const [showId, setShowId] = useState("");
-  
+
   useEffect(() => {
     document.title = getTitle();
   }, []);
-  
+
   const lang = language.name.slice(1);
   const { user } = useGraffiticodeAuth();
   const { isValidating, isLoading, data: accessToken } = useSWR(
@@ -117,11 +117,11 @@ export default function Compiles({ language }) {
       return +b.timestamp - +a.timestamp;
     }) || [];
     setCompiles(compilesData);
-    
+
     // Create nested structure for the navigation
     const nested = getNestedCompiles(compilesData);
     setNestedCompiles(nested);
-    
+
     // Set the first compile as selected by default if there are any
     if (compilesData.length > 0 && !id) {
       setId(compilesData[0].id);
