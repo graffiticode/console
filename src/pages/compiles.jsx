@@ -88,8 +88,8 @@ const getNestedCompiles = (compiles) => {
 export default function Compiles({ language }) {
   const [userId, setUserId] = useState();
   const [id, setId] = useState('');
-  const [formHeight, setFormHeight] = useState(280);
-  const [dataHeight, setDataHeight] = useState(280);
+  const [formHeight, setFormHeight] = useState(350);
+  const [dataHeight, setDataHeight] = useState(350);
   const [compiles, setCompiles] = useState([]);
   const [nestedCompiles, setNestedCompiles] = useState([]);
   const [showId, setShowId] = useState("");
@@ -273,7 +273,6 @@ export default function Compiles({ language }) {
           <div className="grid grid-cols-1 gap-4 sm:px-6 lg:px-8">
             {/* Form panel on top */}
             <div>
-              <div className="text-sm font-medium text-gray-700 mb-2">Form</div>
               <FormView
                 accessToken={accessToken}
                 id={id}
@@ -286,7 +285,6 @@ export default function Compiles({ language }) {
 
             {/* Data panel on bottom */}
             <div>
-              <div className="text-sm font-medium text-gray-700 mb-2">Data</div>
               <div className="border border-gray-300 rounded-none overflow-auto p-2 resize" style={{height: dataHeight}}>
                 <DataPanel
                   id={id}
