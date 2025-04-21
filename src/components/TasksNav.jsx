@@ -80,26 +80,34 @@ function EllipsisMenu({ id, name, mark, isPublic, onChange }) {
                 </div>
               )}
             </Menu.Item>
-            <Menu.Item>
-              {({ active }) => (
-                <div
-                  className="pt-3 pb-1 text-xs font-mono text-gray-700 hover:text-gray-900 cursor-pointer border-t border-gray-200 mt-2 truncate"
-                  onClick={() => {
-                    navigator.clipboard.writeText(id);
-                    // Show a temporary confirmation message
-                    const menuEl = document.activeElement;
-                    const originalText = menuEl.textContent;
-                    menuEl.textContent = "✓ Copied!";
-                    setTimeout(() => {
-                      menuEl.textContent = originalText;
-                    }, 1000);
-                  }}
-                  title="Click to copy"
-                >
-                  {id}
-                </div>
-              )}
-            </Menu.Item>
+            {/* Custom menu item outside of Menu.Item to prevent auto-closing */}
+            <div className="p-0">
+              <div
+                className="pt-3 pb-1 text-xs font-mono text-gray-700 hover:text-gray-900 cursor-pointer border-t border-gray-200 mt-2 truncate"
+                onClick={(e) => {
+                  // Prevent default behavior and stop event propagation
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // Copy the ID to clipboard
+                  navigator.clipboard.writeText(id);
+                  // Show a temporary confirmation message
+                  const element = e.currentTarget;
+                  const originalText = element.textContent;
+                  element.innerHTML = `
+<span style='color: #22c55e;'>
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor' class='size-5'>
+  <path fill-rule='evenodd' d='M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z' clip-rule='evenodd' />
+</svg>
+</span>`;
+                  setTimeout(() => {
+                    element.textContent = originalText;
+                  }, 1000);
+                }}
+                title="Click to copy"
+              >
+                {id}
+              </div>
+            </div>
           </div>
         </Menu.Items>
       </Transition>
