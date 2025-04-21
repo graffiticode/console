@@ -87,7 +87,16 @@ const getNestedCompiles = (compiles) => {
 
 export default function Compiles({ language }) {
   const [userId, setUserId] = useState();
-  const [id, setId] = useState('');
+  const [id, _setId] = useState('');
+
+  // Wrapped setId to store in localStorage when it changes
+  const setId = (newId) => {
+    _setId(newId);
+    // Store the task ID in localStorage
+    if (newId) {
+      localStorage.setItem('graffiticode:selected:taskId', newId);
+    }
+  };
   const [formHeight, setFormHeight] = useState(350);
   const [dataHeight, setDataHeight] = useState(350);
   const [compiles, setCompiles] = useState([]);
@@ -122,13 +131,72 @@ export default function Compiles({ language }) {
     const nested = getNestedCompiles(compilesData);
     setNestedCompiles(nested);
 
-    // Set the first compile as selected by default if there are any
-    if (compilesData.length > 0 && !id) {
-      setId(compilesData[0].id);
-      if (nested.length > 0) {
-        nested[0].current = true;
+    // Try to restore the previously selected task ID from localStorage
+    let taskIdFound = false;
+    if (compilesData.length > 0) {
+      try {
+        const savedTaskId = localStorage.getItem('graffiticode:selected:taskId');
+        if (savedTaskId && nested.length > 0) {
+          // Get just the base task ID (before the '+' if present)
+          const [baseTaskId] = savedTaskId.split('+');
+
+          // First try to find an exact match
+          for (let i = 0; i < nested.length; i++) {
+            const item = nested[i];
+            item.current = false; // Reset all items initially
+
+            // Check if this item matches the saved ID
+            if (item.id === savedTaskId || item.taskId === baseTaskId) {
+              setId(item.id);
+              item.current = true;
+              taskIdFound = true;
+              break;
+            }
+
+            // If this item has children, check them too
+            if (item.children) {
+              for (let j = 0; j < item.children.length; j++) {
+                const child = item.children[j];
+                if (child.id === savedTaskId) {
+                  setId(child.id);
+                  item.current = true;
+                  taskIdFound = true;
+                  break;
+                }
+              }
+              if (taskIdFound) break;
+            }
+          }
+
+          // If no exact match, try to find a compile with the same base task ID
+          if (!taskIdFound) {
+            for (let i = 0; i < nested.length; i++) {
+              const item = nested[i];
+              const [itemTaskId] = item.id.split('+');
+
+              if (itemTaskId === baseTaskId) {
+                setId(item.id);
+                item.current = true;
+                taskIdFound = true;
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error restoring task selection:", e);
+      }
+
+      // Set the first compile as selected by default if no matching task was found
+      if (!taskIdFound) {
+        setId(compilesData[0].id);
+        if (nested.length > 0) {
+          nested[0].current = true;
+        }
       }
     }
+
+    setNestedCompiles([...nested]); // Force update of nested compiles with current flags
   }, [data]);
 
   if (!user) {

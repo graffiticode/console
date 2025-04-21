@@ -96,9 +96,14 @@ export default function Gallery({ lang, mark }) {
   const [ formHeight, setFormHeight ] = useState(350);
   const [ editorHeight, setEditorHeight ] = useState(350);
   const [ id, _setId ] = useState("");
-  // Wrapped setId with debug logging
+
+  // Wrapped setId to store the ID in localStorage when it changes
   const setId = (newId) => {
     _setId(newId);
+    // Store the task ID in localStorage
+    if (newId) {
+      localStorage.setItem('graffiticode:selected:taskId', newId);
+    }
   };
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
@@ -132,6 +137,26 @@ export default function Gallery({ lang, mark }) {
         return task;
       });
       setTasks(processedTasks);
+
+      // Try to restore the previously selected task ID from localStorage
+      try {
+        const savedTaskId = localStorage.getItem('graffiticode:selected:taskId');
+        if (savedTaskId) {
+          // Check if this task or a related task exists in our current tasks list
+          const taskIdBase = savedTaskId.split('+')[0]; // Get the base task ID without data ID
+          const matchingTask = processedTasks.find(task =>
+            task.id === savedTaskId || task.id === taskIdBase ||
+            (task.id.startsWith(taskIdBase) && task.id.includes('+'))
+          );
+
+          if (matchingTask) {
+            setId(matchingTask.id);
+            return; // We found a match, no need to default to first item
+          }
+        }
+      } catch (e) {
+        console.error("Error restoring task selection:", e);
+      }
     } else {
       setTasks([]);
     }

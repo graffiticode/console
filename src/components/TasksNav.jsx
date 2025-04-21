@@ -234,7 +234,7 @@ const getNestedItems = ({ setId, tasks }) => {
   return nestedItems;
 }
 
-export default function TasksNav({ user, setId, tasks }) {
+export default function TasksNav({ user, setId, tasks, currentId }) {
   const [ items, setItems ] = useState([]);
   const [ showId, setShowId ] = useState("");
   const [ updatedTasks, setUpdatedTasks ] = useState([]);
@@ -249,10 +249,64 @@ export default function TasksNav({ user, setId, tasks }) {
       });
     }
     const nestedItems = getNestedItems({setId, tasks});
+
     if (nestedItems.length) {
-      nestedItems[0].current = true;
-      console.log("HELP_DEBUG [TasksNav] - Setting initial task id:", nestedItems[0].id);
-      setId(nestedItems[0].id);
+      // Check if we have a stored taskId that matches or partially matches any of our tasks
+      let foundMatch = false;
+
+      // Try to get the selected task ID from localStorage
+      const savedTaskId = localStorage.getItem('graffiticode:selected:taskId');
+
+      if (savedTaskId) {
+        // Get the base task ID (before the '+' if present)
+        const [baseTaskId] = savedTaskId.split('+');
+
+        // First, try to find an exact match
+        nestedItems.forEach(item => {
+          // Initialize all items as not current
+          item.current = false;
+
+          // Check for exact match
+          if (item.id === savedTaskId || item.id === baseTaskId) {
+            item.current = true;
+            foundMatch = true;
+            setId(item.id);
+          }
+
+          // If this item has children, check them too
+          if (item.children) {
+            item.children.forEach(childItem => {
+              // Check if any child matches the saved ID
+              const childFullId = item.id + "+" + childItem.id;
+              if (childFullId === savedTaskId) {
+                item.current = true; // Parent is considered current when child is selected
+                foundMatch = true;
+                setId(childFullId);
+              }
+            });
+          }
+        });
+
+        // If no exact match, try to find a task with the same base ID
+        if (!foundMatch) {
+          nestedItems.forEach(item => {
+            const [itemBaseId] = item.id.split('+');
+            if (itemBaseId === baseTaskId) {
+              item.current = true;
+              foundMatch = true;
+              setId(item.id);
+            }
+          });
+        }
+      }
+
+      // If no match was found, default to the first item
+      if (!foundMatch) {
+        nestedItems[0].current = true;
+        console.log("HELP_DEBUG [TasksNav] - Setting initial task id:", nestedItems[0].id);
+        setId(nestedItems[0].id);
+      }
+
       setItems(nestedItems);
     }
   }, [tasks.length]);
