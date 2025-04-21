@@ -126,7 +126,7 @@ function EllipsisMenu({ id, name, mark, isPublic, onChange }) {
             }}
           >
             <div className="p-4">
-              <div className="text-sm font-medium text-gray-700 mb-3">Edit Task</div>
+              <div className="text-sm font-medium text-gray-700 mb-3">Task Attributes</div>
 
               <div className="mb-4">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Name:</label>
