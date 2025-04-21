@@ -80,6 +80,26 @@ function EllipsisMenu({ id, name, mark, isPublic, onChange }) {
                 </div>
               )}
             </Menu.Item>
+            <Menu.Item>
+              {({ active }) => (
+                <div
+                  className="pt-3 pb-1 text-xs font-mono text-gray-700 hover:text-gray-900 cursor-pointer border-t border-gray-200 mt-2 truncate"
+                  onClick={() => {
+                    navigator.clipboard.writeText(id);
+                    // Show a temporary confirmation message
+                    const menuEl = document.activeElement;
+                    const originalText = menuEl.textContent;
+                    menuEl.textContent = "✓ Copied!";
+                    setTimeout(() => {
+                      menuEl.textContent = originalText;
+                    }, 1000);
+                  }}
+                  title="Click to copy"
+                >
+                  {id}
+                </div>
+              )}
+            </Menu.Item>
           </div>
         </Menu.Items>
       </Transition>
