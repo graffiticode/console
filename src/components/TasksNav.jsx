@@ -1,7 +1,7 @@
 import useSWR from "swr";
 import { Disclosure, Menu, Popover, Transition } from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, useRef } from 'react';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { postTaskUpdates } from '../utils/swr/fetchers';
@@ -14,7 +14,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function NameText({ name, setName }) {
+function NameText({ id, name, setName }) {
   const [ currentValue, setCurrentValue ] = useState(name);
   return (
     <div>
@@ -25,93 +25,165 @@ function NameText({ name, setName }) {
         className="block w-full rounded-none border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-inset focus:ring-gray-600 text-xs sm:leading-6 px-3 focus:outline-none"
         defaultValue={currentValue !== "unnamed" && currentValue || ""}
         onChange={(e) => setCurrentValue(e.target.value)}
-        onBlur={() => setName(currentValue || "unnamed")}
+        onBlur={() => setName(currentValue || formatTaskId(id))}
       />
     </div>
   )
 }
 
 function EllipsisMenu({ id, name, mark, isPublic, onChange }) {
-  return (
-    <Menu as="div" className="relative inline-block text-left">
-      <div>
-        <Menu.Button
-          className="flex items-center mt-1 text-gray-400 hover:text-gray-600"
-        >
-          <EllipsisVerticalIcon className="h-4" aria-hidden="true" />
-        </Menu.Button>
-      </div>
+  const [isOpen, setIsOpen] = useState(false);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
-      <Transition
-        as={Fragment}
-        enter="transition ease-out duration-100"
-        enterFrom="transform opacity-0 scale-95"
-        enterTo="transform opacity-100 scale-100"
-        leave="transition ease-in duration-75"
-        leaveFrom="transform opacity-100 scale-100"
-        leaveTo="transform opacity-0 scale-95"
+  // Position menu next to the button
+  const positionMenu = () => {
+    if (buttonRef.current && menuRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect();
+      const menuWidth = 280; // Fixed width of menu
+      const menuHeight = menuRef.current.offsetHeight;
+
+      // Check if there's enough space to the right
+      const rightSpace = window.innerWidth - buttonRect.right;
+      const leftSpace = buttonRect.left;
+
+      let top = buttonRect.top;
+      let left;
+
+      // If menu would go below viewport bottom, position it above
+      if (top + menuHeight > window.innerHeight) {
+        top = Math.max(window.innerHeight - menuHeight - 10, 10);
+      }
+
+      // Determine horizontal position - prefer right side if there's space
+      if (rightSpace >= menuWidth + 8) {
+        // Position to the right of the button
+        left = buttonRect.right + 8;
+      } else if (leftSpace >= menuWidth + 8) {
+        // Position to the left of the button
+        left = buttonRect.left - menuWidth - 8;
+      } else {
+        // Not enough space on either side, center it
+        left = Math.max(10, window.innerWidth / 2 - menuWidth / 2);
+      }
+
+      setMenuPosition({ top, left });
+    }
+  };
+
+  const handleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isOpen) {
+      setIsOpen(false);
+    } else {
+      setIsOpen(true);
+      // Wait for menu to be rendered before positioning
+      setTimeout(() => {
+        positionMenu();
+        // Re-check position after a short delay to account for content rendering
+        setTimeout(positionMenu, 50);
+      }, 0);
+    }
+  };
+
+  // Reposition on window resize
+  useEffect(() => {
+    if (isOpen) {
+      window.addEventListener('resize', positionMenu);
+      return () => window.removeEventListener('resize', positionMenu);
+    }
+  }, [isOpen]);
+
+  return (
+    <div className="relative" style={{ display: 'inline-block' }}>
+      <button
+        ref={buttonRef}
+        className="flex items-center mt-1 text-gray-400 hover:text-gray-600"
+        onClick={handleClick}
+        aria-label="Open menu"
       >
-        <Menu.Items className="absolute right-0 z-10 mt-2 w-64 origin-top-right rounded-none bg-white focus:outline-none">
-          <div className="p-2">
-            <Menu.Item>
-              {({ active }) => (
-                <NameText
-                  name={name}
-                  setName={name => onChange({id, name})} />
-              )}
-            </Menu.Item>
-            <Menu.Item>
-              {({ active }) => (
-                <div className="pt-2">
+        <EllipsisVerticalIcon className="h-4" aria-hidden="true" />
+      </button>
+
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-50"
+          onClick={() => setIsOpen(false)}
+        >
+          <div
+            ref={menuRef}
+            className="fixed bg-white shadow-lg ring-1 ring-gray-200 z-50 rounded-none"
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '280px',
+              top: `${menuPosition.top}px`,
+              left: `${menuPosition.left}px`,
+              maxHeight: 'calc(100vh - 40px)',
+              overflow: 'auto'
+            }}
+          >
+            <div className="p-4">
+              <div className="text-sm font-medium text-gray-700 mb-3">Edit Task</div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Name:</label>
+                <input
+                  type="text"
+                  className="w-full rounded-none border border-gray-300 p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-500"
+                  defaultValue={name}
+                  onBlur={(e) => onChange({id, name: e.target.value})}
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Mark:</label>
+                <div className="flex">
                   <MarkSelector
                     mark={marks[mark - 1]}
                     setMark={mark => onChange({id, mark})}
                   />
                 </div>
-              )}
-            </Menu.Item>
-            <Menu.Item>
-              {({ active }) => (
-                <div className="pt-2">
-                  <PublicToggle
-                    isPublic={isPublic}
-                    setIsPublic={isPublic => onChange({id, isPublic})}
-                  />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Public:</label>
+                <PublicToggle
+                  isPublic={isPublic}
+                  setIsPublic={isPublic => onChange({id, isPublic})}
+                />
+              </div>
+
+              <div className="border-t border-gray-200 pt-2">
+                <div
+                  className="text-xs font-mono text-gray-600 hover:text-gray-900 cursor-pointer py-1.5 truncate"
+                  onClick={(e) => {
+                    navigator.clipboard.writeText(id);
+                    const element = e.currentTarget;
+                    element.innerHTML = `
+                      <span class="text-green-500 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1">
+                          <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
+                        </svg>
+                        Copied!
+                      </span>
+                    `;
+                    setTimeout(() => {
+                      element.textContent = id;
+                    }, 1000);
+                  }}
+                  title="Click to copy task ID"
+                >
+                  {id}
                 </div>
-              )}
-            </Menu.Item>
-            {/* Custom menu item outside of Menu.Item to prevent auto-closing */}
-            <div className="p-0">
-              <div
-                className="pt-3 pb-1 text-xs font-mono text-gray-700 hover:text-gray-900 cursor-pointer border-t border-gray-200 mt-2 truncate"
-                onClick={(e) => {
-                  // Prevent default behavior and stop event propagation
-                  e.preventDefault();
-                  e.stopPropagation();
-                  // Copy the ID to clipboard
-                  navigator.clipboard.writeText(id);
-                  // Show a temporary confirmation message
-                  const element = e.currentTarget;
-                  const originalText = element.textContent;
-                  element.innerHTML = `
-<span style='color: #22c55e;'>
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor' class='size-5'>
-  <path fill-rule='evenodd' d='M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z' clip-rule='evenodd' />
-</svg>
-</span>`;
-                  setTimeout(() => {
-                    element.textContent = originalText;
-                  }, 1000);
-                }}
-                title="Click to copy"
-              >
-                {id}
               </div>
             </div>
           </div>
-        </Menu.Items>
-      </Transition>
-    </Menu>
+        </div>
+      )}
+    </div>
   )
 }
 
