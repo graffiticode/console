@@ -205,17 +205,19 @@ export default function Editor({
 
   return (
     <div className="flex items-start space-x-4">
-      <div className="min-w-0 flex-1">
-        <Tabs
-          tab={tab}
-          setTab={setTab}
-          setSaving={setSaving}
-          setShowSaving={setShowSaving}
-          saveDisabled={saveDisabled}
-          setSaveDisabled={setSaveDisabled}
-        />
+      <div className="min-w-0 flex-1 relative">
+        <div className="sticky top-0 bg-white z-10">
+          <Tabs
+            tab={tab}
+            setTab={setTab}
+            setSaving={setSaving}
+            setShowSaving={setShowSaving}
+            saveDisabled={saveDisabled}
+            setSaveDisabled={setSaveDisabled}
+          />
+        </div>
         <div
-          style={{height}}
+          style={{height, overflowY: "auto"}}
         >
           {
             (() => {
