@@ -3,14 +3,6 @@
     "messages": [
       {
         "role": "user",
-        "content": "add two number"
-      },
-      {
-        "role": "assistant",
-        "content": "```l0002\nlet add2 = <x y: add x y>..\n\nlet result = add2 4 5..\n\nprint result..\n```"
-      },
-      {
-        "role": "user",
         "content": "print fizzbuzz"
       },
       {
@@ -23,6 +15,26 @@
     "expected_output": "result = [computed value]",
     "lang": "0002",
     "task_id": "eyJ0YXNrSWRzIjpbIllSQUV3eE1Yd0NueEo0RmFVeVFKIl19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "add two number"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\nlet add2 = <x y: add x y>..\n\nlet result = add2 4 5..\n\nprint result..\n```"
+      }
+    ],
+    "code": "print 'foo'..",
+    "explanation": "Simple L0002 code that executes an operation.",
+    "expected_output": "Output depends on execution",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbInhjYmh0VzQwbXppRmdBYkdDVG1WIl19",
     "code_source": "task_src_field",
     "usage_count": 1,
     "pair_count": 1

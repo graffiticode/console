@@ -429,7 +429,7 @@ async function main() {
             
             // Add user messages
             if (message.type === 'user' && message.user) {
-              dialogMessages.push({
+              dialogMessages.unshift({
                 role: 'user',
                 content: message.user
               });
@@ -447,7 +447,7 @@ async function main() {
               }
               
               if (content) {
-                dialogMessages.push({
+                dialogMessages.unshift({
                   role: 'assistant',
                   content: content
                 });
@@ -477,7 +477,7 @@ async function main() {
           
           // Add to training examples
           trainingExamples.push({
-            messages: dialogMessages.reverse(),
+            messages: dialogMessages,
             code,
             explanation,
             expected_output,
@@ -537,7 +537,7 @@ async function main() {
     
     // Sort by usage count (most used first)
     trainingExamples.sort((a, b) => b.usage_count - a.usage_count);
-    
+
     // Create the output directory if it doesn't exist
     const outputDir = path.dirname(outputPath);
     if (!fs.existsSync(outputDir)) {
