@@ -2,12 +2,8 @@
   {
     "messages": [
       {
-        "role": "assistant",
-        "content": "```l0002\n| Define a function to convert a number to a FizzBuzz string\nlet fizzbuzz = <n:\n  if eq (mod n 15) 0 then\n    \"FizzBuzz\" \n  else if eq (mod n 3) 0 then\n    \"Fizz\"\n  else if eq (mod n 5) 0 then \n    \"Buzz\"\n  else\n    concat \"\" n\n>..\n\n| Generate a list of numbers from 1 to 100\nlet numbers = range 1 100 1..\n\n| Convert each number to its FizzBuzz string \nlet result = map (fizzbuzz) numbers..\n\n| Print out the FizzBuzz sequence\nprint (concat \", \" result)..\n```"
-      },
-      {
         "role": "user",
-        "content": "print fizzbuzz"
+        "content": "add two number"
       },
       {
         "role": "assistant",
@@ -15,7 +11,11 @@
       },
       {
         "role": "user",
-        "content": "add two number"
+        "content": "print fizzbuzz"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\n| Define a function to convert a number to a FizzBuzz string\nlet fizzbuzz = <n:\n  if eq (mod n 15) 0 then\n    \"FizzBuzz\" \n  else if eq (mod n 3) 0 then\n    \"Fizz\"\n  else if eq (mod n 5) 0 then \n    \"Buzz\"\n  else\n    concat \"\" n\n>..\n\n| Generate a list of numbers from 1 to 100\nlet numbers = range 1 100 1..\n\n| Convert each number to its FizzBuzz string \nlet result = map (fizzbuzz) numbers..\n\n| Print out the FizzBuzz sequence\nprint (concat \", \" result)..\n```"
       }
     ],
     "code": "| Define a function to convert a number to a FizzBuzz string\nlet fizzbuzz = <n:\n  if eq (mod n 15) 0 then\n    \"FizzBuzz\" \n  else if eq (mod n 3) 0 then\n    \"Fizz\"\n  else if eq (mod n 5) 0 then \n    \"Buzz\"\n  else\n    n\n>..\n\n| Generate a list of numbers from 1 to 100\nlet numbers = range 1 100 1..\n\n| Convert each number to its FizzBuzz string \nlet result = map (fizzbuzz) numbers..\n\n| Print out the FizzBuzz sequence\nprint result\n..",
