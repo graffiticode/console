@@ -7,11 +7,13 @@
  * 3. Token usage tracking
  * 4. Code verification via Graffiticode API
  * 5. Error correction via Claude
+ * 6. Retrieval of relevant examples to enhance generation accuracy
  */
 
 import axios from "axios";
 import { postApiCompile } from "./api";
 import { postTask, getData } from "../pages/api/resolvers";
+import admin from 'firebase-admin';
 
 // Define available Claude models
 const CLAUDE_MODELS = {
@@ -31,7 +33,392 @@ function detectLanguage(prompt) {
   return "graffiticode";
 }
 
-const systemPrompt = `
+/**
+ * Get Firestore database reference with initialization check
+ * @returns {FirebaseFirestore.Firestore} Firestore database instance
+ */
+function getFirestoreDb() {
+  // Get existing Firestore instance or initialize if needed
+  try {
+    return admin.firestore();
+  } catch (error) {
+    // If admin isn't initialized, initialize it with our project
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        projectId: 'graffiticode'
+      });
+    }
+    return admin.firestore();
+  }
+}
+
+/**
+ * Get relevant examples from training data based on user prompt and language
+ * @param {string} prompt - The user's prompt
+ * @param {Object} language - The currently selected language (e.g., {id: 2, name: "L0002"})
+ * @param {number} limit - Maximum number of examples to retrieve (default: 3)
+ * @returns {Promise<Array>} - Array of relevant examples
+ */
+async function getRelevantExamples(prompt, language, limit = 3) {
+  try {
+    // Extract language name without the 'L' prefix (e.g., "0002" from "L0002")
+    const langCode = language?.name?.substring(1) || "0002"; // Default to 0002 if not provided
+    console.log(`Getting relevant examples for language: ${langCode}`);
+    
+    // First try to get examples from Firestore
+    const db = getFirestoreDb();
+    
+    // Check if the training_examples collection exists
+    const trainingCollRef = db.collection('training_examples');
+    const snapshot = await trainingCollRef.limit(1).get();
+    
+    // If the collection doesn't exist or is empty, use the local training data
+    if (snapshot.empty) {
+      console.log('No training examples in Firestore, using local training data');
+      
+      // Import local training data
+      const fs = require('fs');
+      const path = require('path');
+      const localExamples = JSON.parse(
+        fs.readFileSync(
+          path.join(process.cwd(), 'training_examples.json'), 
+          'utf8'
+        )
+      );
+      
+      // Simple keyword matching to find relevant examples
+      const keywords = prompt.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      
+      // Filter examples by language and score them based on keyword matches
+      const scoredExamples = localExamples
+        .filter(example => {
+          // If example has a lang field, match it; otherwise assume it's for the default language
+          const exampleLang = example.lang || "0002";
+          return exampleLang === langCode;
+        })
+        .map(example => {
+          // For dialog-based examples, search through all message content
+          const textToSearch = example.messages 
+            ? example.messages.map(m => m.content).join(' ').toLowerCase()
+            : (example.description || '').toLowerCase();
+            
+          const score = keywords.reduce((sum, keyword) => {
+            return sum + (textToSearch.includes(keyword) ? 1 : 0);
+          }, 0);
+          
+          return { ...example, score };
+        });
+      
+      // Sort by relevance score and take the top examples
+      return scoredExamples
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+    }
+    
+    // If Firestore collection exists, query it for relevant examples
+    const queryResults = [];
+    const keywords = prompt.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    
+    // First try to find examples matching both language and keywords
+    for (const keyword of keywords) {
+      const query = await trainingCollRef
+        .where('lang', '==', langCode)
+        .where('keywords', 'array-contains', keyword)
+        .limit(Math.ceil(limit / keywords.length))
+        .get();
+      
+      query.forEach(doc => {
+        const data = doc.data();
+        queryResults.push({
+          ...data,
+          id: doc.id
+        });
+      });
+      
+      if (queryResults.length >= limit) break;
+    }
+    
+    // If we still don't have enough examples, get some random ones from this language
+    if (queryResults.length < limit) {
+      const randomQuery = await trainingCollRef
+        .where('lang', '==', langCode)
+        .limit(limit - queryResults.length)
+        .get();
+        
+      randomQuery.forEach(doc => {
+        // Avoid duplicates
+        if (!queryResults.find(r => r.id === doc.id)) {
+          const data = doc.data();
+          queryResults.push({
+            ...data,
+            id: doc.id
+          });
+        }
+      });
+    }
+    
+    // If we STILL don't have enough examples, fall back to examples from any language
+    if (queryResults.length < limit) {
+      console.log(`Not enough examples for language ${langCode}, falling back to examples from L0002`);
+      
+      for (const keyword of keywords) {
+        if (queryResults.length >= limit) break;
+        
+        const query = await trainingCollRef
+          .where('lang', '==', '0002')
+          .where('keywords', 'array-contains', keyword)
+          .limit(Math.ceil((limit - queryResults.length) / keywords.length))
+          .get();
+        
+        query.forEach(doc => {
+          // Avoid duplicates
+          if (!queryResults.find(r => r.id === doc.id)) {
+            const data = doc.data();
+            queryResults.push({
+              ...data,
+              id: doc.id
+            });
+          }
+        });
+      }
+    }
+    
+    return queryResults;
+    
+  } catch (error) {
+    console.error('Error retrieving training examples:', error);
+    // Fallback to returning empty array if there's an error
+    return [];
+  }
+}
+
+/**
+ * Initialize the training_examples collection in Firestore
+ * This should be run once to populate the database with examples
+ * @param {string} targetLanguage - Optional language code to initialize (e.g., "0002" for L0002)
+ */
+export async function initializeTrainingExamples(targetLanguage = null) {
+  try {
+    const db = getFirestoreDb();
+    const trainingCollRef = db.collection('training_examples');
+    
+    // Check if collection already has data
+    let snapshot;
+    if (targetLanguage) {
+      // If filtering by language, check if examples for this language exist
+      snapshot = await trainingCollRef
+        .where('lang', '==', targetLanguage)
+        .limit(1)
+        .get();
+      
+      if (!snapshot.empty) {
+        console.log(`Training examples for language ${targetLanguage} already initialized`);
+        return { 
+          success: true, 
+          message: `Examples for language ${targetLanguage} already initialized` 
+        };
+      }
+    } else {
+      // Otherwise check for any examples
+      snapshot = await trainingCollRef.limit(1).get();
+      if (!snapshot.empty) {
+        console.log('Training examples collection already initialized');
+        return { success: true, message: 'Collection already initialized' };
+      }
+    }
+    
+    // Import local training data
+    const fs = require('fs');
+    const path = require('path');
+    const localExamples = JSON.parse(
+      fs.readFileSync(
+        path.join(process.cwd(), 'training_examples.json'), 
+        'utf8'
+      )
+    );
+    
+    // Filter examples by language if specified
+    const exampleToImport = targetLanguage 
+      ? localExamples.filter(ex => {
+          // If example has a lang field use it, otherwise assume it's for L0002
+          const exampleLang = ex.lang || "0002";
+          return exampleLang === targetLanguage;
+        })
+      : localExamples;
+    
+    if (exampleToImport.length === 0) {
+      return { 
+        success: false, 
+        message: `No examples found for language ${targetLanguage}` 
+      };
+    }
+    
+    // Prepare batch writes (Firestore has a limit of 500 writes per batch)
+    const batch = db.batch();
+    let batchCount = 0;
+    let totalAdded = 0;
+    
+    for (const example of exampleToImport) {
+      // Generate keywords from all available text
+      let textToIndexForKeywords = '';
+      
+      // For dialog-based examples, extract text from all messages
+      if (example.messages && Array.isArray(example.messages)) {
+        textToIndexForKeywords = example.messages
+          .map(m => m.content || '')
+          .join(' ');
+      } 
+      // Fall back to description or code if no messages
+      else if (example.description) {
+        textToIndexForKeywords = example.description;
+      } else if (example.code) {
+        textToIndexForKeywords = example.code;
+      }
+      
+      // Extract keywords for better searchability
+      const keywords = textToIndexForKeywords.toLowerCase()
+        .split(/\s+/)
+        .filter(word => word.length > 3 && !['function', 'const', 'return', 'this', 'that'].includes(word));
+        
+      const docRef = trainingCollRef.doc();
+      
+      // Ensure each example has the language code
+      const lang = example.lang || "0002"; // Default to L0002 if not specified
+      
+      // For examples with no description but with messages, generate a description
+      let description = example.description;
+      if (!description && example.messages && example.messages.length > 0) {
+        // Find the first user message to use as description
+        const userMessage = example.messages.find(m => m.role === 'user');
+        if (userMessage) {
+          description = userMessage.content.substring(0, 100) + 
+            (userMessage.content.length > 100 ? '...' : '');
+        }
+      }
+      
+      batch.set(docRef, {
+        ...example,
+        lang,               // Explicitly set language
+        description,        // Add generated description if needed
+        keywords,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      batchCount++;
+      totalAdded++;
+      
+      // Commit when batch size reaches 499
+      if (batchCount >= 499) {
+        await batch.commit();
+        console.log(`Committed batch of ${batchCount} examples`);
+        batchCount = 0;
+      }
+    }
+    
+    // Commit any remaining documents
+    if (batchCount > 0) {
+      await batch.commit();
+      console.log(`Committed final batch of ${batchCount} examples`);
+    }
+    
+    return { 
+      success: true, 
+      message: targetLanguage
+        ? `Added ${totalAdded} training examples for language ${targetLanguage} to Firestore`
+        : `Added ${totalAdded} training examples to Firestore` 
+    };
+    
+  } catch (error) {
+    console.error('Error initializing training examples:', error);
+    return { 
+      success: false, 
+      message: `Failed to initialize: ${error.message}` 
+    };
+  }
+}
+
+/**
+ * Add a new training example to the database
+ * @param {Object} example - The example to add
+ * @param {string} example.description - Description of the example (optional if messages provided)
+ * @param {string} example.code - The code for the example
+ * @param {string} example.explanation - Explanation of how the code works (optional if messages provided)
+ * @param {string} example.lang - Language code (e.g., "0002" for L0002)
+ * @param {Array} example.messages - Optional array of message objects with {role, content} format
+ * @returns {Promise<Object>} - Result of the operation
+ */
+export async function addTrainingExample(example) {
+  try {
+    // Validate example structure - either traditional format or dialog-based format
+    const hasTraditionalFormat = example.description && example.code;
+    const hasDialogFormat = example.messages && Array.isArray(example.messages) && 
+                           example.messages.length > 0 && example.code;
+    
+    if (!hasTraditionalFormat && !hasDialogFormat) {
+      return { 
+        success: false, 
+        message: 'Example must include either (description and code) or (messages array and code)' 
+      };
+    }
+    
+    const db = getFirestoreDb();
+    const trainingCollRef = db.collection('training_examples');
+    
+    // Generate keywords from all available text
+    let textToIndexForKeywords = '';
+    
+    // For dialog-based examples, extract text from all messages
+    if (example.messages && Array.isArray(example.messages)) {
+      textToIndexForKeywords = example.messages
+        .map(m => m.content || '')
+        .join(' ');
+        
+      // Generate a description from the first user message if none provided
+      if (!example.description) {
+        const userMessage = example.messages.find(m => m.role === 'user');
+        if (userMessage) {
+          example.description = userMessage.content.substring(0, 100) + 
+            (userMessage.content.length > 100 ? '...' : '');
+        }
+      }
+    } 
+    // Fall back to description or code
+    else if (example.description) {
+      textToIndexForKeywords = example.description;
+    }
+    
+    // Extract keywords for better searchability
+    const keywords = textToIndexForKeywords.toLowerCase()
+      .split(/\s+/)
+      .filter(word => word.length > 3 && !['function', 'const', 'return', 'this', 'that'].includes(word));
+      
+    // Ensure the example has a language code (default to "0002" if not provided)
+    const lang = example.lang || "0002";
+    
+    // Add the example to Firestore
+    const docRef = await trainingCollRef.add({
+      ...example,
+      lang,     // Make sure language is explicitly included
+      keywords,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { 
+      success: true, 
+      message: `Training example added successfully for language ${lang}`,
+      id: docRef.id 
+    };
+    
+  } catch (error) {
+    console.error('Error adding training example:', error);
+    return { 
+      success: false, 
+      message: `Failed to add example: ${error.message}` 
+    };
+  }
+}
+
+const baseSystemPrompt = `
 You are a programming assistant that translates natural language into code written in a functional DSL called **Graffiticode**, specifically dialect L0002.
 
 Graffiticode is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.
@@ -104,44 +491,101 @@ Start with \`|\` and extend to the end of the line.
 Only return idiomatic, valid Graffiticode. Use readable names. Output **only the code** unless explanation is requested.
 `.trim();
 
-const claudePrompt = {
-  system: systemPrompt,
+/**
+ * Generate examples section from retrieved training examples
+ * @param {Array} examples - Array of training examples
+ * @returns {string} - Formatted examples section for the system prompt
+ */
+function generateExamplesSection(examples) {
+  if (!examples || examples.length === 0) return '';
+  
+  let examplesText = `\n\n## RELEVANT EXAMPLES:\n\n`;
+  
+  examples.forEach((example, i) => {
+    if (example.messages && Array.isArray(example.messages) && example.messages.length > 0) {
+      // Handle dialog-based examples
+      examplesText += `### Example ${i+1}: Dialog Interaction\n`;
+      examplesText += "Here's a relevant conversation about this type of task:\n\n";
+      
+      example.messages.forEach(message => {
+        const roleLabel = message.role === 'user' ? 'User' : 'Assistant';
+        examplesText += `**${roleLabel}**: ${message.content}\n\n`;
+      });
+      
+      // If we have code, also include it separately
+      if (example.code) {
+        examplesText += "```\n";
+        examplesText += example.code;
+        examplesText += "\n```\n";
+      }
+      
+      // Add explanation if available
+      if (example.explanation) {
+        examplesText += `${example.explanation}\n\n`;
+      }
+    } else {
+      // Handle traditional examples
+      examplesText += `### Example ${i+1}: ${example.description || 'Graffiticode Example'}\n`;
+      examplesText += "```\n";
+      examplesText += example.code;
+      examplesText += "\n```\n";
+      examplesText += `${example.explanation || 'An example of Graffiticode.'}\n\n`;
+    }
+  });
+  
+  return examplesText;
+}
 
-  messages: [
-    {
-      role: "user",
-      content: "Generate code that doubles every number in the list [1, 2, 3]."
-    },
-    {
-      role: "assistant",
-      content: `
+/**
+ * Create a prompt for Claude that will generate high-quality code
+ * @param {string} userPrompt - The user's original prompt
+ * @param {Array} examples - Relevant examples to include
+ * @returns {string} - A well-formatted prompt for Claude
+ */
+async function createCodeGenerationPrompt(userPrompt, examples = []) {
+  // Generate examples section from retrieved examples
+  const examplesSection = generateExamplesSection(examples);
+
+  // Combine base system prompt with examples
+  const enhancedSystemPrompt = baseSystemPrompt + examplesSection;
+  
+  const promptData = {
+    system: enhancedSystemPrompt,
+    messages: [
+      {
+        role: "user",
+        content: "Generate code that doubles every number in the list [1, 2, 3]."
+      },
+      {
+        role: "assistant",
+        content: `
 | Define a function to double a number
 let double = <x: add x x>..
 | Apply the double function to each number in the list
 let result = map (double) [1 2 3]..
-      `.trim()
-    },
-    {
-      role: "user",
-      content: "Get the total price of all in-stock items in a product list with a 10% discount."
-    },
-    {
-      role: "assistant",
-      content: `
+        `.trim()
+      },
+      {
+        role: "user",
+        content: "Get the total price of all in-stock items in a product list with a 10% discount."
+      },
+      {
+        role: "assistant",
+        content: `
 | Function to check if an item is in stock
 let inStock = <item: gt get item "stock" 0>..
 
 | Function to apply a discount to an item's price
 let applyDiscount = <item discount: {
-  id: get item "id"
-  name: get item "name"
+  id: get "id" item
+  name: get "name" item
   | Multiply price by (1 - discount)
-  price: mul get item "price" sub 1 discount
-  stock: get item "stock"
+  price: mul get "price" item sub 1 discount
+  stock: get "stock" item
 }>..
 
 | Function to calculate the total price of all items
-let calculateTotal = <items: reduce (<item total: add total get item "price">) 0 items>..
+let calculateTotal = <items: reduce (<item total: add total get "price" item>) 0 items>..
 
 | Filter for only in-stock items
 let availableItems = filter (inStock) products..
@@ -156,26 +600,15 @@ let total = calculateTotal discountedItems..
 print "hello, world!"..
 
 `.trim()
-    },
-  ]
-};
-
-/**
- * Create a prompt for Claude that will generate high-quality code
- * @param {string} userPrompt - The user's original prompt
- * @param {string} language - The detected or specified programming language
- * @returns {string} - A well-formatted prompt for Claude
- */
-function createCodeGenerationPrompt(userPrompt, language) {
-  return JSON.stringify({
-    ...claudePrompt,
-    messages: [
-      ...claudePrompt.messages,
-      {role: "user",
-       content: userPrompt,
+      },
+      {
+        role: "user",
+        content: userPrompt,
       },
     ],
-  }, null, 2)
+  };
+
+  return JSON.stringify(promptData, null, 2);
 }
 
 /**
@@ -419,25 +852,81 @@ When fixing code:
 }
 
 /**
- * Generate code, verify it, and fix if needed
+ * Store successful code generation in Firebase for future reference
+ * @param {string} prompt - User's original prompt
+ * @param {string} code - Successfully generated code
+ * @param {string} langCode - Language code (e.g., "0002")
+ * @param {boolean} verified - Whether the code passed verification
+ */
+async function storeSuccessfulGeneration(prompt, code, langCode = "0002", verified = true) {
+  try {
+    const db = getFirestoreDb();
+    
+    // Store in a separate collection for successful generations
+    await db.collection('successful_generations').add({
+      prompt,
+      code,
+      lang: langCode,  // Store the language code
+      verified,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      // Extract keywords for better searchability
+      keywords: prompt.toLowerCase()
+        .split(/\s+/)
+        .filter(word => word.length > 3)
+    });
+    
+    console.log(`Stored successful generation for language ${langCode} for future reference`);
+  } catch (error) {
+    // Just log error but don't interrupt the main flow
+    console.error('Failed to store successful generation:', error);
+  }
+}
+
+/**
+ * Generate code, verify it, and fix if needed, using relevant examples
  * @param {Object} params - Parameters for code generation
  * @param {string} params.prompt - The user's prompt
- * @param {string} params.language - The target language (ignored, always uses Graffiticode)
+ * @param {Object} params.language - The target language object (e.g. {id: 2, name: "L0002"})
  * @param {Object} params.options - Options for the API call
  * @param {Object} params.auth - Authentication object containing token for verification
  * @returns {Promise<Object>} - The final code response
  */
-export async function generateCode({ auth, prompt, language = null, options = {} }) {
+export async function generateCode({ auth, prompt, language, options = {} }) {
   console.log(
     "generateCode()",
     "auth=" + JSON.stringify(auth, null, 2),
+    "language=" + JSON.stringify(language, null, 2),
   );
+  
   const accessToken = auth?.token;
+  
+  // Default to L0002 if no language provided
+  if (!language || !language.name) {
+    language = {id: 2, name: "L0002"};
+    console.log("No language specified, defaulting to L0002");
+  }
+  
+  // Extract language code (e.g., "0002" from "L0002")
+  const langCode = language.name.substring(1);
+  
   try {
-    const targetLanguage = "graffiticode";
-
+    // Retrieve relevant examples for this prompt, filtered by language
+    const relevantExamples = await getRelevantExamples(prompt, language, 3);
+    console.log(`Found ${relevantExamples.length} relevant examples for the prompt in language ${langCode}`);
+    console.log(
+      "generateCode()",
+      "relevantExamples=" + JSON.stringify(relevantExamples, null, 2),      
+    );
+  
+    
     // Create a well-formatted prompt for Claude to generate Graffiticode
-    const formattedPrompt = createCodeGenerationPrompt(prompt, targetLanguage);
+    const formattedPrompt = await createCodeGenerationPrompt(prompt, relevantExamples);
+
+    console.log(
+      "generateCode()",
+      "language=" + JSON.stringify(language),
+      "formattedPrompt=" + formattedPrompt,
+    );
 
     // Use the most capable model for Graffiticode generation
     const model = options.model || CLAUDE_MODELS.OPUS;
@@ -469,6 +958,8 @@ export async function generateCode({ auth, prompt, language = null, options = {}
 
         // If compilation was successful, break the loop
         if (verificationResult.status === "success" && !verificationResult.error) {
+          // Store this successful generation for future training
+          await storeSuccessfulGeneration(prompt, generatedCode, langCode, true);
           break;
         }
 
@@ -503,12 +994,17 @@ export async function generateCode({ auth, prompt, language = null, options = {}
           break;
         }
       }
+      
+      // If we've reached max fix attempts but code still works, store it anyway
+      if (fixAttempts >= MAX_FIX_ATTEMPTS && verificationResult.status !== "error") {
+        await storeSuccessfulGeneration(prompt, generatedCode, langCode, false);
+      }
     }
 
-    // Return formatted response with Graffiticode language
+    // Return formatted response with the language name
     return {
       code: generatedCode,
-      language: targetLanguage, // Always Graffiticode
+      language: language.name.toLowerCase(), // Include specific language name
       model: response.model,
       usage: {
         input_tokens: finalUsage.prompt_tokens,
@@ -518,7 +1014,7 @@ export async function generateCode({ auth, prompt, language = null, options = {}
       fixAttempts
     };
   } catch (error) {
-    console.error("Error generating Graffiticode:", error);
-    throw new Error(`Failed to generate Graffiticode: ${error.message}`);
+    console.error(`Error generating code for ${language.name}:`, error);
+    throw new Error(`Failed to generate code for ${language.name}: ${error.message}`);
   }
 }

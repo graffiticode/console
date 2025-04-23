@@ -1,0 +1,30 @@
+[
+  {
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "```l0002\n| Define a function to convert a number to a FizzBuzz string\nlet fizzbuzz = <n:\n  if eq (mod n 15) 0 then\n    \"FizzBuzz\" \n  else if eq (mod n 3) 0 then\n    \"Fizz\"\n  else if eq (mod n 5) 0 then \n    \"Buzz\"\n  else\n    concat \"\" n\n>..\n\n| Generate a list of numbers from 1 to 100\nlet numbers = range 1 100 1..\n\n| Convert each number to its FizzBuzz string \nlet result = map (fizzbuzz) numbers..\n\n| Print out the FizzBuzz sequence\nprint (concat \", \" result)..\n```"
+      },
+      {
+        "role": "user",
+        "content": "print fizzbuzz"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\nlet add2 = <x y: add x y>..\n\nlet result = add2 4 5..\n\nprint result..\n```"
+      },
+      {
+        "role": "user",
+        "content": "add two number"
+      }
+    ],
+    "code": "| Define a function to convert a number to a FizzBuzz string\nlet fizzbuzz = <n:\n  if eq (mod n 15) 0 then\n    \"FizzBuzz\" \n  else if eq (mod n 3) 0 then\n    \"Fizz\"\n  else if eq (mod n 5) 0 then \n    \"Buzz\"\n  else\n    n\n>..\n\n| Generate a list of numbers from 1 to 100\nlet numbers = range 1 100 1..\n\n| Convert each number to its FizzBuzz string \nlet result = map (fizzbuzz) numbers..\n\n| Print out the FizzBuzz sequence\nprint result\n..",
+    "explanation": "L0002 program that transforms each element in a collection.",
+    "expected_output": "result = [computed value]",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbIllSQUV3eE1Yd0NueEo0RmFVeVFKIl19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 1
+  }
+]
