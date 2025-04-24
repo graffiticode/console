@@ -224,15 +224,6 @@ export async function compiles({ auth, lang, type }) {
   }
 }
 
-/**
- * Generate code using the Claude LLM
- *
- * @param {Object} params - Parameters for code generation
- * @param {string} params.prompt - The code description or requirements
- * @param {string} [params.language] - Optional target programming language
- * @param {Object} [params.options] - Additional generation options
- * @returns {Promise<Object>} - Generated code and metadata
- */
 export async function generateCode({ auth, prompt, language, options }) {
   // TODO add support for calling the compiler to check generated code.
   try {

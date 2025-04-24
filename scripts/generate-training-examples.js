@@ -1,9 +1,8 @@
 /**
  * Script to generate training_examples.json from help field in taskIds collection
  *
- * This script fetches examples from Firestore, looking specifically in the
- * /users/{userId}/taskIds collection. Each task document has a "help" field
- * containing dialog interactions between users and the help assistant.
+ * This script fetches examples using the GraphQL tasks query, filtering by lang and mark values.
+ * Each task document has a "help" field containing dialog interactions between users and the help assistant.
  *
  * Usage:
  * node scripts/generate-training-examples.js [options]
@@ -14,9 +13,12 @@
  *   --service-account <path>         Path to Firebase service account JSON file
  *   --user <userId>                  User ID to use (defaults to a predefined user ID)
  *   --user-path <path>               Path to users collection (default: /users)
- *   --task-collection <name>         Name of the taskIds collection (default: taskIds)
+ *   --task-collection <name>            Name of the taskIds collection (default: taskIds)
  *   --lang <language>                Filter tasks by language code (e.g., "0002")
+ *   --mark <mark>                    Filter tasks by mark value (default: 1)
  *   --all-langs                      Process all languages (default behavior)
+ *   --token <token>                  Authentication token for GraphQL API
+ *   --graphql-endpoint <url>         GraphQL API endpoint (default: http://localhost:3000/api)
  *
  * Examples:
  *   # Basic usage with defaults (uses predefined user ID)
@@ -27,11 +29,15 @@
  *
  *   # Generate examples only for a specific language
  *   node scripts/generate-training-examples.js --lang 0002
+ *
+ *   # Generate examples with specific mark value
+ *   node scripts/generate-training-examples.js --lang 0002 --mark 2
  */
 
 const fs = require('fs');
 const path = require('path');
 const admin = require('firebase-admin');
+const fetch = require('node-fetch');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -39,6 +45,17 @@ const args = process.argv.slice(2);
 const limit = args.includes('--limit')
   ? parseInt(args[args.indexOf('--limit') + 1])
   : 100000; // Very high limit to effectively get all documents
+
+// Language filter settings
+const filterByLanguage = args.includes('--lang');
+const languageFilter = filterByLanguage
+  ? args[args.indexOf('--lang') + 1]
+  : null;
+
+// Mark filter settings
+const markValue = args.includes('--mark')
+  ? parseInt(args[args.indexOf('--mark') + 1])
+  : 1; // Default mark value
 
 // Determine output file path, adding language code to filename if filtering
 let outputPath;
@@ -72,11 +89,14 @@ const taskCollection = args.includes('--task-collection')
   ? args[args.indexOf('--task-collection') + 1]
   : 'taskIds';
 
-// Language filter settings
-const filterByLanguage = args.includes('--lang');
-const languageFilter = filterByLanguage
-  ? args[args.indexOf('--lang') + 1]
+// GraphQL API settings
+const authToken = args.includes('--token')
+  ? args[args.indexOf('--token') + 1]
   : null;
+
+const graphqlEndpoint = args.includes('--graphql-endpoint')
+  ? args[args.indexOf('--graphql-endpoint') + 1]
+  : 'http://localhost:3000/api';
 
 // Show help if requested
 if (args.includes('--help')) {
@@ -89,9 +109,12 @@ Options:
   --service-account <path>         Path to Firebase service account JSON file
   --user <userId>                  User ID to use (defaults to a predefined user ID)
   --user-path <path>               Path to users collection (default: /users)
-  --task-collection <name>         Name of the taskIds collection (default: taskIds)
+  --task-collection <name>            Name of the taskIds collection (default: taskIds)
   --lang <language>                Filter tasks by language code (e.g., "0002")
+  --mark <mark>                    Filter tasks by mark value (default: 1)
   --all-langs                      Process all languages (default behavior)
+  --token <token>                  Authentication token for GraphQL API
+  --graphql-endpoint <url>         GraphQL API endpoint (default: http://localhost:3000/api)
 
 Examples:
   # Basic usage with defaults
@@ -100,17 +123,22 @@ Examples:
   # Specify a different user ID
   node scripts/generate-training-examples.js --user 1a2b3c4d5e6f
 
-  # Generate examples only for a specific language
-  node scripts/generate-training-examples.js --lang 0002
+  # Generate examples only for a specific language and mark value
+  node scripts/generate-training-examples.js --lang 0002 --mark 1
   `);
   process.exit(0);
 }
 
-// Build the path to the user's taskIds collection
+// Build the path to the user's taskIds collection (for backward compatibility)
 const userTasksPath = `${usersPath}/${userId}/${taskCollection}`;
 console.log(`Starting with user tasks path: ${userTasksPath}`);
 
-// Initialize Firebase Admin SDK
+// Check if we have a token for the GraphQL API
+if (!authToken) {
+  console.log('No auth token provided for GraphQL API, falling back to Firebase Admin SDK');
+}
+
+// Initialize Firebase Admin SDK (as fallback if GraphQL is not available)
 try {
   // Only initialize with service account if explicitly provided
   if (serviceAccountPath) {
@@ -237,16 +265,117 @@ function generateExplanation(code, lang) {
   return explanation;
 }
 
+/**
+ * Function to fetch tasks using GraphQL
+ * @param {string} lang - Language filter
+ * @param {number} mark - Mark filter
+ * @returns {Promise<Array>} - Array of task objects
+ */
+async function fetchTasksWithGraphQL(lang, mark) {
+  try {
+    console.log(`Fetching tasks with GraphQL for lang=${lang}, mark=${mark}`);
+    
+    // First try to introspect the schema to verify the query structure
+    try {
+      const introspectionQuery = `
+        {
+          __schema {
+            queryType {
+              fields {
+                name
+                args {
+                  name
+                  type {
+                    name
+                    kind
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+      
+      console.log('Attempting schema introspection to verify query structure...');
+      const introspectionResponse = await fetch(graphqlEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authToken
+        },
+        body: JSON.stringify({ query: introspectionQuery })
+      });
+      
+      const introspectionResult = await introspectionResponse.json();
+      console.log('Schema introspection result:', JSON.stringify(introspectionResult, null, 2));
+    } catch (e) {
+      console.log('Schema introspection failed, continuing with original query');
+    }
+    
+    // GraphQL query for tasks
+    const query = `
+      query GetTasks($lang: String!, $mark: Int!) {
+        tasks(lang: $lang, mark: $mark) {
+          id
+          lang
+          src
+          code
+          help
+          taskId
+          isPublic
+          created
+          name
+          mark
+        }
+      }
+    `;
+    
+    // Variables for the query
+    const variables = { lang, mark };
+    
+    // Log request details for debugging
+    console.log(`Making GraphQL request to: ${graphqlEndpoint}`);
+    console.log(`Auth token present: ${authToken ? 'Yes' : 'No'}`);
+    console.log('Request body:', JSON.stringify({query, variables}, null, 2));
+    
+    // Make the GraphQL request
+    const response = await fetch(graphqlEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authToken
+      },
+      body: JSON.stringify({
+        query,
+        variables
+      })
+    });
+    
+    // Log response status
+    console.log(`Response status: ${response.status} ${response.statusText}`);
+    
+    // Parse the response
+    const result = await response.json();
+    
+    // Log full response for debugging
+    console.log('Full response:', JSON.stringify(result, null, 2));
+    
+    // Check for errors
+    if (result.errors) {
+      console.error('GraphQL query errors:', result.errors);
+      throw new Error('Failed to fetch tasks with GraphQL');
+    }
+    
+    // Return the tasks
+    return result.data.tasks || [];
+  } catch (error) {
+    console.error('Error fetching tasks with GraphQL:', error);
+    throw error;
+  }
+}
+
 async function main() {
   try {
-    if (filterByLanguage) {
-      console.log(`\nGenerating training examples for language: ${languageFilter} from task documents at: ${userTasksPath}`);
-    } else {
-      console.log(`\nGenerating training examples from all languages in task documents at: ${userTasksPath}`);
-    }
-
-    const db = admin.firestore();
-
     // Initialize statistics tracking
     const statistics = {
       codeSources: {},        // Track source of code fields
@@ -260,171 +389,126 @@ async function main() {
       totalMessages: 0        // Total individual messages processed
     };
 
-    // DEBUG: List available collections (top-level only)
-    console.log('Available top-level collections:');
-    const collections = await db.listCollections();
-    for (const collection of collections) {
-      console.log(`- ${collection.id}`);
-    }
-
-    // Attempt to access a direct path to tasks
-    let tryPaths = [
-      userTasksPath,         // User's tasks path (e.g., /users/userId/taskIds)
-      `/taskIds`,            // Root level collection
-      `/users/taskIds`,      // Common alternatives
-      `/Tasks`
-    ];
-
-    let tasksCollectionRef;
-    let tasksSnapshot;
-    let foundPath = null;
-
-    for (const tryPath of tryPaths) {
-      console.log(`\nAttempting to access tasks at: ${tryPath}`);
-      try {
-        const tempRef = db.collection(tryPath);
-        const tempSnapshot = await tempRef.limit(1).get();
-
-        if (!tempSnapshot.empty) {
-          tasksCollectionRef = tempRef;
-          tasksSnapshot = tempSnapshot;
-          foundPath = tryPath;
-          console.log(`SUCCESS! Found tasks collection at: ${tryPath}`);
-
-          // Check the first document to see if it looks like a task
-          const sampleDoc = tempSnapshot.docs[0].data();
-          console.log(`Sample document fields: ${Object.keys(sampleDoc).join(', ')}`);
-
-          // Look for help field on the document
-          if (sampleDoc.help) {
-            console.log(`Found help field with type: ${typeof sampleDoc.help}`);
-            if (Array.isArray(sampleDoc.help)) {
-              console.log(`✓ Help field is an array with ${sampleDoc.help.length} items`);
-              break;
-            } else {
-              console.log(`Help field is not an array, it's a: ${typeof sampleDoc.help}`);
-            }
-          } else {
-            console.log(`No help field found on document. Available fields: ${Object.keys(sampleDoc).join(', ')}`);
-          }
-        } else {
-          console.log(`No documents found at path: ${tryPath}`);
-        }
-      } catch (error) {
-        console.log(`Error accessing ${tryPath}: ${error.message}`);
-      }
-    }
-
-    if (!foundPath) {
-      console.error("\nERROR: Could not find tasks in any of the attempted paths.");
-      console.error("Please specify the correct path using:");
-      console.error("--user-path <userPath> --user <userId> --task-collection <collectionName>");
-      process.exit(1);
-    }
-
-    console.log(`\nUsing tasks collection at: ${foundPath}`);
-
-    // Show a sample of the first task document
-    console.log("\nSample of first task document:");
-    const sampleTask = tasksSnapshot.docs[0];
-    console.log(`- Task ID: ${sampleTask.id}`);
-    const sampleData = sampleTask.data();
-    console.log(`- Fields: ${Object.keys(sampleData).join(', ')}`);
-
-    if (sampleData.help && Array.isArray(sampleData.help)) {
-      console.log(`- Help array has ${sampleData.help.length} items`);
-      if (sampleData.help.length > 0) {
-        const helpItem = sampleData.help[0];
-        console.log(`- First help item has type: ${helpItem.type}`);
-        console.log(`- Fields in first help item: ${Object.keys(helpItem).join(', ')}`);
-      }
-    }
-
-    // Now process all task documents in batches
-    console.log(`\nBeginning to process tasks (limit: ${limit})...`);
-
+    // Array to store training examples
     const trainingExamples = [];
-    let lastDoc = null;
-    let batchSize = 100; // Reasonable batch size
-    let batchNumber = 1;
-    let totalFetched = 0;
-    let hasMore = true;
-
-    // Process tasks in batches
-    while (hasMore && totalFetched < limit) {
-      // Build the query
-      let query = tasksCollectionRef;
-
-      // Apply limit
-      const remainingLimit = limit - totalFetched;
-      const currentBatchSize = Math.min(batchSize, remainingLimit);
-      query = query.limit(currentBatchSize);
-
-      // Apply pagination
-      if (lastDoc) {
-        query = query.startAfter(lastDoc);
-      }
-
-      // Execute the query to get task documents
-      const batchSnapshot = await query.get();
-
-      if (batchSnapshot.empty) {
-        hasMore = false;
-        console.log('No more task documents to fetch.');
-      } else {
-        const batchDocs = batchSnapshot.docs;
-        statistics.totalTasks += batchDocs.length;
-        console.log(`\nBatch ${batchNumber}: Retrieved ${batchDocs.length} task documents`);
-
-        // For each task document, process the help array
-        for (const taskDoc of batchDocs) {
-          const taskId = taskDoc.id;
-          const taskData = taskDoc.data();
-
-          if (taskData.mark !== 1) {
+    
+    // Determine languages to process
+    const languagesToProcess = filterByLanguage 
+      ? [languageFilter]
+      : ['0002', '0011', '0012', '0165']; // Add other languages as needed
+    
+    // Process each language
+    for (const lang of languagesToProcess) {
+      try {
+        console.log(`\nProcessing tasks for language: L${lang} with mark: ${markValue}`);
+        
+        // Try to fetch tasks using GraphQL if token is available
+        let tasks = [];
+        
+        if (authToken) {
+          try {
+            tasks = await fetchTasksWithGraphQL(lang, markValue);
+            console.log(`Successfully fetched ${tasks.length} tasks using GraphQL for L${lang}`);
+          } catch (error) {
+            console.error(`Error fetching tasks with GraphQL for L${lang}:`, error.message);
+            console.log('Falling back to Firebase Admin SDK');
+            tasks = [];
+          }
+        }
+        
+        // If GraphQL failed or no token, fallback to Firebase Admin SDK
+        if (tasks.length === 0 && !authToken) {
+          console.log(`Using Firebase Admin SDK to fetch tasks for L${lang}`);
+          const db = admin.firestore();
+          
+          // Build query for the specific language and mark
+          const taskQuery = db.collection(userTasksPath)
+            .where('lang', '==', lang)
+            .where('mark', '==', markValue)
+            .limit(limit);
+          
+          const taskSnapshot = await taskQuery.get();
+          
+          // Convert Firebase documents to similar format as GraphQL results
+          if (!taskSnapshot.empty) {
+            tasks = taskSnapshot.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                lang: data.lang,
+                src: data.src || '',
+                code: data.code || '',
+                help: data.help || '[]',
+                isPublic: data.isPublic,
+                created: data.created ? data.created.toString() : '',
+                name: data.name,
+                mark: data.mark
+              };
+            });
+            console.log(`Successfully fetched ${tasks.length} tasks using Firebase for L${lang}`);
+          } else {
+            console.log(`No tasks found for L${lang} with mark ${markValue} in Firebase`);
+          }
+        }
+        
+        // Process the tasks
+        statistics.totalTasks += tasks.length;
+        console.log(`Processing ${tasks.length} tasks for L${lang}`);
+        
+        for (const task of tasks) {
+          const taskId = task.id;
+          
+          // Parse help field
+          let help = [];
+          try {
+            help = JSON.parse(task.help);
+          } catch (e) {
+            console.log(`Task ${taskId} has invalid help JSON: ${e.message}`);
             continue;
           }
-
-          console.log(
-            "taskData=" + JSON.stringify(taskData, null, 2),
-          );
-
-          const help = JSON.parse(taskData.help);
-
-          // Check if this document has a help array
+          
+          // Check if this document has a valid help array
           if (!help || !Array.isArray(help)) {
             console.log(`Task ${taskId} has no help array`);
             continue;
           }
-
+          
           if (help.length === 0) {
             console.log(`Task ${taskId} has an empty help array`);
             statistics.tasksWithEmptyHelp++;
             continue;
           }
-
+          
           statistics.tasksWithHelpArray++;
           console.log(`Processing task ${taskId} with ${help.length} help messages`);
-
+          
           // Get the code from the task
           let code = "";
           let codeSource = "";
-
+          
           // Try multiple fields for code
-          if (taskData.code && typeof taskData.code === 'string' && taskData.code.trim().length >= 10) {
-            code = taskData.code.trim();
-            codeSource = "task_code_field";
-          } else if (taskData.src && typeof taskData.src === 'string' && taskData.src.trim().length >= 10) {
-            code = taskData.src.trim();
+          if (task.code && typeof task.code === 'string' && task.code.trim().length >= 10) {
+            try {
+              // If code is JSON string, parse it
+              const parsedCode = JSON.parse(task.code);
+              code = typeof parsedCode === 'string' ? parsedCode.trim() : JSON.stringify(parsedCode);
+              codeSource = "task_code_field";
+            } catch (e) {
+              // If not valid JSON, use as is
+              code = task.code.trim();
+              codeSource = "task_code_field";
+            }
+          } else if (task.src && typeof task.src === 'string' && task.src.trim().length >= 10) {
+            code = task.src.trim();
             codeSource = "task_src_field";
-          } else if (taskData.source && typeof taskData.source === 'string' && taskData.source.trim().length >= 10) {
-            code = taskData.source.trim();
+          } else if (task.source && typeof task.source === 'string' && task.source.trim().length >= 10) {
+            code = task.source.trim();
             codeSource = "task_source_field";
-          } else if (taskData.content && typeof taskData.content === 'string' && taskData.content.trim().length >= 10) {
-            code = taskData.content.trim();
+          } else if (task.content && typeof task.content === 'string' && task.content.trim().length >= 10) {
+            code = task.content.trim();
             codeSource = "task_content_field";
           }
-
+          
           // If code not found in task fields, look for it in the help messages
           if (!code) {
             for (const message of help) {
@@ -436,35 +520,26 @@ async function main() {
               }
             }
           }
-
+          
           // Skip if we still couldn't find any code
           if (!code) {
             console.log(`No code found for task ${taskId}`);
             statistics.skippedNoCode++;
             continue;
           }
-
-          // Get language code from task
-          const lang = taskData.lang || "0002"; // Default to L0002 if not specified
-
-          // Skip this task if we're filtering by language and it doesn't match
-          if (filterByLanguage && lang !== languageFilter) {
-            console.log(`Skipping task ${taskId} with language ${lang} (filtering for ${languageFilter})`);
-            continue;
-          }
-
+          
           // Track code sources and languages
           statistics.codeSources[codeSource] = (statistics.codeSources[codeSource] || 0) + 1;
           statistics.languageCounts[lang] = (statistics.languageCounts[lang] || 0) + 1;
-
+          
           // Process the help array to construct dialog messages
           const dialogMessages = [];
           let dialogPairs = 0;
-
+          
           for (const message of help) {
             // Skip invalid messages
             if (!message || typeof message !== 'object') continue;
-
+            
             // Add user messages
             if (message.type === 'user' && message.user) {
               dialogMessages.unshift({
@@ -476,14 +551,14 @@ async function main() {
             else if (message.type === 'bot' && message.help) {
               const helpObj = message.help;
               let content = '';
-
+              
               if (helpObj.type === 'text' && helpObj.text) {
                 content = helpObj.text;
               } else if (helpObj.type === 'code' && helpObj.text) {
                 // Format code with markdown
                 content = `\`\`\`${helpObj.language || 'ocaml'}\n${helpObj.text}\n\`\`\``;
               }
-
+              
               if (content) {
                 dialogMessages.unshift({
                   role: 'assistant',
@@ -492,27 +567,27 @@ async function main() {
               }
             }
           }
-
+          
           // Count dialog pairs (user message followed by assistant message)
           for (let i = 0; i < dialogMessages.length - 1; i++) {
             if (dialogMessages[i].role === 'user' && dialogMessages[i+1].role === 'assistant') {
               dialogPairs++;
             }
           }
-
+          
           statistics.totalDialogPairs += dialogPairs;
           statistics.totalMessages += dialogMessages.length;
-
+          
           // Skip if there are no complete dialog pairs
           if (dialogPairs === 0) {
             console.log(`Task ${taskId} has no complete dialog pairs`);
             continue;
           }
-
+          
           // Generate explanation and expected output
           const explanation = generateExplanation(code, `L${lang}`);
           const expected_output = determineExpectedOutput(code);
-
+          
           // Add to training examples
           trainingExamples.push({
             messages: dialogMessages,
@@ -522,34 +597,23 @@ async function main() {
             lang,
             task_id: taskId,
             code_source: codeSource,
-            usage_count: taskData.count || 1,
+            usage_count: task.count || 1,
             pair_count: dialogPairs
           });
-
+          
           statistics.totalProcessed++;
-
+          
           if (statistics.totalProcessed % 50 === 0) {
             console.log(`Processed ${statistics.totalProcessed} tasks with dialog so far...`);
           }
         }
-
-        // Update pagination for next batch
-        lastDoc = batchDocs[batchDocs.length - 1];
-        totalFetched += batchDocs.length;
-        batchNumber++;
-
-        // Check if we might have more documents
-        hasMore = batchDocs.length === currentBatchSize;
-
-        // Print interim statistics
-        console.log(`\nInterim Statistics:`);
-        console.log(`Tasks processed: ${statistics.totalTasks}`);
-        console.log(`Tasks with help array: ${statistics.tasksWithHelpArray}`);
-        console.log(`Tasks processed with dialog: ${statistics.totalProcessed}`);
-        console.log(`Total dialog pairs: ${statistics.totalDialogPairs}`);
+      } catch (error) {
+        console.error(`Error processing language L${lang}:`, error);
+        // Continue with next language
+        continue;
       }
     }
-
+    
     // Print detailed statistics report
     console.log('\n===== FINAL STATISTICS =====');
     console.log(`Total tasks found: ${statistics.totalTasks}`);
@@ -559,48 +623,48 @@ async function main() {
     console.log(`Total dialog pairs: ${statistics.totalDialogPairs}`);
     console.log(`Total messages: ${statistics.totalMessages}`);
     console.log(`Skipped (no code): ${statistics.skippedNoCode}`);
-
+    
     console.log('\nCode sources:');
     for (const [source, count] of Object.entries(statistics.codeSources || {}).sort((a, b) => b[1] - a[1])) {
       const percentage = (count / statistics.totalProcessed * 100).toFixed(2);
       console.log(`  - ${source}: ${count} (${percentage}%)`);
     }
-
+    
     console.log('\nLanguage distribution:');
     for (const [lang, count] of Object.entries(statistics.languageCounts).sort((a, b) => b[1] - a[1])) {
       const percentage = (count / statistics.totalProcessed * 100).toFixed(2);
       console.log(`  - L${lang}: ${count} (${percentage}%)`);
     }
     console.log('======================\n');
-
+    
     // Sort by usage count (most used first)
     trainingExamples.sort((a, b) => b.usage_count - a.usage_count);
-
+    
     // Create the output directory if it doesn't exist
     const outputDir = path.dirname(outputPath);
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
-
+    
     // Write to output file
     fs.writeFileSync(
       outputPath,
       JSON.stringify(trainingExamples, null, 2),
       'utf8'
     );
-
+    
     if (filterByLanguage) {
       console.log(`Successfully generated ${trainingExamples.length} training examples for language ${languageFilter}.`);
     } else {
       console.log(`Successfully generated ${trainingExamples.length} training examples across all languages.`);
     }
     console.log(`Output written to: ${outputPath}`);
-
+    
   } catch (error) {
     console.error('Error generating training examples:', error);
     process.exit(1);
   }
-
+  
   // Clean exit
   process.exit(0);
 }

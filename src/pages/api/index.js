@@ -91,7 +91,17 @@ const resolvers = {
     tasks: async (_, args, ctx) => {
       const { token } = ctx;
       const { lang, mark } = args;
+      console.log(
+        "tasks()",
+        "token=" + token,
+        "lang=" + lang,
+        "mark=" + mark,
+      );
       const { uid } = await client.verifyToken(token);
+      console.log(
+        "tasks()",
+        "uid=" + uid,
+      );
       return await tasks({ auth: { uid, token }, lang, mark });
     },
   },

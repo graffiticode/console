@@ -1,0 +1,90 @@
+[
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "create a 2 by 2 spreadsheet with the cell names as the cell values"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\ncolumns {\n  A: {\n    width: 50,\n    justify: \"center\",\n  },\n  B: {\n    width: 50,\n    justify: \"center\",\n  },\n}\ncells {\n  A1: {\n    text: \"A1\",\n  },\n  A2: {\n    text: \"A2\",\n  },\n  B1: {\n    text: \"B1\",\n  },\n  B2: {\n    text: \"B2\",\n  },\n}\n{}..\n```"
+      }
+    ],
+    "code": "columns {\n  A: {\n    width: 50,\n    justify: \"center\",\n  },\n  B: {\n    width: 50,\n    justify: \"center\",\n  },\n}\ncells {\n  A1: {\n    text: \"A1\",\n  },\n  A2: {\n    text: \"A2\",\n  },\n  B1: {\n    text: \"B1\",\n  },\n  B2: {\n    text: \"B2\",\n  },\n}\n{}..",
+    "explanation": "Simple L0165 code that executes an operation.",
+    "expected_output": "Output depends on execution",
+    "lang": "0165",
+    "task_id": "eyJ0YXNrSWRzIjpbIjM4eEJUMXBBNFdKQzZYUmp6VHB5Il19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "create a 2 by 2 spreadsheet with the cell names as the cell values"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\ncolumns {\n  A: {\n    width: 50,\n    justify: \"center\",\n  },\n  B: {\n    width: 50,\n    justify: \"center\",\n  },\n}\ncells {\n  A1: {\n    text: \"A1\",\n  },\n  A2: {\n    text: \"A2\",\n  },\n  B1: {\n    text: \"B1\",\n  },\n  B2: {\n    text: \"B2\",\n  },\n}\n{}..\n```"
+      }
+    ],
+    "code": "columns {\n}\ncells {\n  A1: {\n    text: \"A1\",\n  },\n  A2: {\n    text: \"A2\",\n  },\n  A3: {\n    text: \"A3\",\n  },\n  B1: {\n    text: \"B1\",\n  },\n  B2: {\n    text: \"B2\",\n  },\n  B3: {\n    text: \"B3\",\n  },\n  C1: {\n    text: \"C1\",\n  },\n  C2: {\n    text: \"C2\",\n  },\n  C3: {\n    text: \"C3\",\n  },\n}\n{}..",
+    "explanation": "Simple L0165 code that executes an operation.",
+    "expected_output": "Output depends on execution",
+    "lang": "0165",
+    "task_id": "eyJ0YXNrSWRzIjpbIko0WUQ2Vzc5TjNEOTJVSmhKMkZPIl19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "create a spreadsheet that assesses a students ability to construct a table that reflects the values below. rows may be in any order.\n{\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000\",\n  B2: \"325000\",\n  B3: \"26000\",\n  B4: \"875000\",\n}"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\ntable \n  rows {\n    \"*\": {\n      assess: {\n        index: \"A\",\n        order: \"actual\", | \"expected\", \"asc\", \"desc\"\n      }\n    }\n  }\n  columns {\n    A: {\n      width: 200,\n      justify: \"left\",\n    },\n    B: {\n      width: 100,\n      format: \"Currency\",\n    },\n  }\n  cells {\n    A1: {\n      text: \"{{A1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A1}}\",\n        }\n      }\n    },\n    A2: {\n      text: \"{{A2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A2}}\",\n        }\n      }\n    },\n    A3: {\n      text: \"{{A3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A3}}\",\n        }\n      }\n    },\n    A4: {\n      text: \"{{A4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A4}}\",\n        }\n      }\n    },\n    B1: {\n      text: \"{{B1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B1}}\",\n        }\n      }\n    },\n    B2: {\n      text: \"{{B2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B2}}\"\n        }\n      }\n    },\n    B3: {\n      text: \"{{B3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B3}}\",\n        }\n      }      \n    }\n    B4: {\n      text: \"{{B4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B4}}\",\n        }\n      }      \n    }\n  }\nparams {\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000\",\n  B2: \"325000\",\n  B3: \"26000\",\n  B4: \"875000\",\n}\n{}\n..\n```"
+      }
+    ],
+    "code": "table \n  rows {\n    \"*\": {\n      assess: {\n        index: \"A\",\n        order: \"actual\", | \"expected\", \"asc\", \"desc\"\n      }\n    }\n  }\n  columns {\n    A: {\n      width: 200,\n      justify: \"left\",\n    },\n    B: {\n      width: 100,\n      format: \"Currency\",\n    },\n  }\n  cells {\n    A1: {\n      text: \"{{A1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A1}}\",\n        }\n      }\n    },\n    A2: {\n      text: \"{{A2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A2}}\",\n        }\n      }\n    },\n    A3: {\n      text: \"{{A3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A3}}\",\n        }\n      }\n    },\n    A4: {\n      text: \"{{A4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A4}}\",\n        }\n      }\n    },\n    B1: {\n      text: \"{{B1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B1}}\",\n        }\n      }\n    },\n    B2: {\n      text: \"{{B2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B2}}\"\n        }\n      }\n    },\n    B3: {\n      text: \"{{B3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B3}}\",\n        }\n      }      \n    }\n    B4: {\n      text: \"{{B4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B4}}\",\n        }\n      }      \n    }\n  }\nparams {\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000\",\n  B2: \"325000\",\n  B3: \"26000\",\n  B4: \"875000\",\n}\n{}\n..",
+    "explanation": "Simple L0165 code that executes an operation.",
+    "expected_output": "Output depends on execution",
+    "lang": "0165",
+    "task_id": "eyJ0YXNrSWRzIjpbIm9LUVVpTGQzNnhuY0R6OEphN1NaIl19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "create a 2 by 2 spreadsheet with the cell names as the cell values"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\ncolumns {\n  A: {\n    width: 50,\n    justify: \"center\",\n  },\n  B: {\n    width: 50,\n    justify: \"center\",\n  },\n}\ncells {\n  A1: {\n    text: \"A1\",\n  },\n  A2: {\n    text: \"A2\",\n  },\n  B1: {\n    text: \"B1\",\n  },\n  B2: {\n    text: \"B2\",\n  },\n}\n{}..\n```"
+      },
+      {
+        "role": "user",
+        "content": "create a 3 by 3 table where the call values are the cell names and they are aligned in the center of the cells"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\ncolumns {\n  A: {\n    justify: \"center\",\n  }\n  B: {\n    justify: \"center\",\n  }\n  C: {\n    justify: \"center\",\n  }\n}\ncells {\n  A1: {\n    text: \"A1\",\n  },\n  A2: {\n    text: \"A2\",\n  },\n  A3: {\n    text: \"A3\",\n  },\n  B1: {\n    text: \"B1\",\n  },\n  B2: {\n    text: \"B2\",\n  },\n  B3: {\n    text: \"B3\",\n  },\n  C1: {\n    text: \"C1\",\n  },\n  C2: {\n    text: \"C2\",\n  },\n  C3: {\n    text: \"C3\",\n  },\n}\n{}..\n```"
+      }
+    ],
+    "code": "columns {\n  A: {\n    justify: \"center\",\n  }\n  B: {\n    justify: \"center\",\n  }\n  C: {\n    justify: \"center\",\n  }\n}\ncells {\n  A1: {\n    text: \"A1\",\n  },\n  A2: {\n    text: \"A2\",\n  },\n  A3: {\n    text: \"A3\",\n  },\n  B1: {\n    text: \"B1\",\n  },\n  B2: {\n    text: \"B2\",\n  },\n  B3: {\n    text: \"B3\",\n  },\n  C1: {\n    text: \"C1\",\n  },\n  C2: {\n    text: \"C2\",\n  },\n  C3: {\n    text: \"C3\",\n  },\n}\n{}..",
+    "explanation": "Simple L0165 code that executes an operation.",
+    "expected_output": "Output depends on execution",
+    "lang": "0165",
+    "task_id": "eyJ0YXNrSWRzIjpbInI1TGFCclp0ME9NY2FLOWhwMmRqIl19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 2
+  }
+]
