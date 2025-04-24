@@ -3,19 +3,19 @@
     "messages": [
       {
         "role": "user",
-        "content": "add two number"
+        "content": "write a program that computes the overtime payroll for a company with the following employee data: [ { name: \"Alice\", wage: 15, hours: 35 } { name: \"Bob\", wage: 20, hours: 50 } { name: \"Charlie\", wage: 18, hours: 40 } ]"
       },
       {
         "role": "assistant",
-        "content": "```l0002\nlet add2 = <x y: add x y>..\n\nlet result = add2 4 5..\n\nprint result..\n```"
+        "content": "```graffiticode\n| Function to calculate overtime pay for an employee\nlet overtimePay = <employee:\n  let wage = get employee \"wage\"..\n  let hours = get employee \"hours\"..\n  let regularPay = mul wage (min hours 40)..\n  let overtimeHours = max 0 (sub hours 40)..\n  let overtimeRate = mul 1.5 wage..\n  let overtimePay = mul overtimeHours overtimeRate..\n  add regularPay overtimePay\n>..\n\n| Calculate overtime pay for each employee  \nlet payroll = map (overtimePay) [\n  {name: \"Alice\" wage: 15 hours: 35}\n  {name: \"Bob\" wage: 20 hours: 50}\n  {name: \"Charlie\" wage: 18 hours: 40}  \n]..\n\n| Print the payroll\nprint payroll..\n```"
       }
     ],
-    "code": "{\"22\":{\"elts\":[\"9\"],\"tag\":\"NUM\"},\"23\":{\"coord\":{\"from\":54,\"to\":59},\"elts\":[22],\"tag\":\"PRINT\"},\"25\":{\"elts\":[23],\"tag\":\"EXPRS\"},\"26\":{\"elts\":[25],\"tag\":\"PROG\"},\"root\":26}",
-    "explanation": "Simple L0002 code that executes an operation.",
-    "expected_output": "Output depends on execution",
+    "code": "| Function to calculate overtime pay for an employee\nlet overtimePay = <employee:\n  let wage = get employee \"wage\"..\n  let hours = get employee \"hours\"..\n  let regularPay = mul wage (min hours 40)..\n  let overtimeHours = max 0 (sub hours 40)..\n  let overtimeRate = mul 1.5 wage..\n  let overtimePay = mul overtimeHours overtimeRate..\n  add regularPay overtimePay\n>..\n\n| Calculate overtime pay for each employee  \nlet payroll = map (overtimePay) [\n  {name: \"Alice\" wage: 15 hours: 35}\n  {name: \"Bob\" wage: 20 hours: 50}\n  {name: \"Charlie\" wage: 18 hours: 40}  \n]..\n\n| Print the payroll\nprint payroll..",
+    "explanation": "L0002 program that transforms each element in a collection.",
+    "expected_output": "overtimePay = <function>",
     "lang": "0002",
-    "task_id": "eyJ0YXNrSWRzIjpbIjR0Z2psa0dCckhOelFRbE9KWGl0Il19",
-    "code_source": "task_code_field",
+    "task_id": "eyJ0YXNrSWRzIjpbIjZvd3ZhWXR5TFZpTjRpcmxXNXFVIl19",
+    "code_source": "help_message_code",
     "usage_count": 1,
     "pair_count": 1
   },
@@ -23,19 +23,71 @@
     "messages": [
       {
         "role": "user",
-        "content": "print fizzbuzz"
+        "content": "write a function that outputs the text 'hello world'"
       },
       {
         "role": "assistant",
-        "content": "```l0002\n| Define a function to convert a number to a FizzBuzz string\nlet fizzbuzz = <n:\n  case mod n 15 of \n    0: \"FizzBuzz\"\n    case mod n 3 of\n      0: \"Fizz\" \n      case mod n 5 of\n        0: \"Buzz\"\n        _: concat \"\" n\n      end\n    end \n  end\n>..\\n\n\n| Generate a list of numbers from 1 to 100\nlet numbers = range 1 101 1..\n\n| Convert each number to its FizzBuzz string\nlet result = map (fizzbuzz) numbers..\n\n| Print out the FizzBuzz sequence \nprint result..\n```"
+        "content": "```graffiticode\nHere is a function that outputs the text \"hello world\" in Graffiticode:\n\nlet greet = <: \"hello world\">.\n\nTo explain:\n- We define a function called `greet` using a lambda \n- The lambda takes no arguments, indicated by the empty angle brackets `<:`\n- The function body simply returns the string literal `\"hello world\"`\n\nSo calling `greet` will output the text \"hello world\".\n```"
+      },
+      {
+        "role": "user",
+        "content": "write a function that outputs the the text 'foo'. make sure to comment any commentary prose with the line comment delineator |"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| Define a function named `foo` that takes no arguments\nlet foo = <:\n  | Return the string literal \"foo\"\n  \"foo\"  \n>.\n```"
+      },
+      {
+        "role": "user",
+        "content": "write a function that outputs the the text 'foo'. make sure to comment any commentary prose with the line comment delineator |. call that function at the top level of the program"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| Define a function that returns the string \"foo\"\nlet fooFn = <: \"foo\">.\n\n| Call the fooFn function\nfooFn.\n```"
+      },
+      {
+        "role": "user",
+        "content": "write a function that outputs the the text 'foo'. make sure to comment any commentary prose with the line comment delineator |. call that function at the top level of the program. remember that let declaration and program terminators are the token .."
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| Define a function that returns the string \"foo\"\nlet fooFn = <: \"foo\">.\n\n| Call the fooFn function\nfooFn ()..\n```"
+      },
+      {
+        "role": "user",
+        "content": "write a program that prints hello world. make sure to delineate comment with the line comment token |"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| This program prints the string \"Hello, world!\"\nlet main = <_: print \"Hello, world!\">..\\nmain ()..\"\n```"
       }
     ],
-    "code": "{\"2\":{\"elts\":[\"n\"],\"tag\":\"IDENT\"},\"5\":{\"elts\":[\"15\"],\"tag\":\"NUM\"},\"7\":{\"elts\":[\"0\"],\"tag\":\"NUM\"},\"13\":{\"elts\":[\"3\"],\"tag\":\"NUM\"},\"20\":{\"elts\":[\"5\"],\"tag\":\"NUM\"},\"33\":{\"elts\":[2],\"tag\":\"LIST\"},\"34\":{\"elts\":[],\"tag\":\"LIST\"},\"35\":{\"elts\":[0],\"tag\":\"LIST\"},\"40\":{\"elts\":[\"1\"],\"tag\":\"NUM\"},\"41\":{\"elts\":[\"101\"],\"tag\":\"NUM\"},\"50\":{\"coord\":{\"from\":301,\"to\":306},\"elts\":[40,41,40],\"tag\":\"RANGE\"},\"54\":{\"elts\":[\"FizzBuzz\"],\"tag\":\"STR\"},\"55\":{\"elts\":[7,54],\"tag\":\"OF\"},\"58\":{\"elts\":[\"Fizz\"],\"tag\":\"STR\"},\"59\":{\"elts\":[7,58],\"tag\":\"OF\"},\"61\":{\"elts\":[\"Buzz\"],\"tag\":\"STR\"},\"62\":{\"elts\":[7,61],\"tag\":\"OF\"},\"72\":{\"elts\":[],\"tag\":\"_\"},\"73\":{\"elts\":[72,2],\"tag\":\"OF\"},\"74\":{\"elts\":[2,20],\"tag\":\"MOD\"},\"75\":{\"elts\":[74,62,73],\"tag\":\"CASE\"},\"76\":{\"elts\":[72,75],\"tag\":\"OF\"},\"77\":{\"elts\":[2,13],\"tag\":\"MOD\"},\"78\":{\"elts\":[77,59,76],\"tag\":\"CASE\"},\"79\":{\"elts\":[72,78],\"tag\":\"OF\"},\"80\":{\"elts\":[2,5],\"tag\":\"MOD\"},\"81\":{\"elts\":[80,55,79],\"tag\":\"CASE\"},\"82\":{\"elts\":[33,81,34,35],\"tag\":\"LAMBDA\"},\"83\":{\"elts\":[82],\"tag\":\"PAREN\"},\"84\":{\"coord\":{\"from\":376,\"to\":379},\"elts\":[83,50],\"tag\":\"MAP\"},\"86\":{\"coord\":{\"from\":437,\"to\":442},\"elts\":[84],\"tag\":\"PRINT\"},\"88\":{\"elts\":[86],\"tag\":\"EXPRS\"},\"89\":{\"elts\":[88],\"tag\":\"PROG\"},\"root\":89}",
-    "explanation": "Simple L0002 code that executes an operation.",
+    "code": "| This program prints the string \"Hello, world!\"\nlet main = <_: print \"Hello, world!\">..\\nmain ()..\"",
+    "explanation": "Short L0002 program with 3 operations that manipulates data.",
+    "expected_output": "main = <function>",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbIkJ2Uzg2R3RzQm5ha1FzUWtyWFhTIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 5
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "use the function range to generate a list of number between 0 and 100 incremented by 10"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| Generate a list of numbers from 0 to 100 incremented by 10\nlet numbers = range 0 101 10..\nprint numbers..\n\n\n\n```"
+      }
+    ],
+    "code": "| Generate a list of numbers from 0 to 100 incremented by 10\nlet numbers = range 0 101 10..\nprint numbers..",
+    "explanation": "Short L0002 program with 2 operations that manipulates data.",
     "expected_output": "Output depends on execution",
     "lang": "0002",
-    "task_id": "eyJ0YXNrSWRzIjpbIjZMWHJLQndwWlpBU0VhYXptbFZ0Il19",
-    "code_source": "task_code_field",
+    "task_id": "eyJ0YXNrSWRzIjpbIkVmb3dUMm5RdFZQRFlIRDRySXBSIl19",
+    "code_source": "help_message_code",
     "usage_count": 1,
     "pair_count": 1
   },
@@ -43,19 +95,19 @@
     "messages": [
       {
         "role": "user",
-        "content": "print a list of integers between 1 and 10"
+        "content": "get the value of binding 'x' from and object that contains 'x'"
       },
       {
         "role": "assistant",
-        "content": "```l0002\n| Here is the corrected code to print a list of integers between 1 and 10:\n\nlet numbers = range 1 11 1..\nprint numbers..\n```"
+        "content": "```graffiticode\n| Get the value of a binding (field) in a record\nlet obj = {x: 42 y: \"hello\"}..\nprint get \"x\" obj..\n```"
       }
     ],
-    "code": "{\"3\":{\"elts\":[\"1\"],\"tag\":\"NUM\"},\"4\":{\"elts\":[\"11\"],\"tag\":\"NUM\"},\"8\":{\"coord\":{\"from\":90,\"to\":95},\"elts\":[3,4,3],\"tag\":\"RANGE\"},\"10\":{\"coord\":{\"from\":105,\"to\":110},\"elts\":[8],\"tag\":\"PRINT\"},\"12\":{\"elts\":[10],\"tag\":\"EXPRS\"},\"13\":{\"elts\":[12],\"tag\":\"PROG\"},\"root\":13}",
-    "explanation": "Simple L0002 code that executes an operation.",
+    "code": "| Get the value of a binding (field) in a record\nlet obj = {x: 42 y: \"hello\"}..\nprint get \"x\" obj..",
+    "explanation": "Short L0002 program with 2 operations that manipulates data.",
     "expected_output": "Output depends on execution",
     "lang": "0002",
-    "task_id": "eyJ0YXNrSWRzIjpbIlI1elpWakhDU2RNYzFnMGdjRlF6Il19",
-    "code_source": "task_code_field",
+    "task_id": "eyJ0YXNrSWRzIjpbIkZQQ3F1T1FYT3NkQmd2bmhtY3ROIl19",
+    "code_source": "help_message_code",
     "usage_count": 1,
     "pair_count": 1
   },
@@ -63,19 +115,19 @@
     "messages": [
       {
         "role": "user",
-        "content": "print fizzbuzz"
+        "content": "write a program that prints hello world. make sure to delineate comment with the line comment token |"
       },
       {
         "role": "assistant",
-        "content": "```l0002\n| Define a function to convert a number to a FizzBuzz string\nlet fizzbuzz = <n:\n  if eq (mod n 15) 0 then\n    \"FizzBuzz\" \n  else if eq (mod n 3) 0 then\n    \"Fizz\"\n  else if eq (mod n 5) 0 then \n    \"Buzz\"\n  else\n    concat \"\" n\n>..\n\n| Generate a list of numbers from 1 to 100\nlet numbers = range 1 100 1..\n\n| Convert each number to its FizzBuzz string \nlet result = map (fizzbuzz) numbers..\n\n| Print out the FizzBuzz sequence\nprint (concat \", \" result)..\n```"
+        "content": "```graffiticode\nlet main = <: print \"Hello, world!\">..\nmain..\"\n```"
       }
     ],
-    "code": "{\"2\":{\"elts\":[\"n\"],\"tag\":\"IDENT\"},\"6\":{\"elts\":[\"15\"],\"tag\":\"NUM\"},\"9\":{\"elts\":[\"0\"],\"tag\":\"NUM\"},\"16\":{\"elts\":[\"3\"],\"tag\":\"NUM\"},\"25\":{\"elts\":[\"5\"],\"tag\":\"NUM\"},\"36\":{\"elts\":[2],\"tag\":\"LIST\"},\"37\":{\"elts\":[],\"tag\":\"LIST\"},\"38\":{\"elts\":[0],\"tag\":\"LIST\"},\"43\":{\"elts\":[\"1\"],\"tag\":\"NUM\"},\"44\":{\"elts\":[\"100\"],\"tag\":\"NUM\"},\"53\":{\"coord\":{\"from\":280,\"to\":285},\"elts\":[43,44,43],\"tag\":\"RANGE\"},\"60\":{\"elts\":[\"FizzBuzz\"],\"tag\":\"STR\"},\"65\":{\"elts\":[\"Fizz\"],\"tag\":\"STR\"},\"70\":{\"elts\":[\"Buzz\"],\"tag\":\"STR\"},\"77\":{\"elts\":[2,25],\"tag\":\"MOD\"},\"78\":{\"elts\":[77],\"tag\":\"PAREN\"},\"79\":{\"elts\":[78,9],\"tag\":\"EQ\"},\"81\":{\"elts\":[79,70,2],\"tag\":\"IF\"},\"82\":{\"elts\":[2,16],\"tag\":\"MOD\"},\"83\":{\"elts\":[82],\"tag\":\"PAREN\"},\"84\":{\"elts\":[83,9],\"tag\":\"EQ\"},\"85\":{\"elts\":[84,65,81],\"tag\":\"IF\"},\"86\":{\"elts\":[2,6],\"tag\":\"MOD\"},\"87\":{\"elts\":[86],\"tag\":\"PAREN\"},\"88\":{\"elts\":[87,9],\"tag\":\"EQ\"},\"89\":{\"elts\":[88,60,85],\"tag\":\"IF\"},\"90\":{\"elts\":[36,89,37,38],\"tag\":\"LAMBDA\"},\"91\":{\"elts\":[90],\"tag\":\"PAREN\"},\"92\":{\"coord\":{\"from\":356,\"to\":359},\"elts\":[91,53],\"tag\":\"MAP\"},\"94\":{\"coord\":{\"from\":416,\"to\":421},\"elts\":[92],\"tag\":\"PRINT\"},\"96\":{\"elts\":[94],\"tag\":\"EXPRS\"},\"97\":{\"elts\":[96],\"tag\":\"PROG\"},\"root\":97}",
-    "explanation": "Simple L0002 code that executes an operation.",
-    "expected_output": "Output depends on execution",
+    "code": "let main = <: print \"Hello, world!\">..\nmain..\"",
+    "explanation": "Short L0002 program with 3 operations that manipulates data.",
+    "expected_output": "main = <function>",
     "lang": "0002",
-    "task_id": "eyJ0YXNrSWRzIjpbIllSQUV3eE1Yd0NueEo0RmFVeVFKIl19",
-    "code_source": "task_code_field",
+    "task_id": "eyJ0YXNrSWRzIjpbIkkzT1I3SmpkRkdIeEQybTgxRnZ6Il19",
+    "code_source": "help_message_code",
     "usage_count": 1,
     "pair_count": 1
   },
@@ -83,19 +135,199 @@
     "messages": [
       {
         "role": "user",
-        "content": "print hello world"
+        "content": "reduce a list of ten integers into the sum of their values"
       },
       {
         "role": "assistant",
-        "content": "```l0002\nlet hello = <name: print concat [\"Hello, \" name]>..\nhello \"world\"..\n```"
+        "content": "```graffiticode\n| Define a list of 10 integers\nlet numbers = [5 12 8 23 1 9 18 7 4 11]..\n\n| Use reduce to sum the values\n| The lambda takes an accumulator and the current number \n| It returns the accumulator plus the current number\nlet sum = reduce (<acc num: add acc num>) 0 numbers..\n\n| Print the final sum\nprint sum..\n```"
       }
     ],
-    "code": "{\"18\":{\"elts\":[\"Hello, \"],\"tag\":\"STR\"},\"23\":{\"elts\":[\"world\"],\"tag\":\"STR\"},\"24\":{\"elts\":[18,23],\"tag\":\"LIST\"},\"25\":{\"elts\":[24],\"tag\":\"CONCAT\"},\"26\":{\"elts\":[25],\"tag\":\"PRINT\"},\"28\":{\"elts\":[26],\"tag\":\"EXPRS\"},\"29\":{\"elts\":[28],\"tag\":\"PROG\"},\"root\":29}",
+    "code": "| Define a list of 10 integers\nlet numbers = [5 12 8 23 1 9 18 7 4 11]..\n\n| Use reduce to sum the values\n| The lambda takes an accumulator and the current number \n| It returns the accumulator plus the current number\nlet sum = reduce (<acc num: add acc num>) 0 numbers..\n\n| Print the final sum\nprint sum..",
+    "explanation": "Short L0002 program with 3 operations that manipulates data.",
+    "expected_output": "sum = [computed value]",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbIko1ZFQ0TmI5bFlFOVNYMElzRmhZIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "write a program that computes the overtime payroll for a company with the following employee data: \nlet employees = [\n  { name: \"Alice\", wage: 15, hours: 35 }\n  { name: \"Bob\", wage: 20, hours: 50 } \n  { name: \"Charlie\", wage: 18, hours: 40 }\n]..\n"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\nlet add2 = <[a b]: add a b>..\n\n| Function to calculate an employee's pay including overtime\nlet calculatePay = <\n  employee: \n    let regularHours =\n      if lt get employee \"hours\" 40 \n        then get employee \"hours\" \n        else 40..\n  let overtimeHours =\n    if gt get employee \"hours\" 40\n      then sub get employee \"hours\" 40\n      else 0..\n  let regularPay =\n    mul get employee \"wage\" regularHours..\n  let overtimePay =\n    mul mul get employee \"wage\" 1.5 overtimeHours..\n  add regularPay overtimePay\n>..\n\n| Function to calculate total payroll for all employees\nlet calculatePayroll = <employees:\n  let payAmounts = map (calculatePay) employees..\n  reduce (add2) 0 payAmounts\n>..\n\n| Employee data\nlet employees = [\n  { name: \"Alice\", wage: 15, hours: 35 }\n  { name: \"Bob\", wage: 20, hours: 50 } \n  { name: \"Charlie\", wage: 18, hours: 40 }\n]..\n\n| Calculate the total payroll\nlet totalPayroll = calculatePayroll employees..\nprint totalPayroll..\n```"
+      }
+    ],
+    "code": "let add2 = <[a b]: add a b>..\n\n| Function to calculate an employee's pay including overtime\nlet calculatePay = <\n  employee: \n    let regularHours =\n      if lt get employee \"hours\" 40 \n        then get employee \"hours\" \n        else 40..\n  let overtimeHours =\n    if gt get employee \"hours\" 40\n      then sub get employee \"hours\" 40\n      else 0..\n  let regularPay =\n    mul get employee \"wage\" regularHours..\n  let overtimePay =\n    mul mul get employee \"wage\" 1.5 overtimeHours..\n  add regularPay overtimePay\n>..\n\n| Function to calculate total payroll for all employees\nlet calculatePayroll = <employees:\n  let payAmounts = map (calculatePay) employees..\n  reduce (add2) 0 payAmounts\n>..\n\n| Employee data\nlet employees = [\n  { name: \"Alice\", wage: 15, hours: 35 }\n  { name: \"Bob\", wage: 20, hours: 50 } \n  { name: \"Charlie\", wage: 18, hours: 40 }\n]..\n\n| Calculate the total payroll\nlet totalPayroll = calculatePayroll employees..\nprint totalPayroll..",
+    "explanation": "L0002 program that transforms each element in a collection.",
+    "expected_output": "add2 = <function>",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbIktvYUgwQ0Y2Qk9DQzJsdTRhY0hpIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "write a program that computes the overtime payroll for a company with the following employee data: [ { name: \"Alice\", wage: 15, hours: 35 } { name: \"Bob\", wage: 20, hours: 50 } { name: \"Charlie\", wage: 18, hours: 40 } ]"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| Function to calculate overtime pay for an employee\nlet overtimePay = <acc employee:\n  let wage = get employee \"wage\"..\n  let hours = get employee \"hours\"..\n  let regularPay = mul wage (min hours 40)..\n  let overtimeHours = max 0 (sub hours 40)..\n  let overtimeRate = mul 1.5 wage..\n  let overtimePay = mul overtimeHours overtimeRate..\n  let name = get employee \"name\"..\n  set acc name add regularPay overtimePay\n>..\n\n| Calculate overtime pay for each employee  \nlet payroll = reduce (overtimePay) {} [\n  {name: \"Alice\" wage: 15 hours: 35}\n  {name: \"Bob\" wage: 20 hours: 50}\n  {name: \"Charlie\" wage: 18 hours: 40}  \n]..\n\n| Print the payroll\nprint payroll..\n```"
+      }
+    ],
+    "code": "| Function to calculate overtime pay for an employee\nlet overtimePay = <acc employee:\n  let wage = get employee \"wage\"..\n  let hours = get employee \"hours\"..\n  let regularPay = mul wage (min hours 40)..\n  let overtimeHours = max 0 (sub hours 40)..\n  let overtimeRate = mul 1.5 wage..\n  let overtimePay = mul overtimeHours overtimeRate..\n  let name = get employee \"name\"..\n  set acc name add regularPay overtimePay\n>..\n\n| Calculate overtime pay for each employee  \nlet payroll = reduce (overtimePay) {} [\n  {name: \"Alice\" wage: 15 hours: 35}\n  {name: \"Bob\" wage: 20 hours: 50}\n  {name: \"Charlie\" wage: 18 hours: 40}  \n]..\n\n| Print the payroll\nprint payroll..",
+    "explanation": "L0002 program that aggregates values from a collection.",
+    "expected_output": "overtimePay = <function>",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbIlFia3V0bk4yOFdtanB3QzZqWFJkIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "use the builtin function filter to filter a list of even numbers between 0 and 100 so that only tenth value is remaining. print the result"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| Function to check if a number is a multiple of 10\nlet isMultipleOfTen = <x: eq mod x 10 0>..\n\n| Generate a list of even numbers from 0 to 100\nlet evens = range 0 101 2..\n\n| Filter the even numbers to only multiples of 10\nlet tens = filter (isMultipleOfTen) evens..\n\n| Print the resulting list\nprint tens..\n```"
+      }
+    ],
+    "code": "| Function to check if a number is a multiple of 10\nlet isMultipleOfTen = <x: eq mod x 10 0>..\n\n| Generate a list of even numbers from 0 to 100\nlet evens = range 0 101 2..\n\n| Filter the even numbers to only multiples of 10\nlet tens = filter (isMultipleOfTen) evens..\n\n| Print the resulting list\nprint tens..",
+    "explanation": "L0002 program that filters elements from a collection.",
+    "expected_output": "isMultipleOfTen = <function>",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbImhxdzVnWE5SWHMyNmVucFhiOGJGIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "add 3 to a list of ten integers and print the result"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| Generate a list of integers from 1 to 10\nlet numbers = range 1 10 1..\n\n| Function to add 3 to a number \nlet add3 = <x: add x 3>..\n\n| Apply add3 to each number in the list\nlet result = map (add3) numbers..\n\n| Print the resulting list\nprint result..\n```"
+      }
+    ],
+    "code": "| Generate a list of integers from 1 to 10\nlet numbers = range 1 10 1..\n\n| Function to add 3 to a number \nlet add3 = <x: add x 3>..\n\n| Apply add3 to each number in the list\nlet result = map (add3) numbers..\n\n| Print the resulting list\nprint result..",
+    "explanation": "L0002 program that transforms each element in a collection.",
+    "expected_output": "result = [computed value]",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbImpsSWU2WUdTQktYellBSkJuSEVRIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "print the message 'hello, world!'"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| print the message 'hello, world!'\nprint 'hello, world!'..\n```"
+      }
+    ],
+    "code": "| print the message 'hello, world!'\nprint 'hello, world!'..",
     "explanation": "Simple L0002 code that executes an operation.",
     "expected_output": "Output depends on execution",
     "lang": "0002",
-    "task_id": "eyJ0YXNrSWRzIjpbIm1rOWpCWVdvY244UUJPbE1UcVhqIl19",
-    "code_source": "task_code_field",
+    "task_id": "eyJ0YXNrSWRzIjpbInFuUllPSEtWRkJWWmNZUlVpenNCIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "write me a program that uses tags to represent the colors blue, red and green. use a case of expression to distinguish between those tags"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| Function to get color name from tag\nlet colorName = <color:\n  case color of\n    Blue: \"blue\"\n    Red: \"red\" \n    Green: \"green\"\n    _: \"unknown\"\n  end  \n>..\n\n| Example usage\nlet favoriteColor = Blue..\nprint `Your favorite color is ${colorName favoriteColor}.`..\n```"
+      }
+    ],
+    "code": "| Function to get color name from tag\nlet colorName = <color:\n  case color of\n    Blue: \"blue\"\n    Red: \"red\" \n    Green: \"green\"\n    _: \"unknown\"\n  end  \n>..\n\n| Example usage\nlet favoriteColor = Blue..\nprint `Your favorite color is ${colorName favoriteColor}.`..",
+    "explanation": "Short L0002 program with 3 operations that manipulates data.",
+    "expected_output": "colorName = <function>",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbInJ4MGFSMmJnQzF1ZjVEMXI5cTlVIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "create an record with field named foo to 10 and then set another field named bar to 20"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\nlet obj = {foo: 10}..\nset \"bar\" 20 obj..\n..\n```"
+      }
+    ],
+    "code": "let obj = {foo: 10}..\nset \"bar\" 20 obj..\n..",
+    "explanation": "Short L0002 program with 2 operations that manipulates data.",
+    "expected_output": "Output depends on execution",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbInVid21xa25weFdWd0M0aUdCTENnIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "write fizzbuzz and print the result"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\nlet fizzBuzz = <n:\n  if eq 0 mod n 15 then \"FizzBuzz\"\n  else if eq 0 mod n 3 then \"Fizz\"\n  else if eq 0 mod n 5 then \"Buzz\"\n  else n\n>..\nlet numbers = range 1 101 1..\nlet result = map (fizzBuzz) numbers..\nprint result..\n```"
+      }
+    ],
+    "code": "let fizzBuzz = <n:\n  if eq 0 mod n 15 then \"FizzBuzz\"\n  else if eq 0 mod n 3 then \"Fizz\"\n  else if eq 0 mod n 5 then \"Buzz\"\n  else n\n>..\nlet numbers = range 1 101 1..\nlet result = map (fizzBuzz) numbers..\nprint result..",
+    "explanation": "L0002 program that transforms each element in a collection.",
+    "expected_output": "result = [computed value]",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbIncwWlRSVFZlZDJtUDNMOHlCOGlsIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "use the builtin function filter to filter a list of even numbers between 0 and 100 so that only tenth value is remaining. print the result"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\n| Function to check if a number is a multiple of 10\nlet isMultipleOfTen = <x: eq mod x 10 0>..\n\n| Generate a list of even numbers from 0 to 100\nlet evens = range 0 101 2..\n\n| Filter the even numbers to only multiples of 10\nlet tens = filter (isMultipleOfTen) evens..\n\n| Print the resulting list\nprint tens..\n```"
+      }
+    ],
+    "code": "| Function to check if a number is a multiple of 10\nlet isMultipleOfTen = <x: eq mod x 10 0>..\n\n| Generate a list of even numbers from 0 to 100\nlet evens = range 0 101 2..\n\n| Filter the even numbers to only multiples of 10\nlet tens = filter (isMultipleOfTen) evens..\n\n| Print the resulting list\nprint tens..",
+    "explanation": "L0002 program that filters elements from a collection.",
+    "expected_output": "isMultipleOfTen = <function>",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbInlxUFJXY3VEMnNDMjcydnB2SWVVIl19",
+    "code_source": "help_message_code",
     "usage_count": 1,
     "pair_count": 1
   }

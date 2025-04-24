@@ -34,10 +34,57 @@
  *   node scripts/generate-training-examples.js --lang 0002 --mark 2
  */
 
-const fs = require('fs');
-const path = require('path');
-const admin = require('firebase-admin');
-const fetch = require('node-fetch');
+//const fs = require('fs');
+import fs from "fs";
+//const path = require('path');
+import path from "path";
+//const admin = require('firebase-admin');
+import admin from "firebase-admin";
+//const fetch = require('node-fetch');
+import fetch from "node-fetch";
+//const bent = require('bent');
+import bent from "bent";
+
+const {
+  GC_API_KEY_ID,
+  GC_API_KEY_SECRET,
+  GC_AUTH_URL = "https://auth.graffiticode.org",
+  GC_API_URL = "https://api.graffiticode.org",
+} = process.env;
+
+const postAuthJSON = bent(GC_AUTH_URL, "POST", "json", 200, 401);
+const getApiJSON = bent(GC_API_URL, "GET", "json", 200, 400);
+
+let currentTokenPromise = null;
+const getAccessToken = () => {
+  if (!currentTokenPromise) {
+    console.log("Retrieving access token");
+    currentTokenPromise = Promise.resolve()
+      .then(() => postAuthJSON(
+        `/v1/api-keys/${GC_API_KEY_ID}/authenticate`,
+        { token: GC_API_KEY_SECRET }
+      ))
+      .then(({ data }) => {
+        console.log(
+          "getAccessToken()",
+          "GC_AUTH_URL=" + GC_AUTH_URL,
+          "data=" + JSON.stringify(data, null, 2),
+        );
+        if (data) {
+          const { accessToken } = data;
+          const { exp } = JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString("utf8"));
+          setTimeout(() => {
+            currentTokenPromise = null;
+            console.log("Cleared access token that is about to expire.");
+          }, exp * 1000 - Date.now() - 1000);
+          return accessToken;
+        } else {
+          return null;
+        }
+      });
+  }
+  return currentTokenPromise;
+};
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -92,7 +139,7 @@ const taskCollection = args.includes('--task-collection')
 // GraphQL API settings
 const authToken = args.includes('--token')
   ? args[args.indexOf('--token') + 1]
-  : null;
+  : await getAccessToken();
 
 const graphqlEndpoint = args.includes('--graphql-endpoint')
   ? args[args.indexOf('--graphql-endpoint') + 1]
@@ -411,43 +458,7 @@ async function main() {
             console.log(`Successfully fetched ${tasks.length} tasks using GraphQL for L${lang}`);
           } catch (error) {
             console.error(`Error fetching tasks with GraphQL for L${lang}:`, error.message);
-            console.log('Falling back to Firebase Admin SDK');
             tasks = [];
-          }
-        }
-        
-        // If GraphQL failed or no token, fallback to Firebase Admin SDK
-        if (tasks.length === 0 && !authToken) {
-          console.log(`Using Firebase Admin SDK to fetch tasks for L${lang}`);
-          const db = admin.firestore();
-          
-          // Build query for the specific language and mark
-          const taskQuery = db.collection(userTasksPath)
-            .where('lang', '==', lang)
-            .where('mark', '==', markValue)
-            .limit(limit);
-          
-          const taskSnapshot = await taskQuery.get();
-          
-          // Convert Firebase documents to similar format as GraphQL results
-          if (!taskSnapshot.empty) {
-            tasks = taskSnapshot.docs.map(doc => {
-              const data = doc.data();
-              return {
-                id: doc.id,
-                lang: data.lang,
-                src: data.src || '',
-                code: data.code || '',
-                help: data.help || '[]',
-                isPublic: data.isPublic,
-                created: data.created ? data.created.toString() : '',
-                name: data.name,
-                mark: data.mark
-              };
-            });
-            console.log(`Successfully fetched ${tasks.length} tasks using Firebase for L${lang}`);
-          } else {
-            console.log(`No tasks found for L${lang} with mark ${markValue} in Firebase`);
           }
         }
         
@@ -480,44 +491,21 @@ async function main() {
           }
           
           statistics.tasksWithHelpArray++;
-          console.log(`Processing task ${taskId} with ${help.length} help messages`);
+          console.log(
+            `Processing task ${taskId} with ${help.length} help messages`,
+            console.log("help=" + JSON.stringify(help, null, 2)),
+          );
           
           // Get the code from the task
           let code = "";
           let codeSource = "";
           
-          // Try multiple fields for code
-          if (task.code && typeof task.code === 'string' && task.code.trim().length >= 10) {
-            try {
-              // If code is JSON string, parse it
-              const parsedCode = JSON.parse(task.code);
-              code = typeof parsedCode === 'string' ? parsedCode.trim() : JSON.stringify(parsedCode);
-              codeSource = "task_code_field";
-            } catch (e) {
-              // If not valid JSON, use as is
-              code = task.code.trim();
-              codeSource = "task_code_field";
-            }
-          } else if (task.src && typeof task.src === 'string' && task.src.trim().length >= 10) {
-            code = task.src.trim();
-            codeSource = "task_src_field";
-          } else if (task.source && typeof task.source === 'string' && task.source.trim().length >= 10) {
-            code = task.source.trim();
-            codeSource = "task_source_field";
-          } else if (task.content && typeof task.content === 'string' && task.content.trim().length >= 10) {
-            code = task.content.trim();
-            codeSource = "task_content_field";
-          }
-          
-          // If code not found in task fields, look for it in the help messages
-          if (!code) {
-            for (const message of help) {
-              if (message.type === 'bot' && message.help && message.help.type === 'code' &&
-                  message.help.text && message.help.text.trim().length >= 10) {
-                code = message.help.text.trim();
-                codeSource = "help_message_code";
-                break;
-              }
+          for (const message of help) {
+            if (message.type === 'bot' && message.help && message.help.type === 'code' &&
+                message.help.text && message.help.text.trim().length >= 10) {
+              code = message.help.text.trim();
+              codeSource = "help_message_code";
+              break;
             }
           }
           
@@ -613,6 +601,11 @@ async function main() {
         continue;
       }
     }
+
+    console.log(
+      "main",
+      "trainingExamples=" + JSON.stringify(trainingExamples, null, 2),
+    );
     
     // Print detailed statistics report
     console.log('\n===== FINAL STATISTICS =====');
