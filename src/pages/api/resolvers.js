@@ -239,14 +239,14 @@ export async function generateCode({ auth, prompt, language, options }) {
     console.log(
       "generateCode()",
       "prompt=", prompt.substring(0, 50) + (prompt.length > 50 ? "..." : ""),
-      "language=", language || "graffiticode"
+      "language=", language,
     );
 
     // Call the code generation service to generate Graffiticode
     const result = await codeGenerationService({
       auth,
       prompt,
-      language,
+      lang: language,
       options: {
         model: options?.model,
         temperature: options?.temperature,

@@ -4,7 +4,7 @@ import { generateCode } from "../utils/swr/fetchers";
 /**
  * Function to generate Graffiticode responses using the generateCode function
  */
-const generateBotResponse = async (message, user) => {
+const generateBotResponse = async ({message, user, language}) => {
   try {
     // Use our fetcher function directly
     console.log(
@@ -17,7 +17,8 @@ const generateBotResponse = async (message, user) => {
       options: {
         temperature: 0.2,
         maxTokens: 2000
-      }
+      },
+      language,
     });
 
     // Transform the response to match our expected format
@@ -69,7 +70,7 @@ greeting "user"..`,
 /**
  * ChatBot component that provides a chat interface
  */
-export const ChatBot = ({ onSendMessage, user }) => {
+export const ChatBot = ({ onSendMessage, user, language }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSendMessage = useCallback(async (message) => {
@@ -78,7 +79,7 @@ export const ChatBot = ({ onSendMessage, user }) => {
     setIsLoading(true);
     try {
       // Get response from the bot, passing the accessToken if available
-      const response = await generateBotResponse(message, user);
+      const response = await generateBotResponse({message, user, language});
 
       // Send the user message and bot response to the parent component
       onSendMessage(message, response);

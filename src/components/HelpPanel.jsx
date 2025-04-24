@@ -44,6 +44,7 @@ export const HelpPanel = ({
       handleMessage(userMessage, botResponse);
     },
     user,
+    language,
   });
 
   // // Custom function to handle code generation specifically

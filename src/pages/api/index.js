@@ -101,7 +101,11 @@ const resolvers = {
       const { uid } = await client.verifyToken(token);
       const auth = {uid, token};
       const { prompt, language, options } = args;
-      console.log("generateCode mutation called", prompt.substring(0, 30) + "...");
+      console.log(
+        "generateCode mutation called",
+        "language=" + language,
+        "prompt=" + prompt.substring(0, 30) + "...",
+      );
 
       try {
         // No authentication required for code generation

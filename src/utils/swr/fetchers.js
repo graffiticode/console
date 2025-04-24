@@ -230,6 +230,10 @@ export const loadGraphiQL = async ({ user }) => {
  * @returns {Promise<Object>} - Generated code and metadata
  */
 export const generateCode = async ({ user, prompt, language, options }) => {
+  console.log(
+    "fetchers/generateCode()",
+    "language=" + language,
+  );
   if (!user) {
     return {};
   }

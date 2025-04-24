@@ -25,31 +25,31 @@ export default async function handler(req, res) {
   try {
     // Get query parameters
     const { language, limit = 10, offset = 0 } = req.query;
-    
+
     const db = getFirestoreDb();
     const trainingCollRef = db.collection('training_examples');
-    
+
     // Build query
     let query = trainingCollRef;
-    
+
     // Filter by language if provided
     if (language) {
       // Extract language code (e.g., "0002" from "L0002")
-      const langCode = language.startsWith('L') 
-        ? language.substring(1) 
+      const langCode = language.startsWith('L')
+        ? language.substring(1)
         : language;
-        
+
       query = query.where('lang', '==', langCode);
     }
-    
+
     // Apply pagination
     query = query.orderBy('createdAt', 'desc')
       .limit(parseInt(limit))
       .offset(parseInt(offset));
-    
+
     // Execute query
     const snapshot = await query.get();
-    
+
     // Process results
     const examples = [];
     snapshot.forEach(doc => {
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
         createdAt: doc.data().createdAt?.toDate().toISOString() || null
       });
     });
-    
+
     // Get total count (for pagination)
     let totalCount = 0;
     if (language) {
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
       const countSnapshot = await trainingCollRef.count().get();
       totalCount = countSnapshot.data().count;
     }
-    
+
     return res.status(200).json({
       success: true,
       data: {
@@ -86,8 +86,8 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Error retrieving training examples:', error);
-    return res.status(500).json({ 
-      success: false, 
+    return res.status(500).json({
+      success: false,
       message: 'Failed to retrieve training examples',
       error: error.message
     });

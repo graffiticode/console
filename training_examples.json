@@ -3,6 +3,86 @@
     "messages": [
       {
         "role": "user",
+        "content": "create a 2 by 2 spreadsheet with the cell names as the cell values"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\ncolumns {\n  A: {\n    width: 50,\n    justify: \"center\",\n  },\n  B: {\n    width: 50,\n    justify: \"center\",\n  },\n}\ncells {\n  A1: {\n    text: \"A1\",\n  },\n  A2: {\n    text: \"A2\",\n  },\n  B1: {\n    text: \"B1\",\n  },\n  B2: {\n    text: \"B2\",\n  },\n}\n{}..\n```"
+      }
+    ],
+    "code": "columns {\n  A: {\n    width: 50,\n    justify: \"center\",\n  },\n  B: {\n    width: 50,\n    justify: \"center\",\n  },\n}\ncells {\n  A1: {\n    text: \"A1\",\n  },\n  A2: {\n    text: \"A2\",\n  },\n  B1: {\n    text: \"B1\",\n  },\n  B2: {\n    text: \"B2\",\n  },\n}\n{}..",
+    "explanation": "Simple L0165 code that executes an operation.",
+    "expected_output": "Output depends on execution",
+    "lang": "0165",
+    "task_id": "eyJ0YXNrSWRzIjpbIjM4eEJUMXBBNFdKQzZYUmp6VHB5Il19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "add two number"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\nlet add2 = <x y: add x y>..\n\nlet result = add2 4 5..\n\nprint result..\n```"
+      }
+    ],
+    "code": "let add2 = <x y: add x y>..\n\nlet result = add2 4 5..\n\nprint result..",
+    "explanation": "Short L0002 program with 3 operations that manipulates data.",
+    "expected_output": "result = [computed value]",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbIjR0Z2psa0dCckhOelFRbE9KWGl0Il19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "print fizzbuzz"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\n| Define a function to convert a number to a FizzBuzz string\nlet fizzbuzz = <n:\n  case mod n 15 of \n    0: \"FizzBuzz\"\n    case mod n 3 of\n      0: \"Fizz\" \n      case mod n 5 of\n        0: \"Buzz\"\n        _: concat \"\" n\n      end\n    end \n  end\n>..\\n\n\n| Generate a list of numbers from 1 to 100\nlet numbers = range 1 101 1..\n\n| Convert each number to its FizzBuzz string\nlet result = map (fizzbuzz) numbers..\n\n| Print out the FizzBuzz sequence \nprint result..\n```"
+      }
+    ],
+    "code": "| Define a function to convert a number to a FizzBuzz string\nlet fizzbuzz = <n:\n  case mod n 15 of \n    0: \"FizzBuzz\"\n    _: case mod n 3 of\n      0: \"Fizz\" \n      _: case mod n 5 of\n        0: \"Buzz\"\n        _: n\n      end\n    end \n  end\n>..\n\n| Generate a list of numbers from 1 to 100\nlet numbers = range 1 101 1..\n\n| Convert each number to its FizzBuzz string\nlet result = map (fizzbuzz) numbers..\n\n| Print out the FizzBuzz sequence \nprint result..",
+    "explanation": "L0002 program that transforms each element in a collection.",
+    "expected_output": "result = [computed value]",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbIjZMWHJLQndwWlpBU0VhYXptbFZ0Il19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "print a list of integers between 1 and 10"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\n| Here is the corrected code to print a list of integers between 1 and 10:\n\nlet numbers = range 1 11 1..\nprint numbers..\n```"
+      }
+    ],
+    "code": "| Here is the corrected code to print a list of integers between 1 and 10:\n\nlet numbers = range 1 11 1..\nprint numbers..",
+    "explanation": "Short L0002 program with 2 operations that manipulates data.",
+    "expected_output": "Output depends on execution",
+    "lang": "0002",
+    "task_id": "eyJ0YXNrSWRzIjpbIlI1elpWakhDU2RNYzFnMGdjRlF6Il19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
         "content": "print fizzbuzz"
       },
       {
@@ -23,18 +103,38 @@
     "messages": [
       {
         "role": "user",
-        "content": "add two number"
+        "content": "print hello world"
       },
       {
         "role": "assistant",
-        "content": "```l0002\nlet add2 = <x y: add x y>..\n\nlet result = add2 4 5..\n\nprint result..\n```"
+        "content": "```l0002\nlet hello = <name: print concat [\"Hello, \" name]>..\nhello \"world\"..\n```"
       }
     ],
-    "code": "print 'foo'..",
-    "explanation": "Simple L0002 code that executes an operation.",
-    "expected_output": "Output depends on execution",
+    "code": "let hello = <name: print concat [\"Hello, \" name]>..\nhello \"world\"..",
+    "explanation": "Short L0002 program with 2 operations that manipulates data.",
+    "expected_output": "hello = <function>",
     "lang": "0002",
-    "task_id": "eyJ0YXNrSWRzIjpbInhjYmh0VzQwbXppRmdBYkdDVG1WIl19",
+    "task_id": "eyJ0YXNrSWRzIjpbIm1rOWpCWVdvY244UUJPbE1UcVhqIl19",
+    "code_source": "task_src_field",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "create a spreadsheet that assesses a students ability to construct a table that reflects the values below. rows may be in any order.\n{\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000\",\n  B2: \"325000\",\n  B3: \"26000\",\n  B4: \"875000\",\n}"
+      },
+      {
+        "role": "assistant",
+        "content": "```l0002\ntable \n  rows {\n    \"*\": {\n      assess: {\n        index: \"A\",\n        order: \"actual\", | \"expected\", \"asc\", \"desc\"\n      }\n    }\n  }\n  columns {\n    A: {\n      width: 200,\n      justify: \"left\",\n    },\n    B: {\n      width: 100,\n      format: \"Currency\",\n    },\n  }\n  cells {\n    A1: {\n      text: \"{{A1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A1}}\",\n        }\n      }\n    },\n    A2: {\n      text: \"{{A2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A2}}\",\n        }\n      }\n    },\n    A3: {\n      text: \"{{A3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A3}}\",\n        }\n      }\n    },\n    A4: {\n      text: \"{{A4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A4}}\",\n        }\n      }\n    },\n    B1: {\n      text: \"{{B1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B1}}\",\n        }\n      }\n    },\n    B2: {\n      text: \"{{B2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B2}}\"\n        }\n      }\n    },\n    B3: {\n      text: \"{{B3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B3}}\",\n        }\n      }      \n    }\n    B4: {\n      text: \"{{B4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B4}}\",\n        }\n      }      \n    }\n  }\nparams {\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000\",\n  B2: \"325000\",\n  B3: \"26000\",\n  B4: \"875000\",\n}\n{}\n..\n```"
+      }
+    ],
+    "code": "table \n  rows {\n    \"*\": {\n      assess: {\n        index: \"A\",\n        order: \"actual\", | \"expected\", \"asc\", \"desc\"\n      }\n    }\n  }\n  columns {\n    A: {\n      width: 200,\n      justify: \"left\",\n    },\n    B: {\n      width: 100,\n      format: \"Currency\",\n    },\n  }\n  cells {\n    A1: {\n      text: \"{{A1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A1}}\",\n        }\n      }\n    },\n    A2: {\n      text: \"{{A2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A2}}\",\n        }\n      }\n    },\n    A3: {\n      text: \"{{A3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A3}}\",\n        }\n      }\n    },\n    A4: {\n      text: \"{{A4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A4}}\",\n        }\n      }\n    },\n    B1: {\n      text: \"{{B1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B1}}\",\n        }\n      }\n    },\n    B2: {\n      text: \"{{B2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B2}}\"\n        }\n      }\n    },\n    B3: {\n      text: \"{{B3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B3}}\",\n        }\n      }      \n    }\n    B4: {\n      text: \"{{B4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B4}}\",\n        }\n      }      \n    }\n  }\nparams {\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000\",\n  B2: \"325000\",\n  B3: \"26000\",\n  B4: \"875000\",\n}\n{}\n..",
+    "explanation": "Simple L0165 code that executes an operation.",
+    "expected_output": "Output depends on execution",
+    "lang": "0165",
+    "task_id": "eyJ0YXNrSWRzIjpbIm9LUVVpTGQzNnhuY0R6OEphN1NaIl19",
     "code_source": "task_src_field",
     "usage_count": 1,
     "pair_count": 1
