@@ -52,6 +52,44 @@ function getFirestoreDb() {
   }
 }
 
+/**
+ * Parse markdown training examples file into structured data
+ * @param {string} markdownContent - Content of the markdown file
+ * @returns {Array} Array of parsed examples
+ */
+function parseMarkdownExamples(markdownContent) {
+  try {
+    const examples = [];
+    // Split the content by sections
+    const sections = markdownContent.split('---');
+    
+    for (const section of sections) {
+      if (!section.trim()) continue;
+      
+      // Extract task and code from each section
+      const taskMatch = section.match(/###\s*Task\s*\n"([^"]+)"/);
+      const codeMatch = section.match(/###\s*Graffiticode\s*\n([\s\S]+?)(?=\n\n|$)/);
+      
+      if (taskMatch && codeMatch) {
+        examples.push({
+          task: taskMatch[1].trim(),
+          code: codeMatch[1].trim(),
+          // Create a messages array for compatibility with existing code
+          messages: [
+            { role: 'user', content: taskMatch[1].trim() },
+            { role: 'assistant', content: `\`\`\`\n${codeMatch[1].trim()}\n\`\`\`` }
+          ]
+        });
+      }
+    }
+    
+    return examples;
+  } catch (error) {
+    console.error('Error parsing markdown examples:', error);
+    return [];
+  }
+}
+
 async function getRelevantExamples({ prompt, lang, limit = 3 }) {
   console.log(
     "getRelevantExamples()",
@@ -61,51 +99,64 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
   try {
     console.log(`Getting relevant examples for language: ${lang}`);
 
-    // Import local training data
+    // Import local training data from markdown format
     const fs = require('fs');
     const path = require('path');
-    const localExamples = JSON.parse(
-      fs.readFileSync(
-        path.join(process.cwd(), `./training/l${lang}-training-examples.json`),
-        'utf8'
-      )
-    );
+    
+    let examples = [];
+    
+    // Try to load the markdown file first
+    const mdFilePath = path.join(process.cwd(), `./training/l${lang}-training-examples.md`);
+    
+    if (fs.existsSync(mdFilePath)) {
+      // Read and parse the markdown file
+      const markdownContent = fs.readFileSync(mdFilePath, 'utf8');
+      examples = parseMarkdownExamples(markdownContent);
+      console.log(`Loaded ${examples.length} examples from markdown file for L${lang}`);
+    } else {
+      // Fall back to JSON if markdown file doesn't exist
+      const jsonFilePath = path.join(process.cwd(), `./training/l${lang}-training-examples.json`);
+      if (fs.existsSync(jsonFilePath)) {
+        examples = JSON.parse(fs.readFileSync(jsonFilePath, 'utf8'));
+        console.log(`Loaded ${examples.length} examples from JSON file for L${lang}`);
+      } else {
+        console.warn(`No training examples file found for L${lang}`);
+        return [];
+      }
+    }
 
     // Simple keyword matching to find relevant examples
     const keywords = prompt.toLowerCase().split(/\s+/).filter(w => w.length > 3);
 
-    // Filter examples by language and score them based on keyword matches
-    const scoredExamples = (
-      localExamples
-        .filter(example => {
-          // If example has a lang field, match it; otherwise assume it's for the default language
-          const exampleLang = example.lang || "0002";
-          return exampleLang === lang;
-        })
-        .map(example => {
-          // For dialog-based examples, search through all message content
-          const textToSearch = example.messages
-            ? example.messages.map(m => m.content).join(' ').toLowerCase()
-            : (example.description || '').toLowerCase();
+    // Score examples based on keyword matches
+    const scoredExamples = examples.map(example => {
+      // For markdown examples, search through task and code
+      let textToSearch = '';
+      
+      if (example.task) {
+        // For markdown format
+        textToSearch = (example.task + ' ' + example.code).toLowerCase();
+      } else if (example.messages) {
+        // For dialog-based examples in JSON format
+        textToSearch = example.messages.map(m => m.content).join(' ').toLowerCase();
+      } else {
+        // Fallback for other formats
+        textToSearch = (example.description || '').toLowerCase();
+      }
 
-          const score = keywords.reduce((sum, keyword) => {
-            return sum + (textToSearch.includes(keyword) ? 1 : 0);
-          }, 0);
+      const score = keywords.reduce((sum, keyword) => {
+        return sum + (textToSearch.includes(keyword) ? 1 : 0);
+      }, 0);
 
-          return { ...example, score };
-        })
-    );
+      return { ...example, score };
+    });
 
     const topExamples = scoredExamples
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
 
-    console.log(
-      "getRelevantExamples",
-      "topExamples=" + JSON.stringify(topExamples, null, 2),
-    );
-
-    // Sort by relevance score and take the top examples
+    console.log(`Found ${topExamples.length} relevant examples for the prompt`);
+    
     return topExamples;
   } catch (error) {
     console.error('Error retrieving training examples:', error);
@@ -424,10 +475,17 @@ function generateExamplesSection(examples) {
   let examplesText = `\n\n## RELEVANT EXAMPLES:\n\n`;
 
   examples.forEach((example, i) => {
-    if (example.messages && Array.isArray(example.messages) && example.messages.length > 0) {
-      // Handle dialog-based examples
+    if (example.task && example.code) {
+      // Handle markdown-based examples (new format)
+      examplesText += `### Example ${i+1}: ${example.task}\n`;
+      examplesText += "Task: " + example.task + "\n\n";
+      examplesText += "```\n";
+      examplesText += example.code;
+      examplesText += "\n```\n\n";
+    } else if (example.messages && Array.isArray(example.messages) && example.messages.length > 0) {
+      // Handle dialog-based examples (legacy format)
       examplesText += `### Example ${i+1}: Dialog Interaction\n`;
-      examplesText += "Here's a relevant conversation about this type of task:\n\n";
+      examplesText += "Here's a relevant example of this type of task:\n\n";
 
       example.messages.forEach(message => {
         const roleLabel = message.role === 'user' ? 'User' : 'Assistant';
@@ -435,7 +493,7 @@ function generateExamplesSection(examples) {
       });
 
       // If we have code, also include it separately
-      if (example.code) {
+      if (example.code && !example.messages.some(m => m.content.includes(example.code))) {
         examplesText += "```\n";
         examplesText += example.code;
         examplesText += "\n```\n";
@@ -446,7 +504,7 @@ function generateExamplesSection(examples) {
         examplesText += `${example.explanation}\n\n`;
       }
     } else {
-      // Handle traditional examples
+      // Handle traditional examples (legacy format)
       examplesText += `### Example ${i+1}: ${example.description || 'Graffiticode Example'}\n`;
       examplesText += "```\n";
       examplesText += example.code;

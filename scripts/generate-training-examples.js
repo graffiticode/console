@@ -327,6 +327,82 @@ function generateExplanation(code, lang) {
   return explanation;
 }
 
+// Function to extract a task description from dialog messages
+function extractTaskFromMessages(messages) {
+  // Look for the first user message that seems to be a request for code
+  for (const message of messages) {
+    if (message.role === 'user') {
+      const content = message.content.trim();
+      
+      // Skip very short messages or those that are likely questions
+      if (content.length < 10 || content.endsWith('?')) {
+        continue;
+      }
+      
+      // Skip messages that are likely follow-up questions or clarifications
+      if (/^(can you|could you|please|how|what|why|when)/i.test(content)) {
+        continue;
+      }
+      
+      // Likely a task request
+      return content;
+    }
+  }
+  
+  // If no suitable message found, use the first user message if available
+  const firstUserMessage = messages.find(m => m.role === 'user');
+  if (firstUserMessage) {
+    return firstUserMessage.content.trim();
+  }
+  
+  // Fallback
+  return "Implement the following functionality";
+}
+
+// Function to convert training examples to the new markdown format
+function convertToMarkdownFormat(trainingExamples) {
+  let markdown = `# Graffiticode Training Examples\n\n`;
+  
+  // Group examples by language
+  const examplesByLang = {};
+  trainingExamples.forEach(example => {
+    const lang = example.lang;
+    if (!examplesByLang[lang]) {
+      examplesByLang[lang] = [];
+    }
+    examplesByLang[lang].push(example);
+  });
+  
+  // Process each language group
+  for (const [lang, examples] of Object.entries(examplesByLang)) {
+    markdown += `## Language L${lang}\n\n`;
+    
+    // Add each example in the new format
+    examples.forEach((example, index) => {
+      // Extract a meaningful task description from the messages
+      const task = extractTaskFromMessages(example.messages);
+      
+      // Clean up the code
+      const code = example.code.trim();
+      
+      markdown += `### Task\n"${task}"\n\n`;
+      markdown += `### Graffiticode\n${code}\n\n`;
+      
+      // Add separator between examples except after the last one
+      if (index < examples.length - 1) {
+        markdown += `---\n\n`;
+      }
+    });
+    
+    // Add separator between language sections except after the last one
+    if (Object.keys(examplesByLang).indexOf(lang) < Object.keys(examplesByLang).length - 1) {
+      markdown += `\n\n`;
+    }
+  }
+  
+  return markdown;
+}
+
 /**
  * Function to fetch tasks using GraphQL
  * @param {string} lang - Language filter
@@ -654,7 +730,21 @@ async function main() {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
+    // Convert to the new markdown-like format
+    const markdownExamples = convertToMarkdownFormat(trainingExamples);
+    
+    // Get file extension based on format
+    const fileExtension = '.md';
+    const outputPathWithExt = outputPath.replace(/\.json$/, fileExtension);
+    
     // Write to output file
+    fs.writeFileSync(
+      outputPathWithExt,
+      markdownExamples,
+      'utf8'
+    );
+    
+    // Also save the original JSON data for reference/debugging
     fs.writeFileSync(
       outputPath,
       JSON.stringify(trainingExamples, null, 2),
@@ -666,7 +756,9 @@ async function main() {
     } else {
       console.log(`Successfully generated ${trainingExamples.length} training examples across all languages.`);
     }
-    console.log(`Output written to: ${outputPath}`);
+    console.log(`Generated files:`);
+    console.log(`- Markdown format: ${outputPathWithExt}`);
+    console.log(`- JSON format: ${outputPath}`);
 
   } catch (error) {
     console.error('Error generating training examples:', error);
