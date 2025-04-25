@@ -111,7 +111,7 @@ let outputDir = "./";
 if (args.includes('--outdir')) {
   outputDir = args[args.indexOf('--outdir') + 1];
 } else if (args.includes('--output-dir')) {
-  outputDir = args[args.indexOf('--output-dir') + 1]; 
+  outputDir = args[args.indexOf('--output-dir') + 1];
 }
 
 // Make sure output directory ends with a slash
@@ -336,7 +336,7 @@ function generateExplanation(code, lang) {
 async function fetchTasksWithGraphQL(lang, mark) {
   try {
     console.log(`Fetching tasks with GraphQL for lang=${lang}, mark=${mark}`);
-    
+
     // First try to introspect the schema to verify the query structure
     try {
       const introspectionQuery = `
@@ -357,7 +357,7 @@ async function fetchTasksWithGraphQL(lang, mark) {
           }
         }
       `;
-      
+
       console.log('Attempting schema introspection to verify query structure...');
       const introspectionResponse = await fetch(graphqlEndpoint, {
         method: 'POST',
@@ -367,13 +367,13 @@ async function fetchTasksWithGraphQL(lang, mark) {
         },
         body: JSON.stringify({ query: introspectionQuery })
       });
-      
+
       const introspectionResult = await introspectionResponse.json();
       console.log('Schema introspection result:', JSON.stringify(introspectionResult, null, 2));
     } catch (e) {
       console.log('Schema introspection failed, continuing with original query');
     }
-    
+
     // GraphQL query for tasks
     const query = `
       query GetTasks($lang: String!, $mark: Int!) {
@@ -391,15 +391,15 @@ async function fetchTasksWithGraphQL(lang, mark) {
         }
       }
     `;
-    
+
     // Variables for the query
     const variables = { lang, mark };
-    
+
     // Log request details for debugging
     console.log(`Making GraphQL request to: ${graphqlEndpoint}`);
     console.log(`Auth token present: ${authToken ? 'Yes' : 'No'}`);
     console.log('Request body:', JSON.stringify({query, variables}, null, 2));
-    
+
     // Make the GraphQL request
     const response = await fetch(graphqlEndpoint, {
       method: 'POST',
@@ -412,22 +412,22 @@ async function fetchTasksWithGraphQL(lang, mark) {
         variables
       })
     });
-    
+
     // Log response status
     console.log(`Response status: ${response.status} ${response.statusText}`);
-    
+
     // Parse the response
     const result = await response.json();
-    
+
     // Log full response for debugging
     console.log('Full response:', JSON.stringify(result, null, 2));
-    
+
     // Check for errors
     if (result.errors) {
       console.error('GraphQL query errors:', result.errors);
       throw new Error('Failed to fetch tasks with GraphQL');
     }
-    
+
     // Return the tasks
     return result.data.tasks || [];
   } catch (error) {
@@ -453,20 +453,20 @@ async function main() {
 
     // Array to store training examples
     const trainingExamples = [];
-    
+
     // Determine languages to process
-    const languagesToProcess = filterByLanguage 
+    const languagesToProcess = filterByLanguage
       ? [languageFilter]
       : ['0002', '0011', '0012', '0165']; // Add other languages as needed
-    
+
     // Process each language
     for (const lang of languagesToProcess) {
       try {
         console.log(`\nProcessing tasks for language: L${lang} with mark: ${markValue}`);
-        
+
         // Try to fetch tasks using GraphQL if token is available
         let tasks = [];
-        
+
         if (authToken) {
           try {
             tasks = await fetchTasksWithGraphQL(lang, markValue);
@@ -476,14 +476,14 @@ async function main() {
             tasks = [];
           }
         }
-        
+
         // Process the tasks
         statistics.totalTasks += tasks.length;
         console.log(`Processing ${tasks.length} tasks for L${lang}`);
-        
+
         for (const task of tasks) {
           const taskId = task.id;
-          
+
           // Parse help field
           let help = [];
           try {
@@ -492,29 +492,29 @@ async function main() {
             console.log(`Task ${taskId} has invalid help JSON: ${e.message}`);
             continue;
           }
-          
+
           // Check if this document has a valid help array
           if (!help || !Array.isArray(help)) {
             console.log(`Task ${taskId} has no help array`);
             continue;
           }
-          
+
           if (help.length === 0) {
             console.log(`Task ${taskId} has an empty help array`);
             statistics.tasksWithEmptyHelp++;
             continue;
           }
-          
+
           statistics.tasksWithHelpArray++;
           console.log(
             `Processing task ${taskId} with ${help.length} help messages`,
             console.log("help=" + JSON.stringify(help, null, 2)),
           );
-          
+
           // Get the code from the task
           let code = "";
           let codeSource = "";
-          
+
           for (const message of help) {
             if (message.type === 'bot' && message.help && message.help.type === 'code' &&
                 message.help.text && message.help.text.trim().length >= 10) {
@@ -523,26 +523,26 @@ async function main() {
               break;
             }
           }
-          
+
           // Skip if we still couldn't find any code
           if (!code) {
             console.log(`No code found for task ${taskId}`);
             statistics.skippedNoCode++;
             continue;
           }
-          
+
           // Track code sources and languages
           statistics.codeSources[codeSource] = (statistics.codeSources[codeSource] || 0) + 1;
           statistics.languageCounts[lang] = (statistics.languageCounts[lang] || 0) + 1;
-          
+
           // Process the help array to construct dialog messages
           const dialogMessages = [];
           let dialogPairs = 0;
-          
+
           for (const message of help) {
             // Skip invalid messages
             if (!message || typeof message !== 'object') continue;
-            
+
             // Add user messages
             if (message.type === 'user' && message.user) {
               dialogMessages.unshift({
@@ -554,14 +554,14 @@ async function main() {
             else if (message.type === 'bot' && message.help) {
               const helpObj = message.help;
               let content = '';
-              
+
               if (helpObj.type === 'text' && helpObj.text) {
                 content = helpObj.text;
               } else if (helpObj.type === 'code' && helpObj.text) {
                 // Format code with markdown
                 content = `\`\`\`${helpObj.language || 'ocaml'}\n${helpObj.text}\n\`\`\``;
               }
-              
+
               if (content) {
                 dialogMessages.unshift({
                   role: 'assistant',
@@ -570,27 +570,27 @@ async function main() {
               }
             }
           }
-          
+
           // Count dialog pairs (user message followed by assistant message)
           for (let i = 0; i < dialogMessages.length - 1; i++) {
             if (dialogMessages[i].role === 'user' && dialogMessages[i+1].role === 'assistant') {
               dialogPairs++;
             }
           }
-          
+
           statistics.totalDialogPairs += dialogPairs;
           statistics.totalMessages += dialogMessages.length;
-          
+
           // Skip if there are no complete dialog pairs
           if (dialogPairs === 0) {
             console.log(`Task ${taskId} has no complete dialog pairs`);
             continue;
           }
-          
+
           // Generate explanation and expected output
           const explanation = generateExplanation(code, `L${lang}`);
           const expected_output = determineExpectedOutput(code);
-          
+
           // Add to training examples
           trainingExamples.push({
             messages: dialogMessages,
@@ -603,9 +603,9 @@ async function main() {
             usage_count: task.count || 1,
             pair_count: dialogPairs
           });
-          
+
           statistics.totalProcessed++;
-          
+
           if (statistics.totalProcessed % 50 === 0) {
             console.log(`Processed ${statistics.totalProcessed} tasks with dialog so far...`);
           }
@@ -621,7 +621,7 @@ async function main() {
       "main",
       "trainingExamples=" + JSON.stringify(trainingExamples, null, 2),
     );
-    
+
     // Print detailed statistics report
     console.log('\n===== FINAL STATISTICS =====');
     console.log(`Total tasks found: ${statistics.totalTasks}`);
@@ -631,48 +631,48 @@ async function main() {
     console.log(`Total dialog pairs: ${statistics.totalDialogPairs}`);
     console.log(`Total messages: ${statistics.totalMessages}`);
     console.log(`Skipped (no code): ${statistics.skippedNoCode}`);
-    
+
     console.log('\nCode sources:');
     for (const [source, count] of Object.entries(statistics.codeSources || {}).sort((a, b) => b[1] - a[1])) {
       const percentage = (count / statistics.totalProcessed * 100).toFixed(2);
       console.log(`  - ${source}: ${count} (${percentage}%)`);
     }
-    
+
     console.log('\nLanguage distribution:');
     for (const [lang, count] of Object.entries(statistics.languageCounts).sort((a, b) => b[1] - a[1])) {
       const percentage = (count / statistics.totalProcessed * 100).toFixed(2);
       console.log(`  - L${lang}: ${count} (${percentage}%)`);
     }
     console.log('======================\n');
-    
+
     // Sort by usage count (most used first)
     trainingExamples.sort((a, b) => b.usage_count - a.usage_count);
-    
+
     // Create the output directory if it doesn't exist
     const outputDir = path.dirname(outputPath);
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
-    
+
     // Write to output file
     fs.writeFileSync(
       outputPath,
       JSON.stringify(trainingExamples, null, 2),
       'utf8'
     );
-    
+
     if (filterByLanguage) {
       console.log(`Successfully generated ${trainingExamples.length} training examples for language ${languageFilter}.`);
     } else {
       console.log(`Successfully generated ${trainingExamples.length} training examples across all languages.`);
     }
     console.log(`Output written to: ${outputPath}`);
-    
+
   } catch (error) {
     console.error('Error generating training examples:', error);
     process.exit(1);
   }
-  
+
   // Clean exit
   process.exit(0);
 }
