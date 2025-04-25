@@ -38,3 +38,8 @@ yarn-error.log*
 
 /src/components/l0152
 /src/components/l0155
+
+# firebase
+
+*firebase*
+*firestore*
