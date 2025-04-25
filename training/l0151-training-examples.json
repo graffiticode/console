@@ -1,0 +1,134 @@
+[
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "what is 2 plus 2"
+      },
+      {
+        "role": "assistant",
+        "content": "```ocaml\nlet add_numbers a b =\n  a + b\n\nlet () =\n  let result = add_numbers 2 2 in\n  Printf.printf \"%d\\n\" result\n```"
+      }
+    ],
+    "code": "let add_numbers a b =\n  a + b\n\nlet () =\n  let result = add_numbers 2 2 in\n  Printf.printf \"%d\\n\" result",
+    "explanation": "Simple L0151 code that assigns a value.",
+    "expected_output": "result = [computed value]",
+    "lang": "0151",
+    "task_id": "eyJ0YXNrSWRzIjpbIkhiR1BTTWZrMWJ6bm0wV3RqT0VsIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 1
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "create a spreadsheet question for me"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\nHere is a spreadsheet question for you:\n\nGiven the following data in a spreadsheet:\n\n| Product   | Price | Quantity Sold |\n|-----------|-------|---------------|\n| Widget    | $10   | 500           |\n| Gadget    | $20   | 250           |\n| Gizmo     | $15   | 200           |\n| Thingamabob | $25 | 100           |\n\nWrite a formula to calculate:\n1. The total revenue for each product \n2. The total overall revenue across all products\n3. The average price of the products\n4. The product that generated the most total revenue\n\nThe solution should use common spreadsheet functions like SUM, AVERAGE, MAX, etc.\n\nLet me know if you would like me to provide the solution as well!\n```"
+      },
+      {
+        "role": "user",
+        "content": "create a spreadsheet question for me. please provide the solution"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\nHere's a spreadsheet question for you, along with the solution in Graffiticode:\n\nQuestion:\nGiven a spreadsheet with columns for employee name, hourly wage, and hours worked, calculate the total payroll cost. Employees get paid 1.5x their hourly wage for any hours over 40.\n\nSpreadsheet data:\n[\n  { name: \"Alice\", wage: 15, hours: 35 }\n  { name: \"Bob\", wage: 20, hours: 47 } \n  { name: \"Charlie\", wage: 18, hours: 40 }\n]\n\nSolution:\nlet overtimeHours = <employee: sub get employee \"hours\" 40>..\\nlet overtimePay = <employee: mul get employee \"wage\" 1.5 overtimeHours employee>..\\nlet regularPay = <employee: mul get employee \"wage\" if lt get employee \"hours\" 40 then get employee \"hours\" else 40>..\\nlet totalPay = <employee: add regularPay employee overtimePay employee>..\\nlet employeePay = map (totalPay) employees..\\nlet totalPayroll = reduce (add) 0 employeePay..\n\nExplanation:\n1. `overtimeHours` calculates the number of overtime hours for each employee (hours over 40)\n2. `overtimePay` calculates overtime pay at 1.5x wage for those overtime hours \n3. `regularPay` calculates regular pay for the first 40 hours (or less if under 40 total hours)\n4. `totalPay` sums the regular and overtime pay for each employee\n5. `employeePay` maps the `totalPay` function over the list of employees \n6. Finally, `totalPayroll` sums up the pay for all employees to get the total payroll cost\n\nThe key steps are calculating regular and overtime pay separately, then combining them for each employee before summing the total. Let me know if you have any other questions!\n```"
+      }
+    ],
+    "code": "Here's a spreadsheet question for you, along with the solution in Graffiticode:\n\nQuestion:\nGiven a spreadsheet with columns for employee name, hourly wage, and hours worked, calculate the total payroll cost. Employees get paid 1.5x their hourly wage for any hours over 40.\n\nSpreadsheet data:\n[\n  { name: \"Alice\", wage: 15, hours: 35 }\n  { name: \"Bob\", wage: 20, hours: 47 } \n  { name: \"Charlie\", wage: 18, hours: 40 }\n]\n\nSolution:\nlet overtimeHours = <employee: sub get employee \"hours\" 40>..\\nlet overtimePay = <employee: mul get employee \"wage\" 1.5 overtimeHours employee>..\\nlet regularPay = <employee: mul get employee \"wage\" if lt get employee \"hours\" 40 then get employee \"hours\" else 40>..\\nlet totalPay = <employee: add regularPay employee overtimePay employee>..\\nlet employeePay = map (totalPay) employees..\\nlet totalPayroll = reduce (add) 0 employeePay..\n\nExplanation:\n1. `overtimeHours` calculates the number of overtime hours for each employee (hours over 40)\n2. `overtimePay` calculates overtime pay at 1.5x wage for those overtime hours \n3. `regularPay` calculates regular pay for the first 40 hours (or less if under 40 total hours)\n4. `totalPay` sums the regular and overtime pay for each employee\n5. `employeePay` maps the `totalPay` function over the list of employees \n6. Finally, `totalPayroll` sums up the pay for all employees to get the total payroll cost\n\nThe key steps are calculating regular and overtime pay separately, then combining them for each employee before summing the total. Let me know if you have any other questions!",
+    "explanation": "L0151 program that transforms each element in a collection.",
+    "expected_output": "overtimeHours = <function>",
+    "lang": "0151",
+    "task_id": "eyJ0YXNrSWRzIjpbIlI3bVBlNGF1RjBtemJUV0xkVE1NIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 2
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "create a spreadsheet question for me"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\nHere is a spreadsheet question for you:\n\nGiven the following data in a spreadsheet:\n\n| Product   | Price | Quantity Sold |\n|-----------|-------|---------------|\n| Widget    | $10   | 500           |\n| Gadget    | $20   | 250           |\n| Gizmo     | $15   | 200           |\n| Thingamabob | $25 | 100           |\n\nWrite a formula to calculate:\n1. The total revenue for each product \n2. The total overall revenue across all products\n3. The average price of the products\n4. The product that generated the most total revenue\n\nThe solution should use common spreadsheet functions like SUM, AVERAGE, MAX, etc.\n\nLet me know if you would like me to provide the solution as well!\n```"
+      },
+      {
+        "role": "user",
+        "content": "create a spreadsheet question for me. please provide the solution"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\ntable {\n  rows: {\n    \"*\": {\n      assess: {\n        index: \"A\",\n        order: \"actual\", | \"expected\", \"asc\", \"desc\"\n      }\n    }\n  },\n  columns: {\n    A: {\n      width: 200,\n      justify: \"left\",\n    },\n    B: {\n      width: 100,\n      format: \"Currency\",\n    },\n  },\n  cells: {\n    A1: {\n      text: \"{{A1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A1}}\",\n        }\n      }\n    },\n    A2: {\n      text: \"{{A2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A2}}\",\n        }\n      }\n    },\n    A3: {\n      text: \"{{A3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A3}}\",\n        }\n      }\n    },\n    A4: {\n      text: \"{{A4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A4}}\",\n        }\n      }\n    },\n    B1: {\n      text: \"{{B1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B1}}\",\n        }\n      }\n    },\n    B2: {\n      text: \"{{B2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B2}}\"\n        }\n      }\n    },\n    B3: {\n      text: \"{{B3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B3}}\",\n        }\n      }      \n    }\n    B4: {\n      text: \"{{B4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B4}}\",\n        }\n      }      \n    }\n  }\n} \nparams {\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000..1585000:200000\",\n  B2: \"325000..425000:25000\",\n  B3: \"26000..30000:2000\",\n  B4: \"875000..975000:50000\",\n}..\n```"
+      }
+    ],
+    "code": "table {\n  rows: {\n    \"*\": {\n      assess: {\n        index: \"A\",\n        order: \"actual\", | \"expected\", \"asc\", \"desc\"\n      }\n    }\n  },\n  columns: {\n    A: {\n      width: 200,\n      justify: \"left\",\n    },\n    B: {\n      width: 100,\n      format: \"Currency\",\n    },\n  },\n  cells: {\n    A1: {\n      text: \"{{A1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A1}}\",\n        }\n      }\n    },\n    A2: {\n      text: \"{{A2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A2}}\",\n        }\n      }\n    },\n    A3: {\n      text: \"{{A3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A3}}\",\n        }\n      }\n    },\n    A4: {\n      text: \"{{A4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A4}}\",\n        }\n      }\n    },\n    B1: {\n      text: \"{{B1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B1}}\",\n        }\n      }\n    },\n    B2: {\n      text: \"{{B2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B2}}\"\n        }\n      }\n    },\n    B3: {\n      text: \"{{B3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B3}}\",\n        }\n      }      \n    }\n    B4: {\n      text: \"{{B4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B4}}\",\n        }\n      }      \n    }\n  }\n} \nparams {\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000..1585000:200000\",\n  B2: \"325000..425000:25000\",\n  B3: \"26000..30000:2000\",\n  B4: \"875000..975000:50000\",\n}..",
+    "explanation": "Multi-step L0151 program that processes data through several operations.",
+    "expected_output": "Output depends on execution",
+    "lang": "0151",
+    "task_id": "eyJ0YXNrSWRzIjpbIlV0MVBjVU03QktJdWwxSU5mUGFWIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 2
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "create a spreadsheet question for me"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\nHere is a spreadsheet question for you:\n\nGiven the following data in a spreadsheet:\n\n| Product   | Price | Quantity Sold |\n|-----------|-------|---------------|\n| Widget    | $10   | 500           |\n| Gadget    | $20   | 250           |\n| Gizmo     | $15   | 200           |\n| Thingamabob | $25 | 100           |\n\nWrite a formula to calculate:\n1. The total revenue for each product \n2. The total overall revenue across all products\n3. The average price of the products\n4. The product that generated the most total revenue\n\nThe solution should use common spreadsheet functions like SUM, AVERAGE, MAX, etc.\n\nLet me know if you would like me to provide the solution as well!\n```"
+      },
+      {
+        "role": "user",
+        "content": "create a spreadsheet question for me. please provide the solution"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\ntable {\n  rows: {\n    \"*\": {\n      assess: {\n        index: \"A\",\n        order: \"actual\", | \"expected\", \"asc\", \"desc\"\n      }\n    }\n  },\n  columns: {\n    A: {\n      width: 200,\n      justify: \"left\",\n    },\n    B: {\n      width: 100,\n      format: \"Currency\",\n    },\n  },\n  cells: {\n    A1: {\n      text: \"{{A1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A1}}\",\n        }\n      }\n    },\n    A2: {\n      text: \"{{A2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A2}}\",\n        }\n      }\n    },\n    A3: {\n      text: \"{{A3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A3}}\",\n        }\n      }\n    },\n    A4: {\n      text: \"{{A4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A4}}\",\n        }\n      }\n    },\n    B1: {\n      text: \"{{B1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B1}}\",\n        }\n      }\n    },\n    B2: {\n      text: \"{{B2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B2}}\"\n        }\n      }\n    },\n    B3: {\n      text: \"{{B3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B3}}\",\n        }\n      }      \n    }\n    B4: {\n      text: \"{{B4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B4}}\",\n        }\n      }      \n    }\n  }\n} \nparams {\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000..1585000:200000\",\n  B2: \"325000..425000:25000\",\n  B3: \"26000..30000:2000\",\n  B4: \"875000..975000:50000\",\n}..\n```"
+      }
+    ],
+    "code": "table {\n  rows: {\n    \"*\": {\n      assess: {\n        index: \"A\",\n        order: \"actual\", | \"expected\", \"asc\", \"desc\"\n      }\n    }\n  },\n  columns: {\n    A: {\n      width: 200,\n      justify: \"left\",\n    },\n    B: {\n      width: 100,\n      format: \"Currency\",\n    },\n  },\n  cells: {\n    A1: {\n      text: \"{{A1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A1}}\",\n        }\n      }\n    },\n    A2: {\n      text: \"{{A2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A2}}\",\n        }\n      }\n    },\n    A3: {\n      text: \"{{A3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A3}}\",\n        }\n      }\n    },\n    A4: {\n      text: \"{{A4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A4}}\",\n        }\n      }\n    },\n    B1: {\n      text: \"{{B1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B1}}\",\n        }\n      }\n    },\n    B2: {\n      text: \"{{B2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B2}}\"\n        }\n      }\n    },\n    B3: {\n      text: \"{{B3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B3}}\",\n        }\n      }      \n    }\n    B4: {\n      text: \"{{B4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B4}}\",\n        }\n      }      \n    }\n  }\n} \nparams {\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000..1585000:200000\",\n  B2: \"325000..425000:25000\",\n  B3: \"26000..30000:2000\",\n  B4: \"875000..975000:50000\",\n}..",
+    "explanation": "Multi-step L0151 program that processes data through several operations.",
+    "expected_output": "Output depends on execution",
+    "lang": "0151",
+    "task_id": "eyJ0YXNrSWRzIjpbImdlOU1mRFNRcVVmQUZxZjNwSmRhIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 2
+  },
+  {
+    "messages": [
+      {
+        "role": "user",
+        "content": "create a spreadsheet question for me"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\nHere is a spreadsheet question for you:\n\nGiven the following data in a spreadsheet:\n\n| Product   | Price | Quantity Sold |\n|-----------|-------|---------------|\n| Widget    | $10   | 500           |\n| Gadget    | $20   | 250           |\n| Gizmo     | $15   | 200           |\n| Thingamabob | $25 | 100           |\n\nWrite a formula to calculate:\n1. The total revenue for each product \n2. The total overall revenue across all products\n3. The average price of the products\n4. The product that generated the most total revenue\n\nThe solution should use common spreadsheet functions like SUM, AVERAGE, MAX, etc.\n\nLet me know if you would like me to provide the solution as well!\n```"
+      },
+      {
+        "role": "user",
+        "content": "create a spreadsheet question for me. please provide the solution"
+      },
+      {
+        "role": "assistant",
+        "content": "```graffiticode\ntable {\n  rows: {\n    \"*\": {\n      assess: {\n        index: \"A\",\n        order: \"actual\", | \"expected\", \"asc\", \"desc\"\n      }\n    }\n  },\n  columns: {\n    A: {\n      width: 200,\n      justify: \"left\",\n    },\n    B: {\n      width: 100,\n      format: \"Currency\",\n    },\n  },\n  cells: {\n    A1: {\n      text: \"{{A1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A1}}\",\n        }\n      }\n    },\n    A2: {\n      text: \"{{A2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A2}}\",\n        }\n      }\n    },\n    A3: {\n      text: \"{{A3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A3}}\",\n        }\n      }\n    },\n    A4: {\n      text: \"{{A4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A4}}\",\n        }\n      }\n    },\n    B1: {\n      text: \"{{B1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B1}}\",\n        }\n      }\n    },\n    B2: {\n      text: \"{{B2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B2}}\"\n        }\n      }\n    },\n    B3: {\n      text: \"{{B3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B3}}\",\n        }\n      }      \n    }\n    B4: {\n      text: \"{{B4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B4}}\",\n        }\n      }      \n    }\n  }\n} \nparams {\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000..1585000:200000\",\n  B2: \"325000..425000:25000\",\n  B3: \"26000..30000:2000\",\n  B4: \"875000..975000:50000\",\n}..\n```"
+      }
+    ],
+    "code": "table {\n  rows: {\n    \"*\": {\n      assess: {\n        index: \"A\",\n        order: \"actual\", | \"expected\", \"asc\", \"desc\"\n      }\n    }\n  },\n  columns: {\n    A: {\n      width: 200,\n      justify: \"left\",\n    },\n    B: {\n      width: 100,\n      format: \"Currency\",\n    },\n  },\n  cells: {\n    A1: {\n      text: \"{{A1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A1}}\",\n        }\n      }\n    },\n    A2: {\n      text: \"{{A2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A2}}\",\n        }\n      }\n    },\n    A3: {\n      text: \"{{A3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A3}}\",\n        }\n      }\n    },\n    A4: {\n      text: \"{{A4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{A4}}\",\n        }\n      }\n    },\n    B1: {\n      text: \"{{B1}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B1}}\",\n        }\n      }\n    },\n    B2: {\n      text: \"{{B2}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B2}}\"\n        }\n      }\n    },\n    B3: {\n      text: \"{{B3}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B3}}\",\n        }\n      }      \n    }\n    B4: {\n      text: \"{{B4}}\",\n      attrs: {\n        assess: {\n          method: \"value\",\n          expected: \"{{B4}}\",\n        }\n      }      \n    }\n  }\n} \nparams {\n  A1: \"Fees earned\",\n  A2: \"Office expense\",\n  A3: \"Miscellaneous expense\",\n  A4: \"Salary and wage expense\",\n  B1: \"1485000..1585000:200000\",\n  B2: \"325000..425000:25000\",\n  B3: \"26000..30000:2000\",\n  B4: \"875000..975000:50000\",\n}..",
+    "explanation": "Multi-step L0151 program that processes data through several operations.",
+    "expected_output": "Output depends on execution",
+    "lang": "0151",
+    "task_id": "eyJ0YXNrSWRzIjpbInRsQjYxVUtVN0RPRDdSTGJ5aXpTIl19",
+    "code_source": "help_message_code",
+    "usage_count": 1,
+    "pair_count": 2
+  }
+]

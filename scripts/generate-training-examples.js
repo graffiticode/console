@@ -105,15 +105,30 @@ const markValue = args.includes('--mark')
   : 1; // Default mark value
 
 // Determine output file path, adding language code to filename if filtering
-let outputPath;
-if (args.includes('--output')) {
-  outputPath = args[args.indexOf('--output') + 1];
-} else {
-  const baseOutputName = filterByLanguage
-    ? `training_examples_L${languageFilter}.json`
-    : 'training_examples.json';
-  outputPath = path.join(process.cwd(), baseOutputName);
+let outputDir = "./";
+
+// Support both --outdir and --output-dir for the directory parameter
+if (args.includes('--outdir')) {
+  outputDir = args[args.indexOf('--outdir') + 1];
+} else if (args.includes('--output-dir')) {
+  outputDir = args[args.indexOf('--output-dir') + 1]; 
 }
+
+// Make sure output directory ends with a slash
+if (!outputDir.endsWith('/')) {
+  outputDir += '/';
+}
+
+// Create full path for output file
+const outputFileName = filterByLanguage
+      ? `l${languageFilter}-training-examples.json`
+      : 'training_examples.json';
+
+const outputPath = path.join(process.cwd(), `${outputDir}/${outputFileName}`);
+
+console.log(
+  "outputPath=" + outputPath,
+);
 
 const serviceAccountPath = args.includes('--service-account')
   ? args[args.indexOf('--service-account') + 1]
