@@ -19,11 +19,11 @@ let overtimePay = <employee:
   add regularPay overtimePay
 >..
 
-| Calculate overtime pay for each employee  
+| Calculate overtime pay for each employee
 let payroll = map (overtimePay) [
   {name: "Alice" wage: 15 hours: 35}
   {name: "Bob" wage: 20 hours: 50}
-  {name: "Charlie" wage: 18 hours: 40}  
+  {name: "Charlie" wage: 18 hours: 40}
 ]..
 
 | Print the payroll
@@ -92,7 +92,7 @@ main.."
 let numbers = [5 12 8 23 1 9 18 7 4 11]..
 
 | Use reduce to sum the values
-| The lambda takes an accumulator and the current number 
+| The lambda takes an accumulator and the current number
 | It returns the accumulator plus the current number
 let sum = reduce (<acc num: add acc num>) 0 numbers..
 
@@ -103,10 +103,10 @@ print sum..
 ---
 
 ### Prompt
-"write a program that computes the overtime payroll for a company with the following employee data: 
+"write a program that computes the overtime payroll for a company with the following employee data:
 let employees = [
   { name: "Alice", wage: 15, hours: 35 }
-  { name: "Bob", wage: 20, hours: 50 } 
+  { name: "Bob", wage: 20, hours: 50 }
   { name: "Charlie", wage: 18, hours: 40 }
 ].."
 
@@ -117,10 +117,10 @@ let add2 = <[a b]: add a b>..
 
 | Function to calculate an employee's pay including overtime
 let calculatePay = <
-  employee: 
+  employee:
     let regularHours =
-      if lt get employee "hours" 40 
-        then get employee "hours" 
+      if lt get employee "hours" 40
+        then get employee "hours"
         else 40..
   let overtimeHours =
     if gt get employee "hours" 40
@@ -142,7 +142,7 @@ let calculatePayroll = <employees:
 | Employee data
 let employees = [
   { name: "Alice", wage: 15, hours: 35 }
-  { name: "Bob", wage: 20, hours: 50 } 
+  { name: "Bob", wage: 20, hours: 50 }
   { name: "Charlie", wage: 18, hours: 40 }
 ]..
 
@@ -171,11 +171,11 @@ let overtimePay = <acc employee:
   set acc name add regularPay overtimePay
 >..
 
-| Calculate overtime pay for each employee  
+| Calculate overtime pay for each employee
 let payroll = reduce (overtimePay) {} [
   {name: "Alice" wage: 15 hours: 35}
   {name: "Bob" wage: 20 hours: 50}
-  {name: "Charlie" wage: 18 hours: 40}  
+  {name: "Charlie" wage: 18 hours: 40}
 ]..
 
 | Print the payroll
@@ -214,7 +214,7 @@ print tens..
 | Generate a list of integers from 1 to 10
 let numbers = range 1 10 1..
 
-| Function to add 3 to a number 
+| Function to add 3 to a number
 let add3 = <x: add x 3>..
 
 | Apply add3 to each number in the list
@@ -248,10 +248,10 @@ print 'hello, world!'..
 let colorName = <color:
   case color of
     Blue: "blue"
-    Red: "red" 
+    Red: "red"
     Green: "green"
     _: "unknown"
-  end  
+  end
 >..
 
 | Example usage

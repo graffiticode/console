@@ -32,7 +32,7 @@ Given a spreadsheet with columns for employee name, hourly wage, and hours worke
 Spreadsheet data:
 [
   { name: "Alice", wage: 15, hours: 35 }
-  { name: "Bob", wage: 20, hours: 47 } 
+  { name: "Bob", wage: 20, hours: 47 }
   { name: "Charlie", wage: 18, hours: 40 }
 ]
 
@@ -41,10 +41,10 @@ let overtimeHours = <employee: sub get employee "hours" 40>..\nlet overtimePay =
 
 Explanation:
 1. `overtimeHours` calculates the number of overtime hours for each employee (hours over 40)
-2. `overtimePay` calculates overtime pay at 1.5x wage for those overtime hours 
+2. `overtimePay` calculates overtime pay at 1.5x wage for those overtime hours
 3. `regularPay` calculates regular pay for the first 40 hours (or less if under 40 total hours)
 4. `totalPay` sums the regular and overtime pay for each employee
-5. `employeePay` maps the `totalPay` function over the list of employees 
+5. `employeePay` maps the `totalPay` function over the list of employees
 6. Finally, `totalPayroll` sums up the pay for all employees to get the total payroll cost
 
 The key steps are calculating regular and overtime pay separately, then combining them for each employee before summing the total. Let me know if you have any other questions!
@@ -139,7 +139,7 @@ table {
           method: "value",
           expected: "{{B3}}",
         }
-      }      
+      }
     }
     B4: {
       text: "{{B4}}",
@@ -148,10 +148,10 @@ table {
           method: "value",
           expected: "{{B4}}",
         }
-      }      
+      }
     }
   }
-} 
+}
 params {
   A1: "Fees earned",
   A2: "Office expense",
@@ -253,7 +253,7 @@ table {
           method: "value",
           expected: "{{B3}}",
         }
-      }      
+      }
     }
     B4: {
       text: "{{B4}}",
@@ -262,10 +262,10 @@ table {
           method: "value",
           expected: "{{B4}}",
         }
-      }      
+      }
     }
   }
-} 
+}
 params {
   A1: "Fees earned",
   A2: "Office expense",
@@ -367,7 +367,7 @@ table {
           method: "value",
           expected: "{{B3}}",
         }
-      }      
+      }
     }
     B4: {
       text: "{{B4}}",
@@ -376,10 +376,10 @@ table {
           method: "value",
           expected: "{{B4}}",
         }
-      }      
+      }
     }
   }
-} 
+}
 params {
   A1: "Fees earned",
   A2: "Office expense",

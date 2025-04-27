@@ -375,8 +375,11 @@ function convertToMarkdownFormat(trainingExamples) {
       // Extract a meaningful task description from the messages
       const prompt = extractTaskFromMessages(example.messages);
       
-      // Clean up the code
-      const code = example.code.trim();
+      // Clean up the code - remove trailing whitespace from each line
+      const code = example.code.trim()
+        .split('\n')
+        .map(line => line.trimRight())
+        .join('\n');
       
       // Use the standard format with "Prompt" and "Code" sections
       // Code is always wrapped in triple backticks
@@ -394,6 +397,11 @@ function convertToMarkdownFormat(trainingExamples) {
       markdown += `\n\n`;
     }
   }
+  
+  // Remove any trailing whitespace from the entire markdown content
+  markdown = markdown.split('\n')
+    .map(line => line.trimRight())
+    .join('\n');
   
   return markdown;
 }

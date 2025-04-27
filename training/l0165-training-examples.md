@@ -114,7 +114,7 @@ columns {
       justify: "left"
     },
     B: {
-      width: 80, 
+      width: 80,
       justify: "right"
     }
   }
@@ -123,13 +123,13 @@ cells {
       text: "Apples",
       attrs: {
         assess: {
-          method: "value", 
+          method: "value",
           expected: "Apples"
         }
       }
     },
     A2: {
-      text: "Oranges", 
+      text: "Oranges",
       attrs: {
         assess: {
           method: "value",
@@ -141,7 +141,7 @@ cells {
       text: "Bananas",
       attrs: {
         assess: {
-          method: "value", 
+          method: "value",
           expected: "Bananas"
         }
       }
@@ -161,7 +161,7 @@ cells {
         assess: {
           method: "value",
           expected: "{{B2}}"
-        }  
+        }
       }
     },
     B3: {
@@ -171,12 +171,12 @@ cells {
           method: "value",
           expected: "{{B3}}"
         }
-      }      
+      }
     }
 }
 params {
     B1: "140",
-    B2: "230", 
+    B2: "230",
     B3: "320"
 }
 {}..
