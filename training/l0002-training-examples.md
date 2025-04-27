@@ -2,7 +2,7 @@
 
 ## Language L0002
 
-### Task
+### Prompt
 "A program that computes the overtime payroll for a company with the following employee data: [ { name: "Alice", wage: 15, hours: 35 } { name: "Bob", wage: 20, hours: 50 } { name: "Charlie", wage: 18, hours: 40 } ]"
 
 ### Code
@@ -32,7 +32,7 @@ print payroll..
 
 ---
 
-### Task
+### Prompt
 "use the function range to generate a list of number between 0 and 100 incremented by 10"
 
 ### Code
@@ -45,7 +45,7 @@ print numbers..
 
 ---
 
-### Task
+### Prompt
 "get the value of binding 'x' from and object that contains 'x'"
 
 ### Code
@@ -57,7 +57,7 @@ print get "x" obj..
 
 ---
 
-### Task
+### Prompt
 "write a program that prints hello world. make sure to delineate comment with the line comment token |"
 
 ### Code
@@ -69,7 +69,7 @@ main.."
 
 ---
 
-### Task
+### Prompt
 "reduce a list of ten integers into the sum of their values"
 
 ### Code
@@ -89,7 +89,7 @@ print sum..
 
 ---
 
-### Task
+### Prompt
 "write a program that computes the overtime payroll for a company with the following employee data: 
 let employees = [
   { name: "Alice", wage: 15, hours: 35 }
@@ -140,7 +140,7 @@ print totalPayroll..
 
 ---
 
-### Task
+### Prompt
 "write a program that computes the overtime payroll for a company with the following employee data: [ { name: "Alice", wage: 15, hours: 35 } { name: "Bob", wage: 20, hours: 50 } { name: "Charlie", wage: 18, hours: 40 } ]"
 
 ### Code
@@ -171,7 +171,7 @@ print payroll..
 
 ---
 
-### Task
+### Prompt
 "use the builtin function filter to filter a list of even numbers between 0 and 100 so that only tenth value is remaining. print the result"
 
 ### Code
@@ -192,7 +192,7 @@ print tens..
 
 ---
 
-### Task
+### Prompt
 "add 3 to a list of ten integers and print the result"
 
 ### Code
@@ -213,7 +213,7 @@ print result..
 
 ---
 
-### Task
+### Prompt
 "print the message 'hello, world!'"
 
 ### Code
@@ -225,7 +225,7 @@ print 'hello, world!'..
 
 ---
 
-### Task
+### Prompt
 "write me a program that uses tags to represent the colors blue, red and green. use a case of expression to distinguish between those tags"
 
 ### Code
@@ -248,7 +248,7 @@ print `Your favorite color is ${colorName favoriteColor}.`..
 
 ---
 
-### Task
+### Prompt
 "create an record with field named foo to 10 and then set another field named bar to 20"
 
 ### Code
@@ -258,7 +258,7 @@ set "bar" 20 obj..
 
 ---
 
-### Task
+### Prompt
 "write fizzbuzz and print the result"
 
 ### Code
@@ -278,7 +278,7 @@ print result..
 
 ---
 
-### Task
+### Prompt
 "use the builtin function filter to filter a list of even numbers between 0 and 100 so that only tenth value is remaining. print the result"
 
 ### Code

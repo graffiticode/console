@@ -62,15 +62,31 @@ function parseMarkdownExamples(markdownContent) {
     const examples = [];
     // Split the content by sections
     const sections = markdownContent.split('---');
-    
+
     for (const section of sections) {
       if (!section.trim()) continue;
-      
-      // Extract task and code from each section
-      const taskMatch = section.match(/###\s*Task\s*\n"([^"]+)"/);
-      const codeMatch = section.match(/###\s*Graffiticode\s*\n([\s\S]+?)(?=\n\n|$)/);
-      
-      if (taskMatch && codeMatch) {
+
+      // Extract prompt and code from each section
+      const promptMatch = section.match(/###\s*Prompt\s*\n"([^"]+)"/);
+      const codeBlockMatch = section.match(/###\s*Code\s*\n\s*```\s*\n([\s\S]+?)\n\s*```/);
+
+      // Fall back to older format if needed
+      const taskMatch = !promptMatch && section.match(/###\s*Task\s*\n"([^"]+)"/);
+      const codeMatch = !codeBlockMatch && section.match(/###\s*Graffiticode\s*\n([\s\S]+?)(?=\n\n|$)/);
+
+      if (promptMatch && codeBlockMatch) {
+        // New format
+        examples.push({
+          task: promptMatch[1].trim(),
+          code: codeBlockMatch[1].trim(),
+          // Create a messages array for compatibility with existing code
+          messages: [
+            { role: 'user', content: promptMatch[1].trim() },
+            { role: 'assistant', content: `\`\`\`\n${codeBlockMatch[1].trim()}\n\`\`\`` }
+          ]
+        });
+      } else if (taskMatch && codeMatch) {
+        // Old format
         examples.push({
           task: taskMatch[1].trim(),
           code: codeMatch[1].trim(),
@@ -82,7 +98,7 @@ function parseMarkdownExamples(markdownContent) {
         });
       }
     }
-    
+
     return examples;
   } catch (error) {
     console.error('Error parsing markdown examples:', error);
@@ -102,12 +118,12 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
     // Import local training data from markdown format
     const fs = require('fs');
     const path = require('path');
-    
+
     let examples = [];
-    
+
     // Try to load the markdown file first
     const mdFilePath = path.join(process.cwd(), `./training/l${lang}-training-examples.md`);
-    
+
     if (fs.existsSync(mdFilePath)) {
       // Read and parse the markdown file
       const markdownContent = fs.readFileSync(mdFilePath, 'utf8');
@@ -132,7 +148,7 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
     const scoredExamples = examples.map(example => {
       // For markdown examples, search through task and code
       let textToSearch = '';
-      
+
       if (example.task) {
         // For markdown format
         textToSearch = (example.task + ' ' + example.code).toLowerCase();
@@ -206,26 +222,73 @@ export async function initializeTrainingExamples(lang = null) {
     // Import local training data
     const fs = require('fs');
     const path = require('path');
-    const localExamples = JSON.parse(
-      fs.readFileSync(
-        path.join(process.cwd(), 'training_examples.json'),
-        'utf8'
-      )
-    );
 
-    // Filter examples by language if specified
-    const exampleToImport = lang
-      ? localExamples.filter(ex => {
-          // If example has a lang field use it, otherwise assume it's for L0002
-          const exampleLang = ex.lang || "0002";
-          return exampleLang === lang;
-        })
-      : localExamples;
+    // First try to load examples from markdown format (preferred)
+    let examples = [];
+    const langFilter = lang ? lang : null;
 
-    if (exampleToImport.length === 0) {
+    if (langFilter) {
+      // If specific language requested, try to load just that language's markdown file
+      const mdFilePath = path.join(process.cwd(), `./training/l${langFilter}-training-examples.md`);
+      if (fs.existsSync(mdFilePath)) {
+        const markdownContent = fs.readFileSync(mdFilePath, 'utf8');
+        examples = parseMarkdownExamples(markdownContent);
+        console.log(`Loaded ${examples.length} examples from markdown file for L${langFilter}`);
+      }
+    }
+
+    // If no examples loaded yet and no specific language filter, try loading from all markdown files
+    if (examples.length === 0 && !langFilter) {
+      try {
+        const trainingDir = path.join(process.cwd(), './training');
+        const mdFiles = fs.readdirSync(trainingDir)
+          .filter(file => file.match(/l\d+-training-examples\.md$/));
+
+        for (const mdFile of mdFiles) {
+          const fileLang = mdFile.match(/l(\d+)-training-examples\.md$/)[1];
+          const mdFilePath = path.join(trainingDir, mdFile);
+          const markdownContent = fs.readFileSync(mdFilePath, 'utf8');
+          const langExamples = parseMarkdownExamples(markdownContent).map(ex => ({
+            ...ex,
+            lang: fileLang
+          }));
+          examples = [...examples, ...langExamples];
+          console.log(`Loaded ${langExamples.length} examples from ${mdFile}`);
+        }
+      } catch (error) {
+        console.error('Error loading markdown examples:', error);
+      }
+    }
+
+    // Fall back to JSON if still no examples
+    if (examples.length === 0) {
+      try {
+        const jsonPath = path.join(process.cwd(), langFilter
+          ? `./training/l${langFilter}-training-examples.json`
+          : 'training_examples.json');
+
+        if (fs.existsSync(jsonPath)) {
+          examples = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+          console.log(`Loaded ${examples.length} examples from JSON file`);
+        }
+      } catch (error) {
+        console.error('Error loading JSON examples:', error);
+      }
+    }
+
+    // Filter examples by language if specified and if we've loaded from a composite source
+    if (langFilter && examples.some(ex => ex.lang)) {
+      examples = examples.filter(ex => {
+        // If example has a lang field use it, otherwise assume it's for L0002
+        const exampleLang = ex.lang || "0002";
+        return exampleLang === langFilter;
+      });
+    }
+
+    if (examples.length === 0) {
       return {
         success: false,
-        message: `No examples found for language ${lang}`
+        message: `No examples found ${langFilter ? `for language ${langFilter}` : ''}`
       };
     }
 
@@ -234,7 +297,7 @@ export async function initializeTrainingExamples(lang = null) {
     let batchCount = 0;
     let totalAdded = 0;
 
-    for (const example of exampleToImport) {
+    for (const example of examples) {
       // Generate keywords from all available text
       let textToIndexForKeywords = '';
 
@@ -244,7 +307,11 @@ export async function initializeTrainingExamples(lang = null) {
           .map(m => m.content || '')
           .join(' ');
       }
-      // Fall back to description or code if no messages
+      // Add task/prompt to keywords if available
+      else if (example.task) {
+        textToIndexForKeywords = example.task + ' ' + (example.code || '');
+      }
+      // Fall back to description or code if no messages or task
       else if (example.description) {
         textToIndexForKeywords = example.description;
       } else if (example.code) {
@@ -259,23 +326,27 @@ export async function initializeTrainingExamples(lang = null) {
       const docRef = trainingCollRef.doc();
 
       // Ensure each example has the language code
-      const lang = example.lang || "0002"; // Default to L0002 if not specified
+      const exampleLang = example.lang || "0002"; // Default to L0002 if not specified
 
-      // For examples with no description but with messages, generate a description
+      // For examples with no description, generate one from task/prompt or messages
       let description = example.description;
-      if (!description && example.messages && example.messages.length > 0) {
-        // Find the first user message to use as description
-        const userMessage = example.messages.find(m => m.role === 'user');
-        if (userMessage) {
-          description = userMessage.content.substring(0, 100) +
-            (userMessage.content.length > 100 ? '...' : '');
+      if (!description) {
+        if (example.task) {
+          description = example.task;
+        } else if (example.messages && example.messages.length > 0) {
+          // Find the first user message to use as description
+          const userMessage = example.messages.find(m => m.role === 'user');
+          if (userMessage) {
+            description = userMessage.content.substring(0, 100) +
+              (userMessage.content.length > 100 ? '...' : '');
+          }
         }
       }
 
       batch.set(docRef, {
         ...example,
-        lang,               // Explicitly set language
-        description,        // Add generated description if needed
+        lang: exampleLang,       // Explicitly set language
+        description,             // Add generated description if needed
         keywords,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -299,8 +370,8 @@ export async function initializeTrainingExamples(lang = null) {
 
     return {
       success: true,
-      message: lang
-        ? `Added ${totalAdded} training examples for language ${lang} to Firestore`
+      message: langFilter
+        ? `Added ${totalAdded} training examples for language ${langFilter} to Firestore`
         : `Added ${totalAdded} training examples to Firestore`
     };
 
@@ -479,9 +550,9 @@ function generateExamplesSection(examples) {
 
   examples.forEach((example, i) => {
     if (example.task && example.code) {
-      // Handle markdown-based examples (new format)
+      // Handle markdown-based examples (standardized format)
       examplesText += `### Example ${i+1}: ${example.task}\n`;
-      examplesText += "Task: " + example.task + "\n\n";
+      examplesText += "Prompt: " + example.task + "\n\n";
       examplesText += "```\n";
       examplesText += example.code;
       examplesText += "\n```\n\n";

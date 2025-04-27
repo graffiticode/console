@@ -2,10 +2,12 @@
 
 ## Language L0165
 
-### Task
+### Prompt
 "Create a 2 by 2 spreadsheet with the content being the names of the cells"
 
-### Graffiticode
+### Code
+
+```
 columns {
   A: {
     width: 50,
@@ -31,4 +33,4 @@ cells {
   },
 }
 {}..
-
+```

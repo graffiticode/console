@@ -380,13 +380,13 @@ function convertToMarkdownFormat(trainingExamples) {
     // Add each example in the new format
     examples.forEach((example, index) => {
       // Extract a meaningful task description from the messages
-      const task = extractTaskFromMessages(example.messages);
+      const prompt = extractTaskFromMessages(example.messages);
       
       // Clean up the code
       const code = example.code.trim();
       
-      markdown += `### Task\n"${task}"\n\n`;
-      markdown += `### Graffiticode\n${code}\n\n`;
+      markdown += `### Prompt\n"${prompt}"\n\n`;
+      markdown += `### Code\n\n\`\`\`\n${code}\n\`\`\`\n\n`;
       
       // Add separator between examples except after the last one
       if (index < examples.length - 1) {
