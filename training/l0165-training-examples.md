@@ -92,3 +92,93 @@ cells {
 {}..
 ```
 
+---
+
+### Prompt
+"create a spreadsheet assessment where the student lists the number of apples, oranges and bananas in the following quantities 140, 230, 320, respectively."
+
+### Code
+
+```
+rows {
+    "*": {
+      assess: {
+        index: "A",
+        order: "actual" | "expected", "asc", "desc"
+      }
+    }
+  }
+columns {
+    A: {
+      width: 120,
+      justify: "left"
+    },
+    B: {
+      width: 80, 
+      justify: "right"
+    }
+  }
+cells {
+    A1: {
+      text: "Apples",
+      attrs: {
+        assess: {
+          method: "value", 
+          expected: "Apples"
+        }
+      }
+    },
+    A2: {
+      text: "Oranges", 
+      attrs: {
+        assess: {
+          method: "value",
+          expected: "Oranges"
+        }
+      }
+    },
+    A3: {
+      text: "Bananas",
+      attrs: {
+        assess: {
+          method: "value", 
+          expected: "Bananas"
+        }
+      }
+    },
+    B1: {
+      text: "{{B1}}",
+      attrs: {
+        assess: {
+          method: "value",
+          expected: "{{B1}}"
+        }
+      }
+    },
+    B2: {
+      text: "{{B2}}",
+      attrs: {
+        assess: {
+          method: "value",
+          expected: "{{B2}}"
+        }  
+      }
+    },
+    B3: {
+      text: "{{B3}}",
+      attrs: {
+        assess: {
+          method: "value",
+          expected: "{{B3}}"
+        }
+      }      
+    }
+}
+params {
+    B1: "140",
+    B2: "230", 
+    B3: "320"
+}
+{}..
+```
+
