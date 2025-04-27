@@ -156,7 +156,10 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
       .slice(0, limit);
 
     console.log(`Found ${topExamples.length} relevant examples for the prompt`);
-    
+    console.log(
+      "getRelevantExamples()",
+      "topExamples=" + JSON.stringify(topExamples, null, 2),
+    );
     return topExamples;
   } catch (error) {
     console.error('Error retrieving training examples:', error);

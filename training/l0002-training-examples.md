@@ -30,15 +30,6 @@ print payroll..
 ---
 
 ### Task
-"write a function that outputs the text 'hello world'"
-
-### Graffiticode
-| This program prints the string "Hello, world!"
-let main = <_: print "Hello, world!">..\nmain ().."
-
----
-
-### Task
 "use the function range to generate a list of number between 0 and 100 incremented by 10"
 
 ### Graffiticode
