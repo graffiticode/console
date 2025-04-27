@@ -43,75 +43,52 @@ cells {
 ### Code
 
 ```
-let table = {
-  rows: {
-    \"*\": {
+let cowsCount = "100"..
+let pigsCount = "200"..
+rows {
+  "*": {
+    assess: {
+      index: "B",
+      order: "actual", | "expected", "asc", "desc"
+    }
+  }
+}
+columns {
+  A: {
+    width: 100,
+    justify: "right",
+  },
+  B: {
+    width: 100,
+    justify: "left",
+  },
+}
+cells {
+  A1: {
+    text: "",
+    attrs: {
       assess: {
-        index: \"A\",
-        order: \"actual\" | \"expected\", \"asc\", \"desc\"
-      }
-    }
-  }
-  columns: {
-    A: {
-      width: 100,
-      justify: \"right\"
-    },
-    B: {
-      width: 100,
-      justify: \"left\"
-    }
-  }
-  cells: {
-    A1: {
-      text: \"{{A1}}\",
-      attrs: {
-        assess: {
-          method: \"value\",
-          expected: \"{{A1}}\"
-        }
+        method: "value",
+        expected: cowsCount,
       }
     },
-    A2: {
-      text: \"{{A2}}\",
-      attrs: {
-        assess: {
-          method: \"value\",
-          expected: \"{{A2}}\"
-        }
+  },
+  A2: {
+    text: "",
+    attrs: {
+      assess: {
+        method: "value",
+        expected: pigsCount,
       }
     },
-    B1: {
-      text: \"{{B1}}\",
-      attrs: {
-        assess: {
-          method: \"value\",
-          expected: \"{{B1}}\"
-        }
-      }
-    },
-    B2: {
-      text: \"{{B2}}\",
-      attrs: {
-        assess: {
-          method: \"value\",
-          expected: \"{{B2}}\"
-        }
-      }
-    }
-  }
-}..
-
-let params = {
-  A1: \"100\",
-  A2: \"200\", 
-  B1: \"cows\",
-  B2: \"pigs\"
-}..
-
-| The main issue was a missing double dot (..) to terminate the `let table` statement
-| Added the .. after the table record to fix this
-| Also added .. after the `let params` statement for consistency
-| Removed the empty record {} at the end as it served no purpose
+  },
+  B1: {
+    text: "cows",
+  },
+  B2: {
+    text: "pigs",
+  },
+}
+{}..
 ```
 
