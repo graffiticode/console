@@ -119,16 +119,9 @@ if (!outputDir.endsWith('/')) {
   outputDir += '/';
 }
 
-// Create full path for output file
-const outputFileName = filterByLanguage
-      ? `l${languageFilter}-training-examples.json`
-      : 'training_examples.json';
+// We'll create the markdown file path at write time
 
-const outputPath = path.join(process.cwd(), `${outputDir}/${outputFileName}`);
-
-console.log(
-  "outputPath=" + outputPath,
-);
+console.log(`Using output directory: ${outputDir}`);
 
 const serviceAccountPath = args.includes('--service-account')
   ? args[args.indexOf('--service-account') + 1]
@@ -359,7 +352,7 @@ function extractTaskFromMessages(messages) {
   return "Implement the following functionality";
 }
 
-// Function to convert training examples to the new markdown format
+// Function to convert training examples to the standardized markdown format
 function convertToMarkdownFormat(trainingExamples) {
   let markdown = `# Graffiticode Training Examples\n\n`;
   
@@ -377,7 +370,7 @@ function convertToMarkdownFormat(trainingExamples) {
   for (const [lang, examples] of Object.entries(examplesByLang)) {
     markdown += `## Language L${lang}\n\n`;
     
-    // Add each example in the new format
+    // Add each example in the standardized format
     examples.forEach((example, index) => {
       // Extract a meaningful task description from the messages
       const prompt = extractTaskFromMessages(example.messages);
@@ -385,6 +378,8 @@ function convertToMarkdownFormat(trainingExamples) {
       // Clean up the code
       const code = example.code.trim();
       
+      // Use the standard format with "Prompt" and "Code" sections
+      // Code is always wrapped in triple backticks
       markdown += `### Prompt\n"${prompt}"\n\n`;
       markdown += `### Code\n\n\`\`\`\n${code}\n\`\`\`\n\n`;
       
@@ -724,30 +719,22 @@ async function main() {
     // Sort by usage count (most used first)
     trainingExamples.sort((a, b) => b.usage_count - a.usage_count);
 
-    // Create the output directory if it doesn't exist
-    const outputDir = path.dirname(outputPath);
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
+    // Make sure the output directory exists
+    const fullOutputDir = path.resolve(process.cwd(), outputDir);
+    if (!fs.existsSync(fullOutputDir)) {
+      fs.mkdirSync(fullOutputDir, { recursive: true });
     }
 
     // Convert to the new markdown-like format
     const markdownExamples = convertToMarkdownFormat(trainingExamples);
     
-    // Get file extension based on format
-    const fileExtension = '.md';
-    const outputPathWithExt = outputPath.replace(/\.json$/, fileExtension);
+    // Output path always uses .md extension
+    const outputPathMd = path.join(fullOutputDir, `l${languageFilter || 'all'}-training-examples.md`);
     
-    // Write to output file
+    // Write to markdown file
     fs.writeFileSync(
-      outputPathWithExt,
+      outputPathMd,
       markdownExamples,
-      'utf8'
-    );
-    
-    // Also save the original JSON data for reference/debugging
-    fs.writeFileSync(
-      outputPath,
-      JSON.stringify(trainingExamples, null, 2),
       'utf8'
     );
 
@@ -756,9 +743,7 @@ async function main() {
     } else {
       console.log(`Successfully generated ${trainingExamples.length} training examples across all languages.`);
     }
-    console.log(`Generated files:`);
-    console.log(`- Markdown format: ${outputPathWithExt}`);
-    console.log(`- JSON format: ${outputPath}`);
+    console.log(`Generated file: ${outputPathMd}`);
 
   } catch (error) {
     console.error('Error generating training examples:', error);

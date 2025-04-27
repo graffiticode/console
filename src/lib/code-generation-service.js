@@ -115,13 +115,13 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
   try {
     console.log(`Getting relevant examples for language: ${lang}`);
 
-    // Import local training data from markdown format
+    // Import local training data from markdown format only
     const fs = require('fs');
     const path = require('path');
 
     let examples = [];
 
-    // Try to load the markdown file first
+    // Load the markdown file
     const mdFilePath = path.join(process.cwd(), `./training/l${lang}-training-examples.md`);
 
     if (fs.existsSync(mdFilePath)) {
@@ -130,15 +130,8 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
       examples = parseMarkdownExamples(markdownContent);
       console.log(`Loaded ${examples.length} examples from markdown file for L${lang}`);
     } else {
-      // Fall back to JSON if markdown file doesn't exist
-      const jsonFilePath = path.join(process.cwd(), `./training/l${lang}-training-examples.json`);
-      if (fs.existsSync(jsonFilePath)) {
-        examples = JSON.parse(fs.readFileSync(jsonFilePath, 'utf8'));
-        console.log(`Loaded ${examples.length} examples from JSON file for L${lang}`);
-      } else {
-        console.warn(`No training examples file found for L${lang}`);
-        return [];
-      }
+      console.warn(`No training examples file found for L${lang}`);
+      return [];
     }
 
     // Simple keyword matching to find relevant examples
@@ -153,7 +146,7 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
         // For markdown format
         textToSearch = (example.task + ' ' + example.code).toLowerCase();
       } else if (example.messages) {
-        // For dialog-based examples in JSON format
+        // For dialog-based examples
         textToSearch = example.messages.map(m => m.content).join(' ').toLowerCase();
       } else {
         // Fallback for other formats
@@ -219,11 +212,11 @@ export async function initializeTrainingExamples(lang = null) {
       }
     }
 
-    // Import local training data
+    // Import local training data from markdown only
     const fs = require('fs');
     const path = require('path');
 
-    // First try to load examples from markdown format (preferred)
+    // Load examples from markdown format
     let examples = [];
     const langFilter = lang ? lang : null;
 
@@ -235,10 +228,8 @@ export async function initializeTrainingExamples(lang = null) {
         examples = parseMarkdownExamples(markdownContent);
         console.log(`Loaded ${examples.length} examples from markdown file for L${langFilter}`);
       }
-    }
-
-    // If no examples loaded yet and no specific language filter, try loading from all markdown files
-    if (examples.length === 0 && !langFilter) {
+    } else {
+      // If no language filter, load all markdown files
       try {
         const trainingDir = path.join(process.cwd(), './training');
         const mdFiles = fs.readdirSync(trainingDir)
@@ -260,36 +251,21 @@ export async function initializeTrainingExamples(lang = null) {
       }
     }
 
-    // Fall back to JSON if still no examples
+    // If no examples found, return error
     if (examples.length === 0) {
-      try {
-        const jsonPath = path.join(process.cwd(), langFilter
-          ? `./training/l${langFilter}-training-examples.json`
-          : 'training_examples.json');
-
-        if (fs.existsSync(jsonPath)) {
-          examples = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-          console.log(`Loaded ${examples.length} examples from JSON file`);
-        }
-      } catch (error) {
-        console.error('Error loading JSON examples:', error);
-      }
+      return {
+        success: false,
+        message: `No examples found ${langFilter ? `for language ${langFilter}` : ''}`
+      };
     }
 
-    // Filter examples by language if specified and if we've loaded from a composite source
+    // Filter examples by language if specified and we've loaded from multiple files
     if (langFilter && examples.some(ex => ex.lang)) {
       examples = examples.filter(ex => {
         // If example has a lang field use it, otherwise assume it's for L0002
         const exampleLang = ex.lang || "0002";
         return exampleLang === langFilter;
       });
-    }
-
-    if (examples.length === 0) {
-      return {
-        success: false,
-        message: `No examples found ${langFilter ? `for language ${langFilter}` : ''}`
-      };
     }
 
     // Prepare batch writes (Firestore has a limit of 500 writes per batch)

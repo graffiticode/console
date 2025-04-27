@@ -3,7 +3,7 @@
 ## Language L0002
 
 ### Prompt
-"A program that computes the overtime payroll for a company with the following employee data: [ { name: "Alice", wage: 15, hours: 35 } { name: "Bob", wage: 20, hours: 50 } { name: "Charlie", wage: 18, hours: 40 } ]"
+"write a program that computes the overtime payroll for a company with the following employee data: [ { name: "Alice", wage: 15, hours: 35 } { name: "Bob", wage: 20, hours: 50 } { name: "Charlie", wage: 18, hours: 40 } ]"
 
 ### Code
 
@@ -33,6 +33,18 @@ print payroll..
 ---
 
 ### Prompt
+"write a function that outputs the text 'hello world'"
+
+### Code
+
+```
+| This program prints the string "Hello, world!"
+let main = <_: print "Hello, world!">..\nmain ().."
+```
+
+---
+
+### Prompt
 "use the function range to generate a list of number between 0 and 100 incremented by 10"
 
 ### Code
@@ -49,6 +61,7 @@ print numbers..
 "get the value of binding 'x' from and object that contains 'x'"
 
 ### Code
+
 ```
 | Get the value of a binding (field) in a record
 let obj = {x: 42 y: "hello"}..
@@ -252,9 +265,12 @@ print `Your favorite color is ${colorName favoriteColor}.`..
 "create an record with field named foo to 10 and then set another field named bar to 20"
 
 ### Code
+
+```
 let obj = {foo: 10}..
 set "bar" 20 obj..
 ..
+```
 
 ---
 
@@ -262,7 +278,6 @@ set "bar" 20 obj..
 "write fizzbuzz and print the result"
 
 ### Code
-
 
 ```
 let fizzBuzz = <n:
@@ -296,3 +311,4 @@ let tens = filter (isMultipleOfTen) evens..
 | Print the resulting list
 print tens..
 ```
+
