@@ -6,6 +6,8 @@
 "write a program that computes the overtime payroll for a company with the following employee data: [ { name: "Alice", wage: 15, hours: 35 } { name: "Bob", wage: 20, hours: 50 } { name: "Charlie", wage: 18, hours: 40 } ]"
 
 ### Graffiticode
+
+```
 | Function to calculate overtime pay for an employee
 let overtimePay = <employee:
   let wage = get employee "wage"..
@@ -26,6 +28,7 @@ let payroll = map (overtimePay) [
 
 | Print the payroll
 print payroll..
+```
 
 ---
 
@@ -33,9 +36,12 @@ print payroll..
 "use the function range to generate a list of number between 0 and 100 incremented by 10"
 
 ### Graffiticode
+
+```
 | Generate a list of numbers from 0 to 100 incremented by 10
 let numbers = range 0 101 10..
 print numbers..
+```
 
 ---
 
@@ -43,9 +49,11 @@ print numbers..
 "get the value of binding 'x' from and object that contains 'x'"
 
 ### Graffiticode
+```
 | Get the value of a binding (field) in a record
 let obj = {x: 42 y: "hello"}..
 print get "x" obj..
+```
 
 ---
 
@@ -53,8 +61,11 @@ print get "x" obj..
 "write a program that prints hello world. make sure to delineate comment with the line comment token |"
 
 ### Graffiticode
+
+```
 let main = <: print "Hello, world!">..
 main.."
+```
 
 ---
 
@@ -62,6 +73,8 @@ main.."
 "reduce a list of ten integers into the sum of their values"
 
 ### Graffiticode
+
+```
 | Define a list of 10 integers
 let numbers = [5 12 8 23 1 9 18 7 4 11]..
 
@@ -72,6 +85,7 @@ let sum = reduce (<acc num: add acc num>) 0 numbers..
 
 | Print the final sum
 print sum..
+```
 
 ---
 
@@ -84,6 +98,8 @@ let employees = [
 ].."
 
 ### Graffiticode
+
+```
 let add2 = <[a b]: add a b>..
 
 | Function to calculate an employee's pay including overtime
@@ -120,6 +136,7 @@ let employees = [
 | Calculate the total payroll
 let totalPayroll = calculatePayroll employees..
 print totalPayroll..
+```
 
 ---
 
@@ -127,6 +144,8 @@ print totalPayroll..
 "write a program that computes the overtime payroll for a company with the following employee data: [ { name: "Alice", wage: 15, hours: 35 } { name: "Bob", wage: 20, hours: 50 } { name: "Charlie", wage: 18, hours: 40 } ]"
 
 ### Graffiticode
+
+```
 | Function to calculate overtime pay for an employee
 let overtimePay = <acc employee:
   let wage = get employee "wage"..
@@ -148,6 +167,7 @@ let payroll = reduce (overtimePay) {} [
 
 | Print the payroll
 print payroll..
+```
 
 ---
 
@@ -155,6 +175,8 @@ print payroll..
 "use the builtin function filter to filter a list of even numbers between 0 and 100 so that only tenth value is remaining. print the result"
 
 ### Graffiticode
+
+```
 | Function to check if a number is a multiple of 10
 let isMultipleOfTen = <x: eq mod x 10 0>..
 
@@ -166,6 +188,7 @@ let tens = filter (isMultipleOfTen) evens..
 
 | Print the resulting list
 print tens..
+```
 
 ---
 
@@ -173,6 +196,8 @@ print tens..
 "add 3 to a list of ten integers and print the result"
 
 ### Graffiticode
+
+```
 | Generate a list of integers from 1 to 10
 let numbers = range 1 10 1..
 
@@ -184,6 +209,7 @@ let result = map (add3) numbers..
 
 | Print the resulting list
 print result..
+```
 
 ---
 
@@ -191,8 +217,11 @@ print result..
 "print the message 'hello, world!'"
 
 ### Graffiticode
+
+```
 | print the message 'hello, world!'
 print 'hello, world!'..
+```
 
 ---
 
@@ -200,6 +229,8 @@ print 'hello, world!'..
 "write me a program that uses tags to represent the colors blue, red and green. use a case of expression to distinguish between those tags"
 
 ### Graffiticode
+
+```
 | Function to get color name from tag
 let colorName = <color:
   case color of
@@ -213,6 +244,7 @@ let colorName = <color:
 | Example usage
 let favoriteColor = Blue..
 print `Your favorite color is ${colorName favoriteColor}.`..
+```
 
 ---
 
@@ -230,6 +262,9 @@ set "bar" 20 obj..
 "write fizzbuzz and print the result"
 
 ### Graffiticode
+
+
+```
 let fizzBuzz = <n:
   if eq 0 mod n 15 then "FizzBuzz"
   else if eq 0 mod n 3 then "Fizz"
@@ -239,6 +274,7 @@ let fizzBuzz = <n:
 let numbers = range 1 101 1..
 let result = map (fizzBuzz) numbers..
 print result..
+```
 
 ---
 
@@ -246,6 +282,8 @@ print result..
 "use the builtin function filter to filter a list of even numbers between 0 and 100 so that only tenth value is remaining. print the result"
 
 ### Graffiticode
+
+```
 | Function to check if a number is a multiple of 10
 let isMultipleOfTen = <x: eq mod x 10 0>..
 
@@ -257,4 +295,4 @@ let tens = filter (isMultipleOfTen) evens..
 
 | Print the resulting list
 print tens..
-
+```
