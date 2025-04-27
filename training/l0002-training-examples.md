@@ -3,9 +3,9 @@
 ## Language L0002
 
 ### Task
-"write a program that computes the overtime payroll for a company with the following employee data: [ { name: "Alice", wage: 15, hours: 35 } { name: "Bob", wage: 20, hours: 50 } { name: "Charlie", wage: 18, hours: 40 } ]"
+"A program that computes the overtime payroll for a company with the following employee data: [ { name: "Alice", wage: 15, hours: 35 } { name: "Bob", wage: 20, hours: 50 } { name: "Charlie", wage: 18, hours: 40 } ]"
 
-### Graffiticode
+### Code
 
 ```
 | Function to calculate overtime pay for an employee
@@ -35,7 +35,7 @@ print payroll..
 ### Task
 "use the function range to generate a list of number between 0 and 100 incremented by 10"
 
-### Graffiticode
+### Code
 
 ```
 | Generate a list of numbers from 0 to 100 incremented by 10
@@ -48,7 +48,7 @@ print numbers..
 ### Task
 "get the value of binding 'x' from and object that contains 'x'"
 
-### Graffiticode
+### Code
 ```
 | Get the value of a binding (field) in a record
 let obj = {x: 42 y: "hello"}..
@@ -60,7 +60,7 @@ print get "x" obj..
 ### Task
 "write a program that prints hello world. make sure to delineate comment with the line comment token |"
 
-### Graffiticode
+### Code
 
 ```
 let main = <: print "Hello, world!">..
@@ -72,7 +72,7 @@ main.."
 ### Task
 "reduce a list of ten integers into the sum of their values"
 
-### Graffiticode
+### Code
 
 ```
 | Define a list of 10 integers
@@ -97,7 +97,7 @@ let employees = [
   { name: "Charlie", wage: 18, hours: 40 }
 ].."
 
-### Graffiticode
+### Code
 
 ```
 let add2 = <[a b]: add a b>..
@@ -143,7 +143,7 @@ print totalPayroll..
 ### Task
 "write a program that computes the overtime payroll for a company with the following employee data: [ { name: "Alice", wage: 15, hours: 35 } { name: "Bob", wage: 20, hours: 50 } { name: "Charlie", wage: 18, hours: 40 } ]"
 
-### Graffiticode
+### Code
 
 ```
 | Function to calculate overtime pay for an employee
@@ -174,7 +174,7 @@ print payroll..
 ### Task
 "use the builtin function filter to filter a list of even numbers between 0 and 100 so that only tenth value is remaining. print the result"
 
-### Graffiticode
+### Code
 
 ```
 | Function to check if a number is a multiple of 10
@@ -195,7 +195,7 @@ print tens..
 ### Task
 "add 3 to a list of ten integers and print the result"
 
-### Graffiticode
+### Code
 
 ```
 | Generate a list of integers from 1 to 10
@@ -216,7 +216,7 @@ print result..
 ### Task
 "print the message 'hello, world!'"
 
-### Graffiticode
+### Code
 
 ```
 | print the message 'hello, world!'
@@ -228,7 +228,7 @@ print 'hello, world!'..
 ### Task
 "write me a program that uses tags to represent the colors blue, red and green. use a case of expression to distinguish between those tags"
 
-### Graffiticode
+### Code
 
 ```
 | Function to get color name from tag
@@ -251,7 +251,7 @@ print `Your favorite color is ${colorName favoriteColor}.`..
 ### Task
 "create an record with field named foo to 10 and then set another field named bar to 20"
 
-### Graffiticode
+### Code
 let obj = {foo: 10}..
 set "bar" 20 obj..
 ..
@@ -261,7 +261,7 @@ set "bar" 20 obj..
 ### Task
 "write fizzbuzz and print the result"
 
-### Graffiticode
+### Code
 
 
 ```
@@ -281,7 +281,7 @@ print result..
 ### Task
 "use the builtin function filter to filter a list of even numbers between 0 and 100 so that only tenth value is remaining. print the result"
 
-### Graffiticode
+### Code
 
 ```
 | Function to check if a number is a multiple of 10
