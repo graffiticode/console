@@ -94,7 +94,7 @@ export default function Gallery({ lang, mark }) {
   const [ newTask, setNewTask ] = useState(null);
   const [ showSaving, setShowSaving ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
-  const [ editorHeight, setEditorHeight ] = useState(350);
+  const [ editorHeight, setEditorHeight ] = useState(600);
   const [ id, _setId ] = useState("");
 
   // Wrapped setId to store the ID in localStorage when it changes
