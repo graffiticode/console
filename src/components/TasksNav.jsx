@@ -391,7 +391,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
 
   return (
     <div
-      className="w-64 flex shrink flex-col gap-y-5 overflow-y-auto bg-white pt-4 max-h-screen"
+      className="w-[215px] flex-none flex flex-col gap-y-5 overflow-hidden bg-white pt-4 max-h-screen"
     >
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
@@ -419,8 +419,9 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                         }}
                         className={classNames(
                           item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                          'block rounded-none py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900'
+                          'block rounded-none py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[175px] text-left'
                         )}
+                        title={item.name}
                       >
                         {item.name}
                       </button>
@@ -456,8 +457,9 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                               }}
                               className={classNames(
                                 item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                                'flex items-center w-full text-xs text-left rounded-none px-2 gap-x-3 text-sm leading-6 font-bold text-gray-700'
+                                'flex items-center w-full text-xs text-left rounded-none px-2 gap-x-3 leading-6 font-bold text-gray-700'
                               )}
+                              title={item.name}
                             >
                               <ChevronRightIcon
                                 className={classNames(
@@ -466,7 +468,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                                 )}
                                 aria-hidden="true"
                               />
-                              {item.name}
+                              <span className="truncate max-w-[140px]">{item.name}</span>
                             </Disclosure.Button>
                             { showId === item.id &&
                               <EllipsisMenu
@@ -499,8 +501,9 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                                     }}
                                     className={classNames(
                                       subItem.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                                      'font-normal block rounded-none py-0 pr-2 pl-8 text-xs leading-6 text-gray-700'
+                                      'font-normal block rounded-none py-0 pr-2 pl-8 text-xs leading-6 text-gray-700 truncate max-w-[160px] text-left'
                                     )}
+                                    title={subItem.name}
                                   >
                                     {subItem.name}
                                   </button>

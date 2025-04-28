@@ -193,7 +193,7 @@ export default function Gallery({ lang, mark }) {
 
   return (
     <div className="flex h-[calc(100vh-64px)]">
-      <div className="colspan-1 h-full overflow-auto">
+      <div className="flex-none w-[220px] h-full overflow-auto">
         <button
           className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
           title="New Task"
@@ -202,7 +202,7 @@ export default function Gallery({ lang, mark }) {
         </button>
         <TasksNav user={user} setId={setId} tasks={tasks} />
       </div>
-      <div className="flex flex-col grow pt-2 px-4 sm:px-6">
+      <div className="flex flex-col grow pt-2 px-2 sm:px-4">
         <div className={classNames(
                hideEditor ? "lg:grid-cols-1" : "lg:grid-cols-1",
                "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
