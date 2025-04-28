@@ -206,7 +206,10 @@ export default function Editor({
   return (
     <div className="flex items-start space-x-4">
       <div className="min-w-0 flex-1 relative">
-        <div className="sticky top-0 bg-white z-10">
+        {/* Sticky tabs container */}
+        <div
+          className="sticky top-0 bg-white z-30 shadow-sm"
+        >
           <Tabs
             tab={tab}
             setTab={setTab}
@@ -216,8 +219,14 @@ export default function Editor({
             setSaveDisabled={setSaveDisabled}
           />
         </div>
+
+        {/* Content container with scrolling */}
         <div
-          style={{height, overflowY: "auto"}}
+          style={{
+//            height: height ? `calc(${height}px - 56px)` : '500px',
+            overflowY: "auto",
+            marginTop: "0"
+          }}
         >
           {
             (() => {

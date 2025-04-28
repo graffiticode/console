@@ -47,38 +47,6 @@ export const HelpPanel = ({
     language,
   });
 
-  // // Custom function to handle code generation specifically
-  // const handleCodeGeneration = async (content) => {
-  //   try {
-  //     // Call the generateCode API for Graffiticode
-  //     console.log(
-  //       "HelpPanel/handleCodeGeneration()",
-  //       "user=" + JSON.stringify(user),
-  //     );
-  //     const result = await generateCode({
-  //       prompt: content,
-  //       options: {
-  //         temperature: 0.7,
-  //         maxTokens: 2000
-  //       }
-  //     });
-
-  //     return {
-  //       text: result.code,
-  //       type: 'code',
-  //       model: result.model,
-  //       language: result.language || 'graffiticode',
-  //       usage: result.usage
-  //     };
-  //   } catch (error) {
-  //     console.error("Error generating code:", error);
-  //     return {
-  //       text: "Error generating code: " + error.message,
-  //       type: 'error'
-  //     };
-  //   }
-  // };
-
   // Scroll to bottom whenever messages change
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -97,12 +65,6 @@ export const HelpPanel = ({
       },
       ...prev
     ]);
-
-    // // If no bot response was provided, generate one
-    // if (!botResponse) {
-    //   // Generate code since this is a code assistant
-    //   botResponse = await handleCodeGeneration(userMessage);
-    // }
 
     // Add bot response to the chat
     setHelp(prev => [
@@ -123,18 +85,6 @@ export const HelpPanel = ({
 
   // State for the input field
   const [messageText, setMessageText] = useState('');
-
-  // Handle submitting the form
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!messageText.trim() || isLoading) return;
-
-    const message = messageText;
-    setMessageText('');
-
-    // Use the ChatBot's send message handler
-    await handleSendMessage(message);
-  };
 
   // Integration with TextEditor component
   const [state] = useState(createState({}, (data, { type, args }) => {
@@ -182,21 +132,15 @@ export const HelpPanel = ({
   };
 
   if (typeof help === "string" && help.trim() !== "") {
-    console.log("[1] Parsing help: " + help);
     help = JSON.parse(help);
     if (typeof help === "string" && help.trim() !== "") {
-      console.log("[2] Parsing help: " + help);
       help = JSON.parse(help);
     }
   }
-  console.log(
-    "HelpPanel",
-    "help=" + JSON.stringify(help, null, 2),
-  );
   return (
     <div className="flex flex-col h-full">
-      {/* Input field at the top, aligned with output boxes */}
-      <div className="px-4 mb-4 py-2">
+      {/* Input field at the top, aligned with output boxes - made sticky */}
+      <div className="sticky top-0 z-10 bg-white px-4 py-2 border-b shadow-sm">
         <div className="flex justify-between items-center mb-1">
           <div className="text-sm font-semibold text-gray-500">
             What would you like to make with Graffiticode?
@@ -223,22 +167,30 @@ export const HelpPanel = ({
             />
           </div>
         </div>
+
+        {/* Loading indicator inside sticky container */}
+        {isLoading && (
+          <div className="flex items-center mt-3">
+            <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-lg text-gray-600 border border-gray-200 shadow-sm">
+              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              <span className="text-gray-500 ml-2 text-xs">Generating Graffiticode...</span>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Loading indicator right below input */}
-      {isLoading && (
-        <div className="flex items-center px-4 mb-4">
-          <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-lg text-gray-600 border border-gray-200 shadow-sm">
-            <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-            <span className="text-gray-500 ml-2 text-xs">Generating Graffiticode...</span>
-          </div>
-        </div>
-      )}
+      {/* Add some space between sticky header and content */}
+      <div className="h-4"></div>
 
       {/* Messages in reverse chronological order */}
-      <div className="flex-grow overflow-auto px-4">
+      <div className="flex-grow overflow-auto px-4 pb-4">
+        {help.length === 0 && (
+          <div className="text-center text-gray-400 py-8">
+            No messages yet. Start by asking a question above.
+          </div>
+        )}
         {help.map((item, index) => (
           <div key={index} className={`mb-4 ${item.type === 'user' ? 'text-right' : 'text-left'} relative group`}>
             {/* Only show delete button on user messages */}
