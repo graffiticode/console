@@ -243,10 +243,15 @@ export const HelpPanel = ({
             ) : item.help?.type === 'code' ? (
               <div className="bg-gray-100 rounded-lg p-3 shadow-sm">
                 <div className="relative">
-                  <pre className="bg-gray-800 text-gray-100 p-3 rounded overflow-x-auto text-xs font-mono">
+                  <pre
+                    className="bg-gray-800 text-gray-100 p-3 rounded overflow-auto text-xs font-mono max-h-[400px] pr-12"
+                    style={{
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: '#4B5563 #1F2937'
+                    }}>
                     {item.help?.text}
                   </pre>
-                  <div className="absolute top-2 right-2 flex space-x-1">
+                  <div className="absolute top-2 right-5 flex space-x-1">
                     <button
                       className="text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded p-1"
                       onClick={() => {
