@@ -34,7 +34,6 @@ export const HelpPanel = ({
 }) => {
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
-  const messagesEndRef = useRef(null);
   const { user } = useGraffiticodeAuth();
 
   // ChatBot integration
@@ -47,12 +46,7 @@ export const HelpPanel = ({
     language,
   });
 
-  // Scroll to bottom whenever messages change
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [help]);
+  // No need to scroll since messages are in reverse chronological order (newest at top)
 
   // Handle sending a new message
   const handleMessage = useCallback(async (userMessage, botResponse = null) => {
@@ -137,10 +131,42 @@ export const HelpPanel = ({
       help = JSON.parse(help);
     }
   }
+
+  // Create a ref to measure the header height
+  const headerRef = useRef(null);
+  const [headerHeight, setHeaderHeight] = useState(130);  // Default initial height
+
+  // Update header height when it changes
+  useEffect(() => {
+    if (headerRef.current) {
+      const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+          setHeaderHeight(entry.contentRect.height);
+        }
+      });
+
+      resizeObserver.observe(headerRef.current);
+
+      // Initial height measurement
+      setHeaderHeight(headerRef.current.offsetHeight);
+
+      return () => {
+        resizeObserver.disconnect();
+      };
+    }
+  }, []);
+
+  // Update header height when loading state changes
+  useEffect(() => {
+    if (headerRef.current) {
+      setHeaderHeight(headerRef.current.offsetHeight);
+    }
+  }, [isLoading]);
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Input field at the top, aligned with output boxes - made sticky */}
-      <div className="sticky top-0 z-10 bg-white px-4 py-2 border-b shadow-sm">
+    <div className="flex flex-col h-[calc(100vh-120px)]">
+      {/* Fixed height header containing input field and controls */}
+      <div ref={headerRef} className="flex-none sticky top-0 z-10 bg-white px-4 py-2 border-b shadow-sm">
         <div className="flex justify-between items-center mb-1">
           <div className="text-sm font-semibold text-gray-500">
             What would you like to make with Graffiticode?
@@ -170,7 +196,7 @@ export const HelpPanel = ({
 
         {/* Loading indicator inside sticky container */}
         {isLoading && (
-          <div className="flex items-center mt-3">
+          <div className="flex items-center mt-3 mb-2">
             <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-lg text-gray-600 border border-gray-200 shadow-sm">
               <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
               <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
@@ -181,11 +207,15 @@ export const HelpPanel = ({
         )}
       </div>
 
-      {/* Add some space between sticky header and content */}
-      <div className="h-4"></div>
-
-      {/* Messages in reverse chronological order */}
-      <div className="flex-grow overflow-auto px-4 pb-4">
+      {/* Scrollable messages container - dynamically sized based on header height */}
+      <div
+        className="overflow-auto px-4 py-4"
+        style={{
+          height: `calc(100vh - ${headerHeight}px - 120px)`,
+          marginTop: '8px',
+          marginBottom: '8px'
+        }}
+      >
         {help.length === 0 && (
           <div className="text-center text-gray-400 py-8">
             No messages yet. Start by asking a question above.
@@ -212,20 +242,6 @@ export const HelpPanel = ({
               </div>
             ) : item.help?.type === 'code' ? (
               <div className="bg-gray-100 rounded-lg p-3 shadow-sm">
-                {/*
-                <div className="flex justify-between mb-2">
-                  <div className="flex items-center">
-                    {item.help.model && (
-                      <span className="text-xs text-gray-500 ml-2">
-                        {item.help.model}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-xs text-gray-500">
-                    {item.help.usage && formatTokenUsage(item.help.usage)}
-                  </span>
-                  </div>
-                 */}
                 <div className="relative">
                   <pre className="bg-gray-800 text-gray-100 p-3 rounded overflow-x-auto text-xs font-mono">
                     {item.help?.text}
@@ -243,8 +259,8 @@ export const HelpPanel = ({
                       }}
                       title="Refresh Code"
                     >
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
-  <path fill-rule="evenodd" d="M8 3.5c-.771 0-1.537.022-2.297.066a1.124 1.124 0 0 0-1.058 1.028l-.018.214a.75.75 0 1 1-1.495-.12l.018-.221a2.624 2.624 0 0 1 2.467-2.399 41.628 41.628 0 0 1 4.766 0 2.624 2.624 0 0 1 2.467 2.399c.056.662.097 1.329.122 2l.748-.748a.75.75 0 1 1 1.06 1.06l-2 2.001a.75.75 0 0 1-1.061 0l-2-1.999a.75.75 0 0 1 1.061-1.06l.689.688a39.89 39.89 0 0 0-.114-1.815 1.124 1.124 0 0 0-1.058-1.028A40.138 40.138 0 0 0 8 3.5ZM3.22 7.22a.75.75 0 0 1 1.061 0l2 2a.75.75 0 1 1-1.06 1.06l-.69-.69c.025.61.062 1.214.114 1.816.048.56.496.996 1.058 1.028a40.112 40.112 0 0 0 4.594 0 1.124 1.124 0 0 0 1.058-1.028 39.2 39.2 0 0 0 .018-.219.75.75 0 1 1 1.495.12l-.018.226a2.624 2.624 0 0 1-2.467 2.399 41.648 41.648 0 0 1-4.766 0 2.624 2.624 0 0 1-2.467-2.399 41.395 41.395 0 0 1-.122-2l-.748.748A.75.75 0 1 1 1.22 9.22l2-2Z" clip-rule="evenodd" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-4">
+  <path fillRule="evenodd" d="M8 3.5c-.771 0-1.537.022-2.297.066a1.124 1.124 0 0 0-1.058 1.028l-.018.214a.75.75 0 1 1-1.495-.12l.018-.221a2.624 2.624 0 0 1 2.467-2.399 41.628 41.628 0 0 1 4.766 0 2.624 2.624 0 0 1 2.467 2.399c.056.662.097 1.329.122 2l.748-.748a.75.75 0 1 1 1.06 1.06l-2 2.001a.75.75 0 0 1-1.061 0l-2-1.999a.75.75 0 0 1 1.061-1.06l.689.688a39.89 39.89 0 0 0-.114-1.815 1.124 1.124 0 0 0-1.058-1.028A40.138 40.138 0 0 0 8 3.5ZM3.22 7.22a.75.75 0 0 1 1.061 0l2 2a.75.75 0 1 1-1.06 1.06l-.69-.69c.025.61.062 1.214.114 1.816.048.56.496.996 1.058 1.028a40.112 40.112 0 0 0 4.594 0 1.124 1.124 0 0 0 1.058-1.028 39.2 39.2 0 0 0 .018-.219.75.75 0 1 1 1.495.12l-.018.226a2.624 2.624 0 0 1-2.467 2.399 41.648 41.648 0 0 1-4.766 0 2.624 2.624 0 0 1-2.467-2.399 41.395 41.395 0 0 1-.122-2l-.748.748A.75.75 0 1 1 1.22 9.22l2-2Z" clipRule="evenodd" />
 </svg>
                     </button>
                     <button
@@ -267,7 +283,7 @@ export const HelpPanel = ({
                       title="Pull Code"
                       disabled={!code}
                     >
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-4">
   <path d="M8.75 2.75a.75.75 0 0 0-1.5 0v5.69L5.03 6.22a.75.75 0 0 0-1.06 1.06l3.5 3.5a.75.75 0 0 0 1.06 0l3.5-3.5a.75.75 0 0 0-1.06-1.06L8.75 8.44V2.75Z" />
   <path d="M3.5 9.75a.75.75 0 0 0-1.5 0v1.5A2.75 2.75 0 0 0 4.75 14h6.5A2.75 2.75 0 0 0 14 11.25v-1.5a.75.75 0 0 0-1.5 0v1.5c0 .69-.56 1.25-1.25 1.25h-6.5c-.69 0-1.25-.56-1.25-1.25v-1.5Z" />
 </svg>

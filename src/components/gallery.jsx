@@ -192,8 +192,8 @@ export default function Gallery({ lang, mark }) {
   }
 
   return (
-    <div className="flex">
-      <div className="colspan-1">
+    <div className="flex h-[calc(100vh-64px)]">
+      <div className="colspan-1 h-full overflow-auto">
         <button
           className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
           title="New Task"
@@ -202,7 +202,7 @@ export default function Gallery({ lang, mark }) {
         </button>
         <TasksNav user={user} setId={setId} tasks={tasks} />
       </div>
-      <div className="flex flex-col grow mt-6 px-4 sm:px-6">
+      <div className="flex flex-col grow pt-2 px-4 sm:px-6">
         <div className={classNames(
                hideEditor ? "lg:grid-cols-1" : "lg:grid-cols-1",
                "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
@@ -226,9 +226,9 @@ export default function Gallery({ lang, mark }) {
                   showSaving &&
                     "ring-8" ||
                     "ring-0",
-                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-none overflow-auto resize-y"
+                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-none overflow-hidden mb-2"
                 )}
-                style={{height: editorHeight}}
+                style={{height: "calc(100vh - 80px)"}}
               >
                 <Editor
                   accessToken={accessToken}

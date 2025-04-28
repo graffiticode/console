@@ -204,11 +204,11 @@ export default function Editor({
   }
 
   return (
-    <div className="flex items-start space-x-4">
-      <div className="min-w-0 flex-1 relative">
+    <div className="flex items-start space-x-4 h-full min-h-[calc(100vh-120px)]">
+      <div className="min-w-0 flex-1 relative flex flex-col h-full">
         {/* Sticky tabs container */}
         <div
-          className="sticky top-0 bg-white z-30 shadow-sm"
+          className="sticky top-0 bg-white z-30 shadow-sm flex-none"
         >
           <Tabs
             tab={tab}
@@ -222,9 +222,9 @@ export default function Editor({
 
         {/* Content container with scrolling */}
         <div
+          className="flex-grow overflow-auto"
           style={{
-//            height: height ? `calc(${height}px - 56px)` : '500px',
-            overflowY: "auto",
+            height: "calc(100vh - 120px)", // Full viewport height minus tabs and navbar
             marginTop: "0"
           }}
         >
