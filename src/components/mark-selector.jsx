@@ -15,7 +15,7 @@ export const marks = [
   { id: 1, color: GREEN },
   { id: 2, color: AMBER },
   { id: 3, color: RED },
-  { id: 4, color: GRAY },
+  { id: 4, color: BLUE },
   { id: 5, color: BLACK },
 ];
 
