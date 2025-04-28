@@ -391,12 +391,12 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
 
   return (
     <div
-      className="w-[215px] flex-none flex flex-col gap-y-5 overflow-hidden bg-white pt-4 max-h-screen"
+      className="w-[210px] flex-none flex flex-col gap-y-2 overflow-visible bg-white pt-2 max-h-[calc(100vh-110px)] sticky top-[84px]"
     >
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
-          <li>
-            <ul role="list" className="-mx-2 space-y-1">
+          <li className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+            <ul role="list" className="space-y-1">
               {items.map((item) => (
                 <li key={item.id}>
                   {!item.children ? (
@@ -419,7 +419,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                         }}
                         className={classNames(
                           item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                          'block rounded-none py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[175px] text-left'
+                          'block rounded-none py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left'
                         )}
                         title={item.name}
                       >
@@ -468,7 +468,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                                 )}
                                 aria-hidden="true"
                               />
-                              <span className="truncate max-w-[140px]">{item.name}</span>
+                              <span className="truncate max-w-[130px]">{item.name}</span>
                             </Disclosure.Button>
                             { showId === item.id &&
                               <EllipsisMenu
@@ -501,7 +501,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                                     }}
                                     className={classNames(
                                       subItem.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                                      'font-normal block rounded-none py-0 pr-2 pl-8 text-xs leading-6 text-gray-700 truncate max-w-[160px] text-left'
+                                      'font-normal block rounded-none py-0 pr-2 pl-8 text-xs leading-6 text-gray-700 truncate max-w-[150px] text-left'
                                     )}
                                     title={subItem.name}
                                   >

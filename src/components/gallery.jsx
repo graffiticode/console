@@ -193,13 +193,15 @@ export default function Gallery({ lang, mark }) {
 
   return (
     <div className="flex h-[calc(100vh-64px)]">
-      <div className="flex-none w-[220px] h-full overflow-auto">
-        <button
-          className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-          title="New Task"
-          onClick={handleCreateTask}>
-          +
-        </button>
+      <div className="flex-none w-[210px] h-full">
+        <div className="sticky top-[64px] bg-white z-20 pb-2">
+          <button
+            className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
+            title="New Task"
+            onClick={handleCreateTask}>
+            +
+          </button>
+        </div>
         <TasksNav user={user} setId={setId} tasks={tasks} />
       </div>
       <div className="flex flex-col grow pt-2 px-2 sm:px-4">
