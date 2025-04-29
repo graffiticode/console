@@ -123,8 +123,6 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                       <a
                         href="https://forum.graffiticode.com/"
                         className="text-sky-300 hover:text-sky-400"
-                        target="_blank"
-                        rel="noopener"
                       >
                         Community
                       </a>
@@ -169,8 +167,6 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                     <a
                       href="https://forum.graffiticode.com/"
                       className="text-sky-300 hover:text-sky-400 text-sm mr-8"
-                      target="_blank"
-                      rel="noopener"
                     >
                       Community
                     </a>
