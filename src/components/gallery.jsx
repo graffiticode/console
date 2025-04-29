@@ -194,7 +194,7 @@ export default function Gallery({ lang, mark }) {
   return (
     <div className="flex h-[calc(100vh-64px)]">
       <div className="flex-none w-[210px] h-full">
-        <div className="sticky top-[64px] bg-white z-20 pb-2">
+        <div className="sticky top-[64px] bg-white z-40 pb-2">
           <button
             className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
             title="New Task"

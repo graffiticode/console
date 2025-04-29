@@ -166,7 +166,7 @@ export const HelpPanel = ({
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
       {/* Fixed height header containing input field and controls */}
-      <div ref={headerRef} className="flex-none sticky top-0 z-10 bg-white px-4 py-2 border-b shadow-sm">
+      <div ref={headerRef} className="flex-none sticky top-0 z-20 bg-white px-4 py-2 border-b shadow-sm">
         <div className="flex justify-between items-center mb-1">
           <div className="text-sm font-semibold text-gray-500">
             What would you like to make with Graffiticode?
