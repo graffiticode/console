@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Image from 'next/image';
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment, useRef } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
@@ -119,8 +119,18 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                     }
                   </div>
                   <div className="hidden md:block">
-                    <div className="text-sm font-medium ml-4 flex items-center md:ml-6 text-gray-400 hover:text-white">
-                      <SignIn userId={userId} setUserId={setUserId}/>
+                    <div className="text-sm font-medium ml-4 flex items-center md:ml-6 space-x-8">
+                      <a
+                        href="https://forum.graffiticode.com/"
+                        className="text-sky-300 hover:text-sky-400"
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        Community
+                      </a>
+                      <div className="text-gray-400 hover:text-white">
+                        <SignIn userId={userId} setUserId={setUserId}/>
+                      </div>
                     </div>
                   </div>
                   <div className="-mr-2 flex md:hidden">
@@ -155,8 +165,18 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                   ))}
                 </div>
                 <div className="pt-4 pb-3 border-t border-gray-700">
-                  <div className="flex items-center px-5 text-gray-400 hover:text-white">
-                    <SignIn />
+                  <div className="flex items-center px-5">
+                    <a
+                      href="https://forum.graffiticode.com/"
+                      className="text-sky-300 hover:text-sky-400 text-sm mr-8"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      Community
+                    </a>
+                    <div className="text-gray-400 hover:text-white">
+                      <SignIn />
+                    </div>
                     <button
                       type="button"
                       className="ml-auto bg-gray-800 flex-shrink-0 p-1 rounded-none text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
