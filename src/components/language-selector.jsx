@@ -19,7 +19,7 @@ import { getTitle } from '../lib/utils';
 
 const languages = [
   {id: 1,  name: 'L0001', desc: "Base language", domains: ["hide"]},
-  {id: 2,  name: 'L0002', desc: "Base language, v2", domains: ["graffiticode"]},
+  {id: 2,  name: 'L0002', desc: "Base language", domains: ["graffiticode"]},
   {id: 3,  name: 'L0011', desc: "Property editors", domains: ["hide"]},
   {id: 4,  name: 'L0012', desc: "Object viewers", domains: ["hide"]},
   {id: 5,  name: 'L0137', desc: "Data transformers", domains: ["hide"]},
@@ -40,7 +40,7 @@ const languages = [
   {id: 20, name: 'L0162', desc: "Walking routes", domains: ["hide"]},
   {id: 21, name: 'L0163', desc: "Code editors", domains: ["hide"]},
   {id: 22, name: 'L0164', desc: "Code generators", domains: ["hide"]},
-  {id: 23, name: 'L0165', desc: "Spreadsheet questions, v2", domains: ["graffiticode"]},
+  {id: 23, name: 'L0165', desc: "Spreadsheet questions", domains: ["graffiticode"]},
 ];
 
 function classNames(...classes) {
@@ -65,9 +65,12 @@ export default function LanguageSelector({ domain, language, setLanguage }) {
             language.domains.length === 0 ||
             language.domains.includes(domain.toLowerCase())
         );
-  // Check if query is a valid custom language format (e.g., "L0177")
-  const isCustomLanguage = query && /^L\d+$/i.test(query) &&
-    !domainLanguages.some(lang => lang.name.toLowerCase() === query.toLowerCase());
+  // Normalize the query to ensure it has the leading "L" if it's just numbers
+  const normalizedQuery = query && /^\d+$/.test(query) ? `L${query}` : query;
+
+  // Check if query is a valid custom language format (e.g., "L0177" or just "0177")
+  const isCustomLanguage = normalizedQuery && /^L\d+$/i.test(normalizedQuery) &&
+    !domainLanguages.some(lang => lang.name.toLowerCase() === normalizedQuery.toLowerCase());
 
   // For custom languages, we want to still show all domain languages in the dropdown
   // When no query is entered, show all domain languages
@@ -75,9 +78,19 @@ export default function LanguageSelector({ domain, language, setLanguage }) {
   const filteredLanguages =
         query === ""
           ? domainLanguages
-          : domainLanguages.filter(language =>
-              language.name.toLowerCase().includes(query.toLowerCase())
-            );
+          : domainLanguages.filter(language => {
+              // Match "L0177" format directly
+              if (language.name.toLowerCase().includes(query.toLowerCase())) {
+                return true;
+              }
+
+              // Match just numbers (e.g., "0177") against language names (e.g., "L0177")
+              if (/^\d+$/.test(query)) {
+                return language.name.toLowerCase().includes(`l${query.toLowerCase()}`);
+              }
+
+              return false;
+            });
   return (
     <Combobox as="div" value={language} onChange={setLanguage}>
       <div className="relative">
@@ -95,7 +108,7 @@ export default function LanguageSelector({ domain, language, setLanguage }) {
             {isCustomLanguage && (
               <Combobox.Option
                 key="custom"
-                value={{ id: 'custom', name: query.toUpperCase(), desc: "Custom language" }}
+                value={{ id: 'custom', name: normalizedQuery.toUpperCase(), desc: "Custom language" }}
                 className={({ active }) =>
                   classNames(
                     'relative cursor-default select-none py-2 pl-8 pr-4',
@@ -106,7 +119,7 @@ export default function LanguageSelector({ domain, language, setLanguage }) {
                 {({ active, selected }) => (
                   <>
                     <span className={classNames('block truncate', selected && 'font-semibold')}>
-                      {query.toUpperCase()} (Custom)
+                      {normalizedQuery.toUpperCase()} (Custom)
                     </span>
                     {selected && (
                       <span
