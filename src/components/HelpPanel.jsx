@@ -199,12 +199,9 @@ export const HelpPanel = ({
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
-      {/* Fixed height header containing input field and controls */}
-      <div ref={headerRef} className="flex-none sticky top-0 z-20 bg-white px-4 py-2 border-b shadow-sm">
-        <div className="flex justify-between items-center mb-1">
-          <div className="text-sm font-semibold text-gray-500">
-            What would you like to make with Graffiticode?
-          </div>
+      {/* Clear all button at the top */}
+      <div className="flex-none py-2 px-4 border-b">
+        <div className="flex justify-end">
           {help.length > 0 && (
             <button
               className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors"
@@ -215,44 +212,18 @@ export const HelpPanel = ({
             </button>
           )}
         </div>
-        <div className="text-xs font-light text-gray-500 mt-1 mb-2">
-          Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
-          Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for a new line.
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div className="p-1 pb-0">
-            <TextEditor
-              state={state}
-              disabled={isLoading}
-            />
-          </div>
-        </div>
-
-        {/* Loading indicator inside sticky container */}
-        {isLoading && (
-          <div className="flex items-center mt-3 mb-2">
-            <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-lg text-gray-600 border border-gray-200 shadow-sm">
-              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              <span className="text-gray-500 ml-2 text-xs">Generating Graffiticode...</span>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Scrollable messages container - dynamically sized based on header height */}
+      {/* Scrollable messages container - now takes most of the space */}
       <div
-        className="overflow-auto px-4 py-4"
+        className="flex-grow overflow-auto px-4 py-4"
         style={{
-          height: `calc(100vh - ${headerHeight}px - 120px)`,
-          marginTop: '8px',
-          marginBottom: '8px'
+          height: 'calc(100vh - 240px)' // Adjusted to account for input at bottom
         }}
       >
         {help.length === 0 && (
           <div className="text-center text-gray-400 py-8">
-            No messages yet. Start by asking a question above.
+            No messages yet. Start by asking a question below.
           </div>
         )}
         {help.map((item, index) => (
@@ -283,6 +254,39 @@ export const HelpPanel = ({
         ))}
         {/* Invisible element for auto-scrolling to bottom */}
         <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input field at the bottom */}
+      <div ref={headerRef} className="flex-none sticky bottom-0 z-20 bg-white px-4 py-3 border-t shadow-md">
+        <div className="flex justify-between items-center mb-1">
+          <div className="text-sm font-semibold text-gray-500">
+            What would you like to make with Graffiticode?
+          </div>
+        </div>
+        <div className="text-xs font-light text-gray-500 mt-1 mb-2">
+          Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
+          Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for a new line.
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className="p-1 pb-0">
+            <TextEditor
+              state={state}
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+
+        {/* Loading indicator inside sticky container */}
+        {isLoading && (
+          <div className="flex items-center mt-3 mb-2">
+            <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-lg text-gray-600 border border-gray-200 shadow-sm">
+              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              <span className="text-gray-500 ml-2 text-xs">Generating Graffiticode...</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
