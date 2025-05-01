@@ -195,7 +195,7 @@ export const HelpPanel = ({
   // Function to create conversation pairs from messages
   const createConversationPairs = () => {
     const pairs = [];
-    
+
     // First create pairs of user-bot messages from the original array
     for (let i = 0; i < help.length; i++) {
       if (help[i].type === 'user') {
@@ -206,7 +206,7 @@ export const HelpPanel = ({
           bot: botResponse,
           index: i
         });
-        
+
         // Skip the bot message in the next iteration if we found one
         if (botResponse) i++;
       } else if (help[i].type === 'bot') {
@@ -218,7 +218,7 @@ export const HelpPanel = ({
         });
       }
     }
-    
+
     // Reverse the pairs to show newest conversations first
     return pairs.reverse();
   };
@@ -279,10 +279,10 @@ export const HelpPanel = ({
             No messages yet. Start by asking a question above.
           </div>
         )}
-        
+
         {/* Invisible element for auto-scrolling to top */}
         <div ref={messagesEndRef} />
-        
+
         {/* Group messages into user-bot pairs and display in reverse chronological order */}
         {createConversationPairs().map((pair, pairIndex) => (
           <div key={pairIndex} className="mb-6 relative group">
@@ -296,7 +296,7 @@ export const HelpPanel = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            
+
             {/* User message always displayed first/above */}
             {pair.user && (
               <div className="mb-2 text-right">
@@ -305,7 +305,7 @@ export const HelpPanel = ({
                 </div>
               </div>
             )}
-            
+
             {/* Bot response displayed second/below the user message */}
             {pair.bot && (
               <div className="text-left">
