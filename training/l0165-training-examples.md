@@ -3,42 +3,148 @@
 ## Language L0165
 
 ### Prompt
-"Create a 2 by 2 spreadsheet with the content being the names of the cells"
+"Create a spreadsheet assessment that asked the student to complete a spreadsheet that has the line items of Income, Rent/Mortgage, Utilities, Food, Transportation, Entertainment, Savings, and Miscellaneous. Give reasonable fixed values for the Income, Utilities and Entertainment. Prompt the student to complete the cells for Rent as 35% of Income, Food as 15%, Transportation as 10%, Savings as 20%, and Miscellaneous as the amount that is left over.
 
-### Code
+create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
 
-```
+### Chat Transcript
+
+**Assistant**: ```graffiticode
+let income = 5000..
+let utilities = 200..
+let entertainment = 300..
+
 columns {
   A: {
-    width: 50,
-    justify: "center",
+    width: 150
+    justify: "left"
+  }
+  B: {
+    width: 100
+    justify: "right"
+  }
+}
+
+cells {
+  A1: { text: "Income" }
+  B1: { text: income }
+
+  A2: {
+    text: "Rent/Mortgage"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.35"
+      }
+    }
+  }
+  B2: { text: "" }
+
+  A3: { text: "Utilities" }
+  B3: { text: utilities }
+
+  A4: {
+    text: "Food"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.15"
+      }
+    }
+  }
+  B4: { text: "" }
+
+  A5: {
+    text: "Transportation"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.1"
+      }
+    }
+  }
+  B5: { text: "" }
+
+  A6: { text: "Entertainment" }
+  B6: { text: entertainment }
+
+  A7: {
+    text: "Savings"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.2"
+      }
+    }
+  }
+  B7: { text: "" }
+
+  A8: {
+    text: "Miscellaneous"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1-SUM(B2:B7)"
+      }
+    }
+  }
+  B8: { text: "" }
+}..
+```
+
+**User**: Create a spreadsheet assessment that asked the student to complete a spreadsheet that has the line items of Income, Rent/Mortgage, Utilities, Food, Transportation, Entertainment, Savings, and Miscellaneous. Give reasonable fixed values for the Income, Utilities and Entertainment. Prompt the student to complete the cells for Rent as 35% of Income, Food as 15%, Transportation as 10%, Savings as 20%, and Miscellaneous as the amount that is left over.
+
+**Assistant**: ```graffiticode
+let cowsCount = "100"..
+let pigsCount = "200"..
+rows {
+  "*": {
+    assess: {
+      index: "B",
+      order: "actual", | "expected", "asc", "desc"
+    }
+  }
+}
+columns {
+  A: {
+    width: 100,
+    justify: "right",
   },
   B: {
-    width: 50,
-    justify: "center",
+    width: 100,
+    justify: "left",
   },
 }
 cells {
   A1: {
-    text: "A1",
+    text: "",
+    attrs: {
+      assess: {
+        method: "value",
+        expected: cowsCount,
+      }
+    },
   },
   A2: {
-    text: "A2",
+    text: "",
+    attrs: {
+      assess: {
+        method: "value",
+        expected: pigsCount,
+      }
+    },
   },
   B1: {
-    text: "B1",
+    text: "cows",
   },
   B2: {
-    text: "B2",
+    text: "pigs",
   },
 }
 {}..
 ```
 
----
-
-### Prompt
-"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
+**User**: create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs.
 
 ### Code
 
@@ -128,11 +234,98 @@ cells {
 ---
 
 ### Prompt
-"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
+"Create a spreadsheet assessment that asked the student to complete a spreadsheet that has the line items of Income, Rent/Mortgage, Utilities, Food, Transportation, Entertainment, Savings, and Miscellaneous. Give reasonable fixed values for the Income, Utilities and Entertainment. Prompt the student to complete the cells for Rent as 35% of Income, Food as 15%, Transportation as 10%, Savings as 20%, and Miscellaneous as the amount that is left over.
 
-### Code
+create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
 
+### Chat Transcript
+
+**Assistant**: ```graffiticode
+let income = 5000..
+let utilities = 200..
+let entertainment = 300..
+
+columns {
+  A: {
+    width: 150
+    justify: "left"
+  }
+  B: {
+    width: 100
+    justify: "right"
+  }
+}
+
+cells {
+  A1: { text: "Income" }
+  B1: { text: income }
+
+  A2: {
+    text: "Rent/Mortgage"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.35"
+      }
+    }
+  }
+  B2: { text: "" }
+
+  A3: { text: "Utilities" }
+  B3: { text: utilities }
+
+  A4: {
+    text: "Food"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.15"
+      }
+    }
+  }
+  B4: { text: "" }
+
+  A5: {
+    text: "Transportation"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.1"
+      }
+    }
+  }
+  B5: { text: "" }
+
+  A6: { text: "Entertainment" }
+  B6: { text: entertainment }
+
+  A7: {
+    text: "Savings"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.2"
+      }
+    }
+  }
+  B7: { text: "" }
+
+  A8: {
+    text: "Miscellaneous"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1-SUM(B2:B7)"
+      }
+    }
+  }
+  B8: { text: "" }
+}..
 ```
+
+**User**: Create a spreadsheet assessment that asked the student to complete a spreadsheet that has the line items of Income, Rent/Mortgage, Utilities, Food, Transportation, Entertainment, Savings, and Miscellaneous. Give reasonable fixed values for the Income, Utilities and Entertainment. Prompt the student to complete the cells for Rent as 35% of Income, Food as 15%, Transportation as 10%, Savings as 20%, and Miscellaneous as the amount that is left over.
+
+**Assistant**: ```graffiticode
 let cowsCount = "100"..
 let pigsCount = "200"..
 rows {
@@ -182,10 +375,7 @@ cells {
 {}..
 ```
 
----
-
-### Prompt
-"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
+**User**: create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs.
 
 ### Code
 
@@ -276,7 +466,148 @@ cells {
 ---
 
 ### Prompt
-"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
+"Create a spreadsheet assessment that asked the student to complete a spreadsheet that has the line items of Income, Rent/Mortgage, Utilities, Food, Transportation, Entertainment, Savings, and Miscellaneous. Give reasonable fixed values for the Income, Utilities and Entertainment. Prompt the student to complete the cells for Rent as 35% of Income, Food as 15%, Transportation as 10%, Savings as 20%, and Miscellaneous as the amount that is left over.
+
+create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
+
+### Chat Transcript
+
+**Assistant**: ```graffiticode
+let income = 5000..
+let utilities = 200..
+let entertainment = 300..
+
+columns {
+  A: {
+    width: 150
+    justify: "left"
+  }
+  B: {
+    width: 100
+    justify: "right"
+  }
+}
+
+cells {
+  A1: { text: "Income" }
+  B1: { text: income }
+
+  A2: {
+    text: "Rent/Mortgage"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.35"
+      }
+    }
+  }
+  B2: { text: "" }
+
+  A3: { text: "Utilities" }
+  B3: { text: utilities }
+
+  A4: {
+    text: "Food"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.15"
+      }
+    }
+  }
+  B4: { text: "" }
+
+  A5: {
+    text: "Transportation"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.1"
+      }
+    }
+  }
+  B5: { text: "" }
+
+  A6: { text: "Entertainment" }
+  B6: { text: entertainment }
+
+  A7: {
+    text: "Savings"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.2"
+      }
+    }
+  }
+  B7: { text: "" }
+
+  A8: {
+    text: "Miscellaneous"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1-SUM(B2:B7)"
+      }
+    }
+  }
+  B8: { text: "" }
+}..
+```
+
+**User**: Create a spreadsheet assessment that asked the student to complete a spreadsheet that has the line items of Income, Rent/Mortgage, Utilities, Food, Transportation, Entertainment, Savings, and Miscellaneous. Give reasonable fixed values for the Income, Utilities and Entertainment. Prompt the student to complete the cells for Rent as 35% of Income, Food as 15%, Transportation as 10%, Savings as 20%, and Miscellaneous as the amount that is left over.
+
+**Assistant**: ```graffiticode
+let cowsCount = "100"..
+let pigsCount = "200"..
+rows {
+  "*": {
+    assess: {
+      index: "B",
+      order: "actual", | "expected", "asc", "desc"
+    }
+  }
+}
+columns {
+  A: {
+    width: 100,
+    justify: "right",
+  },
+  B: {
+    width: 100,
+    justify: "left",
+  },
+}
+cells {
+  A1: {
+    text: "",
+    attrs: {
+      assess: {
+        method: "value",
+        expected: cowsCount,
+      }
+    },
+  },
+  A2: {
+    text: "",
+    attrs: {
+      assess: {
+        method: "value",
+        expected: pigsCount,
+      }
+    },
+  },
+  B1: {
+    text: "cows",
+  },
+  B2: {
+    text: "pigs",
+  },
+}
+{}..
+```
+
+**User**: create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs.
 
 ### Code
 
@@ -418,7 +749,148 @@ cells {
 ---
 
 ### Prompt
-"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
+"Create a spreadsheet assessment that asked the student to complete a spreadsheet that has the line items of Income, Rent/Mortgage, Utilities, Food, Transportation, Entertainment, Savings, and Miscellaneous. Give reasonable fixed values for the Income, Utilities and Entertainment. Prompt the student to complete the cells for Rent as 35% of Income, Food as 15%, Transportation as 10%, Savings as 20%, and Miscellaneous as the amount that is left over.
+
+create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
+
+### Chat Transcript
+
+**Assistant**: ```graffiticode
+let income = 5000..
+let utilities = 200..
+let entertainment = 300..
+
+columns {
+  A: {
+    width: 150
+    justify: "left"
+  }
+  B: {
+    width: 100
+    justify: "right"
+  }
+}
+
+cells {
+  A1: { text: "Income" }
+  B1: { text: income }
+
+  A2: {
+    text: "Rent/Mortgage"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.35"
+      }
+    }
+  }
+  B2: { text: "" }
+
+  A3: { text: "Utilities" }
+  B3: { text: utilities }
+
+  A4: {
+    text: "Food"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.15"
+      }
+    }
+  }
+  B4: { text: "" }
+
+  A5: {
+    text: "Transportation"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.1"
+      }
+    }
+  }
+  B5: { text: "" }
+
+  A6: { text: "Entertainment" }
+  B6: { text: entertainment }
+
+  A7: {
+    text: "Savings"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.2"
+      }
+    }
+  }
+  B7: { text: "" }
+
+  A8: {
+    text: "Miscellaneous"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1-SUM(B2:B7)"
+      }
+    }
+  }
+  B8: { text: "" }
+}..
+```
+
+**User**: Create a spreadsheet assessment that asked the student to complete a spreadsheet that has the line items of Income, Rent/Mortgage, Utilities, Food, Transportation, Entertainment, Savings, and Miscellaneous. Give reasonable fixed values for the Income, Utilities and Entertainment. Prompt the student to complete the cells for Rent as 35% of Income, Food as 15%, Transportation as 10%, Savings as 20%, and Miscellaneous as the amount that is left over.
+
+**Assistant**: ```graffiticode
+let cowsCount = "100"..
+let pigsCount = "200"..
+rows {
+  "*": {
+    assess: {
+      index: "B",
+      order: "actual", | "expected", "asc", "desc"
+    }
+  }
+}
+columns {
+  A: {
+    width: 100,
+    justify: "right",
+  },
+  B: {
+    width: 100,
+    justify: "left",
+  },
+}
+cells {
+  A1: {
+    text: "",
+    attrs: {
+      assess: {
+        method: "value",
+        expected: cowsCount,
+      }
+    },
+  },
+  A2: {
+    text: "",
+    attrs: {
+      assess: {
+        method: "value",
+        expected: pigsCount,
+      }
+    },
+  },
+  B1: {
+    text: "cows",
+  },
+  B2: {
+    text: "pigs",
+  },
+}
+{}..
+```
+
+**User**: create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs.
 
 ### Code
 
