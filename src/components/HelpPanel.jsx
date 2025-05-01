@@ -165,17 +165,6 @@ export const HelpPanel = ({
   const messagesEndRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(130);  // Default initial height
 
-  // Auto-scroll to top when messages change (since we're displaying in reverse chronological order)
-  const scrollToTop = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  useEffect(() => {
-    scrollToTop();
-  }, [help]);
-
   // Update header height when it changes
   useEffect(() => {
     if (headerRef.current) {
