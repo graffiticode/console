@@ -277,7 +277,7 @@ export const HelpPanel = ({
       >
         {help.length === 0 && (
           <div className="text-center text-gray-400 py-8">
-            No messages yet. Start by asking a question above.
+            No messages yet. Start by asking for help above.
           </div>
         )}
 
