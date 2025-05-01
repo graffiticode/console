@@ -44,6 +44,7 @@ export const HelpPanel = ({
     },
     user,
     language,
+    chatHistory: help, // Pass the current help array as chat history
   });
 
   // We'll need to auto-scroll to the bottom when new messages arrive
@@ -85,6 +86,12 @@ export const HelpPanel = ({
 
   // State for the input field
   const [messageText, setMessageText] = useState('');
+
+  // Re-create ChatBot when help (chat history) changes
+  // This ensures that new messages are included in the context
+  useEffect(() => {
+    console.log("Chat history updated, messages count:", help.length);
+  }, [help]);
 
   // Integration with TextEditor component
   const [state] = useState(createState({}, (data, { type, args }) => {

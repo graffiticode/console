@@ -4,17 +4,54 @@ import { generateCode } from "../utils/swr/fetchers";
 /**
  * Function to generate Graffiticode responses using the generateCode function
  */
-const generateBotResponse = async ({message, user, language}) => {
+const generateBotResponse = async ({message, user, language, chatHistory = []}) => {
   try {
     // Use our fetcher function directly
     console.log(
       "ChatBot/generateBotResponse()",
       "user=" + JSON.stringify(user),
-      "language=" + language
+      "language=" + language,
+      "chatHistory length=" + chatHistory.length
     );
+
+    // Format chat history as context for the prompt
+    let contextualPrompt = message;
+
+    // Only add chat history if there's a meaningful amount (at least 1 exchange)
+    if (chatHistory.length >= 2) {
+      // Build context from the chat history
+      let conversationContext = "Previous conversation:\n\n";
+
+      // Add a limited number of previous exchanges as context (last 3 exchanges)
+      const limitedHistory = chatHistory.slice(-6); // Get last 6 messages (3 exchanges)
+
+      for (let i = 0; i < limitedHistory.length; i++) {
+        const item = limitedHistory[i];
+        if (item.type === 'user') {
+          conversationContext += `User: ${item.user}\n`;
+        } else if (item.type === 'bot') {
+          // For bot responses, include either the text (if a description) or a summary (if code)
+          if (item.help && item.help.type === 'code') {
+            conversationContext += `Assistant: [Generated Graffiticode code]\n`;
+            // If there's a description, include it
+            if (item.help.description) {
+              conversationContext += `Description: ${item.help.description}\n`;
+            }
+          } else {
+            conversationContext += `Assistant: ${item.user}\n`;
+          }
+        }
+      }
+
+      conversationContext += "\nNow, please address this new request:\n";
+      contextualPrompt = conversationContext + message;
+    }
+
+    console.log("Using contextual prompt:", contextualPrompt.substring(0, 200) + "...");
+
     const result = await generateCode({
       user,
-      prompt: message,
+      prompt: contextualPrompt,
       options: {
         temperature: 0.2,
         maxTokens: 2000
@@ -87,7 +124,7 @@ greeting "user"..`,
 /**
  * ChatBot component that provides a chat interface
  */
-export const ChatBot = ({ onSendMessage, user, language }) => {
+export const ChatBot = ({ onSendMessage, user, language, chatHistory = [] }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSendMessage = useCallback(async (message) => {
@@ -95,8 +132,13 @@ export const ChatBot = ({ onSendMessage, user, language }) => {
 
     setIsLoading(true);
     try {
-      // Get response from the bot, passing the accessToken if available
-      const response = await generateBotResponse({message, user, language});
+      // Get response from the bot, passing the accessToken and chat history
+      const response = await generateBotResponse({
+        message,
+        user,
+        language,
+        chatHistory
+      });
 
       // Send the user message and bot response to the parent component
       onSendMessage(message, response);
@@ -110,7 +152,7 @@ export const ChatBot = ({ onSendMessage, user, language }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [onSendMessage, user, language]);
+  }, [onSendMessage, user, language, chatHistory]);
 
   return {
     handleSendMessage,
