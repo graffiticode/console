@@ -46,22 +46,23 @@ export const HelpPanel = ({
     language,
   });
 
-  // No need to scroll since messages are in reverse chronological order (newest at top)
+  // We'll need to auto-scroll to the bottom when new messages arrive
 
   // Handle sending a new message
   const handleMessage = useCallback(async (userMessage, botResponse = null) => {
-    // Add user message to the chat
+    // Add user message to the chat in chronological order (at the end)
     setHelp(prev => [
+      ...prev,
       {
         user: userMessage,
         help: getHelp(userMessage),
         type: 'user'
-      },
-      ...prev
+      }
     ]);
 
-    // Add bot response to the chat
+    // Add bot response to the chat in chronological order (at the end)
     setHelp(prev => [
+      ...prev,
       {
         user: botResponse.text,
         help: {
@@ -72,8 +73,7 @@ export const HelpPanel = ({
           usage: botResponse.usage
         },
         type: 'bot'
-      },
-      ...prev
+      }
     ]);
   }, []);
 
@@ -107,11 +107,11 @@ export const HelpPanel = ({
   const handleDeleteMessagePair = (index) => {
     setHelp(prev => {
       const newHelp = [...prev];
-      // Check if this is a user message and if the previous message is a bot response
-      // In reversed chronological order, the bot response comes before the user message
-      if (newHelp[index].type === 'user' && index - 1 >= 0 && newHelp[index - 1].type === 'bot') {
+      // Check if this is a user message and if the next message is a bot response
+      // In chronological order, the bot response comes after the user message
+      if (newHelp[index].type === 'user' && index + 1 < newHelp.length && newHelp[index + 1].type === 'bot') {
         // Remove both the user message and the corresponding bot response
-        newHelp.splice(index - 1, 2);
+        newHelp.splice(index, 2);
       } else {
         // Just remove the single message as fallback
         newHelp.splice(index, 1);
@@ -132,9 +132,19 @@ export const HelpPanel = ({
     }
   }
 
-  // Create a ref to measure the header height
+  // Create refs to measure the header height and handle scrolling
   const headerRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(130);  // Default initial height
+
+  // Auto-scroll to bottom when messages change
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [help]);
 
   // Update header height when it changes
   useEffect(() => {
@@ -303,6 +313,8 @@ export const HelpPanel = ({
             )}
           </div>
         ))}
+        {/* Invisible element for auto-scrolling to bottom */}
+        <div ref={messagesEndRef} />
       </div>
     </div>
   );
