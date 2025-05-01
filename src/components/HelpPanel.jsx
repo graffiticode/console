@@ -13,6 +13,7 @@ import { createState } from "../lib/state";
 import { generateCode } from "../utils/swr/fetchers";
 import { ChatBot } from './ChatBot';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import ReactMarkdown from 'react-markdown';
 
 const isNullOrEmptyObject = (obj) => !obj || Object.keys(obj).length === 0;
 
@@ -310,7 +311,11 @@ export const HelpPanel = ({
             {pair.bot && (
               <div className="text-left">
                 <div className="bg-gray-100 rounded-lg p-3">
-                  <p className="text-sm">{pair.bot.help.text}</p>
+                  <div className="text-sm prose prose-sm prose-slate max-w-none">
+                    <ReactMarkdown>
+                      {pair.bot.help.text}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </div>
             )}
