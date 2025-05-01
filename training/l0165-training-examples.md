@@ -38,92 +38,91 @@ cells {
 ---
 
 ### Prompt
-"create a spreadsheet assessment where the student lists the number of apples, oranges and bananas in the following quantities 140, 230, 320, respectively."
+"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
 
 ### Code
 
 ```
-rows {
-  "*": {
-    assess: {
-      index: "A",
-      order: "actual" | "expected", "asc", "desc"
-    }
-  }
-}
+let income = 5000..
+let utilities = 200..
+let entertainment = 300..
+
 columns {
   A: {
-    width: 120,
+    width: 150
     justify: "left"
-  },
+  }
   B: {
-    width: 80,
+    width: 100
     justify: "right"
   }
 }
+
 cells {
-  A1: {
-    text: "Apples",
-    attrs: {
-      assess: {
-        method: "value",
-        expected: "Apples"
-      }
-    }
-  },
+  A1: { text: "Income" }
+  B1: { text: income }
+
   A2: {
-    text: "Oranges",
+    text: "Rent/Mortgage"
     attrs: {
       assess: {
-        method: "value",
-        expected: "Oranges"
-      }
-    }
-  },
-  A3: {
-    text: "Bananas",
-    attrs: {
-      assess: {
-        method: "value",
-        expected: "Bananas"
-      }
-    }
-  },
-  B1: {
-    text: "{{B1}}",
-    attrs: {
-      assess: {
-        method: "value",
-        expected: "{{B1}}"
-      }
-    }
-  },
-  B2: {
-    text: "{{B2}}",
-    attrs: {
-      assess: {
-        method: "value",
-        expected: "{{B2}}"
-      }
-    }
-  },
-  B3: {
-    text: "{{B3}}",
-    attrs: {
-      assess: {
-        method: "value",
-        expected: "{{B3}}"
+        method: "formula"
+        expected: "=B1*0.35"
       }
     }
   }
-}
-params {
-  B1: "140",
-  B2: "230",
-  B3: "320"
-}
-{}
-..
+  B2: { text: "" }
+
+  A3: { text: "Utilities" }
+  B3: { text: utilities }
+
+  A4: {
+    text: "Food"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.15"
+      }
+    }
+  }
+  B4: { text: "" }
+
+  A5: {
+    text: "Transportation"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.1"
+      }
+    }
+  }
+  B5: { text: "" }
+
+  A6: { text: "Entertainment" }
+  B6: { text: entertainment }
+
+  A7: {
+    text: "Savings"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.2"
+      }
+    }
+  }
+  B7: { text: "" }
+
+  A8: {
+    text: "Miscellaneous"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1-SUM(B2:B7)"
+      }
+    }
+  }
+  B8: { text: "" }
+}..
 ```
 
 ---
@@ -181,5 +180,381 @@ cells {
   },
 }
 {}..
+```
+
+---
+
+### Prompt
+"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
+
+### Code
+
+```
+let income = 5000..
+let utilities = 200..
+let entertainment = 300..
+
+columns {
+  A: {
+    width: 150
+    justify: "left"
+  }
+  B: {
+    width: 100
+    justify: "right"
+  }
+}
+
+cells {
+  A1: { text: "Income" }
+  B1: { text: income }
+
+  A2: {
+    text: "Rent/Mortgage"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.35"
+      }
+    }
+  }
+  B2: { text: "" }
+
+  A3: { text: "Utilities" }
+  B3: { text: utilities }
+
+  A4: {
+    text: "Food"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.15"
+      }
+    }
+  }
+  B4: { text: "" }
+
+  A5: {
+    text: "Transportation"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.1"
+      }
+    }
+  }
+  B5: { text: "" }
+
+  A6: { text: "Entertainment" }
+  B6: { text: entertainment }
+
+  A7: {
+    text: "Savings"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1*0.2"
+      }
+    }
+  }
+  B7: { text: "" }
+
+  A8: {
+    text: "Miscellaneous"
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B1-SUM(B2:B7)"
+      }
+    }
+  }
+  B8: { text: "" }
+}
+{}..
+```
+
+---
+
+### Prompt
+"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
+
+### Code
+
+```
+rows {
+  "*": {
+    assess: {
+      index: "A",
+      order: "expected",
+    }
+  }
+}
+columns {
+  A: {
+    width: 100,
+    justify: "left",
+  },
+  B: {
+    width: 100,
+    format: "Currency",
+  },
+  C: {
+    width: 300,
+    justify: "left",
+  },
+}
+cells {
+  A1: {
+    text: "CATEGORY",
+    attrs: {
+      background: "#efefef",
+      fontWeight: "bold",
+    },
+  },
+  A2: {
+    text: "Income",
+  },
+  A3: {
+    text: "Rent/Mortgage",
+  },
+  A4: {
+    text: "Utilities",
+  },
+  A5: {
+    text: "Food",
+  },
+  A6: {
+    text: "Transportation",
+  },
+  A7: {
+    text: "Entertainment",
+  },
+  A8: {
+    text: "Savings",
+  },
+  A9: {
+    text: "Miscellaneous",
+  },
+  B1: {
+    text: "AMOUNT",
+    attrs: {
+      background: "#efefef",
+      fontWeight: "bold",
+    },
+  },
+  B2: {
+    text: "4000",
+  },
+  B3: {
+    attrs: {assess: {
+      method: "formula",
+      expected: "=b2*35%",
+    }}
+  },
+  B4: {
+    text: "200",
+  },
+  B5: {
+    attrs: {assess: {
+      method: "formula",
+      expected: "=b2*15%",
+    }}
+  },
+  B6: {
+    attrs: {assess: {
+      method: "formula",
+      expected: "=b2*10%",
+    }}
+  },
+  B7: {
+    text: "150",
+  },
+  B8: {
+    attrs: {assess: {
+      method: "formula",
+      expected: "=b2*20%",
+    }}
+  },
+  B9: {
+    attrs: {assess: {
+      method: "formula",
+      expected: "=b2-sum(b3:b8)",
+    }}
+  },
+  C1: {
+    text: "DETAILS",
+    attrs: {
+      background: "#efefef",
+      fontWeight: "bold",
+    },
+  },
+  C2: {
+    text: "Total monthly income",
+  },
+  C3: {
+    text: "35% of your total income",
+  },
+  C4: {
+    text: "Fixed expense",
+  },
+  C5: {
+    text: "15% of your total income",
+  },
+  C6: {
+    text: "10% of your total income",
+  },
+  C7: {
+    text: "Fixed expense",
+  },
+  C8: {
+    text: "20% of your total income ",
+  },
+  C9: {
+    text: "Remaining income after all other expenses",
+  },
+}{v:11}..
+```
+
+---
+
+### Prompt
+"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
+
+### Code
+
+```
+rows {
+    "*": {
+      assess: {
+        index: "A",
+        order: "expected",
+      }
+    }
+  }
+columns {
+    A: {
+      width: 100,
+      justify: "left",
+    },
+    B: {
+      width: 100,
+      format: "Currency",
+    },
+    C: {
+      width: 300,
+      justify: "left",
+    },
+  }
+cells {
+    A1: {
+      text: "CATEGORY",
+      attrs: {
+        background: "#efefef",
+        fontWeight: "bold",
+      },
+    },
+    A2: {
+      text: "Income",
+    },
+    A3: {
+      text: "Rent/Mortgage",
+    },
+    A4: {
+      text: "Utilities",
+    },
+    A5: {
+      text: "Food",
+    },
+    A6: {
+      text: "Transportation",
+    },
+    A7: {
+      text: "Entertainment",
+    },
+    A8: {
+      text: "Savings",
+    },
+    A9: {
+      text: "Miscellaneous",
+    },
+    B1: {
+      text: "AMOUNT",
+      attrs: {
+        background: "#efefef",
+        fontWeight: "bold",
+      },
+    },
+    B2: {
+      text: "4000",
+    },
+    B3: {
+      attrs: {assess: {
+        method: "formula",
+        expected: "=b2*35%",
+      }}
+    },
+    B4: {
+      text: "200",
+    },
+    B5: {
+      attrs: {assess: {
+        method: "formula",
+        expected: "=b2*15%",
+      }}
+    },
+    B6: {
+      attrs: {assess: {
+        method: "formula",
+        expected: "=b2*10%",
+      }}
+    },
+    B7: {
+      text: "150",
+    },
+    B8: {
+      attrs: {assess: {
+        method: "formula",
+        expected: "=b2*20%",
+      }}
+    },
+    B9: {
+      attrs: {assess: {
+        method: "formula",
+        expected: "=b2-sum(b3:b8)",
+      }}
+    },
+    C1: {
+      text: "DETAILS",
+      attrs: {
+        background: "#efefef",
+        fontWeight: "bold",
+      },
+    },
+    C2: {
+      text: "Total monthly income",
+    },
+    C3: {
+      text: "35% of your total income",
+    },
+    C4: {
+      text: "Fixed expense",
+    },
+    C5: {
+      text: "15% of your total income",
+    },
+    C6: {
+      text: "10% of your total income",
+    },
+    C7: {
+      text: "Fixed expense",
+    },
+    C8: {
+      text: "20% of your total income ",
+    },
+    C9: {
+      text: "Remaining income after all other expenses",
+    },
+  }
+{v:11}..
 ```
 

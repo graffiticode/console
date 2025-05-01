@@ -33,13 +33,37 @@ print payroll..
 ---
 
 ### Prompt
-"write a function that outputs the text 'hello world'"
+"write a case expression that translates ten number values to their french names as strings. call it with a list of ten matching and non matching values"
 
 ### Code
 
 ```
-| This program prints the string "Hello, world!"
-let main = <_: print "Hello, world!">..\nmain ().."
+let fn = <x:
+  case x of
+    10: "ten"
+    30: "thirty"
+    _: "other"
+  end
+>..
+print fn 10..
+```
+
+---
+
+### Prompt
+"get the head of a list of strings"
+
+### Code
+
+```
+| Define a list of strings
+let fruits = ["apple" "banana" "orange"]..
+
+| Get the head (first element) of the list
+let firstFruit = hd fruits..
+
+| Print the first fruit
+print firstFruit..
 ```
 
 ---
@@ -76,8 +100,10 @@ print get "x" obj..
 ### Code
 
 ```
-let main = <: print "Hello, world!">..
-main.."
+| this is a comment.
+print "hello, comment!"..
+Everything after the end of program is a comment
+and doesn't affect the code.
 ```
 
 ---
@@ -113,8 +139,6 @@ let employees = [
 ### Code
 
 ```
-let add2 = <[a b]: add a b>..
-
 | Function to calculate an employee's pay including overtime
 let calculatePay = <
   employee:
@@ -132,6 +156,8 @@ let calculatePay = <
     mul mul get employee "wage" 1.5 overtimeHours..
   add regularPay overtimePay
 >..
+
+let add2 = <[a b]: add a b>..
 
 | Function to calculate total payroll for all employees
 let calculatePayroll = <employees:
@@ -168,11 +194,13 @@ let overtimePay = <acc employee:
   let overtimeRate = mul 1.5 wage..
   let overtimePay = mul overtimeHours overtimeRate..
   let name = get employee "name"..
-  set acc name add regularPay overtimePay
+  let pay = add regularPay overtimePay..
+  let total = get acc "total"..
+  set (set acc name pay) "total" add total pay
 >..
 
 | Calculate overtime pay for each employee
-let payroll = reduce (overtimePay) {} [
+let payroll = reduce (overtimePay) {total: 0} [
   {name: "Alice" wage: 15 hours: 35}
   {name: "Bob" wage: 20 hours: 50}
   {name: "Charlie" wage: 18 hours: 40}
@@ -185,22 +213,53 @@ print payroll..
 ---
 
 ### Prompt
+"get the tail of a list of integers"
+
+### Code
+
+```
+| Define a list of integers
+let numbers = [5 8 2 9 3]..  | Get the tail of the list (everything after the first element)
+let tail = tl numbers..  | Print the resulting tail
+print tail..
+```
+
+---
+
+### Prompt
+"write a case expression that translates ten number values to their french names as strings. call it with a list of ten matching and non matching values"
+
+### Code
+
+```
+| Function to calculate the nth Fibonacci number
+let fib = <n:
+  if eq n 0 then
+    0
+  else if eq n 1 then
+    1
+  else
+    add (fib (sub n 1)) (fib (sub n 2))
+>..
+
+
+| Calculate the 10th Fibonacci number
+let result = fib 10..
+
+| Print the result
+print result..
+```
+
+---
+
+### Prompt
 "use the builtin function filter to filter a list of even numbers between 0 and 100 so that only tenth value is remaining. print the result"
 
 ### Code
 
 ```
-| Function to check if a number is a multiple of 10
-let isMultipleOfTen = <x: eq mod x 10 0>..
-
-| Generate a list of even numbers from 0 to 100
-let evens = range 0 101 2..
-
-| Filter the even numbers to only multiples of 10
-let tens = filter (isMultipleOfTen) evens..
-
-| Print the resulting list
-print tens..
+let add2 = <a b: add a b>..
+print apply (add2) [10 21]..
 ```
 
 ---
@@ -222,6 +281,78 @@ let result = map (add3) numbers..
 
 | Print the resulting list
 print result..
+```
+
+---
+
+### Prompt
+"write a case expression that translates ten number values to their french names as strings. call it with a list of ten matching and non matching values"
+
+### Code
+
+```
+| Function to translate a number to its French name
+let frenchNumber = <n:
+  case n of
+    0: "zéro"
+    1: "un"
+    2: "deux"
+    3: "trois"
+    4: "quatre"
+    5: "cinq"
+    6: "six"
+    7: "sept"
+    8: "huit"
+    9: "neuf"
+    10: "dix"
+    _: "unknown"
+  end
+>..
+
+| List of numbers to translate
+let numbers = [1 3 5 7 9 11 8 6 10 2]..
+
+| Map each number to its French name
+let frenchNumbers = map (frenchNumber) numbers..
+
+| Print the results
+print frenchNumbers..
+```
+
+---
+
+### Prompt
+"write a case expression that translates ten number values to their french names as strings. call it with a list of ten matching and non matching values"
+
+### Code
+
+```
+| Function to translate a number to its French name
+let frenchNumber = <n:
+  case n of
+    0: "zéro"
+    1: "un"
+    2: "deux"
+    3: "trois"
+    4: "quatre"
+    5: "cinq"
+    6: "six"
+    7: "sept"
+    8: "huit"
+    9: "neuf"
+    10: "dix"
+    _: "unknown"
+  end
+>..
+
+| List of numbers to translate
+let numbers = [1 3 5 7 9 11 8 6 4 2]..
+
+| Map each number to its French name
+let frenchNumbers = map (frenchNumber) numbers..
+
+| Print the results
+print frenchNumbers..
 ```
 
 ---

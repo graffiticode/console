@@ -525,6 +525,7 @@ async function main() {
       totalTasks: 0,          // Total task documents found
       tasksWithHelpArray: 0,  // Tasks that have a help array
       tasksWithEmptyHelp: 0,  // Tasks with empty help array
+      tasksWithSrcCode: 0,    // Tasks with code in the src field
       skippedNoCode: 0,       // Tasks without code
       totalDialogPairs: 0,    // Total number of dialog pairs extracted
       totalMessages: 0        // Total individual messages processed
@@ -590,25 +591,22 @@ async function main() {
             console.log("help=" + JSON.stringify(help, null, 2)),
           );
 
-          // Get the code from the task
-          let code = "";
-          let codeSource = "";
-
-          for (const message of help) {
-            if (message.type === 'bot' && message.help && message.help.type === 'code' &&
-                message.help.text && message.help.text.trim().length >= 10) {
-              code = message.help.text.trim();
-              codeSource = "help_message_code";
-              break;
-            }
-          }
-
-          // Skip if we still couldn't find any code
-          if (!code) {
-            console.log(`No code found for task ${taskId}`);
+          // Get the code directly from the src field of the task
+          let code = task.src || "";
+          let codeSource = "task_src_field";
+          
+          // Skip if there's no code in the src field
+          if (!code || code.trim().length < 10) {
+            console.log(`No valid code in src field for task ${taskId}`);
             statistics.skippedNoCode++;
             continue;
           }
+          
+          // Track tasks with valid source code
+          statistics.tasksWithSrcCode++;
+          
+          // Trim the code
+          code = code.trim();
 
           // Track code sources and languages
           statistics.codeSources[codeSource] = (statistics.codeSources[codeSource] || 0) + 1;
@@ -706,6 +704,7 @@ async function main() {
     console.log(`Total tasks found: ${statistics.totalTasks}`);
     console.log(`Tasks with help array: ${statistics.tasksWithHelpArray}`);
     console.log(`Tasks with empty help array: ${statistics.tasksWithEmptyHelp}`);
+    console.log(`Tasks with valid source code: ${statistics.tasksWithSrcCode}`);
     console.log(`Tasks processed with dialog: ${statistics.totalProcessed}`);
     console.log(`Total dialog pairs: ${statistics.totalDialogPairs}`);
     console.log(`Total messages: ${statistics.totalMessages}`);
