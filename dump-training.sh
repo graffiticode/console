@@ -69,6 +69,7 @@ else
   echo "Dumping training data for all languages..."
   dump_language 0002
   dump_language 0151
+  dump_language 0159
   dump_language 0165
   # Add other languages here as needed
 fi

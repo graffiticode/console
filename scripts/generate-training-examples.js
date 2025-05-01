@@ -322,30 +322,19 @@ function generateExplanation(code, lang) {
 
 // Function to extract a task description from dialog messages
 function extractTaskFromMessages(messages) {
-  // Look for the first user message that seems to be a request for code
-  for (const message of messages) {
-    if (message.role === 'user') {
-      const content = message.content.trim();
-      
-      // Skip very short messages or those that are likely questions
-      if (content.length < 10 || content.endsWith('?')) {
-        continue;
-      }
-      
-      // Skip messages that are likely follow-up questions or clarifications
-      if (/^(can you|could you|please|how|what|why|when)/i.test(content)) {
-        continue;
-      }
-      
-      // Likely a task request
-      return content;
-    }
-  }
+  // Concatenate all user messages to create a more comprehensive task description
+  const userMessages = messages
+    .filter(m => m.role === 'user')
+    .map(m => m.content.trim())
+    .filter(content => content.length > 0);
   
-  // If no suitable message found, use the first user message if available
-  const firstUserMessage = messages.find(m => m.role === 'user');
-  if (firstUserMessage) {
-    return firstUserMessage.content.trim();
+  if (userMessages.length > 0) {
+    // If there are multiple messages, join them to create a complete conversation context
+    if (userMessages.length > 1) {
+      return userMessages.join("\n\n");
+    }
+    // Otherwise just return the single message
+    return userMessages[0];
   }
   
   // Fallback
@@ -381,9 +370,21 @@ function convertToMarkdownFormat(trainingExamples) {
         .map(line => line.trimRight())
         .join('\n');
       
-      // Use the standard format with "Prompt" and "Code" sections
+      // Use the standard format with "Prompt", "Chat Transcript", and "Code" sections
       // Code is always wrapped in triple backticks
       markdown += `### Prompt\n"${prompt}"\n\n`;
+      
+      // Add the full chat transcript in chronological order
+      markdown += `### Chat Transcript\n\n`;
+      // Messages are already in chronological order, as we preserved their order when parsing
+      example.messages.forEach((message, msgIndex) => {
+        const role = message.role === 'user' ? 'User' : 'Assistant';
+        // Format the content with proper markdown for code blocks
+        let content = message.content.trim();
+        
+        markdown += `**${role}**: ${content}\n\n`;
+      });
+      
       markdown += `### Code\n\n\`\`\`\n${code}\n\`\`\`\n\n`;
       
       // Add separator between examples except after the last one
@@ -616,16 +617,25 @@ async function main() {
           const dialogMessages = [];
           let dialogPairs = 0;
 
-          for (const message of help) {
+          // Help array is in chronological order. We need to preserve this order
+          // for the chat transcript while ensuring user/bot messages are correctly paired
+          for (let i = 0; i < help.length; i++) {
+            const message = help[i];
+            
             // Skip invalid messages
             if (!message || typeof message !== 'object') continue;
 
             // Add user messages
             if (message.type === 'user' && message.user) {
-              dialogMessages.unshift({
+              dialogMessages.push({
                 role: 'user',
                 content: message.user
               });
+              
+              // Look for a corresponding bot message that follows
+              if (i+1 < help.length && help[i+1].type === 'bot' && help[i+1].help) {
+                dialogPairs++;
+              }
             }
             // Add bot messages
             else if (message.type === 'bot' && message.help) {
@@ -640,7 +650,7 @@ async function main() {
               }
 
               if (content) {
-                dialogMessages.unshift({
+                dialogMessages.push({
                   role: 'assistant',
                   content: content
                 });
@@ -648,12 +658,7 @@ async function main() {
             }
           }
 
-          // Count dialog pairs (user message followed by assistant message)
-          for (let i = 0; i < dialogMessages.length - 1; i++) {
-            if (dialogMessages[i].role === 'user' && dialogMessages[i+1].role === 'assistant') {
-              dialogPairs++;
-            }
-          }
+          // We've already counted the dialog pairs while parsing the messages
 
           statistics.totalDialogPairs += dialogPairs;
           statistics.totalMessages += dialogMessages.length;

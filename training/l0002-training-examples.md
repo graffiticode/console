@@ -33,6 +33,42 @@ print payroll..
 ---
 
 ### Prompt
+"translate a list of integers from zero to twenty incremented by 2 into french"
+
+### Code
+
+```
+| Function to translate a number to its French name
+let frenchNumber = <n:
+  case n of
+    0: "zéro"
+    2: "deux"
+    4: "quatre"
+    6: "six"
+    8: "huit"
+    10: "dix"
+    12: "douze"
+    14: "quatorze"
+    16: "seize"
+    18: "dix-huit"
+    20: "vingt"
+    _: "unknown"
+  end
+>..\n
+
+| Generate a list of even numbers from 0 to 20
+let numbers = range 0 22 2..\n
+
+| Map each number to its French name
+let frenchNumbers = map (frenchNumber) numbers..\n
+
+| Print the results
+print frenchNumbers..
+```
+
+---
+
+### Prompt
 "write a case expression that translates ten number values to their french names as strings. call it with a list of ten matching and non matching values"
 
 ### Code
