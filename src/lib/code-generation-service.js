@@ -450,7 +450,9 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
 - Use \`let name = value..\` for declarations
 - All functions are prefix notation: \`add 1 2\` (no infix allowed)
 - Lambdas use angle brackets: \`<x y: expr>\`
-- All top-level expressions must end with \`..\`
+- CRITICAL: ALL top-level expressions MUST end with \`..\` (double dots)
+- CRITICAL: EVERY program MUST have at least one expression ending with \`..\`
+- CRITICAL: The final expression in a program MUST end with \`..\`
 - Use parentheses to pass functions or delay application: \`map (double) [1 2 3]\`
 - Whitespace separates tokens; commas and parens are optional but allowed
 - Static types are inferred; no type annotations
@@ -459,7 +461,12 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
 
 ## Built-in Types
 - **Numbers**: \`42\`, \`-3.14\`
-- **Strings**: \`"hello"\` or multiline with \`'hello,\\nworld!'\`; supports interpolation: \` \\\`hello, \${name}!\\\` \`
+- **Strings**: \`"hello"\` or multiline with \`'hello,\\nworld!'\`;
+  - Quotes inside strings should NOT be escaped unless nested in another string
+  - CORRECT: \`"The user's name is John"\` (no escape on apostrophe)
+  - INCORRECT: \`"The user\\'s name is John"\` (don't escape apostrophes)
+  - For nested quotes, use different quote types: \`"He said 'hello'"\` or \`'She said "goodbye"'\`
+  - Supports interpolation: \` \\\`hello, \${name}!\\\` \`
 - **Booleans**: \`true\`, \`false\`; **Null**: \`null\`
 - **Lists**: \`[1 2 3]\`; support pattern matching
 - **Records**: \`{name: "Alice" age: 30}\`; access via \`get\`, support destructuring
@@ -512,6 +519,8 @@ Start with \`|\` and extend to the end of the line.
 - \`theme dark..\` — set theme; arg is tag: \`dark\` or \`light\`
 
 Only return idiomatic, valid Graffiticode. Use readable names. Output **only the code** unless explanation is requested.
+
+CRITICAL REMINDER: EVERY program MUST have at least one expression ending with \`..\` (double dots), and the final expression in your code MUST end with \`..\`. Failing to add the \`..\` at the end of expressions will cause the code to fail.
 `.trim();
 
 /**
@@ -628,7 +637,28 @@ let total = calculateTotal discountedItems..
 
 | Print the text 'hello, world!'
 print "hello, world!"..
+`.trim()
+      },
+      {
+        role: "user",
+        content: "Create a greeting function that handles apostrophes correctly."
+      },
+      {
+        role: "assistant",
+        content: `
+| Function to generate a personalized greeting
+let createGreeting = <name: concat "Hello, it's nice to meet you, " name>..
 
+| Examples with apostrophes and quotes (notice they are NOT escaped)
+let greeting1 = createGreeting "John"..
+let greeting2 = "He said 'Welcome to our store'"..
+let greeting3 = 'She replied "Thank you for the help"'..
+
+| Example with user's possessive (apostrophe not escaped)
+let userMessage = "Thank you for updating the user's profile"..
+
+| Display one of the greetings
+print greeting1..
 `.trim()
       },
       {
@@ -843,7 +873,7 @@ function createErrorFixPrompt(code, errorInfo) {
   const formattedErrors = parseGraffiticodeErrors(errorInfo);
 
   return JSON.stringify({
-    system: `You are an expert Graffiticode programmer tasked with fixing code errors. 
+    system: `You are an expert Graffiticode programmer tasked with fixing code errors.
 Graffiticode is a minimal, prefix, expression-oriented language with these key features:
 - \`let\` bindings with syntax: \`let name = value..\`
 - No infix operators; use prefix calls like \`add 1 2\`
