@@ -247,6 +247,7 @@ export const generateCode = async ({ user, prompt, language, options }) => {
     mutation GenerateCode($prompt: String!, $language: String, $options: CodeGenerationOptions) {
       generateCode(prompt: $prompt, language: $language, options: $options) {
         code
+        description
         language
         model
         usage {
@@ -266,6 +267,10 @@ export const generateCode = async ({ user, prompt, language, options }) => {
 
   try {
     const result = await client.request(query, variables);
+    console.log(
+      "fetchers/generateCode()",
+      "result=" + JSON.stringify(result, null, 2),
+    );
     return result.generateCode;
   } catch (error) {
     console.error("Error in generateCode fetcher:", error);

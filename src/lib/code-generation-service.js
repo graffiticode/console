@@ -962,6 +962,10 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
     // Call the Claude API
     const response = await callClaudeAPI(formattedPrompt, apiOptions);
     let generatedCode = response.content;
+    console.log(
+      "[1] generateCode()",
+      "generatedCode=" + generatedCode,
+    );
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
@@ -972,7 +976,7 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
       while (fixAttempts < MAX_FIX_ATTEMPTS) {
         console.log(
-          "generateCode()",
+          "[2] generateCode()",
           "generatedCode=" + generatedCode,
         );
         verificationResult = await verifyCode(generatedCode, accessToken);
@@ -1022,9 +1026,47 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
       }
     }
 
-    // Return formatted response with the language name
+    // Generate a description of the code
+    // Create a prompt for Claude to describe the code
+    const descriptionPrompt = JSON.stringify({
+      system: `You are an expert Graffiticode programmer tasked with describing generated code in simple terms.
+Analyze the provided Graffiticode and explain what it does in 2-3 sentences of plain English.
+Focus on explaining the purpose and functionality without technical jargon.
+Keep your description concise and user-friendly, so people unfamiliar with programming can understand.
+IMPORTANT: Always phrase your description to indicate this is code that was generated, not code that the user wrote.`,
+      messages: [
+        {
+          role: "user",
+          content: `Please provide a brief, clear description of what this generated Graffiticode does:
+
+${generatedCode}
+
+Explain it in 2-3 sentences of simple language that anyone can understand. Start with something like "This code generates..." or "The generated code..." instead of assuming the user wrote it.`
+        }
+      ]
+    }, null, 2);
+
+    // Call Claude API to get the description
+    const descriptionResponse = await callClaudeAPI(descriptionPrompt, {
+      model: CLAUDE_MODELS.HAIKU, // Use a smaller model for faster response
+      temperature: 0.2,
+      max_tokens: 200 // Short description only
+    });
+
+    console.log(
+      "generateCode()",
+      "descriptionResponse=" + JSON.stringify(descriptionResponse, null, 2),
+    );
+
+    // Add the description tokens to the usage metrics
+    finalUsage.prompt_tokens += descriptionResponse.usage.prompt_tokens;
+    finalUsage.completion_tokens += descriptionResponse.usage.completion_tokens;
+    finalUsage.total_tokens += descriptionResponse.usage.total_tokens;
+
+    // Return formatted response with the language name and description
     return {
       code: generatedCode,
+      description: descriptionResponse.content,
       lang: lang,
       model: response.model,
       usage: {

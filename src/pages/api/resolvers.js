@@ -248,7 +248,8 @@ export async function generateCode({ auth, prompt, language, options }) {
     console.log(
       "generateCode()",
       "model=", result.model,
-      "language=", result.language
+      "language=", result.language,
+      "description=", result.description ? result.description.substring(0, 50) + "..." : "none"
     );
 
     return result;

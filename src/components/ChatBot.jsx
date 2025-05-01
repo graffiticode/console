@@ -10,6 +10,7 @@ const generateBotResponse = async ({message, user, language}) => {
     console.log(
       "ChatBot/generateBotResponse()",
       "user=" + JSON.stringify(user),
+      "language=" + language
     );
     const result = await generateCode({
       user,
@@ -20,11 +21,23 @@ const generateBotResponse = async ({message, user, language}) => {
       },
       language,
     });
+    console.log(
+      "ChatBot/generateBotResponse()",
+      "result=" + JSON.stringify(result),
+    );
+
+    // Log just the first part of the description for development purposes
+    if (result.description) {
+      const previewLength = Math.min(50, result.description.length);
+      console.log("Generated description:", result.description.substring(0, previewLength) +
+                  (result.description.length > previewLength ? "..." : ""));
+    }
 
     // Transform the response to match our expected format
     return {
       text: result.code,
       type: 'code',
+      description: result.description || '',  // Use the actual description from the API
       language: result.language || 'graffiticode',
       model: result.model,
       usage: result.usage
@@ -42,19 +55,22 @@ const fallbackResponse = (message) => {
   if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
     return {
       text: 'Hello! How can I help you with Graffiticode today?',
-      type: 'text'
+      type: 'text',
+      description: 'Hello! How can I help you with Graffiticode today?'
     };
   } else if (message.toLowerCase().includes('help')) {
     return {
       text: 'I can help you write Graffiticode. What specific functionality would you like me to implement?',
-      type: 'text'
+      type: 'text',
+      description: 'I can help you write Graffiticode. What specific functionality would you like me to implement?'
     };
   } else if (message.toLowerCase().includes('example')) {
     return {
       text: `let double = <x: add x x>..
 let result = map (double) [1 2 3]..`,
       type: 'code',
-      language: 'graffiticode'
+      language: 'graffiticode',
+      description: 'This code creates a function to double numbers and applies it to the list [1, 2, 3], resulting in [2, 4, 6].'
     };
   } else {
     return {
@@ -62,7 +78,8 @@ let result = map (double) [1 2 3]..`,
 let greeting = <name: concat "Hello, " name>..
 greeting "user"..`,
       type: 'code',
-      language: 'graffiticode'
+      language: 'graffiticode',
+      description: 'This code creates a greeting function that adds "Hello, " before a name, and then applies it to "user".'
     };
   }
 };
@@ -87,12 +104,13 @@ export const ChatBot = ({ onSendMessage, user, language }) => {
       console.error('Error getting bot response:', error);
       onSendMessage(message, {
         text: 'I encountered an error processing your request. Please try again.',
-        type: 'text'
+        type: 'text',
+        description: 'I encountered an error processing your request. Please try again.'
       });
     } finally {
       setIsLoading(false);
     }
-  }, [onSendMessage, user]);
+  }, [onSendMessage, user, language]);
 
   return {
     handleSendMessage,

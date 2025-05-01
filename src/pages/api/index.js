@@ -42,6 +42,7 @@ const typeDefs = `
 
   type GeneratedCode {
     code: String!
+    description: String
     language: String
     model: String
     usage: UsageInfo

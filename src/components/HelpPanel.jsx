@@ -60,17 +60,18 @@ export const HelpPanel = ({
       }
     ]);
 
-    // Add bot response to the chat in chronological order (at the end)
+    // Only add the bot's description to the chat if one is available
+    const displayText = botResponse.description || "Code generated and sent to editor.";
+
     setHelp(prev => [
       ...prev,
       {
-        user: botResponse.text,
+        user: displayText,
         help: {
-          type: botResponse.type === 'code' ? 'code' : 'text',
-          text: botResponse.text,
-          model: botResponse.model,
-          language: botResponse.language || 'ocaml',
-          usage: botResponse.usage
+          type: 'text',
+          text: displayText,
+          model: botResponse.model || 'unknown',
+          usage: botResponse.usage || {}
         },
         type: 'bot'
       }
@@ -130,11 +131,22 @@ export const HelpPanel = ({
     setHelp([]);
   };
 
+  // Parse help if it's a string
   if (typeof help === "string" && help.trim() !== "") {
-    help = JSON.parse(help);
-    if (typeof help === "string" && help.trim() !== "") {
+    try {
       help = JSON.parse(help);
+      if (typeof help === "string" && help.trim() !== "") {
+        help = JSON.parse(help);
+      }
+    } catch (e) {
+      console.error("Error parsing help string:", e);
+      help = [];
     }
+  }
+
+  // Ensure help is always an array
+  if (!Array.isArray(help)) {
+    help = [];
   }
 
   // Create refs to measure the header height and handle scrolling
@@ -254,46 +266,6 @@ export const HelpPanel = ({
             {item.type === 'user' ? (
               <div className="inline-block max-w-3/4 bg-blue-100 rounded-lg p-3 text-left">
                 <p className="text-sm">{item.user}</p>
-              </div>
-            ) : item.help?.type === 'code' ? (
-              <div className="bg-gray-100 rounded-lg p-3 shadow-sm">
-                <div className="relative">
-                  <pre
-                    className="bg-gray-800 text-gray-100 p-3 rounded overflow-auto text-xs font-mono max-h-[400px] pr-12"
-                    style={{
-                      scrollbarWidth: 'thin',
-                      scrollbarColor: '#4B5563 #1F2937'
-                    }}>
-                    {item.help?.text}
-                  </pre>
-                  <div className="absolute top-2 right-5 flex space-x-1">
-                    <button
-                      className="text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded p-1"
-                      onClick={() => {
-                        if (code) {
-                          // Update this message with the current code from the code panel
-                          setHelp(prev => prev.map((msg, idx) =>
-                            idx === index ? {
-                              ...msg,
-                              help: {
-                                ...msg.help,
-                                text: code
-                              },
-                              user: code
-                            } : msg
-                          ));
-                        }
-                      }}
-                      title="Pull Code from Editor"
-                      disabled={!code}
-                    >
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-4">
-  <path d="M8.75 2.75a.75.75 0 0 0-1.5 0v5.69L5.03 6.22a.75.75 0 0 0-1.06 1.06l3.5 3.5a.75.75 0 0 0 1.06 0l3.5-3.5a.75.75 0 0 0-1.06-1.06L8.75 8.44V2.75Z" />
-  <path d="M3.5 9.75a.75.75 0 0 0-1.5 0v1.5A2.75 2.75 0 0 0 4.75 14h6.5A2.75 2.75 0 0 0 14 11.25v-1.5a.75.75 0 0 0-1.5 0v1.5c0 .69-.56 1.25-1.25 1.25h-6.5c-.69 0-1.25-.56-1.25-1.25v-1.5Z" />
-</svg>
-                    </button>
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="bg-gray-100 rounded-lg p-3">
