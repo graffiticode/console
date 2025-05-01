@@ -125,6 +125,10 @@ export const HelpPanel = ({
       if (newHelp[index].type === 'user' && index + 1 < newHelp.length && newHelp[index + 1].type === 'bot') {
         // Remove both the user message and the corresponding bot response
         newHelp.splice(index, 2);
+      } else if (newHelp[index].type === 'bot' && index > 0 && newHelp[index - 1].type === 'user') {
+        // If this is a bot message and the previous one is a user message
+        // Remove both the user message and the bot response
+        newHelp.splice(index - 1, 2);
       } else {
         // Just remove the single message as fallback
         newHelp.splice(index, 1);
@@ -161,13 +165,15 @@ export const HelpPanel = ({
   const messagesEndRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(130);  // Default initial height
 
-  // Auto-scroll to bottom when messages change
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Auto-scroll to top when messages change (since we're displaying in reverse chronological order)
+  const scrollToTop = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
+    scrollToTop();
   }, [help]);
 
   // Update header height when it changes
@@ -197,11 +203,45 @@ export const HelpPanel = ({
     }
   }, [isLoading]);
 
+  // Function to create conversation pairs from messages
+  const createConversationPairs = () => {
+    const pairs = [];
+    
+    // First create pairs of user-bot messages from the original array
+    for (let i = 0; i < help.length; i++) {
+      if (help[i].type === 'user') {
+        // Check if next message is a bot response
+        const botResponse = i + 1 < help.length && help[i + 1].type === 'bot' ? help[i + 1] : null;
+        pairs.push({
+          user: help[i],
+          bot: botResponse,
+          index: i
+        });
+        
+        // Skip the bot message in the next iteration if we found one
+        if (botResponse) i++;
+      } else if (help[i].type === 'bot') {
+        // Handle orphaned bot messages (shouldn't happen normally)
+        pairs.push({
+          user: null,
+          bot: help[i],
+          index: i
+        });
+      }
+    }
+    
+    // Reverse the pairs to show newest conversations first
+    return pairs.reverse();
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
-      {/* Clear all button at the top */}
-      <div className="flex-none py-2 px-4 border-b">
-        <div className="flex justify-end">
+      {/* Input field at the top */}
+      <div ref={headerRef} className="flex-none sticky top-0 z-20 bg-white px-4 py-3 border-b shadow-md">
+        <div className="flex justify-between items-center mb-1">
+          <div className="text-sm font-semibold text-gray-500">
+            What would you like to make with Graffiticode?
+          </div>
           {help.length > 0 && (
             <button
               className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors"
@@ -211,57 +251,6 @@ export const HelpPanel = ({
               Clear All
             </button>
           )}
-        </div>
-      </div>
-
-      {/* Scrollable messages container - now takes most of the space */}
-      <div
-        className="flex-grow overflow-auto px-4 py-4"
-        style={{
-          height: 'calc(100vh - 240px)' // Adjusted to account for input at bottom
-        }}
-      >
-        {help.length === 0 && (
-          <div className="text-center text-gray-400 py-8">
-            No messages yet. Start by asking a question below.
-          </div>
-        )}
-        {help.map((item, index) => (
-          <div key={index} className={`mb-4 ${item.type === 'user' ? 'text-right' : 'text-left'} relative group`}>
-            {/* Only show delete button on user messages */}
-            {item.type === 'user' && (
-              <button
-                className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
-                onClick={() => handleDeleteMessagePair(index)}
-                title="Delete conversation"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-
-            {item.type === 'user' ? (
-              <div className="inline-block max-w-3/4 bg-blue-100 rounded-lg p-3 text-left">
-                <p className="text-sm">{item.user}</p>
-              </div>
-            ) : (
-              <div className="bg-gray-100 rounded-lg p-3">
-                <p className="text-sm">{item.help.text}</p>
-              </div>
-            )}
-          </div>
-        ))}
-        {/* Invisible element for auto-scrolling to bottom */}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input field at the bottom */}
-      <div ref={headerRef} className="flex-none sticky bottom-0 z-20 bg-white px-4 py-3 border-t shadow-md">
-        <div className="flex justify-between items-center mb-1">
-          <div className="text-sm font-semibold text-gray-500">
-            What would you like to make with Graffiticode?
-          </div>
         </div>
         <div className="text-xs font-light text-gray-500 mt-1 mb-2">
           Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
@@ -287,6 +276,57 @@ export const HelpPanel = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Scrollable messages container - now takes most of the space */}
+      <div
+        className="flex-grow overflow-auto px-4 py-4"
+        style={{
+          height: 'calc(100vh - 240px)' // Adjusted to account for input at top
+        }}
+      >
+        {help.length === 0 && (
+          <div className="text-center text-gray-400 py-8">
+            No messages yet. Start by asking a question above.
+          </div>
+        )}
+        
+        {/* Invisible element for auto-scrolling to top */}
+        <div ref={messagesEndRef} />
+        
+        {/* Group messages into user-bot pairs and display in reverse chronological order */}
+        {createConversationPairs().map((pair, pairIndex) => (
+          <div key={pairIndex} className="mb-6 relative group">
+            {/* Delete button for the entire pair */}
+            <button
+              className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
+              onClick={() => handleDeleteMessagePair(pair.index)}
+              title="Delete conversation"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            {/* User message always displayed first/above */}
+            {pair.user && (
+              <div className="mb-2 text-right">
+                <div className="inline-block max-w-3/4 bg-blue-100 rounded-lg p-3 text-left">
+                  <p className="text-sm">{pair.user.user}</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Bot response displayed second/below the user message */}
+            {pair.bot && (
+              <div className="text-left">
+                <div className="bg-gray-100 rounded-lg p-3">
+                  <p className="text-sm">{pair.bot.help.text}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
