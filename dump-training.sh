@@ -3,7 +3,7 @@
 # Default values
 OUTPUT_DIR="./training"
 GRAPHQL_ENDPOINT="https://graffiticode.com/api"
-MARK=1
+MARK=4
 LANG=""
 
 # Parse command line arguments

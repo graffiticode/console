@@ -3,15 +3,9 @@
 ## Language L0159
 
 ### Prompt
-"create flashcards for practicing the french names for numbers from 10 to 100
-
-create a matching game for the french names of the 10s from 10 to 100"
+"create a matching game for the french names of the 10s from 10 to 100"
 
 ### Chat Transcript
-
-**User**: create flashcards for practicing the french names for numbers from 10 to 100
-
-**Assistant**: This generated code creates a set of flashcards that display French translations for numbers from 10 to 100. The code defines an array of facts, where each fact is a pair of the English number and its French equivalent. The generated code also includes a setting to use a background texture for the flashcards.
 
 **User**: create a matching game for the french names of the 10s from 10 to 100
 
@@ -97,15 +91,9 @@ match facts [
 ---
 
 ### Prompt
-"create flashcards for practicing the numbers 1 to 10 in french
-
-create flashcards for practicing the names of the french alphabet"
+"create flashcards for practicing the names of the french alphabet"
 
 ### Chat Transcript
-
-**User**: create flashcards for practicing the numbers 1 to 10 in french
-
-**Assistant**: This generated code creates a list of French number flashcards from 1 to 10. The code defines an array of French number words and their English translations, and then uses that data to generate a set of flashcards with a background texture. The purpose of this code is to provide a simple way to practice and learn French numbers from 1 to 10.
 
 **User**: create flashcards for practicing the names of the french alphabet
 

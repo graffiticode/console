@@ -63,83 +63,57 @@ print frenchNumbers..
 ---
 
 ### Prompt
-"compute fibinocci for 10
-
-write a case expression that translates ten number values to their french names as strings. call it with a list of ten matching and non matching values"
+"create an record with field named foo to 10 and then set another field named bar to 20"
 
 ### Chat Transcript
 
-**Assistant**: ```graffiticode
-| Function to calculate the nth Fibonacci number
-let fib = <n:
-  if eq n 0 then
-    0
-  else if eq n 1 then
-    1
-  else
-    add (fib (sub n 1)) (fib (sub n 2))
->..
+**User**: create an record with field named foo to 10 and then set another field named bar to 20
 
-
-| Calculate the 10th Fibonacci number
-let result = fib 10..
-
-| Print the result
-print result..
-```
-
-**User**: compute fibinocci for 10
-
-**Assistant**: ```graffiticode
-| Function to translate a number to its French name
-let frenchNumber = <n:
-  case n of
-    0: "zéro"
-    1: "un"
-    2: "deux"
-    3: "trois"
-    4: "quatre"
-    5: "cinq"
-    6: "six"
-    7: "sept"
-    8: "huit"
-    9: "neuf"
-    10: "dix"
-    _: "unknown"
-  end
->..\n
-
-| List of numbers to translate
-let numbers = [1 3 5 7 9 11 8 6 4 2]..\n
-
-| Map each number to its French name
-let frenchNumbers = map (frenchNumber) numbers..\n
-
-| Print the results
-print frenchNumbers..
-```
-
-**User**: write a case expression that translates ten number values to their french names as strings. call it with a list of ten matching and non matching values
+**Assistant**: The generated code creates a new record (or object) with a field named 'foo' set to the value 10. It then updates that record by adding another field called 'bar' with the value 20. Finally, it prints out the updated record with both the 'foo' and 'bar' fields.
 
 ### Code
 
 ```
-| Function to calculate the nth Fibonacci number
-let fib = <n:
-  if eq n 0 then
-    0
-  else if eq n 1 then
-    1
-  else
-    add (fib (sub n 1)) (fib (sub n 2))
->..
+| Create a record with a field named 'foo' set to 10
+let myRecord = { foo: 10 }..
+
+| Set another field named 'bar' to 20 in the same record
+let updatedRecord = set "bar" 20 myRecord..
+
+| Print the updated record
+print updatedRecord..
+```
+
+---
+
+### Prompt
+"get the first element in a list of strings"
+
+### Chat Transcript
+
+**User**: get the first element in a list of strings
+
+**Assistant**: The generated code creates a function called "first" that retrieves the first element from a list. It then defines a list of fruit names and uses the "first" function to get the first fruit in the list. Finally, it prints the first fruit to the console.
+
+In simple terms, this generated code allows you to easily access the first item in a list and display it.
+
+### Code
+
+```
+| Function to get the first element of a list
+let first = <list: hd list>..
 
 
-| Calculate the 10th Fibonacci number
-let result = fib 10..
+| Example list of strings
+let fruits = ["apple" "banana" "orange" "grape"]..
 
-| Print the result
-print result..
+
+| Get the first fruit
+let firstFruit = first fruits..
+
+
+| Print the first fruit
+print firstFruit..
 ```
 
 ---
@@ -227,92 +201,20 @@ print frenchNumbers..
 ---
 
 ### Prompt
-"compute fibinocci for 10
-
-write a case expression that translates ten number values to their french names as strings. call it with a list of ten matching and non matching values"
+"get the value of binding 'x' from and object that contains 'x'"
 
 ### Chat Transcript
 
-**Assistant**: ```graffiticode
-| Function to calculate the nth Fibonacci number
-let fib = <n:
-  if eq n 0 then
-    0
-  else if eq n 1 then
-    1
-  else
-    add (fib (sub n 1)) (fib (sub n 2))
->..
+**User**: get the value of binding 'x' from and object that contains 'x'
 
-
-| Calculate the 10th Fibonacci number
-let result = fib 10..
-
-| Print the result
-print result..
-```
-
-**User**: compute fibinocci for 10
-
-**Assistant**: ```graffiticode
-| Function to translate a number to its French name
-let frenchNumber = <n:
-  case n of
-    0: "zéro"
-    1: "un"
-    2: "deux"
-    3: "trois"
-    4: "quatre"
-    5: "cinq"
-    6: "six"
-    7: "sept"
-    8: "huit"
-    9: "neuf"
-    10: "dix"
-    _: "unknown"
-  end
->..\n
-
-| List of numbers to translate
-let numbers = [1 3 5 7 9 11 8 6 4 2]..\n
-
-| Map each number to its French name
-let frenchNumbers = map (frenchNumber) numbers..\n
-
-| Print the results
-print frenchNumbers..
-```
-
-**User**: write a case expression that translates ten number values to their french names as strings. call it with a list of ten matching and non matching values
+**Assistant**: The generated code creates an object with two properties, 'x' and 'y', and assigns the values 42 and "hello" to them, respectively. It then retrieves the value of the 'x' property using the 'get' function and stores it in the 'xValue' variable. Finally, it prints the value of 'x' to the console.
 
 ### Code
 
 ```
-| Function to translate a number to its French name
-let frenchNumber = <n:
-  case n of
-    0: "zéro"
-    1: "un"
-    2: "deux"
-    3: "trois"
-    4: "quatre"
-    5: "cinq"
-    6: "six"
-    7: "sept"
-    8: "huit"
-    9: "neuf"
-    10: "dix"
-    _: "unknown"
-  end
->..
-
-| List of numbers to translate
-let numbers = [1 3 5 7 9 11 8 6 4 2]..
-
-| Map each number to its French name
-let frenchNumbers = map (frenchNumber) numbers..
-
-| Print the results
-print frenchNumbers..
+| Object containing the binding 'x'
+let obj = {x: 42 y: "hello"}.. | Get the value of 'x' using the 'get' function
+let xValue = get "x" obj.. | Print the value of 'x'
+print xValue..
 ```
 
