@@ -7,13 +7,41 @@
   // tailwind.config.js
   ```
 */
+import { useState, useEffect } from "react";
 import BillingCard from "./BillingCard";
 import APIKeysCard from "./APIKeysCard";
+import InviteCodesCard from "./InviteCodesCard";
 import SignIn from "./SignIn";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 
-export default function Example() {
+export default function SettingsForm() {
   const { user } = useGraffiticodeAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      checkIfAdmin();
+    }
+  }, [user]);
+
+  const checkIfAdmin = async () => {
+    try {
+      const token = await user.getToken();
+      const response = await fetch("/api/user/admin-status", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setIsAdmin(data.isAdmin);
+      }
+    } catch (err) {
+      console.error("Error checking admin status:", err);
+    }
+  };
+
   if (!user) {
     return (
       <div className="justify-center w-full">
@@ -26,7 +54,7 @@ export default function Example() {
   } else {
     return (
       <div>
-        <div className="relative pt-10">
+        <div className="relative space-y-8">
           <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
             <aside className="py-6 lg:col-span-3">
               <span className="mx-5 text-xl font-bold">API Keys</span>
@@ -35,8 +63,19 @@ export default function Example() {
               <APIKeysCard />
             </div>
           </div>
+          
+          {isAdmin && (
+            <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
+              <aside className="py-6 lg:col-span-3">
+                <span className="mx-5 text-xl font-bold">Invite Codes</span>
+              </aside>
+              <div className="lg:col-span-9">
+                <InviteCodesCard />
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    )
+    );
   }
 }
