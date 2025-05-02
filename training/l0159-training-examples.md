@@ -3,7 +3,9 @@
 ## Language L0159
 
 ### Prompt
-"create flashcards for practicing the french names for numbers from 10 to 100"
+"create flashcards for practicing the french names for numbers from 10 to 100
+
+create a matching game for the french names of the 10s from 10 to 100"
 
 ### Chat Transcript
 
@@ -11,55 +13,85 @@
 
 **Assistant**: This generated code creates a set of flashcards that display French translations for numbers from 10 to 100. The code defines an array of facts, where each fact is a pair of the English number and its French equivalent. The generated code also includes a setting to use a background texture for the flashcards.
 
+**User**: create a matching game for the french names of the 10s from 10 to 100
+
+**Assistant**: The generated code creates a simple matching game where the player has to match numbers to their French names. It defines a list of number-name pairs, sets up the game instructions, and applies a light color theme to the game interface. This code is designed to provide an educational and interactive way for users to learn French number names.
+
 ### Code
 
 ```
-let flashcards =
-  facts [
+let pairs = [
+  ["10", "dix"]
+  ["20", "vingt"]
+  ["30", "trente"]
+  ["40", "quarante"]
+  ["50", "cinquante"]
+  ["60", "soixante"]
+  ["70", "soixante-dix"]
+  ["80", "quatre-vingts"]
+  ["90", "quatre-vingt-dix"]
+  ["100", "cent"]
+]..
+
+match facts pairs {}..
+```
+
+---
+
+### Prompt
+"create a matching game for the 9 times facts up to 9 times 9. add a textured background to the board"
+
+### Chat Transcript
+
+**User**: create a matching game for the 9 times facts up to 9 times 9. add a textured background to the board
+
+**Assistant**: This generated code creates a simple matching game where the player has to match each multiplication fact with its correct answer. The game includes a list of multiplication facts and their corresponding answers, as well as some configuration options to customize the game's appearance. The purpose of this code is to provide an interactive way for users to practice their multiplication skills.
+
+### Code
+
+```
+match facts [
     [
-    '10',
-    'dix'
-    ],
+    '9 \times 1'
+    '9'
+    ]
     [
-    '20',
-    'vingt'
-    ],
+    '9 \times 2'
+    '18'
+    ]
     [
-    '30',
-    'trente'
-    ],
+    '9 \times 3'
+    '27'
+    ]
     [
-    '40',
-    'quarante'
-    ],
+    '9 \times 4'
+    '36'
+    ]
     [
-    '50',
-    'cinquante'
-    ],
+    '9 \times 5'
+    '45'
+    ]
     [
-    '60',
-    'soixante'
-    ],
+    '9 \times 6'
+    '54'
+    ]
     [
-    '70',
-    'soixante-dix'
-    ],
+    '9 \times 7'
+    '63'
+    ]
     [
-    '80',
-    'quatre-vingts'
-    ],
+    '9 \times 8'
+    '72'
+    ]
     [
-    '90',
-    'quatre-vingt-dix'
-    ],
-    [
-    '100',
-    'cent'
-    ],
+    '9 \times 9'
+    '81'
+    ]
   ]
-{
-  useBgTexture: true,
-}..
+  {
+    useBgTexture: true
+  }
+..
 ```
 
 ---
@@ -274,62 +306,56 @@ flashcards
 ---
 
 ### Prompt
-"create flashcards for practicing the french names for numbers from 10 to 100"
+"create a matching game for the 9 times facts up to 9 times 9. add a textured background to the board"
 
 ### Chat Transcript
 
-**User**: create flashcards for practicing the french names for numbers from 10 to 100
+**User**: create a matching game for the 9 times facts up to 9 times 9. add a textured background to the board
 
-**Assistant**: This generated code creates a set of flashcards that display French translations for numbers from 10 to 100. The code defines an array of facts, where each fact is a pair of the English number and its French equivalent. The generated code also includes a setting to use a background texture for the flashcards.
+**Assistant**: This generated code creates a simple matching game where the player has to match each multiplication fact with its correct answer. The game includes a list of multiplication facts and their corresponding answers, as well as some configuration options to customize the game's appearance. The purpose of this code is to provide an interactive way for users to practice their multiplication skills.
 
 ### Code
 
 ```
-flashcards
-  facts [
-    [
-    '10',
-    'dix'
-    ],
-    [
-    '20',
-    'vingt'
-    ],
-    [
-    '30',
-    'trente'
-    ],
-    [
-    '40',
-    'quarante'
-    ],
-    [
-    '50',
-    'cinquante'
-    ],
-    [
-    '60',
-    'soixante'
-    ],
-    [
-    '70',
-    'soixante-dix'
-    ],
-    [
-    '80',
-    'quatre-vingts'
-    ],
-    [
-    '90',
-    'quatre-vingt-dix'
-    ],
-    [
-    '100',
-    'cent'
-    ],
+match facts [
+  [
+    '9 \times 1'
+    '9'
   ]
-{
-  useBgTexture: true,
+  [
+    '9 \times 2'
+    '18'
+  ]
+  [
+    '9 \times 3'
+    '27'
+  ]
+  [
+    '9 \times 4'
+    '36'
+  ]
+  [
+    '9 \times 5'
+    '45'
+  ]
+  [
+    '9 \times 6'
+    '54'
+  ]
+  [
+    '9 \times 7'
+    '63'
+  ]
+  [
+    '9 \times 8'
+    '72'
+  ]
+  [
+    '9 \times 9'
+    '81'
+  ]
+] {
+  useBgTexture: true
 }..
 ```
 
