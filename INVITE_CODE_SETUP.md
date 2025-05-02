@@ -6,15 +6,29 @@ This document provides instructions for setting up and managing the invite code 
 
 The invite code system requires new users to enter an invite code after signing in with their Ethereum wallet. This helps control access to the platform and prevents unwanted registrations.
 
+## Authentication
+
+The system uses Google's recommended authentication practices:
+
+- **Application Default Credentials (ADC)** - No service account keys are stored in code or environment variables
+- **Workload Identity Federation** - When deployed to Google Cloud, the app automatically uses the service account attached to the environment
+- **Local Development** - For local development, use `gcloud auth application-default login`
+
+This approach follows security best practices by avoiding the use of service account keys.
+
 ## Initial Setup
 
 When deploying for the first time:
 
-1. Run the setup script to mark existing users as verified and create initial invite codes:
+1. Authenticate with Google Cloud (if running locally):
+   ```bash
+   gcloud auth application-default login
+   ```
 
-```bash
-npm run setup-invite-codes
-```
+2. Run the setup script to mark existing users as verified and create initial invite codes:
+   ```bash
+   npm run setup-invite-codes
+   ```
 
 This script will:
 - Mark all existing users as verified
@@ -37,31 +51,14 @@ Administrators can manage invite codes through the settings page:
 
 ### Making a User an Admin
 
-To grant a user admin privileges, use the Firebase console or run a script to update the user document:
+To grant a user admin privileges, use the provided admin script:
 
-```javascript
-// Using Firebase Admin SDK
-const admin = require('firebase-admin');
-const db = admin.firestore();
+```bash
+# First, authenticate with Google Cloud (if running locally)
+gcloud auth application-default login
 
-async function makeUserAdmin(uid) {
-  const usersRef = db.collection('users');
-  const userQuery = await usersRef.where('uid', '==', uid).get();
-  
-  if (userQuery.empty) {
-    console.error('User not found');
-    return;
-  }
-  
-  await userQuery.docs[0].ref.update({
-    isAdmin: true
-  });
-  
-  console.log(`User ${uid} is now an admin`);
-}
-
-// Call the function with the user's UID
-makeUserAdmin('0x123456789...');
+# Then make the user an admin
+npm run make-admin 0x1234567890abcdef1234567890abcdef12345678
 ```
 
 ## User Experience

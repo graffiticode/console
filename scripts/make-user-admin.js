@@ -1,16 +1,6 @@
 // Script to make a user an admin
 const admin = require('firebase-admin');
 
-// Initialize Firebase Admin
-// IMPORTANT: You must set the FIREBASE_SERVICE_ACCOUNT_KEY environment variable
-// with a base64-encoded Firebase service account key JSON before running this script
-if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-  console.error('ERROR: FIREBASE_SERVICE_ACCOUNT_KEY environment variable not set');
-  console.error('Please set this variable with a base64-encoded Firebase service account key');
-  console.error('Example: export FIREBASE_SERVICE_ACCOUNT_KEY=$(base64 -w 0 service-account.json)');
-  process.exit(1);
-}
-
 // Get the user ID from command line arguments
 const uid = process.argv[2];
 if (!uid) {
@@ -20,19 +10,23 @@ if (!uid) {
   process.exit(1);
 }
 
-// Initialize Firebase
-const serviceAccount = JSON.parse(
-  Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, 'base64').toString()
-);
-
+// Initialize Firebase Admin using Application Default Credentials (ADC)
+// This follows Google's best practices for authentication
 if (!admin.apps.length) {
   try {
+    // This will use:
+    // - If running on Google Cloud: the service account attached to the environment
+    // - If running locally: ADC from gcloud CLI (after running `gcloud auth application-default login`)
+    // - Or credentials specified by GOOGLE_APPLICATION_CREDENTIALS environment variable
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+      // No explicit credentials required, the SDK will use ADC
     });
     console.log('✅ Firebase Admin SDK initialized successfully');
   } catch (error) {
     console.error('❌ Failed to initialize Firebase Admin SDK:', error);
+    console.error('\nTo authenticate locally:');
+    console.error('1. Run: gcloud auth application-default login');
+    console.error('2. Or set GOOGLE_APPLICATION_CREDENTIALS environment variable pointing to a service account file');
     process.exit(1);
   }
 }

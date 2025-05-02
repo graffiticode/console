@@ -1,17 +1,18 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { client } from '../lib/auth';
 
 // Initialize Firebase Admin SDK if not already initialized
 function initializeFirebaseAdmin() {
   if (!getApps().length) {
-    const serviceAccount = JSON.parse(
-      Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '', 'base64').toString()
-    );
-    
-    initializeApp({
-      credential: cert(serviceAccount),
-    });
+    // Use Application Default Credentials
+    // This is more secure and follows Google's best practices
+    try {
+      initializeApp();
+    } catch (error) {
+      console.error('Failed to initialize Firebase Admin SDK:', error);
+      // The API will still work with Graffiticode auth as fallback
+    }
   }
   
   return getAuth();

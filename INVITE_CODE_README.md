@@ -10,6 +10,16 @@ The invite code system requires new users to enter an invite code after signing 
 
 The invite code system is currently implemented but temporarily disabled. A workaround is in place in the `check-user-verification.js` API endpoint that marks all users as verified, avoiding the need for invite codes at this time.
 
+## Authentication
+
+The system uses Google's recommended authentication practices:
+
+- **Application Default Credentials (ADC)** - No service account keys are stored in code or environment variables
+- **Workload Identity Federation** - When deployed to Google Cloud, the app automatically uses the service account attached to the environment
+- **Local Development** - For local development, use `gcloud auth application-default login`
+
+This approach follows security best practices by avoiding the use of service account keys.
+
 ## Enabling the Invite Code System
 
 To enable the invite code system:
@@ -19,6 +29,10 @@ To enable the invite code system:
 3. Run the setup script to mark existing users as verified and create initial invite codes:
 
 ```bash
+# First, authenticate with Google Cloud (if developing locally)
+gcloud auth application-default login
+
+# Then run the setup script
 npm run setup-invite-codes
 ```
 
@@ -29,8 +43,8 @@ npm run setup-invite-codes
 To grant a user admin privileges:
 
 ```bash
-# Make sure you have the Firebase service account key set
-export FIREBASE_SERVICE_ACCOUNT_KEY=$(base64 -w 0 path/to/service-account.json)
+# First, authenticate with Google Cloud (if developing locally)
+gcloud auth application-default login
 
 # Run the script with the user's Ethereum address
 npm run make-admin 0x1234567890abcdef1234567890abcdef12345678
@@ -41,8 +55,8 @@ npm run make-admin 0x1234567890abcdef1234567890abcdef12345678
 To mark all existing users as verified and create initial invite codes:
 
 ```bash
-# Make sure you have the Firebase service account key set
-export FIREBASE_SERVICE_ACCOUNT_KEY=$(base64 -w 0 path/to/service-account.json)
+# First, authenticate with Google Cloud (if developing locally)
+gcloud auth application-default login
 
 # Run the setup script
 npm run setup-invite-codes
