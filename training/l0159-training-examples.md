@@ -3,6 +3,234 @@
 ## Language L0159
 
 ### Prompt
+"create flashcards for the us state capitals
+
+wrap the text in latex like this: ["\text{Alabama}", "\text{Montgomery}"]. don't escape the backslashes"
+
+### Chat Transcript
+
+**User**: create flashcards for the us state capitals
+
+**Assistant**: This generated code creates a list of state capitals in the United States. It then uses that list to generate a set of flashcards with a dark theme and a background texture. The purpose of this code is to provide an educational tool for learning the state capitals.
+
+**User**: wrap the text in latex like this: ["\text{Alabama}", "\text{Montgomery}"]. don't escape the backslashes
+
+**Assistant**: The generated code creates a set of flashcards that display the names of U.S. states and their corresponding state capitals. The flashcards are stored in the variable "flashcards" and can be used for educational or study purposes. The code also sets a dark gray background color for the flashcards.
+
+### Code
+
+```
+flashcards
+  facts [
+    [
+    "\text{Alabama}",
+    "\text{Montgomery}"
+    ],
+    [
+    "\text{Alaska}",
+    "\text{Juneau}"
+    ],
+    [
+    "\text{Arizona}",
+    "\text{Phoenix}"
+    ],
+    [
+    "\text{Arkansas}",
+    "\text{Little Rock}"
+    ],
+    [
+    "\text{California}",
+    "\text{Sacramento}"
+    ],
+    [
+    "\text{Colorado}",
+    "\text{Denver}"
+    ],
+    [
+    "\text{Connecticut}",
+    "\text{Hartford}"
+    ],
+    [
+    "\text{Delaware}",
+    "\text{Dover}"
+    ],
+    [
+    "\text{Florida}",
+    "\text{Tallahassee}"
+    ],
+    [
+    "\text{Georgia}",
+    "\text{Atlanta}"
+    ],
+    [
+    "\text{Hawaii}",
+    "\text{Honolulu}"
+    ],
+    [
+    "\text{Idaho}",
+    "\text{Boise}"
+    ],
+    [
+    "\text{Illinois}",
+    "\text{Springfield}"
+    ],
+    [
+    "\text{Indiana}",
+    "\text{Indianapolis}"
+    ],
+    [
+    "\text{Iowa}",
+    "\text{Des Moines}"
+    ],
+    [
+    "\text{Kansas}",
+    "\text{Topeka}"
+    ],
+    [
+    "\text{Kentucky}",
+    "\text{Frankfort}"
+    ],
+    [
+    "\text{Louisiana}",
+    "\text{Baton Rouge}"
+    ],
+    [
+    "\text{Maine}",
+    "\text{Augusta}"
+    ],
+    [
+    "\text{Maryland}",
+    "\text{Annapolis}"
+    ],
+    [
+    "\text{Massachusetts}",
+    "\text{Boston}"
+    ],
+    [
+    "\text{Michigan}",
+    "\text{Lansing}"
+    ],
+    [
+    "\text{Minnesota}",
+    "\text{St. Paul}"
+    ],
+    [
+    "\text{Mississippi}",
+    "\text{Jackson}"
+    ],
+    [
+    "\text{Missouri}",
+    "\text{Jefferson City}"
+    ],
+    [
+    "\text{Montana}",
+    "\text{Helena}"
+    ],
+    [
+    "\text{Nebraska}",
+    "\text{Lincoln}"
+    ],
+    [
+    "\text{Nevada}",
+    "\text{Carson City}"
+    ],
+    [
+    "\text{New Hampshire}",
+    "\text{Concord}"
+    ],
+    [
+    "\text{New Jersey}",
+    "\text{Trenton}"
+    ],
+    [
+    "\text{New Mexico}",
+    "\text{Santa Fe}"
+    ],
+    [
+    "\text{New York}",
+    "\text{Albany}"
+    ],
+    [
+    "\text{North Carolina}",
+    "\text{Raleigh}"
+    ],
+    [
+    "\text{North Dakota}",
+    "\text{Bismarck}"
+    ],
+    [
+    "\text{Ohio}",
+    "\text{Columbus}"
+    ],
+    [
+    "\text{Oklahoma}",
+    "\text{Oklahoma City}"
+    ],
+    [
+    "\text{Oregon}",
+    "\text{Salem}"
+    ],
+    [
+    "\text{Pennsylvania}",
+    "\text{Harrisburg}"
+    ],
+    [
+    "\text{Rhode Island}",
+    "\text{Providence}"
+    ],
+    [
+    "\text{South Carolina}",
+    "\text{Columbia}"
+    ],
+    [
+    "\text{South Dakota}",
+    "\text{Pierre}"
+    ],
+    [
+    "\text{Tennessee}",
+    "\text{Nashville}"
+    ],
+    [
+    "\text{Texas}",
+    "\text{Austin}"
+    ],
+    [
+    "\text{Utah}",
+    "\text{Salt Lake City}"
+    ],
+    [
+    "\text{Vermont}",
+    "\text{Montpelier}"
+    ],
+    [
+    "\text{Virginia}",
+    "\text{Richmond}"
+    ],
+    [
+    "\text{Washington}",
+    "\text{Olympia}"
+    ],
+    [
+    "\text{West Virginia}",
+    "\text{Charleston}"
+    ],
+    [
+    "\text{Wisconsin}",
+    "\text{Madison}"
+    ],
+    [
+    "\text{Wyoming}",
+    "\text{Cheyenne}"
+    ]
+  ]
+{
+  useBgTexture: true
+}..
+```
+
+---
+
+### Prompt
 "create a matching game for the french names of the 10s from 10 to 100"
 
 ### Chat Transcript
@@ -288,6 +516,59 @@ flashcards
   ]
 {
   useBgTexture: true,
+}..
+```
+
+---
+
+### Prompt
+"Create flashcards for 9 times practice from 1 to 9"
+
+### Chat Transcript
+
+**User**: Create flashcards for 9 times practice from 1 to 9
+
+**Assistant**: The generated code creates a set of flashcards for practicing multiplication. It generates a list of numbers from 1 to 9, creates a flashcard for each number that displays the question "What is 9 x [number]?" and the corresponding answer, and then displays each flashcard. The code also sets the theme to dark mode for the flashcards.
+
+### Code
+
+```
+flashcards
+  facts [
+    [
+    '9\times2',
+    '18'
+    ],
+    [
+    '9\times3',
+    '27'
+    ],
+    [
+    '9\times4',
+    '36'
+    ],
+    [
+    '9\times5',
+    '45'
+    ],
+    [
+    '9\times6',
+    '54'
+    ],
+    [
+    '9\times7',
+    '63'
+    ],
+    [
+    '9\times8',
+    '72'
+    ],
+    [
+    '9\times9',
+    '81'
+    ],
+  ]
+{
 }..
 ```
 
