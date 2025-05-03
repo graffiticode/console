@@ -450,10 +450,10 @@ function readDialectInstructions(lang) {
   try {
     const fs = require('fs');
     const path = require('path');
-    
+
     // Form the path to the dialect instructions file
     const instructionsPath = path.join(process.cwd(), `./training/l${lang}-instructions.md`);
-    
+
     // Check if file exists
     if (fs.existsSync(instructionsPath)) {
       console.log(`Found dialect instructions for L${lang}`);
@@ -484,12 +484,12 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
 
   // Try to read dialect-specific instructions from file first
   const fileInstructions = readDialectInstructions(lang);
-  
+
   if (fileInstructions) {
     // Use file-based instructions if available
     prompt += fileInstructions;
   }
-  
+
   prompt += `
 ## Core Syntax Rules
 - Use \`let name = value..\` for declarations
@@ -629,7 +629,7 @@ async function createCodeGenerationPrompt(userPrompt, examples = [], lang = "000
 
   // Get the dialect-specific system prompt
   const dialectSystemPrompt = getSystemPromptForDialect(lang);
-  
+
   // Combine dialect-specific system prompt with examples
   const enhancedSystemPrompt = dialectSystemPrompt + examplesSection;
 
@@ -996,13 +996,13 @@ async function storeSuccessfulGeneration(prompt, code, lang = "0002", verified =
  */
 function processGeneratedCode(code) {
   if (!code) return code;
-  
+
   // Replace all double backslashes with single backslashes
   let processed = code.replace(/\\\\/g, '\\');
-  
+
   // Replace literal "\n" with actual newlines
   processed = processed.replace(/\\n/g, '\n');
-  
+
   return processed;
 }
 
@@ -1162,7 +1162,7 @@ Explain it in 2-3 sentences of simple language that anyone can understand. Start
 
     // Ensure the code is properly processed one final time before returning
     const finalProcessedCode = processGeneratedCode(generatedCode);
-    
+
     // Return formatted response with the language name and description
     return {
       code: finalProcessedCode,
