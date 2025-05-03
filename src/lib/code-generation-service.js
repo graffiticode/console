@@ -442,25 +442,33 @@ export async function addTrainingExample(example) {
 }
 
 /**
- * Dialect-specific instruction map
- * Maps language IDs to their specific instructions to be included in the system prompt
+ * Reads dialect-specific instructions from markdown files in the training directory
+ * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
+ * @returns {string} - The dialect-specific instructions, or empty string if none found
  */
-const dialectInstructions = {
-  // Default dialect (L0002) doesn't need specific instructions
-  "0002": "",
-  
-  // L0159 - LaTeX formatting dialect
-  "0159": `
-## Dialect L0159 Specific Instructions
-- This dialect is used for generating formatted text using LaTeX
-- Format all mathematical and prose text using proper LaTeX syntax
-- Properly escape special LaTeX characters
-- Format text using LaTeX commands for emphasis, lists, etc.
-- IMPORTANT: Remember to maintain Graffiticode's core syntax with \`let\` declarations and \`..\` endings
-`,
-
-  // Add other dialect-specific instructions here
-};
+function readDialectInstructions(lang) {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Form the path to the dialect instructions file
+    const instructionsPath = path.join(process.cwd(), `./training/l${lang}-instructions.md`);
+    
+    // Check if file exists
+    if (fs.existsSync(instructionsPath)) {
+      console.log(`Found dialect instructions for L${lang}`);
+      // Read the file content
+      const instructions = fs.readFileSync(instructionsPath, 'utf8');
+      return `\n${instructions}\n`;
+    } else {
+      console.log(`No dialect instructions file found for L${lang}`);
+      return "";
+    }
+  } catch (error) {
+    console.error(`Error reading dialect instructions for L${lang}:`, error);
+    return "";
+  }
+}
 
 /**
  * Returns the appropriate system prompt for a given dialect
@@ -474,9 +482,12 @@ You are a programming assistant that translates natural language into code writt
 
 Graffiticode is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.`;
 
-  // Add dialect-specific instructions if they exist
-  if (dialectInstructions[lang]) {
-    prompt += dialectInstructions[lang];
+  // Try to read dialect-specific instructions from file first
+  const fileInstructions = readDialectInstructions(lang);
+  
+  if (fileInstructions) {
+    // Use file-based instructions if available
+    prompt += fileInstructions;
   }
   
   prompt += `
@@ -495,10 +506,8 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
 
 ## Built-in Types
 - **Numbers**: \`42\`, \`-3.14\`
-- **Strings**: \`"hello"\` or multiline with \`'hello,\\nworld!'\`;
-  - Quotes inside strings should NOT be escaped unless nested in another string
-  - CORRECT: \`"The user's name is John"\` (no escape on apostrophe)
-  - INCORRECT: \`"The user\\'s name is John"\` (don't escape apostrophes)
+- **Strings**: \`"hello"\` or multiline with \`'hello,\nworld!'\`;
+  - Quotes inside strings should NEVER be escaped
   - For nested quotes, use different quote types: \`"He said 'hello'"\` or \`'She said "goodbye"'\`
   - Supports interpolation: \` \\\`hello, \${name}!\\\` \`
   - IMPORTANT: Backslashes should NOT be escaped in generated code
@@ -544,15 +553,8 @@ Start with \`|\` and extend to the end of the line.
 ### Record/List Access
 \`get\`, \`set\`
 
-### String
-\`concat\`, string interpolation
-
 ### Output
 \`print\`
-
-### Dialect L0002 Built-ins
-- \`hello string..\` — display text
-- \`theme dark..\` — set theme; arg is tag: \`dark\` or \`light\`
 
 Only return idiomatic, valid Graffiticode. Use readable names. Output **only the code** unless explanation is requested.
 
