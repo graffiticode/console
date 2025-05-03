@@ -441,11 +441,45 @@ export async function addTrainingExample(example) {
   }
 }
 
-const baseSystemPrompt = `
-You are a programming assistant that translates natural language into code written in a functional DSL called **Graffiticode**, specifically dialect L0002.
+/**
+ * Dialect-specific instruction map
+ * Maps language IDs to their specific instructions to be included in the system prompt
+ */
+const dialectInstructions = {
+  // Default dialect (L0002) doesn't need specific instructions
+  "0002": "",
+  
+  // L0159 - LaTeX formatting dialect
+  "0159": `
+## Dialect L0159 Specific Instructions
+- This dialect is used for generating formatted text using LaTeX
+- Format all mathematical and prose text using proper LaTeX syntax
+- Properly escape special LaTeX characters
+- Format text using LaTeX commands for emphasis, lists, etc.
+- IMPORTANT: Remember to maintain Graffiticode's core syntax with \`let\` declarations and \`..\` endings
+`,
 
-Graffiticode is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.
+  // Add other dialect-specific instructions here
+};
 
+/**
+ * Returns the appropriate system prompt for a given dialect
+ * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
+ * @returns {string} - The customized system prompt
+ */
+function getSystemPromptForDialect(lang) {
+  // Start with the base prompt
+  let prompt = `
+You are a programming assistant that translates natural language into code written in a functional DSL called **Graffiticode**, specifically dialect L${lang}.
+
+Graffiticode is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.`;
+
+  // Add dialect-specific instructions if they exist
+  if (dialectInstructions[lang]) {
+    prompt += dialectInstructions[lang];
+  }
+  
+  prompt += `
 ## Core Syntax Rules
 - Use \`let name = value..\` for declarations
 - All functions are prefix notation: \`add 1 2\` (no infix allowed)
@@ -467,6 +501,8 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
   - INCORRECT: \`"The user\\'s name is John"\` (don't escape apostrophes)
   - For nested quotes, use different quote types: \`"He said 'hello'"\` or \`'She said "goodbye"'\`
   - Supports interpolation: \` \\\`hello, \${name}!\\\` \`
+  - IMPORTANT: Backslashes should NOT be escaped in generated code
+  - IMPORTANT: Literal "\n" should not appear in the generated code; use proper newline characters instead
 - **Booleans**: \`true\`, \`false\`; **Null**: \`null\`
 - **Lists**: \`[1 2 3]\`; support pattern matching
 - **Records**: \`{name: "Alice" age: 30}\`; access via \`get\`, support destructuring
@@ -521,7 +557,10 @@ Start with \`|\` and extend to the end of the line.
 Only return idiomatic, valid Graffiticode. Use readable names. Output **only the code** unless explanation is requested.
 
 CRITICAL REMINDER: EVERY program MUST have at least one expression ending with \`..\` (double dots), and the final expression in your code MUST end with \`..\`. Failing to add the \`..\` at the end of expressions will cause the code to fail.
-`.trim();
+`;
+
+  return prompt.trim();
+}
 
 /**
  * Generate examples section from retrieved training examples
@@ -579,14 +618,18 @@ function generateExamplesSection(examples) {
  * Create a prompt for Claude that will generate high-quality code
  * @param {string} userPrompt - The user's original prompt
  * @param {Array} examples - Relevant examples to include
+ * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
  * @returns {string} - A well-formatted prompt for Claude
  */
-async function createCodeGenerationPrompt(userPrompt, examples = []) {
+async function createCodeGenerationPrompt(userPrompt, examples = [], lang = "0002") {
   // Generate examples section from retrieved examples
   const examplesSection = generateExamplesSection(examples);
 
-  // Combine base system prompt with examples
-  const enhancedSystemPrompt = baseSystemPrompt + examplesSection;
+  // Get the dialect-specific system prompt
+  const dialectSystemPrompt = getSystemPromptForDialect(lang);
+  
+  // Combine dialect-specific system prompt with examples
+  const enhancedSystemPrompt = dialectSystemPrompt + examplesSection;
 
   const promptData = {
     system: enhancedSystemPrompt,
@@ -889,6 +932,8 @@ Graffiticode is a minimal, prefix, expression-oriented language with these key f
 - Whitespace separates tokens; no commas required
 - Line comments start with the pipe character: \`| This is a comment\`
 - IMPORTANT: All let statements MUST end with a double dot (..)
+- IMPORTANT: Backslashes should NOT be escaped in generated code
+- IMPORTANT: Literal "\n" should not appear in the generated code; use proper newline characters instead
 
 Common Graffiticode errors and solutions:
 1. Missing double dot (..) at the end of a let statement
@@ -943,6 +988,23 @@ async function storeSuccessfulGeneration(prompt, code, lang = "0002", verified =
 }
 
 /**
+ * Processes generated code to fix common issues like double backslashes
+ * @param {string} code - The generated code to process
+ * @returns {string} - The processed code with fixes applied
+ */
+function processGeneratedCode(code) {
+  if (!code) return code;
+  
+  // Replace all double backslashes with single backslashes
+  let processed = code.replace(/\\\\/g, '\\');
+  
+  // Replace literal "\n" with actual newlines
+  processed = processed.replace(/\\n/g, '\n');
+  
+  return processed;
+}
+
+/**
  * Generate code, verify it, and fix if needed, using relevant examples
  * @param {Object} params - Parameters for code generation
  * @param {string} params.prompt - The user's prompt
@@ -970,8 +1032,8 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
     );
 
 
-    // Create a well-formatted prompt for Claude to generate Graffiticode
-    const formattedPrompt = await createCodeGenerationPrompt(prompt, relevantExamples);
+    // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
+    const formattedPrompt = await createCodeGenerationPrompt(prompt, relevantExamples, lang);
 
     console.log(
       "generateCode()",
@@ -991,7 +1053,8 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
 
     // Call the Claude API
     const response = await callClaudeAPI(formattedPrompt, apiOptions);
-    let generatedCode = response.content;
+    // Process the generated code to fix double backslashes and other issues
+    let generatedCode = processGeneratedCode(response.content);
     console.log(
       "[1] generateCode()",
       "generatedCode=" + generatedCode,
@@ -1031,8 +1094,8 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
             temperature: 0.1 // Lower temperature for more deterministic fixes
           });
 
-          // Update the generated code with the fixed version
-          generatedCode = fixResponse.content;
+          // Update the generated code with the fixed version and process to fix escaping issues
+          generatedCode = processGeneratedCode(fixResponse.content);
 
           // Add fix attempt usage to total
           finalUsage.prompt_tokens += fixResponse.usage.prompt_tokens;
@@ -1063,7 +1126,9 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
 Analyze the provided Graffiticode and explain what it does in 2-3 sentences of plain English.
 Focus on explaining the purpose and functionality without technical jargon.
 Keep your description concise and user-friendly, so people unfamiliar with programming can understand.
-IMPORTANT: Always phrase your description to indicate this is code that was generated, not code that the user wrote.`,
+IMPORTANT: Always phrase your description to indicate this is code that was generated, not code that the user wrote.
+IMPORTANT: Backslashes should NOT be escaped in generated code.
+IMPORTANT: Literal "\n" should not appear in the generated code; use proper newline characters instead.`,
       messages: [
         {
           role: "user",
@@ -1093,9 +1158,12 @@ Explain it in 2-3 sentences of simple language that anyone can understand. Start
     finalUsage.completion_tokens += descriptionResponse.usage.completion_tokens;
     finalUsage.total_tokens += descriptionResponse.usage.total_tokens;
 
+    // Ensure the code is properly processed one final time before returning
+    const finalProcessedCode = processGeneratedCode(generatedCode);
+    
     // Return formatted response with the language name and description
     return {
-      code: generatedCode,
+      code: finalProcessedCode,
       description: descriptionResponse.content,
       lang: lang,
       model: response.model,
