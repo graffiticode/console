@@ -982,22 +982,22 @@ async function storeSuccessfulGeneration(prompt, code, lang = "0002", verified =
  */
 function processGeneratedCode(content) {
   if (!content) return content;
-  
+
   // Try to extract code from between triple backticks
   const codeBlockRegex = /```(?:[\w]*\n|\n)?([\s\S]*?)```/;
   const match = content.match(codeBlockRegex);
-  
+
   // If we found a code block, extract it
   let code = match ? match[1].trim() : content;
-  
+
   // Replace all double backslashes with single backslashes
   let processed = code.replace(/\\\\/g, '\\');
-  
+
   // Replace literal "\n" with actual newlines
   processed = processed.replace(/\\n/g, '\n');
-  
+
   console.log("Extracted code from response:", processed);
-  
+
   return processed;
 }
 
