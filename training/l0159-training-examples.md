@@ -29,7 +29,6 @@ flashcards
   title "\text{Penguin Populations}"
   facts penguinData
   {
-    textSize: "large"
   }..
 ```
 

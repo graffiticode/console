@@ -107,11 +107,6 @@ function parseMarkdownExamples(markdownContent) {
 }
 
 async function getRelevantExamples({ prompt, lang, limit = 3 }) {
-  console.log(
-    "getRelevantExamples()",
-    "lang=" + JSON.stringify(lang, null, 2),
-  );
-
   try {
     console.log(`Getting relevant examples for language: ${lang}`);
 
@@ -803,24 +798,14 @@ function getFallbackResponse(prompt, options) {
  * @returns {Promise<Object>} - Compilation results including any errors
  */
 async function verifyCode(code, authToken) {
+  console.log(
+    "verifyCode()",
+    "code=" + code,
+  );
   try {
     const task = {lang: "0002", code};
-    console.log(
-      "verifyCode()",
-      "auth=" + JSON.stringify(authToken),
-      "task=" + JSON.stringify(task, null, 2),
-    );
     const { id } = await postTask({auth: {token: authToken}, task, ephemeral: true});
-    console.log(
-      "verifyCode()",
-      "id=" + id,
-    );
     const  compileResponse = await getData({authToken, id});
-    console.log(
-      "verifyCode()",
-      "data=" + JSON.stringify(compileResponse, null, 2),
-    );
-
     // Check if the response indicates an error but doesn't have a standardized error format
     if (compileResponse.status === "error" && !compileResponse.error) {
       // Provide a standardized error object
@@ -936,6 +921,7 @@ Graffiticode is a minimal, prefix, expression-oriented language with these key f
 - IMPORTANT: All let statements MUST end with a double dot (..)
 - IMPORTANT: Backslashes should NOT be escaped in generated code
 - IMPORTANT: Literal "\n" should not appear in the generated code; use proper newline characters instead
+- IMPORTANT: Only generate valid Graffiticode. Any commentary should be elided or in line comments
 
 Common Graffiticode errors and solutions:
 1. Missing double dot (..) at the end of a let statement
@@ -990,19 +976,28 @@ async function storeSuccessfulGeneration(prompt, code, lang = "0002", verified =
 }
 
 /**
- * Processes generated code to fix common issues like double backslashes
- * @param {string} code - The generated code to process
+ * Processes generated code to fix common issues and extract only the code portion
+ * @param {string} content - The content returned from Claude API
  * @returns {string} - The processed code with fixes applied
  */
-function processGeneratedCode(code) {
-  if (!code) return code;
-
+function processGeneratedCode(content) {
+  if (!content) return content;
+  
+  // Try to extract code from between triple backticks
+  const codeBlockRegex = /```(?:[\w]*\n|\n)?([\s\S]*?)```/;
+  const match = content.match(codeBlockRegex);
+  
+  // If we found a code block, extract it
+  let code = match ? match[1].trim() : content;
+  
   // Replace all double backslashes with single backslashes
   let processed = code.replace(/\\\\/g, '\\');
-
+  
   // Replace literal "\n" with actual newlines
   processed = processed.replace(/\\n/g, '\n');
-
+  
+  console.log("Extracted code from response:", processed);
+  
   return processed;
 }
 
@@ -1016,32 +1011,14 @@ function processGeneratedCode(code) {
  * @returns {Promise<Object>} - The final code response
  */
 export async function generateCode({ auth, prompt, lang = "0002", options = {} }) {
-  console.log(
-    "generateCode()",
-    "auth=" + JSON.stringify(auth, null, 2),
-    "lang=" + lang,
-  );
-
   const accessToken = auth?.token;
 
   try {
     // Retrieve relevant examples for this prompt, filtered by language
     const relevantExamples = await getRelevantExamples({prompt, lang, limit: 3});
     console.log(`Found ${relevantExamples.length} relevant examples for the prompt in language ${lang}`);
-    console.log(
-      "generateCode()",
-      "relevantExamples=" + JSON.stringify(relevantExamples, null, 2),
-    );
-
-
     // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
     const formattedPrompt = await createCodeGenerationPrompt(prompt, relevantExamples, lang);
-
-    console.log(
-      "generateCode()",
-      "lang=" + JSON.stringify(lang),
-      "formattedPrompt=" + formattedPrompt,
-    );
 
     // Use the most capable model for Graffiticode generation
     const model = options.model || CLAUDE_MODELS.OPUS;
@@ -1052,6 +1029,11 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
       temperature: options.temperature || 0.2, // Lower temperature for more deterministic code generation
       max_tokens: options.maxTokens || 4000
     };
+
+    console.log(
+      "generateCode()",
+      "formattedPrompt=" + formattedPrompt,
+    );
 
     // Call the Claude API
     const response = await callClaudeAPI(formattedPrompt, apiOptions);
@@ -1070,10 +1052,6 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
     if (accessToken) {
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
       while (fixAttempts < MAX_FIX_ATTEMPTS) {
-        console.log(
-          "[2] generateCode()",
-          "generatedCode=" + generatedCode,
-        );
         verificationResult = await verifyCode(generatedCode, accessToken);
 
         // If compilation was successful, break the loop
@@ -1098,6 +1076,10 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
 
           // Update the generated code with the fixed version and process to fix escaping issues
           generatedCode = processGeneratedCode(fixResponse.content);
+          console.log(
+            "[2] generateCode()",
+            "generatedCode=" + generatedCode,
+          );
 
           // Add fix attempt usage to total
           finalUsage.prompt_tokens += fixResponse.usage.prompt_tokens;
@@ -1105,10 +1087,6 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
           finalUsage.total_tokens += fixResponse.usage.total_tokens;
 
           fixAttempts++;
-          console.log(
-            "generateCode()",
-            "generatedCode=" + generatedCode,
-          );
         } else {
           // No errors found, break the loop
           break;
