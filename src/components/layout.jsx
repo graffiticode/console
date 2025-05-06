@@ -121,7 +121,7 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                   <div className="hidden md:block">
                     <div className="text-sm font-medium ml-4 flex items-center md:ml-6 space-x-8">
                       <a
-                        href="https://forum.graffiticode.com/"
+                        href="https://forum.graffiticode.org/"
                         className="text-sky-300 hover:text-sky-400"
                       >
                         Community

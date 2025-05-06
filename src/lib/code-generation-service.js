@@ -996,6 +996,11 @@ function processGeneratedCode(content) {
   // Replace literal "\n" with actual newlines
   processed = processed.replace(/\\n/g, '\n');
 
+  // Replace escaped quotes with bare quotes
+  processed = processed.replace(/\\"/g, '"');   // Replace \" with "
+  processed = processed.replace(/\\'/g, "'");   // Replace \' with '
+  processed = processed.replace(/\\`/g, "`");   // Replace \` with `
+
   console.log("Extracted code from response:", processed);
 
   return processed;
