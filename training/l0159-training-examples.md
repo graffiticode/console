@@ -29,7 +29,231 @@ flashcards
   title "\text{Penguin Populations}"
   facts penguinData
   {
+    textSize: "large"
   }..
+```
+
+---
+
+### Prompt
+"create flashcards for the us state capitals"
+
+### Chat Transcript
+
+**User**: create flashcards for the us state capitals
+
+**Assistant**: This generated code creates a list of state capitals in the United States. It then uses that list to generate a set of flashcards with a dark theme and a background texture. The purpose of this code is to provide an educational tool for learning the state capitals.
+
+### Code
+
+```
+flashcards
+  title "\text{US State Capitals}"
+  facts [
+    [
+    "\text{Alabama}",
+    "\text{Montgomery}"
+    ],
+    [
+    "\text{Alaska}",
+    "\text{Juneau}"
+    ],
+    [
+    "\text{Arizona}",
+    "\text{Phoenix}"
+    ],
+    [
+    "\text{Arkansas}",
+    "\text{Little Rock}"
+    ],
+    [
+    "\text{California}",
+    "\text{Sacramento}"
+    ],
+    [
+    "\text{Colorado}",
+    "\text{Denver}"
+    ],
+    [
+    "\text{Connecticut}",
+    "\text{Hartford}"
+    ],
+    [
+    "\text{Delaware}",
+    "\text{Dover}"
+    ],
+    [
+    "\text{Florida}",
+    "\text{Tallahassee}"
+    ],
+    [
+    "\text{Georgia}",
+    "\text{Atlanta}"
+    ],
+    [
+    "\text{Hawaii}",
+    "\text{Honolulu}"
+    ],
+    [
+    "\text{Idaho}",
+    "\text{Boise}"
+    ],
+    [
+    "\text{Illinois}",
+    "\text{Springfield}"
+    ],
+    [
+    "\text{Indiana}",
+    "\text{Indianapolis}"
+    ],
+    [
+    "\text{Iowa}",
+    "\text{Des Moines}"
+    ],
+    [
+    "\text{Kansas}",
+    "\text{Topeka}"
+    ],
+    [
+    "\text{Kentucky}",
+    "\text{Frankfort}"
+    ],
+    [
+    "\text{Louisiana}",
+    "\text{Baton Rouge}"
+    ],
+    [
+    "\text{Maine}",
+    "\text{Augusta}"
+    ],
+    [
+    "\text{Maryland}",
+    "\text{Annapolis}"
+    ],
+    [
+    "\text{Massachusetts}",
+    "\text{Boston}"
+    ],
+    [
+    "\text{Michigan}",
+    "\text{Lansing}"
+    ],
+    [
+    "\text{Minnesota}",
+    "\text{St. Paul}"
+    ],
+    [
+    "\text{Mississippi}",
+    "\text{Jackson}"
+    ],
+    [
+    "\text{Missouri}",
+    "\text{Jefferson City}"
+    ],
+    [
+    "\text{Montana}",
+    "\text{Helena}"
+    ],
+    [
+    "\text{Nebraska}",
+    "\text{Lincoln}"
+    ],
+    [
+    "\text{Nevada}",
+    "\text{Carson City}"
+    ],
+    [
+    "\text{New Hampshire}",
+    "\text{Concord}"
+    ],
+    [
+    "\text{New Jersey}",
+    "\text{Trenton}"
+    ],
+    [
+    "\text{New Mexico}",
+    "\text{Santa Fe}"
+    ],
+    [
+    "\text{New York}",
+    "\text{Albany}"
+    ],
+    [
+    "\text{North Carolina}",
+    "\text{Raleigh}"
+    ],
+    [
+    "\text{North Dakota}",
+    "\text{Bismarck}"
+    ],
+    [
+    "\text{Ohio}",
+    "\text{Columbus}"
+    ],
+    [
+    "\text{Oklahoma}",
+    "\text{Oklahoma City}"
+    ],
+    [
+    "\text{Oregon}",
+    "\text{Salem}"
+    ],
+    [
+    "\text{Pennsylvania}",
+    "\text{Harrisburg}"
+    ],
+    [
+    "\text{Rhode Island}",
+    "\text{Providence}"
+    ],
+    [
+    "\text{South Carolina}",
+    "\text{Columbia}"
+    ],
+    [
+    "\text{South Dakota}",
+    "\text{Pierre}"
+    ],
+    [
+    "\text{Tennessee}",
+    "\text{Nashville}"
+    ],
+    [
+    "\text{Texas}",
+    "\text{Austin}"
+    ],
+    [
+    "\text{Utah}",
+    "\text{Salt Lake City}"
+    ],
+    [
+    "\text{Vermont}",
+    "\text{Montpelier}"
+    ],
+    [
+    "\text{Virginia}",
+    "\text{Richmond}"
+    ],
+    [
+    "\text{Washington}",
+    "\text{Olympia}"
+    ],
+    [
+    "\text{West Virginia}",
+    "\text{Charleston}"
+    ],
+    [
+    "\text{Wisconsin}",
+    "\text{Madison}"
+    ],
+    [
+    "\text{Wyoming}",
+    "\text{Cheyenne}"
+    ]
+  ]
+{
+  useBgTexture: true
+}..
 ```
 
 ---
@@ -770,6 +994,95 @@ flashcards
   facts frenchNumbers
 {
   useBgTexture: true,
+}..
+```
+
+---
+
+### Prompt
+"make flash cards for basic arithmetic"
+
+### Chat Transcript
+
+**User**: make flash cards for basic arithmetic
+
+**Assistant**: The generated code defines a list of basic arithmetic facts, such as addition, subtraction, multiplication, and division problems. It then uses these facts to create a set of flashcards with a title, instructions, and a background texture. The purpose of this code is to generate a simple flashcard-style learning tool for practicing basic arithmetic operations.
+
+### Code
+
+```
+| Define basic arithmetic facts
+let arithmeticFacts = [
+  ["2 + 3 = ", "5"],
+  ["4 - 1 = ", "3"],
+  ["6 \times 2 = ", "12"],
+  ["8 \div 2 = ", "4"],
+  ["3 + 5 = ", "8"],
+  ["7 - 4 = ", "3"],
+  ["5 \times 3 = ", "15"],
+  ["10 \div 5 = ", "2"],
+  ["4 + 6 = ", "10"],
+  ["9 - 2 = ", "7"],
+  ["2 \times 4 = ", "8"],
+  ["12 \div 3 = ", "4"]
+]..
+
+| Generate the flashcards using the arithmetic facts
+flashcards
+  title "\text{Basic Arithmetic} "
+  facts arithmeticFacts
+{
+  useBgTexture: true
+}
+..
+```
+
+---
+
+### Prompt
+"create flashcard for first grade addition
+
+elide the answer on the front
+
+better. now don't distinguish the first term from the others on the front"
+
+### Chat Transcript
+
+**User**: create flashcard for first grade addition
+
+**Assistant**: The generated code defines a list of first grade addition facts, with each fact presented as a pair of expressions - one with the answer highlighted in a red box, and the other showing the full equation. The code then uses this list of addition facts to generate a set of flashcards, with a title, instructions, and the addition facts displayed on the cards. This allows for the creation of a simple, visually appealing flashcard set for practicing first grade addition.
+
+**User**: elide the answer on the front
+
+**Assistant**: This generated code creates a set of flashcards for practicing first-grade addition facts. The code defines a list of addition problems with their solutions, and then generates a flashcard set with those problems. The flashcards have the addition problem on the front and the solution on the back, allowing users to practice and test their knowledge of basic addition.
+
+**User**: better. now don't distinguish the first term from the others on the front
+
+**Assistant**: This generated Graffiticode creates a set of flashcards for practicing first-grade addition facts. It defines a list of addition problems and their answers, then uses that information to generate flashcards with the problem on the front and the solution on the back. The generated flashcards have a title, instructions, and options to show the answer and use a textured background.
+
+### Code
+
+```
+| Define the addition facts
+let additionFacts = [
+  ["1 + 2", "3"],
+  ["2 + 3", "5"],
+  ["4 + 1", "5"],
+  ["3 + 2", "5"],
+  ["1 + 4", "5"],
+  ["2 + 2", "4"],
+  ["3 + 3", "6"],
+  ["5 + 1", "6"],
+  ["4 + 2", "6"],
+  ["1 + 5", "6"]
+]..
+
+| Generate the flashcards
+flashcards
+  title "\text{First Grade Addition}"
+  facts additionFacts
+{
+    useBackTexture: true
 }..
 ```
 
