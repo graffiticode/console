@@ -16,7 +16,22 @@ const schema = new Schema({
   nodes: {
     doc: { content: "block+" },
     paragraph: { content: "text*", group: "block", parseDOM: [{ tag: "p" }], toDOM() { return ["p", 0]; } },
+    code_block: {
+      content: "text*",
+      marks: "",
+      group: "block",
+      code: true,
+      defining: true,
+      parseDOM: [{ tag: "pre", preserveWhitespace: "full" }],
+      toDOM() { return ["pre", ["code", 0]] }
+    },
     text: {}
+  },
+  marks: {
+    code: {
+      parseDOM: [{ tag: "code" }],
+      toDOM() { return ["code", 0] }
+    }
   }
 });
 
@@ -51,7 +66,27 @@ const debouncedStateUpdate = debounce(({ state, editorState }) => {
 const getEditorContent = (view) => {
   if (!view) return;
   const { state: { doc } } = view;
-  return doc.textBetween(0, doc.content.size, "\n", "");
+
+  // Create a string builder
+  let content = "";
+
+  // Process nodes to handle code blocks specially
+  doc.forEach((node, offset, index) => {
+    if (node.type.name === 'code_block') {
+      // For code blocks, add triple backticks
+      content += '```\n' + node.textContent + '\n```';
+    } else {
+      // For other blocks, just add the text
+      content += node.textContent;
+    }
+
+    // Add newlines between blocks
+    if (index < doc.childCount - 1) {
+      content += '\n';
+    }
+  });
+
+  return content;
 };
 
 const clearEditor = (view) => {
@@ -75,10 +110,55 @@ const createPlaceholderPlugin = (placeholder) => {
 export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
   const [ editorView, setEditorView ] = useState(null);
   const editorRef = useRef(null);
+  // Function to toggle a code block
+  const toggleCodeBlock = (state, dispatch) => {
+    const { selection } = state;
+    const { $from, $to } = selection;
+    const range = $from.blockRange($to);
+
+    if (!range) return false;
+
+    const nodeType = schema.nodes.code_block;
+    const node = nodeType.create();
+
+    if ($from.parent.type === schema.nodes.code_block) {
+      // If already in a code block, convert to paragraph
+      if (dispatch) {
+        const tr = state.tr.setBlockType(range.start, range.end, schema.nodes.paragraph);
+        dispatch(tr);
+      }
+      return true;
+    } else {
+      // If not in a code block, convert to code block
+      if (dispatch) {
+        const tr = state.tr.setBlockType(range.start, range.end, nodeType);
+        dispatch(tr);
+      }
+      return true;
+    }
+  };
+
+  // Handle triple backtick input
+  const handleBacktickInput = (view, from, to, text) => {
+    if (text === '`' && view.state.doc.textBetween(from - 2, from) === '``') {
+      // When triple backtick is typed, replace with a code block
+      const tr = view.state.tr.delete(from - 2, from + 1);
+      tr.setBlockType(from - 2, from - 2, schema.nodes.code_block);
+      view.dispatch(tr);
+      return true;
+    }
+    return false;
+  };
+
   const plugins = [
     history(),
-    keymap({"Mod-z": undo, "Mod-y": redo}),
+    keymap({"Mod-z": undo, "Mod-y": redo, "Mod-`": toggleCodeBlock}),
     keymap(baseKeymap),
+    new Plugin({
+      props: {
+        handleTextInput: handleBacktickInput
+      }
+    })
   ];
 
   // Add placeholder plugin if placeholder is provided
@@ -194,6 +274,21 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
       <style jsx global>{`
         .editor-disabled {
           background-color: #f9f9f9;
+        }
+        
+        /* Style for code blocks */
+        .ProseMirror pre {
+          background: #f5f5f5;
+          padding: 8px;
+          border-radius: 4px;
+          font-family: monospace;
+          margin: 4px 0;
+        }
+        
+        /* Syntax highlighting for the triple backticks */
+        .ProseMirror-triplequote {
+          color: #888;
+          font-weight: bold;
         }
       `}</style>
     </div>
