@@ -33,6 +33,11 @@ export const HelpPanel = ({
   code,
   setCode
 }) => {
+  console.log(
+    "HelpPanel()",
+    "code=" + JSON.stringify(code, null, 2),
+    "help=" + JSON.stringify(help, null, 2),
+  );
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
   const { user } = useGraffiticodeAuth();
@@ -46,12 +51,15 @@ export const HelpPanel = ({
     user,
     language,
     chatHistory: help, // Pass the current help array as chat history
+    currentCode: code, // Pass the current code from the code panel
   });
 
   // We'll need to auto-scroll to the bottom when new messages arrive
 
   // Handle sending a new message
   const handleMessage = useCallback(async (userMessage, botResponse = null) => {
+    console.log("Handling message, bot response:", botResponse ? botResponse.type : "none");
+
     // Add user message to the chat in chronological order (at the end)
     setHelp(prev => [
       ...prev,
@@ -65,13 +73,15 @@ export const HelpPanel = ({
     // Only add the bot's description to the chat if one is available
     const displayText = botResponse.description || "Code generated and sent to editor.";
 
+    // Store bot response with the current code for future reference
     setHelp(prev => [
       ...prev,
       {
         user: displayText,
         help: {
-          type: 'text',
+          type: botResponse.type === 'code' ? 'code' : 'text',
           text: displayText,
+          code: botResponse.type === 'code' ? botResponse.text : undefined,  // Store the code in the help history
           model: botResponse.model || 'unknown',
           usage: botResponse.usage || {}
         },
@@ -81,6 +91,8 @@ export const HelpPanel = ({
 
     // If the bot response is code, automatically update the code panel
     if (botResponse.type === 'code' && typeof setCode === 'function') {
+      console.log("Setting code panel with new code:",
+        botResponse.text ? botResponse.text.substring(0, 50) + "..." : "none");
       setCode(botResponse.text);
     }
   }, [setCode]);

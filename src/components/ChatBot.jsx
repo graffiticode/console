@@ -1,17 +1,17 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { generateCode } from "../utils/swr/fetchers";
 
 /**
  * Function to generate Graffiticode responses using the generateCode function
  */
-const generateBotResponse = async ({message, user, language, chatHistory = []}) => {
+const generateBotResponse = async ({message, user, language, chatHistory = [], currentCode = ''}) => {
   try {
     // Use our fetcher function directly
     console.log(
-      "ChatBot/generateBotResponse()",
-      "user=" + JSON.stringify(user),
-      "language=" + language,
-      "chatHistory length=" + chatHistory.length
+      "generateBotResponse()",
+      "currentCode length=" + (currentCode?.length || 0),
+      "chatHistory length=" + (chatHistory?.length || 0),
+      "first few chars of code=" + (currentCode?.substring(0, 30) + "..." || "none")
     );
 
     // Format chat history as context for the prompt
@@ -43,11 +43,21 @@ const generateBotResponse = async ({message, user, language, chatHistory = []}) 
         }
       }
 
+      // Include the current code as the Assistant's most recent output
+      if (currentCode && currentCode.trim().length > 0) {
+        conversationContext += "\nAssistant's latest generated code:\n```\n";
+        conversationContext += currentCode;
+        conversationContext += "\n```\n";
+      }
+
       conversationContext += "\nNow, please address this new request:\n";
       contextualPrompt = conversationContext + message;
     }
 
-    console.log("Using contextual prompt:", contextualPrompt.substring(0, 200) + "...");
+    console.log(
+      "ChatBot/generateBotResponse()",
+      "contextualPrompt=" + contextualPrompt,
+    );
 
     const result = await generateCode({
       user,
@@ -58,10 +68,6 @@ const generateBotResponse = async ({message, user, language, chatHistory = []}) 
       },
       language,
     });
-    console.log(
-      "ChatBot/generateBotResponse()",
-      "result=" + JSON.stringify(result),
-    );
 
     // Log just the first part of the description for development purposes
     if (result.description) {
@@ -124,20 +130,52 @@ greeting "user"..`,
 /**
  * ChatBot component that provides a chat interface
  */
-export const ChatBot = ({ onSendMessage, user, language, chatHistory = [] }) => {
+export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], currentCode = '' }) => {
+  console.log(
+    "ChatBot()",
+    "currentCode length=" + (currentCode?.length || 0),
+    "chatHistory length=" + (chatHistory?.length || 0),
+  );
+
   const [isLoading, setIsLoading] = useState(false);
+
+  // Use refs to always have access to the latest props
+  const chatHistoryRef = useRef(chatHistory);
+  const currentCodeRef = useRef(currentCode);
+
+  // Update refs when props change
+  useEffect(() => {
+    chatHistoryRef.current = chatHistory;
+    console.log("ChatHistory ref updated, length:", chatHistory?.length || 0);
+  }, [chatHistory]);
+
+  useEffect(() => {
+    currentCodeRef.current = currentCode;
+    console.log("CurrentCode ref updated, length:", currentCode?.length || 0);
+  }, [currentCode]);
 
   const handleSendMessage = useCallback(async (message) => {
     if (!message.trim()) return;
 
     setIsLoading(true);
     try {
-      // Get response from the bot, passing the accessToken and chat history
+      // Access the latest values from refs
+      const latestChatHistory = chatHistoryRef.current;
+      const latestCode = currentCodeRef.current;
+
+      console.log(
+        "Sending message with latest values:",
+        "code length:", latestCode?.length || 0,
+        "history length:", latestChatHistory?.length || 0
+      );
+
+      // Get response from the bot with the latest values
       const response = await generateBotResponse({
         message,
         user,
         language,
-        chatHistory
+        chatHistory: latestChatHistory,
+        currentCode: latestCode
       });
 
       // Send the user message and bot response to the parent component
@@ -152,7 +190,7 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [] }) => 
     } finally {
       setIsLoading(false);
     }
-  }, [onSendMessage, user, language, chatHistory]);
+  }, [onSendMessage, user, language]); // Remove chatHistory and currentCode from dependencies
 
   return {
     handleSendMessage,

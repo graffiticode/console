@@ -1017,6 +1017,11 @@ function processGeneratedCode(content) {
  */
 export async function generateCode({ auth, prompt, lang = "0002", options = {} }) {
   const accessToken = auth?.token;
+  console.log(
+    "generateCode()",
+    "prompt=" + prompt,
+  );
+
 
   try {
     // Retrieve relevant examples for this prompt, filtered by language
