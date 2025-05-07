@@ -131,21 +131,15 @@ export const HelpPanel = ({
     return `Input: ${usage.input_tokens} | Output: ${usage.output_tokens} | Total: ${usage.input_tokens + usage.output_tokens}`;
   };
 
-  // Function to handle deleting a message pair (prompt and response)
+  // Function to handle deleting a message
   const handleDeleteMessagePair = (index) => {
     setHelp(prev => {
       const newHelp = [...prev];
-      // Check if this is a user message and if the next message is a bot response
-      // In chronological order, the bot response comes after the user message
+      // If it's a user message and has a bot response after it, delete both
       if (newHelp[index].type === 'user' && index + 1 < newHelp.length && newHelp[index + 1].type === 'bot') {
-        // Remove both the user message and the corresponding bot response
         newHelp.splice(index, 2);
-      } else if (newHelp[index].type === 'bot' && index > 0 && newHelp[index - 1].type === 'user') {
-        // If this is a bot message and the previous one is a user message
-        // Remove both the user message and the bot response
-        newHelp.splice(index - 1, 2);
       } else {
-        // Just remove the single message as fallback
+        // Otherwise just delete the message
         newHelp.splice(index, 1);
       }
       return newHelp;
@@ -207,35 +201,28 @@ export const HelpPanel = ({
     }
   }, [isLoading]);
 
-  // Function to create conversation pairs from messages
-  const createConversationPairs = () => {
-    const pairs = [];
+  // Function to prepare messages for display
+  const prepareMessagesForDisplay = () => {
+    // Find all user messages
+    const userMessages = help
+      .filter(item => item.type === 'user')
+      .map((msg, idx) => ({
+        ...msg,
+        index: help.indexOf(msg)
+      }))
+      .reverse(); // Show newest first
 
-    // First create pairs of user-bot messages from the original array
-    for (let i = 0; i < help.length; i++) {
-      if (help[i].type === 'user') {
-        // Check if next message is a bot response
-        const botResponse = i + 1 < help.length && help[i + 1].type === 'bot' ? help[i + 1] : null;
-        pairs.push({
-          user: help[i],
-          bot: botResponse,
-          index: i
-        });
+    // Find the last bot response
+    const lastBotIndex = [...help].reverse().findIndex(item => item.type === 'bot');
+    const lastBotResponse = lastBotIndex !== -1 ? help[help.length - 1 - lastBotIndex] : null;
 
-        // Skip the bot message in the next iteration if we found one
-        if (botResponse) i++;
-      } else if (help[i].type === 'bot') {
-        // Handle orphaned bot messages (shouldn't happen normally)
-        pairs.push({
-          user: null,
-          bot: help[i],
-          index: i
-        });
-      }
-    }
-
-    // Reverse the pairs to show newest conversations first
-    return pairs.reverse();
+    return {
+      userMessages,
+      lastBotResponse: lastBotResponse ? {
+        ...lastBotResponse,
+        index: help.indexOf(lastBotResponse)
+      } : null
+    };
   };
 
   return (
@@ -245,12 +232,17 @@ export const HelpPanel = ({
         <div className="flex justify-between items-center mb-1">
           <div className="text-sm font-semibold text-gray-500">
             What would you like to make with Graffiticode?
+            {help.length > 2 && (
+              <span className="ml-2 text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">
+                Showing latest response
+              </span>
+            )}
           </div>
           {help.length > 0 && (
             <button
               className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors"
               onClick={handleClearAll}
-              title="Clear all messages"
+              title="Clear conversation"
             >
               Clear All
             </button>
@@ -289,92 +281,114 @@ export const HelpPanel = ({
           height: 'calc(100vh - 240px)' // Adjusted to account for input at top
         }}
       >
-        {help.length === 0 && (
-          <div className="text-center text-gray-400 py-8">
-            No messages yet. Start by asking for help above.
-          </div>
-        )}
-
         {/* Invisible element for auto-scrolling to top */}
         <div ref={messagesEndRef} />
 
-        {/* Group messages into user-bot pairs and display in reverse chronological order */}
-        {createConversationPairs().map((pair, pairIndex) => (
-          <div key={pairIndex} className="mb-6 relative group">
-            {/* Delete button for the entire pair */}
-            <button
-              className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
-              onClick={() => handleDeleteMessagePair(pair.index)}
-              title="Delete conversation"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            {/* User message always displayed first/above with markdown support */}
-            {pair.user && (
-              <div className="mb-2 text-right">
-                <div className="inline-block max-w-3/4 bg-blue-100 rounded-lg p-3 text-left">
-                  <div className="text-sm prose prose-sm prose-blue max-w-none">
-                    <ReactMarkdown
-                      components={{
-                        code({node, inline, className, children, ...props}) {
-                          const match = /language-(\w+)/.exec(className || '');
-                          return !inline && match ? (
-                            <SyntaxHighlighter
-                              style={tomorrow}
-                              language={match[1]}
-                              PreTag="div"
-                              {...props}
-                            >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
-                          ) : (
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          );
-                        }
-                      }}
-                    >
-                      {pair.user.user}
-                    </ReactMarkdown>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Bot response displayed second/below the user message */}
-            {pair.bot && (
-              <div className="text-left">
-                <div className="bg-gray-100 rounded-lg p-3">
-                  <div className="text-sm prose prose-sm prose-slate max-w-none">
-                    <ReactMarkdown
-                      components={{
-                        code({node, inline, className, children, ...props}) {
-                          const match = /language-(\w+)/.exec(className || '');
-                          return !inline && match ? (
-                            <SyntaxHighlighter
-                              style={tomorrow}
-                              language={match[1]}
-                              PreTag="div"
-                              {...props}
-                            >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
-                          ) : (
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          );
-                        }
-                      }}
-                    >
-                      {pair.bot.help.text}
-                    </ReactMarkdown>
-                  </div>
-                </div>
-              </div>
-            )}
+        {help.length === 0 && (
+          <div className="text-center text-gray-400 py-8">
+            Enter a prompt above to get help with Graffiticode.
           </div>
-        ))}
+        )}
+
+        {help.length > 0 && (() => {
+          const { lastBotResponse, userMessages } = prepareMessagesForDisplay();
+
+          return (
+            <>
+              {/* Last bot response at the top */}
+              {lastBotResponse && (
+                <div className="mb-6">
+                  <div className="text-left">
+                    <div className="bg-gray-100 rounded-lg p-3">
+                      <div className="text-sm prose prose-sm prose-slate max-w-none">
+                        <ReactMarkdown
+                          components={{
+                            code({node, inline, className, children, ...props}) {
+                              const match = /language-(\w+)/.exec(className || '');
+                              return !inline && match ? (
+                                <SyntaxHighlighter
+                                  style={tomorrow}
+                                  language={match[1]}
+                                  PreTag="div"
+                                  {...props}
+                                >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
+                              ) : (
+                                <code className={className} {...props}>
+                                  {children}
+                                </code>
+                              );
+                            }
+                          }}
+                        >
+                          {lastBotResponse.help.text}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Divider between assistant response and user history */}
+              {lastBotResponse && userMessages.length > 0 && (
+                <div className="flex items-center mb-6">
+                  <div className="flex-grow border-t border-gray-200"></div>
+                  <div className="mx-4 text-xs text-gray-500">User Prompts (reverse order)</div>
+                  <div className="flex-grow border-t border-gray-200"></div>
+                </div>
+              )}
+
+              {/* All user messages in reverse chronological order */}
+              {userMessages.map((message, index) => (
+                <div key={index} className="mb-4 relative group">
+                  {/* Delete button for each user message */}
+                  <button
+                    className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
+                    onClick={() => handleDeleteMessagePair(message.index)}
+                    title="Delete message"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+
+                  <div className="text-right">
+                    <div className="inline-block max-w-3/4 bg-blue-100 rounded-lg p-3 text-left">
+                      <div className="text-sm prose prose-sm prose-blue max-w-none">
+                        <ReactMarkdown
+                          components={{
+                            code({node, inline, className, children, ...props}) {
+                              const match = /language-(\w+)/.exec(className || '');
+                              return !inline && match ? (
+                                <SyntaxHighlighter
+                                  style={tomorrow}
+                                  language={match[1]}
+                                  PreTag="div"
+                                  {...props}
+                                >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
+                              ) : (
+                                <code className={className} {...props}>
+                                  {children}
+                                </code>
+                              );
+                            }
+                          }}
+                        >
+                          {message.user}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {userMessages.length === 0 && !lastBotResponse && (
+                <div className="text-center text-gray-400 py-8">
+                  Enter a prompt above to get help with Graffiticode.
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
