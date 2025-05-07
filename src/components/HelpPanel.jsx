@@ -232,11 +232,6 @@ export const HelpPanel = ({
         <div className="flex justify-between items-center mb-1">
           <div className="text-sm font-semibold text-gray-500">
             What would you like to make with Graffiticode?
-            {help.length > 2 && (
-              <span className="ml-2 text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">
-                Showing latest response
-              </span>
-            )}
           </div>
           {help.length > 0 && (
             <button
