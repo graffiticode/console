@@ -201,6 +201,23 @@ print frenchNumbers..
 ---
 
 ### Prompt
+"create an record with field named foo to 10 and then set another field named bar to 20"
+
+### Chat Transcript
+
+**User**: create an record with field named foo to 10 and then set another field named bar to 20
+
+**Assistant**: The generated code creates a new record (or object) with a field named 'foo' set to the value 10. It then updates that record by adding another field called 'bar' with the value 20. Finally, it prints out the updated record with both the 'foo' and 'bar' fields.
+
+### Code
+
+```
+theme dark hello 'world'..
+```
+
+---
+
+### Prompt
 "get the value of binding 'x' from and object that contains 'x'"
 
 ### Chat Transcript
@@ -216,5 +233,93 @@ print frenchNumbers..
 let obj = {x: 42 y: "hello"}.. | Get the value of 'x' using the 'get' function
 let xValue = get "x" obj.. | Print the value of 'x'
 print xValue..
+```
+
+---
+
+### Prompt
+"write a program that translates integers from 1 to 10 to their french names
+
+make sure you wrap the function argument to map in parens so it is not prematurely applied
+
+make sure you include the definition of numbers and return the result
+
+now do the same for the tens from 10 to 100
+
+test for numeric equality using the function eq
+
+now generate a list of french names for the 10s
+
+include 100"
+
+### Chat Transcript
+
+**User**: write a program that translates integers from 1 to 10 to their french names
+
+**Assistant**: The generated code creates a function that translates a number to its French name. It then generates a list of numbers from 1 to 10, maps each number to its French name using the translation function, and prints out the resulting list of French numbers.
+
+**User**: make sure you wrap the function argument to map in parens so it is not prematurely applied
+
+**Assistant**: The generated code creates a new list of French numbers by taking an existing list of numbers and applying a function called `frenchNumber` to each one. This allows the code to convert the original numbers into their French language equivalents, resulting in a new list of French numbers.
+
+**User**: make sure you include the definition of numbers and return the result
+
+**Assistant**: The generated code creates a function called `frenchNumber` that takes a number as input and returns its French name. It then defines a list of numbers from 1 to 10, maps each number to its French name using the `frenchNumber` function, and returns the resulting list of French numbers.
+
+**User**: now do the same for the tens from 10 to 100
+
+**Assistant**: The generated code creates a function called `frenchNumber` that takes a number as input and returns its French name. It then generates a list of numbers from 10 to 100 in increments of 10, and uses the `frenchNumber` function to translate each number into its French equivalent. Finally, the code returns the list of French numbers.
+
+**User**: test for numeric equality using the function eq
+
+**Assistant**: The generated code creates a function called `isEqual` that checks if two numbers are the same. It then tests this function with three different pairs of numbers and prints the results. The purpose of this code is to demonstrate how the `isEqual` function works by checking if various numbers are equal or not.
+
+**User**: now generate a list of french names for the 10s
+
+**Assistant**: The generated code performs the following tasks:
+
+1. It defines a function called `frenchTens` that takes a number and returns its French name for tens (e.g., "dix" for 10, "vingt" for 20, etc.).
+2. It generates a list of numbers from 10 to 100 in increments of 10, and then uses the `frenchTens` function to translate each number to its French name.
+3. It checks if the 5th element in the list of French numbers is equal to "cinquante" (the French word for 50), and then prints both the list of French numbers and the result of the equality test.
+
+**User**: include 100
+
+**Assistant**: The generated code performs the following tasks:
+
+1. It defines a function called `frenchTens` that translates numbers from 10 to 100 (in increments of 10) into their French names.
+2. It generates a list of numbers from 10 to 100 (in increments of 10) and maps each number to its French name using the `frenchTens` function.
+3. It checks if the 6th element in the list of French numbers (which should be "soixante" or 60) is indeed "soixante", and prints the list of French numbers and the result of this equality test.
+
+### Code
+
+```
+| Function to translate a number to its French name for tens
+let frenchTens = <n:
+  case n of
+    10: "dix"
+    20: "vingt"
+    30: "trente"
+    40: "quarante"
+    50: "cinquante"
+    60: "soixante"
+    70: "soixante-dix"
+    80: "quatre-vingts"
+    90: "quatre-vingt-dix"
+    100: "cent"
+    _: "unknown"
+  end
+>..
+
+| Generate a list of numbers from 10 to 100 in increments of 10
+let numbers = range 10 110 10..
+
+| Map each number to its French name
+let frenchNumbers = map (frenchTens) numbers..
+
+| Check if the 6th element is "soixante" (60 in French)
+let isSixty = eq "soixante" nth 5 frenchNumbers..
+
+| Print the list of French numbers and the result of the equality test
+print frenchNumbers..
 ```
 
