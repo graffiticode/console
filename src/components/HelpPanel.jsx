@@ -14,6 +14,8 @@ import { generateCode } from "../utils/swr/fetchers";
 import { ChatBot } from './ChatBot';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { tomorrow } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 const isNullOrEmptyObject = (obj) => !obj || Object.keys(obj).length === 0;
 
@@ -310,11 +312,33 @@ export const HelpPanel = ({
               </svg>
             </button>
 
-            {/* User message always displayed first/above */}
+            {/* User message always displayed first/above with markdown support */}
             {pair.user && (
               <div className="mb-2 text-right">
                 <div className="inline-block max-w-3/4 bg-blue-100 rounded-lg p-3 text-left">
-                  <p className="text-sm">{pair.user.user}</p>
+                  <div className="text-sm prose prose-sm prose-blue max-w-none">
+                    <ReactMarkdown
+                      components={{
+                        code({node, inline, className, children, ...props}) {
+                          const match = /language-(\w+)/.exec(className || '');
+                          return !inline && match ? (
+                            <SyntaxHighlighter
+                              style={tomorrow}
+                              language={match[1]}
+                              PreTag="div"
+                              {...props}
+                            >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
+                          ) : (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          );
+                        }
+                      }}
+                    >
+                      {pair.user.user}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </div>
             )}
@@ -324,7 +348,25 @@ export const HelpPanel = ({
               <div className="text-left">
                 <div className="bg-gray-100 rounded-lg p-3">
                   <div className="text-sm prose prose-sm prose-slate max-w-none">
-                    <ReactMarkdown>
+                    <ReactMarkdown
+                      components={{
+                        code({node, inline, className, children, ...props}) {
+                          const match = /language-(\w+)/.exec(className || '');
+                          return !inline && match ? (
+                            <SyntaxHighlighter
+                              style={tomorrow}
+                              language={match[1]}
+                              PreTag="div"
+                              {...props}
+                            >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
+                          ) : (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          );
+                        }
+                      }}
+                    >
                       {pair.bot.help.text}
                     </ReactMarkdown>
                   </div>
