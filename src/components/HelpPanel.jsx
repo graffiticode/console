@@ -327,54 +327,57 @@ export const HelpPanel = ({
               {lastBotResponse && userMessages.length > 0 && (
                 <div className="flex items-center mb-6">
                   <div className="flex-grow border-t border-gray-200"></div>
-                  <div className="mx-4 text-xs text-gray-500">User Prompts (reverse order)</div>
+                  <div className="mx-4 text-xs text-gray-500">User Prompts (oldest to newest, left to right)</div>
                   <div className="flex-grow border-t border-gray-200"></div>
                 </div>
               )}
 
-              {/* All user messages in reverse chronological order */}
-              {userMessages.map((message, index) => (
-                <div key={index} className="mb-4 relative group">
-                  {/* Delete button for each user message */}
-                  <button
-                    className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
-                    onClick={() => handleDeleteMessagePair(message.index)}
-                    title="Delete message"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+              {/* User messages in chronological order, flowing left to right */}
+              <div className="flex flex-wrap justify-end gap-2">
+                {userMessages
+                  .slice() // Create a copy
+                  .reverse() // Back to chronological order (oldest first)
+                  .map((message, index) => (
+                    <div key={index} className="mb-2 relative group" style={{ maxWidth: '45%' }}>
+                      {/* Delete button for each user message */}
+                      <button
+                        className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
+                        onClick={() => handleDeleteMessagePair(message.index)}
+                        title="Delete message"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
 
-                  <div className="text-right">
-                    <div className="inline-block max-w-3/4 bg-blue-100 rounded-lg p-3 text-left">
-                      <div className="text-sm prose prose-sm prose-blue max-w-none">
-                        <ReactMarkdown
-                          components={{
-                            code({node, inline, className, children, ...props}) {
-                              const match = /language-(\w+)/.exec(className || '');
-                              return !inline && match ? (
-                                <SyntaxHighlighter
-                                  style={tomorrow}
-                                  language={match[1]}
-                                  PreTag="div"
-                                  {...props}
-                                >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
-                              ) : (
-                                <code className={className} {...props}>
-                                  {children}
-                                </code>
-                              );
-                            }
-                          }}
-                        >
-                          {message.user}
-                        </ReactMarkdown>
+                      <div className="bg-blue-100 rounded-lg p-3 h-full overflow-hidden">
+                        <div className="text-sm prose prose-sm prose-blue max-w-none">
+                          <ReactMarkdown
+                            components={{
+                              code({node, inline, className, children, ...props}) {
+                                const match = /language-(\w+)/.exec(className || '');
+                                return !inline && match ? (
+                                  <SyntaxHighlighter
+                                    style={tomorrow}
+                                    language={match[1]}
+                                    PreTag="div"
+                                    {...props}
+                                  >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
+                                ) : (
+                                  <code className={className} {...props}>
+                                    {children}
+                                  </code>
+                                );
+                              }
+                            }}
+                          >
+                            {message.user}
+                          </ReactMarkdown>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
 
               {userMessages.length === 0 && !lastBotResponse && (
                 <div className="text-center text-gray-400 py-8">
