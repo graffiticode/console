@@ -333,12 +333,12 @@ export const HelpPanel = ({
               )}
 
               {/* User messages in chronological order, flowing left to right */}
-              <div className="flex flex-wrap justify-end gap-2">
+              <div className="flex flex-wrap justify-start gap-2 items-start">
                 {userMessages
                   .slice() // Create a copy
                   .reverse() // Back to chronological order (oldest first)
                   .map((message, index) => (
-                    <div key={index} className="mb-2 relative group" style={{ maxWidth: '45%' }}>
+                    <div key={index} className="mb-2 relative group" style={{ maxWidth: '45%', alignSelf: 'flex-start' }}>
                       {/* Delete button for each user message */}
                       <button
                         className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
@@ -350,7 +350,7 @@ export const HelpPanel = ({
                         </svg>
                       </button>
 
-                      <div className="bg-blue-100 rounded-lg p-3 h-full overflow-hidden">
+                      <div className="bg-blue-100 rounded-lg p-3 overflow-hidden">
                         <div className="text-sm prose prose-sm prose-blue max-w-none">
                           <ReactMarkdown
                             components={{

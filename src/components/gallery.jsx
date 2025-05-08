@@ -228,9 +228,12 @@ export default function Gallery({ lang, mark }) {
                   showSaving &&
                     "ring-8" ||
                     "ring-0",
-                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-none overflow-hidden mb-2"
+                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-none overflow-hidden mb-2 resize-x"
                 )}
-                style={{height: "calc(100vh - 80px)"}}
+                style={{
+                  height: "calc(100vh - 80px)",
+                  resize: "horizontal"
+                }}
               >
                 <Editor
                   accessToken={accessToken}
