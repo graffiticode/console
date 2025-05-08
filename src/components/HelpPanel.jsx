@@ -327,7 +327,7 @@ export const HelpPanel = ({
               {lastBotResponse && userMessages.length > 0 && (
                 <div className="flex items-center mb-6">
                   <div className="flex-grow border-t border-gray-200"></div>
-                  <div className="mx-4 text-xs text-gray-500">User Prompts (oldest to newest, left to right)</div>
+                  <div className="mx-4 text-xs text-gray-500">Prompts</div>
                   <div className="flex-grow border-t border-gray-200"></div>
                 </div>
               )}
