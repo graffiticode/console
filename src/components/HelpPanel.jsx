@@ -327,16 +327,15 @@ export const HelpPanel = ({
               {lastBotResponse && userMessages.length > 0 && (
                 <div className="flex items-center mb-6">
                   <div className="flex-grow border-t border-gray-200"></div>
-                  <div className="mx-4 text-xs text-gray-500">Prompts</div>
+                  <div className="mx-4 text-xs text-gray-500">Prompts (latest first)</div>
                   <div className="flex-grow border-t border-gray-200"></div>
                 </div>
               )}
 
-              {/* User messages in chronological order, flowing left to right */}
+              {/* User messages in reverse chronological order, newest first */}
               <div className="flex flex-wrap justify-start gap-2 items-start">
                 {userMessages
-                  .slice() // Create a copy
-                  .reverse() // Back to chronological order (oldest first)
+                  // No need for .reverse() since userMessages is already newest first
                   .map((message, index) => (
                     <div key={index} className="mb-2 relative group" style={{ maxWidth: '45%', alignSelf: 'flex-start' }}>
                       {/* Delete button for each user message */}
