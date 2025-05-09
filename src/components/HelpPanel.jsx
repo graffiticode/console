@@ -14,6 +14,7 @@ import { generateCode } from "../utils/swr/fetchers";
 import { ChatBot } from './ChatBot';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
@@ -58,22 +59,296 @@ export const HelpPanel = ({
 
   // We'll need to auto-scroll to the bottom when new messages arrive
 
+  // Parse CSV with quotes handling
+  const parseCSVLine = (line) => {
+    if (!line) return [];
+    const result = [];
+    let cell = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+
+      if (char === '"' && (i === 0 || line[i - 1] === ',')) {
+        // Start of quoted cell
+        inQuotes = true;
+        continue;
+      } else if (char === '"' && nextChar === '"' && inQuotes) {
+        // Escaped quote inside quoted cell
+        cell += '"';
+        i++; // Skip next quote
+        continue;
+      } else if (char === '"' && (nextChar === ',' || !nextChar) && inQuotes) {
+        // End of quoted cell
+        inQuotes = false;
+        if (nextChar === ',') i++; // Skip next comma
+        result.push(cell);
+        cell = '';
+        continue;
+      } else if (char === ',' && !inQuotes) {
+        // Unquoted cell delimiter
+        result.push(cell);
+        cell = '';
+        continue;
+      }
+
+      // Add character to current cell
+      cell += char;
+    }
+
+    // Add the last cell
+    if (cell !== '') {
+      result.push(cell);
+    }
+
+    return result;
+  };
+
+  // Check if a single line looks tabular
+  const isLineTabular = (line) => {
+    if (!line || typeof line !== 'string') return false;
+
+    // Detect delimiter
+    const tabCount = line.split('\t').length - 1;
+    const commaCount = line.split(',').length - 1;
+
+    // Simple heuristic - if line has tabs or multiple commas and not too much other text
+    return (tabCount > 0 || commaCount > 1) &&
+           // Check the ratio of delimiters to total length
+           ((tabCount + commaCount) / line.length > 0.03);
+  };
+
+  // Identify tabular sections within mixed content
+  const identifyTabularSections = (text) => {
+    if (!text || typeof text !== 'string') return [];
+
+    const lines = text.trim().split('\n');
+    const sections = [];
+    let currentSection = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const isTableLine = isLineTabular(line);
+
+      if (isTableLine) {
+        if (!currentSection) {
+          // Start a new table section
+          currentSection = {
+            type: 'table',
+            startLine: i,
+            endLine: i,
+            lines: [line]
+          };
+        } else if (currentSection.type === 'table') {
+          // Continue existing table section
+          currentSection.lines.push(line);
+          currentSection.endLine = i;
+        } else {
+          // End text section and start table section
+          sections.push(currentSection);
+          currentSection = {
+            type: 'table',
+            startLine: i,
+            endLine: i,
+            lines: [line]
+          };
+        }
+      } else {
+        // Handle non-table line
+        if (!currentSection) {
+          // Start a new text section
+          currentSection = {
+            type: 'text',
+            startLine: i,
+            endLine: i,
+            lines: [line]
+          };
+        } else if (currentSection.type === 'text') {
+          // Continue existing text section
+          currentSection.lines.push(line);
+          currentSection.endLine = i;
+        } else {
+          // Only end a table section if we have 2+ consecutive non-table lines
+          // or this is a completely blank line after a table
+          if ((i > 0 && !isLineTabular(lines[i-1])) || line.trim() === '') {
+            sections.push(currentSection);
+            currentSection = {
+              type: 'text',
+              startLine: i,
+              endLine: i,
+              lines: [line]
+            };
+          } else {
+            // Otherwise consider it part of the table (could be a header or description)
+            currentSection.lines.push(line);
+            currentSection.endLine = i;
+          }
+        }
+      }
+    }
+
+    // Add the last section
+    if (currentSection) {
+      sections.push(currentSection);
+    }
+
+    // Post-process: merge very small table sections into text
+    return sections.map(section => {
+      if (section.type === 'table' && section.lines.length < 2) {
+        return { ...section, type: 'text' };
+      }
+      return section;
+    });
+  };
+
+  // Check if text is tabular (CSV or TSV)
+  const isTabularData = (text) => {
+    if (!text || typeof text !== 'string') return false;
+
+    // Simple check for consistent delimiters (comma or tab) across multiple lines
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return false; // Need at least 2 lines for a table
+
+    // Filter out empty lines
+    const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+    if (nonEmptyLines.length < 2) return false;
+
+    // Detect if it's TSV (simple - no quotes in TSV)
+    if (nonEmptyLines[0].includes('\t')) {
+      const columnCount = nonEmptyLines[0].split('\t').length;
+      const isConsistentTSV = nonEmptyLines.every(line => line.split('\t').length === columnCount);
+      if (isConsistentTSV && columnCount >= 2) return true;
+    }
+
+    // For CSV, parse with quote handling
+    if (nonEmptyLines[0].includes(',')) {
+      try {
+        const firstRowColumns = parseCSVLine(nonEmptyLines[0]).length;
+        const isConsistentCSV = nonEmptyLines.every(line =>
+          parseCSVLine(line).length === firstRowColumns
+        );
+        return isConsistentCSV && firstRowColumns >= 2;
+      } catch (e) {
+        // If CSV parsing fails, fall back to simple check
+        const columnCount = nonEmptyLines[0].split(',').length;
+        const isSimpleCSV = nonEmptyLines.every(line => line.split(',').length === columnCount);
+        return isSimpleCSV && columnCount >= 2;
+      }
+    }
+
+    return false;
+  };
+
+  // Convert CSV/TSV to markdown table
+  const formatAsMarkdownTable = (text) => {
+    const lines = text.trim().split('\n');
+
+    // Filter out empty lines
+    const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+    if (nonEmptyLines.length < 2) return text; // Return original if not enough data
+
+    // Determine if it's TSV or CSV
+    const isTabDelimited = nonEmptyLines[0].includes('\t');
+
+    // Parse the rows and columns
+    const rows = nonEmptyLines.map(line => {
+      let cells;
+
+      if (isTabDelimited) {
+        // For TSV, simple split
+        cells = line.split('\t');
+      } else {
+        // For CSV, use our parser that handles quotes
+        try {
+          cells = parseCSVLine(line);
+        } catch (e) {
+          // Fallback to simple comma split if parser fails
+          cells = line.split(',');
+        }
+      }
+
+      // Escape pipe characters in cell content to avoid breaking markdown table
+      // and trim whitespace
+      return cells.map(cell => cell.trim().replace(/\|/g, '\\|'));
+    });
+
+    // Create the markdown table
+    let markdownTable = '';
+
+    // Get max column count (in case rows have different column counts)
+    const maxColumnCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
+
+    // Header row - ensure we have enough columns and pad if needed
+    const headerRow = [...rows[0]];
+    while (headerRow.length < maxColumnCount) {
+      headerRow.push('Column ' + (headerRow.length + 1)); // Add default header names
+    }
+    markdownTable += '| ' + headerRow.join(' | ') + ' |\n';
+
+    // Separator row
+    markdownTable += '| ' + headerRow.map(() => '---').join(' | ') + ' |\n';
+
+    // Data rows
+    for (let i = 1; i < rows.length; i++) {
+      // Ensure consistent column count by padding if necessary
+      const paddedRow = [...rows[i]];
+      while (paddedRow.length < maxColumnCount) {
+        paddedRow.push('');
+      }
+      markdownTable += '| ' + paddedRow.join(' | ') + ' |\n';
+    }
+
+    return markdownTable;
+  };
+
+  // Process mixed content with text and tables
+  const processMixedContent = (text) => {
+    if (!text || typeof text !== 'string') return text;
+
+    // If it's a simple all-table content, process as before
+    if (isTabularData(text)) {
+      return formatAsMarkdownTable(text);
+    }
+
+    // For mixed content, identify the sections
+    const sections = identifyTabularSections(text);
+    if (sections.length <= 1) return text; // Not mixed content
+
+    // Process each section
+    return sections.map(section => {
+      if (section.type === 'table' && section.lines.length >= 2) {
+        const tableText = section.lines.join('\n');
+        if (isTabularData(tableText)) {
+          return formatAsMarkdownTable(tableText);
+        } else {
+          return tableText;
+        }
+      } else {
+        return section.lines.join('\n');
+      }
+    }).join('\n\n');
+  };
+
   // Handle sending a new message
   const handleMessage = useCallback(async (userMessage, botResponse = null) => {
     console.log("Handling message, bot response:", botResponse ? botResponse.type : "none");
+
+    // Process message to handle mixed content and format tables
+    let processedUserMessage = processMixedContent(userMessage);
 
     // Add user message to the chat in chronological order (at the end)
     setHelp(prev => [
       ...prev,
       {
-        user: userMessage,
-        help: getHelp(userMessage),
+        user: processedUserMessage,
+        help: getHelp(processedUserMessage),
         type: 'user'
       }
     ]);
 
     // Only add the bot's description to the chat if one is available
-    const displayText = botResponse.description || "Code generated and sent to editor.";
+    const displayText = botResponse?.description || "Code generated and sent to editor.";
 
     // Store bot response with the current code for future reference
     setHelp(prev => [
@@ -81,18 +356,18 @@ export const HelpPanel = ({
       {
         user: displayText,
         help: {
-          type: botResponse.type === 'code' ? 'code' : 'text',
+          type: botResponse?.type === 'code' ? 'code' : 'text',
           text: displayText,
-          code: botResponse.type === 'code' ? botResponse.text : undefined,  // Store the code in the help history
-          model: botResponse.model || 'unknown',
-          usage: botResponse.usage || {}
+          code: botResponse?.type === 'code' ? botResponse.text : undefined,  // Store the code in the help history
+          model: botResponse?.model || 'unknown',
+          usage: botResponse?.usage || {}
         },
         type: 'bot'
       }
     ]);
 
     // If the bot response is code, automatically update the code panel
-    if (botResponse.type === 'code' && typeof setCode === 'function') {
+    if (botResponse?.type === 'code' && typeof setCode === 'function') {
       console.log("Setting code panel with new code:",
         botResponse.text ? botResponse.text.substring(0, 50) + "..." : "none");
       setCode(botResponse.text);
@@ -244,8 +519,9 @@ export const HelpPanel = ({
           )}
         </div>
         <div className="text-xs font-light text-gray-500 mt-1 mb-2">
+          Paste data as CSV or TSV.
+          Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for a newline.
           Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
-          Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for a new line.
         </div>
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="p-1 pb-0">
@@ -297,6 +573,7 @@ export const HelpPanel = ({
                     <div className="bg-gray-100 rounded-lg p-3">
                       <div className="text-sm prose prose-sm prose-slate max-w-none">
                         <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
                           components={{
                             code({node, inline, className, children, ...props}) {
                               const match = /language-(\w+)/.exec(className || '');
@@ -311,6 +588,50 @@ export const HelpPanel = ({
                                 <code className={className} {...props}>
                                   {children}
                                 </code>
+                              );
+                            },
+                            table({node, className, children, ...props}) {
+                              return (
+                                <div className="overflow-x-auto my-2 w-full">
+                                  <table className="table-auto border-collapse w-full text-xs" {...props}>
+                                    {children}
+                                  </table>
+                                </div>
+                              );
+                            },
+                            thead({node, children, ...props}) {
+                              return (
+                                <thead className="bg-gray-100" {...props}>
+                                  {children}
+                                </thead>
+                              );
+                            },
+                            tbody({node, children, ...props}) {
+                              return (
+                                <tbody className="divide-y divide-gray-200" {...props}>
+                                  {children}
+                                </tbody>
+                              );
+                            },
+                            tr({node, children, ...props}) {
+                              return (
+                                <tr className="hover:bg-gray-50" {...props}>
+                                  {children}
+                                </tr>
+                              );
+                            },
+                            th({node, children, ...props}) {
+                              return (
+                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border whitespace-nowrap" {...props}>
+                                  {children}
+                                </th>
+                              );
+                            },
+                            td({node, children, ...props}) {
+                              return (
+                                <td className="px-2 py-1 text-xs text-gray-500 border" {...props}>
+                                  {children}
+                                </td>
                               );
                             }
                           }}
@@ -352,6 +673,7 @@ export const HelpPanel = ({
                       <div className="bg-blue-100 rounded-lg p-3 overflow-hidden">
                         <div className="text-sm prose prose-sm prose-blue max-w-none">
                           <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
                             components={{
                               code({node, inline, className, children, ...props}) {
                                 const match = /language-(\w+)/.exec(className || '');
@@ -366,6 +688,50 @@ export const HelpPanel = ({
                                   <code className={className} {...props}>
                                     {children}
                                   </code>
+                                );
+                              },
+                              table({node, className, children, ...props}) {
+                                return (
+                                  <div className="overflow-x-auto my-2 w-full">
+                                    <table className="table-auto border-collapse w-full text-xs" {...props}>
+                                      {children}
+                                    </table>
+                                  </div>
+                                );
+                              },
+                              thead({node, children, ...props}) {
+                                return (
+                                  <thead className="bg-blue-50" {...props}>
+                                    {children}
+                                  </thead>
+                                );
+                              },
+                              tbody({node, children, ...props}) {
+                                return (
+                                  <tbody className="divide-y divide-blue-100" {...props}>
+                                    {children}
+                                  </tbody>
+                                );
+                              },
+                              tr({node, children, ...props}) {
+                                return (
+                                  <tr className="hover:bg-blue-50" {...props}>
+                                    {children}
+                                  </tr>
+                                );
+                              },
+                              th({node, children, ...props}) {
+                                return (
+                                  <th className="px-2 py-1 text-left text-xs font-medium text-blue-600 uppercase tracking-wider border border-blue-200 whitespace-nowrap" {...props}>
+                                    {children}
+                                  </th>
+                                );
+                              },
+                              td({node, children, ...props}) {
+                                return (
+                                  <td className="px-2 py-1 text-xs text-blue-700 border border-blue-200" {...props}>
+                                    {children}
+                                  </td>
                                 );
                               }
                             }}
