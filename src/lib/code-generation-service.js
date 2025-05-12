@@ -490,7 +490,7 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
 - Use \`let name = value..\` for declarations
 - All functions are prefix notation: \`add 1 2\` (no infix allowed)
 - Lambdas use angle brackets: \`<x y: expr>\`
-- CRITICAL: ALL top-level expressions MUST end with \`..\` (double dots)
+- CRITICAL: ONLY use \`..\` (double dots) to terminate \`let\` declarations and the program
 - CRITICAL: EVERY program MUST have at least one expression ending with \`..\`
 - CRITICAL: The final expression in a program MUST end with \`..\`
 - Use parentheses to pass functions or delay application: \`map (double) [1 2 3]\`

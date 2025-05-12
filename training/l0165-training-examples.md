@@ -57,62 +57,6 @@ cells {
 
 Create a 4 by 4 spreadsheet with the cell contents being the cell names
 
-change the cell value of A1 to 100
-
-make the value of A2 200 and add A1 and A2 using the formula =sum(A1:A2) for the value of A3
-
-remove all but the cells A1, A2 and A3"
-
-### Chat Transcript
-
-**User**: Create a 2 by 2 spreadsheet with the cell contents being the cell names
-
-**Assistant**: This generated code creates a simple spreadsheet-like structure with two columns, each 100 units wide, and four cells with text content. The code defines an object called "columns" that specifies the width of each column, and another object called "cells" that defines the text content for each cell. Finally, the code combines these two objects into a single output.
-
-**User**: Create a 4 by 4 spreadsheet with the cell contents being the cell names
-
-**Assistant**: This generated code creates a simple table structure with four columns (A, B, C, and D) and four rows (1, 2, 3, and 4). Each cell in the table has a specific text value, such as "A1", "B2", "C3", and so on. The code also defines the width of each column to be 100 units. This table structure can be used as a building block for creating more complex data visualizations or user interfaces.
-
-**User**: change the cell value of A1 to 100
-
-**Assistant**: This generated code creates a simple spreadsheet-like structure with four columns (A, B, C, and D) and four rows (1, 2, 3, and 4). Each cell in the spreadsheet has a specific width (100) and contains some text, such as numbers or labels. The generated code defines the properties of the columns and the content of the cells, allowing for the creation of a basic spreadsheet-style layout.
-
-**User**: make the value of A2 200 and add A1 and A2 using the formula =sum(A1:A2) for the value of A3
-
-**Assistant**: This generated code creates a simple spreadsheet-like structure with four columns (A, B, C, and D) and four rows (1, 2, 3, and 4). Each cell in the spreadsheet has a specific text value, and one cell (A3) has a formula that calculates the sum of the values in cells A1 and A2. The code defines the width of each column and the content of each cell, allowing for the creation of a basic spreadsheet-like layout.
-
-**User**: remove all but the cells A1, A2 and A3
-
-**Assistant**: This generated code creates a simple spreadsheet-like structure with three columns and three rows. The first two rows contain the values "100" and "200" in the first column. The third row contains a formula that calculates the sum of the values in the first two rows and displays the result.
-
-### Code
-
-```
-let columns = {
-  A: { width: 100 }
-}..
-
-let cells = {
-  A1: { text: "100" }
-  A2: { text: "200" }
-  A3: {
-    text: "=sum(A1:A2)"
-  }
-}..
-
-{
-  columns: columns
-  cells: cells
-}..
-```
-
----
-
-### Prompt
-"Create a 2 by 2 spreadsheet with the cell contents being the cell names
-
-Create a 4 by 4 spreadsheet with the cell contents being the cell names
-
 change the cell value of A1 to 100"
 
 ### Chat Transcript
@@ -132,15 +76,14 @@ change the cell value of A1 to 100"
 ### Code
 
 ```
-let columns = {
+columns {
   A: { width: 100 }
   B: { width: 100 }
   C: { width: 100 }
   D: { width: 100 }
-}..
-
-let cells = {
-  A1: { text: "100 " }
+}
+cells {
+  A1: { text: "100" }
   A2: { text: "A2" }
   A3: { text: "A3" }
   A4: { text: "A4" }
@@ -156,11 +99,64 @@ let cells = {
   D2: { text: "D2" }
   D3: { text: "D3" }
   D4: { text: "D4" }
-}..
-
+}
 {
-  columns: columns
-  cells: cells
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
+"change the cell value of A1 to 100
+
+make the value of A2 200 and add A1 and A2 using the formula =sum(A1:A2) for the value of A3
+
+remove all but the cells A1, A2 and A3
+
+add the validation for a3 that the value is 300"
+
+### Chat Transcript
+
+**User**: change the cell value of A1 to 100
+
+**Assistant**: This generated code creates a simple spreadsheet-like structure with four columns (A, B, C, and D) and four rows (1, 2, 3, and 4). Each cell in the spreadsheet has a specific width (100) and contains some text, such as numbers or labels. The generated code defines the properties of the columns and the content of the cells, allowing for the creation of a basic spreadsheet-style layout.
+
+**User**: make the value of A2 200 and add A1 and A2 using the formula =sum(A1:A2) for the value of A3
+
+**Assistant**: This generated code creates a simple spreadsheet-like structure with four columns (A, B, C, and D) and four rows (1, 2, 3, and 4). Each cell in the spreadsheet has a specific text value, and one cell (A3) has a formula that calculates the sum of the values in cells A1 and A2. The code defines the width of each column and the content of each cell, allowing for the creation of a basic spreadsheet-like layout.
+
+**User**: remove all but the cells A1, A2 and A3
+
+**Assistant**: This generated code creates a simple spreadsheet-like structure with three columns and three rows. The first two rows contain the values "100" and "200" in the first column. The third row contains a formula that calculates the sum of the values in the first two rows and displays the result.
+
+**User**: add the validation for a3 that the value is 300
+
+**Assistant**: ```ocaml
+This generated code creates a simple spreadsheet-like structure with three columns and three rows. The first two rows contain the values "100" and "200" respectively, and the third row calculates the sum of those two values and checks if the result is "300". The generated code sets the width of the first column to 100 and defines the text and assessment criteria for each cell in the spreadsheet.
+```
+
+### Code
+
+```
+columns {
+  A: { width: 100 }
+}
+cells {
+  A1: { text: "100" }
+  A2: { text: "200" }
+  A3: {
+    text: "=sum(A1:A2)"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "300"
+      }
+    }
+  }
+}
+{
+  v: "0.0.2"
 }..
 ```
 
@@ -178,21 +174,18 @@ let cells = {
 ### Code
 
 ```
-let columns = {
+columns {
   A: { width: 100 }
   B: { width: 100 }
-}..
-
-let cells = {
+}
+cells {
   A1: { text: "A1" }
   A2: { text: "A2" }
   B1: { text: "B1" }
   B2: { text: "B2" }
-}..
-
+}
 {
-  columns: columns
-  cells: cells
+  v: "0.0.1"
 }..
 ```
 

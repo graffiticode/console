@@ -51,4 +51,17 @@ cells {
 ## Formatting Guidelines
 
 - IMPORTANT: Remember to maintain Graffiticode's core syntax with `let` declarations and `..` endings
-- IMPORTANT: All functions have arity of 2 so if there is no data object needed as the last argument, add an empty object
+- IMPORTANT: Use the following code as a template for all generated code:
+
+```
+title ""
+instructions `
+`
+columns {
+}
+cells {
+}
+{
+  v: "0.0.1"
+}..
+```
