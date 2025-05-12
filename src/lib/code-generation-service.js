@@ -553,7 +553,7 @@ Start with \`|\` and extend to the end of the line.
 
 Only return idiomatic, valid Graffiticode. Use readable names. Output **only the code** unless explanation is requested.
 
-CRITICAL REMINDER: EVERY program MUST have at least one expression ending with \`..\` (double dots), and the final expression in your code MUST end with \`..\`. Failing to add the \`..\` at the end of expressions will cause the code to fail.
+CRITICAL REMINDER: Put generated code between \`\`\` (triple backticks) to distinguish code from commentary.
 `;
 
   return prompt.trim();
@@ -728,8 +728,6 @@ async function callClaudeAPI(prompt, options) {
   }
 
   try {
-    console.log(`Calling Claude API (${options.model}) with prompt:`, prompt.substring(0, 50) + "...");
-
     // Anthropic API endpoint
     const apiUrl = "https://api.anthropic.com/v1/messages";
 
@@ -981,6 +979,11 @@ async function storeSuccessfulGeneration(prompt, code, lang = "0002", verified =
  * @returns {string} - The processed code with fixes applied
  */
 function processGeneratedCode(content) {
+  console.log(
+    "processGeneratedCode()",
+    "content=" + content
+  );
+
   if (!content) return content;
 
   // Try to extract code from between triple backticks
@@ -1001,7 +1004,10 @@ function processGeneratedCode(content) {
   processed = processed.replace(/\\'/g, "'");   // Replace \' with '
   processed = processed.replace(/\\`/g, "`");   // Replace \` with `
 
-  console.log("Extracted code from response:", processed);
+  console.log(
+    "processGeneratedCode()",
+    "processed=" + processed
+  );
 
   return processed;
 }
