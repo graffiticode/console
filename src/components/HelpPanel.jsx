@@ -519,8 +519,9 @@ export const HelpPanel = ({
           )}
         </div>
         <div className="text-xs font-light text-gray-500 mt-1 mb-2">
-          Paste data as CSV or TSV.
-          Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for a newline.
+          Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for newlines, {' '}
+          <span className="font-medium py-0.5">CSV</span> for tabular data, {' '}
+          <span className="font-medium py-0.5 px-1 rounded-sm bg-[#f8f8f8] font-mono">```</span> for code.
           Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
         </div>
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
