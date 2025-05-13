@@ -2,7 +2,7 @@
 
 # Default values
 OUTPUT_DIR="./training"
-GRAPHQL_ENDPOINT="https://graffiticode.com/api"
+GRAPHQL_ENDPOINT="https://graffiticode.org/api"
 MARK=4
 LANG=""
 
