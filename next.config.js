@@ -13,7 +13,13 @@ const nextConfig = {
     return config;
   },
   images: {
-    domains: ["cdn.acx.ac"],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'cdn.acx.ac',
+        pathname: '**',
+      },
+    ],
   },
   // Make environment variables available to the client
   env: {
