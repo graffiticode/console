@@ -116,6 +116,94 @@ const errorGutter = gutter({
   }
 });
 
+// Create a ViewPlugin to handle error tooltip positioning
+const errorTooltipPlugin = ViewPlugin.fromClass(class {
+  constructor(view) {
+    this.view = view;
+    this.tooltipHandlers = [];
+
+    // Create a MutationObserver to detect error markers being added to the DOM
+    this.observer = new MutationObserver(this.handleDOMChanges.bind(this));
+    this.observer.observe(view.dom, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class']
+    });
+  }
+
+  handleDOMChanges(mutations) {
+    // Find any newly added error markers
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList') {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            this.setupErrorMarkers(node);
+          }
+        }
+      } else if (mutation.type === 'attributes' &&
+                mutation.attributeName === 'class' &&
+                mutation.target.classList.contains('cm-error-highlight')) {
+        this.setupErrorMarkers(mutation.target);
+      }
+    }
+  }
+
+  setupErrorMarkers(node) {
+    // Check if node is an error marker or contains error markers
+    const errorMarkers = node.classList?.contains('cm-error-highlight')
+                  ? [node]
+                  : Array.from(node.querySelectorAll('.cm-error-highlight'));
+
+    // Also check for gutter markers
+    const gutterMarkers = node.classList?.contains('cm-gutter-error-marker')
+                  ? [node]
+                  : Array.from(node.querySelectorAll('.cm-gutter-error-marker'));
+
+    // Process all markers
+    const allMarkers = [...errorMarkers, ...gutterMarkers];
+
+    // For each marker, add mouseover and mouseout event listeners
+    for (const marker of allMarkers) {
+      if (!marker._hasTooltipHandler) {
+        marker._hasTooltipHandler = true;
+
+        const handleMouseOver = () => {
+          // Get marker position relative to editor
+          const rect = marker.getBoundingClientRect();
+          const editorRect = this.view.dom.getBoundingClientRect();
+
+          // Calculate if marker is in the top or bottom third of the editor
+          const relativePosition = (rect.top - editorRect.top) / editorRect.height;
+
+          // Remove existing positioning classes
+          marker.classList.remove('tooltip-top', 'tooltip-bottom');
+
+          // Add appropriate positioning class
+          if (relativePosition < 0.3) {
+            // If in top third, position tooltip below
+            marker.classList.add('tooltip-bottom');
+          } else {
+            // Otherwise, position tooltip above
+            marker.classList.add('tooltip-top');
+          }
+        };
+
+        marker.addEventListener('mouseover', handleMouseOver);
+        this.tooltipHandlers.push({ element: marker, handler: handleMouseOver });
+      }
+    }
+  }
+
+  destroy() {
+    // Clean up event listeners and observer
+    this.observer.disconnect();
+    for (const {element, handler} of this.tooltipHandlers) {
+      element.removeEventListener('mouseover', handler);
+    }
+  }
+});
+
 // Create a decoration for an error
 const createErrorMark = (from, to, message) => {
   // Ensure message is a string and escape any quotes
@@ -144,7 +232,8 @@ export const CodePanel = ({
     customCompletionDisplay({ setCode }),
     errorMarksField,
     gutterMarkersField,
-    errorGutter
+    errorGutter,
+    errorTooltipPlugin
   ];
 
   const { ref } = useCodeMirror(extensions, setView, code);
@@ -171,11 +260,9 @@ export const CodePanel = ({
     if (!view) return;
 
     try {
-      // Check if we have valid error data
-      if (compiledData &&
-          compiledData.errors &&
-          Array.isArray(compiledData.errors) &&
-          compiledData.errors.length > 0) {
+      // Check if we have valid error data - support both "errors" and "error" arrays
+      const errors = compiledData?.errors || compiledData?.error || [];
+      if (Array.isArray(errors) && errors.length > 0) {
 
         // Create decoration sets for errors and gutter markers
         let errorDecorations = [];
@@ -185,7 +272,7 @@ export const CodePanel = ({
         let gutterMarkers = [];
 
         // First, sort errors by line to group them
-        const sortedErrors = [...compiledData.errors].filter(Boolean).sort((a, b) => {
+        const sortedErrors = [...errors].filter(Boolean).sort((a, b) => {
           const fromA = parseInt(a.from, 10) || 0;
           const fromB = parseInt(b.from, 10) || 0;
           return fromA - fromB;
@@ -289,26 +376,36 @@ export const CodePanel = ({
         .cm-error-highlight {
           position: relative; /* Ensure relative positioning for absolute children */
         }
+        /* Position tooltip below error near top of editor, above error near bottom */
+        /* First, create a rule for all error highlights to check tooltip positioning */
+        .cm-error-highlight {
+          container-type: inline-size; /* Enable container queries */
+        }
         .cm-error-highlight:hover::after {
           content: attr(data-error);
           position: absolute;
           left: 0;
-          /* Position popup below the error text */
-          top: 100%;
-          transform: translateY(5px); /* Add a small offset */
+          max-height: 300px;
+          overflow-y: auto;
+          width: max-content;
+          max-width: 400px;
           background-color: #f44336;
           color: white;
           padding: 10px 15px;
           border-radius: 6px;
-          white-space: pre-wrap;
-          max-width: 600px;
-          min-width: 300px;
-          z-index: 1000;
-          font-family: sans-serif;
-          font-size: 14px;
-          line-height: 1.5;
-          text-align: left;
+          z-index: 10000;
           box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+          filter: drop-shadow(0 0 8px rgba(0,0,0,0.5));
+        }
+        /* Position tooltip below for errors at the top of the editor */
+        .cm-error-highlight.tooltip-bottom:hover::after {
+          top: calc(100% + 5px);
+          bottom: auto;
+        }
+        /* Position tooltip above for errors at the bottom of the editor */
+        .cm-error-highlight.tooltip-top:hover::after {
+          bottom: calc(100% + 5px);
+          top: auto;
         }
         /* Gutter error markers */
         .cm-error-gutter {
@@ -325,23 +422,33 @@ export const CodePanel = ({
         .cm-gutter-error-marker:hover::after {
           content: attr(data-error);
           position: absolute;
-          left: 100%; /* Position to the right of the marker */
-          top: 50%;   /* Vertically center */
-          transform: translateY(-50%); /* Precise vertical centering */
+          left: 20px; /* Position to the right of the gutter */
+          max-height: 300px; /* Limit height */
+          overflow-y: auto; /* Add scrolling for very long error messages */
           background-color: #f44336;
           color: white;
           padding: 10px 15px;
           border-radius: 6px;
+          z-index: 10000;
+          width: max-content;
+          max-width: 400px;
           white-space: pre-wrap;
-          max-width: 600px;
           min-width: 300px;
-          z-index: 1000;
           font-family: sans-serif;
           font-size: 14px;
           line-height: 1.5;
           text-align: left;
           box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-          margin-left: 5px; /* Add a small gap */
+        }
+        /* Position tooltip below for markers at the top of the editor */
+        .cm-gutter-error-marker.tooltip-bottom:hover::after {
+          top: 0; /* Align with the top of the marker */
+          bottom: auto;
+        }
+        /* Position tooltip above for markers at the bottom of the editor */
+        .cm-gutter-error-marker.tooltip-top:hover::after {
+          bottom: 0; /* Align with the bottom of the marker */
+          top: auto;
         }
       `}</style>
       <div
