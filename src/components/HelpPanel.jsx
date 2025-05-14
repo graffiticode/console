@@ -540,7 +540,7 @@ export const HelpPanel = ({
               <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
               <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
               <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              <span className="text-gray-500 ml-2 text-xs">Generating Graffiticode...</span>
+              <span className="text-gray-500 ml-2 text-xs">Generating...</span>
             </div>
           </div>
         )}
