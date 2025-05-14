@@ -52,6 +52,11 @@ img.ProseMirror-separator {
   margin: 0 !important;
 }
 
+/* Make ProseMirror container relative for placeholder positioning */
+.prosemirror-editor {
+  position: relative;
+}
+
 .ProseMirror-textblock-dropdown {
   min-width: 3em;
 }

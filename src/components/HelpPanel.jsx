@@ -504,13 +504,16 @@ export const HelpPanel = ({
     <div className="flex flex-col h-[calc(100vh-120px)]">
       {/* Input field at the top */}
       <div ref={headerRef} className="flex-none sticky top-0 z-20 bg-white px-4 py-3 border-b shadow-md">
-        <div className="flex justify-between items-center mb-1">
-          <div className="text-sm font-semibold text-gray-500">
-            What would you like to make with Graffiticode?
+        <div className="flex justify-between items-center text-xs mb-2">
+          <div className="font-light text-gray-500">
+            Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for newlines, {' '}
+            <span className="font-medium py-0.5">CSV</span> for tabular data, {' '}
+            <span className="font-medium py-0.5 px-1 rounded-sm bg-[#f8f8f8] font-mono">```</span> for code.
+            Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
           </div>
           {help.length > 0 && (
             <button
-              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors"
+              className="text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors ml-4"
               onClick={handleClearAll}
               title="Clear conversation"
             >
@@ -518,17 +521,13 @@ export const HelpPanel = ({
             </button>
           )}
         </div>
-        <div className="text-xs font-light text-gray-500 mt-1 mb-2">
-          Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for newlines, {' '}
-          <span className="font-medium py-0.5">CSV</span> for tabular data, {' '}
-          <span className="font-medium py-0.5 px-1 rounded-sm bg-[#f8f8f8] font-mono">```</span> for code.
-          Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
-        </div>
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="p-1 pb-0">
             <TextEditor
+              key={help.length === 0 ? 'empty' : 'has-content'}
               state={state}
               disabled={isLoading}
+              placeholder={help.length > 0 ? "Reply to make it better..." : "How can I help you today?"}
             />
           </div>
         </div>
@@ -558,7 +557,7 @@ export const HelpPanel = ({
 
         {help.length === 0 && (
           <div className="text-center text-gray-400 py-8">
-            Enter a prompt above to get help with Graffiticode.
+            Enter a request above to get help.
           </div>
         )}
 
@@ -649,7 +648,7 @@ export const HelpPanel = ({
               {lastBotResponse && userMessages.length > 0 && (
                 <div className="flex items-center mb-6">
                   <div className="flex-grow border-t border-gray-200"></div>
-                  <div className="mx-4 text-xs text-gray-500">Prompts (oldest first)</div>
+                  <div className="mx-4 text-xs text-gray-500">Requests</div>
                   <div className="flex-grow border-t border-gray-200"></div>
                 </div>
               )}
@@ -747,7 +746,7 @@ export const HelpPanel = ({
 
               {userMessages.length === 0 && !lastBotResponse && (
                 <div className="text-center text-gray-400 py-8">
-                  Enter a prompt above to get help with Graffiticode.
+                  Enter a request above to get help.
                 </div>
               )}
             </>

@@ -8,6 +8,7 @@ import { undo, redo, history } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 
 import { Plugin } from 'prosemirror-state';
+import { Decoration, DecorationSet } from 'prosemirror-view';
 import ReactDOM from 'react-dom';
 import { MenuView } from './MenuView';
 import { debounce } from "lodash";
@@ -101,7 +102,7 @@ const createPlaceholderPlugin = (placeholder) => {
   return new Plugin({
     props: {
       attributes: {
-        class: 'prosemirror-editor',
+        class: 'prosemirror-editor'
       }
     }
   });
@@ -109,6 +110,7 @@ const createPlaceholderPlugin = (placeholder) => {
 
 export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
   const [ editorView, setEditorView ] = useState(null);
+  const [ hasFocus, setHasFocus ] = useState(false);
   const editorRef = useRef(null);
   // Function to toggle a code block
   const toggleCodeBlock = (state, dispatch) => {
@@ -215,16 +217,24 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
         //   editorState: editorState.toJSON()
         // });
       },
-      // Add attributes for styling disabled state
+      // Add attributes for styling disabled state and placeholder
       attributes: {
         class: disabled ? 'editor-disabled' : '',
+        'data-placeholder': placeholder
+      },
+      handleDOMEvents: {
+        focus: () => {
+          setHasFocus(true);
+          return false;
+        },
+        blur: () => {
+          setHasFocus(false);
+          return false;
+        }
       }
     });
 
     setEditorView(editorView);
-    if (!disabled) {
-      editorView.focus();
-    }
 
     return () => {
       if (editorView) {
@@ -266,7 +276,9 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
       {placeholder && (
         <div
           className="absolute top-[8px] left-[8px] text-gray-400 pointer-events-none"
-          style={{ display: editorView && editorView.state.doc.textContent.length > 0 ? 'none' : 'block' }}
+          style={{ 
+            display: (editorView && editorView.state.doc.textContent.length > 0) || hasFocus ? 'none' : 'block' 
+          }}
         >
           {placeholder}
         </div>
