@@ -72,7 +72,7 @@ export default function Editor({
 
   useEffect(() => {
     if (taskId === "") {
-      setCode("");
+      setCode("{}..");
       setHelp([]);
       setData({});
       setDoPostTask(true);
@@ -91,9 +91,7 @@ export default function Editor({
 
   useEffect(() => {
     const { taskId } = parseId(id);
-    if (taskId) {
-      setTaskId(taskId);
-    }
+    setTaskId(taskId);
     setDoGetData(true);
   }, [id]);
 

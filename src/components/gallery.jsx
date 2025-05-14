@@ -115,8 +115,26 @@ export default function Gallery({ lang, mark }) {
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
     setHideEditor(false);
-    setId("");
-  });
+
+    // Create a temporary new task with a temporary ID
+    const tempId = `temp-${Date.now()}`;
+    const tempTask = {
+      id: tempId,
+      name: "unnamed",
+      src: "{}..",
+      help: [],
+      mark: mark.id,
+      isPublic: false,
+      created: Date.now(),
+      lang: lang,
+    };
+
+    // Add the temporary task to the beginning of the tasks list
+    setTasks([tempTask, ...tasks]);
+
+    // Set the current ID to the temporary ID
+    setId(tempId);
+  }, [tasks, mark, lang, setHideEditor, setTasks, setId]);
 
   const { isValidating, isLoading, data: loadTasksData } =
     useSWR(
@@ -165,9 +183,19 @@ export default function Gallery({ lang, mark }) {
   useEffect(() => {
     // If this is indeed a new task, then add it to the list. Otherwise, nothing
     // to see here.
-    if (newTask && !tasks.some(task => task.id === newTask.id)) {
-      tasks.unshift(newTask);
-      setTasks(tasks);
+    if (newTask) {
+      // Check if we're replacing a temporary task
+      const tempTaskIndex = tasks.findIndex(task => task.id.startsWith('temp-'));
+
+      if (tempTaskIndex >= 0) {
+        // Replace the temporary task with the new saved task
+        const updatedTasks = [...tasks];
+        updatedTasks[tempTaskIndex] = newTask;
+        setTasks(updatedTasks);
+      } else if (!tasks.some(task => task.id === newTask.id)) {
+        // Create a new array with the new task at the beginning
+        setTasks([newTask, ...tasks]);
+      }
     }
     setShowSaving(false);
   }, [newTask]);
@@ -237,7 +265,7 @@ export default function Gallery({ lang, mark }) {
               >
                 <Editor
                   accessToken={accessToken}
-                  id={id}
+                  id={id.startsWith('temp-') ? '' : id}
                   lang={lang}
                   mark={mark}
                   setId={setId}
