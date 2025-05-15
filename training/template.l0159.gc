@@ -1,0 +1,10 @@
+flashcards
+  facts [
+    [
+    'Front',
+    'Back'
+    ],
+  ]
+{
+  useBgTexture: true,
+}..
