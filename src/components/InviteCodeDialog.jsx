@@ -9,7 +9,7 @@ export default function InviteCodeDialog({ open, onClose, onSubmit }) {
     e.preventDefault();
     setError('');
     setLoading(true);
-    
+
     try {
       await onSubmit(inviteCode);
     } catch (err) {

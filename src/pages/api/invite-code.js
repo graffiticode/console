@@ -38,7 +38,7 @@ const handler = async (req, res) => {
     }
 
     const { uid } = await client.verifyToken(token);
-    
+
     if (!inviteCode) {
       return res.status(400).json({ error: 'Invite code is required' });
     }
@@ -52,13 +52,13 @@ const handler = async (req, res) => {
     // Check if user has already used an invite code
     const db = getFirestore();
     const userDoc = await db.collection('users').doc(uid).get();
-    
+
     if (userDoc.exists) {
       const userData = userDoc.data();
       if (userData.inviteCodeUsed) {
         return res.status(400).json({ error: 'Invite code already used' });
       }
-      
+
       // Update user with invite code
       await db.collection('users').doc(uid).update({
         inviteCodeUsed: inviteCode,

@@ -25,7 +25,7 @@ export default function AuthWrapper({ children }) {
           'Authorization': token,
         },
       });
-      
+
       if (response.ok) {
         const userData = await response.json();
         // Existing users are automatically approved, don't need invite code
