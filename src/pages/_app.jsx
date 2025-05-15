@@ -9,6 +9,7 @@ import Layout from '../components/layout';
 import { useState, useEffect } from "react";
 import useLocalStorage from '../hooks/use-local-storage';
 import { marks } from "../components/mark-selector";
+import AuthWrapper from '../components/AuthWrapper';
 const { provider, webSocketProvider } = configureChains(
   [mainnet],
   [publicProvider()],
@@ -43,15 +44,17 @@ export default function App({
       <GraffiticodeFirebaseProvider>
         <WagmiConfig client={client}>
           <GraffiticodeAuthProvider>
-            <Layout
-              pathName={pathName}
-              language={language}
-              setLanguage={setLanguage}
-              mark={mark}
-              setMark={setMark}
-            >
-              <Component {...{...pageProps, language, setLanguage, mark}} />
-            </Layout>
+            <AuthWrapper>
+              <Layout
+                pathName={pathName}
+                language={language}
+                setLanguage={setLanguage}
+                mark={mark}
+                setMark={setMark}
+              >
+                <Component {...{...pageProps, language, setLanguage, mark}} />
+              </Layout>
+            </AuthWrapper>
           </GraffiticodeAuthProvider>
         </WagmiConfig>
       </GraffiticodeFirebaseProvider>
