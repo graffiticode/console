@@ -555,11 +555,6 @@ export const HelpPanel = ({
         {/* Invisible element for auto-scrolling to top */}
         <div ref={messagesEndRef} />
 
-        {help.length === 0 && (
-          <div className="text-center text-gray-400 py-8">
-            Enter a request above to get help.
-          </div>
-        )}
 
         {help.length > 0 && (() => {
           const { lastBotResponse, userMessages } = prepareMessagesForDisplay();
@@ -744,11 +739,6 @@ export const HelpPanel = ({
                 ))}
               </div>
 
-              {userMessages.length === 0 && !lastBotResponse && (
-                <div className="text-center text-gray-400 py-8">
-                  Enter a request above to get help.
-                </div>
-              )}
             </>
           );
         })()}
