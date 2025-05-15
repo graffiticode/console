@@ -24,14 +24,14 @@ export default function InviteCodeDialog({ open, onClose, onSubmit }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
-      <div className="relative bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+      <div className="relative bg-white rounded-none shadow-xl p-6 w-full max-w-sm">
         <h2 className="text-xl font-semibold mb-4">Invite Code</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <input
               id="invite-code"
               type="text"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
               placeholder="Enter your invite code"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
@@ -45,7 +45,7 @@ export default function InviteCodeDialog({ open, onClose, onSubmit }) {
           <div className="flex justify-end space-x-2">
             <button
               type="button"
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-none hover:bg-gray-200 disabled:opacity-50"
               onClick={onClose}
               disabled={loading}
             >
@@ -53,7 +53,7 @@ export default function InviteCodeDialog({ open, onClose, onSubmit }) {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-white bg-gray-600 rounded-none hover:bg-gray-700 disabled:opacity-50"
               disabled={loading || !inviteCode.trim()}
             >
               {loading ? 'Verifying...' : 'Submit'}
