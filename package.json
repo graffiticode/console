@@ -53,6 +53,7 @@
     "dashify": "^2.0.0",
     "firebase": "^9.23.0",
     "firebase-admin": "^11.10.1",
+    "fs": "^0.0.1-security",
     "graphiql": "^2.4.0",
     "graphql": "^16.6.0",
     "graphql-helix": "^1.13.0",

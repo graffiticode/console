@@ -247,6 +247,7 @@ export const generateCode = async ({ user, prompt, language, options }) => {
     mutation GenerateCode($prompt: String!, $language: String, $options: CodeGenerationOptions) {
       generateCode(prompt: $prompt, language: $language, options: $options) {
         code
+        taskId
         description
         language
         model

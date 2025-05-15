@@ -8,7 +8,7 @@ import {
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
-import { loadTasks, getAccessToken } from '../utils/swr/fetchers';
+import { loadTasks, getAccessToken, generateCode } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView.jsx";
@@ -116,12 +116,36 @@ export default function Gallery({ lang, mark }) {
     e.preventDefault();
     setHideEditor(false);
 
-    // Create a temporary new task with a temporary ID
-    const tempId = `temp-${Date.now()}`;
-    const tempTask = {
-      id: tempId,
+    let template = '{}..'; // Default template
+    let taskId = null;
+
+    try {
+      // Generate a minimal template using generateCode
+      const prompt = "Create a minimal starting template";
+      const result = await generateCode({
+        user,
+        prompt,
+        language: lang
+      });
+      if (result) {
+        if (result.code) {
+          template = result.code;
+        }
+        if (result.taskId) {
+          taskId = result.taskId;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to generate template:", error);
+      // Use default template on error
+    }
+
+    // Use the returned task ID or create a temporary one if posting failed
+    const newTaskId = taskId || `temp-${Date.now()}`;
+    const newTask = {
+      id: newTaskId,
       name: "unnamed",
-      src: "{}..",
+      src: template,
       help: [],
       mark: mark.id,
       isPublic: false,
@@ -129,12 +153,12 @@ export default function Gallery({ lang, mark }) {
       lang: lang,
     };
 
-    // Add the temporary task to the beginning of the tasks list
-    setTasks([tempTask, ...tasks]);
+    // Add the new task to the beginning of the tasks list
+    setTasks([newTask, ...tasks]);
 
-    // Set the current ID to the temporary ID
-    setId(tempId);
-  }, [tasks, mark, lang, setHideEditor, setTasks, setId]);
+    // Set the current ID to the new task ID
+    setId(newTaskId);
+  }, [tasks, mark, lang, user, setHideEditor, setTasks, setId]);
 
   const { isValidating, isLoading, data: loadTasksData } =
     useSWR(
@@ -265,7 +289,7 @@ export default function Gallery({ lang, mark }) {
               >
                 <Editor
                   accessToken={accessToken}
-                  id={id.startsWith('temp-') ? '' : id}
+                  id={id}  // Always pass the id, including temp- ids
                   lang={lang}
                   mark={mark}
                   setId={setId}

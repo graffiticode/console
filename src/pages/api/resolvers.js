@@ -4,6 +4,8 @@ import { buildGetTaskDaoForStorageType } from "./utils.js";
 import { getFirestore } from '../../utils/db';
 import { getApiTask, getBaseUrlForApi } from "../../lib/api.js";
 import { generateCode as codeGenerationService } from "../../lib/code-generation-service.js";
+import fs from 'fs';
+import path from 'path';
 // import { buildDynamicSchema } from "./schemas.js";
 
 const taskDaoFactory = buildTaskDaoFactory({});
@@ -16,9 +18,6 @@ const getTask = async ({ auth, id }) => await getApiTask({ id, auth });
 
 export async function logCompile({ auth, id, timestamp, status, data }) {
   try {
-    console.log(
-      "logCompile()",
-    );
     const [{ lang }] = await getTask({ auth, id });
     const path = `users/${auth.uid}/compiles/${id}`;
     data = JSON.parse(data);
@@ -37,9 +36,6 @@ export async function logCompile({ auth, id, timestamp, status, data }) {
 // TODO store code in doc with atomic task id
 export async function saveTask({ auth, id, lang, help, code, mark, isPublic }) {
   try {
-    console.log(
-      "saveTask()",
-    );
     const task = { lang, code };
     //const { id: taskId } = await postTask({ auth, task, ephemeral: false, isPublic });
     await db.doc(`users/${auth.uid}/taskIds/${id}`).set({
@@ -64,17 +60,8 @@ export async function saveTask({ auth, id, lang, help, code, mark, isPublic }) {
 export async function updateTask({ auth, id, name, help, mark, isPublic }) {
   const task = {name, mark, help, isPublic};
   Object.keys(task).forEach(key => task[key] === undefined && delete task[key]);
-  console.log(
-    "updateTask()",
-    "id=" + id,
-    "task=" + JSON.stringify(task, null, 2),
-  );
   try {
     const taskRef = await db.doc(`users/${auth.uid}/taskIds/${id}`);
-    console.log(
-      "updateTask()",
-      "taskRef=" + taskRef,
-    );
     taskRef.update(task);
     if (isPublic) {
       // TODO get lang and code from stored task to send to the api with isPublic
@@ -90,10 +77,6 @@ export async function updateTask({ auth, id, name, help, mark, isPublic }) {
       const { data } = await postApiJSON("/task", { task }, headers);
     }
     const data = { id };
-    console.log(
-      "updateTask()",
-      "id=" + id,
-    );
     return data;
   } catch (x) {
     console.error(
@@ -108,11 +91,6 @@ const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
 
 export async function postTask({ auth, task, ephemeral, isPublic }) {
   try {
-    console.log(
-      "postTask()",
-      "auth=" + JSON.stringify(auth),
-      "task=" + JSON.stringify(task, null, 2),
-    );
     const storageType = ephemeral && "ephemeral" || "persistent";
     const headers = {
       "Authorization": auth.token,
@@ -134,17 +112,9 @@ export async function postTask({ auth, task, ephemeral, isPublic }) {
 
 export async function getData({ authToken, id }) {
   try {
-    console.log(
-      "getData()",
-      "authToken=" + authToken,
-    );
     const baseUrl = getBaseUrlForApi();
     const get = bent(baseUrl, 'GET', 'json', 200);
     const resp = await get(`/data?id=${id}&access_token=${authToken}`);
-    console.log(
-      "getData()",
-      "resp=" + JSON.stringify(resp, null, 2),
-    );
     return resp.data;
   } catch (x) {
     console.log(
@@ -157,9 +127,6 @@ export async function getData({ authToken, id }) {
 
 export async function tasks({ auth, lang, mark }) {
   try {
-    console.log(
-      "tasks()",
-    );
     const taskIdsDocs = await db.collection(`users/${auth.uid}/taskIds`)
           .where('lang', '==', lang)
           .where('mark', '==', mark)
@@ -188,10 +155,6 @@ export async function tasks({ auth, lang, mark }) {
       });
       return tasks;
     }, []);
-    // console.log(
-    //   "tasks()",
-    //   "tasks=" + JSON.stringify(tasks, null, 2),
-    // );
     return tasks;
   } catch (x) {
     console.log(
@@ -204,9 +167,6 @@ export async function tasks({ auth, lang, mark }) {
 
 export async function compiles({ auth, lang, type }) {
   try {
-    console.log(
-      "compiles()",
-    );
     const compilesDocs = await db.collection(`users/${auth.uid}/compiles`)
           .where('lang', '==', lang)
           .get();
@@ -227,32 +187,74 @@ export async function compiles({ auth, lang, type }) {
 export async function generateCode({ auth, prompt, language, options }) {
   // TODO add support for calling the compiler to check generated code.
   try {
-    console.log(
-      "generateCode()",
-      "prompt=", prompt.substring(0, 50) + (prompt.length > 50 ? "..." : ""),
-      "language=", language,
-    );
+    prompt = prompt.trim();
+    let code = null;
+    let taskId = null;
+    let description = null;
+    let model = null;
+    let usage = {
+      input_tokens: 0,
+      output_tokens: 0
+    };
 
-    // Call the code generation service to generate Graffiticode
-    const result = await codeGenerationService({
-      auth,
-      prompt,
-      lang: language,
-      options: {
-        model: options?.model,
-        temperature: options?.temperature,
-        maxTokens: options?.maxTokens
+    // Check if this is the specific prompt for template generation
+    if (prompt === "Create a minimal starting template") {
+      try {
+        // Read template from file system
+        const templatePath = path.join(process.cwd(), 'training', `template.l${language.toLowerCase()}.gc`);
+        if (fs.existsSync(templatePath)) {
+          code = fs.readFileSync(templatePath, 'utf8');
+          description = "Template loaded from file";
+          model = "template-file";
+        }
+      } catch (error) {
+        console.log("generateCode()", "Template file not found or error reading, falling back to service", error.message);
       }
-    });
+    }
 
-    console.log(
-      "generateCode()",
-      "model=", result.model,
-      "language=", result.language,
-      "description=", result.description ? result.description.substring(0, 50) + "..." : "none"
-    );
+    // If no template was loaded, fall back to code generation service
+    if (!code) {
+      const result = await codeGenerationService({
+        auth,
+        prompt,
+        lang: language,
+        options: {
+          model: options?.model,
+          temperature: options?.temperature,
+          maxTokens: options?.maxTokens
+        }
+      });
+      code = result.code;
+      description = result.description;
+      model = result.model;
+      usage = result.usage;
+    }
 
-    return result;
+    // Post the task to get a task ID
+    try {
+      const taskData = await postTask({
+        auth,
+        task: {
+          lang: language,
+          code: code
+        },
+        ephemeral: true, // Make it ephemeral since it's just a template
+        isPublic: false
+      });
+      taskId = taskData.id;
+    } catch (error) {
+      console.error("generateCode()", "Failed to post task", error);
+      // Return without task ID if posting fails
+    }
+
+    return {
+      code: code,
+      taskId: taskId,
+      language: language,
+      description: description,
+      model: model,
+      usage: usage
+    };
   } catch (error) {
     console.error("generateCode()", "ERROR", error);
 

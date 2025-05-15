@@ -42,6 +42,7 @@ const typeDefs = `
 
   type GeneratedCode {
     code: String!
+    taskId: String
     description: String
     language: String
     model: String
