@@ -33,9 +33,9 @@ const navigation = [
   { name: 'Languages', href: '/languages', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: false },
-  { name: 'Specs', href: '/specs', current: false },
-//  { name: 'Explorer', href: '/explorer', current: false },
   { name: 'Settings', href: '/settings', current: false },
+  { name: 'Docs', href: '/docs', current: false },
+//  { name: 'Explorer', href: '/explorer', current: false },
 ]
 
 function classNames(...classes) {
@@ -105,18 +105,12 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                         }
                       </div>
                     </div>
-                    { ["tasks", "compiles", "specs"].includes(pathName)
-                      ? <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
-                          <LanguageSelector domain={getTitle()} language={language} setLanguage={setLanguage} />
-                        </div>
-                      : <div />
-                    }
-                    { pathName === "tasks"
-                      ? <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
-                          <MarkSelector domain={getTitle()} mark={mark} setMark={setMark} />
-                        </div>
-                      : <div />
-                    }
+                    <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
+                      <LanguageSelector domain={getTitle()} language={language} setLanguage={setLanguage} />
+                    </div>
+                    <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
+                      <MarkSelector domain={getTitle()} mark={mark} setMark={setMark} />
+                    </div>
                   </div>
                   <div className="hidden md:block">
                     <div className="text-sm font-medium ml-4 flex items-center md:ml-6 space-x-8">
