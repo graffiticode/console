@@ -108,9 +108,12 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                     <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
                       <LanguageSelector domain={getTitle()} language={language} setLanguage={setLanguage} />
                     </div>
-                    <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
-                      <MarkSelector domain={getTitle()} mark={mark} setMark={setMark} />
-                    </div>
+                    { pathName === "tasks"
+                      ? <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
+                          <MarkSelector domain={getTitle()} mark={mark} setMark={setMark} />
+                        </div>
+                      : <div />
+                    }
                   </div>
                   <div className="hidden md:block">
                     <div className="text-sm font-medium ml-4 flex items-center md:ml-6 space-x-8">
