@@ -116,10 +116,10 @@ export const HelpPanel = ({
 
     // Count commas for CSV detection
     const commaCount = line.split(',').length - 1;
-    
+
     // Check for quoted values that may contain spaces
     const hasQuotedValues = /"[^"]*"/.test(line);
-    
+
     // Basic heuristic: if line has multiple commas, it's likely CSV
     return commaCount > 1 || (commaCount > 0 && hasQuotedValues);
   };
@@ -225,18 +225,18 @@ export const HelpPanel = ({
     // Parse each line using our CSV parser that handles quoted values with spaces
     try {
       const parsedLines = nonEmptyLines.map(line => parseCSVLine(line));
-      
+
       // Get the most common column count to handle slight inconsistencies
       const columnCounts = parsedLines.map(cols => cols.length);
-      const mostCommonColumnCount = columnCounts.sort((a, b) => 
+      const mostCommonColumnCount = columnCounts.sort((a, b) =>
         columnCounts.filter(v => v === a).length - columnCounts.filter(v => v === b).length
       ).pop();
-      
+
       // Check if most lines have a similar column count (allow ±1 for CSV tables which might have aligned sections)
       const consistentColumns = parsedLines.filter(
         cols => Math.abs(cols.length - mostCommonColumnCount) <= 1
       ).length / parsedLines.length >= 0.7; // At least 70% of lines should have consistent columns
-      
+
       return consistentColumns && mostCommonColumnCount >= 2;
     } catch (e) {
       console.error("Error parsing CSV data:", e);
@@ -269,7 +269,7 @@ export const HelpPanel = ({
       return cells.map(cell => {
         // Clean up cell content
         let cleanCell = cell.trim().replace(/\|/g, '\\|');
-        
+
         // Handle parentheses for negative values in financial data
         if (cleanCell.includes('(') && cleanCell.includes(')')) {
           // Convert (123) format to -123 for better readability if it looks like a number
@@ -277,7 +277,7 @@ export const HelpPanel = ({
             cleanCell = '-' + cleanCell.replace(/[()]/g, '').trim();
           }
         }
-        
+
         return cleanCell;
       });
     });
@@ -346,18 +346,26 @@ export const HelpPanel = ({
   const handleMessage = useCallback(async (userMessage, botResponse = null) => {
     console.log("Handling message, bot response:", botResponse ? botResponse.type : "none");
 
-    // Process message to handle mixed content and format tables
-    let processedUserMessage = processMixedContent(userMessage);
+    // If there's no bot response yet, this is the initial message from the user
+    if (!botResponse) {
+      // Process message to handle mixed content and format tables
+      let processedUserMessage = processMixedContent(userMessage);
 
-    // Add user message to the chat in chronological order (at the end)
-    setHelp(prev => [
-      ...prev,
-      {
-        user: processedUserMessage,
-        help: getHelp(processedUserMessage),
-        type: 'user'
-      }
-    ]);
+      // Add user message to the chat in chronological order (at the end)
+      setHelp(prev => [
+        ...prev,
+        {
+          user: processedUserMessage,
+          help: getHelp(processedUserMessage),
+          type: 'user'
+        }
+      ]);
+
+      return;
+    }
+
+    // If we have a bot response but need to skip adding user message (to avoid duplication)
+    const skipUserMessage = botResponse.skipUserMessage;
 
     // Only add the bot's description to the chat if one is available
     const displayText = botResponse?.description || "Code generated and sent to editor.";
@@ -456,10 +464,11 @@ export const HelpPanel = ({
     help = [];
   }
 
-  // Create refs to measure the header height and handle scrolling
+  // Create refs and state for UI elements
   const headerRef = useRef(null);
-  const messagesEndRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(130);  // Default initial height
+  const [processingTime, setProcessingTime] = useState(0);
+  const processingTimeRef = useRef(null);
 
   // Update header height when it changes
   useEffect(() => {
@@ -486,18 +495,40 @@ export const HelpPanel = ({
     if (headerRef.current) {
       setHeaderHeight(headerRef.current.offsetHeight);
     }
+
+    // Track processing time when isLoading changes
+    if (isLoading) {
+      // Reset the time and start the timer
+      setProcessingTime(0);
+      processingTimeRef.current = setInterval(() => {
+        setProcessingTime(prevTime => prevTime + 1);
+      }, 1000);
+    } else {
+      // Clear the timer when loading is done
+      if (processingTimeRef.current) {
+        clearInterval(processingTimeRef.current);
+        processingTimeRef.current = null;
+      }
+    }
+
+    // Clean up on unmount
+    return () => {
+      if (processingTimeRef.current) {
+        clearInterval(processingTimeRef.current);
+      }
+    };
   }, [isLoading]);
 
   // Function to prepare messages for display
   const prepareMessagesForDisplay = () => {
-    // Find all user messages in chronological order (oldest to newest)
+    // Find all user messages in reverse chronological order (newest to oldest)
     const userMessages = help
       .filter(item => item.type === 'user')
       .map((msg, idx) => ({
         ...msg,
         index: help.indexOf(msg)
-      }));
-      // No more reverse() - maintaining chronological order
+      }))
+      .reverse(); // Reverse to show newest messages first
 
     // Find the last bot response
     const lastBotIndex = [...help].reverse().findIndex(item => item.type === 'bot');
@@ -544,17 +575,6 @@ export const HelpPanel = ({
           </div>
         </div>
 
-        {/* Loading indicator inside sticky container */}
-        {isLoading && (
-          <div className="flex items-center mt-3 mb-2">
-            <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-lg text-gray-600 border border-gray-200 shadow-sm">
-              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              <span className="text-gray-500 ml-2 text-xs">Generating...</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Scrollable messages container - now takes most of the space */}
@@ -564,10 +584,6 @@ export const HelpPanel = ({
           height: 'calc(100vh - 240px)' // Adjusted to account for input at top
         }}
       >
-        {/* Invisible element for auto-scrolling to top */}
-        <div ref={messagesEndRef} />
-
-
         {help.length > 0 && (() => {
           const { lastBotResponse, userMessages } = prepareMessagesForDisplay();
 
@@ -655,30 +671,59 @@ export const HelpPanel = ({
               {lastBotResponse && userMessages.length > 0 && (
                 <div className="flex items-center mb-6">
                   <div className="flex-grow border-t border-gray-200"></div>
-                  <div className="mx-4 text-xs text-gray-500">Requests</div>
+                  <div className="mx-4 text-xs text-gray-500">Requests (Latest First)</div>
                   <div className="flex-grow border-t border-gray-200"></div>
                 </div>
               )}
 
-              {/* User messages in chronological order, oldest first */}
+              {/* User messages in reverse chronological order, newest first */}
               <div className="flex flex-wrap justify-start gap-2 items-start">
                 {userMessages
-                  // Displaying messages in chronological order
-                  .map((message, index) => (
-                    <div key={index} className="mb-2 relative group" style={{ maxWidth: '45%', alignSelf: 'flex-start' }}>
-                      {/* Delete button for each user message */}
-                      <button
-                        className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
-                        onClick={() => handleDeleteMessagePair(message.index)}
-                        title="Delete message"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                  // Displaying messages in reverse chronological order (newest first)
+                  .map((message, index) => {
+                    // Find if this is the most recent user message awaiting a response
+                    // First, we need to find the most recent user message in the entire help array
+                    const lastUserMessageIndex = [...help].reverse().findIndex(item => item.type === 'user');
+                    const lastUserMessage = lastUserMessageIndex !== -1 ? help[help.length - 1 - lastUserMessageIndex] : null;
 
-                      <div className="bg-blue-100 rounded-lg p-3 overflow-hidden">
-                        <div className="text-sm prose prose-sm prose-blue max-w-none">
+                    // This message is pending if:
+                    // 1. We're currently loading
+                    // 2. This message is the last user message in the array
+                    // 3. Either this is the last message overall OR the message after it is not a bot response
+                    const isPending = isLoading &&
+                                      lastUserMessage &&
+                                      message.index === help.indexOf(lastUserMessage) &&
+                                      (message.index === help.length - 1 ||
+                                       help[message.index + 1]?.type !== 'bot');
+
+                    return (
+                      <div key={index} className="mb-2 relative group" style={{ maxWidth: '45%', alignSelf: 'flex-start' }}>
+                        {/* Delete button for each user message */}
+                        <button
+                          className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
+                          onClick={() => handleDeleteMessagePair(message.index)}
+                          title="Delete message"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+
+
+                        <div className={`bg-blue-100 rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''}`}>
+                          {isPending && (
+                            <div className="flex items-center justify-between mb-2 text-xs text-blue-600 font-medium">
+                              <div className="flex items-center">
+                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse mr-1"></div>
+                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse mr-1" style={{ animationDelay: '200ms' }}></div>
+                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse mr-1" style={{ animationDelay: '400ms' }}></div>
+                              </div>
+                              <div className="text-blue-500 text-right">
+                                {processingTime > 0 && `${processingTime}s`}
+                              </div>
+                            </div>
+                          )}
+                          <div className="text-sm prose prose-sm prose-blue max-w-none">
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             components={{
@@ -748,7 +793,8 @@ export const HelpPanel = ({
                         </div>
                       </div>
                     </div>
-                ))}
+                  );
+                })}
               </div>
 
             </>

@@ -158,6 +158,11 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
     if (!message.trim()) return;
 
     setIsLoading(true);
+
+    // Immediately call onSendMessage with just the user message to display it
+    // This will update the UI right away while code is being generated
+    onSendMessage(message, null);
+
     try {
       // Access the latest values from refs
       const latestChatHistory = chatHistoryRef.current;
@@ -178,15 +183,22 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
         currentCode: latestCode
       });
 
-      // Send the user message and bot response to the parent component
+      // Send the bot response to the parent component
+      // We're using a special flag to indicate this is just the bot response
+      // without needing to add the user message again
+      if (response) {
+        response.skipUserMessage = true;
+      }
       onSendMessage(message, response);
     } catch (error) {
       console.error('Error getting bot response:', error);
-      onSendMessage(message, {
+      const errorResponse = {
         text: 'I encountered an error processing your request. Please try again.',
         type: 'text',
-        description: 'I encountered an error processing your request. Please try again.'
-      });
+        description: 'I encountered an error processing your request. Please try again.',
+        skipUserMessage: true
+      };
+      onSendMessage(message, errorResponse);
     } finally {
       setIsLoading(false);
     }
