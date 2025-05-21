@@ -59,12 +59,17 @@ export const HelpPanel = ({
 
   // We'll need to auto-scroll to the bottom when new messages arrive
 
-  // Parse CSV with quotes handling
+  // Parse CSV with proper handling of quoted values and values with spaces
   const parseCSVLine = (line) => {
     if (!line) return [];
     const result = [];
     let cell = '';
     let inQuotes = false;
+
+    // If there are no commas, treat it as a single cell
+    if (!line.includes(',')) {
+      return [line.trim()];
+    }
 
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
@@ -75,7 +80,7 @@ export const HelpPanel = ({
         inQuotes = true;
         continue;
       } else if (char === '"' && nextChar === '"' && inQuotes) {
-        // Escaped quote inside quoted cell
+        // Escaped quote inside quoted cell (RFC 4180)
         cell += '"';
         i++; // Skip next quote
         continue;
@@ -83,12 +88,12 @@ export const HelpPanel = ({
         // End of quoted cell
         inQuotes = false;
         if (nextChar === ',') i++; // Skip next comma
-        result.push(cell);
+        result.push(cell.trim()); // Trim whitespace
         cell = '';
         continue;
       } else if (char === ',' && !inQuotes) {
         // Unquoted cell delimiter
-        result.push(cell);
+        result.push(cell.trim()); // Trim whitespace
         cell = '';
         continue;
       }
@@ -99,24 +104,24 @@ export const HelpPanel = ({
 
     // Add the last cell
     if (cell !== '') {
-      result.push(cell);
+      result.push(cell.trim()); // Trim whitespace
     }
 
     return result;
   };
 
-  // Check if a single line looks tabular
+  // Check if a single line looks like CSV data
   const isLineTabular = (line) => {
     if (!line || typeof line !== 'string') return false;
 
-    // Detect delimiter
-    const tabCount = line.split('\t').length - 1;
+    // Count commas for CSV detection
     const commaCount = line.split(',').length - 1;
-
-    // Simple heuristic - if line has tabs or multiple commas and not too much other text
-    return (tabCount > 0 || commaCount > 1) &&
-           // Check the ratio of delimiters to total length
-           ((tabCount + commaCount) / line.length > 0.03);
+    
+    // Check for quoted values that may contain spaces
+    const hasQuotedValues = /"[^"]*"/.test(line);
+    
+    // Basic heuristic: if line has multiple commas, it's likely CSV
+    return commaCount > 1 || (commaCount > 0 && hasQuotedValues);
   };
 
   // Identify tabular sections within mixed content
@@ -202,11 +207,11 @@ export const HelpPanel = ({
     });
   };
 
-  // Check if text is tabular (CSV or TSV)
+  // Check if text is CSV data, with support for values that contain spaces
   const isTabularData = (text) => {
     if (!text || typeof text !== 'string') return false;
 
-    // Simple check for consistent delimiters (comma or tab) across multiple lines
+    // Simple check for CSV across multiple lines
     const lines = text.trim().split('\n');
     if (lines.length < 2) return false; // Need at least 2 lines for a table
 
@@ -214,33 +219,35 @@ export const HelpPanel = ({
     const nonEmptyLines = lines.filter(line => line.trim().length > 0);
     if (nonEmptyLines.length < 2) return false;
 
-    // Detect if it's TSV (simple - no quotes in TSV)
-    if (nonEmptyLines[0].includes('\t')) {
-      const columnCount = nonEmptyLines[0].split('\t').length;
-      const isConsistentTSV = nonEmptyLines.every(line => line.split('\t').length === columnCount);
-      if (isConsistentTSV && columnCount >= 2) return true;
+    // Basic check: does text contain commas?
+    if (!text.includes(',')) return false;
+
+    // Parse each line using our CSV parser that handles quoted values with spaces
+    try {
+      const parsedLines = nonEmptyLines.map(line => parseCSVLine(line));
+      
+      // Get the most common column count to handle slight inconsistencies
+      const columnCounts = parsedLines.map(cols => cols.length);
+      const mostCommonColumnCount = columnCounts.sort((a, b) => 
+        columnCounts.filter(v => v === a).length - columnCounts.filter(v => v === b).length
+      ).pop();
+      
+      // Check if most lines have a similar column count (allow ±1 for CSV tables which might have aligned sections)
+      const consistentColumns = parsedLines.filter(
+        cols => Math.abs(cols.length - mostCommonColumnCount) <= 1
+      ).length / parsedLines.length >= 0.7; // At least 70% of lines should have consistent columns
+      
+      return consistentColumns && mostCommonColumnCount >= 2;
+    } catch (e) {
+      console.error("Error parsing CSV data:", e);
     }
 
-    // For CSV, parse with quote handling
-    if (nonEmptyLines[0].includes(',')) {
-      try {
-        const firstRowColumns = parseCSVLine(nonEmptyLines[0]).length;
-        const isConsistentCSV = nonEmptyLines.every(line =>
-          parseCSVLine(line).length === firstRowColumns
-        );
-        return isConsistentCSV && firstRowColumns >= 2;
-      } catch (e) {
-        // If CSV parsing fails, fall back to simple check
-        const columnCount = nonEmptyLines[0].split(',').length;
-        const isSimpleCSV = nonEmptyLines.every(line => line.split(',').length === columnCount);
-        return isSimpleCSV && columnCount >= 2;
-      }
-    }
-
-    return false;
+    // Finally, check using the isLineTabular to detect if most lines look like CSV
+    const tabularLineCount = nonEmptyLines.filter(isLineTabular).length;
+    return tabularLineCount >= nonEmptyLines.length * 0.7; // 70% or more lines look tabular
   };
 
-  // Convert CSV/TSV to markdown table
+  // Convert CSV data to markdown table, with support for values that contain spaces
   const formatAsMarkdownTable = (text) => {
     const lines = text.trim().split('\n');
 
@@ -248,29 +255,31 @@ export const HelpPanel = ({
     const nonEmptyLines = lines.filter(line => line.trim().length > 0);
     if (nonEmptyLines.length < 2) return text; // Return original if not enough data
 
-    // Determine if it's TSV or CSV
-    const isTabDelimited = nonEmptyLines[0].includes('\t');
-
-    // Parse the rows and columns
+    // Parse the rows and columns using our CSV parser
     const rows = nonEmptyLines.map(line => {
       let cells;
-
-      if (isTabDelimited) {
-        // For TSV, simple split
-        cells = line.split('\t');
-      } else {
-        // For CSV, use our parser that handles quotes
-        try {
-          cells = parseCSVLine(line);
-        } catch (e) {
-          // Fallback to simple comma split if parser fails
-          cells = line.split(',');
-        }
+      try {
+        cells = parseCSVLine(line);
+      } catch (e) {
+        // Fallback to simple comma split if parser fails
+        cells = line.split(',').map(cell => cell.trim());
       }
 
       // Escape pipe characters in cell content to avoid breaking markdown table
-      // and trim whitespace
-      return cells.map(cell => cell.trim().replace(/\|/g, '\\|'));
+      return cells.map(cell => {
+        // Clean up cell content
+        let cleanCell = cell.trim().replace(/\|/g, '\\|');
+        
+        // Handle parentheses for negative values in financial data
+        if (cleanCell.includes('(') && cleanCell.includes(')')) {
+          // Convert (123) format to -123 for better readability if it looks like a number
+          if (/^\(\s*\d[\d\s,.]*\)$/.test(cleanCell)) {
+            cleanCell = '-' + cleanCell.replace(/[()]/g, '').trim();
+          }
+        }
+        
+        return cleanCell;
+      });
     });
 
     // Create the markdown table
@@ -279,8 +288,11 @@ export const HelpPanel = ({
     // Get max column count (in case rows have different column counts)
     const maxColumnCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
 
-    // Header row - ensure we have enough columns and pad if needed
+    // First row is always the header in CSV
     const headerRow = [...rows[0]];
+    const dataStartIndex = 1;
+
+    // Ensure header has enough columns
     while (headerRow.length < maxColumnCount) {
       headerRow.push('Column ' + (headerRow.length + 1)); // Add default header names
     }
@@ -290,7 +302,7 @@ export const HelpPanel = ({
     markdownTable += '| ' + headerRow.map(() => '---').join(' | ') + ' |\n';
 
     // Data rows
-    for (let i = 1; i < rows.length; i++) {
+    for (let i = dataStartIndex; i < rows.length; i++) {
       // Ensure consistent column count by padding if necessary
       const paddedRow = [...rows[i]];
       while (paddedRow.length < maxColumnCount) {
