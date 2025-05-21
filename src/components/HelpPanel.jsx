@@ -46,7 +46,7 @@ export const HelpPanel = ({
   const { user } = useGraffiticodeAuth();
 
   // ChatBot integration
-  const { handleSendMessage, isLoading } = ChatBot({
+  const { handleSendMessage, cancelGeneration, isLoading } = ChatBot({
     onSendMessage: (userMessage, botResponse) => {
       // When we receive a message from the chatbot
       handleMessage(userMessage, botResponse);
@@ -428,6 +428,24 @@ export const HelpPanel = ({
 
   // Function to handle deleting a message
   const handleDeleteMessagePair = (index) => {
+    // Check if this is a pending message
+    const isPendingMessage = isLoading &&
+                            help[index].type === 'user' &&
+                            (index === help.length - 1 || help[index + 1]?.type !== 'bot');
+
+    // If this is a pending message, cancel code generation first
+    if (isPendingMessage) {
+      console.log('Cancelling code generation for pending message');
+      cancelGeneration();
+
+      // Clear the timer if it's running
+      if (processingTimeRef.current) {
+        clearInterval(processingTimeRef.current);
+        processingTimeRef.current = null;
+      }
+    }
+
+    // Update help array to remove the message(s)
     setHelp(prev => {
       const newHelp = [...prev];
       // If it's a user message and has a bot response after it, delete both
@@ -443,6 +461,18 @@ export const HelpPanel = ({
 
   // Function to clear all messages
   const handleClearAll = () => {
+    // If there's an ongoing code generation, cancel it
+    if (isLoading) {
+      console.log('Cancelling code generation due to clear all');
+      cancelGeneration();
+
+      // Clear the timer if it's running
+      if (processingTimeRef.current) {
+        clearInterval(processingTimeRef.current);
+        processingTimeRef.current = null;
+      }
+    }
+
     setHelp([]);
   };
 
@@ -681,28 +711,19 @@ export const HelpPanel = ({
                 {userMessages
                   // Displaying messages in reverse chronological order (newest first)
                   .map((message, index) => {
-                    // Find if this is the most recent user message awaiting a response
-                    // First, we need to find the most recent user message in the entire help array
-                    const lastUserMessageIndex = [...help].reverse().findIndex(item => item.type === 'user');
-                    const lastUserMessage = lastUserMessageIndex !== -1 ? help[help.length - 1 - lastUserMessageIndex] : null;
-
-                    // This message is pending if:
-                    // 1. We're currently loading
-                    // 2. This message is the last user message in the array
-                    // 3. Either this is the last message overall OR the message after it is not a bot response
+                    // Check if this message is pending (waiting for a response)
+                    // We use the same logic as in handleDeleteMessagePair for consistency
                     const isPending = isLoading &&
-                                      lastUserMessage &&
-                                      message.index === help.indexOf(lastUserMessage) &&
-                                      (message.index === help.length - 1 ||
-                                       help[message.index + 1]?.type !== 'bot');
+                                     (message.index === help.length - 1 ||
+                                      help[message.index + 1]?.type !== 'bot');
 
                     return (
                       <div key={index} className="mb-2 relative group" style={{ maxWidth: '45%', alignSelf: 'flex-start' }}>
-                        {/* Delete button for each user message */}
+                        {/* Delete button for each user message - highlighted for pending messages but only visible on hover */}
                         <button
-                          className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10"
+                          className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10 ${isPending ? 'text-red-400 hover:text-red-600 bg-white rounded-full shadow-sm' : 'text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm'}`}
                           onClick={() => handleDeleteMessagePair(message.index)}
-                          title="Delete message"
+                          title={isPending ? "Cancel and delete request" : "Delete message"}
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

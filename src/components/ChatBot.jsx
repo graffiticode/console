@@ -139,6 +139,9 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
 
   const [isLoading, setIsLoading] = useState(false);
 
+  // Reference to control cancellation
+  const cancelGenerationRef = useRef(false);
+
   // Use refs to always have access to the latest props
   const chatHistoryRef = useRef(chatHistory);
   const currentCodeRef = useRef(currentCode);
@@ -154,9 +157,19 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
     console.log("CurrentCode ref updated, length:", currentCode?.length || 0);
   }, [currentCode]);
 
+  // Function to cancel the current code generation
+  const cancelGeneration = useCallback(() => {
+    console.log("Cancelling code generation");
+    cancelGenerationRef.current = true;
+    // Immediately set isLoading to false to unblock the UI
+    setIsLoading(false);
+  }, []);
+
   const handleSendMessage = useCallback(async (message) => {
     if (!message.trim()) return;
 
+    // Reset cancellation flag
+    cancelGenerationRef.current = false;
     setIsLoading(true);
 
     // Immediately call onSendMessage with just the user message to display it
@@ -174,6 +187,12 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
         "history length:", latestChatHistory?.length || 0
       );
 
+      // Check if generation has been cancelled before making the API call
+      if (cancelGenerationRef.current) {
+        console.log("Code generation was cancelled before API call");
+        return;
+      }
+
       // Get response from the bot with the latest values
       const response = await generateBotResponse({
         message,
@@ -183,6 +202,12 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
         currentCode: latestCode
       });
 
+      // Check if generation was cancelled while the API call was in progress
+      if (cancelGenerationRef.current) {
+        console.log("Code generation was cancelled during API call");
+        return;
+      }
+
       // Send the bot response to the parent component
       // We're using a special flag to indicate this is just the bot response
       // without needing to add the user message again
@@ -191,14 +216,17 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
       }
       onSendMessage(message, response);
     } catch (error) {
-      console.error('Error getting bot response:', error);
-      const errorResponse = {
-        text: 'I encountered an error processing your request. Please try again.',
-        type: 'text',
-        description: 'I encountered an error processing your request. Please try again.',
-        skipUserMessage: true
-      };
-      onSendMessage(message, errorResponse);
+      // Only send error if not cancelled
+      if (!cancelGenerationRef.current) {
+        console.error('Error getting bot response:', error);
+        const errorResponse = {
+          text: 'I encountered an error processing your request. Please try again.',
+          type: 'text',
+          description: 'I encountered an error processing your request. Please try again.',
+          skipUserMessage: true
+        };
+        onSendMessage(message, errorResponse);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -206,6 +234,7 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
 
   return {
     handleSendMessage,
+    cancelGeneration,
     isLoading,
   };
 };
