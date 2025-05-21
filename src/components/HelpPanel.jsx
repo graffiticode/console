@@ -114,13 +114,24 @@ export const HelpPanel = ({
   const isLineTabular = (line) => {
     if (!line || typeof line !== 'string') return false;
 
+    // Trim the line to remove whitespace that might affect detection
+    const trimmedLine = line.trim();
+    if (trimmedLine === '') return false;
+
     // Count commas for CSV detection
-    const commaCount = line.split(',').length - 1;
+    const commaCount = trimmedLine.split(',').length - 1;
 
     // Check for quoted values that may contain spaces
-    const hasQuotedValues = /"[^"]*"/.test(line);
+    const hasQuotedValues = /"[^"]*"/.test(trimmedLine);
+
+    // Check if line starts with characters that suggest it's a heading, not data
+    const isPotentialHeading = /^(#|\*|-|\d+\.|>)/.test(trimmedLine);
+
+    // If it looks like a markdown heading or list item and only has 0-1 commas, don't treat as CSV
+    if (isPotentialHeading && commaCount <= 1) return false;
 
     // Basic heuristic: if line has multiple commas, it's likely CSV
+    // Note: We require at least 2 commas (3 fields) for better accuracy unless there are quoted values
     return commaCount > 1 || (commaCount > 0 && hasQuotedValues);
   };
 
@@ -132,11 +143,27 @@ export const HelpPanel = ({
     const sections = [];
     let currentSection = null;
 
+    // Store consecutive non-table line count to better handle transitions
+    let consecutiveNonTableLines = 0;
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const isTableLine = isLineTabular(line);
 
+      // Empty lines don't break table sections, just skip them for analysis
+      if (line.trim() === '') {
+        if (currentSection) {
+          // Add empty lines to current section
+          currentSection.lines.push(line);
+          currentSection.endLine = i;
+        }
+        continue;
+      }
+
       if (isTableLine) {
+        // Reset the counter when we find a table line
+        consecutiveNonTableLines = 0;
+
         if (!currentSection) {
           // Start a new table section
           currentSection = {
@@ -160,7 +187,9 @@ export const HelpPanel = ({
           };
         }
       } else {
-        // Handle non-table line
+        // It's a non-table line
+        consecutiveNonTableLines++;
+
         if (!currentSection) {
           // Start a new text section
           currentSection = {
@@ -174,9 +203,12 @@ export const HelpPanel = ({
           currentSection.lines.push(line);
           currentSection.endLine = i;
         } else {
-          // Only end a table section if we have 2+ consecutive non-table lines
-          // or this is a completely blank line after a table
-          if ((i > 0 && !isLineTabular(lines[i-1])) || line.trim() === '') {
+          // Currently in a table section
+
+          // End table section if:
+          // 1. We have consecutive non-table lines, or
+          // 2. This line is completely empty and follows a table
+          if (consecutiveNonTableLines >= 2) {
             sections.push(currentSection);
             currentSection = {
               type: 'text',
@@ -185,7 +217,7 @@ export const HelpPanel = ({
               lines: [line]
             };
           } else {
-            // Otherwise consider it part of the table (could be a header or description)
+            // Otherwise treat it as header/description text that's part of the table
             currentSection.lines.push(line);
             currentSection.endLine = i;
           }
@@ -198,13 +230,18 @@ export const HelpPanel = ({
       sections.push(currentSection);
     }
 
-    // Post-process: merge very small table sections into text
-    return sections.map(section => {
+    // Post-process: merge very small table sections into text and ensure sections are properly separated
+    const processedSections = sections.map(section => {
+      // Table sections need at least 2 lines to be valid
       if (section.type === 'table' && section.lines.length < 2) {
         return { ...section, type: 'text' };
       }
       return section;
     });
+
+    console.log("Identified sections:", processedSections.map(s => s.type));
+
+    return processedSections;
   };
 
   // Check if text is CSV data, with support for values that contain spaces
@@ -222,6 +259,18 @@ export const HelpPanel = ({
     // Basic check: does text contain commas?
     if (!text.includes(',')) return false;
 
+    // Check if this might be just descriptive text with some commas
+    // Count lines that are likely CSV rows (have similar comma counts)
+    let tabularLineCount = 0;
+    const totalCommaCount = nonEmptyLines.reduce((sum, line) => sum + (line.match(/,/g) || []).length, 0);
+    const avgCommasPerLine = totalCommaCount / nonEmptyLines.length;
+
+    // If average is less than 1 comma per line, it's likely not CSV
+    if (avgCommasPerLine < 1) {
+      console.log("Not likely CSV - too few commas per line on average");
+      return false;
+    }
+
     // Parse each line using our CSV parser that handles quoted values with spaces
     try {
       const parsedLines = nonEmptyLines.map(line => parseCSVLine(line));
@@ -233,18 +282,29 @@ export const HelpPanel = ({
       ).pop();
 
       // Check if most lines have a similar column count (allow ±1 for CSV tables which might have aligned sections)
-      const consistentColumns = parsedLines.filter(
+      const consistentLines = parsedLines.filter(
         cols => Math.abs(cols.length - mostCommonColumnCount) <= 1
-      ).length / parsedLines.length >= 0.7; // At least 70% of lines should have consistent columns
+      );
 
-      return consistentColumns && mostCommonColumnCount >= 2;
+      const consistentRatio = consistentLines.length / parsedLines.length;
+      console.log(`CSV consistency check: ${consistentLines.length}/${parsedLines.length} lines (${(consistentRatio * 100).toFixed(1)}%) have consistent column counts, most common count: ${mostCommonColumnCount}`);
+
+      // At least 60% of lines should have consistent columns and there should be at least 2 columns
+      if (consistentRatio >= 0.6 && mostCommonColumnCount >= 2) {
+        console.log("Detected as CSV via column consistency");
+        return true;
+      }
     } catch (e) {
       console.error("Error parsing CSV data:", e);
     }
 
     // Finally, check using the isLineTabular to detect if most lines look like CSV
-    const tabularLineCount = nonEmptyLines.filter(isLineTabular).length;
-    return tabularLineCount >= nonEmptyLines.length * 0.7; // 70% or more lines look tabular
+    tabularLineCount = nonEmptyLines.filter(isLineTabular).length;
+    const tabularRatio = tabularLineCount / nonEmptyLines.length;
+    console.log(`CSV line-by-line check: ${tabularLineCount}/${nonEmptyLines.length} lines (${(tabularRatio * 100).toFixed(1)}%) are tabular`);
+
+    // Reduced threshold to 60% to be more lenient with mixed content
+    return tabularRatio >= 0.6;
   };
 
   // Convert CSV data to markdown table, with support for values that contain spaces
@@ -318,28 +378,97 @@ export const HelpPanel = ({
   const processMixedContent = (text) => {
     if (!text || typeof text !== 'string') return text;
 
-    // If it's a simple all-table content, process as before
+    // Debug logging
+    console.log("Processing mixed content input:", text.substring(0, 50) + (text.length > 50 ? "..." : ""));
+
+    // Look for mixed content with text followed by a table
+    // This will check after each newline to see if the remaining content looks like a CSV table
+    const lines = text.split('\n');
+
+    // We'll try different positions as potential boundaries between text and table
+    for (let i = 0; i < lines.length - 2; i++) {
+      // Need at least 2 lines for a table, so don't check near the end
+      if (i >= lines.length - 2) break;
+
+      // Get the text before and after this position
+      const textPart = lines.slice(0, i + 1).join('\n');
+      const tablePart = lines.slice(i + 1).join('\n');
+
+      // Skip if either part is too short
+      if (!textPart.trim() || !tablePart.trim()) continue;
+
+      // Check if the table part contains CSV-like data
+      const tableLines = tablePart.split('\n').filter(line => line.trim() !== '');
+
+      // Check if we have enough CSV-like lines and they contain commas
+      const commaLines = tableLines.filter(line => line.includes(','));
+      const hasEnoughLines = tableLines.length >= 2;
+      const hasEnoughCommas = commaLines.length >= Math.ceil(tableLines.length * 0.4); // At least 40% of lines should have commas
+
+      console.log(`Table check at line ${i+1}: ${hasEnoughLines ? 'has enough lines' : 'not enough lines'}, ${hasEnoughCommas ? 'has enough commas' : 'not enough commas'}, comma lines: ${commaLines.length}/${tableLines.length}`);
+
+      // Also check if the last line of text ends with a colon - this is a stronger indicator
+      const endsWithColon = textPart.trim().endsWith(':');
+
+      // The best boundary would be text ending with a colon, but we'll accept other boundaries too
+      if (hasEnoughLines && hasEnoughCommas && (endsWithColon || commaLines.length >= 3)) {
+        console.log(`Detected text followed by table data at line ${i+1}${endsWithColon ? ' (ends with colon)' : ''}`);
+
+        // Format just the table part as a table
+        const formattedTable = formatAsMarkdownTable(tablePart);
+
+        // Return the text part with the formatted table
+        return textPart + "\n\n" + formattedTable;
+      }
+    }
+
+    // If the colon pattern didn't match or wasn't valid CSV, proceed with normal detection
+
+    // First check: If it's a simple all-table content, process it directly
     if (isTabularData(text)) {
+      console.log("Detected as complete tabular data");
       return formatAsMarkdownTable(text);
     }
 
     // For mixed content, identify the sections
     const sections = identifyTabularSections(text);
-    if (sections.length <= 1) return text; // Not mixed content
+    console.log("Found sections:", sections.length);
+
+    // If no mixed content is detected, return the original text
+    if (sections.length <= 1) {
+      console.log("Not detected as mixed content");
+      return text;
+    }
+
+    // Check if any section is identified as a table
+    const hasTableSection = sections.some(section => section.type === 'table' && section.lines.length >= 2);
+    if (!hasTableSection) {
+      console.log("No valid table sections found");
+      return text;
+    }
 
     // Process each section
-    return sections.map(section => {
+    const processedText = sections.map(section => {
       if (section.type === 'table' && section.lines.length >= 2) {
         const tableText = section.lines.join('\n');
+        console.log("Processing table section:", tableText.substring(0, 50) + (tableText.length > 50 ? "..." : ""));
+
+        // Extra validation to ensure this section is actually tabular
         if (isTabularData(tableText)) {
+          console.log("Converting to markdown table");
           return formatAsMarkdownTable(tableText);
         } else {
+          console.log("Section failed tabular validation, keeping as text");
           return tableText;
         }
       } else {
+        // For text sections, just join the lines back
         return section.lines.join('\n');
       }
     }).join('\n\n');
+
+    console.log("Processed mixed content result:", processedText.substring(0, 50) + (processedText.length > 50 ? "..." : ""));
+    return processedText;
   };
 
   // Handle sending a new message
