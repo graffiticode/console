@@ -81,6 +81,79 @@ cells {
 ---
 
 ### Prompt
+"change the cell value of A1 to 100
+
+make the value of A2 200 and add A1 and A2 using the formula =sum(A1:A2) for the value of A3
+
+remove all but the cells A1, A2 and A3
+
+add the validation for a3 that the value is 300
+
+make the unvalidated cells protected"
+
+### Chat Transcript
+
+**User**: change the cell value of A1 to 100
+
+**Assistant**: This generated code creates a simple spreadsheet-like structure with four columns (A, B, C, and D) and four rows (1, 2, 3, and 4). Each cell in the spreadsheet has a specific width (100) and contains some text, such as numbers or labels. The generated code defines the properties of the columns and the content of the cells, allowing for the creation of a basic spreadsheet-style layout.
+
+**User**: make the value of A2 200 and add A1 and A2 using the formula =sum(A1:A2) for the value of A3
+
+**Assistant**: This generated code creates a simple spreadsheet-like structure with four columns (A, B, C, and D) and four rows (1, 2, 3, and 4). Each cell in the spreadsheet has a specific text value, and one cell (A3) has a formula that calculates the sum of the values in cells A1 and A2. The code defines the width of each column and the content of each cell, allowing for the creation of a basic spreadsheet-like layout.
+
+**User**: remove all but the cells A1, A2 and A3
+
+**Assistant**: This generated code creates a simple spreadsheet-like structure with three columns and three rows. The first two rows contain the values "100" and "200" in the first column. The third row contains a formula that calculates the sum of the values in the first two rows and displays the result.
+
+**User**: add the validation for a3 that the value is 300
+
+**Assistant**: ```ocaml
+This generated code creates a simple spreadsheet-like structure with three columns and three rows. The first two rows contain the values "100" and "200" respectively, and the third row calculates the sum of those two values and checks if the result is "300". The generated code sets the width of the first column to 100 and defines the text and assessment criteria for each cell in the spreadsheet.
+```
+
+**User**: make the unvalidated cells protected
+
+**Assistant**: ```ocaml
+The generated code creates a spreadsheet-like structure with three cells in a single column. The first two cells contain the values "100" and "200", which are marked as protected. The third cell contains a formula that calculates the sum of the values in the first two cells, and it is set up to be assessed to ensure the result is "300".
+```
+
+### Code
+
+```
+columns {
+  A: { width: 100 }
+}
+cells {
+  A1: {
+    text: "100"
+    attrs: {
+      protected: true
+    }
+  }
+  A2: {
+    text: "200"
+    attrs: {
+      protected: true
+    }
+  }
+  A3: {
+    text: "=sum(A1:A2)"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "300"
+      }
+    }
+  }
+}
+{
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
 "Create an assessment using the following table:
 
 | CATEGORY | AMOUNT | DETAILS |
