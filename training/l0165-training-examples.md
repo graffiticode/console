@@ -100,7 +100,15 @@ use unformatted value in the text field
 
 format column B as Currency
 
-score by formula rather than value"
+score by formula rather than value
+
+make columns A and C protected
+
+make cell b1 protected
+
+make cells b2, b4 and b7 protected
+
+make row 1 bold"
 
 ### Chat Transcript
 
@@ -145,6 +153,30 @@ This generated Graffiticode creates a monthly budget assessment tool. It calcula
 This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
 ```
 
+**User**: make columns A and C protected
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and a miscellaneous category for the remaining income after all other expenses are accounted for.
+```
+
+**User**: make cell b1 protected
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories based on a $5,000 monthly income. The code sets up the spreadsheet structure, including formulas to automatically calculate the budget items as percentages of the total income or as fixed expenses.
+```
+
+**User**: make cells b2, b4 and b7 protected
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses for utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
+```
+
+**User**: make row 1 bold
+
+**Assistant**: ```ocaml
+The generated code creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses for utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
+```
+
 ### Code
 
 ```
@@ -157,20 +189,47 @@ Calculate the missing dollar amounts in the budget based on the $5000 monthly in
 Enter the correct formulas in the AMOUNT column.
 `
 columns {
-  A: { width: 120 }
+  A: {
+    width: 120
+    protected: true
+  }
   B: {
     width: 100
     format: "Currency"
   }
-  C: { width: 200 }
+  C: {
+    width: 200
+    protected: true
+  }
 }
 cells {
-  A1: { text: "CATEGORY" }
-  B1: { text: "AMOUNT" }
-  C1: { text: "DETAILS" }
+  A1: {
+    text: "CATEGORY"
+    attrs: {
+      fontWeight: "bold"
+    }
+  }
+  B1: {
+    text: "AMOUNT"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  C1: {
+    text: "DETAILS"
+    attrs: {
+      fontWeight: "bold"
+    }
+  }
 
   A2: { text: "Income" }
-  B2: { text: "5000" }
+  B2: {
+    text: "5000"
+    attrs: {
+      protected: true
+    }
+  }
   C2: { text: "Total monthly income" }
 
   A3: { text: "Rent" }
@@ -186,7 +245,12 @@ cells {
   C3: { text: "35% of your total income" }
 
   A4: { text: "Utilities" }
-  B4: { text: "200" }
+  B4: {
+    text: "200"
+    attrs: {
+      protected: true
+    }
+  }
   C4: { text: "Fixed expense" }
 
   A5: { text: "Food" }
@@ -214,7 +278,12 @@ cells {
   C6: { text: "10% of your total income" }
 
   A7: { text: "Entertainment" }
-  B7: { text: "150" }
+  B7: {
+    text: "150"
+    attrs: {
+      protected: true
+    }
+  }
   C7: { text: "Fixed expense" }
 
   A8: { text: "Savings" }
@@ -242,7 +311,60 @@ cells {
   C9: { text: "Remaining income after all other expenses" }
 }
 {
-  v: "0.0.5"
+  v: "0.0.6"
+}..
+```
+
+---
+
+### Prompt
+"Create a 2 by 2 spreadsheet with the cell contents being the cell names
+
+make column A protected
+
+make b1 protected"
+
+### Chat Transcript
+
+**User**: Create a 2 by 2 spreadsheet with the cell contents being the cell names
+
+**Assistant**: This generated code creates a simple spreadsheet-like structure with two columns, each 100 units wide, and four cells with text content. The code defines an object called "columns" that specifies the width of each column, and another object called "cells" that defines the text content for each cell. Finally, the code combines these two objects into a single output.
+
+**User**: make column A protected
+
+**Assistant**: ```ocaml
+The generated code creates a simple spreadsheet-like layout with two columns, A and B, each 100 pixels wide. The first column, A, has its width protected, meaning it cannot be resized. The code then defines four cells within this layout, labeled A1, A2, B1, and B2, each with a text value.
+```
+
+**User**: make b1 protected
+
+**Assistant**: ```ocaml
+The generated code creates a simple spreadsheet-like structure with two columns, A and B, each 100 pixels wide. Within this structure, it defines four cells: A1 with the text "A1", A2 with the text "A2", B1 with the text "B1" and marked as protected, and B2 with the text "B2". The code also includes a version number of "0.0.2".
+```
+
+### Code
+
+```
+columns {
+  A: {
+    width: 100
+    protected: true
+  }
+  B: { width: 100 }
+}
+cells {
+  A1: { text: "A1" }
+  A2: { text: "A2" }
+  B1: {
+    text: "B1"
+    attrs: {
+      protected: true
+    }
+  }
+  B2: { text: "B2" }
+}
+{
+  v: "0.0.2"
 }..
 ```
 
@@ -360,35 +482,6 @@ cells {
 }
 {
   v: "0.0.1"
-}..
-```
-
----
-
-### Prompt
-"Create a 2 by 2 spreadsheet with the cell contents being the cell names"
-
-### Chat Transcript
-
-**User**: Create a 2 by 2 spreadsheet with the cell contents being the cell names
-
-**Assistant**: This generated code creates a simple spreadsheet-like structure with two columns, each 100 units wide, and four cells with text content. The code defines an object called "columns" that specifies the width of each column, and another object called "cells" that defines the text content for each cell. Finally, the code combines these two objects into a single output.
-
-### Code
-
-```
-columns {
-  A: { width: 100 }
-  B: { width: 100 }
-}
-cells {
-  A1: { text: "A1" }
-  A2: { text: "A2" }
-  B1: { text: "B1" }
-  B2: { text: "B2" }
-}
-{
-  v: "0.0.2"
 }..
 ```
 
