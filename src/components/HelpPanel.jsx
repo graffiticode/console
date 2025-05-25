@@ -680,14 +680,13 @@ export const HelpPanel = ({
 
   // Function to prepare messages for display
   const prepareMessagesForDisplay = () => {
-    // Find all user messages in reverse chronological order (newest to oldest)
+    // Find all user messages in chronological order (oldest to newest)
     const userMessages = help
       .filter(item => item.type === 'user')
       .map((msg, idx) => ({
         ...msg,
         index: help.indexOf(msg)
-      }))
-      .reverse(); // Reverse to show newest messages first
+      })); // Show messages in chronological order
 
     // Find the last bot response
     const lastBotIndex = [...help].reverse().findIndex(item => item.type === 'bot');
@@ -830,15 +829,15 @@ export const HelpPanel = ({
               {lastBotResponse && userMessages.length > 0 && (
                 <div className="flex items-center mb-6">
                   <div className="flex-grow border-t border-gray-200"></div>
-                  <div className="mx-4 text-xs text-gray-500">Requests (Latest First)</div>
+                  <div className="mx-4 text-xs text-gray-500">Requests</div>
                   <div className="flex-grow border-t border-gray-200"></div>
                 </div>
               )}
 
-              {/* User messages in reverse chronological order, newest first */}
+              {/* User messages in chronological order, oldest first */}
               <div className="flex flex-wrap justify-start gap-2 items-start">
                 {userMessages
-                  // Displaying messages in reverse chronological order (newest first)
+                  // Displaying messages in chronological order (oldest first)
                   .map((message, index) => {
                     // Check if this message is pending (waiting for a response)
                     // We use the same logic as in handleDeleteMessagePair for consistency
