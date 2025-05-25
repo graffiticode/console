@@ -3,6 +3,84 @@
 ## Language L0165
 
 ### Prompt
+"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs.
+
+protect the cells in column B
+
+bold column b"
+
+### Chat Transcript
+
+**User**: create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs.
+
+**Assistant**: This generated Graffiticode creates a table with two columns, A and B. Column A is set to a width of 100 and the text is aligned to the right, while Column B is also set to a width of 100 but the text is aligned to the left. The code then generates two rows of data, with the first row containing the values "100" in Column A and "cows" in Column B. The second row contains the values "200" in Column A and "pigs" in Column B, and the code also includes assessment criteria to verify that the values in the second row match the expected values.
+
+**User**: protect the cells in column B
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a spreadsheet-like structure with two columns, A and B. Column A has cells with the numbers "100" and "200", and these cells are set up to be automatically assessed to ensure their values match the expected values. Column B has cells with the text "cows" and "pigs", and these cells are marked as protected, meaning they cannot be edited. The code also includes a version number of "0.0.1" at the end.
+```
+
+**User**: bold column b
+
+**Assistant**: ```ocaml
+The generated code creates a spreadsheet-like table with two columns, A and B. Column A has cells with the numbers "100" and "200", which are set up to be automatically assessed for their values. Column B has cells with the words "cows" and "pigs", which are formatted to be in bold text. The code also includes some configuration settings, such as the width of the columns and the justification of the text.
+```
+
+### Code
+
+```
+columns {
+  A: {
+    width: 100
+    justify: "right"
+  }
+  B: {
+    width: 100
+    justify: "left"
+    protected: true
+  }
+}
+cells {
+  A1: {
+    text: "100"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "100"
+      }
+    }
+  }
+  B1: {
+    text: "cows"
+    attrs: {
+      fontWeight: "bold"
+    }
+  }
+  A2: {
+    text: "200"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "200"
+      }
+    }
+  }
+  B2: {
+    text: "pigs"
+    attrs: {
+      fontWeight: "bold"
+    }
+  }
+}
+{
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
 "Create an assessment using the following table:
 
 | CATEGORY | AMOUNT | DETAILS |
@@ -171,58 +249,6 @@ cells {
 ---
 
 ### Prompt
-"create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs."
-
-### Chat Transcript
-
-**User**: create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs.
-
-**Assistant**: This generated Graffiticode creates a table with two columns, A and B. Column A is set to a width of 100 and the text is aligned to the right, while Column B is also set to a width of 100 but the text is aligned to the left. The code then generates two rows of data, with the first row containing the values "100" in Column A and "cows" in Column B. The second row contains the values "200" in Column A and "pigs" in Column B, and the code also includes assessment criteria to verify that the values in the second row match the expected values.
-
-### Code
-
-```
-columns {
-  A: {
-    width: 100
-    justify: "right"
-  }
-  B: {
-    width: 100
-    justify: "left "
-  }
-}
-cells {
-  A1: { text: "100"
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "100"
-      }
-    }
-  }
-  B1: { text: "cows" }
-  A2: {
-    text: "200"
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "200"
-      }
-    }
-  }
-  B2: {
-    text: "pigs"
-  }
-}
-{
-  v: "0.0.1"
-}..
-```
-
----
-
-### Prompt
 "Create a spreadsheet assessment for a simple income statement.
 
 Add to the instructions what the Revenue should be
@@ -369,323 +395,219 @@ cells {
 ---
 
 ### Prompt
-"create a spreadsheet for the 1 to 5 times facts
+"Prepare the General Journal entries to account for the share issue using the following data:
 
-give the headings a gray background
+| Date | Details | Debit | Credit |
+| --- | --- | --- | --- |
+| 2025 |  |  |  |
+| March 31 | Cash at Bank | 600 000 |  |
+|  | Application – Ordinary Share capital |  | 600 000 |
+|  | Cash received on application 400 000 ordinary shares at $1.50 |  |  |
+|  |  |  |  |
+| April 15 | Application – Ordinary Share capital | 600 000 |  |
+|  |  |  |  |
+|  | Share Capital |  | 600 000 |
+|  | To record the allotment of 400 000 ordinary shares at $1.50 |  |  |
+|  |  |  |  |
+| April 23 | Share Issue Costs | (1) 8 000 |  |
+|  | Accounts Payable |  | 8 000 |
+|  | Share issue costs on credit ABN Stockbroking Pty Ltd |  |  |
 
-black out cells for duplicate multiplication facts
+left justify column B
 
-use light gray as the black out color"
+remove (1) from c13
+
+bold row 1
+
+format columns c and d as currency
+
+validate the numeric values in columns   c and d
+
+remove the values from the validated cells"
 
 ### Chat Transcript
 
-**User**: create a spreadsheet for the 1 to 5 times facts
+**User**: Prepare the General Journal entries to account for the share issue using the following data:
+
+| Date | Details | Debit | Credit |
+| --- | --- | --- | --- |
+| 2025 |  |  |  |
+| March 31 | Cash at Bank | 600 000 |  |
+|  | Application – Ordinary Share capital |  | 600 000 |
+|  | Cash received on application 400 000 ordinary shares at $1.50 |  |  |
+|  |  |  |  |
+| April 15 | Application – Ordinary Share capital | 600 000 |  |
+|  |  |  |  |
+|  | Share Capital |  | 600 000 |
+|  | To record the allotment of 400 000 ordinary shares at $1.50 |  |  |
+|  |  |  |  |
+| April 23 | Share Issue Costs | (1) 8 000 |  |
+|  | Accounts Payable |  | 8 000 |
+|  | Share issue costs on credit ABN Stockbroking Pty Ltd |  |  |
 
 **Assistant**: ```ocaml
-This generated Graffiticode creates a multiplication table that covers the numbers 1 through 5. The table has empty cells that the user needs to fill in with the correct products of the row and column headers. The code sets up the structure of the table and specifies the expected values for each cell, allowing the user to practice their multiplication skills.
+The generated code creates a table with a general journal entry assessment. It records the cash received from the issuance of 400,000 ordinary shares at $1.50 per share, the allotment of those shares, and the share issue costs incurred. The purpose of this code is to provide a structured way to account for the share issuance transaction.
 ```
 
-**User**: give the headings a gray background
+**User**: left justify column B
 
 **Assistant**: ```ocaml
-The generated code creates a multiplication table practice exercise. It displays a 5x5 grid with the numbers 1 through 5 in the row and column headers, and the user is asked to fill in the missing values in each cell, which should be the product of the corresponding row and column numbers. This allows the user to practice their multiplication facts from 1 to 5.
+This generated Graffiticode creates a table that represents the general journal entries for a company's share issue. The table includes details such as the date, description, debit, and credit amounts related to the cash received from the share application, the allotment of shares, and the share issue costs. The purpose of this generated code is to provide a clear and organized record of the accounting transactions involved in the share issue process.
 ```
 
-**User**: black out cells for duplicate multiplication facts
+**User**: remove (1) from c13
 
 **Assistant**: ```ocaml
-This generated code creates a multiplication table that displays the products of numbers from 1 to 5. The user is asked to fill in the missing values in the table, and the code will assess whether the user's answers are correct. The table is formatted with a clean, organized layout to make it easy for the user to complete the exercise.
+This generated Graffiticode creates a table that represents the general journal entries for a share issue. The table includes details such as the date, description, debit, and credit amounts related to the cash received from the share application, the allotment of the shares, and the share issue costs. The purpose of this generated code is to provide a structured way to record the accounting transactions associated with the share issue.
 ```
 
-**User**: use light gray as the black out color
+**User**: bold row 1
 
 **Assistant**: ```ocaml
-The generated code creates a multiplication table that covers the numbers 1 through 5. The table has empty cells that the user needs to fill in with the correct products of the row and column numbers. The code sets up the structure of the table, including the column widths and the expected values for each cell.
+This generated Graffiticode creates a table with a general journal entry for a share issue. It includes details such as the date, description, debit and credit amounts related to the cash received from the share application, the allotment of shares, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the accounting entries associated with the share issue.
+```
+
+**User**: format columns c and d as currency
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a table with a general journal entry for a share issue. It includes details such as the date, description, debit and credit amounts related to the cash received from the share application, the recording of the share capital, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the accounting entries associated with the share issue.
+```
+
+**User**: validate the numeric values in columns   c and d
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a table with a general journal entry to record the issuance of 400,000 ordinary shares at $1.50 per share. The code sets up the table structure, column widths, and formatting, and then populates the cells with the relevant financial details, such as the date, description, debit, and credit amounts. The purpose of this generated code is to provide a template for recording the share issue transaction in the general journal.
+```
+
+**User**: remove the values from the validated cells
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a table with a general journal entry for a share issue. The table includes columns for the date, details, debit, and credit, and the rows contain specific entries related to the cash received from the share application, the allotment of the shares, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the financial transactions associated with the share issue.
 ```
 
 ### Code
 
 ```
-title "Multiplication Facts: 1 to 5"
+title "General Journal Entries"
 instructions `
-Fill in the missing values in the multiplication table.
-Each cell should contain the product of its row and column headers.
+Prepare the General Journal entries to account for the share issue using the following data:
 `
 columns {
-  A: { width: 50 }
-  B: { width: 50 }
-  C: { width: 50 }
-  D: { width: 50 }
-  E: { width: 50 }
-  F: { width: 50 }
+  A: {
+    width: 100
+    protected: true
+  }
+  B: {
+    width: 300
+    justify: "left"
+    protected: true
+  }
+  C: {
+    width: 100
+    format: "currency"
+  }
+  D: {
+    width: 100
+    format: "currency"
+  }
 }
 cells {
   A1: {
-    text: ""
+    text: "Date"
     attrs: {
-      background: "#eee"
+      fontWeight: "bold"
     }
   }
   B1: {
-    text: "1"
+    text: "Details"
     attrs: {
-      background: "#eee"
+      fontWeight: "bold"
     }
   }
   C1: {
-    text: "2"
+    text: "Debit"
     attrs: {
-      background: "#eee"
+      fontWeight: "bold"
+      protected: true
     }
   }
   D1: {
-    text: "3"
+    text: "Credit"
     attrs: {
-      background: "#eee"
-    }
-  }
-  E1: {
-    text: "4"
-    attrs: {
-      background: "#eee"
-    }
-  }
-  F1: {
-    text: "5"
-    attrs: {
-      background: "#eee"
+      fontWeight: "bold"
+      protected: true
     }
   }
 
-  A2: {
-    text: "1"
-    attrs: {
-      background: "#eee"
-    }
-  }
-  B2: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "1"
-      }
-    }
-  }
-  C2: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "2"
-      }
-    }
-  }
-  D2: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "3"
-      }
-    }
-  }
-  E2: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "4"
-      }
-    }
-  }
-  F2: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "5"
-      }
-    }
-  }
-
-  A3: {
-    text: "2"
-    attrs: {
-      background: "#eee"
-    }
-  }
-  B3: {
-    text: ""
-    attrs: {
-      background: "#ccc"
-    }
-  }
-  C3: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "4"
-      }
-    }
-  }
-  D3: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "6"
-      }
-    }
-  }
-  E3: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "8"
-      }
-    }
-  }
-  F3: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "10"
-      }
-    }
-  }
-
-  A4: {
-    text: "3"
-    attrs: {
-      background: "#eee"
-    }
-  }
-  B4: {
-    text: ""
-    attrs: {
-      background: "#ccc"
-    }
-  }
+  A3: { text: "2025" }
+  A4: { text: "March 31" }
+  B4: { text: "Cash at Bank" }
   C4: {
     text: ""
     attrs: {
-      background: "#ccc"
-    }
-  }
-  D4: {
-    text: ""
-    attrs: {
       assess: {
         method: "value"
-        expected: "9"
+        expected: "600000"
       }
     }
   }
-  E4: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "12"
-      }
-    }
-  }
-  F4: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "15"
-      }
-    }
-  }
-
-  A5: {
-    text: "4"
-    attrs: {
-      background: "#eee"
-    }
-  }
-  B5: {
-    text: ""
-    attrs: {
-      background: "#ccc"
-    }
-  }
-  C5: {
-    text: ""
-    attrs: {
-      background: "#ccc"
-    }
-  }
+  B5: { text: "Application – Ordinary Share capital" }
   D5: {
     text: ""
     attrs: {
-      background: "#ccc"
-    }
-  }
-  E5: {
-    text: ""
-    attrs: {
       assess: {
         method: "value"
-        expected: "16"
+        expected: "600000"
       }
     }
   }
-  F5: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "value"
-        expected: "20"
-      }
-    }
-  }
+  B6: { text: "Cash received on application 400 000 ordinary shares at $1.50" }
 
-  A6: {
-    text: "5"
-    attrs: {
-      background: "#eee"
-    }
-  }
-  B6: {
-    text: ""
-    attrs: {
-      background: "#ccc"
-    }
-  }
-  C6: {
-    text: ""
-    attrs: {
-      background: "#ccc"
-    }
-  }
-  D6: {
-    text: ""
-    attrs: {
-      background: "#ccc"
-    }
-  }
-  E6: {
-    text: ""
-    attrs: {
-      background: "#ccc"
-    }
-  }
-  F6: {
+  A8: { text: "April 15" }
+  B8: { text: "Application – Ordinary Share capital" }
+  C8: {
     text: ""
     attrs: {
       assess: {
         method: "value"
-        expected: "25"
+        expected: "600000"
       }
     }
   }
+  B10: { text: "Share Capital" }
+  D10: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "600000"
+      }
+    }
+  }
+  B11: { text: "To record the allotment of 400 000 ordinary shares at $1.50" }
+
+  A13: { text: "April 23" }
+  B13: { text: "Share Issue Costs" }
+  C13: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "8000"
+      }
+    }
+  }
+  B14: { text: "Accounts Payable" }
+  D14: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "8000"
+      }
+    }
+  }
+  B15: { text: "Share issue costs on credit ABN Stockbroking Pty Ltd" }
 }
 {
   v: "0.0.1"
