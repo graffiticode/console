@@ -836,7 +836,7 @@ export const HelpPanel = ({
               )}
 
               {/* User messages in reverse chronological order, newest first */}
-              <div className="flex flex-wrap justify-start gap-2 items-start">
+              <div className="space-y-2">
                 {userMessages
                   // Displaying messages in reverse chronological order (newest first)
                   .map((message, index) => {
@@ -847,7 +847,7 @@ export const HelpPanel = ({
                                       help[message.index + 1]?.type !== 'bot');
 
                     return (
-                      <div key={index} className="mb-2 relative group" style={{ maxWidth: '45%', alignSelf: 'flex-start' }}>
+                      <div key={index} className="mb-2 relative group w-full">
                         {/* Delete button for each user message - highlighted for pending messages but only visible on hover */}
                         <button
                           className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10 ${isPending ? 'text-red-400 hover:text-red-600 bg-white rounded-full shadow-sm' : 'text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm'}`}
