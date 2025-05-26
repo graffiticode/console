@@ -486,6 +486,9 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
   }
 
   prompt += `
+## Response Requirements
+- **IMPORTANT**: When current code is provided in the context, treat it as the starting point and make only the necessary incremental changes requested by the user. Preserve existing data, formatting, and structure unless specifically asked to modify them.
+
 ## Core Syntax Rules
 - Use \`let name = value..\` for declarations
 - All functions are prefix notation: \`add 1 2\` (no infix allowed)
