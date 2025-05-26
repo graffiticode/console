@@ -862,14 +862,14 @@ export const HelpPanel = ({
 
                         <div className={`bg-blue-100 rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''}`}>
                           {isPending && (
-                            <div className="flex items-center justify-between mb-2 text-xs text-blue-600 font-medium">
-                              <div className="flex items-center">
-                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse mr-1"></div>
-                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse mr-1" style={{ animationDelay: '200ms' }}></div>
-                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse mr-1" style={{ animationDelay: '400ms' }}></div>
+                            <div className="flex items-center justify-start mb-2 text-xs text-blue-600 font-medium">
+                              <div className="text-blue-500 mr-2 text-sm flex items-center">
+                                {`${processingTime}s`}
                               </div>
-                              <div className="text-blue-500 text-right">
-                                {processingTime > 0 && `${processingTime}s`}
+                              <div className="flex items-center justify-center">
+                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
+                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
+                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1 animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}></div>
                               </div>
                             </div>
                           )}

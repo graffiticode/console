@@ -2,6 +2,10 @@
 
 This dialect is used for generating spreadsheet based assessments.
 
+## Response Requirements
+
+- **IMPORTANT**: Whatever the user request is, the response should always be a complete spreadsheet with all necessary data, formulas, and formatting included.
+
 ## Program structure
 
 ```
