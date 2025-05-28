@@ -122,41 +122,52 @@ function EllipsisMenu({ id, name, mark, isPublic, onChange }) {
               top: `${menuPosition.top}px`,
               left: `${menuPosition.left}px`,
               maxHeight: 'calc(100vh - 40px)',
+              minHeight: '385px',
               overflow: 'auto'
             }}
           >
             <div className="p-4">
-              <div className="text-sm font-medium text-gray-700 mb-3">Task Attributes</div>
+              <div className="text-sm font-semibold text-gray-700 mb-3">Task Attributes</div>
 
               <div className="mb-4">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Name:</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Name</label>
                 <input
                   type="text"
                   className="w-full rounded-none border border-gray-300 p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-500"
-                  defaultValue={name}
-                  onBlur={(e) => onChange({id, name: e.target.value})}
+                  placeholder={name}
+                  onFocus={(e) => e.target.value = ''}
+                  onBlur={(e) => onChange({id, name: e.target.value || name})}
                 />
               </div>
 
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Mark:</label>
-                <div className="flex">
-                  <MarkSelector
-                    mark={marks[mark - 1]}
-                    setMark={mark => onChange({id, mark})}
-                  />
+              <div>
+                <div className="flex relative mb-4 z-50">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Mark</label>
+                    <MarkSelector
+                      mark={marks[mark - 1]}
+                      setMark={mark => onChange({id, mark})}
+                    />
+                  </div>
+                  
+                  <div className="ml-4">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Public</label>
+                    <div 
+                      className="flex items-center" 
+                      title="Public tasks are accessible to anyone with the task ID"
+                    >
+                      <PublicToggle
+                        isPublic={isPublic}
+                        setIsPublic={isPublic => onChange({id, isPublic})}
+                      />
+                      <span className="ml-2 text-xs text-gray-500">(CAUTION)</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Public:</label>
-                <PublicToggle
-                  isPublic={isPublic}
-                  setIsPublic={isPublic => onChange({id, isPublic})}
-                />
-              </div>
-
-              <div className="border-t border-gray-200 pt-2">
+              <div className="border-t border-gray-200 pt-2 mt-4">
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Task ID</label>
                 <div
                   className="text-xs font-mono text-gray-600 hover:text-gray-900 cursor-pointer py-1.5 truncate"
                   onClick={(e) => {
@@ -174,7 +185,7 @@ function EllipsisMenu({ id, name, mark, isPublic, onChange }) {
                       element.textContent = id;
                     }, 1000);
                   }}
-                  title="Click to copy task ID"
+                  title="Click to copy"
                 >
                   {id}
                 </div>

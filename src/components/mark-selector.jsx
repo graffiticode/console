@@ -43,7 +43,7 @@ export default function MarkSelector({ mark, setMark }) {
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <Listbox.Options className="left-0 absolute mt-1 max-h-60 w-full overflow-auto rounded-none bg-white py-1 text-base ring-1 ring-black ring-opacity-25 focus:outline-none sm:text-sm">
+          <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-none bg-white py-1 text-base ring-1 ring-black ring-opacity-25 focus:outline-none sm:text-sm">
             {marks.map((mark, index) => (
               <Listbox.Option
                 key={index}

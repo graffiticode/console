@@ -8,13 +8,6 @@ function classNames(...classes) {
 export default function PublicToggle({ isPublic, setIsPublic }) {
   return (
     <Switch.Group as="div" className="py-2 flex bg-white items-center">
-      <Switch.Label as="span" className="mr-3 text-xs">
-        <span className={classNames(
-                isPublic ? "text-gray-900" : "text-gray-400",
-                "font-medium"
-              )}>Public</span>{' '}
-        <span className="text-gray-500">(CAUTION)</span>
-      </Switch.Label>
       <Switch
         checked={isPublic}
         onChange={setIsPublic}

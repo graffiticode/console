@@ -81,6 +81,40 @@ cells {
 ---
 
 ### Prompt
+"create a starter template with one cell"
+
+### Chat Transcript
+
+**User**: create a starter template with one cell
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a simple spreadsheet with a title of "Untitled Spreadsheet" and a single cell in the A1 position. The spreadsheet has a column width of 100 units for the A column. The code also includes a version number of "0.0.1" at the end.
+```
+
+### Code
+
+```
+title "Untitled Spreadsheet"
+instructions `
+`
+columns {
+  A: {
+    width: 100
+  }
+}
+cells {
+  A1: {
+    text: ""
+  }
+}
+{
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
 "change the cell value of A1 to 100
 
 make the value of A2 200 and add A1 and A2 using the formula =sum(A1:A2) for the value of A3
@@ -147,6 +181,355 @@ cells {
   }
 }
 {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
+"create a five by five table with integer values of your choosing where every other cell is protected
+
+now prefix all the values in the protected cells with a letter P
+
+add validations for all the unprotected cells
+
+excellent! now bold all the protected cells"
+
+### Chat Transcript
+
+**User**: create a five by five table with integer values of your choosing where every other cell is protected
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a spreadsheet-like grid with 5 columns and 5 rows. Each cell in the grid contains a number, and some of the cells are marked as "protected", meaning their values cannot be changed. The purpose of this generated code is to create a structured data layout that could be used for various applications, such as displaying numerical information in a tabular format.
+```
+
+**User**: now prefix all the values in the protected cells with a letter P
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a table with 5 columns and 5 rows. The table cells contain a mix of numbers and text, some of which are marked as "protected". The purpose of this generated code is likely to create a structured data layout, potentially for a spreadsheet or other tabular application.
+```
+
+**User**: add validations for all the unprotected cells
+
+**Assistant**: ```ocaml
+The generated code creates a grid-like structure with 5 columns and 5 rows. Each cell in the grid contains either a number that needs to be entered correctly, or a protected value that the user cannot modify. This code is likely part of an interactive learning or assessment tool, where the user is expected to input the correct values in the unprotected cells.
+```
+
+**User**: excellent! now bold all the protected cells
+
+**Assistant**: ```ocaml
+The generated code creates a grid-like structure with 5 columns and 5 rows. Each cell in the grid contains either a number or a protected label (e.g., "P12", "P19"). The numbers in the cells have associated "assess" attributes that specify the expected value for that cell, which could be used for some kind of assessment or evaluation.
+```
+
+### Code
+
+```
+columns {
+  A: { width: 50 }
+  B: { width: 50 }
+  C: { width: 50 }
+  D: { width: 50 }
+  E: { width: 50 }
+}
+cells {
+  A1: {
+    text: "P12"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  B1: {
+    text: "7"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "7"
+      }
+    }
+  }
+  C1: {
+    text: "P19"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  D1: {
+    text: "3"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "3"
+      }
+    }
+  }
+  E1: {
+    text: "P14"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  A2: {
+    text: "8"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "8"
+      }
+    }
+  }
+  B2: {
+    text: "P25"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  C2: {
+    text: "11"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "11"
+      }
+    }
+  }
+  D2: {
+    text: "P30"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  E2: {
+    text: "5"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "5"
+      }
+    }
+  }
+  A3: {
+    text: "P17"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  B3: {
+    text: "9"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "9"
+      }
+    }
+  }
+  C3: {
+    text: "P22"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  D3: {
+    text: "6"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "6"
+      }
+    }
+  }
+  E3: {
+    text: "P28"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  A4: {
+    text: "13"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "13"
+      }
+    }
+  }
+  B4: {
+    text: "P20"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  C4: {
+    text: "4"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "4"
+      }
+    }
+  }
+  D4: {
+    text: "P16"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  E4: {
+    text: "10"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "10"
+      }
+    }
+  }
+  A5: {
+    text: "P27"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  B5: {
+    text: "2"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "2"
+      }
+    }
+  }
+  C5: {
+    text: "P24"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+  D5: {
+    text: "18"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "18"
+      }
+    }
+  }
+  E5: {
+    text: "P31"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+    }
+  }
+}
+{
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
+"create a starter template with one cell
+
+let's play tic tac toe"
+
+### Chat Transcript
+
+**User**: create a starter template with one cell
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a simple spreadsheet with a title of "Untitled Spreadsheet" and a single cell in the A1 position. The spreadsheet has a column width of 100 units for the A column. The code also includes a version number of "0.0.1" at the end.
+```
+
+**User**: let's play tic tac toe
+
+**Assistant**: ```ocaml
+This code generates a Tic Tac Toe game interface. The generated code sets up a 3x3 grid with cells that can be filled with "X" or "O" by players. The goal is to get 3 of your symbols in a row, either horizontally, vertically, or diagonally, to win the game.
+```
+
+### Code
+
+```
+title "Tic Tac Toe"
+instructions `
+Play Tic Tac Toe by entering "X" or "O" into the cells.
+First player to get 3 in a row horizontally, vertically, or diagonally wins!
+`
+columns {
+  A: { width: 30 justify: "center" }
+  B: { width: 30 justify: "center" }
+  C: { width: 30 justify: "center" }
+}
+cells {
+  A1: {
+    text: ""
+    attrs: {
+      border: "bottom,right"
+    }
+  }
+  B1: {
+    text: ""
+    attrs: {
+      border: "bottom,right,left"
+    }
+  }
+  C1: {
+    text: ""
+    attrs: {
+      border: "bottom,left"
+    }
+  }
+  A2: {
+    text: ""
+    attrs: {
+      border: "top,bottom,right"
+    }
+  }
+  B2: {
+    text: ""
+    attrs: {
+      border: "top,bottom,right,left"
+    }
+  }
+  C2: {
+    text: ""
+    attrs: {
+      border: "top,bottom,left"
+    }
+  }
+  A3: {
+    text: ""
+    attrs: {
+      border: "top,right"
+    }
+  }
+  B3: {
+    text: ""
+    attrs: {
+      border: "top,right,left"
+    }
+  }
+  C3: {
+    text: ""
+    attrs: {
+      border: "top,left"
+    }
+  }
+}
+{
+  hideMenu: true
   v: "0.0.1"
 }..
 ```
