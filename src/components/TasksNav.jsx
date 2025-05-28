@@ -149,11 +149,11 @@ function EllipsisMenu({ id, name, mark, isPublic, onChange }) {
                       setMark={mark => onChange({id, mark})}
                     />
                   </div>
-                  
+
                   <div className="ml-4">
                     <label className="block text-xs font-semibold text-gray-600 mb-1">Public</label>
-                    <div 
-                      className="flex items-center" 
+                    <div
+                      className="flex items-center"
                       title="Public tasks are accessible to anyone with the task ID"
                     >
                       <PublicToggle
