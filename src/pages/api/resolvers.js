@@ -184,9 +184,16 @@ export async function compiles({ auth, lang, type }) {
   }
 }
 
-export async function generateCode({ auth, prompt, language, options }) {
+export async function generateCode({ auth, prompt, language, options, currentCode }) {
   // TODO add support for calling the compiler to check generated code.
   try {
+    console.log(
+      "resolvers/generateCode()",
+      "prompt=" + prompt.substring(0, 30) + "...",
+      "language=" + language,
+      "currentCode length=" + (currentCode ? currentCode.length : 0)
+    );
+
     prompt = prompt.trim();
     let code = null;
     let taskId = null;
@@ -222,7 +229,8 @@ export async function generateCode({ auth, prompt, language, options }) {
           model: options?.model,
           temperature: options?.temperature,
           maxTokens: options?.maxTokens
-        }
+        },
+        currentCode
       });
       code = result.code;
       description = result.description;

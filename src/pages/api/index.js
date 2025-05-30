@@ -65,7 +65,7 @@ const typeDefs = `
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
     saveTask(id: String, lang: String!, code: String!, help: String!, mark: Int!, isPublic: Boolean): String!
     updateTask(id: String, name: String, help: String, mark: Int, isPublic: Boolean): String!
-    generateCode(prompt: String!, language: String, options: CodeGenerationOptions): GeneratedCode!
+    generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String): GeneratedCode!
   }
 
   input CodeGenerationOptions {
@@ -112,16 +112,17 @@ const resolvers = {
       const { token } = ctx;
       const { uid } = await client.verifyToken(token);
       const auth = {uid, token};
-      const { prompt, language, options } = args;
+      const { prompt, language, options, currentCode } = args;
       console.log(
         "generateCode mutation called",
         "language=" + language,
         "prompt=" + prompt.substring(0, 30) + "...",
+        "currentCode length=" + (currentCode ? currentCode.length : 0)
       );
 
       try {
         // No authentication required for code generation
-        return await generateCode({ auth, prompt, language, options });
+        return await generateCode({ auth, prompt, language, options, currentCode });
       } catch (error) {
         console.error("Error in generateCode mutation:", error);
         throw error;

@@ -59,6 +59,12 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       "contextualPrompt=" + contextualPrompt,
     );
 
+    console.log(
+      "ChatBot/generateCode() call",
+      "currentCode length:", currentCode?.length || 0,
+      "first 30 chars:", currentCode?.substring(0, 30) + "..." || "none"
+    );
+
     const result = await generateCode({
       user,
       prompt: contextualPrompt,
@@ -67,6 +73,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
         maxTokens: 2000
       },
       language,
+      currentCode
     });
 
     // Log just the first part of the description for development purposes

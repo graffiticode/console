@@ -229,10 +229,11 @@ export const loadGraphiQL = async ({ user }) => {
  * @param {Object} [params.options] - Additional generation options
  * @returns {Promise<Object>} - Generated code and metadata
  */
-export const generateCode = async ({ user, prompt, language, options }) => {
+export const generateCode = async ({ user, prompt, language, options, currentCode }) => {
   console.log(
     "fetchers/generateCode()",
     "language=" + language,
+    "currentCode length=" + (currentCode ? currentCode.length : 0)
   );
   if (!user) {
     return {};
@@ -244,8 +245,8 @@ export const generateCode = async ({ user, prompt, language, options }) => {
     }
   });
   const query = gql`
-    mutation GenerateCode($prompt: String!, $language: String, $options: CodeGenerationOptions) {
-      generateCode(prompt: $prompt, language: $language, options: $options) {
+    mutation GenerateCode($prompt: String!, $language: String, $options: CodeGenerationOptions, $currentCode: String) {
+      generateCode(prompt: $prompt, language: $language, options: $options, currentCode: $currentCode) {
         code
         taskId
         description
@@ -263,7 +264,8 @@ export const generateCode = async ({ user, prompt, language, options }) => {
   const variables = {
     prompt,
     language,
-    options
+    options,
+    currentCode
   };
 
   try {

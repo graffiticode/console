@@ -17,10 +17,10 @@ import admin from 'firebase-admin';
 
 // Define available Claude models
 const CLAUDE_MODELS = {
-  OPUS: 'claude-3-opus-20240229',
-  SONNET: 'claude-3-sonnet-20240229',
+  OPUS: 'claude-4-opus-20240229',  // Updated to Claude-4 Opus
+  SONNET: 'claude-4-sonnet-20240820',  // Updated to Claude-4 Sonnet
   HAIKU: 'claude-3-haiku-20240307',
-  DEFAULT: 'claude-3-sonnet-20240229' // Default to Sonnet as a good balance
+  DEFAULT: 'claude-4-sonnet-20240820' // Default to Sonnet 4 as a good balance
 };
 
 /**
@@ -160,10 +160,9 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
       .slice(0, limit);
 
     console.log(`Found ${topExamples.length} relevant examples for the prompt`);
-    console.log(
-      "getRelevantExamples()",
-      "topExamples=" + JSON.stringify(topExamples, null, 2),
-    );
+    console.log("\n============= RELEVANT EXAMPLES =============\n");
+    console.log(JSON.stringify(topExamples, null, 2));
+    console.log("\n============= END RELEVANT EXAMPLES =============\n");
     return topExamples;
   } catch (error) {
     console.error('Error retrieving training examples:', error);
@@ -618,9 +617,10 @@ function generateExamplesSection(examples) {
  * @param {string} userPrompt - The user's original prompt
  * @param {Array} examples - Relevant examples to include
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
+ * @param {string} currentCode - The current code (if available) to use as a starting point
  * @returns {string} - A well-formatted prompt for Claude
  */
-async function createCodeGenerationPrompt(userPrompt, examples = [], lang = "0002") {
+async function createCodeGenerationPrompt(userPrompt, examples = [], lang = "0002", currentCode = null) {
   // Generate examples section from retrieved examples
   const examplesSection = generateExamplesSection(examples);
 
@@ -705,10 +705,17 @@ print greeting1..
       },
       {
         role: "user",
-        content: userPrompt,
+        content: currentCode
+          ? `I have the following existing code:\n\n\`\`\`\n${currentCode}\n\`\`\`\n\nI need to: ${userPrompt}`
+          : userPrompt,
       },
     ],
   };
+
+  // Log the complete prompt for debugging
+  console.log("\n============= FULL CODE GENERATION PROMPT =============\n");
+  console.log(JSON.stringify(promptData, null, 2));
+  console.log("\n============= END PROMPT =============\n");
 
   return JSON.stringify(promptData, null, 2);
 }
@@ -766,6 +773,13 @@ async function callClaudeAPI(prompt, options) {
         total_tokens: response.data.usage.input_tokens + response.data.usage.output_tokens
       }
     };
+
+    // Log the response for debugging
+    console.log("\n============= API RESPONSE =============\n");
+    console.log(`Model: ${result.model}`);
+    console.log(`Tokens: ${result.usage.prompt_tokens} prompt, ${result.usage.completion_tokens} completion`);
+    console.log("\nResponse Content:\n", result.content);
+    console.log("\n============= END API RESPONSE =============\n");
 
     return result;
   } catch (error) {
@@ -843,6 +857,9 @@ async function verifyCode(code, authToken) {
  * @returns {string} - Formatted error details
  */
 function parseGraffiticodeErrors(errorInfo) {
+  console.log("\n============= PARSING ERROR INFO =============\n");
+  console.log(JSON.stringify(errorInfo, null, 2));
+  console.log("\n============= END ERROR INFO =============\n");
   let formattedErrors = '';
 
   // Handle different error formats
@@ -1023,7 +1040,19 @@ function processGeneratedCode(content) {
  * @param {Object} params.auth - Authentication object containing token for verification
  * @returns {Promise<Object>} - The final code response
  */
-export async function generateCode({ auth, prompt, lang = "0002", options = {} }) {
+export async function generateCode({ auth, prompt, lang = "0002", options = {}, currentCode = null }) {
+  console.log("\n============= CODE GENERATION REQUEST =============\n");
+  console.log(`User Prompt: ${prompt}`);
+  console.log(`Language: L${lang}`);
+  console.log(`Options: ${JSON.stringify(options, null, 2)}`);
+  if (currentCode) {
+    console.log("\nCurrent Code:");
+    console.log("```");
+    console.log(currentCode);
+    console.log("```");
+  }
+  console.log("\n============= END REQUEST =============\n");
+
   const accessToken = auth?.token;
   console.log(
     "generateCode()",
@@ -1036,9 +1065,9 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
     const relevantExamples = await getRelevantExamples({prompt, lang, limit: 3});
     console.log(`Found ${relevantExamples.length} relevant examples for the prompt in language ${lang}`);
     // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
-    const formattedPrompt = await createCodeGenerationPrompt(prompt, relevantExamples, lang);
+    const formattedPrompt = await createCodeGenerationPrompt(prompt, relevantExamples, lang, currentCode);
 
-    // Use the most capable model for Graffiticode generation
+    // Use Claude-4 Opus for Graffiticode generation - best model for code generation
     const model = options.model || CLAUDE_MODELS.OPUS;
 
     // Set up API call options
@@ -1085,6 +1114,12 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {} }
 
           // Create a prompt to fix the errors
           const fixPrompt = createErrorFixPrompt(generatedCode, verificationResult);
+
+          console.log(`\n============= ERROR CORRECTION ATTEMPT ${fixAttempts + 1} =============`);
+          console.log("Error details:", JSON.stringify(verificationResult, null, 2));
+          console.log("\n----- ERROR FIX PROMPT -----\n");
+          console.log(fixPrompt);
+          console.log("\n----- END ERROR FIX PROMPT -----\n");
 
           // Call the Claude API again to fix the code
           const fixResponse = await callClaudeAPI(fixPrompt, {
@@ -1139,12 +1174,20 @@ Explain it in 2-3 sentences of simple language that anyone can understand. Start
       ]
     }, null, 2);
 
+    console.log("\n============= DESCRIPTION GENERATION PROMPT =============\n");
+    console.log(descriptionPrompt);
+    console.log("\n============= END DESCRIPTION PROMPT =============\n");
+
     // Call Claude API to get the description
     const descriptionResponse = await callClaudeAPI(descriptionPrompt, {
-      model: CLAUDE_MODELS.HAIKU, // Use a smaller model for faster response
+      model: CLAUDE_MODELS.SONNET, // Use Claude-4 Sonnet for better descriptions
       temperature: 0.2,
       max_tokens: 200 // Short description only
     });
+
+    console.log("\n============= DESCRIPTION RESPONSE =============\n");
+    console.log(descriptionResponse.content);
+    console.log("\n============= END DESCRIPTION RESPONSE =============\n");
 
     console.log(
       "generateCode()",
