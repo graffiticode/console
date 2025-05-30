@@ -635,72 +635,50 @@ async function createCodeGenerationPrompt(userPrompt, examples = [], lang = "000
     messages: [
       {
         role: "user",
-        content: "Generate code that doubles every number in the list [1, 2, 3]."
+        content: "Create a data transformation pipeline that filters adult users and extracts their names."
       },
       {
         role: "assistant",
         content: `
-| Define a function to double a number
-let double = <x: add x x>..
-| Apply the double function to each number in the list
-let result = map (double) [1 2 3]..
-        `.trim()
-      },
-      {
-        role: "user",
-        content: "Get the total price of all in-stock items in a product list with a 10% discount."
-      },
-      {
-        role: "assistant",
-        content: `
-| Function to check if an item is in stock
-let inStock = <item: gt get item "stock" 0>..
-
-| Function to apply a discount to an item's price
-let applyDiscount = <item discount: {
-  id: get "id" item
-  name: get "name" item
-  | Multiply price by (1 - discount)
-  price: mul get "price" item sub 1 discount
-  stock: get "stock" item
-}>..
-
-| Function to calculate the total price of all items
-let calculateTotal = <items: reduce (<item total: add total get "price" item>) 0 items>..
-
-| Filter for only in-stock items
-let availableItems = filter (inStock) products..
-
-| Apply a 10% discount to all available items
-let discountedItems = map (<item: applyDiscount item 0.1>) availableItems..
-
-| Calculate the final total price
-let total = calculateTotal discountedItems..
-
-| Print the text 'hello, world!'
-print "hello, world!"..
+| Transform data through a multi-step pipeline
+let users = [{ name: "Alice", age: 28 } { name: "Bob", age: 34 } { name: "Charlie", age: 19 }]..
+let isAdult = <user: ge (get "age" user) 21>..
+let getNames = <user: get "name" user>..
+map (getNames) (filter (isAdult) users)..
 `.trim()
       },
       {
         role: "user",
-        content: "Create a greeting function that handles apostrophes correctly."
+        content: "Create a function that handles different user roles using pattern matching with tags."
       },
       {
         role: "assistant",
         content: `
-| Function to generate a personalized greeting
-let createGreeting = <name: concat "Hello, it's nice to meet you, " name>..
-
-| Examples with apostrophes and quotes (notice they are NOT escaped)
-let greeting1 = createGreeting "John"..
-let greeting2 = "He said 'Welcome to our store'"..
-let greeting3 = 'She replied "Thank you for the help"'..
-
-| Example with user's possessive (apostrophe not escaped)
-let userMessage = "Thank you for updating the user's profile"..
-
-| Display one of the greetings
-print greeting1..
+| Demonstrate pattern matching with tag values and records
+let getStatus = <user:
+  case get "role" user of
+    admin: "Has full access"
+    editor: "Can edit content"
+    viewer: "Read-only access"
+    _: "Unknown role"
+  end
+>..
+getStatus { name: "Alice", role: admin }..
+`.trim()
+      },
+      {
+        role: "user",
+        content: "Show how to compose functions to create a data processing pipeline."
+      },
+      {
+        role: "assistant",
+        content: `
+| Use higher-order functions to process data
+let compose = <f g x: f (g x)>..
+let double = <x: mul x 2>..
+let increment = <x: add x 1>..
+let doubleAndIncrement = compose (increment) (double)..
+map (doubleAndIncrement) [1 2 3 4]..
 `.trim()
       },
       {
