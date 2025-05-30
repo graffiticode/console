@@ -17,10 +17,10 @@ import admin from 'firebase-admin';
 
 // Define available Claude models
 const CLAUDE_MODELS = {
-  OPUS: 'claude-4-opus-20240229',  // Updated to Claude-4 Opus
-  SONNET: 'claude-4-sonnet-20240820',  // Updated to Claude-4 Sonnet
+  OPUS: 'claude-opus-4-20250514',  // Correct name for Claude Opus 4
+  SONNET: 'claude-sonnet-4-20250514',  // Correct name for Claude Sonnet 4
   HAIKU: 'claude-3-haiku-20240307',
-  DEFAULT: 'claude-4-sonnet-20240820' // Default to Sonnet 4 as a good balance
+  DEFAULT: 'claude-sonnet-4-20250514' // Default to Sonnet 4 as a good balance
 };
 
 /**
@@ -160,9 +160,6 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
       .slice(0, limit);
 
     console.log(`Found ${topExamples.length} relevant examples for the prompt`);
-    console.log("\n============= RELEVANT EXAMPLES =============\n");
-    console.log(JSON.stringify(topExamples, null, 2));
-    console.log("\n============= END RELEVANT EXAMPLES =============\n");
     return topExamples;
   } catch (error) {
     console.error('Error retrieving training examples:', error);
@@ -690,10 +687,6 @@ map (doubleAndIncrement) [1 2 3 4]..
     ],
   };
 
-  // Log the complete prompt for debugging
-  console.log("\n============= FULL CODE GENERATION PROMPT =============\n");
-  console.log(JSON.stringify(promptData, null, 2));
-  console.log("\n============= END PROMPT =============\n");
 
   return JSON.stringify(promptData, null, 2);
 }
@@ -752,12 +745,6 @@ async function callClaudeAPI(prompt, options) {
       }
     };
 
-    // Log the response for debugging
-    console.log("\n============= API RESPONSE =============\n");
-    console.log(`Model: ${result.model}`);
-    console.log(`Tokens: ${result.usage.prompt_tokens} prompt, ${result.usage.completion_tokens} completion`);
-    console.log("\nResponse Content:\n", result.content);
-    console.log("\n============= END API RESPONSE =============\n");
 
     return result;
   } catch (error) {
@@ -835,9 +822,6 @@ async function verifyCode(code, authToken) {
  * @returns {string} - Formatted error details
  */
 function parseGraffiticodeErrors(errorInfo) {
-  console.log("\n============= PARSING ERROR INFO =============\n");
-  console.log(JSON.stringify(errorInfo, null, 2));
-  console.log("\n============= END ERROR INFO =============\n");
   let formattedErrors = '';
 
   // Handle different error formats
@@ -1019,17 +1003,6 @@ function processGeneratedCode(content) {
  * @returns {Promise<Object>} - The final code response
  */
 export async function generateCode({ auth, prompt, lang = "0002", options = {}, currentCode = null }) {
-  console.log("\n============= CODE GENERATION REQUEST =============\n");
-  console.log(`User Prompt: ${prompt}`);
-  console.log(`Language: L${lang}`);
-  console.log(`Options: ${JSON.stringify(options, null, 2)}`);
-  if (currentCode) {
-    console.log("\nCurrent Code:");
-    console.log("```");
-    console.log(currentCode);
-    console.log("```");
-  }
-  console.log("\n============= END REQUEST =============\n");
 
   const accessToken = auth?.token;
   console.log(
@@ -1093,11 +1066,6 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {}, 
           // Create a prompt to fix the errors
           const fixPrompt = createErrorFixPrompt(generatedCode, verificationResult);
 
-          console.log(`\n============= ERROR CORRECTION ATTEMPT ${fixAttempts + 1} =============`);
-          console.log("Error details:", JSON.stringify(verificationResult, null, 2));
-          console.log("\n----- ERROR FIX PROMPT -----\n");
-          console.log(fixPrompt);
-          console.log("\n----- END ERROR FIX PROMPT -----\n");
 
           // Call the Claude API again to fix the code
           const fixResponse = await callClaudeAPI(fixPrompt, {
@@ -1163,9 +1131,6 @@ Explain it in 2-3 sentences of simple language that anyone can understand. Start
       max_tokens: 200 // Short description only
     });
 
-    console.log("\n============= DESCRIPTION RESPONSE =============\n");
-    console.log(descriptionResponse.content);
-    console.log("\n============= END DESCRIPTION RESPONSE =============\n");
 
     console.log(
       "generateCode()",
