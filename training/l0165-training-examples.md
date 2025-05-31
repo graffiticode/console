@@ -115,6 +115,248 @@ cells {
 ---
 
 ### Prompt
+"Create an assessment using the following table:
+
+| CATEGORY | AMOUNT | DETAILS |
+| --- | --- | --- |
+| Income | $4,000.00 | Total monthly income |
+| Rent |  | 35% of your total income |
+| Utilities | $200.00 | Fixed expense |
+| Food |  | 15% of your total income |
+| Transportation |  | 10% of your total income |
+| Entertainment | $150.00 | Fixed expense |
+| Savings |  | 20% of your total income |
+| Miscellaneous |  | Remaining income after all other expenses |
+
+change the income value to 5000
+
+use unformatted value in the text field
+
+format column B as Currency
+
+score by formula rather than value
+
+make columns A and C protected
+
+make cell b1 protected
+
+make cells b2, b4 and b7 protected
+
+make row 1 bold"
+
+### Chat Transcript
+
+**User**: Create an assessment using the following table:
+
+| CATEGORY | AMOUNT | DETAILS |
+| --- | --- | --- |
+| Income | $4,000.00 | Total monthly income |
+| Rent |  | 35% of your total income |
+| Utilities | $200.00 | Fixed expense |
+| Food |  | 15% of your total income |
+| Transportation |  | 10% of your total income |
+| Entertainment | $150.00 | Fixed expense |
+| Savings |  | 20% of your total income |
+| Miscellaneous |  | Remaining income after all other expenses |
+
+**Assistant**: ```ocaml
+This generated code creates a monthly budget assessment table. The table includes categories like Rent, Food, Transportation, and Savings, which are calculated as percentages of the total monthly income of $4,000. The table also has fixed expenses like Utilities and Entertainment, and a Miscellaneous category for the remaining income after all other expenses. The purpose of this generated code is to help the user calculate and track their monthly budget.
+```
+
+**User**: change the income value to 5000
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The code also includes fixed expenses for utilities and entertainment, and the remaining income is allocated to a miscellaneous category.
+```
+
+**User**: use unformatted value in the text field
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a given monthly income of $5,000. The code also includes fixed expenses like utilities and entertainment, and the remaining income is allocated to a miscellaneous category.
+```
+
+**User**: format column B as Currency
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a monthly budget assessment tool. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a given monthly income of $5,000. The tool also includes fixed expenses like utilities and entertainment, and the remaining income is categorized as "Miscellaneous." The purpose is to help the user understand how their income should be allocated across different budget items.
+```
+
+**User**: score by formula rather than value
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
+```
+
+**User**: make columns A and C protected
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and a miscellaneous category for the remaining income after all other expenses are accounted for.
+```
+
+**User**: make cell b1 protected
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories based on a $5,000 monthly income. The code sets up the spreadsheet structure, including formulas to automatically calculate the budget items as percentages of the total income or as fixed expenses.
+```
+
+**User**: make cells b2, b4 and b7 protected
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses for utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
+```
+
+**User**: make row 1 bold
+
+**Assistant**: ```ocaml
+The generated code creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses for utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
+```
+
+### Code
+
+```
+title "Monthly Budget Assessment"
+instructions `
+Calculate the missing dollar amounts in the budget based on the $5000 monthly income.
+- Rent, Food, Transportation, and Savings should be calculated as percentages of total income
+- Utilities and Entertainment are fixed expenses
+- Miscellaneous is the remaining income after all other expenses
+Enter the correct formulas in the AMOUNT column.
+`
+columns {
+  A: {
+    width: 120
+    protected: true
+  }
+  B: {
+    width: 100
+    format: "Currency"
+  }
+  C: {
+    width: 200
+    protected: true
+  }
+}
+cells {
+  A1: {
+    text: "CATEGORY"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+      border: "bottom"
+    }
+  }
+  B1: {
+    text: "AMOUNT"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+      border: "bottom"
+    }
+  }
+  C1: {
+    text: "DETAILS"
+    attrs: {
+      protected: true
+      fontWeight: "bold"
+      border: "bottom"
+    }
+  }
+
+  A2: { text: "Income" }
+  B2: {
+    text: "5000"
+    attrs: {
+      protected: true
+    }
+  }
+  C2: { text: "Total monthly income" }
+
+  A3: { text: "Rent" }
+  B3: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B2*0.35"
+      }
+    }
+  }
+  C3: { text: "35% of your total income" }
+
+  A4: { text: "Utilities" }
+  B4: {
+    text: "200"
+    attrs: {
+      protected: true
+    }
+  }
+  C4: { text: "Fixed expense" }
+
+  A5: { text: "Food" }
+  B5: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B2*0.15"
+      }
+    }
+  }
+  C5: { text: "15% of your total income" }
+
+  A6: { text: "Transportation" }
+  B6: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B2*0.1"
+      }
+    }
+  }
+  C6: { text: "10% of your total income" }
+
+  A7: { text: "Entertainment" }
+  B7: {
+    text: "150"
+    attrs: {
+      protected: true
+    }
+  }
+  C7: { text: "Fixed expense" }
+
+  A8: { text: "Savings" }
+  B8: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B2*0.2"
+      }
+    }
+  }
+  C8: { text: "20% of your total income" }
+
+  A9: { text: "Miscellaneous" }
+  B9: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "formula"
+        expected: "=B2-SUM(B3:B8)"
+      }
+    }
+  }
+  C9: { text: "Remaining income after all other expenses" }
+}
+{
+  v: "0.0.6"
+}..
+```
+
+---
+
+### Prompt
 "change the cell value of A1 to 100
 
 make the value of A2 200 and add A1 and A2 using the formula =sum(A1:A2) for the value of A3
@@ -537,243 +779,6 @@ cells {
 ---
 
 ### Prompt
-"Create an assessment using the following table:
-
-| CATEGORY | AMOUNT | DETAILS |
-| --- | --- | --- |
-| Income | $4,000.00 | Total monthly income |
-| Rent |  | 35% of your total income |
-| Utilities | $200.00 | Fixed expense |
-| Food |  | 15% of your total income |
-| Transportation |  | 10% of your total income |
-| Entertainment | $150.00 | Fixed expense |
-| Savings |  | 20% of your total income |
-| Miscellaneous |  | Remaining income after all other expenses |
-
-change the income value to 5000
-
-use unformatted value in the text field
-
-format column B as Currency
-
-score by formula rather than value
-
-make columns A and C protected
-
-make cell b1 protected
-
-make cells b2, b4 and b7 protected
-
-make row 1 bold"
-
-### Chat Transcript
-
-**User**: Create an assessment using the following table:
-
-| CATEGORY | AMOUNT | DETAILS |
-| --- | --- | --- |
-| Income | $4,000.00 | Total monthly income |
-| Rent |  | 35% of your total income |
-| Utilities | $200.00 | Fixed expense |
-| Food |  | 15% of your total income |
-| Transportation |  | 10% of your total income |
-| Entertainment | $150.00 | Fixed expense |
-| Savings |  | 20% of your total income |
-| Miscellaneous |  | Remaining income after all other expenses |
-
-**Assistant**: ```ocaml
-This generated code creates a monthly budget assessment table. The table includes categories like Rent, Food, Transportation, and Savings, which are calculated as percentages of the total monthly income of $4,000. The table also has fixed expenses like Utilities and Entertainment, and a Miscellaneous category for the remaining income after all other expenses. The purpose of this generated code is to help the user calculate and track their monthly budget.
-```
-
-**User**: change the income value to 5000
-
-**Assistant**: ```ocaml
-This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The code also includes fixed expenses for utilities and entertainment, and the remaining income is allocated to a miscellaneous category.
-```
-
-**User**: use unformatted value in the text field
-
-**Assistant**: ```ocaml
-This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a given monthly income of $5,000. The code also includes fixed expenses like utilities and entertainment, and the remaining income is allocated to a miscellaneous category.
-```
-
-**User**: format column B as Currency
-
-**Assistant**: ```ocaml
-This generated Graffiticode creates a monthly budget assessment tool. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a given monthly income of $5,000. The tool also includes fixed expenses like utilities and entertainment, and the remaining income is categorized as "Miscellaneous." The purpose is to help the user understand how their income should be allocated across different budget items.
-```
-
-**User**: score by formula rather than value
-
-**Assistant**: ```ocaml
-This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
-```
-
-**User**: make columns A and C protected
-
-**Assistant**: ```ocaml
-This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and a miscellaneous category for the remaining income after all other expenses are accounted for.
-```
-
-**User**: make cell b1 protected
-
-**Assistant**: ```ocaml
-This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories based on a $5,000 monthly income. The code sets up the spreadsheet structure, including formulas to automatically calculate the budget items as percentages of the total income or as fixed expenses.
-```
-
-**User**: make cells b2, b4 and b7 protected
-
-**Assistant**: ```ocaml
-This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses for utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
-```
-
-**User**: make row 1 bold
-
-**Assistant**: ```ocaml
-The generated code creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses for utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
-```
-
-### Code
-
-```
-title "Monthly Budget Assessment"
-instructions `
-Calculate the missing dollar amounts in the budget based on the $5000 monthly income.
-- Rent, Food, Transportation, and Savings should be calculated as percentages of total income
-- Utilities and Entertainment are fixed expenses
-- Miscellaneous is the remaining income after all other expenses
-Enter the correct formulas in the AMOUNT column.
-`
-columns {
-  A: {
-    width: 120
-    protected: true
-  }
-  B: {
-    width: 100
-    format: "Currency"
-  }
-  C: {
-    width: 200
-    protected: true
-  }
-}
-cells {
-  A1: {
-    text: "CATEGORY"
-    attrs: {
-      fontWeight: "bold"
-    }
-  }
-  B1: {
-    text: "AMOUNT"
-    attrs: {
-      protected: true
-      fontWeight: "bold"
-    }
-  }
-  C1: {
-    text: "DETAILS"
-    attrs: {
-      fontWeight: "bold"
-    }
-  }
-
-  A2: { text: "Income" }
-  B2: {
-    text: "5000"
-    attrs: {
-      protected: true
-    }
-  }
-  C2: { text: "Total monthly income" }
-
-  A3: { text: "Rent" }
-  B3: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "formula"
-        expected: "=B2*0.35"
-      }
-    }
-  }
-  C3: { text: "35% of your total income" }
-
-  A4: { text: "Utilities" }
-  B4: {
-    text: "200"
-    attrs: {
-      protected: true
-    }
-  }
-  C4: { text: "Fixed expense" }
-
-  A5: { text: "Food" }
-  B5: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "formula"
-        expected: "=B2*0.15"
-      }
-    }
-  }
-  C5: { text: "15% of your total income" }
-
-  A6: { text: "Transportation" }
-  B6: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "formula"
-        expected: "=B2*0.1"
-      }
-    }
-  }
-  C6: { text: "10% of your total income" }
-
-  A7: { text: "Entertainment" }
-  B7: {
-    text: "150"
-    attrs: {
-      protected: true
-    }
-  }
-  C7: { text: "Fixed expense" }
-
-  A8: { text: "Savings" }
-  B8: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "formula"
-        expected: "=B2*0.2"
-      }
-    }
-  }
-  C8: { text: "20% of your total income" }
-
-  A9: { text: "Miscellaneous" }
-  B9: {
-    text: ""
-    attrs: {
-      assess: {
-        method: "formula"
-        expected: "=B2-SUM(B3:B8)"
-      }
-    }
-  }
-  C9: { text: "Remaining income after all other expenses" }
-}
-{
-  v: "0.0.6"
-}..
-```
-
----
-
-### Prompt
 "Create a 2 by 2 spreadsheet with the cell contents being the cell names
 
 make column A protected
@@ -1157,6 +1162,130 @@ cells {
     }
   }
   B15: { text: "Share issue costs on credit ABN Stockbroking Pty Ltd" }
+}
+{
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
+"i want to create a vertical math assessment for basic arithmetic. you pick the values to assess
+
+that's interesting, but I want to create a single problem arranged vertically
+
+that's good, but remove row 3 and add a border bottom true to b2
+
+sorry, i wasn't being clear. set border to "bottom"
+
+format numbers using #,##0
+
+move coumn a to column b
+
+move the + in B2 to A2
+
+change the value in b2 to 6345
+
+set the border underline for a2"
+
+### Chat Transcript
+
+**User**: i want to create a vertical math assessment for basic arithmetic. you pick the values to assess
+
+**Assistant**: ```ocaml
+This generated code creates a basic arithmetic assessment with six questions. The user is presented with arithmetic problems, and they must enter the correct answers in the empty cells. The code includes instructions for the user and sets up the layout of the assessment, with the questions in the left column and the answer cells in the right column.
+```
+
+**User**: that's interesting, but I want to create a single problem arranged vertically
+
+**Assistant**: ```ocaml
+The generated code creates a vertical arithmetic problem where the user needs to solve the addition of 4327 and 958. The code sets up a table with a single column, and the first three rows display the numbers to be added vertically. The fourth row is left blank for the user to enter the solution, which is expected to be 5285.
+```
+
+**User**: that's good, but remove row 3 and add a border bottom true to b2
+
+**Assistant**: ```ocaml
+This code generates a simple arithmetic problem where the user needs to add two numbers vertically. The problem is presented with the first number "4327" and the second number "+958" displayed, and the user is expected to enter the correct result of "5285" in the empty cell below. The generated code sets up the layout and formatting for this arithmetic problem.
+```
+
+**User**: sorry, i wasn't being clear. set border to "bottom"
+
+**Assistant**: ```ocaml
+The generated code creates a simple arithmetic problem where the user needs to add two numbers vertically. The problem is presented with the first number "4327" and the second number "+958" displayed, and the user is expected to enter the correct result of "5285" in the empty cell below. This type of interactive arithmetic exercise can be used to test or practice basic math skills.
+```
+
+**User**: format numbers using #,##0
+
+**Assistant**: ```ocaml
+The generated code creates a simple arithmetic problem where the user needs to add two numbers, 4,327 and 958, and enter the result in the third cell. The code sets up the layout and formatting of the problem, including the column width, text formatting, and a bottom border for the second row. The third cell is set up to assess the user's input, expecting the correct answer of 5,285.
+```
+
+**User**: move coumn a to column b
+
+**Assistant**: ```ocaml
+The generated code creates a simple arithmetic problem where the user needs to solve the addition of two numbers, 4,327 and 958, and enter the result in the provided cell. The code sets up the layout and formatting of the problem, including the instructions, column widths, and the expected result of 5,285.
+```
+
+**User**: move the + in B2 to A2
+
+**Assistant**: ```ocaml
+The generated code creates a simple arithmetic problem where the user needs to solve the addition of two numbers, 4,327 and 958, and enter the result in the provided cell. The code sets up the layout of the problem, including the column widths and the formatting of the numbers, and includes an assessment to check if the user's answer is correct.
+```
+
+**User**: change the value in b2 to 6345
+
+**Assistant**: ```ocaml
+The generated code creates a simple arithmetic problem where the user needs to solve the addition of two large numbers, "4,327" and "6,345", and enter the result in the provided cell. The code sets up the layout of the problem, including the column widths and the formatting of the numbers, and includes an assessment to check if the user's answer is correct.
+```
+
+**User**: set the border underline for a2
+
+**Assistant**: ```ocaml
+This generated Graffiticode creates a simple vertical arithmetic problem. It displays two large numbers, one above the other, with a "+" symbol between them. The user is instructed to solve the problem by entering the result in the cell below. The generated code formats the numbers with commas for readability and includes an assessment to check if the user's answer is correct.
+```
+
+### Code
+
+```
+title "Vertical Arithmetic Problem"
+instructions `
+Solve the following arithmetic problem, entering the result below:
+`
+columns {
+  A: { width: 30 }
+  B: { width: 50 }
+}
+cells {
+  A2: {
+    text: "+"
+    attrs: {
+      border: "bottom"
+    }
+  }
+  B1: {
+    text: "  4,327"
+    attrs: {
+      format: "#,##0"
+    }
+  }
+  B2: {
+    text: "  6,345"
+    attrs: {
+      border: "bottom"
+      format: "#,##0"
+    }
+  }
+  B3: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "10672"
+      }
+      format: "#,##0"
+    }
+  }
 }
 {
   v: "0.0.1"
