@@ -34,7 +34,7 @@ while [[ $# -gt 0 ]]; do
       echo "                 If not specified, dumps all languages"
       echo "  --mark, -m     Mark value (default: 1)"
       echo "  --outdir, -o   Output directory (default: ./training)"
-      echo "  --endpoint, -e GraphQL endpoint (default: https://graffiticode.com/api)"
+      echo "  --endpoint, -e GraphQL endpoint (default: https://graffiticode.org/api)"
       echo "  --help, -h     Show this help message"
       echo ""
       echo "Examples:"
