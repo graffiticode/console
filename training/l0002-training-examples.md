@@ -87,6 +87,32 @@ print updatedRecord..
 ---
 
 ### Prompt
+"add 10 to a list of integers 1 through 9"
+
+### Chat Transcript
+
+**User**: add 10 to a list of integers 1 through 9
+
+**Assistant**: ```ocaml
+This generated code creates a simple mathematical operation that adds 10 to each number in a sequence. The code first defines a list of numbers from 1 to 9, then automatically applies a function that adds 10 to every number in that list. The result would be a new list containing the numbers 11, 12, 13, 14, 15, 16, 17, 18, and 19.
+```
+
+### Code
+
+```
+| Function to add 10 to a number
+let addTen = <x: add x 10>..
+
+| Create a list of integers from 1 to 9
+let numbers = range 1 10 1..
+
+| Add 10 to each number in the list
+map (addTen) numbers..
+```
+
+---
+
+### Prompt
 "get the first element in a list of strings"
 
 ### Chat Transcript
@@ -196,6 +222,26 @@ let frenchNumbers = map (frenchNumber) numbers..
 
 | Print the results
 print frenchNumbers..
+```
+
+---
+
+### Prompt
+"print the sum of 100 and 200"
+
+### Chat Transcript
+
+**User**: print the sum of 100 and 200
+
+**Assistant**: ```ocaml
+The generated code performs a simple mathematical calculation by adding two numbers together: 100 and 200. It then displays the result of this addition, which would be 300, on the screen. This is a basic arithmetic operation that demonstrates how to compute and show the sum of two values.
+```
+
+### Code
+
+```
+| Calculate and print the sum of 100 and 200
+print (add 100 200)..
 ```
 
 ---
