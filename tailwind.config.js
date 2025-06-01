@@ -1,6 +1,11 @@
 /** @type {import('tailwindcss').Config} */
-const colors = require('tailwindcss/colors');
-module.exports = {
+import colors from 'tailwindcss/colors';
+import tailwindForms from '@tailwindcss/forms';
+import tailwindAspectRatio from '@tailwindcss/aspect-ratio';
+import tailwindTypography from '@tailwindcss/typography';
+import twElements from "tw-elements/dist/plugin.cjs";
+
+export default {
   content: [
     "./node_modules/tw-elements/dist/js/**/*.js",
     "./src/**/*.{html,js}",
@@ -16,10 +21,10 @@ module.exports = {
     },
   },
   plugins: [
-    require('@tailwindcss/forms'),
-    require('@tailwindcss/aspect-ratio'),
-    require('@tailwindcss/typography'),
-    require("tw-elements/dist/plugin.cjs"),
+    tailwindForms,
+    tailwindAspectRatio,
+    tailwindTypography,
+    twElements,
   ],
   darkMode: "class"
 };
