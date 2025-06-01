@@ -32,7 +32,7 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  --lang, -l     Language code (e.g., 0002, 0151, 0165)"
       echo "                 If not specified, dumps all languages"
-      echo "  --mark, -m     Mark value (default: 1)"
+      echo "  --mark, -m     Mark value (default: 4)"
       echo "  --outdir, -o   Output directory (default: ./training)"
       echo "  --endpoint, -e GraphQL endpoint (default: https://graffiticode.org/api)"
       echo "  --help, -h     Show this help message"

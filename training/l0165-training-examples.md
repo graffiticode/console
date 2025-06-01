@@ -3,6 +3,295 @@
 ## Language L0165
 
 ### Prompt
+"add 10 and 20 in a table"
+
+### Chat Transcript
+
+**User**: add 10 and 20 in a table
+
+**Assistant**: ```ocaml
+This generated code creates a simple spreadsheet with two columns (A and B) that demonstrates basic addition. The spreadsheet contains the numbers 10 and 20 in cells A1 and A2, and cell A3 contains a formula that adds these two numbers together. The code also includes an automatic assessment feature that checks whether the formula correctly calculates the sum as 30.
+```
+
+### Code
+
+```
+title ""
+instructions `
+`
+columns {
+  A: {
+    width: 100
+    justify: "center"
+  }
+  B: {
+    width: 100
+    justify: "center"
+  }
+}
+cells {
+  A1: { text: "10" }
+  A2: { text: "20" }
+  A3: {
+    text: "=A1+A2"
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "30"
+      }
+    }
+  }
+}
+{
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
+"create a times table for integers up to 4"
+
+### Chat Transcript
+
+**User**: create a times table for integers up to 4
+
+**Assistant**: ```ocaml
+This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a spreadsheet-like grid where students need to fill in the empty cells with the correct products of multiplying the row and column numbers (like 2×3=6). The system automatically checks if the answers are correct, making it a self-grading math practice exercise.
+```
+
+### Code
+
+```
+title "Times Table (1-4)"
+instructions `
+- Complete the multiplication table
+- Each cell should contain the product of its row and column numbers
+`
+columns {
+  A: { width: 60 }
+  B: { width: 60 }
+  C: { width: 60 }
+  D: { width: 60 }
+  E: { width: 60 }
+}
+cells {
+  A1: {
+    text: "×"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  B1: {
+    text: "1"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  C1: {
+    text: "2"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  D1: {
+    text: "3"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  E1: {
+    text: "4"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  A2: {
+    text: "1"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  B2: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "1"
+      }
+    }
+  }
+  C2: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "2"
+      }
+    }
+  }
+  D2: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "3"
+      }
+    }
+  }
+  E2: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "4"
+      }
+    }
+  }
+  A3: {
+    text: "2"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  B3: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "2"
+      }
+    }
+  }
+  C3: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "4"
+      }
+    }
+  }
+  D3: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "6"
+      }
+    }
+  }
+  E3: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "8"
+      }
+    }
+  }
+  A4: {
+    text: "3"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  B4: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "3"
+      }
+    }
+  }
+  C4: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "6"
+      }
+    }
+  }
+  D4: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "9"
+      }
+    }
+  }
+  E4: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "12"
+      }
+    }
+  }
+  A5: {
+    text: "4"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  B5: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "4"
+      }
+    }
+  }
+  C5: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "8"
+      }
+    }
+  }
+  D5: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "12"
+      }
+    }
+  }
+  E5: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "16"
+      }
+    }
+  }
+}
+{
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
 "create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs.
 
 protect the cells in column B
