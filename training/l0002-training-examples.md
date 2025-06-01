@@ -3,6 +3,48 @@
 ## Language L0002
 
 ### Prompt
+"print fizzbuzz
+
+compute fizzbuzz through 100"
+
+### Chat Transcript
+
+**User**: print fizzbuzz
+
+**Assistant**: ```ocaml
+This generated code creates a classic FizzBuzz program that takes numbers from 1 to 15 and applies special rules to them. For each number, it replaces multiples of 3 with "Fizz", multiples of 5 with "Buzz", and multiples of both 3 and 5 with "FizzBuzz", while leaving other numbers unchanged. The code then displays all the results, showing a mix of numbers and words like "1, 2, Fizz, 4, Buzz, Fizz, 7, 8, Fizz, Buzz, 11, Fizz, 13, 14, FizzBuzz".
+```
+
+**User**: compute fizzbuzz through 100
+
+**Assistant**: ```ocaml
+This generated code creates a classic FizzBuzz program that processes numbers from 1 to 100. For each number, it replaces multiples of 3 with "Fizz", multiples of 5 with "Buzz", and multiples of both 3 and 5 with "FizzBuzz", while leaving all other numbers unchanged. The code then displays this complete list of transformed numbers and words as the final output.
+```
+
+### Code
+
+```
+| FizzBuzz implementation that computes values from 1 to 100
+let fizzbuzz = <n:
+  if eq (mod n 15) 0 then "FizzBuzz"
+  else if eq (mod n 3) 0 then "Fizz"
+  else if eq (mod n 5) 0 then "Buzz"
+  else n
+>..
+
+| Generate numbers from 1 to 100
+let numbers = range 1 101 1..
+
+| Apply fizzbuzz to each number
+let results = map (fizzbuzz) numbers..
+
+| Print the results
+print results..
+```
+
+---
+
+### Prompt
 "translate a list of french numbers between 1 and 10 into french
 
 translate 10 into french
@@ -140,88 +182,6 @@ let firstFruit = first fruits..
 
 | Print the first fruit
 print firstFruit..
-```
-
----
-
-### Prompt
-"translate a list of french numbers between 1 and 10 into french"
-
-### Chat Transcript
-
-**User**: translate a list of french numbers between 1 and 10 into french
-
-**Assistant**: The generated code creates a function that takes a number as input and returns its French name. It then applies this function to a list of numbers, creating a new list of their French translations. Finally, it prints out the resulting list of French number names.
-
-### Code
-
-```
-| Function to translate a number to its French name
-let frenchNumber = <n:
-  case n of
-    1: "un"
-    2: "deux"
-    3: "trois"
-    4: "quatre"
-    5: "cinq"
-    6: "six"
-    7: "sept"
-    8: "huit"
-    9: "neuf"
-    10: "dix"
-    _: "unknown"
-  end
->..\n
-
-| List of numbers to translate
-let numbers = [1 2 3 4 5 6 7 8 9 10]..\n
-
-| Map each number to its French name
-let frenchNumbers = map (frenchNumber) numbers..\n
-
-| Print the results
-print frenchNumbers..
-```
-
----
-
-### Prompt
-"translate a list of french numbers between 1 and 10 into french"
-
-### Chat Transcript
-
-**User**: translate a list of french numbers between 1 and 10 into french
-
-**Assistant**: The generated code creates a function that takes a number as input and returns its French name. It then applies this function to a list of numbers, creating a new list of their French translations. Finally, it prints out the resulting list of French number names.
-
-### Code
-
-```
-| Function to translate a number to its French name
-let frenchNumber = <n:
-  case n of
-    1: "un"
-    2: "deux"
-    3: "trois"
-    4: "quatre"
-    5: "cinq"
-    6: "six"
-    7: "sept"
-    8: "huit"
-    9: "neuf"
-    10: "dix"
-    _: "unknown"
-  end
->..\n
-
-| List of numbers to translate
-let numbers = [1 2 3 4 5 6 7 8 9 10]..
-
-| Map each number to its French name
-let frenchNumbers = map (frenchNumber) numbers..
-
-| Print the results
-print frenchNumbers..
 ```
 
 ---
