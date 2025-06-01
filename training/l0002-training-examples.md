@@ -3,17 +3,9 @@
 ## Language L0002
 
 ### Prompt
-"print fizzbuzz
-
-compute fizzbuzz through 100"
+"compute fizzbuzz through 100"
 
 ### Chat Transcript
-
-**User**: print fizzbuzz
-
-**Assistant**: ```ocaml
-This generated code creates a classic FizzBuzz program that takes numbers from 1 to 15 and applies special rules to them. For each number, it replaces multiples of 3 with "Fizz", multiples of 5 with "Buzz", and multiples of both 3 and 5 with "FizzBuzz", while leaving other numbers unchanged. The code then displays all the results, showing a mix of numbers and words like "1, 2, Fizz, 4, Buzz, Fizz, 7, 8, Fizz, Buzz, 11, Fizz, 13, 14, FizzBuzz".
-```
 
 **User**: compute fizzbuzz through 100
 
@@ -64,32 +56,6 @@ let updatedRecord = set "bar" 20 myRecord..
 
 | Print the updated record
 print updatedRecord..
-```
-
----
-
-### Prompt
-"add 10 to a list of integers 1 through 9"
-
-### Chat Transcript
-
-**User**: add 10 to a list of integers 1 through 9
-
-**Assistant**: ```ocaml
-This generated code creates a simple mathematical operation that adds 10 to each number in a sequence. The code first defines a list of numbers from 1 to 9, then automatically applies a function that adds 10 to every number in that list. The result would be a new list containing the numbers 11, 12, 13, 14, 15, 16, 17, 18, and 19.
-```
-
-### Code
-
-```
-| Function to add 10 to a number
-let addTen = <x: add x 10>..
-
-| Create a list of integers from 1 to 9
-let numbers = range 1 10 1..
-
-| Add 10 to each number in the list
-map (addTen) numbers..
 ```
 
 ---
