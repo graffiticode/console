@@ -45,66 +45,6 @@ print results..
 ---
 
 ### Prompt
-"translate a list of french numbers between 1 and 10 into french
-
-translate 10 into french
-
-translate a list of integers from zero to twenty incremented by 2 into french"
-
-### Chat Transcript
-
-**User**: translate a list of french numbers between 1 and 10 into french
-
-**Assistant**: The generated code creates a function that takes a number as input and returns its French name. It then applies this function to a list of numbers, creating a new list of their French translations. Finally, it prints out the resulting list of French number names.
-
-**User**: translate 10 into french
-
-**Assistant**: The generated code creates a function called `frenchNumber` that takes a number as input and returns its French name. For example, if you pass in the number 10, the function will return the French word "dix". The code then uses this `frenchNumber` function to translate the number 10 to French and print the result.
-
-**User**: translate a list of integers from zero to twenty incremented by 2 into french
-
-**Assistant**: The generated code performs the following tasks:
-
-1. It defines a function called `frenchNumber` that takes a number as input and returns its French name. The function covers numbers from 0 to 20, with some common even numbers.
-
-2. It generates a list of even numbers from 0 to 20 using the `range` function.
-
-3. It then maps each number in the list to its French name using the `frenchNumber` function and stores the results in the `frenchNumbers` variable. Finally, it prints out the list of French numbers.
-
-### Code
-
-```
-| Function to translate a number to its French name
-let frenchNumber = <n:
-  case n of
-    0: "zéro"
-    2: "deux"
-    4: "quatre"
-    6: "six"
-    8: "huit"
-    10: "dix"
-    12: "douze"
-    14: "quatorze"
-    16: "seize"
-    18: "dix-huit"
-    20: "vingt"
-    _: "unknown"
-  end
->..\n
-
-| Generate a list of even numbers from 0 to 20
-let numbers = range 0 22 2..\n
-
-| Map each number to its French name
-let frenchNumbers = map (frenchNumber) numbers..\n
-
-| Print the results
-print frenchNumbers..
-```
-
----
-
-### Prompt
 "create an record with field named foo to 10 and then set another field named bar to 20"
 
 ### Chat Transcript
@@ -187,38 +127,27 @@ print firstFruit..
 ---
 
 ### Prompt
-"print the sum of 100 and 200"
+"sum the values in an array of the first 100 integers"
 
 ### Chat Transcript
 
-**User**: print the sum of 100 and 200
+**User**: sum the values in an array of the first 100 integers
 
 **Assistant**: ```ocaml
-The generated code performs a simple mathematical calculation by adding two numbers together: 100 and 200. It then displays the result of this addition, which would be 300, on the screen. This is a basic arithmetic operation that demonstrates how to compute and show the sum of two values.
+This generated code creates a list of the first 100 whole numbers (from 1 to 100) and then adds them all together to find their total sum. The code then displays the final result, which would be 5,050. It's essentially performing the mathematical task of finding the sum of all integers from 1 to 100.
 ```
 
 ### Code
 
 ```
-| Calculate and print the sum of 100 and 200
-print (add 100 200)..
-```
+| Generate an array of the first 100 integers (1 to 100)
+let numbers = range 1 101 1..
 
----
+| Sum all values in the array
+let sum = reduce (<x y: add x y>) 0 numbers..
 
-### Prompt
-"create an record with field named foo to 10 and then set another field named bar to 20"
-
-### Chat Transcript
-
-**User**: create an record with field named foo to 10 and then set another field named bar to 20
-
-**Assistant**: The generated code creates a new record (or object) with a field named 'foo' set to the value 10. It then updates that record by adding another field called 'bar' with the value 20. Finally, it prints out the updated record with both the 'foo' and 'bar' fields.
-
-### Code
-
-```
-theme dark hello 'world'..
+| Print the result
+print sum..
 ```
 
 ---
