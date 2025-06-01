@@ -1571,6 +1571,91 @@ cells {
 ---
 
 ### Prompt
+"print fizzbuzz"
+
+### Chat Transcript
+
+**User**: print fizzbuzz
+
+**Assistant**: ```ocaml
+This generated code creates an interactive FizzBuzz learning exercise in the form of a spreadsheet. The code sets up a two-column table where students can practice the classic FizzBuzz problem by filling in the correct answers for numbers 1 through 15 - writing "Fizz" for multiples of 3, "Buzz" for multiples of 5, "FizzBuzz" for multiples of both, and the number itself otherwise. The system automatically checks each answer against the expected solution to provide immediate feedback to learners.
+```
+
+### Code
+
+```
+title "FizzBuzz"
+instructions `
+- Fill in the FizzBuzz values for numbers 1-15
+- Numbers divisible by 3 should be "Fizz"
+- Numbers divisible by 5 should be "Buzz"
+- Numbers divisible by both 3 and 5 should be "FizzBuzz"
+- Otherwise, use the number itself
+`
+columns {
+  A: {
+    width: 100
+    justify: "center"
+  }
+  B: {
+    width: 100
+    justify: "center"
+  }
+}
+cells {
+  A1: {
+    text: "Number"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  B1: {
+    text: "FizzBuzz"
+    attrs: {
+      fontWeight: "bold"
+      protected: true
+    }
+  }
+  A2: { text: "1" attrs: { protected: true } }
+  B2: { text: "" attrs: { assess: { method: "value" expected: "1" } } }
+  A3: { text: "2" attrs: { protected: true } }
+  B3: { text: "" attrs: { assess: { method: "value" expected: "2" } } }
+  A4: { text: "3" attrs: { protected: true } }
+  B4: { text: "" attrs: { assess: { method: "value" expected: "Fizz" } } }
+  A5: { text: "4" attrs: { protected: true } }
+  B5: { text: "" attrs: { assess: { method: "value" expected: "4" } } }
+  A6: { text: "5" attrs: { protected: true } }
+  B6: { text: "" attrs: { assess: { method: "value" expected: "Buzz" } } }
+  A7: { text: "6" attrs: { protected: true } }
+  B7: { text: "" attrs: { assess: { method: "value" expected: "Fizz" } } }
+  A8: { text: "7" attrs: { protected: true } }
+  B8: { text: "" attrs: { assess: { method: "value" expected: "7" } } }
+  A9: { text: "8" attrs: { protected: true } }
+  B9: { text: "" attrs: { assess: { method: "value" expected: "8" } } }
+  A10: { text: "9" attrs: { protected: true } }
+  B10: { text: "" attrs: { assess: { method: "value" expected: "Fizz" } } }
+  A11: { text: "10" attrs: { protected: true } }
+  B11: { text: "" attrs: { assess: { method: "value" expected: "Buzz" } } }
+  A12: { text: "11" attrs: { protected: true } }
+  B12: { text: "" attrs: { assess: { method: "value" expected: "11" } } }
+  A13: { text: "12" attrs: { protected: true } }
+  B13: { text: "" attrs: { assess: { method: "value" expected: "Fizz" } } }
+  A14: { text: "13" attrs: { protected: true } }
+  B14: { text: "" attrs: { assess: { method: "value" expected: "13" } } }
+  A15: { text: "14" attrs: { protected: true } }
+  B15: { text: "" attrs: { assess: { method: "value" expected: "14" } } }
+  A16: { text: "15" attrs: { protected: true } }
+  B16: { text: "" attrs: { assess: { method: "value" expected: "FizzBuzz" } } }
+}
+{
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
 "i want to create a vertical math assessment for basic arithmetic. you pick the values to assess
 
 that's interesting, but I want to create a single problem arranged vertically
