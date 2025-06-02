@@ -146,6 +146,16 @@ export const HelpPanel = ({
     // Store consecutive non-table line count to better handle transitions
     let consecutiveNonTableLines = 0;
 
+    // Special handling for single-line input
+    if (lines.length === 1 && isLineTabular(lines[0])) {
+      return [{
+        type: 'table',
+        startLine: 0,
+        endLine: 0,
+        lines: [lines[0]]
+      }];
+    }
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const isTableLine = isLineTabular(line);
@@ -232,7 +242,26 @@ export const HelpPanel = ({
 
     // Post-process: merge very small table sections into text and ensure sections are properly separated
     const processedSections = sections.map(section => {
-      // Table sections need at least 2 lines to be valid
+      // Single-line tables can be valid if they have enough columns
+      if (section.type === 'table' && section.lines.length === 1) {
+        const line = section.lines[0];
+        // Check if this single line has enough commas to be a valid table
+        const commaCount = (line.match(/,/g) || []).length;
+        const hasQuotedValues = /"[^"]*"/.test(line);
+        // Keep as table if it has enough commas or quoted values with commas
+        if (commaCount >= 2 || (commaCount >= 1 && hasQuotedValues)) {
+          try {
+            const cells = parseCSVLine(line);
+            if (cells.length >= 2) {
+              return section; // Keep as table if it has at least 2 cells
+            }
+          } catch (e) {
+            console.error("Error parsing single-line table section:", e);
+          }
+        }
+        return { ...section, type: 'text' }; // Convert to text if not a valid table
+      }
+      // Multi-line tables need at least 2 lines to be valid
       if (section.type === 'table' && section.lines.length < 2) {
         return { ...section, type: 'text' };
       }
@@ -250,10 +279,64 @@ export const HelpPanel = ({
 
     // Simple check for CSV across multiple lines
     const lines = text.trim().split('\n');
-    if (lines.length < 2) return false; // Need at least 2 lines for a table
-
     // Filter out empty lines
     const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+    // Special case: first line might be CSV header even if it's the only line with commas
+    if (nonEmptyLines.length >= 2) {
+      const firstLine = nonEmptyLines[0];
+      const firstLineCommaCount = (firstLine.match(/,/g) || []).length;
+      // If first line has commas and subsequent lines have content that might be CSV data
+      if (firstLineCommaCount >= 1) {
+        // Count cells in the first line using our parser
+        try {
+          const headerCells = parseCSVLine(firstLine);
+          if (headerCells.length >= 2) {
+            // Check if subsequent lines have enough cells to match the header
+            const subsequentLines = nonEmptyLines.slice(1);
+            const matchingLineCount = subsequentLines.filter(line => {
+              try {
+                const cells = parseCSVLine(line);
+                // Allow some variation in column count (±1)
+                return Math.abs(cells.length - headerCells.length) <= 1;
+              } catch (e) {
+                return false;
+              }
+            }).length;
+            const matchRatio = matchingLineCount / subsequentLines.length;
+            console.log(`First line CSV header check: ${matchingLineCount}/${subsequentLines.length} lines (${(matchRatio * 100).toFixed(1)}%) match header pattern`);
+            // If at least 60% of lines have cells that roughly match the header, this is likely CSV
+            if (matchRatio >= 0.6) {
+              console.log("Detected CSV based on first line header pattern");
+              return true;
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing potential CSV header:", e);
+        }
+      }
+    }
+    // Single line check - if the only line has multiple commas, it might be CSV
+    if (nonEmptyLines.length === 1) {
+      const singleLine = nonEmptyLines[0];
+      const commaCount = (singleLine.match(/,/g) || []).length;
+      const hasQuotedValues = /"[^"]*"/.test(singleLine);
+      // Consider single line as CSV if it has multiple commas or quoted values with commas
+      if (commaCount >= 1) {
+        console.log("Checking if single line is CSV data");
+        // Try to parse the line to make sure it's valid CSV
+        try {
+          const parsedCells = parseCSVLine(singleLine);
+          // Require at least 2 cells for a single line to be considered CSV
+          if (parsedCells.length >= 2) {
+            console.log("Detected single-line CSV data with multiple cells");
+            return true;
+          }
+        } catch (e) {
+          console.error("Error parsing single-line CSV:", e);
+        }
+      }
+    }
+    // If we don't have at least 2 non-empty lines, it's not a multi-line CSV
     if (nonEmptyLines.length < 2) return false;
 
     // Basic check: does text contain commas?
@@ -265,8 +348,8 @@ export const HelpPanel = ({
     const totalCommaCount = nonEmptyLines.reduce((sum, line) => sum + (line.match(/,/g) || []).length, 0);
     const avgCommasPerLine = totalCommaCount / nonEmptyLines.length;
 
-    // If average is less than 1 comma per line, it's likely not CSV
-    if (avgCommasPerLine < 1) {
+    // More lenient check for comma frequency - allow as low as 0.7 commas per line on average
+    if (avgCommasPerLine < 0.7) {
       console.log("Not likely CSV - too few commas per line on average");
       return false;
     }
@@ -313,6 +396,45 @@ export const HelpPanel = ({
 
     // Filter out empty lines
     const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+    // Special handling for single line CSV data
+    if (nonEmptyLines.length === 1) {
+      console.log("Formatting single-line CSV as markdown table");
+      const singleLine = nonEmptyLines[0];
+      // Try to parse the line as CSV
+      let cells;
+      try {
+        cells = parseCSVLine(singleLine);
+      } catch (e) {
+        // Fallback to simple comma split if parser fails
+        cells = singleLine.split(',').map(cell => cell.trim());
+      }
+      // Only proceed if we have at least 2 cells
+      if (cells.length >= 2) {
+        // Generate column headers (Column 1, Column 2, etc.)
+        const headerRow = Array.from({ length: cells.length }, (_, i) => `Column ${i + 1}`);
+        // Create the markdown table
+        let markdownTable = '';
+        markdownTable += '| ' + headerRow.join(' | ') + ' |\n';
+        markdownTable += '| ' + headerRow.map(() => '---').join(' | ') + ' |\n';
+        // Clean up cell values
+        const cleanCells = cells.map(cell => {
+          let cleanCell = cell.trim().replace(/\|/g, '\\|');
+          // Handle parentheses for negative values in financial data
+          if (cleanCell.includes('(') && cleanCell.includes(')')) {
+            // Convert (123) format to -123 for better readability if it looks like a number
+            if (/^\(\s*\d[\d\s,.]*\)$/.test(cleanCell)) {
+              cleanCell = '-' + cleanCell.replace(/[()]/g, '').trim();
+            }
+          }
+          return cleanCell;
+        });
+        markdownTable += '| ' + cleanCells.join(' | ') + ' |\n';
+        return markdownTable;
+      }
+      // If we couldn't process it as CSV, return original
+      return text;
+    }
+    // For multi-line CSV data
     if (nonEmptyLines.length < 2) return text; // Return original if not enough data
 
     // Parse the rows and columns using our CSV parser
@@ -380,12 +502,41 @@ export const HelpPanel = ({
 
     // Debug logging
     console.log("Processing mixed content input:", text.substring(0, 50) + (text.length > 50 ? "..." : ""));
+    // Check if this might be an entire CSV table from the first line
+    const lines = text.trim().split('\n');
+    // Special handling for content that looks like a CSV table from the start
+    if (lines.length >= 2) {
+      // Check if the first line and a good portion of subsequent lines have commas
+      const firstLineHasCommas = lines[0].includes(',');
+      const commaCount = (lines[0].match(/,/g) || []).length;
+      if (firstLineHasCommas && commaCount >= 1) {
+        // Count how many lines have similar comma patterns
+        const linesWithCommas = lines.filter(line => {
+          const lineCommaCount = (line.match(/,/g) || []).length;
+          // Allow some variation in comma count (±1)
+          return lineCommaCount >= commaCount - 1 && lineCommaCount <= commaCount + 1;
+        });
+        const csvConsistencyRatio = linesWithCommas.length / lines.length;
+        console.log(`CSV consistency from first line: ${linesWithCommas.length}/${lines.length} lines (${(csvConsistencyRatio * 100).toFixed(1)}%) have consistent comma counts`);
+        // If at least 60% of lines have consistent comma patterns and there are at least 2 columns,
+        // this is likely a CSV table from the start
+        if (csvConsistencyRatio >= 0.6 && commaCount >= 1) {
+          console.log("Detected CSV table from the first line");
+          return formatAsMarkdownTable(text);
+        }
+      }
+    }
+    // Quick check for single-line CSV input
+    if (!text.includes('\n')) {
+      // If it's a single line, check if it's CSV format
+      if (isLineTabular(text)) {
+        console.log("Detected single-line CSV data at input start");
+        return formatAsMarkdownTable(text);
+      }
+    }
 
     // Look for mixed content with text followed by a table
     // This will check after each newline to see if the remaining content looks like a CSV table
-    const lines = text.split('\n');
-
-    // We'll try different positions as potential boundaries between text and table
     for (let i = 0; i < lines.length - 2; i++) {
       // Need at least 2 lines for a table, so don't check near the end
       if (i >= lines.length - 2) break;
@@ -436,12 +587,18 @@ export const HelpPanel = ({
 
     // If no mixed content is detected, return the original text
     if (sections.length <= 1) {
+      // Special case: if we have exactly one section and it's a table section
+      if (sections.length === 1 && sections[0].type === 'table') {
+        const tableText = sections[0].lines.join('\n');
+        console.log("Processing single table section:", tableText.substring(0, 50) + (tableText.length > 50 ? "..." : ""));
+        return formatAsMarkdownTable(tableText);
+      }
       console.log("Not detected as mixed content");
       return text;
     }
 
     // Check if any section is identified as a table
-    const hasTableSection = sections.some(section => section.type === 'table' && section.lines.length >= 2);
+    const hasTableSection = sections.some(section => section.type === 'table');
     if (!hasTableSection) {
       console.log("No valid table sections found");
       return text;
@@ -449,13 +606,18 @@ export const HelpPanel = ({
 
     // Process each section
     const processedText = sections.map(section => {
-      if (section.type === 'table' && section.lines.length >= 2) {
+      if (section.type === 'table') {
         const tableText = section.lines.join('\n');
         console.log("Processing table section:", tableText.substring(0, 50) + (tableText.length > 50 ? "..." : ""));
 
-        // Extra validation to ensure this section is actually tabular
-        if (isTabularData(tableText)) {
-          console.log("Converting to markdown table");
+        // For single-line tables, we've already validated them during section identification
+        if (section.lines.length === 1) {
+          console.log("Converting single-line table section to markdown table");
+          return formatAsMarkdownTable(tableText);
+        }
+        // For multi-line tables, do an extra validation
+        if (section.lines.length >= 2 && isTabularData(tableText)) {
+          console.log("Converting multi-line table section to markdown table");
           return formatAsMarkdownTable(tableText);
         } else {
           console.log("Section failed tabular validation, keeping as text");
@@ -477,8 +639,17 @@ export const HelpPanel = ({
 
     // If there's no bot response yet, this is the initial message from the user
     if (!botResponse) {
-      // Process message to handle mixed content and format tables
-      let processedUserMessage = processMixedContent(userMessage);
+      console.log("Processing initial user message:", userMessage.substring(0, 50) + (userMessage.length > 50 ? "..." : ""));
+      // Check if the message starts with a code block
+      const isCodeBlock = userMessage.trim().startsWith("```") && userMessage.trim().includes("```", 3);
+      // Skip CSV processing for code blocks as they should be preserved as-is
+      let processedUserMessage;
+      if (isCodeBlock) {
+        processedUserMessage = userMessage;
+      } else {
+        // Process message to handle mixed content and format tables
+        processedUserMessage = processMixedContent(userMessage);
+      }
 
       // Add user message to the chat in chronological order (at the end)
       setHelp(prev => [
