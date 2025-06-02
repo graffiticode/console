@@ -65,36 +65,47 @@ export const HelpPanel = ({
     const result = [];
     let cell = '';
     let inQuotes = false;
+    let isQuotedCell = false;
 
     // If there are no commas, treat it as a single cell
     if (!line.includes(',')) {
-      return [line.trim()];
+      const trimmed = line.trim();
+      // Handle case of a single quoted value
+      if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length > 2) {
+        return [trimmed.substring(1, trimmed.length - 1)];
+      }
+      return [trimmed];
     }
 
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
       const nextChar = line[i + 1];
 
-      if (char === '"' && (i === 0 || line[i - 1] === ',')) {
+      if (char === '"' && (i === 0 || line[i - 1] === ',' || /\s/.test(line[i - 1]))) {
         // Start of quoted cell
         inQuotes = true;
+        isQuotedCell = true;
+        // Skip the opening quote (don't add to cell)
         continue;
       } else if (char === '"' && nextChar === '"' && inQuotes) {
         // Escaped quote inside quoted cell (RFC 4180)
         cell += '"';
         i++; // Skip next quote
         continue;
-      } else if (char === '"' && (nextChar === ',' || !nextChar) && inQuotes) {
+      } else if (char === '"' && (nextChar === ',' || !nextChar || /\s/.test(nextChar)) && inQuotes) {
         // End of quoted cell
         inQuotes = false;
+        // Skip the closing quote (don't add to cell)
         if (nextChar === ',') i++; // Skip next comma
         result.push(cell.trim()); // Trim whitespace
         cell = '';
+        isQuotedCell = false;
         continue;
       } else if (char === ',' && !inQuotes) {
         // Unquoted cell delimiter
         result.push(cell.trim()); // Trim whitespace
         cell = '';
+        isQuotedCell = false;
         continue;
       }
 
@@ -117,22 +128,31 @@ export const HelpPanel = ({
     // Trim the line to remove whitespace that might affect detection
     const trimmedLine = line.trim();
     if (trimmedLine === '') return false;
-
-    // Count commas for CSV detection
-    const commaCount = trimmedLine.split(',').length - 1;
-
-    // Check for quoted values that may contain spaces
-    const hasQuotedValues = /"[^"]*"/.test(trimmedLine);
-
     // Check if line starts with characters that suggest it's a heading, not data
     const isPotentialHeading = /^(#|\*|-|\d+\.|>)/.test(trimmedLine);
+    // Check for quoted values that may contain commas
+    const hasQuotedValues = /"[^"]*"/.test(trimmedLine);
+    // If we have quoted values, try parsing with our CSV parser to get actual cell count
+    if (hasQuotedValues) {
+      try {
+        const cells = parseCSVLine(trimmedLine);
+        // If we have at least 2 columns after parsing, it's likely CSV
+        if (cells.length >= 2) {
+          return true;
+        }
+      } catch (e) {
+        console.error("Error parsing line with quotes for CSV detection:", e);
+      }
+    }
+    // Count commas for CSV detection (for non-quoted values or as fallback)
+    const commaCount = trimmedLine.split(',').length - 1;
 
     // If it looks like a markdown heading or list item and only has 0-1 commas, don't treat as CSV
     if (isPotentialHeading && commaCount <= 1) return false;
 
     // Basic heuristic: if line has multiple commas, it's likely CSV
-    // Note: We require at least 2 commas (3 fields) for better accuracy unless there are quoted values
-    return commaCount > 1 || (commaCount > 0 && hasQuotedValues);
+    // Note: We require at least 1 comma (2 fields) for better accuracy
+    return commaCount >= 1;
   };
 
   // Identify tabular sections within mixed content
@@ -281,113 +301,147 @@ export const HelpPanel = ({
     const lines = text.trim().split('\n');
     // Filter out empty lines
     const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+    // Check if any lines contain quoted values
+    const linesWithQuotes = nonEmptyLines.filter(line => /"[^"]*"/.test(line));
+    const hasQuotedValues = linesWithQuotes.length > 0;
+    console.log(`CSV detection starting with ${nonEmptyLines.length} lines, ${linesWithQuotes.length} contain quotes`);
     // Special case: first line might be CSV header even if it's the only line with commas
     if (nonEmptyLines.length >= 2) {
       const firstLine = nonEmptyLines[0];
-      const firstLineCommaCount = (firstLine.match(/,/g) || []).length;
-      // If first line has commas and subsequent lines have content that might be CSV data
-      if (firstLineCommaCount >= 1) {
-        // Count cells in the first line using our parser
-        try {
-          const headerCells = parseCSVLine(firstLine);
-          if (headerCells.length >= 2) {
-            // Check if subsequent lines have enough cells to match the header
-            const subsequentLines = nonEmptyLines.slice(1);
-            const matchingLineCount = subsequentLines.filter(line => {
-              try {
-                const cells = parseCSVLine(line);
-                // Allow some variation in column count (±1)
-                return Math.abs(cells.length - headerCells.length) <= 1;
-              } catch (e) {
-                return false;
-              }
-            }).length;
-            const matchRatio = matchingLineCount / subsequentLines.length;
-            console.log(`First line CSV header check: ${matchingLineCount}/${subsequentLines.length} lines (${(matchRatio * 100).toFixed(1)}%) match header pattern`);
-            // If at least 60% of lines have cells that roughly match the header, this is likely CSV
-            if (matchRatio >= 0.6) {
-              console.log("Detected CSV based on first line header pattern");
-              return true;
+      // Count cells in the first line using our parser that handles quoted values properly
+      try {
+        const headerCells = parseCSVLine(firstLine);
+        if (headerCells.length >= 2) {
+          // Check if subsequent lines have enough cells to match the header
+          const subsequentLines = nonEmptyLines.slice(1);
+          const matchingLineCount = subsequentLines.filter(line => {
+            try {
+              const cells = parseCSVLine(line);
+              // Allow some variation in column count (±1)
+              return Math.abs(cells.length - headerCells.length) <= 1;
+            } catch (e) {
+              return false;
             }
-          }
-        } catch (e) {
-          console.error("Error parsing potential CSV header:", e);
-        }
-      }
-    }
-    // Single line check - if the only line has multiple commas, it might be CSV
-    if (nonEmptyLines.length === 1) {
-      const singleLine = nonEmptyLines[0];
-      const commaCount = (singleLine.match(/,/g) || []).length;
-      const hasQuotedValues = /"[^"]*"/.test(singleLine);
-      // Consider single line as CSV if it has multiple commas or quoted values with commas
-      if (commaCount >= 1) {
-        console.log("Checking if single line is CSV data");
-        // Try to parse the line to make sure it's valid CSV
-        try {
-          const parsedCells = parseCSVLine(singleLine);
-          // Require at least 2 cells for a single line to be considered CSV
-          if (parsedCells.length >= 2) {
-            console.log("Detected single-line CSV data with multiple cells");
+          }).length;
+          const matchRatio = matchingLineCount / subsequentLines.length;
+          console.log(`First line CSV header check: ${matchingLineCount}/${subsequentLines.length} lines (${(matchRatio * 100).toFixed(1)}%) match header pattern`);
+          // If at least 50% of lines have cells that roughly match the header, this is likely CSV
+          if (matchRatio >= 0.5) {
+            console.log("Detected CSV based on first line header pattern");
             return true;
           }
-        } catch (e) {
-          console.error("Error parsing single-line CSV:", e);
         }
+      } catch (e) {
+        console.error("Error parsing potential CSV header:", e);
+      }
+    }
+    // Single line check - if the only line has commas or quotes, it might be CSV
+    if (nonEmptyLines.length === 1) {
+      const singleLine = nonEmptyLines[0];
+      const hasQuotes = /"[^"]*"/.test(singleLine);
+      // Always try to parse with our proper CSV parser
+      console.log("Checking if single line is CSV data");
+      try {
+        const parsedCells = parseCSVLine(singleLine);
+        // Require at least 2 cells for a single line to be considered CSV
+        if (parsedCells.length >= 2) {
+          console.log("Detected single-line CSV data with multiple cells");
+          return true;
+        }
+      } catch (e) {
+        console.error("Error parsing single-line CSV:", e);
       }
     }
     // If we don't have at least 2 non-empty lines, it's not a multi-line CSV
     if (nonEmptyLines.length < 2) return false;
 
-    // Basic check: does text contain commas?
-    if (!text.includes(',')) return false;
+    // For text with quoted values, we need a more careful approach
+    if (hasQuotedValues) {
+      console.log("CSV contains quoted values, using cell-based detection");
+      try {
+        // Parse each line using our CSV parser that properly handles quoted values
+        const parsedLines = nonEmptyLines.map(line => parseCSVLine(line));
+        // Count how many lines have at least 2 cells after parsing
+        const validLines = parsedLines.filter(cells => cells.length >= 2);
+        const validRatio = validLines.length / nonEmptyLines.length;
+        console.log(`CSV with quotes: ${validLines.length}/${nonEmptyLines.length} lines (${(validRatio * 100).toFixed(1)}%) have at least 2 cells`);
+        // If at least 50% of lines have 2+ cells, it's likely CSV
+        if (validRatio >= 0.5) {
+          return true;
+        }
+        // Get the most common column count to handle inconsistencies
+        const columnCounts = parsedLines.map(cols => cols.length);
+        const mostCommonColumnCount = columnCounts.sort((a, b) =>
+          columnCounts.filter(v => v === a).length - columnCounts.filter(v => v === b).length
+        ).pop();
 
-    // Check if this might be just descriptive text with some commas
-    // Count lines that are likely CSV rows (have similar comma counts)
-    let tabularLineCount = 0;
-    const totalCommaCount = nonEmptyLines.reduce((sum, line) => sum + (line.match(/,/g) || []).length, 0);
-    const avgCommasPerLine = totalCommaCount / nonEmptyLines.length;
+        // Check if most lines have a similar column count (allow ±1 for CSV tables)
+        const consistentLines = parsedLines.filter(
+          cols => Math.abs(cols.length - mostCommonColumnCount) <= 1
+        );
 
-    // More lenient check for comma frequency - allow as low as 0.7 commas per line on average
-    if (avgCommasPerLine < 0.7) {
-      console.log("Not likely CSV - too few commas per line on average");
-      return false;
-    }
+        const consistentRatio = consistentLines.length / parsedLines.length;
+        console.log(`CSV consistency with quotes: ${consistentLines.length}/${parsedLines.length} lines (${(consistentRatio * 100).toFixed(1)}%) have consistent column counts, most common count: ${mostCommonColumnCount}`);
 
-    // Parse each line using our CSV parser that handles quoted values with spaces
-    try {
-      const parsedLines = nonEmptyLines.map(line => parseCSVLine(line));
-
-      // Get the most common column count to handle slight inconsistencies
-      const columnCounts = parsedLines.map(cols => cols.length);
-      const mostCommonColumnCount = columnCounts.sort((a, b) =>
-        columnCounts.filter(v => v === a).length - columnCounts.filter(v => v === b).length
-      ).pop();
-
-      // Check if most lines have a similar column count (allow ±1 for CSV tables which might have aligned sections)
-      const consistentLines = parsedLines.filter(
-        cols => Math.abs(cols.length - mostCommonColumnCount) <= 1
-      );
-
-      const consistentRatio = consistentLines.length / parsedLines.length;
-      console.log(`CSV consistency check: ${consistentLines.length}/${parsedLines.length} lines (${(consistentRatio * 100).toFixed(1)}%) have consistent column counts, most common count: ${mostCommonColumnCount}`);
-
-      // At least 60% of lines should have consistent columns and there should be at least 2 columns
-      if (consistentRatio >= 0.6 && mostCommonColumnCount >= 2) {
-        console.log("Detected as CSV via column consistency");
-        return true;
+        // More lenient threshold (50%) for quoted content and at least 2 columns
+        if (consistentRatio >= 0.5 && mostCommonColumnCount >= 2) {
+          console.log("Detected as CSV via column consistency with quoted values");
+          return true;
+        }
+      } catch (e) {
+        console.error("Error parsing CSV data with quotes:", e);
       }
-    } catch (e) {
-      console.error("Error parsing CSV data:", e);
+    } else {
+      // For content without quotes, use comma-based checks
+      // Basic check: does text contain commas?
+      if (!text.includes(',')) return false;
+
+      // Check if this might be just descriptive text with some commas
+      // Count lines that are likely CSV rows (have similar comma counts)
+      const totalCommaCount = nonEmptyLines.reduce((sum, line) => sum + (line.match(/,/g) || []).length, 0);
+      const avgCommasPerLine = totalCommaCount / nonEmptyLines.length;
+
+      // More lenient check for comma frequency - allow as low as 0.7 commas per line on average
+      if (avgCommasPerLine < 0.7) {
+        console.log("Not likely CSV - too few commas per line on average");
+        return false;
+      }
+
+      // Parse each line using our CSV parser
+      try {
+        const parsedLines = nonEmptyLines.map(line => parseCSVLine(line));
+
+        // Get the most common column count to handle slight inconsistencies
+        const columnCounts = parsedLines.map(cols => cols.length);
+        const mostCommonColumnCount = columnCounts.sort((a, b) =>
+          columnCounts.filter(v => v === a).length - columnCounts.filter(v => v === b).length
+        ).pop();
+
+        // Check if most lines have a similar column count (allow ±1 for CSV tables)
+        const consistentLines = parsedLines.filter(
+          cols => Math.abs(cols.length - mostCommonColumnCount) <= 1
+        );
+
+        const consistentRatio = consistentLines.length / parsedLines.length;
+        console.log(`CSV consistency check: ${consistentLines.length}/${parsedLines.length} lines (${(consistentRatio * 100).toFixed(1)}%) have consistent column counts, most common count: ${mostCommonColumnCount}`);
+
+        // At least 60% of lines should have consistent columns and there should be at least 2 columns
+        if (consistentRatio >= 0.6 && mostCommonColumnCount >= 2) {
+          console.log("Detected as CSV via column consistency");
+          return true;
+        }
+      } catch (e) {
+        console.error("Error parsing CSV data:", e);
+      }
     }
 
     // Finally, check using the isLineTabular to detect if most lines look like CSV
-    tabularLineCount = nonEmptyLines.filter(isLineTabular).length;
+    const tabularLineCount = nonEmptyLines.filter(isLineTabular).length;
     const tabularRatio = tabularLineCount / nonEmptyLines.length;
     console.log(`CSV line-by-line check: ${tabularLineCount}/${nonEmptyLines.length} lines (${(tabularRatio * 100).toFixed(1)}%) are tabular`);
 
-    // Reduced threshold to 60% to be more lenient with mixed content
-    return tabularRatio >= 0.6;
+    // Reduced threshold to 50% to be more lenient with mixed content, especially with quoted values
+    return tabularRatio >= 0.5;
   };
 
   // Convert CSV data to markdown table, with support for values that contain spaces
@@ -396,18 +450,21 @@ export const HelpPanel = ({
 
     // Filter out empty lines
     const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+    // Function to extract cell content preserving commas inside quotes
+    const extractCellsFromLine = (line) => {
+      // Fast path for simple cases
+      if (!line.includes('"')) {
+        return line.split(',').map(cell => cell.trim());
+      }
+      // Use parseCSVLine for proper handling of quoted values
+      return parseCSVLine(line);
+    };
     // Special handling for single line CSV data
     if (nonEmptyLines.length === 1) {
       console.log("Formatting single-line CSV as markdown table");
       const singleLine = nonEmptyLines[0];
-      // Try to parse the line as CSV
-      let cells;
-      try {
-        cells = parseCSVLine(singleLine);
-      } catch (e) {
-        // Fallback to simple comma split if parser fails
-        cells = singleLine.split(',').map(cell => cell.trim());
-      }
+      // Extract cells preserving quoted content
+      const cells = extractCellsFromLine(singleLine);
       // Only proceed if we have at least 2 cells
       if (cells.length >= 2) {
         // Generate column headers (Column 1, Column 2, etc.)
@@ -416,7 +473,7 @@ export const HelpPanel = ({
         let markdownTable = '';
         markdownTable += '| ' + headerRow.join(' | ') + ' |\n';
         markdownTable += '| ' + headerRow.map(() => '---').join(' | ') + ' |\n';
-        // Clean up cell values
+        // Clean up cell values and handle pipes for markdown table
         const cleanCells = cells.map(cell => {
           let cleanCell = cell.trim().replace(/\|/g, '\\|');
           // Handle parentheses for negative values in financial data
@@ -437,21 +494,13 @@ export const HelpPanel = ({
     // For multi-line CSV data
     if (nonEmptyLines.length < 2) return text; // Return original if not enough data
 
-    // Parse the rows and columns using our CSV parser
+    // Parse each line to extract cells properly
     const rows = nonEmptyLines.map(line => {
-      let cells;
-      try {
-        cells = parseCSVLine(line);
-      } catch (e) {
-        // Fallback to simple comma split if parser fails
-        cells = line.split(',').map(cell => cell.trim());
-      }
-
-      // Escape pipe characters in cell content to avoid breaking markdown table
+      // Extract cells preserving quoted content
+      const cells = extractCellsFromLine(line);
+      // Clean up and escape cells for markdown table
       return cells.map(cell => {
-        // Clean up cell content
         let cleanCell = cell.trim().replace(/\|/g, '\\|');
-
         // Handle parentheses for negative values in financial data
         if (cleanCell.includes('(') && cleanCell.includes(')')) {
           // Convert (123) format to -123 for better readability if it looks like a number
@@ -459,7 +508,6 @@ export const HelpPanel = ({
             cleanCell = '-' + cleanCell.replace(/[()]/g, '').trim();
           }
         }
-
         return cleanCell;
       });
     });
@@ -479,8 +527,6 @@ export const HelpPanel = ({
       headerRow.push('Column ' + (headerRow.length + 1)); // Add default header names
     }
     markdownTable += '| ' + headerRow.join(' | ') + ' |\n';
-
-    // Separator row
     markdownTable += '| ' + headerRow.map(() => '---').join(' | ') + ' |\n';
 
     // Data rows
@@ -504,25 +550,64 @@ export const HelpPanel = ({
     console.log("Processing mixed content input:", text.substring(0, 50) + (text.length > 50 ? "..." : ""));
     // Check if this might be an entire CSV table from the first line
     const lines = text.trim().split('\n');
+    // Check if any lines contain quoted values that might include commas
+    const hasQuotedValues = lines.some(line => /"[^"]*"/.test(line));
     // Special handling for content that looks like a CSV table from the start
     if (lines.length >= 2) {
-      // Check if the first line and a good portion of subsequent lines have commas
-      const firstLineHasCommas = lines[0].includes(',');
-      const commaCount = (lines[0].match(/,/g) || []).length;
-      if (firstLineHasCommas && commaCount >= 1) {
-        // Count how many lines have similar comma patterns
-        const linesWithCommas = lines.filter(line => {
-          const lineCommaCount = (line.match(/,/g) || []).length;
-          // Allow some variation in comma count (±1)
-          return lineCommaCount >= commaCount - 1 && lineCommaCount <= commaCount + 1;
-        });
-        const csvConsistencyRatio = linesWithCommas.length / lines.length;
-        console.log(`CSV consistency from first line: ${linesWithCommas.length}/${lines.length} lines (${(csvConsistencyRatio * 100).toFixed(1)}%) have consistent comma counts`);
-        // If at least 60% of lines have consistent comma patterns and there are at least 2 columns,
-        // this is likely a CSV table from the start
-        if (csvConsistencyRatio >= 0.6 && commaCount >= 1) {
-          console.log("Detected CSV table from the first line");
-          return formatAsMarkdownTable(text);
+      if (hasQuotedValues) {
+        console.log("Detected quoted values in potential CSV");
+        // For CSV with quotes, we need to use our proper CSV parser
+        try {
+          // Parse the first line to see if it has multiple cells
+          const firstLineCells = parseCSVLine(lines[0]);
+          if (firstLineCells.length >= 2) {
+            // Now try to parse subsequent lines and check consistency
+            let validCellsCount = 0;
+            for (let i = 1; i < lines.length; i++) {
+              if (lines[i].trim() === '') continue;
+              try {
+                const cells = parseCSVLine(lines[i]);
+                // If this line has roughly the same number of cells as the first line,
+                // it's likely part of the same CSV table
+                if (Math.abs(cells.length - firstLineCells.length) <= 1 && cells.length >= 2) {
+                  validCellsCount++;
+                }
+              } catch (e) {
+                // Skip parsing errors
+              }
+            }
+            const nonEmptyLines = lines.filter(line => line.trim() !== '').length - 1; // Exclude first line
+            const validRatio = nonEmptyLines > 0 ? validCellsCount / nonEmptyLines : 0;
+            console.log(`CSV with quotes: ${validCellsCount}/${nonEmptyLines} lines (${(validRatio * 100).toFixed(1)}%) match first line cell pattern`);
+            // If at least 50% of non-empty lines have a similar cell structure,
+            // this is likely a CSV table from the start
+            if (validRatio >= 0.5 || validCellsCount >= 2) {
+              console.log("Detected CSV table with quotes from the first line");
+              return formatAsMarkdownTable(text);
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing potential CSV with quotes:", e);
+        }
+      } else {
+        // For regular CSV without quotes, check comma patterns
+        const firstLineHasCommas = lines[0].includes(',');
+        const commaCount = (lines[0].match(/,/g) || []).length;
+        if (firstLineHasCommas && commaCount >= 1) {
+          // Count how many lines have similar comma patterns
+          const linesWithCommas = lines.filter(line => {
+            const lineCommaCount = (line.match(/,/g) || []).length;
+            // Allow some variation in comma count (±1)
+            return lineCommaCount >= commaCount - 1 && lineCommaCount <= commaCount + 1;
+          });
+          const csvConsistencyRatio = linesWithCommas.length / lines.length;
+          console.log(`CSV consistency from first line: ${linesWithCommas.length}/${lines.length} lines (${(csvConsistencyRatio * 100).toFixed(1)}%) have consistent comma counts`);
+          // If at least 60% of lines have consistent comma patterns and there are at least 2 columns,
+          // this is likely a CSV table from the start
+          if (csvConsistencyRatio >= 0.6 && commaCount >= 1) {
+            console.log("Detected CSV table from the first line");
+            return formatAsMarkdownTable(text);
+          }
         }
       }
     }
@@ -550,26 +635,67 @@ export const HelpPanel = ({
 
       // Check if the table part contains CSV-like data
       const tableLines = tablePart.split('\n').filter(line => line.trim() !== '');
+      // Check if there are quoted values in the table part
+      const hasQuotedValues = tableLines.some(line => /"[^"]*"/.test(line));
+      // For content with quoted values, use our CSV parser instead of simple comma counting
+      if (hasQuotedValues) {
+        console.log(`Table check at line ${i+1} contains quoted values`);
+        try {
+          // Check if first line can be parsed as CSV with multiple cells
+          const firstLineCells = parseCSVLine(tableLines[0]);
+          if (firstLineCells.length >= 2 && tableLines.length >= 2) {
+            // Try to parse subsequent lines and count how many match the pattern
+            let validLinesCount = 0;
+            for (let j = 1; j < tableLines.length; j++) {
+              try {
+                const cells = parseCSVLine(tableLines[j]);
+                if (Math.abs(cells.length - firstLineCells.length) <= 1 && cells.length >= 2) {
+                  validLinesCount++;
+                }
+              } catch (e) {
+                // Skip parsing errors
+              }
+            }
+            const validRatio = validLinesCount / (tableLines.length - 1);
+            console.log(`CSV with quotes in mixed content: ${validLinesCount}/${tableLines.length - 1} lines (${(validRatio * 100).toFixed(1)}%) match cell pattern`);
+            // Also check if the last line of text ends with a colon - this is a stronger indicator
+            const endsWithColon = textPart.trim().endsWith(':');
+            // For quoted CSV, accept it if either:
+            // 1. The text ends with a colon and we have at least one valid line, OR
+            // 2. At least 50% of lines match the pattern
+            if ((endsWithColon && validLinesCount > 0) || validRatio >= 0.5) {
+              console.log(`Detected text followed by CSV table with quotes at line ${i+1}`);
+              // Format just the table part as a table
+              const formattedTable = formatAsMarkdownTable(tablePart);
+              // Return the text part with the formatted table
+              return textPart + "\n\n" + formattedTable;
+            }
+          }
+        } catch (e) {
+          console.error("Error checking for quoted CSV in mixed content:", e);
+        }
+      } else {
+        // Regular CSV check for content without quotes
+        // Check if we have enough CSV-like lines and they contain commas
+        const commaLines = tableLines.filter(line => line.includes(','));
+        const hasEnoughLines = tableLines.length >= 2;
+        const hasEnoughCommas = commaLines.length >= Math.ceil(tableLines.length * 0.4); // At least 40% of lines should have commas
 
-      // Check if we have enough CSV-like lines and they contain commas
-      const commaLines = tableLines.filter(line => line.includes(','));
-      const hasEnoughLines = tableLines.length >= 2;
-      const hasEnoughCommas = commaLines.length >= Math.ceil(tableLines.length * 0.4); // At least 40% of lines should have commas
+        console.log(`Table check at line ${i+1}: ${hasEnoughLines ? 'has enough lines' : 'not enough lines'}, ${hasEnoughCommas ? 'has enough commas' : 'not enough commas'}, comma lines: ${commaLines.length}/${tableLines.length}`);
 
-      console.log(`Table check at line ${i+1}: ${hasEnoughLines ? 'has enough lines' : 'not enough lines'}, ${hasEnoughCommas ? 'has enough commas' : 'not enough commas'}, comma lines: ${commaLines.length}/${tableLines.length}`);
+        // Also check if the last line of text ends with a colon - this is a stronger indicator
+        const endsWithColon = textPart.trim().endsWith(':');
 
-      // Also check if the last line of text ends with a colon - this is a stronger indicator
-      const endsWithColon = textPart.trim().endsWith(':');
+        // The best boundary would be text ending with a colon, but we'll accept other boundaries too
+        if (hasEnoughLines && hasEnoughCommas && (endsWithColon || commaLines.length >= 3)) {
+          console.log(`Detected text followed by table data at line ${i+1}${endsWithColon ? ' (ends with colon)' : ''}`);
 
-      // The best boundary would be text ending with a colon, but we'll accept other boundaries too
-      if (hasEnoughLines && hasEnoughCommas && (endsWithColon || commaLines.length >= 3)) {
-        console.log(`Detected text followed by table data at line ${i+1}${endsWithColon ? ' (ends with colon)' : ''}`);
+          // Format just the table part as a table
+          const formattedTable = formatAsMarkdownTable(tablePart);
 
-        // Format just the table part as a table
-        const formattedTable = formatAsMarkdownTable(tablePart);
-
-        // Return the text part with the formatted table
-        return textPart + "\n\n" + formattedTable;
+          // Return the text part with the formatted table
+          return textPart + "\n\n" + formattedTable;
+        }
       }
     }
 
