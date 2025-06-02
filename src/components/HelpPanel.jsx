@@ -17,6 +17,29 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import { useDropzone } from 'react-dropzone';
+import { createPortal } from 'react-dom';
+
+// Add custom CSS for dropzone
+const dropzoneStyles = `
+  .drag-active {
+    position: relative;
+  }
+  
+  .drag-active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(59, 130, 246, 0.08);
+    border: 2px dashed rgba(59, 130, 246, 0.5);
+    border-radius: 0.5rem;
+    z-index: 40;
+    pointer-events: none;
+  }
+`;
 
 const isNullOrEmptyObject = (obj) => !obj || Object.keys(obj).length === 0;
 
@@ -44,6 +67,184 @@ export const HelpPanel = ({
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
   const { user } = useGraffiticodeAuth();
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadNotification, setUploadNotification] = useState(null);
+
+  // Create a ref for the state to avoid circular dependencies
+  const stateRef = useRef(null);
+
+  // Integration with TextEditor component - will be properly initialized after ChatBot setup
+  const [state] = useState(createState({}, (data, { type, args }) => {
+    switch (type) {
+      case "update":
+        // Handle message sending only if we have the right functions
+        if (args.content && data.handleSendMessage && !data.isLoading) {
+          data.handleSendMessage(args.content);
+        }
+        return {
+          ...data,
+          ...args,
+        };
+      case "csv-upload":
+        // For CSV uploads, we don't want to trigger handleSendMessage
+        // We just want to update the editor content
+        console.log("CSV upload:", args.filename);
+        return {
+          ...data,
+          content: args.content,
+        };
+      case "config":
+        // For configuring the state with handlers
+        return {
+          ...data,
+          ...args
+        };
+      default:
+        console.error(false, `Unimplemented action type: ${type}`);
+        return data;
+    }
+  }));
+
+  // Handle file drop functionality for the entire panel
+  const onDrop = useCallback((acceptedFiles) => {
+    if (acceptedFiles.length === 0) return;
+
+    const file = acceptedFiles[0];
+    console.log("Dropped file:", file.name);
+
+    // Read the file contents
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const csvContent = e.target.result;
+      let updateSuccess = false;
+
+      // Wait a moment to ensure the editor is accessible
+      setTimeout(() => {
+        // Try direct DOM manipulation first - most reliable method
+        try {
+          // Try to find the editor in multiple ways
+          const editorElement =
+            document.querySelector("[contenteditable=true]") ||
+            document.querySelector(".ProseMirror") ||
+            document.querySelector("[role='textbox']");
+
+          if (editorElement) {
+            console.log("Found editor element:", editorElement);
+            // Focus and clear the editor
+            editorElement.focus();
+
+            // Try multiple approaches to insert text
+            try {
+              // Modern approach
+              document.execCommand('selectAll', false, null);
+              document.execCommand('delete', false, null);
+              document.execCommand('insertText', false, csvContent);
+              updateSuccess = true;
+              console.log("Successfully inserted CSV via execCommand");
+            } catch (insertErr) {
+              console.error("execCommand insertion failed:", insertErr);
+
+              // Try direct innerHTML approach
+              try {
+                editorElement.innerHTML = '';
+                editorElement.innerHTML = csvContent.replace(/\n/g, '<br>');
+                updateSuccess = true;
+                console.log("Successfully inserted CSV via innerHTML");
+              } catch (innerErr) {
+                console.error("innerHTML insertion failed:", innerErr);
+              }
+            }
+          } else {
+            console.error("Could not find editor element");
+          }
+        } catch (err) {
+          console.error("DOM manipulation failed:", err);
+        }
+
+        // Try state update as a fallback
+        if (!updateSuccess && state && typeof state.apply === 'function') {
+          try {
+            state.apply({
+              type: 'csv-upload',
+              args: {
+                content: csvContent
+              }
+            });
+            updateSuccess = true;
+            console.log("Successfully updated content via state update");
+          } catch (err) {
+            console.error("State update failed:", err);
+          }
+        }
+
+        // Show appropriate notification
+        if (updateSuccess) {
+          setUploadNotification({
+            type: 'success',
+            message: `CSV file "${file.name}" loaded into editor`,
+            fileName: file.name
+          });
+        } else {
+          // Last resort: copy to clipboard
+          try {
+            // First try the modern clipboard API
+            navigator.clipboard.writeText(csvContent)
+              .then(() => {
+                setUploadNotification({
+                  type: 'warning',
+                  message: `CSV copied to clipboard. Press Ctrl+V or Cmd+V to paste.`,
+                  fileName: file.name
+                });
+              })
+              .catch((clipErr) => {
+                console.error("Clipboard API failed:", clipErr);
+                // Fallback: show error notification
+                setUploadNotification({
+                  type: 'error',
+                  message: `Could not process CSV file. Please try copying and pasting manually.`,
+                  fileName: file.name
+                });
+              });
+          } catch (clipErr) {
+            console.error("Clipboard operation failed:", clipErr);
+            setUploadNotification({
+              type: 'error',
+              message: `Could not process CSV file`,
+              fileName: file.name
+            });
+          }
+        }
+
+        // Close the modal if it's open
+        setShowUploadModal(false);
+
+        // Clear notification after 3 seconds
+        setTimeout(() => {
+          setUploadNotification(null);
+        }, 3000);
+      }, 100); // Small delay to ensure DOM is ready
+    };
+
+    reader.onerror = (error) => {
+      console.error("Error reading file:", error);
+      setUploadNotification({
+        type: 'error',
+        message: 'Error reading CSV file',
+        fileName: file.name
+      });
+
+      // Close the modal
+      setShowUploadModal(false);
+
+      // Clear notification after 3 seconds
+      setTimeout(() => {
+        setUploadNotification(null);
+      }, 3000);
+    };
+
+    // Read the file as text
+    reader.readAsText(file);
+  }, [state]);
 
   // ChatBot integration
   const { handleSendMessage, cancelGeneration, isLoading } = ChatBot({
@@ -55,6 +256,19 @@ export const HelpPanel = ({
     language,
     chatHistory: help, // Pass the current help array as chat history
     currentCode: code, // Pass the current code from the code panel
+  });
+
+  // Setup dropzone for the entire panel
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'text/csv': ['.csv'],
+      'text/plain': ['.csv', '.txt'],
+      'application/vnd.ms-excel': ['.csv']
+    },
+    maxFiles: 1,
+    noClick: true, // Don't open file dialog on click, only accept drops
+    noKeyboard: true // Disable keyboard interaction
   });
 
   // We'll need to auto-scroll to the bottom when new messages arrive
@@ -822,9 +1036,262 @@ export const HelpPanel = ({
 
   // State for the input field
   const [messageText, setMessageText] = useState('');
-  const [uploadNotification, setUploadNotification] = useState(null);
 
-  // Handle CSV file upload
+  // Custom dropzone component for CSV uploads
+  const CsvDropzone = () => {
+    const onDrop = useCallback((acceptedFiles) => {
+      if (acceptedFiles.length === 0) return;
+
+      const file = acceptedFiles[0];
+      console.log("Uploaded file:", file.name);
+
+      // Read the file contents
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const csvContent = e.target.result;
+        let updateSuccess = false;
+
+        // Wait a moment to ensure the editor is accessible
+        setTimeout(() => {
+          // Try direct DOM manipulation first - most reliable method
+          try {
+            // Try to find the editor in multiple ways
+            const editorElement =
+              document.querySelector("[contenteditable=true]") ||
+              document.querySelector(".ProseMirror") ||
+              document.querySelector("[role='textbox']");
+
+            if (editorElement) {
+              console.log("Found editor element:", editorElement);
+              // Focus and clear the editor
+              editorElement.focus();
+
+              // Try multiple approaches to insert text
+              try {
+                // Modern approach
+                document.execCommand('selectAll', false, null);
+                document.execCommand('delete', false, null);
+                document.execCommand('insertText', false, csvContent);
+                updateSuccess = true;
+                console.log("Successfully inserted CSV via execCommand");
+              } catch (insertErr) {
+                console.error("execCommand insertion failed:", insertErr);
+
+                // Try direct innerHTML approach
+                try {
+                  editorElement.innerHTML = '';
+                  editorElement.innerHTML = csvContent.replace(/\n/g, '<br>');
+                  updateSuccess = true;
+                  console.log("Successfully inserted CSV via innerHTML");
+                } catch (innerErr) {
+                  console.error("innerHTML insertion failed:", innerErr);
+                }
+              }
+            } else {
+              console.error("Could not find editor element");
+            }
+          } catch (err) {
+            console.error("DOM manipulation failed:", err);
+          }
+
+          // If direct DOM manipulation failed, try state update
+          if (!updateSuccess && state && typeof state.update === 'function') {
+            try {
+              state.update({
+                type: 'csv-upload',
+                args: {
+                  content: csvContent
+                }
+              });
+              updateSuccess = true;
+              console.log("Successfully updated content via state update");
+            } catch (err) {
+              console.error("State update failed:", err);
+            }
+          }
+
+          // Show appropriate notification
+          if (updateSuccess) {
+            setUploadNotification({
+              type: 'success',
+              message: `CSV file "${file.name}" loaded into editor`,
+              fileName: file.name
+            });
+          } else {
+            // Last resort: copy to clipboard
+            try {
+              // First try the modern clipboard API
+              navigator.clipboard.writeText(csvContent)
+                .then(() => {
+                  setUploadNotification({
+                    type: 'warning',
+                    message: `CSV copied to clipboard. Press Ctrl+V or Cmd+V to paste.`,
+                    fileName: file.name
+                  });
+                })
+                .catch((clipErr) => {
+                  console.error("Clipboard API failed:", clipErr);
+                  // Fallback: show error notification
+                  setUploadNotification({
+                    type: 'error',
+                    message: `Could not process CSV file. Please try copying and pasting manually.`,
+                    fileName: file.name
+                  });
+                });
+            } catch (clipErr) {
+              console.error("Clipboard operation failed:", clipErr);
+              setUploadNotification({
+                type: 'error',
+                message: `Could not process CSV file`,
+                fileName: file.name
+              });
+            }
+          }
+
+          // Close the modal
+          setShowUploadModal(false);
+
+          // Clear notification after 3 seconds
+          setTimeout(() => {
+            setUploadNotification(null);
+          }, 3000);
+        }, 100); // Small delay to ensure DOM is ready
+      };
+
+      reader.onerror = (error) => {
+        console.error("Error reading file:", error);
+        setUploadNotification({
+          type: 'error',
+          message: 'Error reading CSV file',
+          fileName: file.name
+        });
+
+        // Close the modal
+        setShowUploadModal(false);
+
+        // Clear notification after 3 seconds
+        setTimeout(() => {
+          setUploadNotification(null);
+        }, 3000);
+      };
+
+      // Read the file as text
+      reader.readAsText(file);
+    }, []);
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+      onDrop,
+      accept: {
+        'text/csv': ['.csv'],
+        'text/plain': ['.csv', '.txt'],
+        'application/vnd.ms-excel': ['.csv']
+      },
+      maxFiles: 1
+    });
+
+    const modalContent = (
+      <div
+        className="fixed inset-0 flex items-center justify-center"
+        style={{
+          position: 'fixed',
+          zIndex: 2147483647, // Max possible z-index value
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+        onClick={() => setShowUploadModal(false)}
+      >
+        <div
+          className="bg-white rounded-md p-4 shadow-xl w-[400px] max-w-[90vw]"
+          style={{
+            position: 'relative',
+            zIndex: 2147483647,
+            backgroundColor: 'white',
+            borderRadius: '0.375rem',
+            padding: '1rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-base font-medium">Upload CSV File</h3>
+            <button
+              onClick={() => setShowUploadModal(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div
+            {...getRootProps()}
+            className={`border border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
+              isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+            }`}
+            style={{
+              border: '1px dashed',
+              borderColor: isDragActive ? '#3b82f6' : '#d1d5db',
+              borderRadius: '0.375rem',
+              padding: '1.5rem',
+              textAlign: 'center',
+              cursor: 'pointer',
+              backgroundColor: isDragActive ? '#eff6ff' : 'transparent'
+            }}
+          >
+            <input {...getInputProps()} />
+            {isDragActive ? (
+              <p className="text-blue-500 text-sm">Drop the CSV file here...</p>
+            ) : (
+              <div>
+                <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <p className="mt-2 text-sm text-gray-600">
+                  Drag & drop a CSV file here, or <span className="text-blue-500 font-medium">click to select</span>
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  CSV files only
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end mt-3">
+            <button
+              onClick={() => setShowUploadModal(false)}
+              className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+              style={{
+                padding: '0.375rem 0.75rem',
+                fontSize: '0.75rem',
+                fontWeight: '500',
+                color: '#374151',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '0.25rem',
+                transition: 'background-color 0.2s'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+
+    // Render the modal content as a portal to the document body
+    return createPortal(
+      modalContent,
+      document.body
+    );
+  };
+
+  // Handle CSV file upload (legacy method for direct input handling)
   const handleCsvUpload = (event) => {
     if (!event.target.files || event.target.files.length === 0) {
       return;
@@ -854,10 +1321,10 @@ export const HelpPanel = ({
         } catch (err) {
           console.error("DOM manipulation failed:", err);
         }
-        // If direct DOM manipulation failed, try state update
-        if (!updateSuccess && state && typeof state.update === 'function') {
+        // Try state update as a fallback
+        if (!updateSuccess && state && typeof state.apply === 'function') {
           try {
-            state.update({
+            state.apply({
               type: 'csv-upload',
               args: {
                 content: csvContent
@@ -939,30 +1406,20 @@ export const HelpPanel = ({
     console.log("Chat history updated, messages count:", help.length);
   }, [help]);
 
-  // Integration with TextEditor component
-  const [state] = useState(createState({}, (data, { type, args }) => {
-    switch (type) {
-      case "update":
-        if (args.content && !isLoading) {
-          handleSendMessage(args.content);
+  // Update state handler after ChatBot is initialized
+  useEffect(() => {
+    if (handleSendMessage && state) {
+      stateRef.current = state;
+      // Now we can update the state to properly handle messages
+      state.apply({
+        type: 'config',
+        args: {
+          handleSendMessage,
+          isLoading
         }
-        return {
-          ...data,
-          ...args,
-        };
-      case "csv-upload":
-        // For CSV uploads, we don't want to trigger handleSendMessage
-        // We just want to update the editor content
-        console.log("CSV upload:", args.filename);
-        return {
-          ...data,
-          content: args.content,
-        };
-      default:
-        console.error(false, `Unimplemented action type: ${type}`);
-        return data;
+      });
     }
-  }));
+  }, [handleSendMessage, isLoading, state]);
 
   // Function to format token usage display
   const formatTokenUsage = (usage) => {
@@ -1118,7 +1575,24 @@ export const HelpPanel = ({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)]">
+    <div {...getRootProps()} className={`flex flex-col h-[calc(100vh-120px)] ${isDragActive ? 'drag-active' : ''}`}>
+      {/* Add style tag for dropzone styles */}
+      <style>{dropzoneStyles}</style>
+
+      <input {...getInputProps()} />
+
+      {/* Drag overlay - only visible when dragging */}
+      {isDragActive && (
+        <div className="absolute inset-0 bg-blue-100 bg-opacity-50 flex items-center justify-center z-50 border-4 border-dashed border-blue-400 rounded-lg">
+          <div className="bg-white p-6 rounded-lg shadow-lg text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <p className="mt-4 text-lg font-semibold text-blue-700">Drop CSV file here</p>
+          </div>
+        </div>
+      )}
+
       {/* Input field at the top */}
       <div ref={headerRef} className="flex-none sticky top-0 z-20 bg-white px-4 py-3 border-b shadow-md">
         <div className="flex justify-between items-center text-xs mb-2">
@@ -1126,26 +1600,18 @@ export const HelpPanel = ({
             Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for newlines, {' '}
             <span className="font-medium py-0.5">CSV</span> for tabular data, {' '}
             <span className="font-medium py-0.5 px-1 rounded-sm bg-[#f8f8f8] font-mono">```</span> for code.
+            <span className="ml-1 text-gray-500 flex items-center inline-flex">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </span>
+            Drag & drop files.
             Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
           </div>
           <div className="flex items-center">
-            <label htmlFor="csv-upload" className="text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors cursor-pointer flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              Upload CSV
-              <input
-                id="csv-upload"
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={handleCsvUpload}
-                disabled={isLoading}
-              />
-            </label>
             {help.length > 0 && (
               <button
-                className="text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors ml-4"
+                className="text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors"
                 onClick={handleClearAll}
                 title="Clear conversation"
               >
@@ -1186,6 +1652,8 @@ export const HelpPanel = ({
           </div>
         )}
 
+        {/* CSV Upload Modal */}
+        {showUploadModal && <CsvDropzone />}
       </div>
 
       {/* Scrollable messages container - now takes most of the space */}

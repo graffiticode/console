@@ -5,6 +5,7 @@ This dialect is used for generating spreadsheet based assessments.
 ## Response Requirements
 
 - **IMPORTANT**: Whatever the user request is, the response should always be a complete spreadsheet with all necessary data, formulas, and formatting included.
+- **DEFAULT BEHAVIOR**: If no specific instructions are given but table data is present, create a simple spreadsheet that represents the data with appropriate headers and formatting.
 
 ## Program structure
 
