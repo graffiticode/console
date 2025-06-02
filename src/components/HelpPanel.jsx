@@ -525,6 +525,116 @@ export const HelpPanel = ({
 
   // State for the input field
   const [messageText, setMessageText] = useState('');
+  const [uploadNotification, setUploadNotification] = useState(null);
+
+  // Handle CSV file upload
+  const handleCsvUpload = (event) => {
+    if (!event.target.files || event.target.files.length === 0) {
+      return;
+    }
+
+    try {
+      const file = event.target.files[0];
+      console.log("Uploaded file:", file.name);
+      // Read the file contents
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const csvContent = e.target.result;
+        let updateSuccess = false;
+        // Try direct DOM manipulation first - most reliable method
+        try {
+          const editorElement = document.querySelector("[contenteditable=true]");
+          if (editorElement) {
+            // Focus and clear the editor
+            editorElement.focus();
+            document.execCommand('selectAll', false, null);
+            document.execCommand('delete', false, null);
+            // Insert the content
+            document.execCommand('insertText', false, csvContent);
+            updateSuccess = true;
+            console.log("Successfully inserted CSV via contenteditable element");
+          }
+        } catch (err) {
+          console.error("DOM manipulation failed:", err);
+        }
+        // If direct DOM manipulation failed, try state update
+        if (!updateSuccess && state && typeof state.update === 'function') {
+          try {
+            state.update({
+              type: 'csv-upload',
+              args: {
+                content: csvContent
+              }
+            });
+            updateSuccess = true;
+            console.log("Successfully updated content via state update");
+          } catch (err) {
+            console.error("State update failed:", err);
+          }
+        }
+        // Show appropriate notification
+        if (updateSuccess) {
+          setUploadNotification({
+            type: 'success',
+            message: `CSV file "${file.name}" loaded into editor`,
+            fileName: file.name
+          });
+        } else {
+          // Last resort: copy to clipboard
+          navigator.clipboard.writeText(csvContent)
+            .then(() => {
+              setUploadNotification({
+                type: 'warning',
+                message: `CSV copied to clipboard. Press Ctrl+V or Cmd+V to paste.`,
+                fileName: file.name
+              });
+            })
+            .catch(() => {
+              setUploadNotification({
+                type: 'error',
+                message: `Could not process CSV file`,
+                fileName: file.name
+              });
+            });
+        }
+        // Clear notification after 3 seconds
+        setTimeout(() => {
+          setUploadNotification(null);
+        }, 3000);
+        // Clear the file input
+        event.target.value = null;
+      };
+      reader.onerror = () => {
+        console.error("Error reading file");
+        // Show error notification
+        setUploadNotification({
+          type: 'error',
+          message: 'Error reading CSV file',
+          fileName: file.name
+        });
+        // Clear notification after 3 seconds
+        setTimeout(() => {
+          setUploadNotification(null);
+        }, 3000);
+        // Clear the file input
+        event.target.value = null;
+      };
+      // Read the file as text
+      reader.readAsText(file);
+    } catch (error) {
+      console.error("Error handling CSV upload:", error);
+      // Show error notification
+      setUploadNotification({
+        type: 'error',
+        message: 'Error uploading CSV file',
+        fileName: event.target.files?.[0]?.name || 'Unknown file'
+      });
+      // Clear notification after 3 seconds
+      setTimeout(() => {
+        setUploadNotification(null);
+      }, 3000);
+    }
+  };
 
   // Re-create ChatBot when help (chat history) changes
   // This ensures that new messages are included in the context
@@ -542,6 +652,14 @@ export const HelpPanel = ({
         return {
           ...data,
           ...args,
+        };
+      case "csv-upload":
+        // For CSV uploads, we don't want to trigger handleSendMessage
+        // We just want to update the editor content
+        console.log("CSV upload:", args.filename);
+        return {
+          ...data,
+          content: args.content,
         };
       default:
         console.error(false, `Unimplemented action type: ${type}`);
@@ -713,15 +831,31 @@ export const HelpPanel = ({
             <span className="font-medium py-0.5 px-1 rounded-sm bg-[#f8f8f8] font-mono">```</span> for code.
             Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
           </div>
-          {help.length > 0 && (
-            <button
-              className="text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors ml-4"
-              onClick={handleClearAll}
-              title="Clear conversation"
-            >
-              Clear All
-            </button>
-          )}
+          <div className="flex items-center">
+            <label htmlFor="csv-upload" className="text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors cursor-pointer flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              Upload CSV
+              <input
+                id="csv-upload"
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleCsvUpload}
+                disabled={isLoading}
+              />
+            </label>
+            {help.length > 0 && (
+              <button
+                className="text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors ml-4"
+                onClick={handleClearAll}
+                title="Clear conversation"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="p-1 pb-0">
@@ -733,6 +867,27 @@ export const HelpPanel = ({
             />
           </div>
         </div>
+        {/* CSV Upload Notification */}
+        {uploadNotification && (
+          <div className={`absolute left-1/2 transform -translate-x-1/2 top-24 px-4 py-2 rounded-md shadow-md z-50 flex items-center text-sm ${
+            uploadNotification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
+            <div className="mr-2">
+              {uploadNotification.type === 'success' ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+            <div>
+              {uploadNotification.message}
+            </div>
+          </div>
+        )}
 
       </div>
 
