@@ -398,10 +398,10 @@ export const HelpPanel = ({
     // Store consecutive non-table line count to better handle transitions
     let consecutiveNonTableLines = 0;
 
-    // Special handling for single-line input
-    if (lines.length === 1 && isLineTabular(lines[0])) {
+    // Single-line input should never be treated as a table
+    if (lines.length === 1) {
       return [{
-        type: 'table',
+        type: 'text',
         startLine: 0,
         endLine: 0,
         lines: [lines[0]]
@@ -537,52 +537,62 @@ export const HelpPanel = ({
     const linesWithQuotes = nonEmptyLines.filter(line => /"[^"]*"/.test(line));
     const hasQuotedValues = linesWithQuotes.length > 0;
     console.log(`CSV detection starting with ${nonEmptyLines.length} lines, ${linesWithQuotes.length} contain quotes`);
-    // Special case: first line might be CSV header even if it's the only line with commas
+    // Check for adjacent rows with matching cell counts - required for CSV detection
     if (nonEmptyLines.length >= 2) {
-      const firstLine = nonEmptyLines[0];
-      // Count cells in the first line using our parser that handles quoted values properly
       try {
-        const headerCells = parseCSVLine(firstLine);
-        if (headerCells.length >= 2) {
-          // Check if subsequent lines have enough cells to match the header
-          const subsequentLines = nonEmptyLines.slice(1);
-          const matchingLineCount = subsequentLines.filter(line => {
-            try {
-              const cells = parseCSVLine(line);
-              // Allow some variation in column count (±1)
-              return Math.abs(cells.length - headerCells.length) <= 1;
-            } catch (e) {
-              return false;
-            }
-          }).length;
-          const matchRatio = matchingLineCount / subsequentLines.length;
-          console.log(`First line CSV header check: ${matchingLineCount}/${subsequentLines.length} lines (${(matchRatio * 100).toFixed(1)}%) match header pattern`);
-          // If at least 50% of lines have cells that roughly match the header, this is likely CSV
-          if (matchRatio >= 0.5) {
-            console.log("Detected CSV based on first line header pattern");
-            return true;
+        // Parse all lines to get cell counts
+        const parsedLines = nonEmptyLines.map(line => {
+          try {
+            return parseCSVLine(line);
+          } catch (e) {
+            return [line]; // If parsing fails, treat as single cell
+          }
+        });
+
+        // Find at least one pair of adjacent rows with matching cell counts (and >= 2 cells)
+        let hasAdjacentMatch = false;
+        for (let i = 0; i < parsedLines.length - 1; i++) {
+          const currentCellCount = parsedLines[i].length;
+          const nextCellCount = parsedLines[i + 1].length;
+
+          // Both rows must have at least 2 cells and same count (±1 for flexibility)
+          if (currentCellCount >= 2 && nextCellCount >= 2 &&
+              Math.abs(currentCellCount - nextCellCount) <= 1) {
+            hasAdjacentMatch = true;
+            console.log(`Found adjacent rows with matching cell counts: row ${i} (${currentCellCount} cells) and row ${i+1} (${nextCellCount} cells)`);
+            break;
           }
         }
-      } catch (e) {
-        console.error("Error parsing potential CSV header:", e);
-      }
-    }
-    // Single line check - if the only line has commas or quotes, it might be CSV
-    if (nonEmptyLines.length === 1) {
-      const singleLine = nonEmptyLines[0];
-      const hasQuotes = /"[^"]*"/.test(singleLine);
-      // Always try to parse with our proper CSV parser
-      console.log("Checking if single line is CSV data");
-      try {
-        const parsedCells = parseCSVLine(singleLine);
-        // Require at least 2 cells for a single line to be considered CSV
-        if (parsedCells.length >= 2) {
-          console.log("Detected single-line CSV data with multiple cells");
-          return true;
+
+        if (hasAdjacentMatch) {
+          // Additional check: ensure at least 60% of lines have similar cell counts
+          const cellCounts = parsedLines.map(cells => cells.length);
+          const mostCommonCount = cellCounts.sort((a, b) =>
+            cellCounts.filter(v => v === a).length - cellCounts.filter(v => v === b).length
+          ).pop();
+
+          const consistentLines = cellCounts.filter(count =>
+            count >= 2 && Math.abs(count - mostCommonCount) <= 1
+          ).length;
+          const consistentRatio = consistentLines / cellCounts.length;
+
+          console.log(`CSV consistency check: ${consistentLines}/${cellCounts.length} lines (${(consistentRatio * 100).toFixed(1)}%) have consistent cell counts`);
+
+          if (consistentRatio >= 0.6) {
+            console.log("Detected CSV based on adjacent row matching and consistency");
+            return true;
+          }
+        } else {
+          console.log("No adjacent rows with matching cell counts found - not CSV");
         }
       } catch (e) {
-        console.error("Error parsing single-line CSV:", e);
+        console.error("Error checking for adjacent row matches:", e);
       }
+    }
+    // Single line check - NEVER consider a single line as CSV, regardless of commas
+    if (nonEmptyLines.length === 1) {
+      console.log("Single line detected - not treating as CSV (requires at least 2 rows)");
+      return false;
     }
     // If we don't have at least 2 non-empty lines, it's not a multi-line CSV
     if (nonEmptyLines.length < 2) return false;
@@ -691,36 +701,9 @@ export const HelpPanel = ({
       // Use parseCSVLine for proper handling of quoted values
       return parseCSVLine(line);
     };
-    // Special handling for single line CSV data
+    // Single line data should NOT be formatted as a table - requires at least 2 rows
     if (nonEmptyLines.length === 1) {
-      console.log("Formatting single-line CSV as markdown table");
-      const singleLine = nonEmptyLines[0];
-      // Extract cells preserving quoted content
-      const cells = extractCellsFromLine(singleLine);
-      // Only proceed if we have at least 2 cells
-      if (cells.length >= 2) {
-        // Generate column headers (Column 1, Column 2, etc.)
-        const headerRow = Array.from({ length: cells.length }, (_, i) => `Column ${i + 1}`);
-        // Create the markdown table
-        let markdownTable = '';
-        markdownTable += '| ' + headerRow.join(' | ') + ' |\n';
-        markdownTable += '| ' + headerRow.map(() => '---').join(' | ') + ' |\n';
-        // Clean up cell values and handle pipes for markdown table
-        const cleanCells = cells.map(cell => {
-          let cleanCell = cell.trim().replace(/\|/g, '\\|');
-          // Handle parentheses for negative values in financial data
-          if (cleanCell.includes('(') && cleanCell.includes(')')) {
-            // Convert (123) format to -123 for better readability if it looks like a number
-            if (/^\(\s*\d[\d\s,.]*\)$/.test(cleanCell)) {
-              cleanCell = '-' + cleanCell.replace(/[()]/g, '').trim();
-            }
-          }
-          return cleanCell;
-        });
-        markdownTable += '| ' + cleanCells.join(' | ') + ' |\n';
-        return markdownTable;
-      }
-      // If we couldn't process it as CSV, return original
+      console.log("Single line detected - not formatting as table (requires at least 2 rows)");
       return text;
     }
     // For multi-line CSV data
@@ -843,13 +826,10 @@ export const HelpPanel = ({
         }
       }
     }
-    // Quick check for single-line CSV input
+    // Single-line input should not be treated as CSV - requires at least 2 rows
     if (!text.includes('\n')) {
-      // If it's a single line, check if it's CSV format
-      if (isLineTabular(text)) {
-        console.log("Detected single-line CSV data at input start");
-        return formatAsMarkdownTable(text);
-      }
+      console.log("Single line input detected - not treating as CSV (requires at least 2 rows)");
+      return text;
     }
 
     // Look for mixed content with text followed by a table
