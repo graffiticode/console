@@ -1636,12 +1636,13 @@ export const HelpPanel = ({
             <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for newlines, {' '}
             <span className="font-medium py-0.5">CSV</span> for tables, {' '}
             <span className="font-medium py-0.5 px-1 rounded-sm bg-[#f8f8f8] font-mono">```</span> for code.
-            <span title="Drag & drop" className="ml-1 text-blue-500 flex items-center inline-flex">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            Drag & drop to
+            <span title="Drag & drop to upload file" className="mx-1 text-blue-500 flex items-center inline-flex">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </span>
-            for file upload.{' '}
+            file.{' '}
             <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
           </div>
           <div className="flex items-center">
