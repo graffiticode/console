@@ -50,6 +50,323 @@ cells {
 ---
 
 ### Prompt
+"create a table of the prime number up to 100
+
+turn it into a puzzle where you provide the solution to about a third of the cells but validate all of them
+
+add validation for the cells with given values
+
+make the table 5 by 5
+
+center align all columns
+
+make all columns 50px wide
+
+bold the cells with the given values"
+
+### Chat Transcript
+
+**User**: create a table of the prime number up to 100
+
+**Assistant**: ```ocaml
+This generated code creates a table that displays all the prime numbers from 2 to 100. The table is organized in a 5-column grid format, with each prime number placed in its own cell, starting with 2, 3, 5, 7, and 11 in the first row and continuing through all 25 prime numbers up to 97. The code also includes a title and helpful instructions explaining what prime numbers are for anyone viewing the table.
+```
+
+**User**: turn it into a puzzle where you provide the solution to about a third of the cells but validate all of them
+
+**Assistant**: ```ocaml
+This code generates an interactive math worksheet that teaches students about prime numbers from 2 to 100. The generated worksheet displays a 5x5 grid where some prime numbers are already filled in as hints, and students need to complete the missing prime numbers in the empty cells. When students enter their answers, the system automatically checks if they've entered the correct prime numbers, making it a self-grading educational exercise.
+```
+
+**User**: add validation for the cells with given values
+
+**Assistant**: ```ocaml
+This code generates an interactive math puzzle that teaches students about prime numbers up to 100. The generated puzzle creates a grid where some prime numbers are already filled in as hints (like 2, 7, 17, 29), while students need to fill in the missing prime numbers in the empty cells. The system automatically checks whether students enter the correct prime numbers and provides feedback on their answers.
+```
+
+**User**: make the table 5 by 5
+
+**Assistant**: ```ocaml
+This generated code creates an interactive math puzzle in the form of a 5x5 grid where students need to fill in missing prime numbers. The puzzle displays the first 25 prime numbers in sequential order, with some numbers already provided as hints (like 2, 5, 17, 29, etc.) and empty cells where students must enter the correct missing prime numbers. The code automatically checks whether each answer matches the expected prime number, making it a self-grading educational exercise for learning about prime numbers.
+```
+
+**User**: center align all columns
+
+**Assistant**: ```ocaml
+This generated code creates an interactive prime numbers puzzle presented as a 5x5 grid table. The puzzle challenges users to fill in missing prime numbers from the first 25 prime numbers in sequential order, with some numbers already provided as hints (like 2, 5, 17, 29, etc.). The code automatically checks whether users enter the correct prime numbers in each empty cell, making it a self-grading educational exercise for learning about prime numbers.
+```
+
+**User**: make all columns 50px wide
+
+**Assistant**: ```ocaml
+This generated code creates an interactive prime numbers puzzle presented as a 5x5 grid table. The puzzle challenges users to fill in missing prime numbers from the first 25 prime numbers in sequence, with some numbers already provided as hints (like 2, 5, 17, 29, etc.). The code automatically checks whether users enter the correct prime numbers in each empty cell, making it a self-grading educational exercise for learning about prime numbers.
+```
+
+**User**: bold the cells with the given values
+
+**Assistant**: ```ocaml
+This generated code creates an interactive math puzzle in the form of a 5x5 grid where students need to fill in missing prime numbers. The puzzle displays the first 25 prime numbers in sequential order, with some numbers already provided as hints (shown in bold) and empty cells where students must enter the correct prime numbers. The code automatically checks whether the answers entered are correct, making it a self-grading educational exercise for learning about prime numbers.
+```
+
+### Code
+
+```
+title "Prime Numbers Puzzle (5x5)"
+instructions `
+- Fill in the missing prime numbers
+- The table contains the first 25 prime numbers in order
+- Some values are provided as hints
+`
+columns {
+  A: { width: 50 justify: "center" }
+  B: { width: 50 justify: "center" }
+  C: { width: 50 justify: "center" }
+  D: { width: 50 justify: "center" }
+  E: { width: 50 justify: "center" }
+}
+cells {
+  A1: {
+    text: "2"
+    attrs: {
+      fontWeight: "bold"
+      assess: {
+        method: "value"
+        expected: "2"
+      }
+    }
+  }
+  B1: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "3"
+      }
+    }
+  }
+  C1: {
+    text: "5"
+    attrs: {
+      fontWeight: "bold"
+      assess: {
+        method: "value"
+        expected: "5"
+      }
+    }
+  }
+  D1: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "7"
+      }
+    }
+  }
+  E1: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "11"
+      }
+    }
+  }
+  A2: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "13"
+      }
+    }
+  }
+  B2: {
+    text: "17"
+    attrs: {
+      fontWeight: "bold"
+      assess: {
+        method: "value"
+        expected: "17"
+      }
+    }
+  }
+  C2: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "19"
+      }
+    }
+  }
+  D2: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "23"
+      }
+    }
+  }
+  E2: {
+    text: "29"
+    attrs: {
+      fontWeight: "bold"
+      assess: {
+        method: "value"
+        expected: "29"
+      }
+    }
+  }
+  A3: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "31"
+      }
+    }
+  }
+  B3: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "37"
+      }
+    }
+  }
+  C3: {
+    text: "41"
+    attrs: {
+      fontWeight: "bold"
+      assess: {
+        method: "value"
+        expected: "41"
+      }
+    }
+  }
+  D3: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "43"
+      }
+    }
+  }
+  E3: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "47"
+      }
+    }
+  }
+  A4: {
+    text: "53"
+    attrs: {
+      fontWeight: "bold"
+      assess: {
+        method: "value"
+        expected: "53"
+      }
+    }
+  }
+  B4: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "59"
+      }
+    }
+  }
+  C4: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "61"
+      }
+    }
+  }
+  D4: {
+    text: "67"
+    attrs: {
+      fontWeight: "bold"
+      assess: {
+        method: "value"
+        expected: "67"
+      }
+    }
+  }
+  E4: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "71"
+      }
+    }
+  }
+  A5: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "73"
+      }
+    }
+  }
+  B5: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "79"
+      }
+    }
+  }
+  C5: {
+    text: "83"
+    attrs: {
+      fontWeight: "bold"
+      assess: {
+        method: "value"
+        expected: "83"
+      }
+    }
+  }
+  D5: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "89"
+      }
+    }
+  }
+  E5: {
+    text: ""
+    attrs: {
+      assess: {
+        method: "value"
+        expected: "97"
+      }
+    }
+  }
+}
+{
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Prompt
 "create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs.
 
 protect the cells in column B
