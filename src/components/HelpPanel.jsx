@@ -115,7 +115,7 @@ export const HelpPanel = ({
     // Read the file contents
     const reader = new FileReader();
     reader.onload = (e) => {
-      const csvContent = e.target.result;
+      const fileContent = e.target.result;
       let updateSuccess = false;
 
       // Wait a moment to ensure the editor is accessible
@@ -138,18 +138,18 @@ export const HelpPanel = ({
               // Modern approach
               document.execCommand('selectAll', false, null);
               document.execCommand('delete', false, null);
-              document.execCommand('insertText', false, csvContent);
+              document.execCommand('insertText', false, fileContent);
               updateSuccess = true;
-              console.log("Successfully inserted CSV via execCommand");
+              console.log("Successfully inserted content via execCommand");
             } catch (insertErr) {
               console.error("execCommand insertion failed:", insertErr);
 
               // Try direct innerHTML approach
               try {
                 editorElement.innerHTML = '';
-                editorElement.innerHTML = csvContent.replace(/\n/g, '<br>');
+                editorElement.innerHTML = fileContent.replace(/\n/g, '<br>');
                 updateSuccess = true;
-                console.log("Successfully inserted CSV via innerHTML");
+                console.log("Successfully inserted content via innerHTML");
               } catch (innerErr) {
                 console.error("innerHTML insertion failed:", innerErr);
               }
@@ -167,7 +167,7 @@ export const HelpPanel = ({
             state.apply({
               type: 'csv-upload',
               args: {
-                content: csvContent
+                content: fileContent
               }
             });
             updateSuccess = true;
@@ -181,18 +181,18 @@ export const HelpPanel = ({
         if (updateSuccess) {
           setUploadNotification({
             type: 'success',
-            message: `CSV file "${file.name}" loaded into editor`,
+            message: `File "${file.name}" loaded into editor`,
             fileName: file.name
           });
         } else {
           // Last resort: copy to clipboard
           try {
             // First try the modern clipboard API
-            navigator.clipboard.writeText(csvContent)
+            navigator.clipboard.writeText(fileContent)
               .then(() => {
                 setUploadNotification({
                   type: 'warning',
-                  message: `CSV copied to clipboard. Press Ctrl+V or Cmd+V to paste.`,
+                  message: `File content copied to clipboard. Press Ctrl+V or Cmd+V to paste.`,
                   fileName: file.name
                 });
               })
@@ -201,7 +201,7 @@ export const HelpPanel = ({
                 // Fallback: show error notification
                 setUploadNotification({
                   type: 'error',
-                  message: `Could not process CSV file. Please try copying and pasting manually.`,
+                  message: `Could not process file. Please try copying and pasting manually.`,
                   fileName: file.name
                 });
               });
@@ -209,7 +209,7 @@ export const HelpPanel = ({
             console.error("Clipboard operation failed:", clipErr);
             setUploadNotification({
               type: 'error',
-              message: `Could not process CSV file`,
+              message: `Could not process file`,
               fileName: file.name
             });
           }
@@ -229,7 +229,7 @@ export const HelpPanel = ({
       console.error("Error reading file:", error);
       setUploadNotification({
         type: 'error',
-        message: 'Error reading CSV file',
+        message: 'Error reading file',
         fileName: file.name
       });
 
@@ -262,9 +262,27 @@ export const HelpPanel = ({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
+      'text/*': ['.txt', '.csv', '.json', '.xml', '.md', '.log', '.conf', '.cfg', '.ini', '.yaml', '.yml', '.toml', '.gc'],
+      'application/json': ['.json'],
+      'application/xml': ['.xml'],
+      'application/x-yaml': ['.yaml', '.yml'],
+      'application/toml': ['.toml'],
+      'text/plain': ['.txt', '.text', '.log', '.gc'],
       'text/csv': ['.csv'],
-      'text/plain': ['.csv', '.txt'],
-      'application/vnd.ms-excel': ['.csv']
+      'text/markdown': ['.md', '.markdown'],
+      'text/x-python': ['.py'],
+      'text/x-java': ['.java'],
+      'text/javascript': ['.js', '.mjs', '.jsx'],
+      'text/typescript': ['.ts', '.tsx'],
+      'text/x-c': ['.c', '.h'],
+      'text/x-c++': ['.cpp', '.cc', '.cxx', '.hpp', '.hxx'],
+      'text/x-ruby': ['.rb'],
+      'text/x-go': ['.go'],
+      'text/x-rust': ['.rs'],
+      'text/html': ['.html', '.htm'],
+      'text/css': ['.css', '.scss', '.sass'],
+      'application/x-sh': ['.sh', '.bash'],
+      'text/x-sql': ['.sql']
     },
     maxFiles: 1,
     noClick: true, // Don't open file dialog on click, only accept drops
@@ -1048,7 +1066,7 @@ export const HelpPanel = ({
       // Read the file contents
       const reader = new FileReader();
       reader.onload = (e) => {
-        const csvContent = e.target.result;
+        const fileContent = e.target.result;
         let updateSuccess = false;
 
         // Wait a moment to ensure the editor is accessible
@@ -1071,18 +1089,18 @@ export const HelpPanel = ({
                 // Modern approach
                 document.execCommand('selectAll', false, null);
                 document.execCommand('delete', false, null);
-                document.execCommand('insertText', false, csvContent);
+                document.execCommand('insertText', false, fileContent);
                 updateSuccess = true;
-                console.log("Successfully inserted CSV via execCommand");
+                console.log("Successfully inserted content via execCommand");
               } catch (insertErr) {
                 console.error("execCommand insertion failed:", insertErr);
 
                 // Try direct innerHTML approach
                 try {
                   editorElement.innerHTML = '';
-                  editorElement.innerHTML = csvContent.replace(/\n/g, '<br>');
+                  editorElement.innerHTML = fileContent.replace(/\n/g, '<br>');
                   updateSuccess = true;
-                  console.log("Successfully inserted CSV via innerHTML");
+                  console.log("Successfully inserted content via innerHTML");
                 } catch (innerErr) {
                   console.error("innerHTML insertion failed:", innerErr);
                 }
@@ -1100,7 +1118,7 @@ export const HelpPanel = ({
               state.update({
                 type: 'csv-upload',
                 args: {
-                  content: csvContent
+                  content: fileContent
                 }
               });
               updateSuccess = true;
@@ -1114,18 +1132,18 @@ export const HelpPanel = ({
           if (updateSuccess) {
             setUploadNotification({
               type: 'success',
-              message: `CSV file "${file.name}" loaded into editor`,
+              message: `File "${file.name}" loaded into editor`,
               fileName: file.name
             });
           } else {
             // Last resort: copy to clipboard
             try {
               // First try the modern clipboard API
-              navigator.clipboard.writeText(csvContent)
+              navigator.clipboard.writeText(fileContent)
                 .then(() => {
                   setUploadNotification({
                     type: 'warning',
-                    message: `CSV copied to clipboard. Press Ctrl+V or Cmd+V to paste.`,
+                    message: `File content copied to clipboard. Press Ctrl+V or Cmd+V to paste.`,
                     fileName: file.name
                   });
                 })
@@ -1134,7 +1152,7 @@ export const HelpPanel = ({
                   // Fallback: show error notification
                   setUploadNotification({
                     type: 'error',
-                    message: `Could not process CSV file. Please try copying and pasting manually.`,
+                    message: `Could not process file. Please try copying and pasting manually.`,
                     fileName: file.name
                   });
                 });
@@ -1142,7 +1160,7 @@ export const HelpPanel = ({
               console.error("Clipboard operation failed:", clipErr);
               setUploadNotification({
                 type: 'error',
-                message: `Could not process CSV file`,
+                message: `Could not process file`,
                 fileName: file.name
               });
             }
@@ -1162,7 +1180,7 @@ export const HelpPanel = ({
         console.error("Error reading file:", error);
         setUploadNotification({
           type: 'error',
-          message: 'Error reading CSV file',
+          message: 'Error reading file',
           fileName: file.name
         });
 
@@ -1182,9 +1200,27 @@ export const HelpPanel = ({
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
       onDrop,
       accept: {
+        'text/*': ['.txt', '.csv', '.json', '.xml', '.md', '.log', '.conf', '.cfg', '.ini', '.yaml', '.yml', '.toml', '.gc'],
+        'application/json': ['.json'],
+        'application/xml': ['.xml'],
+        'application/x-yaml': ['.yaml', '.yml'],
+        'application/toml': ['.toml'],
+        'text/plain': ['.txt', '.text', '.log', '.gc'],
         'text/csv': ['.csv'],
-        'text/plain': ['.csv', '.txt'],
-        'application/vnd.ms-excel': ['.csv']
+        'text/markdown': ['.md', '.markdown'],
+        'text/x-python': ['.py'],
+        'text/x-java': ['.java'],
+        'text/javascript': ['.js', '.mjs', '.jsx'],
+        'text/typescript': ['.ts', '.tsx'],
+        'text/x-c': ['.c', '.h'],
+        'text/x-c++': ['.cpp', '.cc', '.cxx', '.hpp', '.hxx'],
+        'text/x-ruby': ['.rb'],
+        'text/x-go': ['.go'],
+        'text/x-rust': ['.rs'],
+        'text/html': ['.html', '.htm'],
+        'text/css': ['.css', '.scss', '.sass'],
+        'application/x-sh': ['.sh', '.bash'],
+        'text/x-sql': ['.sql']
       },
       maxFiles: 1
     });
@@ -1219,7 +1255,7 @@ export const HelpPanel = ({
           onClick={e => e.stopPropagation()}
         >
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-base font-medium">Upload CSV File</h3>
+            <h3 className="text-base font-medium">Upload Text File</h3>
             <button
               onClick={() => setShowUploadModal(false)}
               className="text-gray-400 hover:text-gray-600"
@@ -1247,17 +1283,17 @@ export const HelpPanel = ({
           >
             <input {...getInputProps()} />
             {isDragActive ? (
-              <p className="text-blue-500 text-sm">Drop the CSV file here...</p>
+              <p className="text-blue-500 text-sm">Drop the text file here...</p>
             ) : (
               <div>
                 <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
                 <p className="mt-2 text-sm text-gray-600">
-                  Drag & drop a CSV file here, or <span className="text-blue-500 font-medium">click to select</span>
+                  Drag & drop a text file here, or <span className="text-blue-500 font-medium">click to select</span>
                 </p>
                 <p className="mt-1 text-xs text-gray-500">
-                  CSV files only
+                  Text files (.txt, .csv, .json, .py, .js, .md, .gc, etc.)
                 </p>
               </div>
             )}
@@ -1303,7 +1339,7 @@ export const HelpPanel = ({
       // Read the file contents
       const reader = new FileReader();
       reader.onload = (e) => {
-        const csvContent = e.target.result;
+        const fileContent = e.target.result;
         let updateSuccess = false;
         // Try direct DOM manipulation first - most reliable method
         try {
@@ -1314,9 +1350,9 @@ export const HelpPanel = ({
             document.execCommand('selectAll', false, null);
             document.execCommand('delete', false, null);
             // Insert the content
-            document.execCommand('insertText', false, csvContent);
+            document.execCommand('insertText', false, fileContent);
             updateSuccess = true;
-            console.log("Successfully inserted CSV via contenteditable element");
+            console.log("Successfully inserted content via contenteditable element");
           }
         } catch (err) {
           console.error("DOM manipulation failed:", err);
@@ -1327,7 +1363,7 @@ export const HelpPanel = ({
             state.apply({
               type: 'csv-upload',
               args: {
-                content: csvContent
+                content: fileContent
               }
             });
             updateSuccess = true;
@@ -1340,23 +1376,23 @@ export const HelpPanel = ({
         if (updateSuccess) {
           setUploadNotification({
             type: 'success',
-            message: `CSV file "${file.name}" loaded into editor`,
+            message: `File "${file.name}" loaded into editor`,
             fileName: file.name
           });
         } else {
           // Last resort: copy to clipboard
-          navigator.clipboard.writeText(csvContent)
+          navigator.clipboard.writeText(fileContent)
             .then(() => {
               setUploadNotification({
                 type: 'warning',
-                message: `CSV copied to clipboard. Press Ctrl+V or Cmd+V to paste.`,
+                message: `File content copied to clipboard. Press Ctrl+V or Cmd+V to paste.`,
                 fileName: file.name
               });
             })
             .catch(() => {
               setUploadNotification({
                 type: 'error',
-                message: `Could not process CSV file`,
+                message: `Could not process file`,
                 fileName: file.name
               });
             });
@@ -1373,7 +1409,7 @@ export const HelpPanel = ({
         // Show error notification
         setUploadNotification({
           type: 'error',
-          message: 'Error reading CSV file',
+          message: 'Error reading file',
           fileName: file.name
         });
         // Clear notification after 3 seconds
@@ -1390,7 +1426,7 @@ export const HelpPanel = ({
       // Show error notification
       setUploadNotification({
         type: 'error',
-        message: 'Error uploading CSV file',
+        message: 'Error uploading file',
         fileName: event.target.files?.[0]?.name || 'Unknown file'
       });
       // Clear notification after 3 seconds
@@ -1588,7 +1624,7 @@ export const HelpPanel = ({
             <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <p className="mt-4 text-lg font-semibold text-blue-700">Drop CSV file here</p>
+            <p className="mt-4 text-lg font-semibold text-blue-700">Drop text file here</p>
           </div>
         </div>
       )}
@@ -1597,16 +1633,16 @@ export const HelpPanel = ({
       <div ref={headerRef} className="flex-none sticky top-0 z-20 bg-white px-4 py-3 border-b shadow-md">
         <div className="flex justify-between items-center text-xs mb-2">
           <div className="font-light text-gray-500">
-            Use <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for newlines, {' '}
-            <span className="font-medium py-0.5">CSV</span> for tabular data, {' '}
+            <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for newlines, {' '}
+            <span className="font-medium py-0.5">CSV</span> for tables, {' '}
             <span className="font-medium py-0.5 px-1 rounded-sm bg-[#f8f8f8] font-mono">```</span> for code.
-            <span className="ml-1 text-gray-500 flex items-center inline-flex">
+            <span title="Drag & drop" className="ml-1 text-blue-500 flex items-center inline-flex">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </span>
-            Drag & drop files.
-            Press <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
+            for file upload.{' '}
+            <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
           </div>
           <div className="flex items-center">
             {help.length > 0 && (
@@ -1630,7 +1666,7 @@ export const HelpPanel = ({
             />
           </div>
         </div>
-        {/* CSV Upload Notification */}
+        {/* File Upload Notification */}
         {uploadNotification && (
           <div className={`absolute left-1/2 transform -translate-x-1/2 top-24 px-4 py-2 rounded-md shadow-md z-50 flex items-center text-sm ${
             uploadNotification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
@@ -1652,7 +1688,7 @@ export const HelpPanel = ({
           </div>
         )}
 
-        {/* CSV Upload Modal */}
+        {/* File Upload Modal */}
         {showUploadModal && <CsvDropzone />}
       </div>
 
