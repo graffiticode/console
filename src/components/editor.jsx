@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { CodePanel } from './CodePanel';
 import { DataPanel } from "./DataPanel";
 import { PropPanel } from "./PropPanel";
