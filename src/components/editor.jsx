@@ -69,6 +69,25 @@ export default function Editor({
   const saveTask = buildSaveTask();
   const ids = parseId(id);
   const [ taskId, setTaskId ] = useState(ids.taskId);
+  const dataPanelRef = React.useRef(null);
+
+  const handleCopy = () => {
+    if (dataPanelRef.current) {
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(dataPanelRef.current);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        console.error('Failed to copy: ', err);
+      }
+
+      selection.removeAllRanges();
+    }
+  };
 
   useEffect(() => {
     if (taskId === "") {
@@ -215,6 +234,8 @@ export default function Editor({
             setShowSaving={setShowSaving}
             saveDisabled={saveDisabled}
             setSaveDisabled={setSaveDisabled}
+            onCopy={handleCopy}
+            showCopyButton={tab === "Data"}
           />
         </div>
 
@@ -231,6 +252,7 @@ export default function Editor({
               if (tab === "Data") {
                 return (
                   <DataPanel
+                    ref={dataPanelRef}
                     id={id}
                     user={user}
                   />
