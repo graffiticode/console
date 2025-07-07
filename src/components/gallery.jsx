@@ -167,7 +167,7 @@ export default function Gallery({ lang, mark }) {
     );
 
   useEffect(() => {
-    if (loadTasksData === undefined || loadTasksData.length === 0) {
+    if (!loadTasksData || loadTasksData.length === 0) {
       setId("");
     }
     if (loadTasksData && loadTasksData.length > 0) {
