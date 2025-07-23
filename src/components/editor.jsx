@@ -225,7 +225,7 @@ export default function Editor({
       <div className="min-w-0 flex-1 relative flex flex-col h-full">
         {/* Sticky tabs container */}
         <div
-          className="sticky top-0 bg-white z-30 shadow-sm flex-none"
+          className="sticky top-0 bg-white z-30 flex-none"
         >
           <Tabs
             tab={tab}
@@ -243,8 +243,7 @@ export default function Editor({
         <div
           className="flex-grow overflow-auto"
           style={{
-            height: "calc(100vh - 120px)", // Full viewport height minus tabs and navbar
-            marginTop: "0"
+            height: "calc(100vh - 120px)" // Full viewport height minus tabs and navbar
           }}
         >
           {

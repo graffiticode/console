@@ -276,12 +276,7 @@ export default function Gallery({ lang, mark }) {
             !hideEditor &&
               <div
                 ref={editorRef}
-                className={classNames(
-                  showSaving &&
-                    "ring-8" ||
-                    "ring-0",
-                  "w-full transition-shadow duration-1000 ring-green-100 border border-gray-200 rounded-none overflow-hidden mb-2 resize-x"
-                )}
+                className="w-full ring-0 border border-gray-200 rounded-none overflow-hidden mb-2 resize-x"
                 style={{
                   height: "calc(100vh - 80px)",
                   resize: "horizontal"

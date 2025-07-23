@@ -12,6 +12,7 @@ const tabs = [
 
 export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisabled, setSaveDisabled, onCopy, showCopyButton }) {
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const handleClick = (name) => {
     tabs.find(t => t.current).current = false;
@@ -31,8 +32,14 @@ export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisab
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  const handleSave = () => {
+    setSaving(true);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
   return (
-    <div className="pt-4">
+    <div>
       <div className="sm:hidden">
         <label htmlFor="tabs" className="sr-only">
           Select a tab
@@ -50,8 +57,8 @@ export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisab
         </select>
       </div>
       <div className="hidden sm:block">
-        <div className="">
-          <nav className="-mb-px flex justify-between space-x-4 border-b text-xs pb-1" aria-label="Tabs">
+        <div className="pt-4">
+          <nav className="-mb-px flex justify-between space-x-4 border-b text-xs" aria-label="Tabs">
             <div className="">
             {tabs.map((tab) => (
               <a
@@ -61,7 +68,7 @@ export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisab
                   tab.name === tabName
                     ? 'border-gray-500 text-gray-700 font-semibold'
                     : 'border-transparent font-light text-gray-500 hover:border-gray-300 hover:text-gray-700',
-                  'whitespace-nowrap border-b py-1 mb-0 mx-2 px-1'
+                  'whitespace-nowrap border-b py-2 mb-0 mx-2 px-1'
                 )}
                 aria-current={tab.current ? 'page' : undefined}
               >
@@ -70,21 +77,20 @@ export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisab
             ))}
             </div>
             <div className="flex items-center space-x-1">
-              {showCopyButton && (
-                <button
-                  className="bg-white px-3 py-1 text-xs font-semibold text-gray-700 rounded-none hover:bg-gray-50 transition-colors"
-                  onClick={handleCopy}
-                >
-                  {copied ? (
-                    <span className="text-green-500 flex items-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 mr-1">
-                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
-                      </svg>
-                      Copied!
-                    </span>
-                  ) : 'Copy All'}
-                </button>
-              )}
+              <button
+                className={`bg-white px-3 py-1 text-xs font-semibold text-gray-700 rounded-none hover:bg-gray-50 transition-colors ${showCopyButton ? 'visible' : 'invisible'}`}
+                onClick={handleCopy}
+                disabled={!showCopyButton}
+              >
+                {copied ? (
+                  <span className="text-green-500 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 mr-1">
+                      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                    </svg>
+                    Copied!
+                  </span>
+                ) : 'Copy All'}
+              </button>
               <button
                 className={
                   classNames(
@@ -92,14 +98,17 @@ export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisab
                     "bg-white px-4 transition-colors"
                   )
                 }
-                onClick={() => {
-                  setSaving(true);
-                  setTimeout(() => setShowSaving(true), 100);
-                  setTimeout(() => setShowSaving(false), 1500);
-                }}
+                onClick={handleSave}
                 disabled={saveDisabled}
               >
-                Save
+                {saved ? (
+                  <span className="text-green-500 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 mr-1">
+                      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                    </svg>
+                    Saved!
+                  </span>
+                ) : 'Save'}
               </button>
             </div>
           </nav>
