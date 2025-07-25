@@ -1,10 +1,10 @@
 import { useRouter } from "next/router";
 import { WagmiConfig, createClient, configureChains, mainnet } from 'wagmi'
 import { publicProvider } from 'wagmi/providers/public'
-import { GraffiticodeAuthProvider } from "../hooks/use-graffiticode-auth";
+import { ArtcompilerAuthProvider } from "../hooks/use-artcompiler-auth";
 import "../styles/globals.css";
 import "../styles/prosemirror.css";
-import GraffiticodeFirebaseProvider from '../components/GraffiticodeFirebaseProvider';
+import ArtcompilerFirebaseProvider from '../components/ArtcompilerFirebaseProvider';
 import Layout from '../components/layout';
 import { useState, useEffect } from "react";
 import useLocalStorage from '../hooks/use-local-storage';
@@ -25,25 +25,25 @@ export default function App({
   Component,
   pageProps: { session, ...pageProps },
 }) {
-  const [language, setLanguage] = useLocalStorage("graffiticode:language", {id: 1, name: "L0001"});
-  const [mark, setMark] = useLocalStorage("graffiticode:tasks:mark", marks[0]);
+  const [language, setLanguage] = useLocalStorage("artcompiler:language", {id: 1, name: "L0001"});
+  const [mark, setMark] = useLocalStorage("artcompiler:tasks:mark", marks[0]);
   const router = useRouter();
   const pathName = router.pathname.slice(1);
   return (
     pathName === "form" &&
     <div id="gc-root">
-      <GraffiticodeFirebaseProvider>
+      <ArtcompilerFirebaseProvider>
         <WagmiConfig client={client}>
-          <GraffiticodeAuthProvider>
+          <ArtcompilerAuthProvider>
             <Component {...pageProps} />
-          </GraffiticodeAuthProvider>
+          </ArtcompilerAuthProvider>
         </WagmiConfig>
-      </GraffiticodeFirebaseProvider>
+      </ArtcompilerFirebaseProvider>
     </div> ||
     <div id="gc-root">
-      <GraffiticodeFirebaseProvider>
+      <ArtcompilerFirebaseProvider>
         <WagmiConfig client={client}>
-          <GraffiticodeAuthProvider>
+          <ArtcompilerAuthProvider>
             <AuthWrapper>
               <Layout
                 pathName={pathName}
@@ -55,9 +55,9 @@ export default function App({
                 <Component {...{...pageProps, language, setLanguage, mark}} />
               </Layout>
             </AuthWrapper>
-          </GraffiticodeAuthProvider>
+          </ArtcompilerAuthProvider>
         </WagmiConfig>
-      </GraffiticodeFirebaseProvider>
+      </ArtcompilerFirebaseProvider>
     </div>
   );
 }

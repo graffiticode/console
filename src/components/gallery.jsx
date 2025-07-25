@@ -10,7 +10,7 @@ import Editor from './editor';
 import SignIn from "./SignIn";
 import { loadTasks, getAccessToken, generateCode } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
 import FormView from "./FormView.jsx";
 import { Disclosure } from '@headlessui/react'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
@@ -35,7 +35,7 @@ function getId({ taskId, dataId }) {
 }
 
 const useTaskIdFormUrl = ({ lang, id }) => {
-  const { user } = useGraffiticodeAuth();
+  const { user } = useArtcompilerAuth();
   const { data: src } = useSWR({ lang, user, id }, async ({ lang, user, id }) => {
     if (!id) {
       return "";
@@ -105,7 +105,7 @@ export default function Gallery({ lang, mark }) {
       localStorage.setItem('graffiticode:selected:taskId', newId);
     }
   };
-  const { user } = useGraffiticodeAuth();
+  const { user } = useArtcompilerAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,

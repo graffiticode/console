@@ -56,7 +56,7 @@ export const createErrorResponse = error => ({ status: "error", error, data: nul
 
 export const createSuccessResponse = data => ({ status: "success", error: null, data });
 
-export const getStorageTypeForRequest = req => req.get("x-graffiticode-storage-type");
+export const getStorageTypeForRequest = req => req.get("x-artcompiler-storage-type");
 
 export const buildGetTaskDaoForStorageType = taskDaoFactory => type =>
   taskDaoFactory.create({ type });

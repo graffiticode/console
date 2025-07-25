@@ -4,9 +4,9 @@ import { useSignInWithEthereum } from "./use-ethereum";
 import { useAuth, useUser } from "reactfire";
 import { signInWithCustomToken, signOut } from "firebase/auth";
 
-const GraffiticodeAuthContext = createContext({ loading: true });
+const ArtcompilerAuthContext = createContext({ loading: true });
 
-export function GraffiticodeAuthProvider({ children }) {
+export function ArtcompilerAuthProvider({ children }) {
   const auth = useAuth();
   const { status: firebaseUserStatus, data: firebaseUser } = useUser();
   const { signInWithEthereum: siwe } = useSignInWithEthereum();
@@ -37,18 +37,18 @@ export function GraffiticodeAuthProvider({ children }) {
   };
 
   return (
-    <GraffiticodeAuthContext.Provider value={value}>
+    <ArtcompilerAuthContext.Provider value={value}>
       {firebaseUserStatus !== "loading" && children}
-    </GraffiticodeAuthContext.Provider>
+    </ArtcompilerAuthContext.Provider>
   );
 }
 
-export default function useGraffiticodeAuth() {
-  return useContext(GraffiticodeAuthContext);
+export default function useArtcompilerAuth() {
+  return useContext(ArtcompilerAuthContext);
 }
 
 export function useToken() {
-  const { user } = useGraffiticodeAuth();
+  const { user } = useArtcompilerAuth();
   return useSWR(
     { user },
     async ({ user }) => {

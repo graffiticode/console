@@ -1,2 +1,2 @@
-# Graffiticode Training Examples
+# Artcompiler Training Examples
 

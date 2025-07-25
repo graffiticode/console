@@ -30,7 +30,7 @@ export const postApiCompile = async ({ accessToken, id, data }) => {
     // );
     const headers = {
       authorization: accessToken,
-      "x-graffiticode-storage-type": "persistent",
+      "x-artcompiler-storage-type": "persistent",
     };
     const post = bent(apiUrl, "POST", "json", headers);
     const body = { id, data };

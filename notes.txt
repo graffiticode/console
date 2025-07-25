@@ -97,7 +97,7 @@ ARTCOMPILER STACK
 -- Redux (redux, react-redux, @reduxjs/toolkit)
 -- GraphQL (graphql-request, graphql-helix)
 -- Firestore
--- Graffiticode
+-- Artcompiler
 
 
 MANAGING STATE IN NEXTJS

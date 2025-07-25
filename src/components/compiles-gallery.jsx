@@ -9,7 +9,7 @@ import Editor from './editor';
 import SignIn from "./SignIn";
 import { loadCompiles } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -30,7 +30,7 @@ function getId({ taskId, dataId }) {
 }
 
 const useTaskIdFormUrl = ({ id }) => {
-  const { user } = useGraffiticodeAuth();
+  const { user } = useArtcompilerAuth();
   const { data: src } = useSWR({ user, id }, async ({ user, id }) => {
     if (!id) {
       return "";
@@ -114,7 +114,7 @@ export default function Gallery({ lang, mark }) {
   const [taskId, setTaskId] = useState();
   const [newTask, setNewTask] = useState();
   const [dataId, setDataId] = useState();
-  const { user } = useGraffiticodeAuth();
+  const { user } = useArtcompilerAuth();
   const id = task && task.id;
   const type = "*";  // { "*" | "persistent" | "ephemeral" }
   const { isLoading, data } =

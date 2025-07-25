@@ -72,7 +72,7 @@ export async function updateTask({ auth, id, name, help, mark, isPublic }) {
       };
       // Let the api know this item is now public. This can't be undone!
       const headers = {
-        // "x-graffiticode-storage-type": "persistent",
+        // "x-artcompiler-storage-type": "persistent",
       };
       const { data } = await postApiJSON("/task", { task }, headers);
     }
@@ -94,7 +94,7 @@ export async function postTask({ auth, task, ephemeral, isPublic }) {
     const storageType = ephemeral && "ephemeral" || "persistent";
     const headers = {
       "Authorization": auth.token,
-      "x-graffiticode-storage-type": storageType,
+      "x-artcompiler-storage-type": storageType,
     };
     if (isPublic) {
       delete headers.Authorization;

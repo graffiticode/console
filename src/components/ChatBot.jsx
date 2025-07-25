@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { generateCode } from "../utils/swr/fetchers";
 
 /**
- * Function to generate Graffiticode responses using the generateCode function
+ * Function to generate Artcompiler responses using the generateCode function
  */
 const generateBotResponse = async ({message, user, language, chatHistory = [], currentCode = ''}) => {
   try {
@@ -32,7 +32,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
         } else if (item.type === 'bot') {
           // For bot responses, include either the text (if a description) or a summary (if code)
           if (item.help && item.help.type === 'code') {
-            conversationContext += `Assistant: [Generated Graffiticode code]\n`;
+            conversationContext += `Assistant: [Generated Artcompiler code]\n`;
             // If there's a description, include it
             if (item.help.description) {
               conversationContext += `Description: ${item.help.description}\n`;
@@ -88,7 +88,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       text: result.code,
       type: 'code',
       description: result.description || '',  // Use the actual description from the API
-      language: result.language || 'graffiticode',
+      language: result.language || 'artcompiler',
       model: result.model,
       usage: result.usage
     };
@@ -104,22 +104,22 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
 const fallbackResponse = (message) => {
   if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
     return {
-      text: 'Hello! How can I help you with Graffiticode today?',
+      text: 'Hello! How can I help you with Artcompiler today?',
       type: 'text',
-      description: 'Hello! How can I help you with Graffiticode today?'
+      description: 'Hello! How can I help you with Artcompiler today?'
     };
   } else if (message.toLowerCase().includes('help')) {
     return {
-      text: 'I can help you write Graffiticode. What specific functionality would you like me to implement?',
+      text: 'I can help you write Artcompiler. What specific functionality would you like me to implement?',
       type: 'text',
-      description: 'I can help you write Graffiticode. What specific functionality would you like me to implement?'
+      description: 'I can help you write Artcompiler. What specific functionality would you like me to implement?'
     };
   } else if (message.toLowerCase().includes('example')) {
     return {
       text: `let double = <x: add x x>..
 let result = map (double) [1 2 3]..`,
       type: 'code',
-      language: 'graffiticode',
+      language: 'artcompiler',
       description: 'This code creates a function to double numbers and applies it to the list [1, 2, 3], resulting in [2, 4, 6].'
     };
   } else {
@@ -128,7 +128,7 @@ let result = map (double) [1 2 3]..`,
 let greeting = <name: concat "Hello, " name>..
 greeting "user"..`,
       type: 'code',
-      language: 'graffiticode',
+      language: 'artcompiler',
       description: 'This code creates a greeting function that adds "Hello, " before a name, and then applies it to "user".'
     };
   }

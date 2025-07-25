@@ -16,7 +16,7 @@ export default function Compiles() {
         Welcome to { getTitle() }
       </h2>
       <p>
-        Graffiticode is a tool for programming web components and apis through
+        Artcompiler is a tool for programming web components and apis through
         task specific languages. It is first and foremost a collection of
         end-user programming languages with runtimes that are React components
         and GraphQL services.
@@ -26,13 +26,13 @@ export default function Compiles() {
         but rather the user of the thing being programmed. Just as
         accountants are the end-users of the spreadsheets they create to do work
         for their customers, the designers and developers or whoever else are
-        making software with Graffiticode are its end-users.
+        making software with Artcompiler are its end-users.
       </p>
       <h2 className="font-semibold">
         Getting started
       </h2>
       <p>
-        Get started by signing in the Graffiticode using your preferred Ethereum
+        Get started by signing in the Artcompiler using your preferred Ethereum
         wallet. <i>MetaMask</i> and <i>Coinbase</i> are two of the more popular wallets.
       </p>
       <p>
@@ -51,14 +51,14 @@ export default function Compiles() {
           There are of course many many more languages we could add to the current
           collection. What programmable components and apis would you like to see
           here?&nbsp;
-          <a href="mailto: jeff@artcompiler.com?subject=Graffiticode language idea"><b>Send us a note!</b></a>
+          <a href="mailto: jeff@artcompiler.com?subject=Artcompiler language idea"><b>Send us a note!</b></a>
         </div>
       </div>
       <h2 className="font-semibold">
         Main ideas
       </h2>
       <p>
-        Graffiticode is a <b>language-oriented</b> programming tool. At the
+        Artcompiler is a <b>language-oriented</b> programming tool. At the
         core of every component and api is a task-oriented language that is used
         to customize its feel and function. On the frontend, code defines the
         initial state of user interface components. On the backend, code defines
@@ -92,7 +92,7 @@ export default function Compiles() {
         compiles by a hash for their task language and code and data. The&nbsp;
         <Link href="/compiles"><b>Compiles</b></Link>
         &nbsp;tab shows the cached compiles performed through the
-        <i> Graffiticode Console</i> and <i>API Gateway</i>.
+        <i> Artcompiler Console</i> and <i>API Gateway</i>.
       </p>
       <h2 className="font-semibold">
         Hosting
@@ -100,7 +100,7 @@ export default function Compiles() {
       <p>
         React components are installed using your chosen <i>npm</i> package
         installer. GraphQL services are either self-hosted or managed by an
-        hosting provider such as Graffiticode.
+        hosting provider such as Artcompiler.
       </p>
     </div>
   );

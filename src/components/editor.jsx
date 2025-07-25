@@ -7,7 +7,7 @@ import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
 import useSWR from "swr";
 import { buildSaveTask, postTask, getData } from '../utils/swr/fetchers';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useArtcompilerAuth from '../hooks/use-artcompiler-auth';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
 import { isNonNullNonEmptyObject } from "../utils";
@@ -65,7 +65,7 @@ export default function Editor({
   const [ doGetData, setDoGetData ] = useState(false);
   const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Help");
   const [ saveDisabled, setSaveDisabled ] = useState(true);
-  const { user } = useGraffiticodeAuth();
+  const { user } = useArtcompilerAuth();
   const saveTask = buildSaveTask();
   const ids = parseId(id);
   const [ taskId, setTaskId ] = useState(ids.taskId);

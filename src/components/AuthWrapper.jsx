@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import InviteCodeDialog from './InviteCodeDialog';
 import SignInAlert from './SignInAlert';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useArtcompilerAuth from '../hooks/use-artcompiler-auth';
 
 export default function AuthWrapper({ children }) {
-  const { user, loading } = useGraffiticodeAuth();
+  const { user, loading } = useArtcompilerAuth();
   const [showInviteCodeDialog, setShowInviteCodeDialog] = useState(false);
   const [hasInviteCode, setHasInviteCode] = useState(false);
   const [checkingInviteCode, setCheckingInviteCode] = useState(false);

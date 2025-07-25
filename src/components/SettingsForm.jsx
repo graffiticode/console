@@ -10,10 +10,10 @@
 import BillingCard from "./BillingCard";
 import APIKeysCard from "./APIKeysCard";
 import SignIn from "./SignIn";
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
 
 export default function Example() {
-  const { user } = useGraffiticodeAuth();
+  const { user } = useArtcompilerAuth();
   if (!user) {
     return (
       <div className="justify-center w-full">

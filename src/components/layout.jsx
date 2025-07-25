@@ -5,7 +5,7 @@ import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
 import Timeline from '../components/timeline';
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
 import LanguageSelector from '../components/language-selector';
 import MarkSelector from '../components/mark-selector';
 import useLocalStorage from '../hooks/use-local-storage';

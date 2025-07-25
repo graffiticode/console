@@ -1,7 +1,7 @@
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
 
 export default function SignInComponent({ label = "Sign in" }) {
-  const { loading, user, signInWithEthereum, signOut } = useGraffiticodeAuth();
+  const { loading, user, signInWithEthereum, signOut } = useArtcompilerAuth();
 
   const handleSignIn = async () => {
     try {

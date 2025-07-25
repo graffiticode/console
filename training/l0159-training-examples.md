@@ -1,4 +1,4 @@
-# Graffiticode Training Examples
+# Artcompiler Training Examples
 
 ## Language L0159
 
@@ -835,7 +835,7 @@ better. now don't distinguish the first term from the others on the front"
 
 **User**: better. now don't distinguish the first term from the others on the front
 
-**Assistant**: This generated Graffiticode creates a set of flashcards for practicing first-grade addition facts. It defines a list of addition problems and their answers, then uses that information to generate flashcards with the problem on the front and the solution on the back. The generated flashcards have a title, instructions, and options to show the answer and use a textured background.
+**Assistant**: This generated Artcompiler creates a set of flashcards for practicing first-grade addition facts. It defines a list of addition problems and their answers, then uses that information to generate flashcards with the problem on the front and the solution on the back. The generated flashcards have a title, instructions, and options to show the answer and use a textured background.
 
 ### Code
 

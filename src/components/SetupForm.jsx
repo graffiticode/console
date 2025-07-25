@@ -3,7 +3,7 @@ import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js'
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import axios from 'axios';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useArtcompilerAuth from '../hooks/use-artcompiler-auth';
 
 const SetupForm = () => {
   const stripe = useStripe();
@@ -55,7 +55,7 @@ const SetupForm = () => {
 const stripePromise = loadStripe('pk_test_51LhI57LUz4JwpsJ6p6lzznvkbFNQj8k9LnAYckCJZ4Tv9AZzYHxKafXTKsTS12F8vUpKyELdBvXtvgSmNOzdqug200VALmBhSl');
 
 function SetupApp() {
-  const { user } = useGraffiticodeAuth();
+  const { user } = useArtcompilerAuth();
   const [clientSecret, setClientSecret] = useState();
   useEffect(() => {
     const fetchSecret = async () => {

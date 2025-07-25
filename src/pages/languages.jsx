@@ -6,7 +6,7 @@ import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import Gallery from '../components/gallery';
 import Timeline from '../components/timeline';
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
 import { selectLanguages } from "../components/language-selector";
 import {
   CalendarIcon,
@@ -35,7 +35,7 @@ const languages = selectLanguages();
 import useLocalStorage from '../hooks/use-local-storage';
 
 function LanguageList({ language, setLanguage }) {
-  const { user } = useGraffiticodeAuth();
+  const { user } = useArtcompilerAuth();
   const { isValidating, isLoading, data } =
     useSWR(
       user ? { user, langs: languages, mark: 1 } : null,

@@ -1,6 +1,6 @@
 # Dialect L0002 Specific Instructions
 
-L0002 is the base dialect of Graffiticode, focused on simple interactions and visualizations.
+L0002 is the base dialect of Artcompiler, focused on simple interactions and visualizations.
 
 ## L0002 Specific Guidelines
 

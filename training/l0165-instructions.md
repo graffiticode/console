@@ -55,7 +55,7 @@ cells {
 
 ## Formatting Guidelines
 
-- IMPORTANT: Remember to maintain Graffiticode's core syntax with `let` declarations and `..` endings
+- IMPORTANT: Remember to maintain Artcompiler's core syntax with `let` declarations and `..` endings
 - IMPORTANT: Use the following code as a template for all generated code:
 
 ```

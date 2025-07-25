@@ -5,7 +5,7 @@
  * 1. Language detection from prompts
  * 2. API calls to Claude for code generation
  * 3. Token usage tracking
- * 4. Code verification via Graffiticode API
+ * 4. Code verification via Artcompiler API
  * 5. Error correction via Claude
  * 6. Retrieval of relevant examples to enhance generation accuracy
  */
@@ -24,13 +24,13 @@ const CLAUDE_MODELS = {
 };
 
 /**
- * Always returns Graffiticode as the language
+ * Always returns Artcompiler as the language
  * @param {string} prompt - User's input prompt (ignored)
- * @returns {string} Always returns "graffiticode"
+ * @returns {string} Always returns "artcompiler"
  */
 function detectLanguage(prompt) {
-  // Always return Graffiticode regardless of prompt content
-  return "graffiticode";
+  // Always return Artcompiler regardless of prompt content
+  return "artcompiler";
 }
 
 /**
@@ -45,7 +45,7 @@ function getFirestoreDb() {
     // If admin isn't initialized, initialize it with our project
     if (!admin.apps.length) {
       admin.initializeApp({
-        projectId: 'graffiticode'
+        projectId: 'artcompiler'
       });
     }
     return admin.firestore();
@@ -72,7 +72,7 @@ function parseMarkdownExamples(markdownContent) {
 
       // Fall back to older format if needed
       const taskMatch = !promptMatch && section.match(/###\s*Task\s*\n"([^"]+)"/);
-      const codeMatch = !codeBlockMatch && section.match(/###\s*Graffiticode\s*\n([\s\S]+?)(?=\n\n|$)/);
+      const codeMatch = !codeBlockMatch && section.match(/###\s*Artcompiler\s*\n([\s\S]+?)(?=\n\n|$)/);
 
       if (promptMatch && codeBlockMatch) {
         // New format
@@ -469,9 +469,9 @@ function readDialectInstructions(lang) {
 function getSystemPromptForDialect(lang) {
   // Start with the base prompt
   let prompt = `
-You are a programming assistant that translates natural language into code written in a functional DSL called **Graffiticode**, specifically dialect L${lang}.
+You are a programming assistant that translates natural language into code written in a functional DSL called **Artcompiler**, specifically dialect L${lang}.
 
-Graffiticode is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.`;
+Artcompiler is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.`;
 
   // Try to read dialect-specific instructions from file first
   const fileInstructions = readDialectInstructions(lang);
@@ -549,7 +549,7 @@ Start with \`|\` and extend to the end of the line.
 ### Output
 \`print\`
 
-Only return idiomatic, valid Graffiticode. Use readable names. Output **only the code** unless explanation is requested.
+Only return idiomatic, valid Artcompiler. Use readable names. Output **only the code** unless explanation is requested.
 
 CRITICAL REMINDER: Put generated code between \`\`\` (triple backticks) to distinguish code from commentary.
 `;
@@ -598,11 +598,11 @@ function generateExamplesSection(examples) {
       }
     } else {
       // Handle traditional examples (legacy format)
-      examplesText += `### Example ${i+1}: ${example.description || 'Graffiticode Example'}\n`;
+      examplesText += `### Example ${i+1}: ${example.description || 'Artcompiler Example'}\n`;
       examplesText += "```\n";
       examplesText += example.code;
       examplesText += "\n```\n";
-      examplesText += `${example.explanation || 'An example of Graffiticode.'}\n\n`;
+      examplesText += `${example.explanation || 'An example of Artcompiler.'}\n\n`;
     }
   });
 
@@ -771,7 +771,7 @@ function getFallbackResponse(prompt, options) {
 }
 
 /**
- * Verify the generated code using the Graffiticode API
+ * Verify the generated code using the Artcompiler API
  * @param {string} code - The generated code to verify
  * @param {string} accessToken - Authentication token for the API
  * @returns {Promise<Object>} - Compilation results including any errors
@@ -807,7 +807,7 @@ async function verifyCode(code, authToken) {
     }
     return compileResponse;
   } catch (error) {
-    console.error("Error verifying Graffiticode:", error);
+    console.error("Error verifying Artcompiler:", error);
     return {
       status: "error",
       error: { message: error.message },
@@ -817,11 +817,11 @@ async function verifyCode(code, authToken) {
 }
 
 /**
- * Parse error information from Graffiticode compilation results
+ * Parse error information from Artcompiler compilation results
  * @param {Object} errorInfo - Error information from the API
  * @returns {string} - Formatted error details
  */
-function parseGraffiticodeErrors(errorInfo) {
+function parseArtcompilerErrors(errorInfo) {
   let formattedErrors = '';
 
   // Handle different error formats
@@ -879,11 +879,11 @@ function parseGraffiticodeErrors(errorInfo) {
  */
 function createErrorFixPrompt(code, errorInfo) {
   // Parse and format the error information
-  const formattedErrors = parseGraffiticodeErrors(errorInfo);
+  const formattedErrors = parseArtcompilerErrors(errorInfo);
 
   return JSON.stringify({
-    system: `You are an expert Graffiticode programmer tasked with fixing code errors.
-Graffiticode is a minimal, prefix, expression-oriented language with these key features:
+    system: `You are an expert Artcompiler programmer tasked with fixing code errors.
+Artcompiler is a minimal, prefix, expression-oriented language with these key features:
 - \`let\` bindings with syntax: \`let name = value..\`
 - No infix operators; use prefix calls like \`add 1 2\`
 - Function application is prefix: \`fn arg1 arg2\`
@@ -900,9 +900,9 @@ Graffiticode is a minimal, prefix, expression-oriented language with these key f
 - IMPORTANT: All let statements MUST end with a double dot (..)
 - IMPORTANT: Backslashes should NOT be escaped in generated code
 - IMPORTANT: Literal "\n" should not appear in the generated code; use proper newline characters instead
-- IMPORTANT: Only generate valid Graffiticode. Any commentary should be elided or in line comments
+- IMPORTANT: Only generate valid Artcompiler. Any commentary should be elided or in line comments
 
-Common Graffiticode errors and solutions:
+Common Artcompiler errors and solutions:
 1. Missing double dot (..) at the end of a let statement
 2. Missing parentheses around function references: use (functionName) not functionName
 3. Incorrect function application: use prefix notation like "add x y" not "x + y"
@@ -917,7 +917,7 @@ When fixing code:
     messages: [
       {
         role: "user",
-        content: `The following Graffiticode has compilation errors:\n\n${code}\n\nError details:\n${formattedErrors}\n\nPlease fix the code and return only the corrected version.`
+        content: `The following Artcompiler has compilation errors:\n\n${code}\n\nError details:\n${formattedErrors}\n\nPlease fix the code and return only the corrected version.`
       }
     ]
   }, null, 2);
@@ -1015,10 +1015,10 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {}, 
     // Retrieve relevant examples for this prompt, filtered by language
     const relevantExamples = await getRelevantExamples({prompt, lang, limit: 3});
     console.log(`Found ${relevantExamples.length} relevant examples for the prompt in language ${lang}`);
-    // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
+    // Create a well-formatted prompt for Claude to generate Artcompiler with dialect-specific instructions
     const formattedPrompt = await createCodeGenerationPrompt(prompt, relevantExamples, lang, currentCode);
 
-    // Use Claude-4 Opus for Graffiticode generation - best model for code generation
+    // Use Claude-4 Opus for Artcompiler generation - best model for code generation
     const model = options.model || CLAUDE_MODELS.OPUS;
 
     // Set up API call options
@@ -1101,8 +1101,8 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {}, 
     // Generate a description of the code
     // Create a prompt for Claude to describe the code
     const descriptionPrompt = JSON.stringify({
-      system: `You are an expert Graffiticode programmer tasked with describing generated code in simple terms.
-Analyze the provided Graffiticode and explain what it does in 2-3 sentences of plain English.
+      system: `You are an expert Artcompiler programmer tasked with describing generated code in simple terms.
+Analyze the provided Artcompiler and explain what it does in 2-3 sentences of plain English.
 Focus on explaining the purpose and functionality without technical jargon.
 Keep your description concise and user-friendly, so people unfamiliar with programming can understand.
 IMPORTANT: Always phrase your description to indicate this is code that was generated, not code that the user wrote.
@@ -1111,7 +1111,7 @@ IMPORTANT: Literal "\n" should not appear in the generated code; use proper newl
       messages: [
         {
           role: "user",
-          content: `Please provide a brief, clear description of what this generated Graffiticode does:
+          content: `Please provide a brief, clear description of what this generated Artcompiler does:
 
 ${generatedCode}
 
