@@ -39,7 +39,7 @@ export default function FormView({ lang, id, setData, setId, setNewTask, classNa
 
   const Form = reactForms.includes(lang) && FormReact || FormIFrame;
   return (
-    <div className="justify-center min-w-full">
+    <div className="justify-center min-w-full h-full">
       <Form
         accessToken={accessToken}
         lang={lang}

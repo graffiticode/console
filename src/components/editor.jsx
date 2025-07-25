@@ -49,6 +49,7 @@ export default function Editor({
   tasks,
   setShowSaving,
   height,
+  onCreateTask,
 }) {
   const [ code, setCode ] = useState("");
   const [ help, setHelp ] = useState([]);
@@ -236,6 +237,7 @@ export default function Editor({
             setSaveDisabled={setSaveDisabled}
             onCopy={handleCopy}
             showCopyButton={tab === "Data"}
+            onCreateTask={onCreateTask}
           />
         </div>
 

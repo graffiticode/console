@@ -1476,22 +1476,6 @@ export const HelpPanel = ({
     });
   };
 
-  // Function to clear all messages
-  const handleClearAll = () => {
-    // If there's an ongoing code generation, cancel it
-    if (isLoading) {
-      console.log('Cancelling code generation due to clear all');
-      cancelGeneration();
-
-      // Clear the timer if it's running
-      if (processingTimeRef.current) {
-        clearInterval(processingTimeRef.current);
-        processingTimeRef.current = null;
-      }
-    }
-
-    setHelp([]);
-  };
 
   // Parse help if it's a string
   if (typeof help === "string" && help.trim() !== "") {
@@ -1624,17 +1608,6 @@ export const HelpPanel = ({
             </span>
             file.{' '}
             <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
-          </div>
-          <div className="flex items-center">
-            {help.length > 0 && (
-              <button
-                className="text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded transition-colors"
-                onClick={handleClearAll}
-                title="Clear conversation"
-              >
-                Clear All
-              </button>
-            )}
           </div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">

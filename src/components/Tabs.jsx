@@ -10,7 +10,7 @@ const tabs = [
   { name: 'Data', current: false },
 ];
 
-export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisabled, setSaveDisabled, onCopy, showCopyButton }) {
+export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisabled, setSaveDisabled, onCopy, showCopyButton, onCreateTask }) {
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -90,6 +90,13 @@ export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisab
                     Copied!
                   </span>
                 ) : 'Copy All'}
+              </button>
+              <button
+                className="bg-white px-3 py-1 text-xs font-semibold text-gray-700 rounded-none hover:bg-gray-50 transition-colors"
+                onClick={onCreateTask}
+                title="New Task"
+              >
+                New Task
               </button>
               <button
                 className={

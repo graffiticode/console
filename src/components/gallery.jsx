@@ -244,7 +244,8 @@ export default function Gallery({ lang, mark }) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)]">
+    <div className="flex h-[calc(100vh-64px)] w-full">
+      {/* TasksNav panel hidden - uncomment to restore
       <div className="flex-none w-[210px] h-full">
         <div className="sticky top-[64px] bg-white z-40 pb-2">
           <button
@@ -256,30 +257,22 @@ export default function Gallery({ lang, mark }) {
         </div>
         <TasksNav user={user} setId={setId} tasks={tasks} />
       </div>
-      <div className="flex flex-col grow pt-2 px-2 sm:px-4">
+      */}
+      <div className="flex flex-col grow pt-2 px-2">
         <div className={classNames(
-               hideEditor ? "lg:grid-cols-1" : "lg:grid-cols-1",
-               "grid grid-cols-1 gap-4 sm:px-6 lg:px-8"
+               hideEditor ? "block" : "flex flex-col lg:flex-row",
+               "gap-4 items-start"
              )}>
-          {
-            <FormView
-              key="form"
-              accessToken={accessToken}
-              id={id}
-              lang={lang}
-              height={formHeight}
-              className="border border-gray-300 rounded-none overflow-auto p-2 resize"
-              style={{height: formHeight}}
-            />
-          }
           {
             !hideEditor &&
               <div
                 ref={editorRef}
-                className="w-full ring-0 border border-gray-200 rounded-none overflow-hidden mb-2 resize-x"
+                className="relative ring-0 border border-gray-200 rounded-none mb-2 order-2 lg:order-1 resize-x"
                 style={{
-                  height: "calc(100vh - 80px)",
-                  resize: "horizontal"
+                  height: "calc(100vh - 100px)",
+                  width: "50%",
+                  minWidth: "300px",
+                  maxWidth: "80%"
                 }}
               >
                 <Editor
@@ -292,8 +285,31 @@ export default function Gallery({ lang, mark }) {
                   tasks={tasks}
                   setShowSaving={setShowSaving}
                   height={editorHeight}
+                  onCreateTask={handleCreateTask}
                 />
               </div>
+          }
+          {
+            <div
+              className="relative ring-0 border border-gray-300 rounded-none resize-both order-1 lg:order-2"
+              style={{
+                height: "calc(100vh - 100px)",
+                width: "50%",
+                minHeight: "200px",
+                maxHeight: "calc(100vh - 100px)",
+                minWidth: "300px",
+                maxWidth: "80%"
+              }}
+            >
+              <FormView
+                key="form"
+                accessToken={accessToken}
+                id={id}
+                lang={lang}
+                height="100%"
+                className="h-full overflow-auto p-2"
+              />
+            </div>
           }
         </div>
       </div>

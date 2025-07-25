@@ -60,8 +60,7 @@ const IFrame = ({ id, src, setData, className, width, height }) => (
     src={src}
     key="1"
     className={className}
-    width="100%"
-    height={height}
+    style={{ width: "100%", height: height || "100%" }}
   />
 );
 
@@ -92,9 +91,9 @@ export const FormIFrame = ({
       id={id}
       src={src}
       setData={setData}
-      className={className}
+      className={`${className} w-full h-full`}
       width="100%"
-      height={height}
+      height={height || "100%"}
     />
   );
 };
