@@ -32,7 +32,7 @@ export default function Tasks({ language, mark }) {
   }, []);
   const lang = language.name.slice(1);
   return (
-    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <div className="max-w-7xl mx-auto py-0 sm:px-6 lg:px-8">
       <Gallery lang={lang} mark={mark} />
     </div>
   )

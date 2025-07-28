@@ -1,7 +1,7 @@
 import assert from "assert";
 import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
 import useSWR from "swr";
-import { Dialog, Transition } from '@headlessui/react'
+import { Dialog, Transition, Menu } from '@headlessui/react'
 import {
   XMarkIcon,
   ChevronDoubleLeftIcon,
@@ -96,6 +96,7 @@ export default function Gallery({ lang, mark }) {
   const [ formHeight, setFormHeight ] = useState(350);
   const [ editorHeight, setEditorHeight ] = useState(600);
   const [ id, _setId ] = useState("");
+  const [ triggerSave, setTriggerSave ] = useState(false);
 
   // Wrapped setId to store the ID in localStorage when it changes
   const setId = (newId) => {
@@ -112,8 +113,15 @@ export default function Gallery({ lang, mark }) {
   );
   const editorRef = useRef();
 
+  const handleSave = useCallback(() => {
+    setTriggerSave(true);
+    setTimeout(() => setTriggerSave(false), 100);
+  }, []);
+
   const handleCreateTask = useCallback(async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
     setHideEditor(false);
 
     let template = '{}..'; // Default template
@@ -244,73 +252,146 @@ export default function Gallery({ lang, mark }) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full">
-      {/* TasksNav panel hidden - uncomment to restore
-      <div className="flex-none w-[210px] h-full">
-        <div className="sticky top-[64px] bg-white z-40 pb-2">
+    <div className="flex flex-col h-[calc(100vh-64px)] w-full">
+      {/* Menu bar spanning full width */}
+      <div className="bg-white px-2 py-1 flex-none">
+        <div className="flex items-center space-x-1">
+          <Menu as="div" className="relative inline-block text-left">
+            <Menu.Button className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none">
+              File
+            </Menu.Button>
+            <Transition
+              as={Fragment}
+              enter="transition ease-out duration-100"
+              enterFrom="transform opacity-0 scale-95"
+              enterTo="transform opacity-100 scale-100"
+              leave="transition ease-in duration-75"
+              leaveFrom="transform opacity-100 scale-100"
+              leaveTo="transform opacity-0 scale-95"
+            >
+              <Menu.Items className="absolute left-0 mt-1 w-40 origin-top-left rounded-none bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                <div className="py-1">
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button
+                        onClick={handleCreateTask}
+                        className={classNames(
+                          active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                          'block w-full px-4 py-2 text-left text-sm'
+                        )}
+                      >
+                        New
+                      </button>
+                    )}
+                  </Menu.Item>
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button
+                        onClick={handleSave}
+                        className={classNames(
+                          active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                          'block w-full px-4 py-2 text-left text-sm'
+                        )}
+                      >
+                        Save
+                      </button>
+                    )}
+                  </Menu.Item>
+                </div>
+              </Menu.Items>
+            </Transition>
+          </Menu>
           <button
-            className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-            title="New Task"
-            onClick={handleCreateTask}>
-            +
+            className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none"
+            onClick={() => console.log('Edit menu')}
+          >
+            Edit
+          </button>
+          <button
+            className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none"
+            onClick={() => console.log('View menu')}
+          >
+            View
+          </button>
+          <button
+            className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none"
+            onClick={() => console.log('Tools menu')}
+          >
+            Tools
           </button>
         </div>
-        <TasksNav user={user} setId={setId} tasks={tasks} />
       </div>
-      */}
-      <div className="flex flex-col grow pt-2 px-2">
-        <div className={classNames(
-               hideEditor ? "block" : "flex flex-col lg:flex-row",
-               "gap-4 items-start"
-             )}>
-          {
-            !hideEditor &&
+      
+      {/* Main content area */}
+      <div className="flex grow">
+        {/* TasksNav panel hidden - uncomment to restore
+        <div className="flex-none w-[210px] h-full">
+          <div className="sticky top-[64px] bg-white z-40 pb-2">
+            <button
+              className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
+              title="New Task"
+              onClick={handleCreateTask}>
+              +
+            </button>
+          </div>
+          <TasksNav user={user} setId={setId} tasks={tasks} />
+        </div>
+        */}
+        <div className="flex flex-col grow px-2" style={{paddingTop: "5px"}}>
+          <div className={classNames(
+                 hideEditor ? "block" : "flex flex-col lg:flex-row",
+                 "gap-4 items-start"
+               )}>
+            {
+              !hideEditor &&
+                <div
+                  ref={editorRef}
+                  className="relative ring-0 border border-gray-200 rounded-none mb-2 order-2 lg:order-1 resize-x"
+                  style={{
+                    height: "calc(100vh - 125px)",
+                    width: "50%",
+                    minWidth: "300px",
+                    maxWidth: "80%"
+                  }}
+                >
+                  <Editor
+                    accessToken={accessToken}
+                    id={id}  // Always pass the id, including temp- ids
+                    lang={lang}
+                    mark={mark}
+                    setId={setId}
+                    setNewTask={setNewTask}
+                    tasks={tasks}
+                    setShowSaving={setShowSaving}
+                    height={editorHeight}
+                    onCreateTask={handleCreateTask}
+                    triggerSave={triggerSave}
+                  />
+                </div>
+            }
+            {
               <div
-                ref={editorRef}
-                className="relative ring-0 border border-gray-200 rounded-none mb-2 order-2 lg:order-1 resize-x"
+                className="relative ring-0 border border-gray-300 rounded-none resize-both order-1 lg:order-2"
                 style={{
-                  height: "calc(100vh - 100px)",
+                  height: "calc(100vh - 125px)",
                   width: "50%",
+                  minHeight: "200px",
+                  maxHeight: "calc(100vh - 125px)",
                   minWidth: "300px",
                   maxWidth: "80%"
                 }}
               >
-                <Editor
+                <FormView
+                  key="form"
                   accessToken={accessToken}
-                  id={id}  // Always pass the id, including temp- ids
+                  id={id}
                   lang={lang}
-                  mark={mark}
-                  setId={setId}
-                  setNewTask={setNewTask}
-                  tasks={tasks}
-                  setShowSaving={setShowSaving}
-                  height={editorHeight}
-                  onCreateTask={handleCreateTask}
+                  height="100%"
+                  className="h-full overflow-auto p-2"
                 />
               </div>
-          }
-          {
-            <div
-              className="relative ring-0 border border-gray-300 rounded-none resize-both order-1 lg:order-2"
-              style={{
-                height: "calc(100vh - 100px)",
-                width: "50%",
-                minHeight: "200px",
-                maxHeight: "calc(100vh - 100px)",
-                minWidth: "300px",
-                maxWidth: "80%"
-              }}
-            >
-              <FormView
-                key="form"
-                accessToken={accessToken}
-                id={id}
-                lang={lang}
-                height="100%"
-                className="h-full overflow-auto p-2"
-              />
-            </div>
-          }
+            }
+          </div>
         </div>
       </div>
     </div>

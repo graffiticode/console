@@ -10,19 +10,14 @@ const tabs = [
   { name: 'Data', current: false },
 ];
 
-export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisabled, setSaveDisabled, onCopy, showCopyButton, onCreateTask }) {
+export function Tabs({ tab: tabName, setTab, onCopy, showCopyButton }) {
   const [copied, setCopied] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   const handleClick = (name) => {
     tabs.find(t => t.current).current = false;
     tabs.find(t => t.name === name).current = true;
     setTab(name);
 
-    // Enable the Save button when user clicks on the Help tab
-    if (name === 'Help' && setSaveDisabled) {
-      setSaveDisabled(false);
-    }
   };
 
   const handleCopy = () => {
@@ -33,11 +28,6 @@ export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisab
     }
   };
 
-  const handleSave = () => {
-    setSaving(true);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
   return (
     <div>
       <div className="sm:hidden">
@@ -58,8 +48,8 @@ export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisab
       </div>
       <div className="hidden sm:block">
         <div className="pt-4">
-          <nav className="-mb-px flex justify-between space-x-4 border-b text-xs" aria-label="Tabs">
-            <div className="">
+          <nav className="-mb-px flex justify-between border-b text-xs" aria-label="Tabs">
+            <div className="flex">
             {tabs.map((tab) => (
               <a
                 key={tab.name}
@@ -76,14 +66,19 @@ export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisab
               </a>
             ))}
             </div>
-            <div className="flex items-center space-x-1">
+            {showCopyButton && (
               <button
-                className={`bg-white px-3 py-1 text-xs font-semibold text-gray-700 rounded-none hover:bg-gray-50 transition-colors ${showCopyButton ? 'visible' : 'invisible'}`}
+                className={classNames(
+                  copied 
+                    ? 'text-green-500 font-semibold'
+                    : 'font-light text-gray-500 hover:text-gray-700',
+                  'whitespace-nowrap py-2 mb-0 mx-2 px-1'
+                )}
                 onClick={handleCopy}
                 disabled={!showCopyButton}
               >
                 {copied ? (
-                  <span className="text-green-500 flex items-center">
+                  <span className="flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 mr-1">
                       <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
                     </svg>
@@ -91,35 +86,7 @@ export function Tabs({ tab: tabName, setTab, setSaving, setShowSaving, saveDisab
                   </span>
                 ) : 'Copy All'}
               </button>
-              <button
-                className="bg-white px-3 py-1 text-xs font-semibold text-gray-700 rounded-none hover:bg-gray-50 transition-colors"
-                onClick={onCreateTask}
-                title="New Task"
-              >
-                New Task
-              </button>
-              <button
-                className={
-                  classNames(
-                    saveDisabled && "text-gray-400 font-medium" || "font-semibold text-gray-700 hover:bg-gray-50",
-                    "bg-white px-4 transition-colors w-20 flex items-center justify-center"
-                  )
-                }
-                onClick={handleSave}
-                disabled={saveDisabled}
-              >
-                {saved ? (
-                  <span className="text-green-500 font-semibold flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 mr-1">
-                      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
-                    </svg>
-                    Saved!
-                  </span>
-                ) : (
-                  <span>Save</span>
-                )}
-              </button>
-            </div>
+            )}
           </nav>
         </div>
       </div>

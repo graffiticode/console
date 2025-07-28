@@ -50,6 +50,7 @@ export default function Editor({
   setShowSaving,
   height,
   onCreateTask,
+  triggerSave,
 }) {
   const [ code, setCode ] = useState("");
   const [ help, setHelp ] = useState([]);
@@ -142,6 +143,13 @@ export default function Editor({
       setSaveDisabled(false);
     }
   }, [help]);
+
+  // Handle save trigger from menu
+  useEffect(() => {
+    if (triggerSave && !saveDisabled) {
+      setSaving(true);
+    }
+  }, [triggerSave, saveDisabled]);
 
   // This is the critical fix - when a user clicks on a task in the list,
   // we need to force the task ID to update and help to be reloaded
