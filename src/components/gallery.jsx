@@ -97,6 +97,10 @@ export default function Gallery({ lang, mark }) {
   const [ editorHeight, setEditorHeight ] = useState(600);
   const [ id, _setId ] = useState("");
   const [ triggerSave, setTriggerSave ] = useState(false);
+  const [ fileMenuOpen, setFileMenuOpen ] = useState(false);
+  const [ isTasksPanelCollapsed, setIsTasksPanelCollapsed ] = useState(
+    localStorage.getItem('graffiticode:tasksPanelCollapsed') === 'true'
+  );
 
   // Wrapped setId to store the ID in localStorage when it changes
   const setId = (newId) => {
@@ -117,6 +121,12 @@ export default function Gallery({ lang, mark }) {
     setTriggerSave(true);
     setTimeout(() => setTriggerSave(false), 100);
   }, []);
+
+  const toggleTasksPanel = useCallback(() => {
+    const newState = !isTasksPanelCollapsed;
+    setIsTasksPanelCollapsed(newState);
+    localStorage.setItem('graffiticode:tasksPanelCollapsed', newState.toString());
+  }, [isTasksPanelCollapsed]);
 
   const handleCreateTask = useCallback(async (e) => {
     if (e && e.preventDefault) {
@@ -252,15 +262,22 @@ export default function Gallery({ lang, mark }) {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] w-full">
-      {/* Menu bar spanning full width */}
-      <div className="bg-white px-2 py-1 flex-none">
-        <div className="flex items-center space-x-1">
-          <Menu as="div" className="relative inline-block text-left">
-            <Menu.Button className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none">
+    <div className="flex h-[calc(100vh-64px)] w-full">
+      {/* Menu bar hidden - uncomment to restore
+      <div className="bg-white py-1 flex-none">
+        <div className="flex items-center space-x-1 pl-2">
+          <div
+            className="relative inline-block text-left"
+            onMouseEnter={() => setFileMenuOpen(true)}
+            onMouseLeave={() => setFileMenuOpen(false)}
+          >
+            <button
+              className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none"
+            >
               File
-            </Menu.Button>
+            </button>
             <Transition
+              show={fileMenuOpen}
               as={Fragment}
               enter="transition ease-out duration-100"
               enterFrom="transform opacity-0 scale-95"
@@ -269,38 +286,30 @@ export default function Gallery({ lang, mark }) {
               leaveFrom="transform opacity-100 scale-100"
               leaveTo="transform opacity-0 scale-95"
             >
-              <Menu.Items className="absolute left-0 mt-1 w-40 origin-top-left rounded-none bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+              <div className="absolute left-0 mt-1 w-40 origin-top-left rounded-none bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                 <div className="py-1">
-                  <Menu.Item>
-                    {({ active }) => (
-                      <button
-                        onClick={handleCreateTask}
-                        className={classNames(
-                          active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
-                          'block w-full px-4 py-2 text-left text-sm'
-                        )}
-                      >
-                        New
-                      </button>
-                    )}
-                  </Menu.Item>
-                  <Menu.Item>
-                    {({ active }) => (
-                      <button
-                        onClick={handleSave}
-                        className={classNames(
-                          active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
-                          'block w-full px-4 py-2 text-left text-sm'
-                        )}
-                      >
-                        Save
-                      </button>
-                    )}
-                  </Menu.Item>
+                  <button
+                    onClick={() => {
+                      handleCreateTask();
+                      setFileMenuOpen(false);
+                    }}
+                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  >
+                    New
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleSave();
+                      setFileMenuOpen(false);
+                    }}
+                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  >
+                    Save
+                  </button>
                 </div>
-              </Menu.Items>
+              </div>
             </Transition>
-          </Menu>
+          </div>
           <button
             className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none"
             onClick={() => console.log('Edit menu')}
@@ -321,22 +330,42 @@ export default function Gallery({ lang, mark }) {
           </button>
         </div>
       </div>
-      
+      */}
       {/* Main content area */}
       <div className="flex grow">
-        {/* TasksNav panel hidden - uncomment to restore
-        <div className="flex-none w-[210px] h-full">
-          <div className="sticky top-[64px] bg-white z-40 pb-2">
+        {/* TasksNav panel with collapse functionality */}
+        <div className={classNames(
+          "flex-none h-full transition-all duration-300",
+          isTasksPanelCollapsed ? "w-10" : "w-[210px]"
+        )}>
+          <div className="sticky top-[64px] bg-white z-40 pb-2 flex items-center justify-between">
+            {!isTasksPanelCollapsed && (
+              <button
+                className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none ml-2"
+                title="New Task"
+                onClick={handleCreateTask}>
+                +
+              </button>
+            )}
             <button
-              className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
-              title="New Task"
-              onClick={handleCreateTask}>
-              +
+              className="text-gray-400 hover:text-gray-500 focus:outline-none p-2"
+              title={isTasksPanelCollapsed ? "Expand tasks panel" : "Collapse tasks panel"}
+              onClick={toggleTasksPanel}>
+              {isTasksPanelCollapsed ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+              )}
             </button>
           </div>
-          <TasksNav user={user} setId={setId} tasks={tasks} />
+          {!isTasksPanelCollapsed && (
+            <TasksNav user={user} setId={setId} tasks={tasks} />
+          )}
         </div>
-        */}
         <div className="flex flex-col grow px-2" style={{paddingTop: "5px"}}>
           <div className={classNames(
                  hideEditor ? "block" : "flex flex-col lg:flex-row",
@@ -348,10 +377,10 @@ export default function Gallery({ lang, mark }) {
                   ref={editorRef}
                   className="relative ring-0 border border-gray-200 rounded-none mb-2 order-2 lg:order-1 resize-x"
                   style={{
-                    height: "calc(100vh - 125px)",
-                    width: "50%",
+                    height: "calc(100vh - 80px)",
+                    width: "48%",
                     minWidth: "300px",
-                    maxWidth: "80%"
+                    maxWidth: "70%"
                   }}
                 >
                   <Editor
@@ -373,12 +402,12 @@ export default function Gallery({ lang, mark }) {
               <div
                 className="relative ring-0 border border-gray-300 rounded-none resize-both order-1 lg:order-2"
                 style={{
-                  height: "calc(100vh - 125px)",
-                  width: "50%",
+                  height: "calc(100vh - 80px)",
+                  width: "48%",
                   minHeight: "200px",
-                  maxHeight: "calc(100vh - 125px)",
+                  maxHeight: "calc(100vh - 80px)",
                   minWidth: "300px",
-                  maxWidth: "80%"
+                  maxWidth: "70%"
                 }}
               >
                 <FormView
