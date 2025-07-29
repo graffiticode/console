@@ -229,6 +229,81 @@ export const loadGraphiQL = async ({ user }) => {
  * @param {Object} [params.options] - Additional generation options
  * @returns {Promise<Object>} - Generated code and metadata
  */
+export const loadItems = async ({ user, lang }) => {
+  if (!user) {
+    return [];
+  }
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const query = gql`
+    query loadItems($lang: String!) {
+      items(lang: $lang) {
+        id
+        name
+        taskId
+        lang
+        created
+        updated
+      }
+    }
+  `;
+  return client.request(query, { lang }).then(data => data.items);
+};
+
+export const createItem = async ({ user, lang, name, taskId }) => {
+  if (!user) {
+    return null;
+  }
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const mutation = gql`
+    mutation createItem($lang: String!, $name: String, $taskId: String) {
+      createItem(lang: $lang, name: $name, taskId: $taskId) {
+        id
+        name
+        taskId
+        lang
+        created
+        updated
+      }
+    }
+  `;
+  return client.request(mutation, { lang, name, taskId }).then(data => data.createItem);
+};
+
+export const updateItem = async ({ user, id, name, taskId }) => {
+  if (!user) {
+    return null;
+  }
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const mutation = gql`
+    mutation updateItem($id: String!, $name: String, $taskId: String) {
+      updateItem(id: $id, name: $name, taskId: $taskId) {
+        id
+        name
+        taskId
+        lang
+        created
+        updated
+      }
+    }
+  `;
+  return client.request(mutation, { id, name, taskId }).then(data => data.updateItem);
+};
+
 export const generateCode = async ({ user, prompt, language, options, currentCode }) => {
   console.log(
     "fetchers/generateCode()",

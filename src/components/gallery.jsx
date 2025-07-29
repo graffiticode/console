@@ -14,7 +14,7 @@ import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
 import FormView from "./FormView.jsx";
 import { Disclosure } from '@headlessui/react'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
-import TasksNav from "./TasksNav.jsx";
+import ItemsNav from "./ItemsNav.jsx";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -98,8 +98,8 @@ export default function Gallery({ lang, mark }) {
   const [ id, _setId ] = useState("");
   const [ triggerSave, setTriggerSave ] = useState(false);
   const [ fileMenuOpen, setFileMenuOpen ] = useState(false);
-  const [ isTasksPanelCollapsed, setIsTasksPanelCollapsed ] = useState(
-    localStorage.getItem('graffiticode:tasksPanelCollapsed') === 'true'
+  const [ isItemsPanelCollapsed, setIsItemsPanelCollapsed ] = useState(
+    localStorage.getItem('graffiticode:itemsPanelCollapsed') === 'true'
   );
 
   // Wrapped setId to store the ID in localStorage when it changes
@@ -122,13 +122,13 @@ export default function Gallery({ lang, mark }) {
     setTimeout(() => setTriggerSave(false), 100);
   }, []);
 
-  const toggleTasksPanel = useCallback(() => {
-    const newState = !isTasksPanelCollapsed;
-    setIsTasksPanelCollapsed(newState);
-    localStorage.setItem('graffiticode:tasksPanelCollapsed', newState.toString());
-  }, [isTasksPanelCollapsed]);
+  const toggleItemsPanel = useCallback(() => {
+    const newState = !isItemsPanelCollapsed;
+    setIsItemsPanelCollapsed(newState);
+    localStorage.setItem('graffiticode:itemsPanelCollapsed', newState.toString());
+  }, [isItemsPanelCollapsed]);
 
-  const handleCreateTask = useCallback(async (e) => {
+  const handleCreateItem = useCallback(async (e) => {
     if (e && e.preventDefault) {
       e.preventDefault();
     }
@@ -290,7 +290,7 @@ export default function Gallery({ lang, mark }) {
                 <div className="py-1">
                   <button
                     onClick={() => {
-                      handleCreateTask();
+                      handleCreateItem();
                       setFileMenuOpen(false);
                     }}
                     className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
@@ -333,25 +333,17 @@ export default function Gallery({ lang, mark }) {
       */}
       {/* Main content area */}
       <div className="flex grow">
-        {/* TasksNav panel with collapse functionality */}
+        {/* ItemsNav panel with collapse functionality */}
         <div className={classNames(
           "flex-none h-full transition-all duration-300",
-          isTasksPanelCollapsed ? "w-10" : "w-[210px]"
+          isItemsPanelCollapsed ? "w-10" : "w-[210px]"
         )}>
           <div className="sticky top-[64px] bg-white z-40 pb-2 flex items-center justify-between">
-            {!isTasksPanelCollapsed && (
-              <button
-                className="text-xl rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none ml-2"
-                title="New Task"
-                onClick={handleCreateTask}>
-                +
-              </button>
-            )}
             <button
               className="text-gray-400 hover:text-gray-500 focus:outline-none p-2"
-              title={isTasksPanelCollapsed ? "Expand tasks panel" : "Collapse tasks panel"}
-              onClick={toggleTasksPanel}>
-              {isTasksPanelCollapsed ? (
+              title={isItemsPanelCollapsed ? "Expand items panel" : "Collapse items panel"}
+              onClick={toggleItemsPanel}>
+              {isItemsPanelCollapsed ? (
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                 </svg>
@@ -362,8 +354,8 @@ export default function Gallery({ lang, mark }) {
               )}
             </button>
           </div>
-          {!isTasksPanelCollapsed && (
-            <TasksNav user={user} setId={setId} tasks={tasks} />
+          {!isItemsPanelCollapsed && (
+            <ItemsNav user={user} lang={lang} setTaskId={setId} currentTaskId={id} />
           )}
         </div>
         <div className="flex flex-col grow px-2" style={{paddingTop: "5px"}}>
@@ -393,7 +385,7 @@ export default function Gallery({ lang, mark }) {
                     tasks={tasks}
                     setShowSaving={setShowSaving}
                     height={editorHeight}
-                    onCreateTask={handleCreateTask}
+                    onCreateItem={handleCreateItem}
                     triggerSave={triggerSave}
                   />
                 </div>

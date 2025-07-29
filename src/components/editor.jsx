@@ -49,7 +49,7 @@ export default function Editor({
   tasks,
   setShowSaving,
   height,
-  onCreateTask,
+  onCreateItem,
   triggerSave,
 }) {
   const [ code, setCode ] = useState("");
@@ -245,7 +245,7 @@ export default function Editor({
             setSaveDisabled={setSaveDisabled}
             onCopy={handleCopy}
             showCopyButton={tab === "Data"}
-            onCreateTask={onCreateTask}
+            onCreateItem={onCreateItem}
           />
         </div>
 
