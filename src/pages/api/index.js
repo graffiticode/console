@@ -16,6 +16,10 @@ import {
   postTask,
   getData,
   generateCode,
+  createItem,
+  updateItem,
+  getItems,
+  getItem,
 } from "./resolvers.js";
 import { client } from "../../lib/auth";
 
@@ -40,6 +44,15 @@ const typeDefs = `
     name: String
   }
 
+  type Item {
+    id: String!
+    name: String!
+    taskId: String!
+    lang: String!
+    created: String!
+    updated: String
+  }
+
   type GeneratedCode {
     code: String!
     taskId: String
@@ -58,6 +71,8 @@ const typeDefs = `
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
+    items(lang: String!): [Item!]
+    item(id: String!): Item
   }
 
   type Mutation {
@@ -66,6 +81,8 @@ const typeDefs = `
     saveTask(id: String, lang: String!, code: String!, help: String!, mark: Int!, isPublic: Boolean): String!
     updateTask(id: String, name: String, help: String, mark: Int, isPublic: Boolean): String!
     generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String): GeneratedCode!
+    createItem(lang: String!, name: String, taskId: String): Item!
+    updateItem(id: String!, name: String, taskId: String): Item!
   }
 
   input CodeGenerationOptions {
@@ -105,6 +122,18 @@ const resolvers = {
         "uid=" + uid,
       );
       return await tasks({ auth: { uid, token }, lang, mark });
+    },
+    items: async (_, args, ctx) => {
+      const { token } = ctx;
+      const { lang } = args;
+      const { uid } = await client.verifyToken(token);
+      return await getItems({ auth: { uid, token }, lang });
+    },
+    item: async (_, args, ctx) => {
+      const { token } = ctx;
+      const { id } = args;
+      const { uid } = await client.verifyToken(token);
+      return await getItem({ auth: { uid, token }, id });
     },
   },
   Mutation: {
@@ -165,6 +194,18 @@ const resolvers = {
       const { uid } = await client.verifyToken(token);
       const resp = await logCompile({ auth: { uid, token }, id, timestamp, status, data });
       return resp;
+    },
+    createItem: async (_, args, ctx) => {
+      const { token } = ctx;
+      const { lang, name, taskId } = args;
+      const { uid } = await client.verifyToken(token);
+      return await createItem({ auth: { uid, token }, lang, name, taskId });
+    },
+    updateItem: async (_, args, ctx) => {
+      const { token } = ctx;
+      const { id, name, taskId } = args;
+      const { uid } = await client.verifyToken(token);
+      return await updateItem({ auth: { uid, token }, id, name, taskId });
     },
   },
 };

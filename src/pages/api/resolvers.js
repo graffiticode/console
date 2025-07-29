@@ -269,3 +269,144 @@ export async function generateCode({ auth, prompt, language, options, currentCod
     throw new Error(`Failed to generate code: ${error.message}`);
   }
 }
+
+export async function createItem({ auth, lang, name, taskId }) {
+  try {
+    console.log(
+      "createItem()",
+      "lang=" + lang,
+      "name=" + name,
+      "taskId=" + taskId,
+    );
+
+    // Generate a unique ID for the item
+    const itemRef = db.collection(`users/${auth.uid}/items`).doc();
+    const id = itemRef.id;
+    
+    // If no name provided, use "unnamed"
+    if (!name) {
+      name = "unnamed";
+    }
+    
+    // If no taskId provided, create a minimal template task
+    if (!taskId) {
+      const result = await generateCode({
+        auth,
+        prompt: "Create a minimal starting template",
+        language: lang,
+        options: {},
+        currentCode: null
+      });
+      taskId = result.taskId;
+    }
+    
+    const timestamp = Date.now();
+    const item = {
+      id,
+      name,
+      taskId,
+      lang,
+      created: timestamp,
+      updated: timestamp
+    };
+    
+    await itemRef.set(item);
+    
+    return {
+      ...item,
+      created: String(timestamp),
+      updated: String(timestamp)
+    };
+  } catch (error) {
+    console.error("createItem()", "ERROR", error);
+    throw new Error(`Failed to create item: ${error.message}`);
+  }
+}
+
+export async function updateItem({ auth, id, name, taskId }) {
+  try {
+    console.log(
+      "updateItem()",
+      "id=" + id,
+      "name=" + name,
+      "taskId=" + taskId,
+    );
+    
+    const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+    const itemDoc = await itemRef.get();
+    
+    if (!itemDoc.exists) {
+      throw new Error("Item not found");
+    }
+    
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (taskId !== undefined) updates.taskId = taskId;
+    updates.updated = Date.now();
+    
+    await itemRef.update(updates);
+    
+    const updatedDoc = await itemRef.get();
+    const data = updatedDoc.data();
+    
+    return {
+      id,
+      ...data,
+      created: String(data.created),
+      updated: String(data.updated)
+    };
+  } catch (error) {
+    console.error("updateItem()", "ERROR", error);
+    throw new Error(`Failed to update item: ${error.message}`);
+  }
+}
+
+export async function getItems({ auth, lang }) {
+  try {
+    console.log("getItems()", "lang=" + lang);
+    
+    const itemsSnapshot = await db.collection(`users/${auth.uid}/items`)
+      .where('lang', '==', lang)
+      .orderBy('created', 'desc')
+      .get();
+    
+    const items = [];
+    itemsSnapshot.forEach(doc => {
+      const data = doc.data();
+      items.push({
+        id: doc.id,
+        ...data,
+        created: String(data.created),
+        updated: data.updated ? String(data.updated) : String(data.created)
+      });
+    });
+    
+    return items;
+  } catch (error) {
+    console.error("getItems()", "ERROR", error);
+    throw new Error(`Failed to get items: ${error.message}`);
+  }
+}
+
+export async function getItem({ auth, id }) {
+  try {
+    console.log("getItem()", "id=" + id);
+    
+    const itemDoc = await db.doc(`users/${auth.uid}/items/${id}`).get();
+    
+    if (!itemDoc.exists) {
+      return null;
+    }
+    
+    const data = itemDoc.data();
+    return {
+      id: itemDoc.id,
+      ...data,
+      created: String(data.created),
+      updated: data.updated ? String(data.updated) : String(data.created)
+    };
+  } catch (error) {
+    console.error("getItem()", "ERROR", error);
+    throw new Error(`Failed to get item: ${error.message}`);
+  }
+}
