@@ -14,11 +14,9 @@ const taskDao = getTaskDaoForStore("firestore");
 
 const db = getFirestore();
 
-const getTask = async ({ auth, id }) => await getApiTask({ id, auth });
-
 export async function logCompile({ auth, id, timestamp, status, data }) {
   try {
-    const [{ lang }] = await getTask({ auth, id });
+    const [{ lang }] = await getApiTask({ id, auth });
     const path = `users/${auth.uid}/compiles/${id}`;
     data = JSON.parse(data);
     await db.doc(path).set({ id, timestamp, status, lang, data });
@@ -91,6 +89,10 @@ const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
 
 export async function postTask({ auth, task, ephemeral, isPublic }) {
   try {
+    console.log(
+      "postTask()",
+      "task=" + JSON.stringify(task, null, 2),
+    );
     const storageType = ephemeral && "ephemeral" || "persistent";
     const headers = {
       "Authorization": auth.token,
@@ -100,6 +102,10 @@ export async function postTask({ auth, task, ephemeral, isPublic }) {
       delete headers.Authorization;
     }
     const { data } = await postApiJSON("/task", { task }, headers);
+    console.log(
+      "postTask()",
+      "data=" + JSON.stringify(data, null, 2),
+    );
     return data;
   } catch (x) {
     console.log(
@@ -408,5 +414,53 @@ export async function getItem({ auth, id }) {
   } catch (error) {
     console.error("getItem()", "ERROR", error);
     throw new Error(`Failed to get item: ${error.message}`);
+  }
+}
+
+export async function getTask({ auth, id }) {
+  try {
+    console.log(
+      "[1] getTask()",
+      "id=" + id
+    );
+    
+    // First try to get from user's tasks
+    const taskDoc = await db.doc(`users/${auth.uid}/taskIds/${id}`).get();
+    
+    if (!taskDoc.exists) {
+      return null;
+    }
+    
+    const taskData = taskDoc.data();
+    
+    console.log(
+      "[2] getTask()",
+      "taskData=" + JSON.stringify(taskData, null, 2),
+    );
+
+    // Get the actual task code from the API
+    const apiTask = await getApiTask({ id, auth });
+    const apiTaskData = apiTask[0] || apiTask;
+    
+    console.log(
+      "[3] getTask()",
+      "apiTaskData=" + JSON.stringify(apiTaskData, null, 2),
+    );
+
+    return {
+      id: id,
+      lang: taskData.lang,
+      code: JSON.stringify(apiTaskData.code),
+      src: taskData.src,
+      help: taskData.help || "[]",
+      isPublic: taskData.isPublic,
+      taskId: id,
+      created: taskData.created ? String(taskData.created) : "",
+      name: taskData.name,
+      mark: taskData.mark,
+    };
+  } catch (error) {
+    console.error("getTask()", "ERROR", error);
+    throw new Error(`Failed to get task: ${error.message}`);
   }
 }

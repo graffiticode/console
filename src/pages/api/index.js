@@ -11,6 +11,7 @@ import {
   compiles,
   logCompile,
   tasks,
+  getTask,
   saveTask,
   updateTask,
   postTask,
@@ -71,6 +72,7 @@ const typeDefs = `
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
+    task(id: String!): Task
     items(lang: String!): [Item!]
     item(id: String!): Item
   }
@@ -122,6 +124,12 @@ const resolvers = {
         "uid=" + uid,
       );
       return await tasks({ auth: { uid, token }, lang, mark });
+    },
+    task: async (_, args, ctx) => {
+      const { token } = ctx;
+      const { id } = args;
+      const { uid } = await client.verifyToken(token);
+      return await getTask({ auth: { uid, token }, id });
     },
     items: async (_, args, ctx) => {
       const { token } = ctx;

@@ -32,9 +32,11 @@ export const compile = async ({ user, id, data }) => {
 };
 
 export const postTask = async ({ user, lang, code }) => {
-  // console.log(
-  //   "postTask()",
-  // );
+  console.log(
+    "postTask()",
+    "lang=" + lang,
+    "code=" + code,
+  );
   const query = gql`
     mutation post ($lang: String!, $code: String!, $ephemeral: Boolean!) {
       postTask(lang: $lang, code: $code, ephemeral: $ephemeral)
@@ -50,7 +52,7 @@ export const postTask = async ({ user, lang, code }) => {
   return client.request(query, { lang, code, ephemeral }).then(data => data.postTask);
 };
 
-export const buildSaveTask = () => async ({ user, id, lang, code, help, mark, isPublic = false }) => {
+export const saveTask = async ({ user, id, lang, code, help, mark, isPublic = false }) => {
   console.log(
     "buildSaveTask()",
     "help=" + JSON.stringify(help, null, 2),
@@ -302,6 +304,35 @@ export const updateItem = async ({ user, id, name, taskId }) => {
     }
   `;
   return client.request(mutation, { id, name, taskId }).then(data => data.updateItem);
+};
+
+export const getTask = async ({ user, id }) => {
+  if (!user || !id) {
+    return null;
+  }
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const query = gql`
+    query getTask($id: String!) {
+      task(id: $id) {
+        id
+        lang
+        src
+        code
+        help
+        isPublic
+        taskId
+        created
+        name
+        mark
+      }
+    }
+  `;
+  return client.request(query, { id }).then(data => data.task);
 };
 
 export const generateCode = async ({ user, prompt, language, options, currentCode }) => {

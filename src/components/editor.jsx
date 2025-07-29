@@ -6,21 +6,22 @@ import { HelpPanel } from "./HelpPanel";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
 import useSWR from "swr";
-import { buildSaveTask, postTask, getData } from '../utils/swr/fetchers';
+import { saveTask, postTask, getData, getTask } from '../utils/swr/fetchers';
 import useArtcompilerAuth from '../hooks/use-artcompiler-auth';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
 import { isNonNullNonEmptyObject } from "../utils";
-import { postTaskUpdates } from '../utils/swr/fetchers';
 import useLocalStorage from '../hooks/use-local-storage';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-const getId = ({ taskId, dataId }) => (
-  taskId && dataId && `${taskId}+${dataId}` || taskId || dataId
-);
+const getId = ({ taskId, dataId }) => {
+  if (!taskId && !dataId) return "";
+  if (taskId && dataId) return `${taskId}+${dataId}`;
+  return String(taskId || dataId || "");
+};
 
 const parseId = id => {
   if (!id) {
@@ -38,19 +39,13 @@ const parseId = id => {
   edited code and props to get an id for the current state of the view.
  */
 
-
 export default function Editor({
   accessToken,
   id,
   lang,
   mark: initMark,
   setId,
-  setNewTask,
-  tasks,
-  setShowSaving,
   height,
-  onCreateItem,
-  triggerSave,
 }) {
   const [ code, setCode ] = useState("");
   const [ help, setHelp ] = useState([]);
@@ -60,17 +55,15 @@ export default function Editor({
   const [ view, setView ] = useState();
   const [ mark, setMark ] = useState(initMark);
   const [ isPublic, setIsPublic ] = useState(false);
-  const [ saving, setSaving ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
-  // No longer using postTaskUpdates for help changes
-  const [ doPostDataTask, setDoPostDataTask ] = useState(false);
-  const [ doGetData, setDoGetData ] = useState(false);
+  const [ doSaveTask, setDoSaveTask ] = useState(false);
+//  const [ doPostDataTask, setDoPostDataTask ] = useState(false);
+//  const [ doGetData, setDoGetData ] = useState(false);
   const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Help");
-  const [ saveDisabled, setSaveDisabled ] = useState(true);
   const { user } = useArtcompilerAuth();
-  const saveTask = buildSaveTask();
   const ids = parseId(id);
   const [ taskId, setTaskId ] = useState(ids.taskId);
+  const [ hasInitialized, setHasInitialized ] = useState(false);
   const dataPanelRef = React.useRef(null);
 
   const handleCopy = () => {
@@ -91,65 +84,57 @@ export default function Editor({
     }
   };
 
+  // Load task data when taskId changes
+  const { data: taskData } = useSWR(
+    taskId && user ? { user, id: taskId } : null,
+    getTask
+  );
+
   useEffect(() => {
-    if (taskId === "") {
-      setCode("{}..");
-      setHelp([]);
-      setData({});
-      setDoPostTask(true);
-    } else {
-      const task = tasks.find(task => task.id === taskId);
-      if (task) {
-        setCode(task.src);
-        setHelp(task.help && (
-          typeof task.help === "string" && JSON.parse(task.help) ||
-            task.help ||
+    // if (taskId === "" && hasInitialized) {
+    //   // Only create new task if we've already initialized (user action)
+    //   setCode("{}..");
+    //   setHelp([]);
+    //   setData({});
+    //   setDoPostTask(true);
+    // } else
+    if (taskData) {
+      if (taskData.src) {
+        setCode(taskData.src);
+        setHelp(taskData.help && (
+          typeof taskData.help === "string" && JSON.parse(taskData.help) ||
+            taskData.help ||
             []
-        ))
+        ));
+        setHasInitialized(true);
       }
-    }
-  }, [taskId, tasks]);
+  }, [taskId, taskData, hasInitialized]);
 
   useEffect(() => {
     const { taskId } = parseId(id);
     setTaskId(taskId);
-    setDoGetData(true);
+//    setDoGetData(true);
   }, [id]);
 
-  const getDataResp = useSWR(
-    doGetData && {
-      user,
-      id,
-    } || null,
-    getData
-  );
+  // const getDataResp = useSWR(
+  //   doGetData && {
+  //     user,
+  //     id,
+  //   } || null,
+  //   getData
+  // );
 
-  if (getDataResp.data) {
-    const data = getDataResp.data;
-    setDoGetData(false);
-    setData(data);
-  }
+  // if (getDataResp.data) {
+  //   const data = getDataResp.data;
+  //   setDoGetData(false);
+  //   setData(data);
+  // }
 
   useEffect(() => {
-    if (code) {
+    if (code && hasInitialized) {
       setDoPostTask(true);
-      setSaveDisabled(false);
     }
-  }, [code]);
-
-  // Enable save button when help changes
-  useEffect(() => {
-    if (help && help.length > 0) {
-      setSaveDisabled(false);
-    }
-  }, [help]);
-
-  // Handle save trigger from menu
-  useEffect(() => {
-    if (triggerSave && !saveDisabled) {
-      setSaving(true);
-    }
-  }, [triggerSave, saveDisabled]);
+  }, [code, hasInitialized]);
 
   // This is the critical fix - when a user clicks on a task in the list,
   // we need to force the task ID to update and help to be reloaded
@@ -172,33 +157,12 @@ export default function Editor({
     setDoPostTask(false);
     setTaskId(taskId);
     setId(taskId);
-  }
-
-  useEffect(() => {
-    if (isNonNullNonEmptyObject(props)) {
-      setDoPostDataTask(true);
-      setSaveDisabled(false);
-    }
-  }, [JSON.stringify(props)]);
-
-  const postDataTaskResp = useSWR(
-    doPostDataTask && {
-      user,
-      lang: "0001",
-      code: `${JSON.stringify(props)}..`
-    } || null,
-    postTask
-  );
-
-  if (postDataTaskResp.data) {
-    const dataId = postDataTaskResp.data;
-    setDoPostDataTask(false);
-    setId(getId({taskId, dataId}));
+    setDoSaveTask(true);
   }
 
   // Save task.
   const saveTaskResp = useSWR(
-    saving && {
+    doSaveTask && {
       user,
       id,
       lang,
@@ -210,24 +174,31 @@ export default function Editor({
     saveTask
   );
 
-  if (saveTaskResp.data?.id) {
-    const data = saveTaskResp.data;
-    if (data?.id) {
-      // We have successfully saved a task so add it to the task list.
-      setNewTask({
-        ...data,
-        id,
-        lang,
-        code,
-        help,
-        mark: mark.id,
-        isPublic,
-        created: Date.now(),
-      });
-    }
-    setSaving(false);
-    setSaveDisabled(true);
+  if (saveTaskResp.data) {
+    setDoSaveTask(false);
   }
+
+   // useEffect(() => {
+  //   if (isNonNullNonEmptyObject(props)) {
+  //     setDoPostDataTask(true);
+  //   }
+  // }, [JSON.stringify(props)]);
+
+  // const postDataTaskResp = useSWR(
+  //   doPostDataTask && {
+  //     user,
+  //     lang: "0001",
+  //     code: `${JSON.stringify(props)}..`
+  //   } || null,
+  //   postTask
+  // );
+
+  // if (postDataTaskResp.data) {
+  //   const dataId = postDataTaskResp.data;
+  //   setDoPostDataTask(false);
+  //   setId(getId({taskId, dataId}));
+  // }
+
 
   return (
     <div className="flex items-start space-x-4 h-full min-h-[calc(100vh-120px)]">
@@ -239,13 +210,8 @@ export default function Editor({
           <Tabs
             tab={tab}
             setTab={setTab}
-            setSaving={setSaving}
-            setShowSaving={setShowSaving}
-            saveDisabled={saveDisabled}
-            setSaveDisabled={setSaveDisabled}
             onCopy={handleCopy}
             showCopyButton={tab === "Data"}
-            onCreateItem={onCreateItem}
           />
         </div>
 
@@ -274,14 +240,26 @@ export default function Editor({
                     accessToken={accessToken}
                     language={lang}
                     code={code}
-                    setCode={setCode}
+                    setCode={(newCode) => {
+                      setCode(newCode);
+                      // Mark as initialized when user edits
+                      if (!hasInitialized) {
+                        setHasInitialized(true);
+                      }
+                    }}
                   />
                 );
               } else {
                 return (
                   <CodePanel
                     code={code}
-                    setCode={setCode}
+                    setCode={(newCode) => {
+                      setCode(newCode);
+                      // Mark as initialized when user edits
+                      if (!hasInitialized) {
+                        setHasInitialized(true);
+                      }
+                    }}
                     compiledData={data}
                   />
                 );

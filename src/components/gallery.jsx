@@ -1,4 +1,3 @@
-import assert from "assert";
 import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
 import useSWR from "swr";
 import { Dialog, Transition, Menu } from '@headlessui/react'
@@ -8,13 +7,14 @@ import {
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
-import { loadTasks, getAccessToken, generateCode } from '../utils/swr/fetchers';
+import { getAccessToken, generateCode, loadItems, createItem, updateItem } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
 import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
 import FormView from "./FormView.jsx";
 import { Disclosure } from '@headlessui/react'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
 import ItemsNav from "./ItemsNav.jsx";
+import { PlusIcon } from '@heroicons/react/20/solid';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -50,77 +50,64 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-const sliceName = name => name.slice(17).slice(0,27);
-
-const getNestedItems = ({ setId, setItems, tasks }) => {
-  const items = tasks.map((task, index) => {
-    // Group by head.
-    const [hd0, tl0] = task.id.split("+");
-    let children;
-    if (tl0 === undefined) {
-      // Only compute kids for root tasks.
-      tasks.forEach(task => {
-        const [hd1, tl1] = task.id.split("+");
-        if (hd0 === hd1 && tl1 !== undefined) {
-          if (children === undefined) {
-            children = [];
-          }
-          children.push({
-            id: tl1,
-            name: sliceName(tl1),
-            task,
-          });
-        };
-      });
-    }
-    if (tl0 === undefined) {
-      return {
-        id: task.id,
-        name: sliceName(task.id),
-        children,
-        task,
-      };
-    } else {
-      return undefined;
-    }
-  });
-  const nestedItems = items.filter(item => item !== undefined);
-  return nestedItems;
-}
+// TODO:
+// [ ] build list of items for the current lang and mark
+// [ ] select the current item
+// [ ] pass items to ItemsNav
+// [ ] pass task to Editor
+// [ ] on setId, update the current item's taskId
+// [ ] move new item button to Gallery
 
 export default function Gallery({ lang, mark }) {
   const [ hideEditor, setHideEditor ] = useState(false);
-  const [ tasks, setTasks ] = useState([]);
-  const [ newTask, setNewTask ] = useState(null);
-  const [ showSaving, setShowSaving ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ editorHeight, setEditorHeight ] = useState(600);
   const [ id, _setId ] = useState("");
-  const [ triggerSave, setTriggerSave ] = useState(false);
-  const [ fileMenuOpen, setFileMenuOpen ] = useState(false);
+  const [ isCreatingItem, setIsCreatingItem ] = useState(false);
   const [ isItemsPanelCollapsed, setIsItemsPanelCollapsed ] = useState(
     localStorage.getItem('graffiticode:itemsPanelCollapsed') === 'true'
   );
-
-  // Wrapped setId to store the ID in localStorage when it changes
-  const setId = (newId) => {
-    _setId(newId);
-    // Store the task ID in localStorage
-    if (newId) {
-      localStorage.setItem('graffiticode:selected:taskId', newId);
-    }
-  };
+  const [ items, setItems ] = useState([]);
+  const [ selectedItemId, setSelectedItemId ] = useState("");
+  const setId = id => _setId(id);
   const { user } = useArtcompilerAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,
   );
   const editorRef = useRef();
+  // Load items from the API only once on initialization
+  const { data: loadedItems } = useSWR(
+    user && lang ? `items-${lang}` : null,
+    () => loadItems({ user, lang }),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
 
-  const handleSave = useCallback(() => {
-    setTriggerSave(true);
-    setTimeout(() => setTriggerSave(false), 100);
-  }, []);
+  useEffect(() => {
+    if (loadedItems && loadedItems.length > 0) {
+      setItems(loadedItems);
+      // Try to restore the previously selected item from localStorage
+      const savedItemId = localStorage.getItem(`graffiticode:selected:itemId`);
+      if (savedItemId) {
+        const matchingItem = loadedItems.find(item => item.id === savedItemId);
+        if (matchingItem) {
+          setSelectedItemId(matchingItem.id);
+          setId(matchingItem.taskId);
+          return;
+      }
+      // Default to the first item if no saved selection
+      if (loadedItems[0]) {
+        setSelectedItemId(loadedItems[0].id);
+        setId(loadedItems[0].taskId);
+      }
+    } else {
+      setItems([]);
+      setSelectedItemId("");
+    }
+  }, [loadedItems]);
 
   const toggleItemsPanel = useCallback(() => {
     const newState = !isItemsPanelCollapsed;
@@ -128,119 +115,65 @@ export default function Gallery({ lang, mark }) {
     localStorage.setItem('graffiticode:itemsPanelCollapsed', newState.toString());
   }, [isItemsPanelCollapsed]);
 
-  const handleCreateItem = useCallback(async (e) => {
-    if (e && e.preventDefault) {
-      e.preventDefault();
-    }
-    setHideEditor(false);
-
-    let template = '{}..'; // Default template
-    let taskId = null;
-
+  const handleCreateItem = async () => {
+    if (isCreatingItem) return;
+    setIsCreatingItem(true);
     try {
-      // Generate a minimal template using generateCode
-      const prompt = "Create a minimal starting template";
-      const result = await generateCode({
-        user,
-        prompt,
-        language: lang
-      });
-      if (result) {
-        if (result.code) {
-          template = result.code;
-        }
-        if (result.taskId) {
-          taskId = result.taskId;
-        }
+      const newItem = await createItem({ user, lang, name: "unnamed", taskId: null });
+      if (newItem) {
+        // Add the new item to the beginning of the list
+        setItems(prevItems => [newItem, ...prevItems]);
+        // Select the new item
+        setSelectedItemId(newItem.id);
+        setId(newItem.taskId);
+        localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
       }
     } catch (error) {
-      console.error("Failed to generate template:", error);
-      // Use default template on error
+      console.error("Failed to create item:", error);
+    } finally {
+      setIsCreatingItem(false);
     }
+  };
 
-    // Use the returned task ID or create a temporary one if posting failed
-    const newTaskId = taskId || `temp-${Date.now()}`;
-    const newTask = {
-      id: newTaskId,
-      name: "unnamed",
-      src: template,
-      help: [],
-      mark: mark.id,
-      isPublic: false,
-      created: Date.now(),
-      lang: lang,
-    };
+  const handleUpdateItem = async ({ id, name, taskId }) => {
+    // Update local state first
+    setItems(prevItems => {
+      const updated = prevItems.map(item =>
+        item.id === id
+          ? { ...item, ...(name !== undefined && { name }), ...(taskId !== undefined && { taskId }) }
+          : item
+      );
+      return updated;
+    });
+    // Then update backend
+    try {
+      const result = await updateItem({ user, id, name, taskId });
+    } catch (error) {
+      console.error("Failed to update item:", error);
+      // Optionally revert local state on error
+      // setItems(prevItems);
+    }
+  };
 
-    // Add the new task to the beginning of the tasks list
-    setTasks([newTask, ...tasks]);
+  const handleSelectItem = (itemId) => {
+    const item = items.find(i => i.id === itemId);
+    if (item) {
+      setSelectedItemId(item.id);
+      setId(item.taskId);
+      localStorage.setItem(`graffiticode:selected:itemId`, item.id);
+    }
+  };
 
-    // Set the current ID to the new task ID
-    setId(newTaskId);
-  }, [tasks, mark, lang, user, setHideEditor, setTasks, setId]);
-
-  const { isValidating, isLoading, data: loadTasksData } =
-    useSWR(
-      user ? { user, lang, mark: mark.id } : null,
-      loadTasks,
-    );
-
+  // Update the selected item's taskId when the id changes
   useEffect(() => {
-    if (!loadTasksData || loadTasksData.length === 0) {
-      setId("");
-    }
-    if (loadTasksData && loadTasksData.length > 0) {
-      const processedTasks = loadTasksData.map(task => {
-        if (task.help) {
-          assert(!task.help || typeof task.help === "string", typeof task.help);
-          task.help = task.help && JSON.parse(task.help) || [];
-        }
-        return task;
-      });
-      setTasks(processedTasks);
-
-      // Try to restore the previously selected task ID from localStorage
-      try {
-        const savedTaskId = localStorage.getItem('graffiticode:selected:taskId');
-        if (savedTaskId) {
-          // Check if this task or a related task exists in our current tasks list
-          const taskIdBase = savedTaskId.split('+')[0]; // Get the base task ID without data ID
-          const matchingTask = processedTasks.find(task =>
-            task.id === savedTaskId || task.id === taskIdBase ||
-            (task.id.startsWith(taskIdBase) && task.id.includes('+'))
-          );
-
-          if (matchingTask) {
-            setId(matchingTask.id);
-            return; // We found a match, no need to default to first item
-          }
-        }
-      } catch (e) {
-        console.error("Error restoring task selection:", e);
-      }
-    } else {
-      setTasks([]);
-    }
-  }, [loadTasksData]);
-
-  useEffect(() => {
-    // If this is indeed a new task, then add it to the list. Otherwise, nothing
-    // to see here.
-    if (newTask) {
-      // Check if we're replacing a temporary task
-      const tempTaskIndex = tasks.findIndex(task => task.id.startsWith('temp-'));
-
-      if (tempTaskIndex >= 0) {
-        // Replace the temporary task with the new saved task
-        const updatedTasks = [...tasks];
-        updatedTasks[tempTaskIndex] = newTask;
-        setTasks(updatedTasks);
-      } else if (!tasks.some(task => task.id === newTask.id)) {
-        // Create a new array with the new task at the beginning
-        setTasks([newTask, ...tasks]);
+    if (selectedItemId && id && items.length > 0) {
+      const currentItem = items.find(item => item.id === selectedItemId);
+      if (currentItem && currentItem.taskId !== id) {
+        handleUpdateItem({ id: selectedItemId, taskId: id });
       }
     }
-    setShowSaving(false);
-  }, [newTask]);
+  }, [id, selectedItemId, items]); // Depend on id, selectedItemId, and items
+
 
   if (!user) {
     return (
@@ -253,84 +186,8 @@ export default function Gallery({ lang, mark }) {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="justify-center w-full">
-        Loading...
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-[calc(100vh-64px)] w-full">
-      {/* Menu bar hidden - uncomment to restore
-      <div className="bg-white py-1 flex-none">
-        <div className="flex items-center space-x-1 pl-2">
-          <div
-            className="relative inline-block text-left"
-            onMouseEnter={() => setFileMenuOpen(true)}
-            onMouseLeave={() => setFileMenuOpen(false)}
-          >
-            <button
-              className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none"
-            >
-              File
-            </button>
-            <Transition
-              show={fileMenuOpen}
-              as={Fragment}
-              enter="transition ease-out duration-100"
-              enterFrom="transform opacity-0 scale-95"
-              enterTo="transform opacity-100 scale-100"
-              leave="transition ease-in duration-75"
-              leaveFrom="transform opacity-100 scale-100"
-              leaveTo="transform opacity-0 scale-95"
-            >
-              <div className="absolute left-0 mt-1 w-40 origin-top-left rounded-none bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
-                <div className="py-1">
-                  <button
-                    onClick={() => {
-                      handleCreateItem();
-                      setFileMenuOpen(false);
-                    }}
-                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                  >
-                    New
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleSave();
-                      setFileMenuOpen(false);
-                    }}
-                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                  >
-                    Save
-                  </button>
-                </div>
-              </div>
-            </Transition>
-          </div>
-          <button
-            className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none"
-            onClick={() => console.log('Edit menu')}
-          >
-            Edit
-          </button>
-          <button
-            className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none"
-            onClick={() => console.log('View menu')}
-          >
-            View
-          </button>
-          <button
-            className="px-4 py-1 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-none"
-            onClick={() => console.log('Tools menu')}
-          >
-            Tools
-          </button>
-        </div>
-      </div>
-      */}
       {/* Main content area */}
       <div className="flex grow">
         {/* ItemsNav panel with collapse functionality */}
@@ -355,7 +212,24 @@ export default function Gallery({ lang, mark }) {
             </button>
           </div>
           {!isItemsPanelCollapsed && (
-            <ItemsNav user={user} lang={lang} setTaskId={setId} currentTaskId={id} />
+            <>
+              <div className="flex items-center justify-between px-2 pb-2">
+              <button
+                onClick={handleCreateItem}
+                disabled={isCreatingItem}
+                className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-100 disabled:opacity-50"
+                title="Create new item"
+              >
+                <PlusIcon className="h-4 w-4 text-gray-600" />
+              </button>
+            </div>
+              <ItemsNav
+                items={items}
+                selectedItemId={selectedItemId}
+                onSelectItem={handleSelectItem}
+                onUpdateItem={handleUpdateItem}
+              />
+              </>
           )}
         </div>
         <div className="flex flex-col grow px-2" style={{paddingTop: "5px"}}>
@@ -377,16 +251,11 @@ export default function Gallery({ lang, mark }) {
                 >
                   <Editor
                     accessToken={accessToken}
-                    id={id}  // Always pass the id, including temp- ids
+                    id={id}
                     lang={lang}
                     mark={mark}
                     setId={setId}
-                    setNewTask={setNewTask}
-                    tasks={tasks}
-                    setShowSaving={setShowSaving}
                     height={editorHeight}
-                    onCreateItem={handleCreateItem}
-                    triggerSave={triggerSave}
                   />
                 </div>
             }

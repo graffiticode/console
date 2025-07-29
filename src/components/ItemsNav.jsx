@@ -1,9 +1,7 @@
-import useSWR from "swr";
 import { Menu, Transition } from '@headlessui/react'
 import { Fragment, useEffect, useState, useRef } from 'react';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { PlusIcon } from '@heroicons/react/20/solid';
-import { loadItems, createItem, updateItem } from '../utils/swr/fetchers';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -150,122 +148,13 @@ function EllipsisMenu({ id, name, taskId, onChange }) {
   )
 }
 
-export default function ItemsNav({ user, lang, setTaskId, currentTaskId, onCreateItem }) {
-  const [ items, setItems ] = useState([]);
+export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem }) {
   const [ showId, setShowId ] = useState("");
-  const [ selectedItemId, setSelectedItemId ] = useState("");
-  const [ isCreatingItem, setIsCreatingItem ] = useState(false);
-  // Load items from the API
-  const { data: loadedItems, mutate: mutateItems } = useSWR(
-    user && lang ? { user, lang } : null,
-    loadItems
-  );
-
-  useEffect(() => {
-    if (loadedItems && loadedItems.length > 0) {
-      setItems(loadedItems);
-      // Try to restore the previously selected item from localStorage
-      const savedItemId = localStorage.getItem(`graffiticode:selected:itemId:${lang}`);
-      if (savedItemId) {
-        const matchingItem = loadedItems.find(item => item.id === savedItemId);
-        if (matchingItem) {
-          setSelectedItemId(matchingItem.id);
-          setTaskId(matchingItem.taskId);
-          return;
-        }
-      }
-      // Default to the first item if no saved selection
-      setSelectedItemId(loadedItems[0].id);
-      setTaskId(loadedItems[0].taskId);
-    } else {
-      setItems([]);
-      setSelectedItemId("");
-    }
-  }, [loadedItems, lang, setTaskId]);
-
-  // Update item's taskId when currentTaskId changes
-  useEffect(() => {
-    if (selectedItemId && currentTaskId && items.length > 0) {
-      const selectedItem = items.find(item => item.id === selectedItemId);
-      if (selectedItem && selectedItem.taskId !== currentTaskId) {
-        // Update the item with the new taskId
-        updateItem({ user, id: selectedItemId, taskId: currentTaskId }).then(() => {
-          mutateItems();
-        });
-      }
-    }
-  }, [currentTaskId, selectedItemId, items, user, mutateItems]);
-
-  const handleCreateItem = async () => {
-    if (isCreatingItem) return;
-    setIsCreatingItem(true);
-    try {
-      const newItem = await createItem({ user, lang, name: "unnamed", taskId: null });
-      if (newItem) {
-        // Refresh the items list
-        await mutateItems();
-        // Select the new item
-        setSelectedItemId(newItem.id);
-        setTaskId(newItem.taskId);
-        localStorage.setItem(`graffiticode:selected:itemId:${lang}`, newItem.id);
-        // Call the parent's onCreateItem callback if provided
-        if (onCreateItem) {
-          onCreateItem(newItem);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to create item:", error);
-    } finally {
-      setIsCreatingItem(false);
-    }
-  };
-
-  const handleUpdateItem = async ({ id, name }) => {
-    try {
-      await updateItem({ user, id, name });
-      await mutateItems();
-    } catch (error) {
-      console.error("Failed to update item:", error);
-    }
-  };
-
-  const handleSelectItem = (item) => {
-    setSelectedItemId(item.id);
-    setTaskId(item.taskId);
-    localStorage.setItem(`graffiticode:selected:itemId:${lang}`, item.id);
-  };
-
-  if (!Array.isArray(items) || items.length === 0) {
-    return (
-      <div className="w-64 flex flex-1 flex-col p-8 text-left place-content-left">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={handleCreateItem}
-            disabled={isCreatingItem}
-            className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-100 disabled:opacity-50"
-            title="Create new item"
-          >
-            <PlusIcon className="h-4 w-4 text-gray-600" />
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
       className="w-[210px] flex-none flex flex-col gap-y-2 overflow-visible bg-white pt-2 max-h-[calc(100vh-110px)] sticky top-[84px] z-40"
     >
-      <div className="flex items-center justify-between px-2 pb-2">
-        <button
-          onClick={handleCreateItem}
-          disabled={isCreatingItem}
-          className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-100 disabled:opacity-50"
-          title="Create new item"
-        >
-          <PlusIcon className="h-4 w-4 text-gray-600" />
-        </button>
-      </div>
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
           <li className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100vh - 180px)' }}>
@@ -284,10 +173,10 @@ export default function ItemsNav({ user, lang, setTaskId, currentTaskId, onCreat
                     }}
                   >
                     <button
-                      onClick={() => handleSelectItem(item)}
+                      onClick={() => onSelectItem(item.id)}
                       className={classNames(
                         item.id === selectedItemId ? 'bg-gray-50' : 'hover:bg-gray-50',
-                        'block rounded-none py-1 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left'
+                        'block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left'
                       )}
                       title={item.name}
                     >
@@ -298,7 +187,7 @@ export default function ItemsNav({ user, lang, setTaskId, currentTaskId, onCreat
                         id={item.id}
                         name={item.name}
                         taskId={item.taskId}
-                        onChange={handleUpdateItem}
+                        onChange={onUpdateItem}
                       /> || <div />
                     }
                   </div>
