@@ -225,6 +225,11 @@ export async function generateCode({ auth, prompt, language, options, currentCod
       }
     }
 
+    console.log(
+      "generateCode()",
+      "code=" + code,
+    );
+
     // If no template was loaded, fall back to code generation service
     if (!code) {
       const result = await codeGenerationService({
@@ -279,7 +284,7 @@ export async function generateCode({ auth, prompt, language, options, currentCod
 export async function createItem({ auth, lang, name, taskId }) {
   try {
     console.log(
-      "createItem()",
+      "[1] createItem()",
       "lang=" + lang,
       "name=" + name,
       "taskId=" + taskId,
@@ -293,7 +298,6 @@ export async function createItem({ auth, lang, name, taskId }) {
     if (!name) {
       name = "unnamed";
     }
-    
     // If no taskId provided, create a minimal template task
     if (!taskId) {
       const result = await generateCode({
@@ -306,6 +310,11 @@ export async function createItem({ auth, lang, name, taskId }) {
       taskId = result.taskId;
     }
     
+    console.log(
+      "[2] createItem()",
+      "taskId=" + taskId,
+    );
+
     const timestamp = Date.now();
     const item = {
       id,
@@ -419,11 +428,6 @@ export async function getItem({ auth, id }) {
 
 export async function getTask({ auth, id }) {
   try {
-    console.log(
-      "[1] getTask()",
-      "id=" + id
-    );
-    
     // First try to get from user's tasks
     const taskDoc = await db.doc(`users/${auth.uid}/taskIds/${id}`).get();
     
@@ -433,20 +437,10 @@ export async function getTask({ auth, id }) {
     
     const taskData = taskDoc.data();
     
-    console.log(
-      "[2] getTask()",
-      "taskData=" + JSON.stringify(taskData, null, 2),
-    );
-
     // Get the actual task code from the API
     const apiTask = await getApiTask({ id, auth });
     const apiTaskData = apiTask[0] || apiTask;
     
-    console.log(
-      "[3] getTask()",
-      "apiTaskData=" + JSON.stringify(apiTaskData, null, 2),
-    );
-
     return {
       id: id,
       lang: taskData.lang,

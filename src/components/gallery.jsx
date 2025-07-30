@@ -97,6 +97,7 @@ export default function Gallery({ lang, mark }) {
           setSelectedItemId(matchingItem.id);
           setId(matchingItem.taskId);
           return;
+        }
       }
       // Default to the first item if no saved selection
       if (loadedItems[0]) {
@@ -195,41 +196,39 @@ export default function Gallery({ lang, mark }) {
           "flex-none h-full transition-all duration-300",
           isItemsPanelCollapsed ? "w-10" : "w-[210px]"
         )}>
-          <div className="sticky top-[64px] bg-white z-40 pb-2 flex items-center justify-between">
-            <button
-              className="text-gray-400 hover:text-gray-500 focus:outline-none p-2"
-              title={isItemsPanelCollapsed ? "Expand items panel" : "Collapse items panel"}
-              onClick={toggleItemsPanel}>
-              {isItemsPanelCollapsed ? (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-                </svg>
-              )}
-            </button>
-          </div>
-          {!isItemsPanelCollapsed && (
-            <>
-              <div className="flex items-center justify-between px-2 pb-2">
+          <div className="sticky top-[64px] bg-white z-40 pb-2">
+            <div className="flex flex-col items-start">
+              <button
+                className="text-gray-400 hover:text-gray-500 focus:outline-none p-2"
+                title={isItemsPanelCollapsed ? "Expand items panel" : "Collapse items panel"}
+                onClick={toggleItemsPanel}>
+                {isItemsPanelCollapsed ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                  </svg>
+                )}
+              </button>
               <button
                 onClick={handleCreateItem}
                 disabled={isCreatingItem}
-                className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-100 disabled:opacity-50"
+                className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-100 disabled:opacity-50 ml-2"
                 title="Create new item"
               >
                 <PlusIcon className="h-4 w-4 text-gray-600" />
               </button>
             </div>
-              <ItemsNav
-                items={items}
-                selectedItemId={selectedItemId}
-                onSelectItem={handleSelectItem}
-                onUpdateItem={handleUpdateItem}
-              />
-              </>
+          </div>
+          {!isItemsPanelCollapsed && (
+            <ItemsNav
+              items={items}
+              selectedItemId={selectedItemId}
+              onSelectItem={handleSelectItem}
+              onUpdateItem={handleUpdateItem}
+            />
           )}
         </div>
         <div className="flex flex-col grow px-2" style={{paddingTop: "5px"}}>

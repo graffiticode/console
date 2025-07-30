@@ -99,6 +99,10 @@ export default function Editor({
     //   setDoPostTask(true);
     // } else
     if (taskData) {
+      console.log(
+        "Editor()",
+        "taskData=" + JSON.stringify(taskData, null, 2),
+      );
       if (taskData.src) {
         setCode(taskData.src);
         setHelp(taskData.help && (
@@ -108,6 +112,7 @@ export default function Editor({
         ));
         setHasInitialized(true);
       }
+    }
   }, [taskId, taskData, hasInitialized]);
 
   useEffect(() => {
