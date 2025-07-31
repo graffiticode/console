@@ -7,7 +7,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function EllipsisMenu({ id, name, taskId, onChange }) {
+function EllipsisMenu({ itemId, name, taskId, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
@@ -112,7 +112,7 @@ function EllipsisMenu({ id, name, taskId, onChange }) {
                   className="w-full rounded-none border border-gray-300 p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-500"
                   placeholder={name}
                   onFocus={(e) => e.target.value = ''}
-                  onBlur={(e) => onChange({id, name: e.target.value || name})}
+                  onBlur={(e) => onChange({itemId, name: e.target.value || name})}
                 />
               </div>
 
@@ -184,7 +184,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                     </button>
                     { item.id === showId &&
                       <EllipsisMenu
-                        id={item.id}
+                        itemId={item.id}
                         name={item.name}
                         taskId={item.taskId}
                         onChange={onUpdateItem}

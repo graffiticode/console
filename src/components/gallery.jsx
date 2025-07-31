@@ -50,26 +50,21 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-// TODO:
-// [ ] build list of items for the current lang and mark
-// [ ] select the current item
-// [ ] pass items to ItemsNav
-// [ ] pass task to Editor
-// [ ] on setId, update the current item's taskId
-// [ ] move new item button to Gallery
-
 export default function Gallery({ lang, mark }) {
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ editorHeight, setEditorHeight ] = useState(600);
-  const [ id, _setId ] = useState("");
+  const [ taskId, setTaskIdState ] = useState("");
+
+  const setTaskId = (newTaskId) => {
+    setTaskIdState(newTaskId);
+  };
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
   const [ isItemsPanelCollapsed, setIsItemsPanelCollapsed ] = useState(
     localStorage.getItem('graffiticode:itemsPanelCollapsed') === 'true'
   );
   const [ items, setItems ] = useState([]);
   const [ selectedItemId, setSelectedItemId ] = useState("");
-  const setId = id => _setId(id);
   const { user } = useArtcompilerAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
@@ -88,33 +83,21 @@ export default function Gallery({ lang, mark }) {
 
   useEffect(() => {
     if (loadedItems && loadedItems.length > 0) {
-      console.log(
-        "Gallery()",
-        "loadedItems=" + JSON.stringify(loadedItems, null, 2),
-      );
       setItems(loadedItems);
       // Try to restore the previously selected item from localStorage
       const savedItemId = localStorage.getItem(`graffiticode:selected:itemId`);
       if (savedItemId) {
         const matchingItem = loadedItems.find(item => item.id === savedItemId);
         if (matchingItem) {
-          console.log(
-            "Gallery()",
-            "matchingItem=" + JSON.stringify(matchingItem, null, 2),
-          );
           setSelectedItemId(matchingItem.id);
-          setId(matchingItem.taskId);
+          setTaskIdState(matchingItem.taskId);
           return;
         }
       }
       // Default to the first item if no saved selection
       if (loadedItems[0]) {
-        console.log(
-          "Gallery()",
-          "loadedItems[0]=" + JSON.stringify(loadedItems[0], null, 2),
-        );
         setSelectedItemId(loadedItems[0].id);
-        setId(loadedItems[0].taskId);
+        setTaskIdState(loadedItems[0].taskId);
       }
     } else {
       setItems([]);
@@ -138,7 +121,7 @@ export default function Gallery({ lang, mark }) {
         setItems(prevItems => [newItem, ...prevItems]);
         // Select the new item
         setSelectedItemId(newItem.id);
-        setId(newItem.taskId);
+        setTaskId(newItem.taskId);
         localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
       }
     } catch (error) {
@@ -148,11 +131,11 @@ export default function Gallery({ lang, mark }) {
     }
   };
 
-  const handleUpdateItem = async ({ id, name, taskId }) => {
+  const handleUpdateItem = async ({ itemId, name, taskId }) => {
     // Update local state first
     setItems(prevItems => {
       const updated = prevItems.map(item =>
-        item.id === id
+        item.id === itemId
           ? { ...item, ...(name !== undefined && { name }), ...(taskId !== undefined && { taskId }) }
           : item
       );
@@ -160,7 +143,7 @@ export default function Gallery({ lang, mark }) {
     });
     // Then update backend
     try {
-      const result = await updateItem({ user, id, name, taskId });
+      const result = await updateItem({ user, id: itemId, name, taskId });
     } catch (error) {
       console.error("Failed to update item:", error);
       // Optionally revert local state on error
@@ -172,21 +155,22 @@ export default function Gallery({ lang, mark }) {
     const item = items.find(i => i.id === itemId);
     if (item) {
       setSelectedItemId(item.id);
-      setId(item.taskId);
+      setTaskIdState(item.taskId);
       localStorage.setItem(`graffiticode:selected:itemId`, item.id);
     }
   };
 
-  // Update the selected item's taskId when the id changes
+  // Update the selected item's taskId when the taskId changes due to editing
   useEffect(() => {
-    if (selectedItemId && id && items.length > 0) {
-      const currentItem = items.find(item => item.id === selectedItemId);
-      if (currentItem && currentItem.taskId !== id) {
-        handleUpdateItem({ id: selectedItemId, taskId: id });
+    if (selectedItemId && taskId && items.length > 0) {
+      const selectedItem = items.find(item => item.id === selectedItemId);
+
+      // Update the currently selected item with the new task ID
+      if (selectedItem && selectedItem.taskId !== taskId) {
+        handleUpdateItem({ itemId: selectedItemId, taskId: taskId });
       }
     }
-  }, [id, selectedItemId, items]); // Depend on id, selectedItemId, and items
-
+  }, [taskId, selectedItemId, items]);
 
   if (!user) {
     return (
@@ -248,50 +232,45 @@ export default function Gallery({ lang, mark }) {
                  hideEditor ? "block" : "flex flex-col lg:flex-row",
                  "gap-4 items-start"
                )}>
-            {
-              !hideEditor &&
-                <div
-                  ref={editorRef}
-                  className="relative ring-0 border border-gray-200 rounded-none mb-2 order-2 lg:order-1 resize-x"
-                  style={{
-                    height: "calc(100vh - 80px)",
-                    width: "48%",
-                    minWidth: "300px",
-                    maxWidth: "70%"
-                  }}
-                >
-                  <Editor
-                    accessToken={accessToken}
-                    id={id}
-                    lang={lang}
-                    mark={mark}
-                    setId={setId}
-                    height={editorHeight}
-                  />
-                </div>
-            }
-            {
-              <div
-                className="relative ring-0 border border-gray-300 rounded-none resize-both order-1 lg:order-2"
-                style={{
-                  height: "calc(100vh - 80px)",
-                  width: "48%",
-                  minHeight: "200px",
-                  maxHeight: "calc(100vh - 80px)",
-                  minWidth: "300px",
-                  maxWidth: "70%"
-                }}
-              >
-                <FormView
-                  key="form"
-                  accessToken={accessToken}
-                  id={id}
-                  lang={lang}
-                  height="100%"
-                  className="h-full overflow-auto p-2"
-                />
-              </div>
-            }
+            <div
+              ref={editorRef}
+              className="relative ring-0 border border-gray-200 rounded-none mb-2 order-2 lg:order-1 resize-x"
+              style={{
+                height: "calc(100vh - 80px)",
+                width: "48%",
+                minWidth: "300px",
+                maxWidth: "70%"
+              }}
+            >
+              <Editor
+                accessToken={accessToken}
+                id={taskId}
+                lang={lang}
+                mark={mark}
+                setId={setTaskId}
+                height={editorHeight}
+              />
+            </div>
+            <div
+              className="relative ring-0 border border-gray-300 rounded-none resize-both order-1 lg:order-2"
+              style={{
+                height: "calc(100vh - 80px)",
+                width: "48%",
+                minHeight: "200px",
+                maxHeight: "calc(100vh - 80px)",
+                minWidth: "300px",
+                maxWidth: "70%"
+              }}
+            >
+              <FormView
+                key="form"
+                accessToken={accessToken}
+                id={taskId}
+                lang={lang}
+                height="100%"
+                className="h-full overflow-auto p-2"
+              />
+            </div>
           </div>
         </div>
       </div>

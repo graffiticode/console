@@ -56,15 +56,14 @@ export default function Editor({
   const [ mark, setMark ] = useState(initMark);
   const [ isPublic, setIsPublic ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
-  const [ doSaveTask, setDoSaveTask ] = useState(false);
-//  const [ doPostDataTask, setDoPostDataTask ] = useState(false);
-//  const [ doGetData, setDoGetData ] = useState(false);
+  const [ isUserEdit, setIsUserEdit ] = useState(false);
   const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Help");
   const { user } = useArtcompilerAuth();
   const ids = parseId(id);
   const [ taskId, setTaskId ] = useState(ids.taskId);
-  const [ hasInitialized, setHasInitialized ] = useState(false);
+  const [ isPostingTask, setIsPostingTask ] = useState(false);
   const dataPanelRef = React.useRef(null);
+  const currentTaskIdRef = React.useRef(taskId);
 
   const handleCopy = () => {
     if (dataPanelRef.current) {
@@ -91,61 +90,37 @@ export default function Editor({
   );
 
   useEffect(() => {
-    console.log(
-      "Editor()",
-      "hasInitialized=" + hasInitialized,
-      "taskId=" + taskId,
-      "taskData=" + JSON.stringify(taskData, null, 2),
-    );
-    // if (taskId === "" && hasInitialized) {
-    //   // Only create new task if we've already initialized (user action)
-    //   setCode("{}..");
-    //   setHelp([]);
-    //   setData({});
-    //   setDoPostTask(true);
-    // } else
-    if (taskData) {
-      console.log(
-        "Editor()",
-        "taskData=" + JSON.stringify(taskData, null, 2),
-      );
+    if (taskData && taskId !== currentTaskIdRef.current) {
+      // Switching tasks - safe to overwrite
       if (taskData.src) {
+        // Clear any pending user edits when loading new task source
+        setIsUserEdit(false);
+        setDoPostTask(false);
+        setIsPostingTask(false);
         setCode(taskData.src);
         setHelp(taskData.help && (
           typeof taskData.help === "string" && JSON.parse(taskData.help) ||
             taskData.help ||
             []
         ));
-        setHasInitialized(true);
+        currentTaskIdRef.current = taskId;
       }
     }
-  }, [taskId, taskData, hasInitialized]);
+  }, [taskId, taskData]);
 
   useEffect(() => {
     const { taskId } = parseId(id);
     setTaskId(taskId);
-//    setDoGetData(true);
   }, [id]);
 
-  // const getDataResp = useSWR(
-  //   doGetData && {
-  //     user,
-  //     id,
-  //   } || null,
-  //   getData
-  // );
-
-  // if (getDataResp.data) {
-  //   const data = getDataResp.data;
-  //   setDoGetData(false);
-  //   setData(data);
-  // }
-
   useEffect(() => {
-    if (code && hasInitialized) {
+    // Only post task if code changes due to user editing
+    if (code && isUserEdit && !isPostingTask) {
       setDoPostTask(true);
+      setIsUserEdit(false); // Reset flag after posting
+      setIsPostingTask(true); // Prevent duplicate posts
     }
-  }, [code, hasInitialized]);
+  }, [code, isUserEdit, isPostingTask]);
 
   // This is the critical fix - when a user clicks on a task in the list,
   // we need to force the task ID to update and help to be reloaded
@@ -163,53 +138,30 @@ export default function Editor({
     postTask
   );
 
-  if (postTaskResp.data) {
-    const taskId = postTaskResp.data;
-    setDoPostTask(false);
-    setTaskId(taskId);
-    setId(taskId);
-    setDoSaveTask(true);
-  }
+  useEffect(() => {
+    if (postTaskResp.data && isPostingTask) {
+      const newTaskId = postTaskResp.data;
+      setDoPostTask(false);
+      setIsPostingTask(false); // Reset the flag
+      setTaskId(newTaskId);
+      setId(newTaskId);
 
-  // Save task.
-  const saveTaskResp = useSWR(
-    doSaveTask && {
-      user,
-      id,
-      lang,
-      code,
-      help, //: JSON.stringify(help), // Explicitly stringify help here for saving
-      mark: mark.id,
-      isPublic
-    } || null,
-    saveTask
-  );
+      // Save the task immediately after creation
+      saveTask({
+        user,
+        id: newTaskId,
+        lang,
+        code,
+        help,
+        mark: mark.id,
+        isPublic
+      }).catch(error => {
+        console.error("Failed to save task:", error);
+      });
+    }
+  }, [postTaskResp.data, isPostingTask, user, lang, code, help, mark.id, isPublic]);
 
-  if (saveTaskResp.data) {
-    setDoSaveTask(false);
-  }
-
-   // useEffect(() => {
-  //   if (isNonNullNonEmptyObject(props)) {
-  //     setDoPostDataTask(true);
-  //   }
-  // }, [JSON.stringify(props)]);
-
-  // const postDataTaskResp = useSWR(
-  //   doPostDataTask && {
-  //     user,
-  //     lang: "0001",
-  //     code: `${JSON.stringify(props)}..`
-  //   } || null,
-  //   postTask
-  // );
-
-  // if (postDataTaskResp.data) {
-  //   const dataId = postDataTaskResp.data;
-  //   setDoPostDataTask(false);
-  //   setId(getId({taskId, dataId}));
-  // }
-
+  // Removed SWR-based save task - now saving directly after post completes
 
   return (
     <div className="flex items-start space-x-4 h-full min-h-[calc(100vh-120px)]">
@@ -252,10 +204,9 @@ export default function Editor({
                     language={lang}
                     code={code}
                     setCode={(newCode) => {
-                      setCode(newCode);
-                      // Mark as initialized when user edits
-                      if (!hasInitialized) {
-                        setHasInitialized(true);
+                      if (newCode !== code) {
+                        setIsUserEdit(true);
+                        setCode(newCode);
                       }
                     }}
                   />
@@ -265,10 +216,9 @@ export default function Editor({
                   <CodePanel
                     code={code}
                     setCode={(newCode) => {
-                      setCode(newCode);
-                      // Mark as initialized when user edits
-                      if (!hasInitialized) {
-                        setHasInitialized(true);
+                      if (newCode !== code) {
+                        setIsUserEdit(true);
+                        setCode(newCode);
                       }
                     }}
                     compiledData={data}
