@@ -86,11 +86,17 @@ export default function Editor({
 
   // Load task data when taskId changes
   const { data: taskData } = useSWR(
-    taskId && user ? { user, id: taskId } : null,
-    getTask
+    taskId && user ? [`getTask-${taskId}`, { user, id: taskId }] : null,
+    ([_, params]) => getTask(params)
   );
 
   useEffect(() => {
+    console.log(
+      "Editor()",
+      "hasInitialized=" + hasInitialized,
+      "taskId=" + taskId,
+      "taskData=" + JSON.stringify(taskData, null, 2),
+    );
     // if (taskId === "" && hasInitialized) {
     //   // Only create new task if we've already initialized (user action)
     //   setCode("{}..");

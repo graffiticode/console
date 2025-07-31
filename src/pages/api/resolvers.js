@@ -193,13 +193,6 @@ export async function compiles({ auth, lang, type }) {
 export async function generateCode({ auth, prompt, language, options, currentCode }) {
   // TODO add support for calling the compiler to check generated code.
   try {
-    console.log(
-      "resolvers/generateCode()",
-      "prompt=" + prompt.substring(0, 30) + "...",
-      "language=" + language,
-      "currentCode length=" + (currentCode ? currentCode.length : 0)
-    );
-
     prompt = prompt.trim();
     let code = null;
     let taskId = null;
@@ -224,12 +217,6 @@ export async function generateCode({ auth, prompt, language, options, currentCod
         console.log("generateCode()", "Template file not found or error reading, falling back to service", error.message);
       }
     }
-
-    console.log(
-      "generateCode()",
-      "code=" + code,
-    );
-
     // If no template was loaded, fall back to code generation service
     if (!code) {
       const result = await codeGenerationService({
@@ -293,7 +280,6 @@ export async function createItem({ auth, lang, name, taskId }) {
     // Generate a unique ID for the item
     const itemRef = db.collection(`users/${auth.uid}/items`).doc();
     const id = itemRef.id;
-    
     // If no name provided, use "unnamed"
     if (!name) {
       name = "unnamed";
@@ -309,7 +295,6 @@ export async function createItem({ auth, lang, name, taskId }) {
       });
       taskId = result.taskId;
     }
-    
     console.log(
       "[2] createItem()",
       "taskId=" + taskId,
@@ -324,9 +309,7 @@ export async function createItem({ auth, lang, name, taskId }) {
       created: timestamp,
       updated: timestamp
     };
-    
     await itemRef.set(item);
-    
     return {
       ...item,
       created: String(timestamp),
@@ -346,24 +329,18 @@ export async function updateItem({ auth, id, name, taskId }) {
       "name=" + name,
       "taskId=" + taskId,
     );
-    
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
     const itemDoc = await itemRef.get();
-    
     if (!itemDoc.exists) {
       throw new Error("Item not found");
     }
-    
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (taskId !== undefined) updates.taskId = taskId;
     updates.updated = Date.now();
-    
     await itemRef.update(updates);
-    
     const updatedDoc = await itemRef.get();
     const data = updatedDoc.data();
-    
     return {
       id,
       ...data,
@@ -379,12 +356,10 @@ export async function updateItem({ auth, id, name, taskId }) {
 export async function getItems({ auth, lang }) {
   try {
     console.log("getItems()", "lang=" + lang);
-    
     const itemsSnapshot = await db.collection(`users/${auth.uid}/items`)
       .where('lang', '==', lang)
       .orderBy('created', 'desc')
       .get();
-    
     const items = [];
     itemsSnapshot.forEach(doc => {
       const data = doc.data();
@@ -395,7 +370,6 @@ export async function getItems({ auth, lang }) {
         updated: data.updated ? String(data.updated) : String(data.created)
       });
     });
-    
     return items;
   } catch (error) {
     console.error("getItems()", "ERROR", error);
@@ -406,13 +380,10 @@ export async function getItems({ auth, lang }) {
 export async function getItem({ auth, id }) {
   try {
     console.log("getItem()", "id=" + id);
-    
     const itemDoc = await db.doc(`users/${auth.uid}/items/${id}`).get();
-    
     if (!itemDoc.exists) {
       return null;
     }
-    
     const data = itemDoc.data();
     return {
       id: itemDoc.id,
@@ -430,17 +401,13 @@ export async function getTask({ auth, id }) {
   try {
     // First try to get from user's tasks
     const taskDoc = await db.doc(`users/${auth.uid}/taskIds/${id}`).get();
-    
     if (!taskDoc.exists) {
       return null;
     }
-    
     const taskData = taskDoc.data();
-    
     // Get the actual task code from the API
     const apiTask = await getApiTask({ id, auth });
     const apiTaskData = apiTask[0] || apiTask;
-    
     return {
       id: id,
       lang: taskData.lang,

@@ -88,12 +88,20 @@ export default function Gallery({ lang, mark }) {
 
   useEffect(() => {
     if (loadedItems && loadedItems.length > 0) {
+      console.log(
+        "Gallery()",
+        "loadedItems=" + JSON.stringify(loadedItems, null, 2),
+      );
       setItems(loadedItems);
       // Try to restore the previously selected item from localStorage
       const savedItemId = localStorage.getItem(`graffiticode:selected:itemId`);
       if (savedItemId) {
         const matchingItem = loadedItems.find(item => item.id === savedItemId);
         if (matchingItem) {
+          console.log(
+            "Gallery()",
+            "matchingItem=" + JSON.stringify(matchingItem, null, 2),
+          );
           setSelectedItemId(matchingItem.id);
           setId(matchingItem.taskId);
           return;
@@ -101,6 +109,10 @@ export default function Gallery({ lang, mark }) {
       }
       // Default to the first item if no saved selection
       if (loadedItems[0]) {
+        console.log(
+          "Gallery()",
+          "loadedItems[0]=" + JSON.stringify(loadedItems[0], null, 2),
+        );
         setSelectedItemId(loadedItems[0].id);
         setId(loadedItems[0].taskId);
       }

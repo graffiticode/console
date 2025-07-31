@@ -10,22 +10,21 @@ export const DataPanel = forwardRef(function DataPanel({
   user,
 }, ref) {
   const [ data, setData ] = useState({});
-  const [ doGetData, setDoGetData ] = useState(false);
 
-  useEffect(() => {
-    setDoGetData(true);
-  }, [id]);
-
-  const getDataResp = useSWR(
-    doGetData && { user, id } || null,
-    getData
+  const { data: fetchedData } = useSWR(
+    user && id ? [`getData-${id}`, { user, id }] : null,
+    ([_, params]) => getData(params)
   );
 
-  if (getDataResp.data) {
-    const data = getDataResp.data;
-    setData(data);
-    setDoGetData(false);
-  }
+  useEffect(() => {
+    if (fetchedData) {
+      console.log(
+        "DataPanel()",
+        "fetchedData=" + JSON.stringify(fetchedData, null, 2),
+      );
+      setData(fetchedData);
+    }
+  }, [fetchedData]);
 
   return (
     isNullOrEmptyObject(data) &&
