@@ -104,15 +104,15 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
 const fallbackResponse = (message) => {
   if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
     return {
-      text: 'Hello! How can I help you with Artcompiler today?',
+      text: 'Hello! What do you want to make with Artcompiler today?',
       type: 'text',
-      description: 'Hello! How can I help you with Artcompiler today?'
+      description: 'Hello! What do you want to make with Artcompiler today?'
     };
   } else if (message.toLowerCase().includes('help')) {
     return {
-      text: 'I can help you write Artcompiler. What specific functionality would you like me to implement?',
+      text: 'I can help you make things with Artcompiler. What specific functionality would you like me to implement?',
       type: 'text',
-      description: 'I can help you write Artcompiler. What specific functionality would you like me to implement?'
+      description: 'I can help you make things with Artcompiler. What specific functionality would you like me to implement?'
     };
   } else if (message.toLowerCase().includes('example')) {
     return {

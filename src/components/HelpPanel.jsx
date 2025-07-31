@@ -1616,7 +1616,7 @@ export const HelpPanel = ({
               key={help.length === 0 ? 'empty' : 'has-content'}
               state={state}
               disabled={isLoading}
-              placeholder={help.length > 0 ? "Reply to make changes..." : "How can I help you today?"}
+              placeholder={help.length > 0 ? "Reply to make changes..." : "What do you want to make today?"}
             />
           </div>
         </div>

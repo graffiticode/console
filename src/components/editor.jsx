@@ -57,7 +57,7 @@ export default function Editor({
   const [ isPublic, setIsPublic ] = useState(false);
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ isUserEdit, setIsUserEdit ] = useState(false);
-  const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Help");
+  const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Make");
   const { user } = useArtcompilerAuth();
   const ids = parseId(id);
   const [ taskId, setTaskId ] = useState(ids.taskId);
@@ -195,7 +195,7 @@ export default function Editor({
                     user={user}
                   />
                 );
-              } else if (tab === "Help") {
+              } else if (tab === "Make") {
                 return (
                   <HelpPanel
                     help={help}
