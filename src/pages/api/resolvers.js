@@ -286,6 +286,7 @@ export async function createItem({ auth, lang, name, taskId, mark }) {
       name = "unnamed";
     }
     // If no taskId provided, create a minimal template task
+    let code = "";
     if (!taskId) {
       const result = await generateCode({
         auth,
@@ -295,12 +296,12 @@ export async function createItem({ auth, lang, name, taskId, mark }) {
         currentCode: null
       });
       taskId = result.taskId;
+      code = result.code;
     }
     console.log(
       "[2] createItem()",
       "taskId=" + taskId,
     );
-
     const timestamp = Date.now();
     const item = {
       id,
@@ -312,6 +313,20 @@ export async function createItem({ auth, lang, name, taskId, mark }) {
       updated: timestamp
     };
     await itemRef.set(item);
+    // Save task so that it is in the console db.
+    console.log(
+      "Saved task id:",
+      (await saveTask({
+        auth,
+        id: taskId,
+        lang,
+        help: "[]",
+        code,
+        mark,
+        isPublic: false,
+      })).id,
+      "code:", code,
+    );
     return {
       ...item,
       created: String(timestamp),

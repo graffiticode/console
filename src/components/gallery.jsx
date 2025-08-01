@@ -16,6 +16,17 @@ import { ChevronRightIcon } from '@heroicons/react/20/solid'
 import ItemsNav from "./ItemsNav.jsx";
 import { PlusIcon } from '@heroicons/react/20/solid';
 
+const parseId = id => {
+  if (!id) {
+    return {taskId: ""};
+  }
+  const parts = id.split("+");
+  return {
+    taskId: parts[0],
+    dataId: parts.length > 1 && parts.slice(1).join("+"),
+  };
+};
+
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
@@ -54,11 +65,7 @@ export default function Gallery({ lang, mark }) {
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ editorHeight, setEditorHeight ] = useState(600);
-  const [ taskId, setTaskIdState ] = useState("");
-
-  const setTaskId = (newTaskId) => {
-    setTaskIdState(newTaskId);
-  };
+  const [ taskId, setTaskId ] = useState("");
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
   const [ isItemsPanelCollapsed, setIsItemsPanelCollapsed ] = useState(
     localStorage.getItem('graffiticode:itemsPanelCollapsed') === 'true'
@@ -90,14 +97,14 @@ export default function Gallery({ lang, mark }) {
         const matchingItem = loadedItems.find(item => item.id === savedItemId);
         if (matchingItem) {
           setSelectedItemId(matchingItem.id);
-          setTaskIdState(matchingItem.taskId);
+          setTaskId(matchingItem.taskId);
           return;
         }
       }
       // Default to the first item if no saved selection
       if (loadedItems[0]) {
         setSelectedItemId(loadedItems[0].id);
-        setTaskIdState(loadedItems[0].taskId);
+        setTaskId(loadedItems[0].taskId);
       }
     } else {
       setItems([]);
@@ -115,11 +122,19 @@ export default function Gallery({ lang, mark }) {
     if (isCreatingItem) return;
     setIsCreatingItem(true);
     try {
-      const newItem = await createItem({ user, lang, name: "unnamed", taskId: null, mark: mark?.id || 1 });
+      const newItem = await createItem({
+        user,
+        lang,
+        name: "unnamed",
+        taskId: null,
+        mark: mark?.id || 1
+      });
+      console.log(
+        "Gallery()",
+        "newItem=" + JSON.stringify(newItem, null, 2),
+      );
       if (newItem) {
-        // Add the new item to the beginning of the list
         setItems(prevItems => [newItem, ...prevItems]);
-        // Select the new item
         setSelectedItemId(newItem.id);
         setTaskId(newItem.taskId);
         localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
@@ -155,7 +170,7 @@ export default function Gallery({ lang, mark }) {
     const item = items.find(i => i.id === itemId);
     if (item) {
       setSelectedItemId(item.id);
-      setTaskIdState(item.taskId);
+      setTaskId(item.taskId);
       localStorage.setItem(`graffiticode:selected:itemId`, item.id);
     }
   };
@@ -245,10 +260,10 @@ export default function Gallery({ lang, mark }) {
             >
               <Editor
                 accessToken={accessToken}
-                id={taskId}
+                taskId={taskId}
                 lang={lang}
                 mark={mark}
-                setId={setTaskId}
+                setTaskId={setTaskId}
                 height={editorHeight}
               />
             </div>

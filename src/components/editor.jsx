@@ -17,23 +17,6 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-const getId = ({ taskId, dataId }) => {
-  if (!taskId && !dataId) return "";
-  if (taskId && dataId) return `${taskId}+${dataId}`;
-  return String(taskId || dataId || "");
-};
-
-const parseId = id => {
-  if (!id) {
-    return {taskId: ""};
-  }
-  const parts = id.split("+");
-  return {
-    taskId: parts[0],
-    dataId: parts.length > 1 && parts.slice(1).join("+"),
-  };
-};
-
 /*
   The job of the Editor is to provide code and props editors and to compile the
   edited code and props to get an id for the current state of the view.
@@ -41,10 +24,10 @@ const parseId = id => {
 
 export default function Editor({
   accessToken,
-  id,
+  taskId,
+  setTaskId,
   lang,
   mark: initMark,
-  setId,
   height,
 }) {
   const [ code, setCode ] = useState("");
@@ -59,8 +42,6 @@ export default function Editor({
   const [ isUserEdit, setIsUserEdit ] = useState(false);
   const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Make");
   const { user } = useArtcompilerAuth();
-  const ids = parseId(id);
-  const [ taskId, setTaskId ] = useState(ids.taskId);
   const [ isPostingTask, setIsPostingTask ] = useState(false);
   const dataPanelRef = React.useRef(null);
   const currentTaskIdRef = React.useRef(taskId);
@@ -90,6 +71,11 @@ export default function Editor({
   );
 
   useEffect(() => {
+    console.log(
+      "Editor()",
+      "taskId=" + taskId,
+      "taskData=" + JSON.stringify(taskData, null, 2),
+    );
     if (taskData && taskId !== currentTaskIdRef.current) {
       // Switching tasks - safe to overwrite
       if (taskData.src) {
@@ -106,12 +92,7 @@ export default function Editor({
         currentTaskIdRef.current = taskId;
       }
     }
-  }, [taskId, taskData]);
-
-  useEffect(() => {
-    const { taskId } = parseId(id);
-    setTaskId(taskId);
-  }, [id]);
+  }, [taskId]);
 
   useEffect(() => {
     // Only post task if code changes due to user editing
@@ -122,17 +103,6 @@ export default function Editor({
     }
   }, [code, isUserEdit, isPostingTask]);
 
-  // This is the critical fix - when a user clicks on a task in the list,
-  // we need to force the task ID to update and help to be reloaded
-  useEffect(() => {
-    if (id && id !== getId({taskId})) {
-      const { taskId: newTaskId } = parseId(id);
-      if (newTaskId) {
-        setTaskId(newTaskId);
-      }
-    }
-  }, [id, taskId]);
-
   const postTaskResp = useSWR(
     doPostTask && { user, lang, code } || null,
     postTask
@@ -140,16 +110,14 @@ export default function Editor({
 
   useEffect(() => {
     if (postTaskResp.data && isPostingTask) {
-      const newTaskId = postTaskResp.data;
+      const taskId = postTaskResp.data;
       setDoPostTask(false);
       setIsPostingTask(false); // Reset the flag
-      setTaskId(newTaskId);
-      setId(newTaskId);
-
+      setTaskId(taskId);
       // Save the task immediately after creation
       saveTask({
         user,
-        id: newTaskId,
+        id: taskId,
         lang,
         code,
         help,

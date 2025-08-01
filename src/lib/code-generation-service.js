@@ -1101,21 +1101,27 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {}, 
     // Generate a description of the code
     // Create a prompt for Claude to describe the code
     const descriptionPrompt = JSON.stringify({
-      system: `You are an expert Artcompiler programmer tasked with describing generated code in simple terms.
-Analyze the provided Artcompiler and explain what it does in 2-3 sentences of plain English.
-Focus on explaining the purpose and functionality without technical jargon.
-Keep your description concise and user-friendly, so people unfamiliar with programming can understand.
-IMPORTANT: Always phrase your description to indicate this is code that was generated, not code that the user wrote.
-IMPORTANT: Backslashes should NOT be escaped in generated code.
-IMPORTANT: Literal "\n" should not appear in the generated code; use proper newline characters instead.`,
+      system: `
+You are an expert Graffiticode programmer tasked with describing in simple terms
+the solution that the generated code creates. Analyze the provided Graffiticode
+and explain what it does in a single sentence of plain English. Focus on
+explaining the purpose and functionality without technical jargon. Keep your
+description concise and user-friendly, so people unfamiliar with programming can
+understand.
+IMPORTANT: Always phrase your description to describe the effect of the code, not
+the code itself.
+`,
       messages: [
         {
           role: "user",
-          content: `Please provide a brief, clear description of what this generated Artcompiler does:
+          content: `
+Please provide a brief, clear description of what application that this
+generated Graffiticode does in a single sentence:
 
 ${generatedCode}
 
-Explain it in 2-3 sentences of simple language that anyone can understand. Start with something like "This code generates..." or "The generated code..." instead of assuming the user wrote it.`
+Explain it in one sentence of simple language that anyone can understand.
+`
         }
       ]
     }, null, 2);
