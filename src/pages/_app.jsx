@@ -26,7 +26,7 @@ export default function App({
   pageProps: { session, ...pageProps },
 }) {
   const [language, setLanguage] = useLocalStorage("artcompiler:language", {id: 1, name: "L0001"});
-  const [mark, setMark] = useLocalStorage("artcompiler:tasks:mark", marks[0]);
+  const [mark, setMark] = useLocalStorage("artcompiler:items:mark", marks[0]);
   const router = useRouter();
   const pathName = router.pathname.slice(1);
   return (

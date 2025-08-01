@@ -36,7 +36,7 @@ const parseQuery =
 export default function Form() {
   const router = useRouter();
   const { lang, id } = parseQuery(router.query);
-  const [mark, setMark] = useLocalStorage("artcompiler:tasks:mark", marks[0]);
+  const [mark, setMark] = useLocalStorage("artcompiler:items:mark", marks[0]);
   if (id === undefined) {
     return <div />;
   }

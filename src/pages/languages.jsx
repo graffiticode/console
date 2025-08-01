@@ -64,7 +64,7 @@ function LanguageList({ language, setLanguage }) {
         {languages.map((language) => (
           <Link
             key={language.name}
-            href="/tasks"
+            href="/items"
             onClick={() => setLanguage({ name: language.name })}
           >
           <li className="col-span-1 flex rounded-none shadow-sm">

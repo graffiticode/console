@@ -81,7 +81,7 @@ export default function Compiles() {
       </p>
       <p>
         <b>Tasks.</b> The components and apis are programmed with the&nbsp;
-        <Link href="/tasks"><b>Tasks</b></Link>
+        <Link href="/items"><b>Items</b></Link>
         &nbsp;editor. Once programmed, the static state of the component or api
         is used to initialize them whereever and however they may be hosted.
       </p>
