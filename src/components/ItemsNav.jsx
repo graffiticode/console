@@ -2,12 +2,13 @@ import { Menu, Transition } from '@headlessui/react'
 import { Fragment, useEffect, useState, useRef } from 'react';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { PlusIcon } from '@heroicons/react/20/solid';
+import MarkSelector, { marks } from './mark-selector.jsx';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function EllipsisMenu({ itemId, name, taskId, onChange }) {
+function EllipsisMenu({ itemId, name, taskId, mark, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
@@ -98,7 +99,7 @@ function EllipsisMenu({ itemId, name, taskId, onChange }) {
               top: `${menuPosition.top}px`,
               left: `${menuPosition.left}px`,
               maxHeight: 'calc(100vh - 40px)',
-              minHeight: '200px',
+              minHeight: '240px',
               overflow: 'auto'
             }}
           >
@@ -116,7 +117,7 @@ function EllipsisMenu({ itemId, name, taskId, onChange }) {
                 />
               </div>
 
-              <div className="border-t border-gray-200 pt-2">
+              <div className="mb-4">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Task ID</label>
                 <div
                   className="text-xs font-mono text-gray-600 hover:text-gray-900 cursor-pointer py-1.5 truncate"
@@ -140,6 +141,15 @@ function EllipsisMenu({ itemId, name, taskId, onChange }) {
                   {taskId}
                 </div>
               </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Mark</label>
+                <MarkSelector
+                  mark={marks[(mark || 1) - 1]}
+                  setMark={newMark => onChange({itemId, mark: newMark.id})}
+                  dropUp={true}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -148,8 +158,13 @@ function EllipsisMenu({ itemId, name, taskId, onChange }) {
   )
 }
 
-export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem }) {
+export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, currentMark }) {
   const [ showId, setShowId ] = useState("");
+
+  // Filter items by current mark
+  const filteredItems = currentMark 
+    ? items.filter(item => (item.mark || 1) === currentMark)
+    : items;
 
   return (
     <div
@@ -159,7 +174,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
         <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
           <li className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100vh - 180px)' }}>
             <ul role="list" className="space-y-1">
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <li key={item.id}>
                   <div
                     className={classNames(
@@ -187,6 +202,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                         itemId={item.id}
                         name={item.name}
                         taskId={item.taskId}
+                        mark={item.mark}
                         onChange={onUpdateItem}
                       /> || <div />
                     }

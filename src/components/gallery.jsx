@@ -115,7 +115,7 @@ export default function Gallery({ lang, mark }) {
     if (isCreatingItem) return;
     setIsCreatingItem(true);
     try {
-      const newItem = await createItem({ user, lang, name: "unnamed", taskId: null });
+      const newItem = await createItem({ user, lang, name: "unnamed", taskId: null, mark: mark?.id || 1 });
       if (newItem) {
         // Add the new item to the beginning of the list
         setItems(prevItems => [newItem, ...prevItems]);
@@ -131,19 +131,19 @@ export default function Gallery({ lang, mark }) {
     }
   };
 
-  const handleUpdateItem = async ({ itemId, name, taskId }) => {
+  const handleUpdateItem = async ({ itemId, name, taskId, mark }) => {
     // Update local state first
     setItems(prevItems => {
       const updated = prevItems.map(item =>
         item.id === itemId
-          ? { ...item, ...(name !== undefined && { name }), ...(taskId !== undefined && { taskId }) }
+          ? { ...item, ...(name !== undefined && { name }), ...(taskId !== undefined && { taskId }), ...(mark !== undefined && { mark }) }
           : item
       );
       return updated;
     });
     // Then update backend
     try {
-      const result = await updateItem({ user, id: itemId, name, taskId });
+      const result = await updateItem({ user, id: itemId, name, taskId, mark });
     } catch (error) {
       console.error("Failed to update item:", error);
       // Optionally revert local state on error
@@ -224,6 +224,7 @@ export default function Gallery({ lang, mark }) {
               selectedItemId={selectedItemId}
               onSelectItem={handleSelectItem}
               onUpdateItem={handleUpdateItem}
+              currentMark={mark?.id}
             />
           )}
         </div>

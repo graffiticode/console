@@ -50,6 +50,7 @@ const typeDefs = `
     name: String!
     taskId: String!
     lang: String!
+    mark: Int
     created: String!
     updated: String
   }
@@ -83,8 +84,8 @@ const typeDefs = `
     saveTask(id: String, lang: String!, code: String!, help: String!, mark: Int!, isPublic: Boolean): String!
     updateTask(id: String, name: String, help: String, mark: Int, isPublic: Boolean): String!
     generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String): GeneratedCode!
-    createItem(lang: String!, name: String, taskId: String): Item!
-    updateItem(id: String!, name: String, taskId: String): Item!
+    createItem(lang: String!, name: String, taskId: String, mark: Int): Item!
+    updateItem(id: String!, name: String, taskId: String, mark: Int): Item!
   }
 
   input CodeGenerationOptions {
@@ -205,15 +206,15 @@ const resolvers = {
     },
     createItem: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, name, taskId } = args;
+      const { lang, name, taskId, mark } = args;
       const { uid } = await client.verifyToken(token);
-      return await createItem({ auth: { uid, token }, lang, name, taskId });
+      return await createItem({ auth: { uid, token }, lang, name, taskId, mark });
     },
     updateItem: async (_, args, ctx) => {
       const { token } = ctx;
-      const { id, name, taskId } = args;
+      const { id, name, taskId, mark } = args;
       const { uid } = await client.verifyToken(token);
-      return await updateItem({ auth: { uid, token }, id, name, taskId });
+      return await updateItem({ auth: { uid, token }, id, name, taskId, mark });
     },
   },
 };

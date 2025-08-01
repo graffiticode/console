@@ -268,13 +268,14 @@ export async function generateCode({ auth, prompt, language, options, currentCod
   }
 }
 
-export async function createItem({ auth, lang, name, taskId }) {
+export async function createItem({ auth, lang, name, taskId, mark }) {
   try {
     console.log(
       "[1] createItem()",
       "lang=" + lang,
       "name=" + name,
       "taskId=" + taskId,
+      "mark=" + mark,
     );
 
     // Generate a unique ID for the item
@@ -306,6 +307,7 @@ export async function createItem({ auth, lang, name, taskId }) {
       name,
       taskId,
       lang,
+      mark: mark || 1, // Default to mark 1 if not provided
       created: timestamp,
       updated: timestamp
     };
@@ -321,13 +323,14 @@ export async function createItem({ auth, lang, name, taskId }) {
   }
 }
 
-export async function updateItem({ auth, id, name, taskId }) {
+export async function updateItem({ auth, id, name, taskId, mark }) {
   try {
     console.log(
       "updateItem()",
       "id=" + id,
       "name=" + name,
       "taskId=" + taskId,
+      "mark=" + mark,
     );
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
     const itemDoc = await itemRef.get();
@@ -337,6 +340,7 @@ export async function updateItem({ auth, id, name, taskId }) {
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (taskId !== undefined) updates.taskId = taskId;
+    if (mark !== undefined) updates.mark = mark;
     updates.updated = Date.now();
     await itemRef.update(updates);
     const updatedDoc = await itemRef.get();
@@ -366,6 +370,7 @@ export async function getItems({ auth, lang }) {
       items.push({
         id: doc.id,
         ...data,
+        mark: data.mark || 1, // Default to mark 1 if not set
         created: String(data.created),
         updated: data.updated ? String(data.updated) : String(data.created)
       });
