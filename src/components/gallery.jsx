@@ -271,7 +271,7 @@ export default function Gallery({ lang, mark }) {
               ref={editorRef}
               className="relative ring-0 border border-gray-200 rounded-none mb-2 order-2 lg:order-1 resize-x"
               style={{
-                height: "calc(100vh - 80px)",
+                height: "calc(100vh - 90px)",
                 width: "48%",
                 minWidth: "300px",
                 maxWidth: "70%"
@@ -289,10 +289,10 @@ export default function Gallery({ lang, mark }) {
             <div
               className="relative ring-0 border border-gray-300 rounded-none resize-both order-1 lg:order-2"
               style={{
-                height: "calc(100vh - 80px)",
+                height: "calc(100vh - 90px)",
                 width: "48%",
                 minHeight: "200px",
-                maxHeight: "calc(100vh - 80px)",
+                maxHeight: "calc(100vh - 90px)",
                 minWidth: "300px",
                 maxWidth: "70%"
               }}

@@ -47,7 +47,7 @@ export function Tabs({ tab: tabName, setTab, onCopy, showCopyButton }) {
         </select>
       </div>
       <div className="hidden sm:block">
-        <div className="pt-4">
+        <div className="pt-1">
           <nav className="-mb-px flex justify-between border-b text-xs" aria-label="Tabs">
             <div className="flex">
             {tabs.map((tab) => (
@@ -71,7 +71,7 @@ export function Tabs({ tab: tabName, setTab, onCopy, showCopyButton }) {
                 className={classNames(
                   copied 
                     ? 'text-green-500 font-semibold'
-                    : 'font-light text-gray-500 hover:text-gray-700',
+                    : 'font-light text-gray-500 hover:text-gray-700 hover:font-semibold',
                   'whitespace-nowrap py-2 mb-0 mx-2 px-1'
                 )}
                 onClick={handleCopy}
