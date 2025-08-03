@@ -71,11 +71,6 @@ export default function Editor({
   );
 
   useEffect(() => {
-    console.log(
-      "Editor()",
-      "taskId=" + taskId,
-      "taskData=" + JSON.stringify(taskData, null, 2),
-    );
     if (taskData && taskId !== currentTaskIdRef.current) {
       // Switching tasks - safe to overwrite
       if (taskData.src) {
@@ -159,7 +154,7 @@ export default function Editor({
                 return (
                   <DataPanel
                     ref={dataPanelRef}
-                    id={id}
+                    id={taskId}
                     user={user}
                   />
                 );

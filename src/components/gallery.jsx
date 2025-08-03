@@ -80,8 +80,8 @@ export default function Gallery({ lang, mark }) {
   const editorRef = useRef();
   // Load items from the API only once on initialization
   const { data: loadedItems } = useSWR(
-    user && lang ? `items-${lang}` : null,
-    () => loadItems({ user, lang }),
+    user && lang && mark ? `items-${lang}-${mark.id}` : null,
+    () => loadItems({ user, lang, mark: mark.id }),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
@@ -129,10 +129,6 @@ export default function Gallery({ lang, mark }) {
         taskId: null,
         mark: mark?.id || 1
       });
-      console.log(
-        "Gallery()",
-        "newItem=" + JSON.stringify(newItem, null, 2),
-      );
       if (newItem) {
         setItems(prevItems => [newItem, ...prevItems]);
         setSelectedItemId(newItem.id);
@@ -239,7 +235,6 @@ export default function Gallery({ lang, mark }) {
               selectedItemId={selectedItemId}
               onSelectItem={handleSelectItem}
               onUpdateItem={handleUpdateItem}
-              currentMark={mark?.id}
             />
           )}
         </div>

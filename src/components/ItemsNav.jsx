@@ -158,13 +158,8 @@ function EllipsisMenu({ itemId, name, taskId, mark, onChange }) {
   )
 }
 
-export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, currentMark }) {
+export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem }) {
   const [ showId, setShowId ] = useState("");
-
-  // Filter items by current mark
-  const filteredItems = currentMark 
-    ? items.filter(item => (item.mark || 1) === currentMark)
-    : items;
 
   return (
     <div
@@ -173,8 +168,11 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
           <li className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+            {items.length === 0 ? (
+              <p className="text-xs text-gray-500 text-left px-4 py-4">No items found</p>
+            ) : (
             <ul role="list" className="space-y-1">
-              {filteredItems.map((item) => (
+              {items.map((item) => (
                 <li key={item.id}>
                   <div
                     className={classNames(
@@ -210,6 +208,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                 </li>
               ))}
             </ul>
+            )}
           </li>
         </ul>
       </nav>

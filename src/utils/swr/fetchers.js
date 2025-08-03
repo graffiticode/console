@@ -231,7 +231,7 @@ export const loadGraphiQL = async ({ user }) => {
  * @param {Object} [params.options] - Additional generation options
  * @returns {Promise<Object>} - Generated code and metadata
  */
-export const loadItems = async ({ user, lang }) => {
+export const loadItems = async ({ user, lang, mark }) => {
   if (!user) {
     return [];
   }
@@ -242,8 +242,8 @@ export const loadItems = async ({ user, lang }) => {
     }
   });
   const query = gql`
-    query loadItems($lang: String!) {
-      items(lang: $lang) {
+    query loadItems($lang: String!, $mark: Int) {
+      items(lang: $lang, mark: $mark) {
         id
         name
         taskId
@@ -254,7 +254,7 @@ export const loadItems = async ({ user, lang }) => {
       }
     }
   `;
-  return client.request(query, { lang }).then(data => data.items);
+  return client.request(query, { lang, mark }).then(data => data.items);
 };
 
 export const createItem = async ({ user, lang, name, taskId, mark }) => {

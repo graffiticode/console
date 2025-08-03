@@ -372,11 +372,16 @@ export async function updateItem({ auth, id, name, taskId, mark }) {
   }
 }
 
-export async function getItems({ auth, lang }) {
+export async function getItems({ auth, lang, mark }) {
   try {
-    console.log("getItems()", "lang=" + lang);
-    const itemsSnapshot = await db.collection(`users/${auth.uid}/items`)
-      .where('lang', '==', lang)
+    console.log("getItems()", "lang=" + lang, "mark=" + mark);
+    let query = db.collection(`users/${auth.uid}/items`)
+      .where('lang', '==', lang);
+    // Only filter by mark if it's provided
+    if (mark !== undefined && mark !== null) {
+      query = query.where('mark', '==', mark);
+    }
+    const itemsSnapshot = await query
       .orderBy('created', 'desc')
       .get();
     const items = [];

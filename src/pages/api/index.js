@@ -74,7 +74,7 @@ const typeDefs = `
     compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
     task(id: String!): Task
-    items(lang: String!): [Item!]
+    items(lang: String!, mark: Int): [Item!]
     item(id: String!): Item
   }
 
@@ -134,9 +134,9 @@ const resolvers = {
     },
     items: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang } = args;
+      const { lang, mark } = args;
       const { uid } = await client.verifyToken(token);
-      return await getItems({ auth: { uid, token }, lang });
+      return await getItems({ auth: { uid, token }, lang, mark });
     },
     item: async (_, args, ctx) => {
       const { token } = ctx;
