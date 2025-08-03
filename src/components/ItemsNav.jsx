@@ -169,7 +169,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
         <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
           <li className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100vh - 180px)' }}>
             {items.length === 0 ? (
-              <p className="text-xs text-gray-500 text-left px-4 py-4">No items found</p>
+              <p className="text-xs text-gray-500 text-left pl-4 py-0 leading-6">No items found</p>
             ) : (
             <ul role="list" className="space-y-1">
               {items.map((item) => (

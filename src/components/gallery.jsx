@@ -142,19 +142,43 @@ export default function Gallery({ lang, mark }) {
     }
   };
 
-  const handleUpdateItem = async ({ itemId, name, taskId, mark }) => {
+  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark }) => {
+    // Check if we're changing the mark
+    const currentItem = items.find(item => item.id === itemId);
+    const isMarkChanging = newMark !== undefined && currentItem && currentItem.mark !== newMark;
+    const currentFilterMark = mark?.id;
+    
     // Update local state first
     setItems(prevItems => {
+      // If mark is changing and we're filtering by mark, remove the item
+      if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark) {
+        return prevItems.filter(item => item.id !== itemId);
+      }
+      
+      // Otherwise, update the item in place
       const updated = prevItems.map(item =>
         item.id === itemId
-          ? { ...item, ...(name !== undefined && { name }), ...(taskId !== undefined && { taskId }), ...(mark !== undefined && { mark }) }
+          ? { ...item, ...(name !== undefined && { name }), ...(taskId !== undefined && { taskId }), ...(newMark !== undefined && { mark: newMark }) }
           : item
       );
       return updated;
     });
+    
+    // If we removed the current selected item, select the first item
+    if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark && selectedItemId === itemId) {
+      const remainingItems = items.filter(item => item.id !== itemId);
+      if (remainingItems.length > 0) {
+        setSelectedItemId(remainingItems[0].id);
+        setTaskId(remainingItems[0].taskId);
+      } else {
+        setSelectedItemId("");
+        setTaskId("");
+      }
+    }
+    
     // Then update backend
     try {
-      const result = await updateItem({ user, id: itemId, name, taskId, mark });
+      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark });
     } catch (error) {
       console.error("Failed to update item:", error);
       // Optionally revert local state on error
