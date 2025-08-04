@@ -1,12 +1,12 @@
-# Artcompiler APP
+# Graffiticode APP
 
 ## Local development
 
-1. Run Artcompiler App in terminal
+1. Run Graffiticode App in terminal
 
     ```bash
-    # In the Artcompiler App root directory
+    # In the Graffiticode App root directory
     npm run dev
     ```
 
-1. Run Artcompiler API and auth servers by following the instructions here (https://github.com/artcompiler/artcompiler)
+1. Run Graffiticode API and auth servers by following the instructions here (https://github.com/graffiticode/graffiticode)

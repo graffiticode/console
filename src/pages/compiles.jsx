@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
-import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
+import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import LanguageSelector from '../components/language-selector';
 import useLocalStorage from '../hooks/use-local-storage';
 import {
@@ -94,7 +94,7 @@ export default function Compiles({ language }) {
     _setId(newId);
     // Store the task ID in localStorage
     if (newId) {
-      localStorage.setItem('artcompiler:selected:taskId', newId);
+      localStorage.setItem('graffiticode:selected:taskId', newId);
     }
   };
   const [formHeight, setFormHeight] = useState(350);
@@ -108,7 +108,7 @@ export default function Compiles({ language }) {
   }, []);
 
   const lang = language.name.slice(1);
-  const { user } = useArtcompilerAuth();
+  const { user } = useGraffiticodeAuth();
   const { isValidating, isLoading, data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,
@@ -135,7 +135,7 @@ export default function Compiles({ language }) {
     let taskIdFound = false;
     if (compilesData.length > 0) {
       try {
-        const savedTaskId = localStorage.getItem('artcompiler:selected:taskId');
+        const savedTaskId = localStorage.getItem('graffiticode:selected:taskId');
         if (savedTaskId && nested.length > 0) {
           // Get just the base task ID (before the '+' if present)
           const [baseTaskId] = savedTaskId.split('+');

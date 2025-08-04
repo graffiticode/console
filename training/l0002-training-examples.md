@@ -1,4 +1,4 @@
-# Artcompiler Training Examples
+# Graffiticode Training Examples
 
 ## Language L0002
 

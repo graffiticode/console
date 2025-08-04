@@ -5,7 +5,7 @@ const nextConfig = {
   async rewrites() {
     return [{
       source: "/docs",
-      destination: "https://docs.artcompiler.com",
+      destination: "https://docs.graffiticode.com",
     }];
   },
   webpack: (config) => {

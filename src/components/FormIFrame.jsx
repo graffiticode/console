@@ -7,7 +7,7 @@ import {
 import Editor from './editor';
 import SignIn from "./SignIn";
 import { isNonEmptyString } from "../utils";
-import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
+import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 
 const useTaskIdFormUrl = ({ accessToken, lang, id, origin }) => {
   if (!id) {

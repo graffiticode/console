@@ -2,7 +2,7 @@ import useSWR from "swr";
 import { useState, useEffect } from 'react';
 import { loadCompiles } from '../utils/swr/fetchers';
 import { CheckIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/20/solid'
-import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
+import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import SignIn from '../components/SignIn'
 
 function classNames(...classes) {
@@ -19,7 +19,7 @@ async function handleClick({ user, id, lang }) {
 }
 
 export default function Timeline({ lang }) {
-  const { user } = useArtcompilerAuth();
+  const { user } = useGraffiticodeAuth();
   const type = "*";  // { "*" | "persistent" | "ephemeral" }
   const [compiles, setCompiles] = useState([]);
   const { isLoading, data } =

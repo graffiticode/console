@@ -12,7 +12,7 @@ import { TextEditor } from "./TextEditor";
 import { createState } from "../lib/state";
 import { generateCode } from "../utils/swr/fetchers";
 import { ChatBot } from './ChatBot';
-import useArtcompilerAuth from '../hooks/use-artcompiler-auth';
+import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -66,7 +66,7 @@ export const HelpPanel = ({
   );
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
-  const { user } = useArtcompilerAuth();
+  const { user } = useGraffiticodeAuth();
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadNotification, setUploadNotification] = useState(null);
 

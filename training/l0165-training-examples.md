@@ -1,4 +1,4 @@
-# Artcompiler Training Examples
+# Graffiticode Training Examples
 
 ## Language L0165
 
@@ -377,12 +377,12 @@ bold column b"
 
 **User**: create a spreadsheet assessment with two rows and two columns. the spreadsheet should indicate how many pigs and how many cows are listed. the A column indicates the quantity and the B column indicates the animal type. there are 100 cows and 200 pigs.
 
-**Assistant**: This generated Artcompiler creates a table with two columns, A and B. Column A is set to a width of 100 and the text is aligned to the right, while Column B is also set to a width of 100 but the text is aligned to the left. The code then generates two rows of data, with the first row containing the values "100" in Column A and "cows" in Column B. The second row contains the values "200" in Column A and "pigs" in Column B, and the code also includes assessment criteria to verify that the values in the second row match the expected values.
+**Assistant**: This generated Graffiticode creates a table with two columns, A and B. Column A is set to a width of 100 and the text is aligned to the right, while Column B is also set to a width of 100 but the text is aligned to the left. The code then generates two rows of data, with the first row containing the values "100" in Column A and "cows" in Column B. The second row contains the values "200" in Column A and "pigs" in Column B, and the code also includes assessment criteria to verify that the values in the second row match the expected values.
 
 **User**: protect the cells in column B
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a spreadsheet-like structure with two columns, A and B. Column A has cells with the numbers "100" and "200", and these cells are set up to be automatically assessed to ensure their values match the expected values. Column B has cells with the text "cows" and "pigs", and these cells are marked as protected, meaning they cannot be edited. The code also includes a version number of "0.0.1" at the end.
+This generated Graffiticode creates a spreadsheet-like structure with two columns, A and B. Column A has cells with the numbers "100" and "200", and these cells are set up to be automatically assessed to ensure their values match the expected values. Column B has cells with the text "cows" and "pigs", and these cells are marked as protected, meaning they cannot be edited. The code also includes a version number of "0.0.1" at the end.
 ```
 
 **User**: bold column b
@@ -452,7 +452,7 @@ cells {
 **User**: create a starter template with one cell
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a simple spreadsheet with a title of "Untitled Spreadsheet" and a single cell in the A1 position. The spreadsheet has a column width of 100 units for the A column. The code also includes a version number of "0.0.1" at the end.
+This generated Graffiticode creates a simple spreadsheet with a title of "Untitled Spreadsheet" and a single cell in the A1 position. The spreadsheet has a column width of 100 units for the A column. The code also includes a version number of "0.0.1" at the end.
 ```
 
 ### Code
@@ -530,43 +530,43 @@ This generated code creates a monthly budget assessment table. The table include
 **User**: change the income value to 5000
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The code also includes fixed expenses for utilities and entertainment, and the remaining income is allocated to a miscellaneous category.
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The code also includes fixed expenses for utilities and entertainment, and the remaining income is allocated to a miscellaneous category.
 ```
 
 **User**: use unformatted value in the text field
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a given monthly income of $5,000. The code also includes fixed expenses like utilities and entertainment, and the remaining income is allocated to a miscellaneous category.
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a given monthly income of $5,000. The code also includes fixed expenses like utilities and entertainment, and the remaining income is allocated to a miscellaneous category.
 ```
 
 **User**: format column B as Currency
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a monthly budget assessment tool. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a given monthly income of $5,000. The tool also includes fixed expenses like utilities and entertainment, and the remaining income is categorized as "Miscellaneous." The purpose is to help the user understand how their income should be allocated across different budget items.
+This generated Graffiticode creates a monthly budget assessment tool. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a given monthly income of $5,000. The tool also includes fixed expenses like utilities and entertainment, and the remaining income is categorized as "Miscellaneous." The purpose is to help the user understand how their income should be allocated across different budget items.
 ```
 
 **User**: score by formula rather than value
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
 ```
 
 **User**: make columns A and C protected
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and a miscellaneous category for the remaining income after all other expenses are accounted for.
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and a miscellaneous category for the remaining income after all other expenses are accounted for.
 ```
 
 **User**: make cell b1 protected
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories based on a $5,000 monthly income. The code sets up the spreadsheet structure, including formulas to automatically calculate the budget items as percentages of the total income or as fixed expenses.
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories based on a $5,000 monthly income. The code sets up the spreadsheet structure, including formulas to automatically calculate the budget items as percentages of the total income or as fixed expenses.
 ```
 
 **User**: make cells b2, b4 and b7 protected
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses for utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
+This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses for utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
 ```
 
 **User**: make row 1 bold
@@ -1160,13 +1160,13 @@ excellent! now bold all the protected cells"
 **User**: create a five by five table with integer values of your choosing where every other cell is protected
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a spreadsheet-like grid with 5 columns and 5 rows. Each cell in the grid contains a number, and some of the cells are marked as "protected", meaning their values cannot be changed. The purpose of this generated code is to create a structured data layout that could be used for various applications, such as displaying numerical information in a tabular format.
+This generated Graffiticode creates a spreadsheet-like grid with 5 columns and 5 rows. Each cell in the grid contains a number, and some of the cells are marked as "protected", meaning their values cannot be changed. The purpose of this generated code is to create a structured data layout that could be used for various applications, such as displaying numerical information in a tabular format.
 ```
 
 **User**: now prefix all the values in the protected cells with a letter P
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a table with 5 columns and 5 rows. The table cells contain a mix of numbers and text, some of which are marked as "protected". The purpose of this generated code is likely to create a structured data layout, potentially for a spreadsheet or other tabular application.
+This generated Graffiticode creates a table with 5 columns and 5 rows. The table cells contain a mix of numbers and text, some of which are marked as "protected". The purpose of this generated code is likely to create a structured data layout, potentially for a spreadsheet or other tabular application.
 ```
 
 **User**: add validations for all the unprotected cells
@@ -1409,7 +1409,7 @@ let's play tic tac toe"
 **User**: create a starter template with one cell
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a simple spreadsheet with a title of "Untitled Spreadsheet" and a single cell in the A1 position. The spreadsheet has a column width of 100 units for the A column. The code also includes a version number of "0.0.1" at the end.
+This generated Graffiticode creates a simple spreadsheet with a title of "Untitled Spreadsheet" and a single cell in the A1 position. The spreadsheet has a column width of 100 units for the A column. The code also includes a version number of "0.0.1" at the end.
 ```
 
 **User**: let's play tic tac toe
@@ -1564,13 +1564,13 @@ Remove the instructions about revenue and operating expenses"
 **User**: Create a spreadsheet assessment for a simple income statement.
 
 **Assistant**: ```ocaml
-The generated Artcompiler creates an income statement assessment tool. It allows users to input the total revenue, and the code will automatically calculate the gross profit, operating expenses, operating income, income tax, and net income based on the provided formulas. The purpose of this generated code is to provide a simple and interactive way for users to assess their income statement without needing to perform the calculations manually.
+The generated Graffiticode creates an income statement assessment tool. It allows users to input the total revenue, and the code will automatically calculate the gross profit, operating expenses, operating income, income tax, and net income based on the provided formulas. The purpose of this generated code is to provide a simple and interactive way for users to assess their income statement without needing to perform the calculations manually.
 ```
 
 **User**: Add to the instructions what the Revenue should be
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates an income statement assessment template. It prompts the user to fill in missing values, such as the total revenue, operating expenses, and income tax. The code then calculates the gross profit, operating income, income tax, and net income based on the provided information. The goal is to guide the user through the process of completing an income statement.
+This generated Graffiticode creates an income statement assessment template. It prompts the user to fill in missing values, such as the total revenue, operating expenses, and income tax. The code then calculates the gross profit, operating income, income tax, and net income based on the provided information. The goal is to guide the user through the process of completing an income statement.
 ```
 
 **User**: Add the values for Revenue and Operating Expenses and instruct the student to complete the rest of the statement
@@ -1723,37 +1723,37 @@ The generated code creates a table with a general journal entry assessment. It r
 **User**: left justify column B
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a table that represents the general journal entries for a company's share issue. The table includes details such as the date, description, debit, and credit amounts related to the cash received from the share application, the allotment of shares, and the share issue costs. The purpose of this generated code is to provide a clear and organized record of the accounting transactions involved in the share issue process.
+This generated Graffiticode creates a table that represents the general journal entries for a company's share issue. The table includes details such as the date, description, debit, and credit amounts related to the cash received from the share application, the allotment of shares, and the share issue costs. The purpose of this generated code is to provide a clear and organized record of the accounting transactions involved in the share issue process.
 ```
 
 **User**: remove (1) from c13
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a table that represents the general journal entries for a share issue. The table includes details such as the date, description, debit, and credit amounts related to the cash received from the share application, the allotment of the shares, and the share issue costs. The purpose of this generated code is to provide a structured way to record the accounting transactions associated with the share issue.
+This generated Graffiticode creates a table that represents the general journal entries for a share issue. The table includes details such as the date, description, debit, and credit amounts related to the cash received from the share application, the allotment of the shares, and the share issue costs. The purpose of this generated code is to provide a structured way to record the accounting transactions associated with the share issue.
 ```
 
 **User**: bold row 1
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a table with a general journal entry for a share issue. It includes details such as the date, description, debit and credit amounts related to the cash received from the share application, the allotment of shares, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the accounting entries associated with the share issue.
+This generated Graffiticode creates a table with a general journal entry for a share issue. It includes details such as the date, description, debit and credit amounts related to the cash received from the share application, the allotment of shares, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the accounting entries associated with the share issue.
 ```
 
 **User**: format columns c and d as currency
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a table with a general journal entry for a share issue. It includes details such as the date, description, debit and credit amounts related to the cash received from the share application, the recording of the share capital, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the accounting entries associated with the share issue.
+This generated Graffiticode creates a table with a general journal entry for a share issue. It includes details such as the date, description, debit and credit amounts related to the cash received from the share application, the recording of the share capital, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the accounting entries associated with the share issue.
 ```
 
 **User**: validate the numeric values in columns   c and d
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a table with a general journal entry to record the issuance of 400,000 ordinary shares at $1.50 per share. The code sets up the table structure, column widths, and formatting, and then populates the cells with the relevant financial details, such as the date, description, debit, and credit amounts. The purpose of this generated code is to provide a template for recording the share issue transaction in the general journal.
+This generated Graffiticode creates a table with a general journal entry to record the issuance of 400,000 ordinary shares at $1.50 per share. The code sets up the table structure, column widths, and formatting, and then populates the cells with the relevant financial details, such as the date, description, debit, and credit amounts. The purpose of this generated code is to provide a template for recording the share issue transaction in the general journal.
 ```
 
 **User**: remove the values from the validated cells
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a table with a general journal entry for a share issue. The table includes columns for the date, details, debit, and credit, and the rows contain specific entries related to the cash received from the share application, the allotment of the shares, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the financial transactions associated with the share issue.
+This generated Graffiticode creates a table with a general journal entry for a share issue. The table includes columns for the date, details, debit, and credit, and the rows contain specific entries related to the cash received from the share application, the allotment of the shares, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the financial transactions associated with the share issue.
 ```
 
 ### Code
@@ -2044,7 +2044,7 @@ The generated code creates a simple arithmetic problem where the user needs to s
 **User**: set the border underline for a2
 
 **Assistant**: ```ocaml
-This generated Artcompiler creates a simple vertical arithmetic problem. It displays two large numbers, one above the other, with a "+" symbol between them. The user is instructed to solve the problem by entering the result in the cell below. The generated code formats the numbers with commas for readability and includes an assessment to check if the user's answer is correct.
+This generated Graffiticode creates a simple vertical arithmetic problem. It displays two large numbers, one above the other, with a "+" symbol between them. The user is instructed to solve the problem by entering the result in the cell below. The generated code formats the numbers with commas for readability and includes an assessment to check if the user's answer is correct.
 ```
 
 ### Code

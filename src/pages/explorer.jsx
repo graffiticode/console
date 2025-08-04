@@ -21,7 +21,7 @@ import SignIn from '../components/SignIn'
 
 export function Logo(props) {
   return (
-    <Image src='/logo.png' alt='Artcompiler logo' width='30' height='30' />
+    <Image src='/logo.png' alt='Graffiticode logo' width='30' height='30' />
   );
 }
 

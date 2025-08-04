@@ -1,4 +1,4 @@
-import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
+import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { useEffect } from "react";
 import useSWR from "swr";
 import { loadGraphiQL } from '../utils/swr/fetchers';
@@ -12,7 +12,7 @@ let token;
 
 export default function GraphiQL() {
   // FIXME add auth to fetch requests.
-  const { user } = useArtcompilerAuth();
+  const { user } = useGraffiticodeAuth();
 
   if (!user) {
     return (

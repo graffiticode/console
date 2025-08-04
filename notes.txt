@@ -14,7 +14,7 @@
 
 TODO
 
-[X] Create chartcompiler-app from artcompiler-app-template
+[X] Create graffiticode-app from graffiticode-app-template
 
 
 ### 31 AUG 2022
@@ -89,7 +89,7 @@ mutations and queries.
 
 ### 19 AUG 2022
 
-ARTCOMPILER STACK
+GRAFFITICODE STACK
 
 -- NextJS
 -- NextAuth
@@ -97,7 +97,7 @@ ARTCOMPILER STACK
 -- Redux (redux, react-redux, @reduxjs/toolkit)
 -- GraphQL (graphql-request, graphql-helix)
 -- Firestore
--- Artcompiler
+-- Graffiticode
 
 
 MANAGING STATE IN NEXTJS
@@ -108,7 +108,7 @@ MANAGING STATE IN NEXTJS
 https://redux.js.org/tutorials/essentials/part-5-async-logic
 
 
-ARTCOMPILER STAGES
+GRAFFITICODE STAGES
 
 Process all the way down. Process generates product.
 
@@ -123,7 +123,7 @@ playbook (process) and blocks (tech stack) for building similar SaaS businesses.
 
 FIRESTORE DASHBOARD
 
-https://console.firebase.google.com/u/5/project/artcompiler-dashboard/overview
+https://console.firebase.google.com/u/5/project/graffiticode-dashboard/overview
 
 
 CONNECTING TO FIRESTORE

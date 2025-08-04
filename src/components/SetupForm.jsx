@@ -3,7 +3,7 @@ import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js'
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import axios from 'axios';
-import useArtcompilerAuth from '../hooks/use-artcompiler-auth';
+import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 
 const SetupForm = () => {
   const stripe = useStripe();
@@ -26,7 +26,7 @@ const SetupForm = () => {
       //`Elements` instance that was used to create the Payment Element
       elements,
       confirmParams: {
-        return_url: 'https://console.chartcompiler.com',
+        return_url: 'https://console.graffiticode.com',
       },
     });
 
@@ -55,7 +55,7 @@ const SetupForm = () => {
 const stripePromise = loadStripe('pk_test_51LhI57LUz4JwpsJ6p6lzznvkbFNQj8k9LnAYckCJZ4Tv9AZzYHxKafXTKsTS12F8vUpKyELdBvXtvgSmNOzdqug200VALmBhSl');
 
 function SetupApp() {
-  const { user } = useArtcompilerAuth();
+  const { user } = useGraffiticodeAuth();
   const [clientSecret, setClientSecret] = useState();
   useEffect(() => {
     const fetchSecret = async () => {

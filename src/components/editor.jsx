@@ -7,7 +7,7 @@ import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
 import useSWR from "swr";
 import { postTask, getData } from '../utils/swr/fetchers';
-import useArtcompilerAuth from '../hooks/use-artcompiler-auth';
+import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
 import { isNonNullNonEmptyObject } from "../utils";
@@ -45,7 +45,7 @@ export default function Editor({
   const [ doPostTask, setDoPostTask ] = useState(false);
   const [ isUserEdit, setIsUserEdit ] = useState(false);
   const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Make");
-  const { user } = useArtcompilerAuth();
+  const { user } = useGraffiticodeAuth();
   const [ isPostingTask, setIsPostingTask ] = useState(false);
   const dataPanelRef = React.useRef(null);
   const currentTaskIdRef = React.useRef(null);

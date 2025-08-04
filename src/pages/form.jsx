@@ -24,7 +24,7 @@ import MarkSelector, { marks } from '../components/mark-selector';
 import useSwr from 'swr';
 import { tasksSettings } from '../utils/swr/fetchers';
 import useLocalStorage from '../hooks/use-local-storage';
-import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
+import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { getTitle } from '../lib/utils';
 
 const parseQuery =
@@ -36,7 +36,7 @@ const parseQuery =
 export default function Form() {
   const router = useRouter();
   const { lang, id } = parseQuery(router.query);
-  const [mark, setMark] = useLocalStorage("artcompiler:items:mark", marks[0]);
+  const [mark, setMark] = useLocalStorage("graffiticode:items:mark", marks[0]);
   if (id === undefined) {
     return <div />;
   }

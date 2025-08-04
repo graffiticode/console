@@ -9,7 +9,7 @@ import Editor from './editor';
 import SignIn from "./SignIn";
 import { loadTasks, getAccessToken } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
-import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
+import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { FormIFrame } from "./FormIFrame";
 import { FormReact } from "./FormReact";
 //const reactForms = ["0002"];
@@ -19,7 +19,7 @@ export default function FormView({ lang, id, setData, setId, setNewTask, classNa
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [dataId, setDataId] = useState();
-  const { user } = useArtcompilerAuth();
+  const { user } = useGraffiticodeAuth();
   const { isValidating, isLoading, data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,

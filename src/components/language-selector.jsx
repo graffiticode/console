@@ -19,7 +19,7 @@ import { getTitle } from '../lib/utils';
 
 const languages = [
   {id: 1,  name: 'L0001', desc: "Base language", domains: ["hide"]},
-  {id: 2,  name: 'L0002', desc: "Base language", domains: ["artcompiler"]},
+  {id: 2,  name: 'L0002', desc: "Base language", domains: ["graffiticode"]},
   {id: 3,  name: 'L0011', desc: "Property editors", domains: ["hide"]},
   {id: 4,  name: 'L0012', desc: "Object viewers", domains: ["hide"]},
   {id: 5,  name: 'L0137', desc: "Data transformers", domains: ["hide"]},
@@ -34,13 +34,13 @@ const languages = [
   {id: 14, name: 'L0156', desc: "Short text scorers", domains: ["hide"]},
   {id: 15, name: 'L0157', desc: "Geoboard manipulatives", domains: ["hide"]},
   {id: 16, name: 'L0158', desc: "Learnosity integrations", domains: ["hide"]},
-  {id: 17, name: 'L0159', desc: "Flashcard sets", domains: ["artcompiler"]},
+  {id: 17, name: 'L0159', desc: "Flashcard sets", domains: ["graffiticode"]},
   {id: 18, name: 'L0160', desc: "XML transformers", domains: ["hide"]},
   {id: 19, name: 'L0161', desc: "Expression translators", domains: ["hide"]},
   {id: 20, name: 'L0162', desc: "Walking routes", domains: ["hide"]},
   {id: 21, name: 'L0163', desc: "Code editors", domains: ["hide"]},
   {id: 22, name: 'L0164', desc: "Code generators", domains: ["hide"]},
-  {id: 23, name: 'L0165', desc: "Spreadsheet questions", domains: ["artcompiler"]},
+  {id: 23, name: 'L0165', desc: "Spreadsheet questions", domains: ["graffiticode"]},
 ];
 
 function classNames(...classes) {
@@ -50,7 +50,7 @@ function classNames(...classes) {
 export function selectLanguages() {
   const domain = getTitle().toLowerCase();
   return languages.filter(language =>
-    domain === "artcompiler" && !language.domains.includes("hide") ||
+    domain === "graffiticode" && !language.domains.includes("hide") ||
       language.domains.length === 0 ||
       language.domains.includes(domain.toLowerCase())
   );

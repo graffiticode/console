@@ -9,7 +9,7 @@ import Editor from './editor';
 import SignIn from "./SignIn";
 import { getAccessToken, generateCode, loadItems, createItem, updateItem } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
-import useArtcompilerAuth from "../hooks/use-artcompiler-auth";
+import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView.jsx";
 import { Disclosure } from '@headlessui/react'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
@@ -46,7 +46,7 @@ function getId({ taskId, dataId }) {
 }
 
 const useTaskIdFormUrl = ({ lang, id }) => {
-  const { user } = useArtcompilerAuth();
+  const { user } = useGraffiticodeAuth();
   const { data: src } = useSWR({ lang, user, id }, async ({ lang, user, id }) => {
     if (!id) {
       return "";
@@ -74,7 +74,7 @@ export default function Gallery({ lang, mark }) {
   const [ selectedItemId, setSelectedItemId ] = useState("");
   const [ editorCode, setEditorCode ] = useState("");
   const [ editorHelp, setEditorHelp ] = useState([]);
-  const { user } = useArtcompilerAuth();
+  const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,

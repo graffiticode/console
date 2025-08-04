@@ -17,5 +17,5 @@ This dialect is used for generating cards for practicing memorization. All facts
   - Properly escape special LaTeX characters: `#`, `$`, `%`, `^`, `&`, `_`, `{`, `}`, `~`, `\`
   - Use proper LaTeX commands for special symbols, Greek letters, etc.
 
-- IMPORTANT: Remember to maintain Artcompiler's core syntax with `let` declarations and `..` endings
+- IMPORTANT: Remember to maintain Graffiticode's core syntax with `let` declarations and `..` endings
 - IMPORTANT: All facts strings should be valid LaTeX that could be compiled with a LaTeX processor

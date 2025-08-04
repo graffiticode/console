@@ -1,4 +1,4 @@
-# AGENT.md - Artcompiler Console Development Guide
+# AGENT.md - Graffiticode Console Development Guide
 
 ## Build/Lint/Test Commands
 - `npm run dev` - Start development server (port 3000)
