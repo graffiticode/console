@@ -44,7 +44,7 @@ export default function Editor({
   const { user } = useArtcompilerAuth();
   const [ isPostingTask, setIsPostingTask ] = useState(false);
   const dataPanelRef = React.useRef(null);
-  const currentTaskIdRef = React.useRef(taskId);
+  const currentTaskIdRef = React.useRef(null);
 
   const handleCopy = () => {
     if (dataPanelRef.current) {
@@ -71,23 +71,27 @@ export default function Editor({
   );
 
   useEffect(() => {
-    if (taskData && taskId !== currentTaskIdRef.current) {
-      // Switching tasks - safe to overwrite
-      if (taskData.src) {
-        // Clear any pending user edits when loading new task source
-        setIsUserEdit(false);
-        setDoPostTask(false);
-        setIsPostingTask(false);
-        setCode(taskData.src);
-        setHelp(taskData.help && (
-          typeof taskData.help === "string" && JSON.parse(taskData.help) ||
-            taskData.help ||
-            []
-        ));
-        currentTaskIdRef.current = taskId;
+    // Check if we have new task data for a different task
+    if (taskData && taskData.id === taskId) {
+      // Only update if this is actually a different task than what's currently loaded
+      if (taskId !== currentTaskIdRef.current) {
+        // Switching tasks - safe to overwrite
+        if (taskData.src !== undefined) {
+          // Clear any pending user edits when loading new task source
+          setIsUserEdit(false);
+          setDoPostTask(false);
+          setIsPostingTask(false);
+          setCode(taskData.src);
+          setHelp(taskData.help && (
+            typeof taskData.help === "string" && JSON.parse(taskData.help) ||
+              taskData.help ||
+              []
+          ));
+          currentTaskIdRef.current = taskId;
+        }
       }
     }
-  }, [taskId]);
+  }, [taskId, taskData]);
 
   useEffect(() => {
     // Only post task if code changes due to user editing
