@@ -69,7 +69,7 @@ export function Tabs({ tab: tabName, setTab, onCopy, showCopyButton }) {
             {showCopyButton && (
               <button
                 className={classNames(
-                  copied 
+                  copied
                     ? 'text-green-500 font-semibold'
                     : 'font-light text-gray-500 hover:text-gray-700 hover:font-semibold',
                   'whitespace-nowrap py-2 mb-0 mx-2 px-1'

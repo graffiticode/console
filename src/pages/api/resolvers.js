@@ -324,7 +324,7 @@ export async function updateItem({ auth, id, name, taskId, mark, help, code, isP
     if (isPublic !== undefined) updates.isPublic = isPublic;
     updates.updated = Date.now();
     await itemRef.update(updates);
-    
+
     const updatedDoc = await itemRef.get();
     const data = updatedDoc.data();
     return {
@@ -351,13 +351,13 @@ export async function getItems({ auth, lang, mark }) {
       .orderBy('created', 'desc')
       .get();
     const items = [];
-    
+
     // Process items and fetch legacy data if needed
     for (const doc of itemsSnapshot.docs) {
       const data = doc.data();
       let code = data.code;
       let help = data.help;
-      
+
       // For backward compatibility: if item doesn't have code, fetch from taskIds collection
       if (!code && data.taskId) {
         try {
@@ -374,7 +374,7 @@ export async function getItems({ auth, lang, mark }) {
           console.log("getItems()", "Failed to fetch legacy task data for item", doc.id, error);
         }
       }
-      
+
       items.push({
         id: doc.id,
         ...data,
