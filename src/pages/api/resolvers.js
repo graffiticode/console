@@ -125,18 +125,31 @@ export async function getData({ authToken, id }) {
 
 export async function tasks({ auth, lang, mark }) {
   try {
+    // Get items from the items collection (primary source)
+    const items = await getItems({ auth, lang, mark });
+
+    // Get taskIds from the taskIds collection (for backward compatibility)
     const taskIdsDocs = await db.collection(`users/${auth.uid}/taskIds`)
           .where('lang', '==', lang)
           .where('mark', '==', mark)
           .get();
+
+    // Create a set of IDs from items to avoid duplicates
+    const itemIds = new Set(items.map(item => item.taskId || item.id));
+
+    // Process taskIds that aren't already in items
     const taskIds = [];
     const userTasks = [];
     taskIdsDocs.forEach(doc => {
-      taskIds.push(doc.id);
-      userTasks.push({ id: doc.id, ...doc.data() });
+      if (!itemIds.has(doc.id)) {
+        taskIds.push(doc.id);
+        userTasks.push({ id: doc.id, ...doc.data() });
+      }
     });
+
+    // Fetch API tasks for backward compatibility entries
     const apiTasks = await Promise.all(taskIds.map(id => getApiTask({ id, auth })));
-    const tasks = apiTasks.reduce((tasks, apiTask, index) => {
+    const legacyTasks = apiTasks.reduce((tasks, apiTask, index) => {
       const userTask = userTasks[index];
       apiTask = apiTask[0] || apiTask;
       tasks.push({
@@ -153,6 +166,37 @@ export async function tasks({ auth, lang, mark }) {
       });
       return tasks;
     }, []);
+
+    // Convert items to tasks format
+    const itemTasks = await Promise.all(items.map(async (item) => {
+      // If item has code, use it; otherwise fetch from API
+      let code = item.code;
+      if (!code && item.taskId) {
+        try {
+          const apiTask = await getApiTask({ id: item.taskId, auth });
+          code = JSON.stringify((apiTask[0] || apiTask).code);
+        } catch (err) {
+          console.log("tasks() failed to get API task for item", item.id, err);
+          code = "{}";
+        }
+      }
+
+      return {
+        id: item.taskId || item.id,
+        lang: item.lang,
+        code: code || "{}",
+        src: item.src || "",
+        help: item.help || "[]",
+        isPublic: item.isPublic || false,
+        taskId: item.taskId || item.id,
+        created: item.created,
+        name: item.name,
+        mark: item.mark || 1,
+      };
+    }));
+
+    // Combine items and legacy tasks
+    const tasks = [...itemTasks, ...legacyTasks];
     return tasks;
   } catch (x) {
     console.log(

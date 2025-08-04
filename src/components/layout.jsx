@@ -32,6 +32,7 @@ export function Logo(props) {
 const navigation = [
   { name: 'Languages', href: '/languages', current: false },
   { name: 'Items', href: '/items', current: false },
+  { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: false },
   { name: 'Settings', href: '/settings', current: false },
   { name: 'Docs', href: '/docs', current: false },
@@ -108,7 +109,7 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                     <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
                       <LanguageSelector domain={getTitle()} language={language} setLanguage={setLanguage} />
                     </div>
-                    { pathName === "items"
+                    { (pathName === "items" || pathName === "tasks")
                       ? <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
                           <MarkSelector domain={getTitle()} mark={mark} setMark={setMark} />
                         </div>
