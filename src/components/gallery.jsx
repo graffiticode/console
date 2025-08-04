@@ -72,6 +72,8 @@ export default function Gallery({ lang, mark }) {
   );
   const [ items, setItems ] = useState([]);
   const [ selectedItemId, setSelectedItemId ] = useState("");
+  const [ editorCode, setEditorCode ] = useState("");
+  const [ editorHelp, setEditorHelp ] = useState([]);
   const { user } = useArtcompilerAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
@@ -98,6 +100,8 @@ export default function Gallery({ lang, mark }) {
         if (matchingItem) {
           setSelectedItemId(matchingItem.id);
           setTaskId(matchingItem.taskId);
+          setEditorCode(matchingItem.code || "");
+          setEditorHelp(typeof matchingItem.help === "string" ? JSON.parse(matchingItem.help || "[]") : (matchingItem.help || []));
           return;
         }
       }
@@ -105,6 +109,8 @@ export default function Gallery({ lang, mark }) {
       if (loadedItems[0]) {
         setSelectedItemId(loadedItems[0].id);
         setTaskId(loadedItems[0].taskId);
+        setEditorCode(loadedItems[0].code || "");
+        setEditorHelp(typeof loadedItems[0].help === "string" ? JSON.parse(loadedItems[0].help || "[]") : (loadedItems[0].help || []));
       }
     } else {
       setItems([]);
@@ -127,12 +133,17 @@ export default function Gallery({ lang, mark }) {
         lang,
         name: "unnamed",
         taskId: null,
-        mark: mark?.id || 1
+        mark: mark?.id || 1,
+        help: "[]",
+        code: "",
+        isPublic: false
       });
       if (newItem) {
         setItems(prevItems => [newItem, ...prevItems]);
         setSelectedItemId(newItem.id);
         setTaskId(newItem.taskId);
+        setEditorCode(newItem.code || "");
+        setEditorHelp(typeof newItem.help === "string" ? JSON.parse(newItem.help || "[]") : (newItem.help || []));
         localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
       }
     } catch (error) {
@@ -142,28 +153,33 @@ export default function Gallery({ lang, mark }) {
     }
   };
 
-  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark }) => {
+  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, code, help, isPublic }) => {
     // Check if we're changing the mark
     const currentItem = items.find(item => item.id === itemId);
     const isMarkChanging = newMark !== undefined && currentItem && currentItem.mark !== newMark;
     const currentFilterMark = mark?.id;
-    
     // Update local state first
     setItems(prevItems => {
       // If mark is changing and we're filtering by mark, remove the item
       if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark) {
         return prevItems.filter(item => item.id !== itemId);
       }
-      
       // Otherwise, update the item in place
       const updated = prevItems.map(item =>
         item.id === itemId
-          ? { ...item, ...(name !== undefined && { name }), ...(taskId !== undefined && { taskId }), ...(newMark !== undefined && { mark: newMark }) }
+          ? {
+              ...item,
+              ...(name !== undefined && { name }),
+              ...(taskId !== undefined && { taskId }),
+              ...(newMark !== undefined && { mark: newMark }),
+              ...(code !== undefined && { code }),
+              ...(help !== undefined && { help }),
+              ...(isPublic !== undefined && { isPublic })
+            }
           : item
       );
       return updated;
     });
-    
     // If we removed the current selected item, select the first item
     if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark && selectedItemId === itemId) {
       const remainingItems = items.filter(item => item.id !== itemId);
@@ -175,10 +191,9 @@ export default function Gallery({ lang, mark }) {
         setTaskId("");
       }
     }
-    
     // Then update backend
     try {
-      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark });
+      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, code, help, isPublic });
     } catch (error) {
       console.error("Failed to update item:", error);
       // Optionally revert local state on error
@@ -191,21 +206,33 @@ export default function Gallery({ lang, mark }) {
     if (item) {
       setSelectedItemId(item.id);
       setTaskId(item.taskId);
+      setEditorCode(item.code || "");
+      setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
       localStorage.setItem(`graffiticode:selected:itemId`, item.id);
     }
   };
 
-  // Update the selected item's taskId when the taskId changes due to editing
+  // Update the selected item's state when editor changes
   useEffect(() => {
-    if (selectedItemId && taskId && items.length > 0) {
+    if (selectedItemId && items.length > 0) {
       const selectedItem = items.find(item => item.id === selectedItemId);
-
-      // Update the currently selected item with the new task ID
-      if (selectedItem && selectedItem.taskId !== taskId) {
-        handleUpdateItem({ itemId: selectedItemId, taskId: taskId });
+      if (selectedItem) {
+        // Check if any values have changed
+        const hasChanges =
+          (taskId && selectedItem.taskId !== taskId) ||
+          (editorCode !== undefined && selectedItem.code !== editorCode) ||
+          (editorHelp !== undefined && JSON.stringify(selectedItem.help) !== JSON.stringify(editorHelp));
+        if (hasChanges) {
+          handleUpdateItem({
+            itemId: selectedItemId,
+            taskId: taskId || selectedItem.taskId,
+            code: editorCode,
+            help: JSON.stringify(editorHelp)
+          });
+        }
       }
     }
-  }, [taskId, selectedItemId, items]);
+  }, [taskId, editorCode, editorHelp, selectedItemId]);
 
   if (!user) {
     return (
@@ -284,6 +311,10 @@ export default function Gallery({ lang, mark }) {
                 mark={mark}
                 setTaskId={setTaskId}
                 height={editorHeight}
+                onCodeChange={setEditorCode}
+                onHelpChange={setEditorHelp}
+                initialCode={editorCode}
+                initialHelp={editorHelp}
               />
             </div>
             <div

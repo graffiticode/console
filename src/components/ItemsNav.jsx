@@ -8,7 +8,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, onChange }) {
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
@@ -150,6 +150,18 @@ function EllipsisMenu({ itemId, name, taskId, mark, onChange }) {
                   dropUp={true}
                 />
               </div>
+
+              <div className="mt-4">
+                <label className="flex items-center text-xs font-semibold text-gray-600">
+                  <input
+                    type="checkbox"
+                    className="mr-2 rounded border-gray-300 text-gray-600 focus:ring-gray-500"
+                    checked={isPublic || false}
+                    onChange={(e) => onChange({itemId, isPublic: e.target.checked})}
+                  />
+                  Public
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -201,6 +213,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                         name={item.name}
                         taskId={item.taskId}
                         mark={item.mark}
+                        isPublic={item.isPublic}
                         onChange={onUpdateItem}
                       /> || <div />
                     }

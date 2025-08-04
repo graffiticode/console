@@ -6,7 +6,7 @@ import { HelpPanel } from "./HelpPanel";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
 import useSWR from "swr";
-import { saveTask, postTask, getData, getTask } from '../utils/swr/fetchers';
+import { postTask, getData } from '../utils/swr/fetchers';
 import useArtcompilerAuth from '../hooks/use-artcompiler-auth';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
@@ -29,9 +29,13 @@ export default function Editor({
   lang,
   mark: initMark,
   height,
+  onCodeChange,
+  onHelpChange,
+  initialCode,
+  initialHelp,
 }) {
-  const [ code, setCode ] = useState("");
-  const [ help, setHelp ] = useState([]);
+  const [ code, setCode ] = useState(initialCode || "");
+  const [ help, setHelp ] = useState(initialHelp || []);
   const [ data, setData ] = useState({});
   const [ props, setProps ] = useState({});
   const [ dataCode, setDataCode ] = useState("");
@@ -64,34 +68,22 @@ export default function Editor({
     }
   };
 
-  // Load task data when taskId changes
-  const { data: taskData } = useSWR(
-    taskId && user ? [`getTask-${taskId}`, { user, id: taskId }] : null,
-    ([_, params]) => getTask(params)
-  );
 
   useEffect(() => {
-    // Check if we have new task data for a different task
-    if (taskData && taskData.id === taskId) {
-      // Only update if this is actually a different task than what's currently loaded
-      if (taskId !== currentTaskIdRef.current) {
-        // Switching tasks - safe to overwrite
-        if (taskData.src !== undefined) {
-          // Clear any pending user edits when loading new task source
-          setIsUserEdit(false);
-          setDoPostTask(false);
-          setIsPostingTask(false);
-          setCode(taskData.src);
-          setHelp(taskData.help && (
-            typeof taskData.help === "string" && JSON.parse(taskData.help) ||
-              taskData.help ||
-              []
-          ));
-          currentTaskIdRef.current = taskId;
-        }
+    // When taskId changes, update the editor with the new initial values
+    if (taskId !== currentTaskIdRef.current) {
+      setIsUserEdit(false);
+      setDoPostTask(false);
+      setIsPostingTask(false);
+      if (initialCode !== undefined) {
+        setCode(initialCode);
       }
+      if (initialHelp !== undefined) {
+        setHelp(initialHelp);
+      }
+      currentTaskIdRef.current = taskId;
     }
-  }, [taskId, taskData]);
+  }, [taskId, initialCode, initialHelp]);
 
   useEffect(() => {
     // Only post task if code changes due to user editing
@@ -101,6 +93,20 @@ export default function Editor({
       setIsPostingTask(true); // Prevent duplicate posts
     }
   }, [code, isUserEdit, isPostingTask]);
+
+  // Notify parent of code changes
+  useEffect(() => {
+    if (onCodeChange && code !== undefined) {
+      onCodeChange(code);
+    }
+  }, [code, onCodeChange]);
+
+  // Notify parent of help changes
+  useEffect(() => {
+    if (onHelpChange && help !== undefined) {
+      onHelpChange(help);
+    }
+  }, [help, onHelpChange]);
 
   const postTaskResp = useSWR(
     doPostTask && { user, lang, code } || null,
@@ -113,18 +119,6 @@ export default function Editor({
       setDoPostTask(false);
       setIsPostingTask(false); // Reset the flag
       setTaskId(taskId);
-      // Save the task immediately after creation
-      saveTask({
-        user,
-        id: taskId,
-        lang,
-        code,
-        help,
-        mark: mark.id,
-        isPublic
-      }).catch(error => {
-        console.error("Failed to save task:", error);
-      });
     }
   }, [postTaskResp.data, isPostingTask, user, lang, code, help, mark.id, isPublic]);
 

@@ -268,7 +268,7 @@ export async function generateCode({ auth, prompt, language, options, currentCod
   }
 }
 
-export async function createItem({ auth, lang, name, taskId, mark }) {
+export async function createItem({ auth, lang, name, taskId, mark, help, code, isPublic }) {
   try {
     console.log(
       "[1] createItem()",
@@ -276,6 +276,9 @@ export async function createItem({ auth, lang, name, taskId, mark }) {
       "name=" + name,
       "taskId=" + taskId,
       "mark=" + mark,
+      "help=" + help,
+      "code=" + (code ? code.length : 0),
+      "isPublic=" + isPublic,
     );
 
     // Generate a unique ID for the item
@@ -286,7 +289,8 @@ export async function createItem({ auth, lang, name, taskId, mark }) {
       name = "unnamed";
     }
     // If no taskId provided, create a minimal template task
-    let code = "";
+    let generatedCode = code || "";
+    let generatedHelp = help || "[]";
     if (!taskId) {
       const result = await generateCode({
         auth,
@@ -296,7 +300,7 @@ export async function createItem({ auth, lang, name, taskId, mark }) {
         currentCode: null
       });
       taskId = result.taskId;
-      code = result.code;
+      generatedCode = result.code;
     }
     console.log(
       "[2] createItem()",
@@ -309,24 +313,13 @@ export async function createItem({ auth, lang, name, taskId, mark }) {
       taskId,
       lang,
       mark: mark || 1, // Default to mark 1 if not provided
+      help: generatedHelp,
+      code: generatedCode,
+      isPublic: isPublic || false,
       created: timestamp,
       updated: timestamp
     };
     await itemRef.set(item);
-    // Save task so that it is in the console db.
-    console.log(
-      "Saved task id:",
-      (await saveTask({
-        auth,
-        id: taskId,
-        lang,
-        help: "[]",
-        code,
-        mark,
-        isPublic: false,
-      })).id,
-      "code:", code,
-    );
     return {
       ...item,
       created: String(timestamp),
@@ -338,7 +331,7 @@ export async function createItem({ auth, lang, name, taskId, mark }) {
   }
 }
 
-export async function updateItem({ auth, id, name, taskId, mark }) {
+export async function updateItem({ auth, id, name, taskId, mark, help, code, isPublic }) {
   try {
     console.log(
       "updateItem()",
@@ -346,6 +339,9 @@ export async function updateItem({ auth, id, name, taskId, mark }) {
       "name=" + name,
       "taskId=" + taskId,
       "mark=" + mark,
+      "help=" + help,
+      "code=" + code,
+      "isPublic=" + isPublic,
     );
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
     const itemDoc = await itemRef.get();
@@ -356,8 +352,12 @@ export async function updateItem({ auth, id, name, taskId, mark }) {
     if (name !== undefined) updates.name = name;
     if (taskId !== undefined) updates.taskId = taskId;
     if (mark !== undefined) updates.mark = mark;
+    if (help !== undefined) updates.help = help;
+    if (code !== undefined) updates.code = code;
+    if (isPublic !== undefined) updates.isPublic = isPublic;
     updates.updated = Date.now();
     await itemRef.update(updates);
+    
     const updatedDoc = await itemRef.get();
     const data = updatedDoc.data();
     return {
@@ -385,16 +385,50 @@ export async function getItems({ auth, lang, mark }) {
       .orderBy('created', 'desc')
       .get();
     const items = [];
-    itemsSnapshot.forEach(doc => {
+    
+    // Process items and fetch legacy data if needed
+    for (const doc of itemsSnapshot.docs) {
       const data = doc.data();
+      let code = data.code;
+      let help = data.help;
+      
+      // For backward compatibility: if item doesn't have code, fetch from taskIds collection
+      if (!code && data.taskId) {
+        try {
+          const taskDoc = await db.doc(`users/${auth.uid}/taskIds/${data.taskId}`).get();
+          if (taskDoc.exists) {
+            const taskData = taskDoc.data();
+            code = taskData.src || "";
+            console.log(
+              "getItems()",
+              "taskId=" + data.taskId,
+              "code=" + code,
+            );
+            // Also get help if not present in item
+            if (!help) {
+              help = taskData.help || "[]";
+            }
+          }
+        } catch (error) {
+          console.log("getItems()", "Failed to fetch legacy task data for item", doc.id, error);
+        }
+      }
+      
       items.push({
         id: doc.id,
         ...data,
         mark: data.mark || 1, // Default to mark 1 if not set
+        help: help || "[]",
+        code: code || "",
+        isPublic: data.isPublic || false,
         created: String(data.created),
         updated: data.updated ? String(data.updated) : String(data.created)
       });
-    });
+    }
+    console.log(
+      "getItems()",
+      "items=" + JSON.stringify(items, null, 2),
+    );
     return items;
   } catch (error) {
     console.error("getItems()", "ERROR", error);
@@ -410,9 +444,34 @@ export async function getItem({ auth, id }) {
       return null;
     }
     const data = itemDoc.data();
+    
+    // For backward compatibility: if item doesn't have code, fetch from taskIds collection
+    let code = data.code;
+    let help = data.help;
+    if (!code && data.taskId) {
+      try {
+        const taskDoc = await db.doc(`users/${auth.uid}/taskIds/${data.taskId}`).get();
+        if (taskDoc.exists) {
+          const taskData = taskDoc.data();
+          code = taskData.src || "";
+          
+          // Also get help if not present in item
+          if (!help) {
+            help = taskData.help || "[]";
+          }
+        }
+      } catch (error) {
+        console.log("getItem()", "Failed to fetch legacy task data", error);
+      }
+    }
+    
     return {
       id: itemDoc.id,
       ...data,
+      mark: data.mark || 1,
+      help: help || "[]",
+      code: code || "",
+      isPublic: data.isPublic || false,
       created: String(data.created),
       updated: data.updated ? String(data.updated) : String(data.created)
     };
