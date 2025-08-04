@@ -93,7 +93,7 @@ export default function Compiles({ language }) {
   const setId = (newId) => {
     _setId(newId);
     // Store the task ID in localStorage
-    if (newId) {
+    if (newId && typeof window !== 'undefined') {
       localStorage.setItem('graffiticode:selected:taskId', newId);
     }
   };
@@ -135,7 +135,7 @@ export default function Compiles({ language }) {
     let taskIdFound = false;
     if (compilesData.length > 0) {
       try {
-        const savedTaskId = localStorage.getItem('graffiticode:selected:taskId');
+        const savedTaskId = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:selected:taskId') : null;
         if (savedTaskId && nested.length > 0) {
           // Get just the base task ID (before the '+' if present)
           const [baseTaskId] = savedTaskId.split('+');

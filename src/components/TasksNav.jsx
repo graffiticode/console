@@ -266,7 +266,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
       let foundMatch = false;
 
       // Try to get the selected task ID from localStorage
-      const savedTaskId = localStorage.getItem('graffiticode:selected:taskId');
+      const savedTaskId = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:selected:taskId') : null;
 
       if (savedTaskId) {
         // Get the base task ID (before the '+' if present)

@@ -68,7 +68,7 @@ export default function Gallery({ lang, mark }) {
   const [ taskId, setTaskId ] = useState("");
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
   const [ isItemsPanelCollapsed, setIsItemsPanelCollapsed ] = useState(
-    localStorage.getItem('graffiticode:itemsPanelCollapsed') === 'true'
+    typeof window !== 'undefined' && localStorage.getItem('graffiticode:itemsPanelCollapsed') === 'true'
   );
   const [ items, setItems ] = useState([]);
   const [ selectedItemId, setSelectedItemId ] = useState("");
@@ -94,7 +94,7 @@ export default function Gallery({ lang, mark }) {
     if (loadedItems && loadedItems.length > 0) {
       setItems(loadedItems);
       // Try to restore the previously selected item from localStorage
-      const savedItemId = localStorage.getItem(`graffiticode:selected:itemId`);
+      const savedItemId = typeof window !== 'undefined' ? localStorage.getItem(`graffiticode:selected:itemId`) : null;
       if (savedItemId) {
         const matchingItem = loadedItems.find(item => item.id === savedItemId);
         if (matchingItem) {
@@ -121,7 +121,9 @@ export default function Gallery({ lang, mark }) {
   const toggleItemsPanel = useCallback(() => {
     const newState = !isItemsPanelCollapsed;
     setIsItemsPanelCollapsed(newState);
-    localStorage.setItem('graffiticode:itemsPanelCollapsed', newState.toString());
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('graffiticode:itemsPanelCollapsed', newState.toString());
+    }
   }, [isItemsPanelCollapsed]);
 
   const handleCreateItem = async () => {
@@ -144,7 +146,9 @@ export default function Gallery({ lang, mark }) {
         setTaskId(newItem.taskId);
         setEditorCode(newItem.code || "");
         setEditorHelp(typeof newItem.help === "string" ? JSON.parse(newItem.help || "[]") : (newItem.help || []));
-        localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
+        }
       }
     } catch (error) {
       console.error("Failed to create item:", error);
@@ -208,7 +212,9 @@ export default function Gallery({ lang, mark }) {
       setTaskId(item.taskId);
       setEditorCode(item.code || "");
       setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
-      localStorage.setItem(`graffiticode:selected:itemId`, item.id);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`graffiticode:selected:itemId`, item.id);
+      }
     }
   };
 
@@ -299,9 +305,9 @@ export default function Gallery({ lang, mark }) {
               className="relative ring-0 border border-gray-200 rounded-none mb-2 order-2 lg:order-1 resize-x"
               style={{
                 height: "calc(100vh - 90px)",
-                width: "48%",
+                width: isItemsPanelCollapsed ? "49%" : "48%",
                 minWidth: "300px",
-                maxWidth: "70%"
+                maxWidth: isItemsPanelCollapsed ? "80%" : "70%"
               }}
             >
               <Editor
@@ -321,11 +327,11 @@ export default function Gallery({ lang, mark }) {
               className="relative ring-0 border border-gray-300 rounded-none resize-both order-1 lg:order-2"
               style={{
                 height: "calc(100vh - 90px)",
-                width: "48%",
+                width: isItemsPanelCollapsed ? "49%" : "48%",
                 minHeight: "200px",
                 maxHeight: "calc(100vh - 90px)",
                 minWidth: "300px",
-                maxWidth: "70%"
+                maxWidth: isItemsPanelCollapsed ? "80%" : "70%"
               }}
             >
               <FormView
