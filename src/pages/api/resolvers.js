@@ -89,10 +89,6 @@ const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
 
 export async function postTask({ auth, task, ephemeral, isPublic }) {
   try {
-    console.log(
-      "postTask()",
-      "task=" + JSON.stringify(task, null, 2),
-    );
     const storageType = ephemeral && "ephemeral" || "persistent";
     const headers = {
       "Authorization": auth.token,
@@ -102,10 +98,6 @@ export async function postTask({ auth, task, ephemeral, isPublic }) {
       delete headers.Authorization;
     }
     const { data } = await postApiJSON("/task", { task }, headers);
-    console.log(
-      "postTask()",
-      "data=" + JSON.stringify(data, null, 2),
-    );
     return data;
   } catch (x) {
     console.log(
@@ -270,17 +262,6 @@ export async function generateCode({ auth, prompt, language, options, currentCod
 
 export async function createItem({ auth, lang, name, taskId, mark, help, code, isPublic }) {
   try {
-    console.log(
-      "[1] createItem()",
-      "lang=" + lang,
-      "name=" + name,
-      "taskId=" + taskId,
-      "mark=" + mark,
-      "help=" + help,
-      "code=" + (code ? code.length : 0),
-      "isPublic=" + isPublic,
-    );
-
     // Generate a unique ID for the item
     const itemRef = db.collection(`users/${auth.uid}/items`).doc();
     const id = itemRef.id;
@@ -302,10 +283,6 @@ export async function createItem({ auth, lang, name, taskId, mark, help, code, i
       taskId = result.taskId;
       generatedCode = result.code;
     }
-    console.log(
-      "[2] createItem()",
-      "taskId=" + taskId,
-    );
     const timestamp = Date.now();
     const item = {
       id,
@@ -333,16 +310,6 @@ export async function createItem({ auth, lang, name, taskId, mark, help, code, i
 
 export async function updateItem({ auth, id, name, taskId, mark, help, code, isPublic }) {
   try {
-    console.log(
-      "updateItem()",
-      "id=" + id,
-      "name=" + name,
-      "taskId=" + taskId,
-      "mark=" + mark,
-      "help=" + help,
-      "code=" + code,
-      "isPublic=" + isPublic,
-    );
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
     const itemDoc = await itemRef.get();
     if (!itemDoc.exists) {
@@ -374,7 +341,6 @@ export async function updateItem({ auth, id, name, taskId, mark, help, code, isP
 
 export async function getItems({ auth, lang, mark }) {
   try {
-    console.log("getItems()", "lang=" + lang, "mark=" + mark);
     let query = db.collection(`users/${auth.uid}/items`)
       .where('lang', '==', lang);
     // Only filter by mark if it's provided
@@ -399,11 +365,6 @@ export async function getItems({ auth, lang, mark }) {
           if (taskDoc.exists) {
             const taskData = taskDoc.data();
             code = taskData.src || "";
-            console.log(
-              "getItems()",
-              "taskId=" + data.taskId,
-              "code=" + code,
-            );
             // Also get help if not present in item
             if (!help) {
               help = taskData.help || "[]";
@@ -425,10 +386,6 @@ export async function getItems({ auth, lang, mark }) {
         updated: data.updated ? String(data.updated) : String(data.created)
       });
     }
-    console.log(
-      "getItems()",
-      "items=" + JSON.stringify(items, null, 2),
-    );
     return items;
   } catch (error) {
     console.error("getItems()", "ERROR", error);
@@ -436,50 +393,6 @@ export async function getItems({ auth, lang, mark }) {
   }
 }
 
-export async function getItem({ auth, id }) {
-  try {
-    console.log("getItem()", "id=" + id);
-    const itemDoc = await db.doc(`users/${auth.uid}/items/${id}`).get();
-    if (!itemDoc.exists) {
-      return null;
-    }
-    const data = itemDoc.data();
-    
-    // For backward compatibility: if item doesn't have code, fetch from taskIds collection
-    let code = data.code;
-    let help = data.help;
-    if (!code && data.taskId) {
-      try {
-        const taskDoc = await db.doc(`users/${auth.uid}/taskIds/${data.taskId}`).get();
-        if (taskDoc.exists) {
-          const taskData = taskDoc.data();
-          code = taskData.src || "";
-          
-          // Also get help if not present in item
-          if (!help) {
-            help = taskData.help || "[]";
-          }
-        }
-      } catch (error) {
-        console.log("getItem()", "Failed to fetch legacy task data", error);
-      }
-    }
-    
-    return {
-      id: itemDoc.id,
-      ...data,
-      mark: data.mark || 1,
-      help: help || "[]",
-      code: code || "",
-      isPublic: data.isPublic || false,
-      created: String(data.created),
-      updated: data.updated ? String(data.updated) : String(data.created)
-    };
-  } catch (error) {
-    console.error("getItem()", "ERROR", error);
-    throw new Error(`Failed to get item: ${error.message}`);
-  }
-}
 
 export async function getTask({ auth, id }) {
   try {

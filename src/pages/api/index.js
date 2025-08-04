@@ -20,7 +20,6 @@ import {
   createItem,
   updateItem,
   getItems,
-  getItem,
 } from "./resolvers.js";
 import { client } from "../../lib/auth";
 
@@ -78,7 +77,6 @@ const typeDefs = `
     tasks(lang: String!, mark: Int!): [Task!]
     task(id: String!): Task
     items(lang: String!, mark: Int): [Item!]
-    item(id: String!): Item
   }
 
   type Mutation {
@@ -140,12 +138,6 @@ const resolvers = {
       const { lang, mark } = args;
       const { uid } = await client.verifyToken(token);
       return await getItems({ auth: { uid, token }, lang, mark });
-    },
-    item: async (_, args, ctx) => {
-      const { token } = ctx;
-      const { id } = args;
-      const { uid } = await client.verifyToken(token);
-      return await getItem({ auth: { uid, token }, id });
     },
   },
   Mutation: {
