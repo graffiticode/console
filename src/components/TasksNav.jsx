@@ -34,45 +34,76 @@ const scrubTitle = title => title.indexOf("|") >= 0 && title.slice(title.indexOf
 const getTitleFromTask = task => scrubTitle(task.src.split("\n").slice(0, 1).join());
 
 const getNestedItems = ({ setId, tasks }) => {
-  const ids = [];
-  const items = tasks.map((task, index) => {
-    // Group by head.
-    const [hd0, tl0] = task.id.split("+");
-    let children;
-    if (ids.find(id => id === hd0) === undefined) {
-      let rootName;
-      // We have a new hd that is a root id.
-      ids.push(hd0);
-      // Only compute kids for root tasks.
-      tasks.forEach(task => {
-        const [hd1, tl1] = task.id.split("+");
-        if (hd0 === hd1) {
-          if (tl1 !== undefined) {
-            if (children === undefined) {
-              children = [];
-            }
-            children.push({
-              ...task,
-              id: task.id,
-              name: task.name && task.name !== "unnamed" ? task.name : elideCompoundId(task.id),
-            });
-          } else {
-            rootName = task.name && task.name !== "unnamed" ? task.name : elideTaskId(task.id);
-          }
-        }
+  // Group tasks by root ID
+  const taskGroups = new Map();
+
+  tasks.forEach(task => {
+    const [rootId, tailId] = task.id.split("+");
+
+    if (!taskGroups.has(rootId)) {
+      taskGroups.set(rootId, {
+        root: null,
+        children: []
       });
-      return {
-        ...task,
-        id: hd0,
-        name: rootName || (task.name && task.name !== "unnamed" ? task.name : elideTaskId(hd0)),
-        children,
-      };
+    }
+
+    const group = taskGroups.get(rootId);
+
+    if (tailId === undefined) {
+      // This is a root task
+      group.root = task;
     } else {
-      // Not a root so return undefined to be filtered out.
-      return undefined;
+      // This is a child task
+      group.children.push({
+        ...task,
+        id: task.id,
+        name: elideCompoundId(task.id),
+      });
     }
   });
-  const nestedItems = items.filter(item => item !== undefined);
+
+  // Convert to nested items array
+  const nestedItems = [];
+
+  taskGroups.forEach((group, rootId) => {
+    // Use the root task if it exists, otherwise create a synthetic root
+    const rootTask = group.root || {
+      id: rootId,
+      created: group.children.length > 0 ? Math.max(...group.children.map(c => +c.created || 0)) : 0,
+      // Copy other fields from first child if no root exists
+      ...(group.children[0] ? {
+        lang: group.children[0].lang,
+        mark: group.children[0].mark,
+        isPublic: group.children[0].isPublic,
+      } : {})
+    };
+
+    // Sort children by created date descending
+    if (group.children.length > 0) {
+      group.children.sort((a, b) => {
+        const at = +a.created || 0;
+        const bt = +b.created || 0;
+        return bt - at;
+      });
+    }
+
+    nestedItems.push({
+      ...rootTask,
+      id: rootId,
+      name: elideTaskId(rootId),
+      children: group.children.length > 0 ? group.children : undefined,
+      // Use the most recent created date (either from root or most recent child)
+      created: group.root ? rootTask.created : (group.children.length > 0 ? group.children[0].created : rootTask.created)
+    });
+  });
+
+  // Sort nested items by created date descending
+  nestedItems.sort((a, b) => {
+    const at = +a.created || 0;
+    const bt = +b.created || 0;
+    return bt - at;
+  });
+
   return nestedItems;
 }
 
@@ -80,23 +111,16 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
   const [ items, setItems ] = useState([]);
   useEffect(() => {
     if (tasks.length) {
-      tasks = tasks.sort((a, b) => {
-        // Sort descending.
-        const at = +a.created || 0;
-        const bt = +b.created || 0;
-        return bt - at;
-      });
-    }
-    const nestedItems = getNestedItems({setId, tasks});
+      const nestedItems = getNestedItems({setId, tasks});
 
-    if (nestedItems.length) {
-      // Check if we have a stored taskId that matches or partially matches any of our tasks
-      let foundMatch = false;
+      if (nestedItems.length) {
+        // Check if we have a stored taskId that matches or partially matches any of our tasks
+        let foundMatch = false;
 
-      // Try to get the selected task ID from localStorage
-      const savedTaskId = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:selected:taskId') : null;
+        // Try to get the selected task ID from localStorage
+        const savedTaskId = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:selected:taskId') : null;
 
-      if (savedTaskId) {
+        if (savedTaskId) {
         // Get the base task ID (before the '+' if present)
         const [baseTaskId] = savedTaskId.split('+');
 
@@ -146,7 +170,8 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
         setId(nestedItems[0].id);
       }
 
-      setItems(nestedItems);
+        setItems(nestedItems);
+      }
     }
   }, [tasks.length]);
 
