@@ -8,7 +8,6 @@ import {
 import Editor from './editor';
 import SignIn from "./SignIn";
 import { getAccessToken, generateCode, loadItems, createItem, updateItem } from '../utils/swr/fetchers';
-import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView.jsx";
 import { Disclosure } from '@headlessui/react'
@@ -29,16 +28,6 @@ const parseId = id => {
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
-}
-
-function getTitle(task) {
-  if (isNonEmptyString(task.src)) {
-    const firstLineParts = task.src.split("\n")[0].split('|');
-    if (firstLineParts.length > 1) {
-      return firstLineParts[1];
-    }
-  }
-  return "";
 }
 
 function getId({ taskId, dataId }) {

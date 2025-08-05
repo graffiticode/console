@@ -137,15 +137,48 @@ export async function tasks({ auth, lang, mark }) {
     // Create a set of IDs from items to avoid duplicates
     const itemIds = new Set(items.map(item => item.taskId || item.id));
 
-    // Process taskIds that aren't already in items
+    // Process taskIds that aren't already in items and create items for them
     const taskIds = [];
     const userTasks = [];
-    taskIdsDocs.forEach(doc => {
-      if (!itemIds.has(doc.id)) {
-        taskIds.push(doc.id);
-        userTasks.push({ id: doc.id, ...doc.data() });
+    for (const doc of taskIdsDocs.docs) {
+      const taskId = doc.id;
+      const taskData = doc.data();
+
+      if (!itemIds.has(taskId)) {
+        // Create an item for this task
+        try {
+          const itemRef = db.collection(`users/${auth.uid}/items`).doc();
+          const item = {
+            id: itemRef.id,
+            taskId: taskId,
+            name: taskData.name || "unnamed",
+            lang: taskData.lang,
+            mark: taskData.mark || 1,
+            help: taskData.help || "[]",
+            code: taskData.src || "",
+            isPublic: taskData.isPublic || false,
+            created: taskData.created || Date.now(),
+            updated: taskData.updated || taskData.created || Date.now()
+          };
+
+          await itemRef.set(item);
+
+          // Add the newly created item to our items list
+          items.push({
+            ...item,
+            created: String(item.created),
+            updated: String(item.updated)
+          });
+
+          console.log(`Created item for task ${taskId}`);
+        } catch (error) {
+          console.error(`Failed to create item for task ${taskId}:`, error);
+          // Still include this task in the legacy list if item creation failed
+          taskIds.push(taskId);
+          userTasks.push({ id: taskId, ...taskData });
+        }
       }
-    });
+    }
 
     // Fetch API tasks for backward compatibility entries
     const apiTasks = await Promise.all(taskIds.map(id => getApiTask({ id, auth })));
@@ -185,7 +218,7 @@ export async function tasks({ auth, lang, mark }) {
         id: item.taskId || item.id,
         lang: item.lang,
         code: code || "{}",
-        src: item.src || "",
+        src: item.code || "",
         help: item.help || "[]",
         isPublic: item.isPublic || false,
         taskId: item.taskId || item.id,
@@ -436,6 +469,7 @@ export async function getItems({ auth, lang, mark }) {
     throw new Error(`Failed to get items: ${error.message}`);
   }
 }
+
 
 
 export async function getTask({ auth, id }) {
