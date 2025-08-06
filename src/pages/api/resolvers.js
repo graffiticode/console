@@ -30,61 +30,6 @@ export async function logCompile({ auth, id, timestamp, status, data }) {
   }
 }
 
-// TODO reuse id from previous postTask
-// TODO store code in doc with atomic task id
-export async function saveTask({ auth, id, lang, help, code, mark, isPublic }) {
-  try {
-    const task = { lang, code };
-    //const { id: taskId } = await postTask({ auth, task, ephemeral: false, isPublic });
-    await db.doc(`users/${auth.uid}/taskIds/${id}`).set({
-      lang,
-      mark,
-      src: code,
-      help,
-      isPublic,
-      created: Date.now(),
-    });
-    const data = { id };
-    return data;
-  } catch (x) {
-    console.log(
-      "saveTask()",
-      "ERROR",
-      x,
-    );
-  }
-}
-
-export async function updateTask({ auth, id, name, help, mark, isPublic }) {
-  const task = {name, mark, help, isPublic};
-  Object.keys(task).forEach(key => task[key] === undefined && delete task[key]);
-  try {
-    const taskRef = await db.doc(`users/${auth.uid}/taskIds/${id}`);
-    taskRef.update(task);
-    if (isPublic) {
-      // TODO get lang and code from stored task to send to the api with isPublic
-      const taskDoc = await taskRef.get();
-      const task = {
-        lang: taskDoc.get("lang"),
-        code: taskDoc.get("src"),
-      };
-      // Let the api know this item is now public. This can't be undone!
-      const headers = {
-        // "x-graffiticode-storage-type": "persistent",
-      };
-      const { data } = await postApiJSON("/task", { task }, headers);
-    }
-    const data = { id };
-    return data;
-  } catch (x) {
-    console.error(
-      "updateTask()",
-      "ERROR",
-      x.stack
-    );
-  }
-}
-
 const postApiJSON = bent(getBaseUrlForApi(), "POST", "json");
 
 export async function postTask({ auth, task, ephemeral, isPublic }) {
@@ -123,7 +68,7 @@ export async function getData({ authToken, id }) {
   }
 }
 
-export async function tasks({ auth, lang, mark }) {
+export async function getTasks({ auth, lang, mark }) {
   try {
     // Get items from the items collection (primary source)
     const items = await getItems({ auth, lang, mark });
@@ -138,8 +83,6 @@ export async function tasks({ auth, lang, mark }) {
     const itemIds = new Set(items.map(item => item.taskId || item.id));
 
     // Process taskIds that aren't already in items and create items for them
-    const taskIds = [];
-    const userTasks = [];
     for (const doc of taskIdsDocs.docs) {
       const taskId = doc.id;
       const taskData = doc.data();
@@ -173,35 +116,25 @@ export async function tasks({ auth, lang, mark }) {
           console.log(`Created item for task ${taskId}`);
         } catch (error) {
           console.error(`Failed to create item for task ${taskId}:`, error);
-          // Still include this task in the legacy list if item creation failed
-          taskIds.push(taskId);
-          userTasks.push({ id: taskId, ...taskData });
         }
       }
     }
 
-    // Fetch API tasks for backward compatibility entries
-    const apiTasks = await Promise.all(taskIds.map(id => getApiTask({ id, auth })));
-    const legacyTasks = apiTasks.reduce((tasks, apiTask, index) => {
-      const userTask = userTasks[index];
-      apiTask = apiTask[0] || apiTask;
-      tasks.push({
-        id: userTask.id,
-        lang: userTask.lang,
-        code: JSON.stringify(apiTask.code),
-        src: userTask.src,
-        help: userTask.help || "[]",
-        isPublic: userTask.isPublic,
-        taskId: taskIds[index],
-        created: "" + userTask.created,
-        name: userTask.name,
-        mark: userTask.mark,
-      });
-      return tasks;
-    }, []);
+    // Mark all tasks in taskIds collection with mark 5 after loading them as items
+    const allTaskIds = await db.collection(`users/${auth.uid}/taskIds`)
+      .where('lang', '==', lang)
+      .where('mark', '==', mark)
+      .get();
+
+    const updatePromises = allTaskIds.docs.map(doc =>
+      db.doc(`users/${auth.uid}/taskIds/${doc.id}`).update({ mark: 5 })
+    );
+
+    await Promise.all(updatePromises);
+    console.log(`Marked ${allTaskIds.docs.length} tasks with mark 5`);
 
     // Convert items to tasks format
-    const itemTasks = await Promise.all(items.map(async (item) => {
+    const tasks = await Promise.all(items.map(async (item) => {
       // If item has code, use it; otherwise fetch from API
       let code = item.code;
       if (!code && item.taskId) {
@@ -209,7 +142,7 @@ export async function tasks({ auth, lang, mark }) {
           const apiTask = await getApiTask({ id: item.taskId, auth });
           code = JSON.stringify((apiTask[0] || apiTask).code);
         } catch (err) {
-          console.log("tasks() failed to get API task for item", item.id, err);
+          console.log("getTasks() failed to get API task for item", item.id, err);
           code = "{}";
         }
       }
@@ -228,12 +161,10 @@ export async function tasks({ auth, lang, mark }) {
       };
     }));
 
-    // Combine items and legacy tasks
-    const tasks = [...itemTasks, ...legacyTasks];
     return tasks;
   } catch (x) {
     console.log(
-      "tasks()",
+      "getTasks()",
       "ERROR",
       x,
     );
@@ -469,8 +400,6 @@ export async function getItems({ auth, lang, mark }) {
     throw new Error(`Failed to get items: ${error.message}`);
   }
 }
-
-
 
 export async function getTask({ auth, id }) {
   try {

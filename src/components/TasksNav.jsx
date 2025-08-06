@@ -3,7 +3,6 @@ import { Disclosure } from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import { Fragment, useEffect, useState } from 'react';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
-import { postTaskUpdates } from '../utils/swr/fetchers';
 
 const sliceName = name => name.slice(17).slice(0,27);
 

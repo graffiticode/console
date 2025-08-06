@@ -52,49 +52,7 @@ export const postTask = async ({ user, lang, code }) => {
   return client.request(query, { lang, code, ephemeral }).then(data => data.postTask);
 };
 
-export const saveTask = async ({ user, id, lang, code, help, mark, isPublic = false }) => {
-  console.log(
-    "buildSaveTask()",
-    "help=" + JSON.stringify(help, null, 2),
-  );
-  const query = gql`
-    mutation post ($id: String, $lang: String!, $code: String!, $help: String!, $mark: Int!, $isPublic: Boolean) {
-      saveTask(id: $id, lang: $lang, code: $code, help: $help, mark: $mark, isPublic: $isPublic)
-    }
-  `;
-  const token = await user.getToken();
-  const client = new GraphQLClient("/api", {
-    headers: {
-      authorization: token,
-    }
-  });
-  return await client.request(
-    query, {
-      id, lang, code, help: JSON.stringify(help), mark, isPublic
-    }).then(data => JSON.parse(data.saveTask));
-};
 
-export const postTaskUpdates = async ({ user, tasks }) => {
-  console.log(
-    "postTaskUpdates()",
-    "tasks=" + JSON.stringify(tasks, null, 2),
-  );
-  const query = gql`
-    mutation post ($id: String, $name: String, $help: String, $mark: Int, $isPublic: Boolean) {
-      updateTask(id: $id, name: $name, help: $help, mark: $mark, isPublic: $isPublic)
-    }
-  `;
-  const token = await user.getToken();
-  const client = new GraphQLClient("/api", {
-    headers: {
-      authorization: token,
-    }
-  });
-  await Promise.all(tasks.forEach(async ({id, name, help, mark, isPublic }) => {
-    await client.request(query, {id, name, help: JSON.stringify(help), mark, isPublic}).then(data => JSON.parse(data.updateTask));
-  }));
-  return {};
-};
 
 export const loadTasks = async ({ user, lang, mark }) => {
   // console.log(
