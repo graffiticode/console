@@ -17,6 +17,40 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+// Compare two code strings ignoring whitespace changes and comments
+// Newlines are not significant in Graffiticode
+// Comments starting with | or / are ignored
+function isCodeEquivalent(code1, code2) {
+  // If both are the same reference or both are null/undefined
+  if (code1 === code2) return true;
+
+  // If one is null/undefined and the other isn't
+  if (!code1 || !code2) return false;
+
+  // Normalize by:
+  // 1. Removing line comments (starting with | or /)
+  // 2. Replacing all newlines with spaces (not significant in Graffiticode)
+  // 3. Replacing multiple whitespaces with single space
+  // 4. Trimming leading/trailing whitespace
+  const normalize = (str) => {
+    return str
+      .split('\n')
+      .map(line => {
+        // Remove comments starting with | or /
+        const trimmed = line.trim();
+        if (trimmed.startsWith('|') || trimmed.startsWith('/')) {
+          return ''; // Remove the entire comment line
+        }
+        return line;
+      })
+      .join(' ')
+      .replace(/\s+/g, ' ')       // Replace multiple whitespaces with single space
+      .trim();
+  };
+
+  return normalize(code1) === normalize(code2);
+}
+
 /*
   The job of the Editor is to provide code and props editors and to compile the
   edited code and props to get an id for the current state of the view.
@@ -49,6 +83,13 @@ export default function Editor({
   const [ isPostingTask, setIsPostingTask ] = useState(false);
   const dataPanelRef = React.useRef(null);
   const currentTaskIdRef = React.useRef(null);
+  const codeRef = React.useRef(initialCode || "");
+
+  // Function to check if new code is different from current code
+  // Uses ref to avoid closure issues with stale state
+  const isCodeNew = React.useCallback((newCode) => {
+    return !isCodeEquivalent(newCode, codeRef.current);
+  }, []);
 
   const handleCopy = () => {
     if (dataPanelRef.current) {
@@ -77,6 +118,7 @@ export default function Editor({
       setIsPostingTask(false);
       if (initialCode !== undefined) {
         setCode(initialCode);
+        codeRef.current = initialCode;
       }
       if (initialHelp !== undefined) {
         setHelp(initialHelp);
@@ -84,6 +126,19 @@ export default function Editor({
       currentTaskIdRef.current = taskId;
     }
   }, [taskId, initialCode, initialHelp]);
+
+  useEffect(() => {
+    // Update code when initialCode changes
+    if (initialCode !== undefined) {
+      setCode(initialCode);
+      codeRef.current = initialCode;
+    }
+  }, [initialCode]);
+
+  // Keep codeRef in sync with code state
+  useEffect(() => {
+    codeRef.current = code;
+  }, [code]);
 
   useEffect(() => {
     // Only post task if code changes due to user editing
@@ -121,8 +176,6 @@ export default function Editor({
       setTaskId(taskId);
     }
   }, [postTaskResp.data, isPostingTask, user, lang, code, help, mark.id, isPublic]);
-
-  // Removed SWR-based save task - now saving directly after post completes
 
   return (
     <div className="flex items-start space-x-4 h-full min-h-[calc(100vh-120px)]">
@@ -164,12 +217,6 @@ export default function Editor({
                     accessToken={accessToken}
                     language={lang}
                     code={code}
-                    setCode={(newCode) => {
-                      if (newCode !== code) {
-                        setIsUserEdit(true);
-                        setCode(newCode);
-                      }
-                    }}
                   />
                 );
               } else {
@@ -177,7 +224,7 @@ export default function Editor({
                   <CodePanel
                     code={code}
                     setCode={(newCode) => {
-                      if (newCode !== code) {
+                      if (isCodeNew(newCode)) {
                         setIsUserEdit(true);
                         setCode(newCode);
                       }

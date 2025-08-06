@@ -56,8 +56,7 @@ export const HelpPanel = ({
   help,
   setHelp,
   language,
-  code,
-  setCode
+  code
 }) => {
   console.log(
     "HelpPanel()",
@@ -1024,13 +1023,8 @@ export const HelpPanel = ({
       }
     ]);
 
-    // If the bot response is code, automatically update the code panel
-    if (botResponse?.type === 'code' && typeof setCode === 'function') {
-      console.log("Setting code panel with new code:",
-        botResponse.text ? botResponse.text.substring(0, 50) + "..." : "none");
-      setCode(botResponse.text);
-    }
-  }, [setCode]);
+    // Code is now always set by the CodePanel, not HelpPanel
+  }, []);
 
   // State for the input field
   const [messageText, setMessageText] = useState('');
