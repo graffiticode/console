@@ -5,10 +5,11 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function PublicToggle({ isPublic, setIsPublic }) {
+export default function PublicToggle({ isPublic, setIsPublic, title }) {
   return (
     <Switch.Group as="div" className="py-2 flex bg-white items-center">
       <Switch
+        title={title}
         checked={isPublic}
         onChange={setIsPublic}
         className={classNames(

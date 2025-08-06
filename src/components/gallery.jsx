@@ -151,42 +151,57 @@ export default function Gallery({ lang, mark }) {
     const currentItem = items.find(item => item.id === itemId);
     const isMarkChanging = newMark !== undefined && currentItem && currentItem.mark !== newMark;
     const currentFilterMark = mark?.id;
-    // Update local state first
-    setItems(prevItems => {
-      // If mark is changing and we're filtering by mark, remove the item
-      if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark) {
-        return prevItems.filter(item => item.id !== itemId);
-      }
-      // Otherwise, update the item in place
-      const updated = prevItems.map(item =>
-        item.id === itemId
-          ? {
-              ...item,
-              ...(name !== undefined && { name }),
-              ...(taskId !== undefined && { taskId }),
-              ...(newMark !== undefined && { mark: newMark }),
-              ...(code !== undefined && { code }),
-              ...(help !== undefined && { help }),
-              ...(isPublic !== undefined && { isPublic })
-            }
-          : item
-      );
-      return updated;
-    });
-    // If we removed the current selected item, select the first item
-    if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark && selectedItemId === itemId) {
-      const remainingItems = items.filter(item => item.id !== itemId);
-      if (remainingItems.length > 0) {
-        setSelectedItemId(remainingItems[0].id);
-        setTaskId(remainingItems[0].taskId);
-      } else {
-        setSelectedItemId("");
-        setTaskId("");
-      }
-    }
+    
     // Then update backend
     try {
       const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, code, help, isPublic });
+      
+      // If mark changed and this is the selected item, we need to reload the task data
+      if (isMarkChanging && selectedItemId === itemId && result && result.taskId) {
+        // Update the taskId which will trigger the editor to reload
+        setTaskId(result.taskId);
+        // Update editor content with the new task's code and help
+        if (result.code !== undefined) {
+          setEditorCode(result.code);
+        }
+        if (result.help !== undefined) {
+          setEditorHelp(typeof result.help === "string" ? JSON.parse(result.help || "[]") : (result.help || []));
+        }
+      }
+      
+      // Update local state after successful backend update
+      setItems(prevItems => {
+        // If mark is changing and we're filtering by mark, remove the item
+        if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark) {
+          return prevItems.filter(item => item.id !== itemId);
+        }
+        // Otherwise, update the item in place with the result from backend
+        const updated = prevItems.map(item =>
+          item.id === itemId
+            ? {
+                ...item,
+                ...result,  // Use the full result from backend
+              }
+            : item
+        );
+        return updated;
+      });
+      
+      // If we removed the current selected item, select the first item
+      if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark && selectedItemId === itemId) {
+        const remainingItems = items.filter(item => item.id !== itemId);
+        if (remainingItems.length > 0) {
+          setSelectedItemId(remainingItems[0].id);
+          setTaskId(remainingItems[0].taskId);
+          setEditorCode(remainingItems[0].code || "");
+          setEditorHelp(typeof remainingItems[0].help === "string" ? JSON.parse(remainingItems[0].help || "[]") : (remainingItems[0].help || []));
+        } else {
+          setSelectedItemId("");
+          setTaskId("");
+          setEditorCode("");
+          setEditorHelp([]);
+        }
+      }
     } catch (error) {
       console.error("Failed to update item:", error);
       // Optionally revert local state on error

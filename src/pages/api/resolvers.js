@@ -316,6 +316,23 @@ export async function createItem({ auth, lang, name, taskId, mark, help, code, i
   }
 }
 
+async function makeApiTaskPublic({ auth, lang, code }) {
+  try {
+    const task = {lang, code};
+    // Let the api know this item is now public by sending with empty
+    // Authorization header. This can't be undone!
+    const headers = {};
+    const { data } = await postApiJSON("/task", { task }, headers);
+    return data;
+  } catch (x) {
+    console.error(
+      "updateTask()",
+      "ERROR",
+      x.stack
+    );
+  }
+}
+
 export async function updateItem({ auth, id, name, taskId, mark, help, code, isPublic }) {
   try {
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
@@ -323,16 +340,23 @@ export async function updateItem({ auth, id, name, taskId, mark, help, code, isP
     if (!itemDoc.exists) {
       throw new Error("Item not found");
     }
+    const itemData = itemDoc.data();
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (taskId !== undefined) updates.taskId = taskId;
     if (mark !== undefined) updates.mark = mark;
     if (help !== undefined) updates.help = help;
     if (code !== undefined) updates.code = code;
-    if (isPublic !== undefined) updates.isPublic = isPublic;
+    if (isPublic !== undefined) {
+      updates.isPublic = isPublic;
+      if (isPublic) {
+        const lang = itemData.lang;
+        const itemCode = code !== undefined ? code : itemData.code;
+        await makeApiTaskPublic({ auth, lang, code: itemCode });
+      }
+    }
     updates.updated = Date.now();
     await itemRef.update(updates);
-
     const updatedDoc = await itemRef.get();
     const data = updatedDoc.data();
     return {

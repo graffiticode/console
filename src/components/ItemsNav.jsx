@@ -3,6 +3,7 @@ import { Fragment, useEffect, useState, useRef } from 'react';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import MarkSelector, { marks } from './mark-selector.jsx';
+import PublicToggle from './public-toggle.jsx';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -142,25 +143,23 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, onChange }) {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Mark</label>
-                <MarkSelector
-                  mark={marks[(mark || 1) - 1]}
-                  setMark={newMark => onChange({itemId, mark: newMark.id})}
-                  dropUp={true}
-                />
-              </div>
-
-              <div className="mt-4">
-                <label className="flex items-center text-xs font-semibold text-gray-600">
-                  <input
-                    type="checkbox"
-                    className="mr-2 rounded border-gray-300 text-gray-600 focus:ring-gray-500"
-                    checked={isPublic || false}
-                    onChange={(e) => onChange({itemId, isPublic: e.target.checked})}
+              <div className="flex gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Mark</label>
+                  <MarkSelector
+                    mark={marks[(mark || 1) - 1]}
+                    setMark={newMark => onChange({itemId, mark: newMark.id})}
+                    dropUp={true}
                   />
-                  Public
-                </label>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Public (Caution)</label>
+                  <PublicToggle
+                    isPublic={isPublic || false}
+                    setIsPublic={isPublic => onChange({itemId, isPublic})}
+                    title="This item's task will be visible to anyone with the task ID. This cannot be undone."
+                  />
+                </div>
               </div>
             </div>
           </div>
