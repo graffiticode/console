@@ -59,11 +59,6 @@ export const HelpPanel = ({
   code,
   setCode
 }) => {
-  console.log(
-    "HelpPanel()",
-    "code=" + JSON.stringify(code, null, 2),
-    "help=" + JSON.stringify(help, null, 2),
-  );
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
   const { user } = useGraffiticodeAuth();
@@ -250,7 +245,7 @@ export const HelpPanel = ({
   const { handleSendMessage, cancelGeneration, isLoading } = ChatBot({
     onSendMessage: (userMessage, botResponse) => {
       console.log(
-        "onSendMessage()",
+        "Help/onSendMessage()",
         "botResponse=" + JSON.stringify(botResponse, null, 2),
       );
       // When we receive a message from the chatbot
@@ -523,8 +518,6 @@ export const HelpPanel = ({
       }
       return section;
     });
-
-    console.log("Identified sections:", processedSections.map(s => s.type));
 
     return processedSections;
   };
