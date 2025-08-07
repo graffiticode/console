@@ -11,8 +11,10 @@ function classNames(...classes) {
 
 function EllipsisMenu({ itemId, name, taskId, mark, isPublic, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [nameValue, setNameValue] = useState(name);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
+  const nameInputRef = useRef(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
   // Position menu next to the button
@@ -67,10 +69,22 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, onChange }) {
     }
   };
 
-  // Reposition on window resize
+  // Update nameValue when name prop changes
+  useEffect(() => {
+    setNameValue(name);
+  }, [name]);
+
+  // Reposition on window resize and focus on name input when opened
   useEffect(() => {
     if (isOpen) {
       window.addEventListener('resize', positionMenu);
+      // Set focus on the name input field when menu opens and select all text
+      setTimeout(() => {
+        if (nameInputRef.current) {
+          nameInputRef.current.focus();
+          nameInputRef.current.select();
+        }
+      }, 100);
       return () => window.removeEventListener('resize', positionMenu);
     }
   }, [isOpen]);
@@ -110,11 +124,21 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, onChange }) {
               <div className="mb-4">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Name</label>
                 <input
+                  ref={nameInputRef}
                   type="text"
                   className="w-full rounded-none border border-gray-300 p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-500"
-                  placeholder={name}
-                  onFocus={(e) => e.target.value = ''}
-                  onBlur={(e) => onChange({itemId, name: e.target.value || name})}
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  onBlur={(e) => {
+                    const newName = e.target.value.trim();
+                    if (newName && newName !== name) {
+                      onChange({itemId, name: newName});
+                    } else if (!newName) {
+                      // Set to "unnamed" if field is cleared
+                      onChange({itemId, name: "unnamed"});
+                      setNameValue("unnamed");
+                    }
+                  }}
                 />
               </div>
 
