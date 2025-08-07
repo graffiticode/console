@@ -15,8 +15,8 @@ import { ChatBot } from './ChatBot';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { tomorrow } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/prism';
+import tomorrow from 'react-syntax-highlighter/dist/cjs/styles/prism/tomorrow';
 import { useDropzone } from 'react-dropzone';
 import { createPortal } from 'react-dom';
 

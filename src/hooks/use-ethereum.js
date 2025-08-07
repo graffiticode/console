@@ -1,25 +1,26 @@
 import { stripHexPrefix } from "@ethereumjs/util";
 import { useCallback } from "react";
-import { useAccount, useConnect, useNetwork, useSignMessage } from "wagmi";
-import { InjectedConnector } from "wagmi/connectors/injected";
+import { useAccount, useConnect, useSignMessage, useChainId } from "wagmi";
+import { injected } from "wagmi/connectors";
 import { client } from "../lib/auth";
 
 export function useSignInWithEthereum() {
   const { signMessageAsync } = useSignMessage();
-  const { chain } = useNetwork();
+  const chainId = useChainId();
   const { address, isConnected } = useAccount();
-  const { connectAsync } = useConnect({
-    connector: new InjectedConnector(),
-  });
+  const { connectAsync } = useConnect();
 
   const getAddress = useCallback(async () => {
     if (isConnected) {
       return address;
     } else {
-      const { account } = await connectAsync({ chainId: chain?.id });
-      return account;
+      const result = await connectAsync({
+        connector: injected(),
+        chainId: chainId
+      });
+      return result.accounts[0];
     }
-  }, [isConnected, address, connectAsync, chain]);
+  }, [isConnected, address, connectAsync, chainId]);
 
   const signInWithEthereum = useCallback(async () => {
     const address = stripHexPrefix(await getAddress());

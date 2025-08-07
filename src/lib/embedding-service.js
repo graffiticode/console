@@ -38,16 +38,16 @@ export async function generateEmbedding(text, options = {}) {
   try {
     const model = options.model || 'text-embedding-3-small';
     const openai = getOpenAIClient();
-    
+
     // Clean and prepare text
     const cleanedText = text.trim().substring(0, 8000); // Model has token limits
-    
+
     const response = await openai.embeddings.create({
       model: model,
       input: cleanedText,
       encoding_format: 'float',
     });
-    
+
     return response.data[0].embedding;
   } catch (error) {
     console.error('Error generating embedding:', error);
@@ -65,26 +65,26 @@ export async function generateBatchEmbeddings(texts, options = {}) {
   try {
     const model = options.model || 'text-embedding-3-small';
     const openai = getOpenAIClient();
-    
+
     // Clean and prepare texts (OpenAI can handle up to 2048 inputs per batch)
     const batchSize = 100;
     const embeddings = [];
-    
+
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize);
-      const cleanedBatch = batch.map(text => 
+      const cleanedBatch = batch.map(text =>
         text.trim().substring(0, 8000)
       );
-      
+
       const response = await openai.embeddings.create({
         model: model,
         input: cleanedBatch,
         encoding_format: 'float',
       });
-      
+
       embeddings.push(...response.data.map(item => item.embedding));
     }
-    
+
     return embeddings;
   } catch (error) {
     console.error('Error generating batch embeddings:', error);
@@ -99,22 +99,22 @@ export async function generateBatchEmbeddings(texts, options = {}) {
  */
 export function createEmbeddingText(example) {
   let textParts = [];
-  
+
   // Add task/prompt if available
   if (example.task) {
     textParts.push(`Task: ${example.task}`);
   }
-  
+
   // Add description if available
   if (example.description) {
     textParts.push(`Description: ${example.description}`);
   }
-  
+
   // Add code with context
   if (example.code) {
     textParts.push(`Code: ${example.code}`);
   }
-  
+
   // Add messages if available (for dialog-based examples)
   if (example.messages && Array.isArray(example.messages)) {
     const messageText = example.messages
@@ -122,12 +122,12 @@ export function createEmbeddingText(example) {
       .join('\n');
     textParts.push(`Dialog:\n${messageText}`);
   }
-  
+
   // Add explanation if available
   if (example.explanation) {
     textParts.push(`Explanation: ${example.explanation}`);
   }
-  
+
   return textParts.join('\n\n');
 }
 
@@ -145,18 +145,18 @@ export async function vectorSearch({ collection, query, limit = 5, lang, db }) {
   try {
     // Generate embedding for the query
     const queryEmbedding = await generateEmbedding(query);
-    
+
     // Create a VectorValue from the embedding
     const vectorQuery = VectorValue.fromArray(queryEmbedding);
-    
+
     // Build the query
     let searchQuery = db.collection(collection);
-    
+
     // Add language filter if specified
     if (lang) {
       searchQuery = searchQuery.where('lang', '==', lang);
     }
-    
+
     // Perform vector similarity search
     // Note: Firebase requires a specific index for vector search
     const results = await searchQuery
@@ -165,7 +165,7 @@ export async function vectorSearch({ collection, query, limit = 5, lang, db }) {
         distanceMeasure: 'COSINE', // or 'EUCLIDEAN', 'DOT_PRODUCT'
       })
       .get();
-    
+
     // Extract documents and add similarity scores
     const documents = [];
     results.forEach(doc => {
@@ -173,25 +173,25 @@ export async function vectorSearch({ collection, query, limit = 5, lang, db }) {
       // Firebase returns distance, convert to similarity score
       const distance = doc.get('__distance__') || 0;
       const similarity = 1 - distance; // For cosine distance
-      
+
       documents.push({
         id: doc.id,
         ...data,
         similarity: similarity
       });
     });
-    
+
     return documents;
   } catch (error) {
     console.error('Error performing vector search:', error);
-    
+
     // If vector search fails, fall back to empty results
     // This might happen if indexes aren't configured yet
     if (error.message.includes('index') || error.message.includes('findNearest')) {
       console.warn('Vector search not available, indexes may need to be configured');
       return [];
     }
-    
+
     throw error;
   }
 }
@@ -207,13 +207,13 @@ export async function vectorSearch({ collection, query, limit = 5, lang, db }) {
  * @param {number} params.vectorWeight - Weight for vector similarity (0-1)
  * @returns {Promise<Array>} - Array of similar documents
  */
-export async function hybridSearch({ 
-  collection, 
-  query, 
-  limit = 5, 
-  lang, 
-  db, 
-  vectorWeight = 0.7 
+export async function hybridSearch({
+  collection,
+  query,
+  limit = 5,
+  lang,
+  db,
+  vectorWeight = 0.7
 }) {
   try {
     // Perform vector search
@@ -224,31 +224,31 @@ export async function hybridSearch({
       lang,
       db
     });
-    
+
     // Extract keywords from query
     const keywords = query.toLowerCase()
       .split(/\s+/)
       .filter(word => word.length > 3);
-    
+
     // Score results based on both vector similarity and keyword matching
     const scoredResults = vectorResults.map(doc => {
       // Vector similarity score (already computed)
       const vectorScore = doc.similarity || 0;
-      
+
       // Keyword matching score
       let keywordScore = 0;
       if (keywords.length > 0) {
         const docText = createEmbeddingText(doc).toLowerCase();
-        const matchedKeywords = keywords.filter(keyword => 
+        const matchedKeywords = keywords.filter(keyword =>
           docText.includes(keyword)
         );
         keywordScore = matchedKeywords.length / keywords.length;
       }
-      
+
       // Combined score
-      const combinedScore = (vectorScore * vectorWeight) + 
+      const combinedScore = (vectorScore * vectorWeight) +
                           (keywordScore * (1 - vectorWeight));
-      
+
       return {
         ...doc,
         vectorScore,
@@ -256,7 +256,7 @@ export async function hybridSearch({
         combinedScore
       };
     });
-    
+
     // Sort by combined score and return top results
     return scoredResults
       .sort((a, b) => b.combinedScore - a.combinedScore)
@@ -280,24 +280,24 @@ export async function addDocumentWithEmbedding({ db, collection, docId, data }) 
   try {
     // Create embedding text from the document data
     const embeddingText = createEmbeddingText(data);
-    
+
     // Generate embedding
     const embedding = await generateEmbedding(embeddingText);
-    
+
     // Create VectorValue for Firestore
     const vectorValue = VectorValue.fromArray(embedding);
-    
+
     // Add or update document with embedding
-    const docRef = docId 
+    const docRef = docId
       ? db.collection(collection).doc(docId)
       : db.collection(collection).doc();
-    
+
     await docRef.set({
       ...data,
       embedding: vectorValue,
       embeddingUpdatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
-    
+
     return docRef.id;
   } catch (error) {
     console.error('Error adding document with embedding:', error);
@@ -317,33 +317,33 @@ export async function updateEmbeddingsInBatch({ db, collection, documents }) {
   try {
     let updatedCount = 0;
     const batchSize = 10; // Process in smaller batches to avoid timeouts
-    
+
     for (let i = 0; i < documents.length; i += batchSize) {
       const batch = documents.slice(i, i + batchSize);
       const texts = batch.map(doc => createEmbeddingText(doc));
-      
+
       // Generate embeddings in batch
       const embeddings = await generateBatchEmbeddings(texts);
-      
+
       // Update documents in Firestore batch
       const writeBatch = db.batch();
-      
+
       batch.forEach((doc, index) => {
         const docRef = db.collection(collection).doc(doc.id);
         const vectorValue = VectorValue.fromArray(embeddings[index]);
-        
+
         writeBatch.update(docRef, {
           embedding: vectorValue,
           embeddingUpdatedAt: FieldValue.serverTimestamp()
         });
       });
-      
+
       await writeBatch.commit();
       updatedCount += batch.length;
-      
+
       console.log(`Updated embeddings for ${updatedCount}/${documents.length} documents`);
     }
-    
+
     return updatedCount;
   } catch (error) {
     console.error('Error updating embeddings in batch:', error);

@@ -14,12 +14,12 @@ import axios from "axios";
 import { postApiCompile } from "./api";
 import { postTask, getData } from "../pages/api/resolvers";
 import admin from 'firebase-admin';
-import { 
-  generateEmbedding, 
-  createEmbeddingText, 
-  vectorSearch, 
+import {
+  generateEmbedding,
+  createEmbeddingText,
+  vectorSearch,
   hybridSearch,
-  addDocumentWithEmbedding 
+  addDocumentWithEmbedding
 } from './embedding-service.js';
 
 // Define available Claude models
@@ -116,9 +116,9 @@ function parseMarkdownExamples(markdownContent) {
 async function getRelevantExamples({ prompt, lang, limit = 3 }) {
   try {
     console.log(`Getting relevant examples for language: ${lang}`);
-    
+
     const db = getFirestoreDb();
-    
+
     // Try vector search first
     try {
       // Use hybrid search for better results
@@ -130,7 +130,7 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
         db: db,
         vectorWeight: 0.7 // Balance between semantic and keyword matching
       });
-      
+
       if (results && results.length > 0) {
         console.log(`Found ${results.length} relevant examples using vector search for L${lang}`);
         return results;
@@ -138,10 +138,10 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
     } catch (vectorError) {
       console.warn('Vector search failed, falling back to keyword search:', vectorError.message);
     }
-    
+
     // Fallback to keyword-based search if vector search fails or returns no results
     console.log('Falling back to keyword-based search...');
-    
+
     // Import local training data from markdown format only
     const fs = require('fs');
     const path = require('path');
@@ -347,7 +347,7 @@ export async function initializeTrainingExamples(lang = null) {
         ...example,
         description
       });
-      
+
       batch.set(docRef, {
         ...example,
         lang: exampleLang,       // Explicitly set language

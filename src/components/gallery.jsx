@@ -151,11 +151,11 @@ export default function Gallery({ lang, mark }) {
     const currentItem = items.find(item => item.id === itemId);
     const isMarkChanging = newMark !== undefined && currentItem && currentItem.mark !== newMark;
     const currentFilterMark = mark?.id;
-    
+
     // Then update backend
     try {
       const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, code, help, isPublic });
-      
+
       // If mark changed and this is the selected item, we need to reload the task data
       if (isMarkChanging && selectedItemId === itemId && result && result.taskId) {
         // Update the taskId which will trigger the editor to reload
@@ -168,7 +168,7 @@ export default function Gallery({ lang, mark }) {
           setEditorHelp(typeof result.help === "string" ? JSON.parse(result.help || "[]") : (result.help || []));
         }
       }
-      
+
       // Update local state after successful backend update
       setItems(prevItems => {
         // If mark is changing and we're filtering by mark, remove the item
@@ -186,7 +186,7 @@ export default function Gallery({ lang, mark }) {
         );
         return updated;
       });
-      
+
       // If we removed the current selected item, select the first item
       if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark && selectedItemId === itemId) {
         const remainingItems = items.filter(item => item.id !== itemId);
