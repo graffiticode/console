@@ -14,6 +14,13 @@ import axios from "axios";
 import { postApiCompile } from "./api";
 import { postTask, getData } from "../pages/api/resolvers";
 import admin from 'firebase-admin';
+import { 
+  generateEmbedding, 
+  createEmbeddingText, 
+  vectorSearch, 
+  hybridSearch,
+  addDocumentWithEmbedding 
+} from './embedding-service.js';
 
 // Define available Claude models
 const CLAUDE_MODELS = {
@@ -109,7 +116,32 @@ function parseMarkdownExamples(markdownContent) {
 async function getRelevantExamples({ prompt, lang, limit = 3 }) {
   try {
     console.log(`Getting relevant examples for language: ${lang}`);
-
+    
+    const db = getFirestoreDb();
+    
+    // Try vector search first
+    try {
+      // Use hybrid search for better results
+      const results = await hybridSearch({
+        collection: 'training_examples',
+        query: prompt,
+        limit: limit,
+        lang: lang,
+        db: db,
+        vectorWeight: 0.7 // Balance between semantic and keyword matching
+      });
+      
+      if (results && results.length > 0) {
+        console.log(`Found ${results.length} relevant examples using vector search for L${lang}`);
+        return results;
+      }
+    } catch (vectorError) {
+      console.warn('Vector search failed, falling back to keyword search:', vectorError.message);
+    }
+    
+    // Fallback to keyword-based search if vector search fails or returns no results
+    console.log('Falling back to keyword-based search...');
+    
     // Import local training data from markdown format only
     const fs = require('fs');
     const path = require('path');
@@ -310,12 +342,20 @@ export async function initializeTrainingExamples(lang = null) {
         }
       }
 
+      // Generate embedding for this example
+      const embeddingText = createEmbeddingText({
+        ...example,
+        description
+      });
+      
       batch.set(docRef, {
         ...example,
         lang: exampleLang,       // Explicitly set language
         description,             // Add generated description if needed
         keywords,
+        embeddingText: embeddingText, // Store the text used for embedding
         createdAt: admin.firestore.FieldValue.serverTimestamp()
+        // Note: We'll generate embeddings in a separate batch process to avoid timeout
       });
 
       batchCount++;
@@ -409,18 +449,22 @@ export async function addTrainingExample(example) {
     // Ensure the example has a language code (default to "0002" if not provided)
     const lang = example.lang || "0002";
 
-    // Add the example to Firestore
-    const docRef = await trainingCollRef.add({
-      ...example,
-      lang,     // Make sure language is explicitly included
-      keywords,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    // Add the example to Firestore with embedding
+    const docId = await addDocumentWithEmbedding({
+      db: db,
+      collection: 'training_examples',
+      data: {
+        ...example,
+        lang,     // Make sure language is explicitly included
+        keywords,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      }
     });
 
     return {
       success: true,
-      message: `Training example added successfully for language ${lang}`,
-      id: docRef.id
+      message: `Training example added successfully for language ${lang} with embedding`,
+      id: docId
     };
 
   } catch (error) {
@@ -934,20 +978,24 @@ async function storeSuccessfulGeneration(prompt, code, lang = "0002", verified =
   try {
     const db = getFirestoreDb();
 
-    // Store in a separate collection for successful generations
-    await db.collection('successful_generations').add({
-      prompt,
-      code,
-      lang: lang,  // Store the language code
-      verified,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      // Extract keywords for better searchability
-      keywords: prompt.toLowerCase()
-        .split(/\s+/)
-        .filter(word => word.length > 3)
+    // Store in a separate collection for successful generations with embedding
+    await addDocumentWithEmbedding({
+      db: db,
+      collection: 'successful_generations',
+      data: {
+        prompt,
+        code,
+        lang: lang,  // Store the language code
+        verified,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        // Extract keywords for better searchability
+        keywords: prompt.toLowerCase()
+          .split(/\s+/)
+          .filter(word => word.length > 3)
+      }
     });
 
-    console.log(`Stored successful generation for language ${lang} for future reference`);
+    console.log(`Stored successful generation with embedding for language ${lang}`);
   } catch (error) {
     // Just log error but don't interrupt the main flow
     console.error('Failed to store successful generation:', error);
