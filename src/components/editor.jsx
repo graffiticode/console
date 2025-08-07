@@ -217,6 +217,12 @@ export default function Editor({
                     accessToken={accessToken}
                     language={lang}
                     code={code}
+                    setCode={(newCode) => {
+                      if (isCodeNew(newCode)) {
+                        setIsUserEdit(true);
+                        setCode(newCode);
+                      }
+                    }}
                   />
                 );
               } else {

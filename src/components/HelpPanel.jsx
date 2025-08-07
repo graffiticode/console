@@ -56,7 +56,8 @@ export const HelpPanel = ({
   help,
   setHelp,
   language,
-  code
+  code,
+  setCode
 }) => {
   console.log(
     "HelpPanel()",
@@ -248,6 +249,10 @@ export const HelpPanel = ({
   // ChatBot integration
   const { handleSendMessage, cancelGeneration, isLoading } = ChatBot({
     onSendMessage: (userMessage, botResponse) => {
+      console.log(
+        "onSendMessage()",
+        "botResponse=" + JSON.stringify(botResponse, null, 2),
+      );
       // When we receive a message from the chatbot
       handleMessage(userMessage, botResponse);
     },
@@ -1023,8 +1028,13 @@ export const HelpPanel = ({
       }
     ]);
 
-    // Code is now always set by the CodePanel, not HelpPanel
-  }, []);
+    // If the bot response is code, automatically update the code panel
+    if (botResponse?.type === 'code' && typeof setCode === 'function') {
+      console.log("Setting code panel with new code:",
+        botResponse.text ? botResponse.text.substring(0, 50) + "..." : "none");
+      setCode(botResponse.text);
+    }
+  }, [setCode]);
 
   // State for the input field
   const [messageText, setMessageText] = useState('');
