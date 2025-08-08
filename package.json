@@ -90,6 +90,8 @@
     "swr": "^2.0.0",
     "topojson-client": "^3.1.0",
     "tw-elements": "^1.0.0-rc.1",
+    "unstorage": "^1.16.1",
+    "valtio": "^2.1.5",
     "versor": "^0.2.0",
     "viem": "^2.33.3",
     "wagmi": "^2.16.1"
