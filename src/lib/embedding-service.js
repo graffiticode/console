@@ -5,7 +5,7 @@
 
 import OpenAI from 'openai';
 import admin from 'firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, VectorValue } from 'firebase-admin/firestore';
 
 // Initialize OpenAI client
 let openaiClient = null;
@@ -143,12 +143,6 @@ export function createEmbeddingText(example) {
  */
 export async function vectorSearch({ collection, query, limit = 5, lang, db }) {
   try {
-    // Generate embedding for the query
-    const queryEmbedding = await generateEmbedding(query);
-
-    // Use the embedding array directly
-    const vectorQuery = queryEmbedding;
-
     // Build the query
     let searchQuery = db.collection(collection);
 
@@ -156,6 +150,18 @@ export async function vectorSearch({ collection, query, limit = 5, lang, db }) {
     if (lang) {
       searchQuery = searchQuery.where('lang', '==', lang);
     }
+
+    // Check if vector search is available
+    if (typeof searchQuery.findNearest !== 'function') {
+      console.warn('Vector search not available - findNearest is not a function. This may require a newer Firebase SDK version.');
+      return [];
+    }
+
+    // Generate embedding for the query
+    const queryEmbedding = await generateEmbedding(query);
+
+    // Convert to VectorValue if available, otherwise use array directly
+    const vectorQuery = VectorValue ? VectorValue.fromArray(queryEmbedding) : queryEmbedding;
 
     // Perform vector similarity search
     // Note: Firebase requires a specific index for vector search
@@ -257,6 +263,12 @@ export async function hybridSearch({
       };
     });
 
+    console.log(
+      "hybridSearch()",
+      "scoreResults[].combinedScore=" + JSON.stringify(scoredResults.map(r => r.combinedScore)),
+      "scoredResults=" + JSON.stringify(scoredResults),
+    );
+
     // Sort by combined score and return top results
     return scoredResults
       .sort((a, b) => b.combinedScore - a.combinedScore)
@@ -284,8 +296,8 @@ export async function addDocumentWithEmbedding({ db, collection, docId, data }) 
     // Generate embedding
     const embedding = await generateEmbedding(embeddingText);
 
-    // Use the embedding array directly for Firestore
-    const vectorValue = embedding;
+    // Convert to VectorValue if available, otherwise use array directly
+    const vectorValue = VectorValue ? VectorValue.fromArray(embedding) : embedding;
 
     // Add or update document with embedding
     const docRef = docId
