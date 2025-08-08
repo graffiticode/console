@@ -1,6 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
+// Note: This is the client-side Firebase config for authentication
+// The server-side scripts use 'graffiticode-app' as the project ID
 export const apiFirebaseConfig = {
   apiKey: "AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I",
   authDomain: "graffiticode.firebaseapp.com",

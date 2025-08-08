@@ -5,7 +5,7 @@
 
 import OpenAI from 'openai';
 import admin from 'firebase-admin';
-import { FieldValue, VectorValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // Initialize OpenAI client
 let openaiClient = null;
@@ -146,8 +146,8 @@ export async function vectorSearch({ collection, query, limit = 5, lang, db }) {
     // Generate embedding for the query
     const queryEmbedding = await generateEmbedding(query);
 
-    // Create a VectorValue from the embedding
-    const vectorQuery = VectorValue.fromArray(queryEmbedding);
+    // Use the embedding array directly
+    const vectorQuery = queryEmbedding;
 
     // Build the query
     let searchQuery = db.collection(collection);
@@ -284,8 +284,8 @@ export async function addDocumentWithEmbedding({ db, collection, docId, data }) 
     // Generate embedding
     const embedding = await generateEmbedding(embeddingText);
 
-    // Create VectorValue for Firestore
-    const vectorValue = VectorValue.fromArray(embedding);
+    // Use the embedding array directly for Firestore
+    const vectorValue = embedding;
 
     // Add or update document with embedding
     const docRef = docId
@@ -330,7 +330,7 @@ export async function updateEmbeddingsInBatch({ db, collection, documents }) {
 
       batch.forEach((doc, index) => {
         const docRef = db.collection(collection).doc(doc.id);
-        const vectorValue = VectorValue.fromArray(embeddings[index]);
+        const vectorValue = embeddings[index];
 
         writeBatch.update(docRef, {
           embedding: vectorValue,

@@ -1,90 +1,89 @@
 /**
- * Script to generate training_examples.json from help field in taskIds collection
+ * Script to generate training_examples.json from help field in items collection
  *
- * This script fetches examples using the GraphQL tasks query, filtering by lang and mark values.
- * Each task document has a "help" field containing dialog interactions between users and the help assistant.
+ * This script fetches items from the items collection which contain all necessary
+ * data including help field with dialog interactions, code, mark, etc.
  *
  * Usage:
  * node scripts/generate-training-examples.js [options]
  *
  * Options:
- *   --limit <number>                 Maximum number of tasks to process (default: 100000)
+ *   --limit <number>                 Maximum number of items to process (default: 100000)
  *   --output <path>                  Output file path (default: ./training_examples.json)
  *   --service-account <path>         Path to Firebase service account JSON file
- *   --user <userId>                  User ID to use (defaults to a predefined user ID)
- *   --user-path <path>               Path to users collection (default: /users)
- *   --task-collection <name>            Name of the taskIds collection (default: taskIds)
- *   --lang <language>                Filter tasks by language code (e.g., "0002")
- *   --mark <mark>                    Filter tasks by mark value (default: 1)
+ *   --items-collection <name>        Name of the items collection (default: items)
+ *   --lang <language>                Filter items by language code (e.g., "0159")
+ *   --mark <mark>                    Filter items by mark value (default: 1)
  *   --all-langs                      Process all languages (default behavior)
- *   --token <token>                  Authentication token for GraphQL API
- *   --graphql-endpoint <url>         GraphQL API endpoint (default: http://localhost:3000/api)
+ *   --store-mode <mode>              Storage mode: 'file' or 'vector' (default: vector)
+ *   --vector-collection <name>       Vector store collection name (default: training_examples)
+ *   --batch-size <number>            Batch size for vector updates (default: 10)
  *
  * Examples:
- *   # Basic usage with defaults (uses predefined user ID)
+ *   # Basic usage with defaults (stores in vector database)
  *   node scripts/generate-training-examples.js
  *
- *   # Specify a different user ID
- *   node scripts/generate-training-examples.js --user 1a2b3c4d5e6f
- *
  *   # Generate examples only for a specific language
- *   node scripts/generate-training-examples.js --lang 0002
+ *   node scripts/generate-training-examples.js --lang 0159
  *
  *   # Generate examples with specific mark value
- *   node scripts/generate-training-examples.js --lang 0002 --mark 2
+ *   node scripts/generate-training-examples.js --lang 0159 --mark 2
+ *
+ *   # Save to file instead of vector database
+ *   node scripts/generate-training-examples.js --store-mode file
+ *
+ *   # Use custom vector collection name
+ *   node scripts/generate-training-examples.js --vector-collection custom_examples
  */
 
-//const fs = require('fs');
 import fs from "fs";
-//const path = require('path');
 import path from "path";
-//const admin = require('firebase-admin');
 import admin from "firebase-admin";
-//const fetch = require('node-fetch');
-import fetch from "node-fetch";
-//const bent = require('bent');
-import bent from "bent";
+import { 
+  createEmbeddingText, 
+  addDocumentWithEmbedding,
+  generateBatchEmbeddings 
+} from '../src/lib/embedding-service.js';
+import { FieldValue } from 'firebase-admin/firestore';
+import dotenv from 'dotenv';
 
-const {
-  GC_API_KEY_ID,
-  GC_API_KEY_SECRET,
-  GC_AUTH_URL = "https://auth.graffiticode.org",
-  GC_API_URL = "https://api.graffiticode.org",
-} = process.env;
+// Load environment variables
+dotenv.config();
 
-const postAuthJSON = bent(GC_AUTH_URL, "POST", "json", 200, 401);
-const getApiJSON = bent(GC_API_URL, "GET", "json", 200, 400);
+// Force connection to production Firestore (bypass emulator)
+delete process.env.FIRESTORE_EMULATOR_HOST;
+delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
 
-let currentTokenPromise = null;
-const getAccessToken = () => {
-  if (!currentTokenPromise) {
-    console.log("Retrieving access token");
-    currentTokenPromise = Promise.resolve()
-      .then(() => postAuthJSON(
-        `/v1/api-keys/${GC_API_KEY_ID}/authenticate`,
-        { token: GC_API_KEY_SECRET }
-      ))
-      .then(({ data }) => {
-        console.log(
-          "getAccessToken()",
-          "GC_AUTH_URL=" + GC_AUTH_URL,
-          "data=" + JSON.stringify(data, null, 2),
-        );
-        if (data) {
-          const { accessToken } = data;
-          const { exp } = JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString("utf8"));
-          setTimeout(() => {
-            currentTokenPromise = null;
-            console.log("Cleared access token that is about to expire.");
-          }, exp * 1000 - Date.now() - 1000);
-          return accessToken;
-        } else {
-          return null;
-        }
-      });
+// Use the local graffiticode-app key file if available and no other credentials are set
+if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  const localKeyPath = '/Users/jeffdyer/graffiticode-app-key.json';
+  if (fs.existsSync(localKeyPath)) {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = localKeyPath;
+    console.log(`Using local service account key: ${localKeyPath}`);
+  } else if (process.env.GOOGLE_APP_CREDENTIALS) {
+    // Fallback to GOOGLE_APP_CREDENTIALS if set
+    const credValue = process.env.GOOGLE_APP_CREDENTIALS;
+    // Check if it's JSON content (starts with {) or a file path
+    if (credValue.trim().startsWith('{')) {
+      // It's JSON content, write it to a temp file
+      const tempFile = '/tmp/temp-service-account.json';
+      fs.writeFileSync(tempFile, credValue);
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = tempFile;
+      console.log('Using credentials from GOOGLE_APP_CREDENTIALS (JSON content)');
+    } else {
+      // It's a file path
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = credValue;
+      console.log(`Using credentials from GOOGLE_APP_CREDENTIALS (file): ${credValue}`);
+    }
   }
-  return currentTokenPromise;
-};
+}
+
+// Debug: Check if credentials are available
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  console.log(`Credentials set: ${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
+} else {
+  console.log('Warning: GOOGLE_APPLICATION_CREDENTIALS not set');
+}
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -104,6 +103,21 @@ const markValue = args.includes('--mark')
   ? parseInt(args[args.indexOf('--mark') + 1])
   : 1; // Default mark value
 
+// Store mode: 'file' (default) or 'vector' to store in vector database
+const storeMode = args.includes('--store-mode')
+  ? args[args.indexOf('--store-mode') + 1]
+  : 'vector'; // Default to vector store
+
+// Collection name for vector store
+const vectorCollection = args.includes('--vector-collection')
+  ? args[args.indexOf('--vector-collection') + 1]
+  : 'training_examples';
+
+// Batch size for vector updates
+const vectorBatchSize = args.includes('--batch-size')
+  ? parseInt(args[args.indexOf('--batch-size') + 1])
+  : 10;
+
 // Determine output file path, adding language code to filename if filtering
 let outputDir = "./";
 
@@ -121,13 +135,17 @@ if (!outputDir.endsWith('/')) {
 
 // We'll create the markdown file path at write time
 
-console.log(`Using output directory: ${outputDir}`);
+if (storeMode === 'file') {
+  console.log(`Using output directory: ${outputDir}`);
+} else {
+  console.log(`Storing in vector database collection: ${vectorCollection}`);
+}
 
 const serviceAccountPath = args.includes('--service-account')
   ? args[args.indexOf('--service-account') + 1]
   : null;
 
-// Default user ID
+// Default user ID (all lowercase)
 const defaultUserId = '24493e1c7a7f1ad57e3c478087c74c2dacb0cba1';
 
 // Check if user parameter is provided
@@ -135,62 +153,53 @@ const userId = args.includes('--user')
   ? args[args.indexOf('--user') + 1]
   : defaultUserId;
 
-// Allow customization of collection paths
-const usersPath = args.includes('--user-path')
-  ? args[args.indexOf('--user-path') + 1]
-  : '/users';
-
-const taskCollection = args.includes('--task-collection')
-  ? args[args.indexOf('--task-collection') + 1]
-  : 'taskIds';
-
-// GraphQL API settings
-const authToken = args.includes('--token')
-  ? args[args.indexOf('--token') + 1]
-  : await getAccessToken();
-
-const graphqlEndpoint = args.includes('--graphql-endpoint')
-  ? args[args.indexOf('--graphql-endpoint') + 1]
-  : 'http://localhost:3000/api';
+// Collection settings
+const itemsCollection = args.includes('--items-collection')
+  ? args[args.indexOf('--items-collection') + 1]
+  : 'items';
 
 // Show help if requested
 if (args.includes('--help')) {
   console.log(`
 Usage: node scripts/generate-training-examples.js [options]
 
+This script fetches items from the users/{userId}/items subcollection and generates
+training examples from the help field. Items contain all necessary data including
+code, mark, and help dialogs.
+
 Options:
-  --limit <number>                 Maximum number of tasks to process (default: 100000)
+  --limit <number>                 Maximum number of items to process (default: 100000)
   --output <path>                  Output file path (default: ./training_examples.json)
   --service-account <path>         Path to Firebase service account JSON file
-  --user <userId>                  User ID to use (defaults to a predefined user ID)
-  --user-path <path>               Path to users collection (default: /users)
-  --task-collection <name>            Name of the taskIds collection (default: taskIds)
-  --lang <language>                Filter tasks by language code (e.g., "0002")
-  --mark <mark>                    Filter tasks by mark value (default: 1)
+  --user <userId>                  User ID to fetch items from (default: predefined ID)
+  --items-collection <name>        Name of the items subcollection (default: items)
+  --lang <language>                Filter items by language code (e.g., "0159")
+  --mark <mark>                    Filter items by mark value (default: 1)
   --all-langs                      Process all languages (default behavior)
-  --token <token>                  Authentication token for GraphQL API
-  --graphql-endpoint <url>         GraphQL API endpoint (default: http://localhost:3000/api)
+  --store-mode <mode>              Storage mode: 'file' or 'vector' (default: vector)
+  --vector-collection <name>       Vector store collection name (default: training_examples)
+  --batch-size <number>            Batch size for vector updates (default: 10)
 
 Examples:
-  # Basic usage with defaults
+  # Basic usage with defaults (stores in vector database)
   node scripts/generate-training-examples.js
 
   # Specify a different user ID
   node scripts/generate-training-examples.js --user 1a2b3c4d5e6f
 
-  # Generate examples only for a specific language and mark value
-  node scripts/generate-training-examples.js --lang 0002 --mark 1
+  # Generate examples only for a specific language
+  node scripts/generate-training-examples.js --lang 0159
+
+  # Generate examples with specific mark value
+  node scripts/generate-training-examples.js --lang 0159 --mark 1
+  
+  # Save to file instead of vector database
+  node scripts/generate-training-examples.js --store-mode file
+  
+  # Use custom vector collection name
+  node scripts/generate-training-examples.js --vector-collection custom_examples
   `);
   process.exit(0);
-}
-
-// Build the path to the user's taskIds collection (for backward compatibility)
-const userTasksPath = `${usersPath}/${userId}/${taskCollection}`;
-console.log(`Starting with user tasks path: ${userTasksPath}`);
-
-// Check if we have a token for the GraphQL API
-if (!authToken) {
-  console.log('No auth token provided for GraphQL API, falling back to Firebase Admin SDK');
 }
 
 // Initialize Firebase Admin SDK (as fallback if GraphQL is not available)
@@ -205,12 +214,18 @@ try {
       console.log(`Using service account from: ${serviceAccountPath}`);
     } catch (saError) {
       console.error(`Error loading service account file: ${saError.message}`);
-      console.log('Falling back to default initialization');
-      admin.initializeApp();
+      console.log('Falling back to application default credentials');
+      admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+        projectId: 'graffiticode-app'
+      });
     }
   } else {
-    // Simple initialization with no parameters works best in most environments
-    admin.initializeApp();
+    // Initialize with application default credentials and explicit project ID
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+      projectId: 'graffiticode-app'
+    });
   }
   console.log('Firebase initialized successfully');
 } catch (err) {
@@ -408,126 +423,224 @@ function convertToMarkdownFormat(trainingExamples) {
 }
 
 /**
- * Function to fetch tasks using GraphQL
- * @param {string} lang - Language filter
- * @param {number} mark - Mark filter
- * @returns {Promise<Array>} - Array of task objects
+ * Store training examples in vector database
+ * @param {Array} trainingExamples - Array of training examples
+ * @param {Object} db - Firestore database instance
+ * @returns {Promise<Object>} - Statistics about the storage operation
  */
-async function fetchTasksWithGraphQL(lang, mark) {
-  try {
-    console.log(`Fetching tasks with GraphQL for lang=${lang}, mark=${mark}`);
+async function storeExamplesInVectorDatabase(trainingExamples, db) {
+  const stats = {
+    total: trainingExamples.length,
+    stored: 0,
+    errors: 0,
+    skipped: 0
+  };
 
-    // First try to introspect the schema to verify the query structure
+  console.log(`\nStoring ${stats.total} examples in vector database...`);
+
+  // Process in batches
+  for (let i = 0; i < trainingExamples.length; i += vectorBatchSize) {
+    const batch = trainingExamples.slice(i, i + vectorBatchSize);
+    console.log(`Processing batch ${Math.floor(i / vectorBatchSize) + 1} (${batch.length} examples)...`);
+
     try {
-      const introspectionQuery = `
-        {
-          __schema {
-            queryType {
-              fields {
-                name
-                args {
-                  name
-                  type {
-                    name
-                    kind
-                  }
-                }
-              }
-            }
-          }
-        }
-      `;
+      // Prepare texts for embedding
+      const textsToEmbed = [];
+      const docsToStore = [];
 
-      console.log('Attempting schema introspection to verify query structure...');
-      const introspectionResponse = await fetch(graphqlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authToken
-        },
-        body: JSON.stringify({ query: introspectionQuery })
+      for (const example of batch) {
+        // Create a unique ID for the example
+        const docId = `${example.lang}_${example.item_id}_${example.task_id || 'notask'}`;
+        
+        // Prepare document data
+        const docData = {
+          ...example,
+          createdAt: FieldValue.serverTimestamp(),
+          source: 'generate-training-examples-script'
+        };
+
+        // Create embedding text
+        const embeddingText = createEmbeddingText(example);
+        textsToEmbed.push(embeddingText);
+        docsToStore.push({ id: docId, data: docData });
+      }
+
+      // Generate embeddings in batch
+      console.log(`  Generating embeddings for ${textsToEmbed.length} examples...`);
+      const embeddings = await generateBatchEmbeddings(textsToEmbed);
+
+      // Store documents with embeddings
+      const writeBatch = db.batch();
+
+      docsToStore.forEach((doc, index) => {
+        const docRef = db.collection(vectorCollection).doc(doc.id);
+        const vectorValue = embeddings[index];
+
+        writeBatch.set(docRef, {
+          ...doc.data,
+          embedding: vectorValue,
+          embeddingText: textsToEmbed[index],
+          embeddingUpdatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        console.log(`  Storing ${doc.id}`);
       });
 
-      const introspectionResult = await introspectionResponse.json();
-      console.log('Schema introspection result:', JSON.stringify(introspectionResult, null, 2));
-    } catch (e) {
-      console.log('Schema introspection failed, continuing with original query');
+      await writeBatch.commit();
+      stats.stored += docsToStore.length;
+      console.log(`  ✓ Batch stored successfully`);
+
+    } catch (error) {
+      console.error(`  ✗ Error processing batch:`, error.message);
+      stats.errors += batch.length;
     }
 
-    // GraphQL query for tasks
-    const query = `
-      query GetTasks($lang: String!, $mark: Int!) {
-        tasks(lang: $lang, mark: $mark) {
-          id
-          lang
-          src
-          code
-          help
-          taskId
-          isPublic
-          created
-          name
-          mark
-        }
+    // Add a small delay between batches to avoid rate limiting
+    if (i + vectorBatchSize < trainingExamples.length) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  return stats;
+}
+
+/**
+ * Function to fetch items from Firestore items collection
+ * @param {string} lang - Language filter
+ * @param {number} mark - Mark filter  
+ * @param {number} limit - Maximum number of items to fetch
+ * @returns {Promise<Array>} - Array of item objects with taskIds
+ */
+async function fetchItemsFromFirestore(lang, mark, limit) {
+  try {
+    const collectionPath = `users/${userId}/${itemsCollection}`;
+    console.log(`Fetching items from Firestore collection '${collectionPath}' for lang=${lang}, mark=${mark}`);
+    console.log(`User ID: ${userId}`);
+    
+    const db = admin.firestore();
+    
+    // Debug: Check if the user document exists
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      console.log(`Warning: User document '${userId}' does not exist in Firestore`);
+      
+      // List some existing users for debugging
+      const usersSnapshot = await db.collection('users').limit(5).get();
+      if (usersSnapshot.size > 0) {
+        console.log(`Found ${usersSnapshot.size} user documents. Sample user IDs:`);
+        usersSnapshot.forEach(doc => {
+          console.log(`  - ${doc.id}`);
+        });
+      } else {
+        console.log('No user documents found in the users collection');
       }
-    `;
-
-    // Variables for the query
-    const variables = { lang, mark };
-
-    // Log request details for debugging
-    console.log(`Making GraphQL request to: ${graphqlEndpoint}`);
-    console.log(`Auth token present: ${authToken ? 'Yes' : 'No'}`);
-    console.log('Request body:', JSON.stringify({query, variables}, null, 2));
-
-    // Make the GraphQL request
-    const response = await fetch(graphqlEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authToken
-      },
-      body: JSON.stringify({
-        query,
-        variables
-      })
-    });
-
-    // Log response status
-    console.log(`Response status: ${response.status} ${response.statusText}`);
-
-    // Parse the response
-    const result = await response.json();
-
-    // Log full response for debugging
-    console.log('Full response:', JSON.stringify(result, null, 2));
-
-    // Check for errors
-    if (result.errors) {
-      console.error('GraphQL query errors:', result.errors);
-      throw new Error('Failed to fetch tasks with GraphQL');
+    } else {
+      console.log(`User document '${userId}' exists`);
     }
-
-    // Return the tasks
-    return result.data.tasks || [];
+    
+    let query = db.collection('users').doc(userId).collection(itemsCollection);
+    
+    // Apply filters
+    if (lang) {
+      query = query.where('lang', '==', lang);
+    }
+    // Temporarily disable mark filter if mark is -1 (for debugging)
+    if (mark !== undefined && mark !== null && mark !== -1) {
+      query = query.where('mark', '==', mark);
+    } else if (mark === -1) {
+      console.log('Mark filter disabled for debugging');
+    }
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    const snapshot = await query.get();
+    console.log(`Query returned ${snapshot.size} documents`);
+    
+    // Debug: Try to get a count without any filters
+    if (snapshot.size === 0) {
+      const debugQuery = db.collection('users').doc(userId).collection(itemsCollection).limit(5);
+      const debugSnapshot = await debugQuery.get();
+      console.log(`Debug: Total documents in collection (no filters, limit 5): ${debugSnapshot.size}`);
+      if (debugSnapshot.size > 0) {
+        console.log('Debug: Sample document structure:');
+        debugSnapshot.forEach(doc => {
+          const data = doc.data();
+          console.log(`  Doc ${doc.id}: lang=${data.lang}, mark=${data.mark}, hasHelp=${!!data.help}, hasSrc=${!!data.src}, hasCode=${!!data.code}`);
+        });
+      }
+    }
+    
+    const items = [];
+    
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      // Don't filter by taskId - include all items that have help and code
+      if (data.help && (data.src || data.code)) {
+        items.push({
+          id: doc.id,
+          taskId: data.taskId || null,
+          lang: data.lang,
+          mark: data.mark,
+          ...data
+        });
+      }
+    });
+    
+    console.log(`Found ${items.length} items with help and code fields`);
+    
+    // If no items found, let's debug what's in the collection
+    if (items.length === 0 && snapshot.size > 0) {
+      console.log('Sample of documents found (first 3):');
+      let count = 0;
+      snapshot.forEach(doc => {
+        if (count < 3) {
+          const data = doc.data();
+          console.log(`  Doc ${doc.id}:`, {
+            hasHelp: !!data.help,
+            hasSrc: !!data.src,
+            hasCode: !!data.code,
+            hasTaskId: !!data.taskId,
+            lang: data.lang,
+            mark: data.mark
+          });
+          count++;
+        }
+      });
+    }
+    
+    return items;
   } catch (error) {
-    console.error('Error fetching tasks with GraphQL:', error);
+    console.error('Error fetching items from Firestore:', error);
     throw error;
   }
 }
 
+
+
 async function main() {
   try {
+    // Check for OPENAI_API_KEY if using vector mode
+    if (storeMode === 'vector' && !process.env.OPENAI_API_KEY) {
+      console.error('Error: OPENAI_API_KEY environment variable is required for vector mode');
+      console.error('Please set it in your .env file or environment');
+      console.error('To use file mode instead, add --store-mode file');
+      process.exit(1);
+    }
+
+    console.log(`Processing items for user: ${userId}`);
+    console.log(`Items collection: ${itemsCollection}`);
+    
     // Initialize statistics tracking
     const statistics = {
       codeSources: {},        // Track source of code fields
       languageCounts: {},     // Track count by language
-      totalProcessed: 0,      // Total tasks processed
-      totalTasks: 0,          // Total task documents found
-      tasksWithHelpArray: 0,  // Tasks that have a help array
-      tasksWithEmptyHelp: 0,  // Tasks with empty help array
-      tasksWithSrcCode: 0,    // Tasks with code in the src field
-      skippedNoCode: 0,       // Tasks without code
+      totalProcessed: 0,      // Total items processed
+      totalItems: 0,          // Total items found
+      itemsWithHelpArray: 0,  // Items that have a help array
+      itemsWithEmptyHelp: 0,  // Items with empty help array
+      itemsWithSrcCode: 0,    // Items with code in the src field
+      skippedNoCode: 0,       // Items without code
       totalDialogPairs: 0,    // Total number of dialog pairs extracted
       totalMessages: 0        // Total individual messages processed
     };
@@ -538,73 +651,64 @@ async function main() {
     // Determine languages to process
     const languagesToProcess = filterByLanguage
       ? [languageFilter]
-      : ['0002', '0011', '0012', '0165']; // Add other languages as needed
+      : ['0159', '0002', '0011', '0012', '0165']; // Add other languages as needed
 
     // Process each language
     for (const lang of languagesToProcess) {
       try {
-        console.log(`\nProcessing tasks for language: L${lang} with mark: ${markValue}`);
+        console.log(`\nProcessing items for language: L${lang} with mark: ${markValue}`);
 
-        // Try to fetch tasks using GraphQL if token is available
-        let tasks = [];
+        // Fetch items from the items collection
+        const items = await fetchItemsFromFirestore(lang, markValue, limit);
+        console.log(`Found ${items.length} items for L${lang}`);
+        statistics.totalItems += items.length;
 
-        if (authToken) {
-          try {
-            tasks = await fetchTasksWithGraphQL(lang, markValue);
-            console.log(`Successfully fetched ${tasks.length} tasks using GraphQL for L${lang}`);
-          } catch (error) {
-            console.error(`Error fetching tasks with GraphQL for L${lang}:`, error.message);
-            tasks = [];
-          }
-        }
+        // Process the items directly
+        console.log(`Processing ${items.length} items for L${lang}`);
 
-        // Process the tasks
-        statistics.totalTasks += tasks.length;
-        console.log(`Processing ${tasks.length} tasks for L${lang}`);
-
-        for (const task of tasks) {
-          const taskId = task.id;
+        for (const item of items) {
+          const itemId = item.id;
 
           // Parse help field
           let help = [];
           try {
-            help = JSON.parse(task.help);
+            help = JSON.parse(item.help);
           } catch (e) {
-            console.log(`Task ${taskId} has invalid help JSON: ${e.message}`);
+            console.log(`Item ${itemId} has invalid help JSON: ${e.message}`);
             continue;
           }
 
           // Check if this document has a valid help array
           if (!help || !Array.isArray(help)) {
-            console.log(`Task ${taskId} has no help array`);
+            console.log(`Item ${itemId} has no help array`);
             continue;
           }
 
           if (help.length === 0) {
-            console.log(`Task ${taskId} has an empty help array`);
-            statistics.tasksWithEmptyHelp++;
+            console.log(`Item ${itemId} has an empty help array`);
+            statistics.itemsWithEmptyHelp++;
             continue;
           }
 
-          statistics.tasksWithHelpArray++;
+          statistics.itemsWithHelpArray++;
           console.log(
-            `Processing task ${taskId} with ${help.length} help messages`,
+            `Processing item ${itemId} with ${help.length} help messages`,
             console.log("help=" + JSON.stringify(help, null, 2)),
           );
 
-          // Get the code directly from the src field of the task
-          let code = task.src || "";
-          let codeSource = "task_src_field";
+          // Get the code directly from the src field of the item
+          let code = item.src || item.code || "";
+          let codeSource = "item_src_field";
           
-          // Skip if there's no code in the src field
+          // Skip if there's no code
           if (!code || code.trim().length < 10) {
-            console.log(`No valid code in src field for task ${taskId}`);
+            console.log(`No valid code in item ${itemId}`);
             statistics.skippedNoCode++;
             continue;
           }
           
-          // Track tasks with valid source code
-          statistics.tasksWithSrcCode++;
+          // Track items with valid source code
+          statistics.itemsWithSrcCode++;
           
           // Trim the code
           code = code.trim();
@@ -665,7 +769,7 @@ async function main() {
 
           // Skip if there are no complete dialog pairs
           if (dialogPairs === 0) {
-            console.log(`Task ${taskId} has no complete dialog pairs`);
+            console.log(`Item ${itemId} has no complete dialog pairs`);
             continue;
           }
 
@@ -680,16 +784,17 @@ async function main() {
             explanation,
             expected_output,
             lang,
-            task_id: taskId,
+            item_id: itemId,
+            task_id: item.taskId,
             code_source: codeSource,
-            usage_count: task.count || 1,
+            usage_count: item.count || 1,
             pair_count: dialogPairs
           });
 
           statistics.totalProcessed++;
 
           if (statistics.totalProcessed % 50 === 0) {
-            console.log(`Processed ${statistics.totalProcessed} tasks with dialog so far...`);
+            console.log(`Processed ${statistics.totalProcessed} items with dialog so far...`);
           }
         }
       } catch (error) {
@@ -706,11 +811,11 @@ async function main() {
 
     // Print detailed statistics report
     console.log('\n===== FINAL STATISTICS =====');
-    console.log(`Total tasks found: ${statistics.totalTasks}`);
-    console.log(`Tasks with help array: ${statistics.tasksWithHelpArray}`);
-    console.log(`Tasks with empty help array: ${statistics.tasksWithEmptyHelp}`);
-    console.log(`Tasks with valid source code: ${statistics.tasksWithSrcCode}`);
-    console.log(`Tasks processed with dialog: ${statistics.totalProcessed}`);
+    console.log(`Total items found: ${statistics.totalItems}`);
+    console.log(`Items with help array: ${statistics.itemsWithHelpArray}`);
+    console.log(`Items with empty help array: ${statistics.itemsWithEmptyHelp}`);
+    console.log(`Items with valid source code: ${statistics.itemsWithSrcCode}`);
+    console.log(`Items processed with dialog: ${statistics.totalProcessed}`);
     console.log(`Total dialog pairs: ${statistics.totalDialogPairs}`);
     console.log(`Total messages: ${statistics.totalMessages}`);
     console.log(`Skipped (no code): ${statistics.skippedNoCode}`);
@@ -731,31 +836,54 @@ async function main() {
     // Sort by usage count (most used first)
     trainingExamples.sort((a, b) => b.usage_count - a.usage_count);
 
-    // Make sure the output directory exists
-    const fullOutputDir = path.resolve(process.cwd(), outputDir);
-    if (!fs.existsSync(fullOutputDir)) {
-      fs.mkdirSync(fullOutputDir, { recursive: true });
-    }
-
-    // Convert to the new markdown-like format
-    const markdownExamples = convertToMarkdownFormat(trainingExamples);
-    
-    // Output path always uses .md extension
-    const outputPathMd = path.join(fullOutputDir, `l${languageFilter || 'all'}-training-examples.md`);
-    
-    // Write to markdown file
-    fs.writeFileSync(
-      outputPathMd,
-      markdownExamples,
-      'utf8'
-    );
-
-    if (filterByLanguage) {
-      console.log(`Successfully generated ${trainingExamples.length} training examples for language ${languageFilter}.`);
+    // Store the examples based on the selected mode
+    if (storeMode === 'vector') {
+      // Store in vector database
+      const db = admin.firestore();
+      const storageStats = await storeExamplesInVectorDatabase(trainingExamples, db);
+      
+      console.log('\n===== VECTOR STORAGE STATISTICS =====');
+      console.log(`Total examples: ${storageStats.total}`);
+      console.log(`Successfully stored: ${storageStats.stored}`);
+      console.log(`Errors: ${storageStats.errors}`);
+      console.log(`Skipped: ${storageStats.skipped}`);
+      console.log('=====================================\n');
+      
+      if (storageStats.stored > 0) {
+        console.log('✅ Training examples successfully stored in vector database');
+        console.log(`Collection: ${vectorCollection}`);
+        console.log('\n⚠️  Important: Deploy Firestore indexes for vector search');
+        console.log('Run: firebase deploy --only firestore:indexes');
+        console.log('This will enable vector similarity search on the embedding field');
+      }
     } else {
-      console.log(`Successfully generated ${trainingExamples.length} training examples across all languages.`);
+      // Store in file (existing logic)
+      // Make sure the output directory exists
+      const fullOutputDir = path.resolve(process.cwd(), outputDir);
+      if (!fs.existsSync(fullOutputDir)) {
+        fs.mkdirSync(fullOutputDir, { recursive: true });
+      }
+
+      // Convert to the new markdown-like format
+      const markdownExamples = convertToMarkdownFormat(trainingExamples);
+      
+      // Output path always uses .md extension
+      const outputPathMd = path.join(fullOutputDir, `l${languageFilter || 'all'}-training-examples.md`);
+      
+      // Write to markdown file
+      fs.writeFileSync(
+        outputPathMd,
+        markdownExamples,
+        'utf8'
+      );
+
+      if (filterByLanguage) {
+        console.log(`Successfully generated ${trainingExamples.length} training examples for language ${languageFilter}.`);
+      } else {
+        console.log(`Successfully generated ${trainingExamples.length} training examples across all languages.`);
+      }
+      console.log(`Generated file: ${outputPathMd}`);
     }
-    console.log(`Generated file: ${outputPathMd}`);
 
   } catch (error) {
     console.error('Error generating training examples:', error);

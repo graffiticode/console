@@ -19,7 +19,7 @@ import {
   updateEmbeddingsInBatch,
   generateBatchEmbeddings 
 } from '../src/lib/embedding-service.js';
-import { FieldValue, VectorValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -46,9 +46,7 @@ if (!process.env.OPENAI_API_KEY) {
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: 'graffiticode'
-  });
+  admin.initializeApp();
 }
 
 const db = admin.firestore();
@@ -140,7 +138,7 @@ async function updateCollectionEmbeddings() {
         
         docsToUpdate.forEach((doc, index) => {
           const docRef = db.collection(collection).doc(doc.id);
-          const vectorValue = VectorValue.fromArray(embeddings[index]);
+          const vectorValue = embeddings[index];
           
           writeBatch.update(docRef, {
             embedding: vectorValue,
