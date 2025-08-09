@@ -23,9 +23,13 @@ export function useSignInWithEthereum() {
   }, [isConnected, address, connectAsync, chainId]);
 
   const signInWithEthereum = useCallback(async () => {
-    const address = stripHexPrefix(await getAddress());
+    const accountAddress = await getAddress();
+    const address = stripHexPrefix(accountAddress);
     const nonce = await client.ethereum.getNonce({ address: stripHexPrefix(address) });
-    const signature = stripHexPrefix(await signMessageAsync({ message: `Nonce: ${nonce}` }));
+    const signature = stripHexPrefix(await signMessageAsync({ 
+      account: accountAddress as `0x${string}`,
+      message: `Nonce: ${nonce}` 
+    }));
     const authContext = await client.ethereum.authenticate({ address, nonce, signature });
     return { ...authContext, uid: address };
   }, [getAddress, signMessageAsync]);
