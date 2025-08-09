@@ -41,4 +41,6 @@ yarn-error.log*
 # firebase
 
 .firebase*
-*firestore*
+firestore-debug.log
+firestore.indexes.json
+firestore.rules
