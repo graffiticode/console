@@ -7,12 +7,6 @@ import { generateCode } from "../utils/swr/fetchers";
 const generateBotResponse = async ({message, user, language, chatHistory = [], currentCode = ''}) => {
   try {
     // Use our fetcher function directly
-    console.log(
-      "generateBotResponse()",
-      "currentCode length=" + (currentCode?.length || 0),
-      "chatHistory length=" + (chatHistory?.length || 0),
-      "first few chars of code=" + (currentCode?.substring(0, 30) + "..." || "none")
-    );
 
     // Format chat history as context for the prompt
     let contextualPrompt = message;
@@ -54,16 +48,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       contextualPrompt = conversationContext + message;
     }
 
-    console.log(
-      "ChatBot/generateBotResponse()",
-      "contextualPrompt=" + contextualPrompt,
-    );
 
-    console.log(
-      "ChatBot/generateCode() call",
-      "currentCode length:", currentCode?.length || 0,
-      "first 30 chars:", currentCode?.substring(0, 30) + "..." || "none"
-    );
 
     const result = await generateCode({
       user,
@@ -76,12 +61,6 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       currentCode
     });
 
-    // Log just the first part of the description for development purposes
-    if (result.description) {
-      const previewLength = Math.min(50, result.description.length);
-      console.log("Generated description:", result.description.substring(0, previewLength) +
-                  (result.description.length > previewLength ? "..." : ""));
-    }
 
     // Transform the response to match our expected format
     return {
@@ -138,11 +117,6 @@ greeting "user"..`,
  * ChatBot component that provides a chat interface
  */
 export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], currentCode = '' }) => {
-  console.log(
-    "ChatBot()",
-    "currentCode length=" + (currentCode?.length || 0),
-    "chatHistory length=" + (chatHistory?.length || 0),
-  );
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -156,17 +130,14 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
   // Update refs when props change
   useEffect(() => {
     chatHistoryRef.current = chatHistory;
-    console.log("ChatHistory ref updated, length:", chatHistory?.length || 0);
   }, [chatHistory]);
 
   useEffect(() => {
     currentCodeRef.current = currentCode;
-    console.log("CurrentCode ref updated, length:", currentCode?.length || 0);
   }, [currentCode]);
 
   // Function to cancel the current code generation
   const cancelGeneration = useCallback(() => {
-    console.log("Cancelling code generation");
     cancelGenerationRef.current = true;
     // Immediately set isLoading to false to unblock the UI
     setIsLoading(false);
@@ -188,15 +159,9 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
       const latestChatHistory = chatHistoryRef.current;
       const latestCode = currentCodeRef.current;
 
-      console.log(
-        "Sending message with latest values:",
-        "code length:", latestCode?.length || 0,
-        "history length:", latestChatHistory?.length || 0
-      );
 
       // Check if generation has been cancelled before making the API call
       if (cancelGenerationRef.current) {
-        console.log("Code generation was cancelled before API call");
         return;
       }
 
@@ -211,7 +176,6 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
 
       // Check if generation was cancelled while the API call was in progress
       if (cancelGenerationRef.current) {
-        console.log("Code generation was cancelled during API call");
         return;
       }
 
