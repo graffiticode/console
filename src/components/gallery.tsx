@@ -7,7 +7,7 @@ import {
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
-import { getAccessToken, generateCode, loadItems, createItem, updateItem } from '../utils/swr/fetchers';
+import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'
@@ -69,6 +69,26 @@ export default function Gallery({ lang, mark }) {
     getAccessToken,
   );
   const editorRef = useRef<any>(null);
+
+  // Detect if we're in Learnosity mode
+  const isLearnosityMode = useRef(false);
+  const learnosityOrigin = useRef(null);
+
+  useEffect(() => {
+    // Check if we were opened from Learnosity (has opener and sessionStorage flag)
+    if (typeof window !== 'undefined' && window.opener) {
+      const learnosityData = sessionStorage.getItem('graffiticode:learnosity');
+      if (learnosityData) {
+        try {
+          const data = JSON.parse(learnosityData);
+          isLearnosityMode.current = true;
+          learnosityOrigin.current = data.origin;
+        } catch (e) {
+          console.error('Failed to parse Learnosity data:', e);
+        }
+      }
+    }
+  }, []);
   // Load items from the API only once on initialization
   const { data: loadedItems } = useSWR(
     user && lang && mark ? `items-${lang}-${mark.id}` : null,
@@ -246,6 +266,22 @@ export default function Gallery({ lang, mark }) {
       }
     }
   }, [taskId, editorCode, editorHelp, selectedItemId]);
+
+  // Send compiled data updates to Learnosity when taskId changes
+  useEffect(() => {
+    if (isLearnosityMode.current && learnosityOrigin.current && window.opener && taskId) {
+      // Fetch the compiled data for this taskId
+      getData({ user, id: taskId, data: {} }).then(compiledData => {
+        window.opener.postMessage({
+          type: 'data-updated',
+          itemId: selectedItemId,
+          data: compiledData
+        }, learnosityOrigin.current);
+      }).catch(err => {
+        console.error('Failed to fetch compiled data:', err);
+      });
+    }
+  }, [taskId, selectedItemId, user]);
 
   if (!user) {
     return (
