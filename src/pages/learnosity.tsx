@@ -5,8 +5,9 @@ import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { createItem } from '../utils/swr/fetchers';
 import { getTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
+import Gallery from '../components/gallery';
 
-export default function Learnosity() {
+export default function Learnosity({ language, setLanguage, mark }) {
   const router = useRouter();
   const { lang: rawLang, itemId, mode, origin } = router.query;
   const lang = Array.isArray(rawLang) ? rawLang[0] : rawLang;
@@ -80,8 +81,7 @@ export default function Learnosity() {
           }));
         }
 
-        // Redirect to the items page with the new item selected
-        router.replace('/items');
+        // Don't redirect, Gallery will be shown below
       } else {
         throw new Error('Failed to create item');
       }
@@ -110,6 +110,23 @@ export default function Learnosity() {
             <SignIn label="Sign in with Graffiticode" />
           </div>
         </div>
+      </>
+    );
+  }
+
+  // Show Gallery UI when we have a created item or are in Learnosity mode
+  if (createdItemId || (mode === 'learnosity' && itemId)) {
+    return (
+      <>
+        <Head>
+          <title>{getTitle()} - Learnosity</title>
+          <link rel="icon" type="image/png" href="favicon.png" />
+        </Head>
+        <Gallery
+          lang={lang}
+          mark={mark}
+          hideItemsNav={true}
+        />
       </>
     );
   }

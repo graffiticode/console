@@ -50,7 +50,7 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-export default function Gallery({ lang, mark }) {
+export default function Gallery({ lang, mark, hideItemsNav = false }) {
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ editorHeight, setEditorHeight ] = useState(600);
@@ -298,6 +298,7 @@ export default function Gallery({ lang, mark }) {
       {/* Main content area */}
       <div className="flex grow">
         {/* ItemsNav panel with collapse functionality */}
+        {!hideItemsNav && (
         <div className={classNames(
           "flex-none h-full transition-all duration-300",
           isItemsPanelCollapsed ? "w-10" : "w-[210px]"
@@ -337,6 +338,7 @@ export default function Gallery({ lang, mark }) {
             />
           )}
         </div>
+        )}
         <div className="flex flex-col grow px-2" style={{paddingTop: "5px"}}>
           <div className={classNames(
                  hideEditor ? "block" : "flex flex-col lg:flex-row",
@@ -347,9 +349,9 @@ export default function Gallery({ lang, mark }) {
               className="relative ring-0 border border-gray-200 rounded-none mb-2 order-2 lg:order-1 resize-x"
               style={{
                 height: "calc(100vh - 90px)",
-                width: isItemsPanelCollapsed ? "49%" : "48%",
+                width: hideItemsNav ? "49%" : (isItemsPanelCollapsed ? "49%" : "48%"),
                 minWidth: "300px",
-                maxWidth: isItemsPanelCollapsed ? "80%" : "70%"
+                maxWidth: hideItemsNav ? "80%" : (isItemsPanelCollapsed ? "80%" : "70%")
               }}
             >
               <Editor
@@ -369,11 +371,11 @@ export default function Gallery({ lang, mark }) {
               className="relative ring-0 border border-gray-300 rounded-none resize-both order-1 lg:order-2"
               style={{
                 height: "calc(100vh - 90px)",
-                width: isItemsPanelCollapsed ? "49%" : "48%",
+                width: hideItemsNav ? "49%" : (isItemsPanelCollapsed ? "49%" : "48%"),
                 minHeight: "200px",
                 maxHeight: "calc(100vh - 90px)",
                 minWidth: "300px",
-                maxWidth: isItemsPanelCollapsed ? "80%" : "70%"
+                maxWidth: hideItemsNav ? "80%" : (isItemsPanelCollapsed ? "80%" : "70%")
               }}
             >
               <FormView

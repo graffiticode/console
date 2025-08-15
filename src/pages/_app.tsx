@@ -35,13 +35,13 @@ export default function App({
   const router = useRouter();
   const pathName = router.pathname.slice(1);
   return (
-    pathName === "form" &&
+    (pathName === "form" || pathName === "learnosity") &&
     <div id="gc-root">
       <GraffiticodeFirebaseProvider>
         <WagmiProvider config={config}>
           <QueryClientProvider client={queryClient}>
             <GraffiticodeAuthProvider>
-              <Component {...pageProps} />
+              <Component {...{...pageProps, language, setLanguage, mark, setMark}} />
             </GraffiticodeAuthProvider>
           </QueryClientProvider>
         </WagmiProvider>
