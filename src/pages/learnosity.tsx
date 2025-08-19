@@ -23,9 +23,22 @@ export default function Learnosity({ language, setLanguage, mark }) {
       return;
     }
 
-    // This page only handles new item creation
+    // If editing an existing item, set up Learnosity mode for the Gallery
     if (itemId) {
-      setError('This page is only for creating new items');
+      // Store Learnosity mode data in sessionStorage so Gallery knows to send messages
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('graffiticode:learnosity', JSON.stringify({
+          origin: String(origin),
+          itemId: itemId
+        }));
+        // Also set the selected item and language in localStorage
+        localStorage.setItem('graffiticode:selected:itemId', String(itemId));
+        localStorage.setItem('graffiticode:language', JSON.stringify({
+          id: parseInt(lang),
+          name: `L${String(lang).padStart(4, '0')}`
+        }));
+      }
+      // Don't create a new item, just show the Gallery with the existing item
       return;
     }
 
@@ -105,9 +118,8 @@ export default function Learnosity({ language, setLanguage, mark }) {
           <div className="max-w-md w-full">
             <h2 className="text-center text-2xl font-bold mb-4">Sign in to Continue</h2>
             <p className="text-center text-gray-600 mb-8">
-              Please sign in to create or edit Learnosity questions
+              Graffiticode account required to create or edit questions
             </p>
-            <SignIn label="Sign in with Graffiticode" />
           </div>
         </div>
       </>
