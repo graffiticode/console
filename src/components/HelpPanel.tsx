@@ -1077,9 +1077,9 @@ export const HelpPanel = ({
                   editorElement.innerHTML = '';
                   editorElement.innerHTML = fileContent.replace(/\n/g, '<br>');
                   updateSuccess = true;
-                  console.log("Successfully inserted content via innerHTML");
+                  console.log("Successfully inserted content via textContent");
                 } catch (innerErr) {
-                  console.error("innerHTML insertion failed:", innerErr);
+                  console.error("textContent insertion failed:", innerErr);
                 }
               }
             } else {

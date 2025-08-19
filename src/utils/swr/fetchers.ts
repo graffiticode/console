@@ -32,7 +32,7 @@ export const compile = async ({ user, id, data }) => {
 };
 
 export const postTask = async ({ user, lang, code }) => {
-  console.log(
+  console.trace(
     "postTask()",
     "lang=" + lang,
     "code=" + code,
@@ -85,7 +85,7 @@ export const loadTasks = async ({ user, lang, mark }) => {
   return client.request(query, { lang, mark }).then(data => data.tasks);
 };
 
-export const getData = async ({ user, id, data }) => {
+export const getData = async ({ user, id }) => {
   // console.log(
   //   "getData()",
   //   "id=" + id,
@@ -94,12 +94,7 @@ export const getData = async ({ user, id, data }) => {
     return {};
   }
 
-  let dataId = 0;
-  if (data && Object.keys(data).length > 0) {
-    const code = `${JSON.stringify(data)}..`;
-    dataId = await postTask({user, lang: "0001", code});
-    id = `${id}+${dataId}`;
-  }
+  // Removed unused data parameter and associated logic that was causing issues
   const token = await user.getToken();
   const client = new GraphQLClient("/api", {
     headers: {

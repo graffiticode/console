@@ -271,7 +271,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   useEffect(() => {
     if (isLearnosityMode.current && learnosityOrigin.current && window.opener && taskId) {
       // Fetch the compiled data for this taskId
-      getData({ user, id: taskId, data: {} }).then(compiledData => {
+      getData({ user, id: taskId }).then(compiledData => {
         window.opener.postMessage({
           type: 'data-updated',
           itemId: selectedItemId,

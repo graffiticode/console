@@ -140,7 +140,8 @@ export async function getTasks({ auth, lang, mark }) {
       if (!code && item.taskId) {
         try {
           const apiTask = await getApiTask({ id: item.taskId, auth });
-          code = JSON.stringify((apiTask[0] || apiTask).code);
+          // apiTask.code is already a string, don't stringify it
+          code = (apiTask[0] || apiTask).code;
         } catch (err) {
           console.log("getTasks() failed to get API task for item", item.id, err);
           code = "{}";
@@ -439,7 +440,7 @@ export async function getTask({ auth, id }) {
     return {
       id: id,
       lang: taskData.lang,
-      code: JSON.stringify(apiTaskData.code),
+      code: apiTaskData.code, // code is already a string, don't stringify it
       src: taskData.src,
       help: taskData.help || "[]",
       isPublic: taskData.isPublic,

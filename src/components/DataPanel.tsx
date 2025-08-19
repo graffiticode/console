@@ -12,7 +12,7 @@ export const DataPanel = forwardRef(function DataPanel({
   const [ data, setData ] = useState({});
 
   const { data: fetchedData } = useSWR(
-    user && id ? [`getData-${id}`, { user, id, data }] : null,
+    user && id ? [`getData-${id}`, { user, id }] : null,
     ([_, params]) => getData(params)
   );
 
