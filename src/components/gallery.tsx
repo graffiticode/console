@@ -70,21 +70,21 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   );
   const editorRef = useRef<any>(null);
 
-  // Detect if we're in Learnosity mode
-  const isLearnosityMode = useRef(false);
-  const learnosityOrigin = useRef(null);
+  // Detect if we're in editor mode
+  const isEditorMode = useRef(false);
+  const editorOrigin = useRef(null);
 
   useEffect(() => {
-    // Check if we were opened from Learnosity (has opener and sessionStorage flag)
+    // Check if we were opened from editor (has opener and sessionStorage flag)
     if (typeof window !== 'undefined' && window.opener) {
-      const learnosityData = sessionStorage.getItem('graffiticode:learnosity');
-      if (learnosityData) {
+      const editorData = sessionStorage.getItem('graffiticode:editor');
+      if (editorData) {
         try {
-          const data = JSON.parse(learnosityData);
-          isLearnosityMode.current = true;
-          learnosityOrigin.current = data.origin;
+          const data = JSON.parse(editorData);
+          isEditorMode.current = true;
+          editorOrigin.current = data.origin;
         } catch (e) {
-          console.error('Failed to parse Learnosity data:', e);
+          console.error('Failed to parse editor data:', e);
         }
       }
     }
@@ -267,16 +267,16 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
     }
   }, [taskId, editorCode, editorHelp, selectedItemId]);
 
-  // Send compiled data updates to Learnosity when taskId changes
+  // Send compiled data updates to editor when taskId changes
   useEffect(() => {
-    if (isLearnosityMode.current && learnosityOrigin.current && window.opener && taskId) {
+    if (isEditorMode.current && editorOrigin.current && window.opener && taskId) {
       // Fetch the compiled data for this taskId
       getData({ user, id: taskId }).then(compiledData => {
         window.opener.postMessage({
           type: 'data-updated',
           itemId: selectedItemId,
           data: compiledData
-        }, learnosityOrigin.current);
+        }, editorOrigin.current);
       }).catch(err => {
         console.error('Failed to fetch compiled data:', err);
       });

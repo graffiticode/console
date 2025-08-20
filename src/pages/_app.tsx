@@ -35,7 +35,7 @@ export default function App({
   const router = useRouter();
   const pathName = router.pathname.slice(1);
   return (
-    (pathName === "form" || pathName === "learnosity") &&
+    (pathName === "form" || pathName === "editor") &&
     <div id="gc-root">
       <GraffiticodeFirebaseProvider>
         <WagmiProvider config={config}>

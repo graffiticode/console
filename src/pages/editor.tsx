@@ -7,7 +7,7 @@ import { getTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
 import Gallery from '../components/gallery';
 
-export default function Learnosity({ language, setLanguage, mark }) {
+export default function Editor({ language, setLanguage, mark }) {
   const router = useRouter();
   const { lang: rawLang, itemId, mode, origin } = router.query;
   const lang = Array.isArray(rawLang) ? rawLang[0] : rawLang;
@@ -19,15 +19,15 @@ export default function Learnosity({ language, setLanguage, mark }) {
 
   useEffect(() => {
     // Only proceed if we have the necessary parameters
-    if (!lang || mode !== 'learnosity' || !origin) {
+    if (!lang || mode !== 'editor' || !origin) {
       return;
     }
 
-    // If editing an existing item, set up Learnosity mode for the Gallery
+    // If editing an existing item, set up editor mode for the Gallery
     if (itemId) {
-      // Store Learnosity mode data in sessionStorage so Gallery knows to send messages
+      // Store editor mode data in sessionStorage so Gallery knows to send messages
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('graffiticode:learnosity', JSON.stringify({
+        sessionStorage.setItem('graffiticode:editor', JSON.stringify({
           origin: String(origin),
           itemId: itemId
         }));
@@ -58,7 +58,7 @@ export default function Learnosity({ language, setLanguage, mark }) {
       const newItem = await createItem({
         user,
         lang: String(lang).padStart(4, '0'), // Ensure proper format (e.g., "0165")
-        name: "Learnosity Question",
+        name: "Editor Question",
         taskId: null,
         mark: 1,
         help: "[]",
@@ -87,8 +87,8 @@ export default function Learnosity({ language, setLanguage, mark }) {
             id: parseInt(lang),
             name: `L${String(lang).padStart(4, '0')}`
           }));
-          // Store Learnosity mode data in sessionStorage
-          sessionStorage.setItem('graffiticode:learnosity', JSON.stringify({
+          // Store editor mode data in sessionStorage
+          sessionStorage.setItem('graffiticode:editor', JSON.stringify({
             origin: String(origin),
             itemId: newItem.id
           }));
@@ -111,7 +111,7 @@ export default function Learnosity({ language, setLanguage, mark }) {
     return (
       <>
         <Head>
-          <title>{getTitle()} - Learnosity Integration</title>
+          <title>{getTitle()} - Editor Integration</title>
           <link rel="icon" type="image/png" href="favicon.png" />
         </Head>
         <div className="min-h-screen flex items-center justify-center">
@@ -134,12 +134,12 @@ export default function Learnosity({ language, setLanguage, mark }) {
     );
   }
 
-  // Show Gallery UI when we have a created item or are in Learnosity mode
-  if (createdItemId || (mode === 'learnosity' && itemId)) {
+  // Show Gallery UI when we have a created item or are in editor mode
+  if (createdItemId || (mode === 'editor' && itemId)) {
     return (
       <>
         <Head>
-          <title>{getTitle()} - Learnosity</title>
+          <title>{getTitle()} - Editor</title>
           <link rel="icon" type="image/png" href="favicon.png" />
         </Head>
         <Gallery
