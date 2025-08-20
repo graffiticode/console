@@ -120,6 +120,14 @@ export default function Learnosity({ language, setLanguage, mark }) {
             <p className="text-center text-gray-600 mb-8">
               Graffiticode account required to create or edit questions
             </p>
+            <div className="flex justify-center">
+              <button
+                onClick={() => window.open('https://graffiticode.com', '_blank')}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Open Graffiticode to Sign In
+              </button>
+            </div>
           </div>
         </div>
       </>
