@@ -20,8 +20,20 @@ export default function Editor({ language, setLanguage, mark }) {
   useEffect(() => {
     // Only proceed if we have the necessary parameters
     const effectiveOrigin = origin || editorOrigin;
+    console.log('Editor useEffect - lang:', lang, 'mode:', mode, 'effectiveOrigin:', effectiveOrigin, 'itemId:', itemId);
+
     if (!lang || mode !== 'editor' || !effectiveOrigin) {
       return;
+    }
+
+    // Always refresh the sessionStorage when editor loads to ensure correct origin
+    if (typeof window !== 'undefined') {
+      const editorData = {
+        origin: String(effectiveOrigin),
+        itemId: itemId || null
+      };
+      sessionStorage.setItem('graffiticode:editor', JSON.stringify(editorData));
+      console.log('Set editor sessionStorage:', editorData);
     }
 
     // If editing an existing item, set up editor mode for the Gallery

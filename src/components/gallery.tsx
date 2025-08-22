@@ -87,7 +87,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
           console.error('Failed to parse editor data:', e);
         }
       }
-      
+
       // Also check URL parameters for editor mode
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('editorMode') === 'true' && urlParams.get('editorOrigin')) {
