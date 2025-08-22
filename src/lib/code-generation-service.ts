@@ -13,21 +13,22 @@
 import axios from "axios";
 import { postApiCompile } from "./api";
 import { postTask, getData } from "../pages/api/resolvers";
-import admin from 'firebase-admin';
+import admin from "firebase-admin";
+import { ragLog } from "./logger";
 import {
   generateEmbedding,
   createEmbeddingText,
   vectorSearch,
   hybridSearch,
-  addDocumentWithEmbedding
-} from './embedding-service';
+  addDocumentWithEmbedding,
+} from "./embedding-service";
 
 // Define available Claude models
 const CLAUDE_MODELS = {
-  OPUS: 'claude-opus-4-20250514',  // Correct name for Claude Opus 4
-  SONNET: 'claude-sonnet-4-20250514',  // Correct name for Claude Sonnet 4
-  HAIKU: 'claude-3-haiku-20240307',
-  DEFAULT: 'claude-sonnet-4-20250514' // Default to Sonnet 4 as a good balance
+  OPUS: "claude-opus-4-20250514", // Correct name for Claude Opus 4
+  SONNET: "claude-sonnet-4-20250514", // Correct name for Claude Sonnet 4
+  HAIKU: "claude-3-haiku-20240307",
+  DEFAULT: "claude-sonnet-4-20250514", // Default to Sonnet 4 as a good balance
 };
 
 /**
@@ -66,18 +67,23 @@ function parseMarkdownExamples(markdownContent) {
   try {
     const examples = [];
     // Split the content by sections
-    const sections = markdownContent.split('---');
+    const sections = markdownContent.split("---");
 
     for (const section of sections) {
       if (!section.trim()) continue;
 
       // Extract prompt and code from each section
       const promptMatch = section.match(/###\s*Prompt\s*\n"([^"]+)"/);
-      const codeBlockMatch = section.match(/###\s*Code\s*\n\s*```\s*\n([\s\S]+?)\n\s*```/);
+      const codeBlockMatch = section.match(
+        /###\s*Code\s*\n\s*```\s*\n([\s\S]+?)\n\s*```/,
+      );
 
       // Fall back to older format if needed
-      const taskMatch = !promptMatch && section.match(/###\s*Task\s*\n"([^"]+)"/);
-      const codeMatch = !codeBlockMatch && section.match(/###\s*Graffiticode\s*\n([\s\S]+?)(?=\n\n|$)/);
+      const taskMatch =
+        !promptMatch && section.match(/###\s*Task\s*\n"([^"]+)"/);
+      const codeMatch =
+        !codeBlockMatch &&
+        section.match(/###\s*Graffiticode\s*\n([\s\S]+?)(?=\n\n|$)/);
 
       if (promptMatch && codeBlockMatch) {
         // New format
@@ -86,9 +92,12 @@ function parseMarkdownExamples(markdownContent) {
           code: codeBlockMatch[1].trim(),
           // Create a messages array for compatibility with existing code
           messages: [
-            { role: 'user', content: promptMatch[1].trim() },
-            { role: 'assistant', content: `\`\`\`\n${codeBlockMatch[1].trim()}\n\`\`\`` }
-          ]
+            { role: "user", content: promptMatch[1].trim() },
+            {
+              role: "assistant",
+              content: `\`\`\`\n${codeBlockMatch[1].trim()}\n\`\`\``,
+            },
+          ],
         });
       } else if (taskMatch && codeMatch) {
         // Old format
@@ -97,23 +106,35 @@ function parseMarkdownExamples(markdownContent) {
           code: codeMatch[1].trim(),
           // Create a messages array for compatibility with existing code
           messages: [
-            { role: 'user', content: taskMatch[1].trim() },
-            { role: 'assistant', content: `\`\`\`\n${codeMatch[1].trim()}\n\`\`\`` }
-          ]
+            { role: "user", content: taskMatch[1].trim() },
+            {
+              role: "assistant",
+              content: `\`\`\`\n${codeMatch[1].trim()}\n\`\`\``,
+            },
+          ],
         });
       }
     }
 
     return examples;
   } catch (error) {
-    console.error('Error parsing markdown examples:', error);
+    console.error("Error parsing markdown examples:", error);
     return [];
   }
 }
 
-async function getRelevantExamples({ prompt, lang, limit = 3 }) {
+async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
   try {
     console.log(`Getting relevant examples for language: ${lang}`);
+
+    if (rid) {
+      ragLog(rid, "retrieval.start", {
+        query: prompt.substring(0, 100),
+        lang,
+        k: limit,
+        mode: "hybrid",
+      });
+    }
 
     const db = getFirestoreDb();
 
@@ -121,61 +142,100 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
     try {
       // Use hybrid search for better results
       const results = await hybridSearch({
-        collection: 'training_examples',
+        collection: "training_examples",
         query: prompt,
         limit: limit,
         lang: lang,
         db: db,
-        vectorWeight: 0.7 // Balance between semantic and keyword matching
+        vectorWeight: 0.7, // Balance between semantic and keyword matching
       });
 
       if (results && results.length > 0) {
-        console.log(`Found ${results.length} relevant examples using vector search for L${lang}`);
+        console.log(
+          `Found ${results.length} relevant examples using vector search for L${lang}`,
+        );
+
+        if (rid) {
+          ragLog(rid, "retrieval.result", {
+            mode: "hybrid",
+            k: limit,
+            lang,
+            resultCount: results.length,
+            ids: results.map((r) => r.id || r.description?.substring(0, 50)),
+            scores: results.map((r) => ({
+              similarity: r.similarity,
+              keywordScore: r.keywordScore,
+              combinedScore: r.combinedScore,
+            })),
+          });
+        }
+
         return results;
       }
     } catch (vectorError) {
-      console.warn('Vector search failed, falling back to keyword search:', vectorError.message);
+      console.warn(
+        "Vector search failed, falling back to keyword search:",
+        vectorError.message,
+      );
+
+      if (rid) {
+        ragLog(rid, "retrieval.fallback", {
+          reason: vectorError.message,
+          mode: "keyword",
+        });
+      }
     }
 
     // Fallback to keyword-based search if vector search fails or returns no results
-    console.log('Falling back to keyword-based search...');
+    console.log("Falling back to keyword-based search...");
 
     // Import local training data from markdown format only
-    const fs = require('fs');
-    const path = require('path');
+    const fs = require("fs");
+    const path = require("path");
 
     let examples = [];
 
     // Load the markdown file
-    const mdFilePath = path.join(process.cwd(), `./training/l${lang}-training-examples.md`);
+    const mdFilePath = path.join(
+      process.cwd(),
+      `./training/l${lang}-training-examples.md`,
+    );
 
     if (fs.existsSync(mdFilePath)) {
       // Read and parse the markdown file
-      const markdownContent = fs.readFileSync(mdFilePath, 'utf8');
+      const markdownContent = fs.readFileSync(mdFilePath, "utf8");
       examples = parseMarkdownExamples(markdownContent);
-      console.log(`Loaded ${examples.length} examples from markdown file for L${lang}`);
+      console.log(
+        `Loaded ${examples.length} examples from markdown file for L${lang}`,
+      );
     } else {
       console.warn(`No training examples file found for L${lang}`);
       return [];
     }
 
     // Simple keyword matching to find relevant examples
-    const keywords = prompt.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const keywords = prompt
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 3);
 
     // Score examples based on keyword matches
-    const scoredExamples = examples.map(example => {
+    const scoredExamples = examples.map((example) => {
       // For markdown examples, search through task and code
-      let textToSearch = '';
+      let textToSearch = "";
 
       if (example.task) {
         // For markdown format
-        textToSearch = (example.task + ' ' + example.code).toLowerCase();
+        textToSearch = (example.task + " " + example.code).toLowerCase();
       } else if (example.messages) {
         // For dialog-based examples
-        textToSearch = example.messages.map(m => m.content).join(' ').toLowerCase();
+        textToSearch = example.messages
+          .map((m) => m.content)
+          .join(" ")
+          .toLowerCase();
       } else {
         // Fallback for other formats
-        textToSearch = (example.description || '').toLowerCase();
+        textToSearch = (example.description || "").toLowerCase();
       }
 
       const score = keywords.reduce((sum, keyword) => {
@@ -190,9 +250,30 @@ async function getRelevantExamples({ prompt, lang, limit = 3 }) {
       .slice(0, limit);
 
     console.log(`Found ${topExamples.length} relevant examples for the prompt`);
+
+    if (rid) {
+      ragLog(rid, "retrieval.result", {
+        mode: "keyword",
+        k: limit,
+        lang,
+        resultCount: topExamples.length,
+        ids: topExamples.map(
+          (e) => e.task?.substring(0, 50) || e.description?.substring(0, 50),
+        ),
+        scores: topExamples.map((e) => ({ keywordScore: e.score })),
+      });
+    }
+
     return topExamples;
   } catch (error) {
-    console.error('Error retrieving training examples:', error);
+    console.error("Error retrieving training examples:", error);
+
+    if (rid) {
+      ragLog(rid, "retrieval.error", {
+        error: error.message,
+      });
+    }
+
     // Fallback to returning empty array if there's an error
     return [];
   }
@@ -212,34 +293,39 @@ export async function addTrainingExample(example) {
   try {
     // Validate example structure - either traditional format or dialog-based format
     const hasTraditionalFormat = example.description && example.code;
-    const hasDialogFormat = example.messages && Array.isArray(example.messages) &&
-                           example.messages.length > 0 && example.code;
+    const hasDialogFormat =
+      example.messages &&
+      Array.isArray(example.messages) &&
+      example.messages.length > 0 &&
+      example.code;
 
     if (!hasTraditionalFormat && !hasDialogFormat) {
       return {
         success: false,
-        message: 'Example must include either (description and code) or (messages array and code)'
+        message:
+          "Example must include either (description and code) or (messages array and code)",
       };
     }
 
     const db = getFirestoreDb();
-    const trainingCollRef = db.collection('training_examples');
+    const trainingCollRef = db.collection("training_examples");
 
     // Generate keywords from all available text
-    let textToIndexForKeywords = '';
+    let textToIndexForKeywords = "";
 
     // For dialog-based examples, extract text from all messages
     if (example.messages && Array.isArray(example.messages)) {
       textToIndexForKeywords = example.messages
-        .map(m => m.content || '')
-        .join(' ');
+        .map((m) => m.content || "")
+        .join(" ");
 
       // Generate a description from the first user message if none provided
       if (!example.description) {
-        const userMessage = example.messages.find(m => m.role === 'user');
+        const userMessage = example.messages.find((m) => m.role === "user");
         if (userMessage) {
-          example.description = userMessage.content.substring(0, 100) +
-            (userMessage.content.length > 100 ? '...' : '');
+          example.description =
+            userMessage.content.substring(0, 100) +
+            (userMessage.content.length > 100 ? "..." : "");
         }
       }
     }
@@ -249,9 +335,14 @@ export async function addTrainingExample(example) {
     }
 
     // Extract keywords for better searchability
-    const keywords = textToIndexForKeywords.toLowerCase()
+    const keywords = textToIndexForKeywords
+      .toLowerCase()
       .split(/\s+/)
-      .filter(word => word.length > 3 && !['function', 'const', 'return', 'this', 'that'].includes(word));
+      .filter(
+        (word) =>
+          word.length > 3 &&
+          !["function", "const", "return", "this", "that"].includes(word),
+      );
 
     // Ensure the example has a language code (default to "0002" if not provided)
     const lang = example.lang || "0002";
@@ -259,26 +350,25 @@ export async function addTrainingExample(example) {
     // Add the example to Firestore with embedding
     const docId = await addDocumentWithEmbedding({
       db: db,
-      collection: 'training_examples',
+      collection: "training_examples",
       data: {
         ...example,
-        lang,     // Make sure language is explicitly included
+        lang, // Make sure language is explicitly included
         keywords,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      }
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
     });
 
     return {
       success: true,
       message: `Training example added successfully for language ${lang} with embedding`,
-      id: docId
+      id: docId,
     };
-
   } catch (error) {
-    console.error('Error adding training example:', error);
+    console.error("Error adding training example:", error);
     return {
       success: false,
-      message: `Failed to add example: ${error.message}`
+      message: `Failed to add example: ${error.message}`,
     };
   }
 }
@@ -290,17 +380,20 @@ export async function addTrainingExample(example) {
  */
 function readDialectInstructions(lang) {
   try {
-    const fs = require('fs');
-    const path = require('path');
+    const fs = require("fs");
+    const path = require("path");
 
     // Form the path to the dialect instructions file
-    const instructionsPath = path.join(process.cwd(), `./training/l${lang}-instructions.md`);
+    const instructionsPath = path.join(
+      process.cwd(),
+      `./training/l${lang}-instructions.md`,
+    );
 
     // Check if file exists
     if (fs.existsSync(instructionsPath)) {
       console.log(`Found dialect instructions for L${lang}`);
       // Read the file content
-      const instructions = fs.readFileSync(instructionsPath, 'utf8');
+      const instructions = fs.readFileSync(instructionsPath, "utf8");
       return `\n${instructions}\n`;
     } else {
       console.log(`No dialect instructions file found for L${lang}`);
@@ -414,30 +507,37 @@ CRITICAL REMINDER: Put generated code between \`\`\` (triple backticks) to disti
  * @returns {string} - Formatted examples section for the system prompt
  */
 function generateExamplesSection(examples) {
-  if (!examples || examples.length === 0) return '';
+  if (!examples || examples.length === 0) return "";
 
   let examplesText = `\n\n## RELEVANT EXAMPLES:\n\n`;
 
   examples.forEach((example, i) => {
     if (example.task && example.code) {
       // Handle markdown-based examples (standardized format)
-      examplesText += `### Example ${i+1}: ${example.task}\n`;
+      examplesText += `### Example ${i + 1}: ${example.task}\n`;
       examplesText += "Prompt: " + example.task + "\n\n";
       examplesText += "```\n";
       examplesText += example.code;
       examplesText += "\n```\n\n";
-    } else if (example.messages && Array.isArray(example.messages) && example.messages.length > 0) {
+    } else if (
+      example.messages &&
+      Array.isArray(example.messages) &&
+      example.messages.length > 0
+    ) {
       // Handle dialog-based examples (legacy format)
-      examplesText += `### Example ${i+1}: Dialog Interaction\n`;
+      examplesText += `### Example ${i + 1}: Dialog Interaction\n`;
       examplesText += "Here's a relevant example of this type of task:\n\n";
 
-      example.messages.forEach(message => {
-        const roleLabel = message.role === 'user' ? 'User' : 'Assistant';
+      example.messages.forEach((message) => {
+        const roleLabel = message.role === "user" ? "User" : "Assistant";
         examplesText += `**${roleLabel}**: ${message.content}\n\n`;
       });
 
       // If we have code, also include it separately
-      if (example.code && !example.messages.some(m => m.content.includes(example.code))) {
+      if (
+        example.code &&
+        !example.messages.some((m) => m.content.includes(example.code))
+      ) {
         examplesText += "```\n";
         examplesText += example.code;
         examplesText += "\n```\n";
@@ -449,11 +549,11 @@ function generateExamplesSection(examples) {
       }
     } else {
       // Handle traditional examples (legacy format)
-      examplesText += `### Example ${i+1}: ${example.description || 'Graffiticode Example'}\n`;
+      examplesText += `### Example ${i + 1}: ${example.description || "Graffiticode Example"}\n`;
       examplesText += "```\n";
       examplesText += example.code;
       examplesText += "\n```\n";
-      examplesText += `${example.explanation || 'An example of Graffiticode.'}\n\n`;
+      examplesText += `${example.explanation || "An example of Graffiticode."}\n\n`;
     }
   });
 
@@ -468,7 +568,13 @@ function generateExamplesSection(examples) {
  * @param {string} currentCode - The current code (if available) to use as a starting point
  * @returns {string} - A well-formatted prompt for Claude
  */
-async function createCodeGenerationPrompt(userPrompt, examples = [], lang = "0002", currentCode = null) {
+async function createCodeGenerationPrompt(
+  userPrompt,
+  examples = [],
+  lang = "0002",
+  currentCode = null,
+  rid = null,
+) {
   // Generate examples section from retrieved examples
   const examplesSection = generateExamplesSection(examples);
 
@@ -478,12 +584,26 @@ async function createCodeGenerationPrompt(userPrompt, examples = [], lang = "000
   // Combine dialect-specific system prompt with examples
   const enhancedSystemPrompt = dialectSystemPrompt + examplesSection;
 
+  if (rid) {
+    ragLog(rid, "prompt.build", {
+      dialect: `L${lang}`,
+      examplesIncluded: examples.length,
+      tokenEstimate: Math.ceil(
+        (enhancedSystemPrompt.length + userPrompt.length) / 4,
+      ),
+      charCount: enhancedSystemPrompt.length + userPrompt.length,
+      hasCurrentCode: !!currentCode,
+      sectionsIncluded: ["system", "examples", "user"],
+    });
+  }
+
   const promptData = {
     system: enhancedSystemPrompt,
     messages: [
       {
         role: "user",
-        content: "Create a data transformation pipeline that filters adult users and extracts their names."
+        content:
+          "Create a data transformation pipeline that filters adult users and extracts their names.",
       },
       {
         role: "assistant",
@@ -493,11 +613,12 @@ let users = [{ name: "Alice", age: 28 } { name: "Bob", age: 34 } { name: "Charli
 let isAdult = <user: ge (get "age" user) 21>..
 let getNames = <user: get "name" user>..
 map (getNames) (filter (isAdult) users)..
-`.trim()
+`.trim(),
       },
       {
         role: "user",
-        content: "Create a function that handles different user roles using pattern matching with tags."
+        content:
+          "Create a function that handles different user roles using pattern matching with tags.",
       },
       {
         role: "assistant",
@@ -512,11 +633,12 @@ let getStatus = <user:
   end
 >..
 getStatus { name: "Alice", role: admin }..
-`.trim()
+`.trim(),
       },
       {
         role: "user",
-        content: "Show how to compose functions to create a data processing pipeline."
+        content:
+          "Show how to compose functions to create a data processing pipeline.",
       },
       {
         role: "assistant",
@@ -527,7 +649,7 @@ let double = <x: mul x 2>..
 let increment = <x: add x 1>..
 let doubleAndIncrement = compose (increment) (double)..
 map (doubleAndIncrement) [1 2 3 4]..
-`.trim()
+`.trim(),
       },
       {
         role: "user",
@@ -538,7 +660,6 @@ map (doubleAndIncrement) [1 2 3 4]..
     ],
   };
 
-
   return JSON.stringify(promptData, null, 2);
 }
 
@@ -548,14 +669,26 @@ map (doubleAndIncrement) [1 2 3 4]..
  * @param {Object} options - Options for the API call
  * @returns {Promise<Object>} - The response from Claude
  */
-async function callClaudeAPI(prompt, options) {
+async function callClaudeAPI(prompt, options, rid = null) {
   // Get the API key from environment variables
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    console.warn("ANTHROPIC_API_KEY not found in environment. Falling back to mock response.");
+    console.warn(
+      "ANTHROPIC_API_KEY not found in environment. Falling back to mock response.",
+    );
     // Return fallback mock response if API key is not available
     return getFallbackResponse(prompt, options);
+  }
+
+  const startTime = Date.now();
+
+  if (rid) {
+    ragLog(rid, "llm.call.start", {
+      model: options.model,
+      temperature: options.temperature,
+      maxTokens: options.max_tokens,
+    });
   }
 
   try {
@@ -568,11 +701,11 @@ async function callClaudeAPI(prompt, options) {
       messages: [
         {
           role: "user",
-          content: prompt
-        }
+          content: prompt,
+        },
       ],
       max_tokens: options.max_tokens,
-      temperature: options.temperature
+      temperature: options.temperature,
     };
 
     // Make the API call
@@ -580,9 +713,11 @@ async function callClaudeAPI(prompt, options) {
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01"
-      }
+        "anthropic-version": "2023-06-01",
+      },
     });
+
+    const latency = Date.now() - startTime;
 
     // Extract the relevant data from the response
     const result = {
@@ -592,14 +727,32 @@ async function callClaudeAPI(prompt, options) {
       usage: {
         prompt_tokens: response.data.usage.input_tokens,
         completion_tokens: response.data.usage.output_tokens,
-        total_tokens: response.data.usage.input_tokens + response.data.usage.output_tokens
-      }
+        total_tokens:
+          response.data.usage.input_tokens + response.data.usage.output_tokens,
+      },
     };
 
+    if (rid) {
+      ragLog(rid, "llm.call.complete", {
+        model: options.model,
+        latency,
+        usage: result.usage,
+      });
+    }
 
     return result;
   } catch (error) {
-    console.error("Error calling Claude API:", error.response?.data || error.message);
+    console.error(
+      "Error calling Claude API:",
+      error.response?.data || error.message,
+    );
+
+    if (rid) {
+      ragLog(rid, "llm.call.error", {
+        error: error.message,
+        latency: Date.now() - startTime,
+      });
+    }
 
     // If the API call fails, return a fallback response
     return getFallbackResponse(prompt, options);
@@ -616,8 +769,9 @@ function getFallbackResponse(prompt, options) {
     usage: {
       prompt_tokens: Math.ceil(prompt.length / 4),
       completion_tokens: Math.ceil(sampleCode.length / 4),
-      total_tokens: Math.ceil(prompt.length / 4) + Math.ceil(sampleCode.length / 4)
-    }
+      total_tokens:
+        Math.ceil(prompt.length / 4) + Math.ceil(sampleCode.length / 4),
+    },
   };
 }
 
@@ -627,42 +781,76 @@ function getFallbackResponse(prompt, options) {
  * @param {string} accessToken - Authentication token for the API
  * @returns {Promise<Object>} - Compilation results including any errors
  */
-async function verifyCode(code, authToken) {
-  console.log(
-    "verifyCode()",
-    "code=" + code,
-  );
+async function verifyCode(code, authToken, rid = null) {
+  console.log("verifyCode()", "code=" + code);
+
+  const startTime = Date.now();
+
+  if (rid) {
+    ragLog(rid, "verification.start", {
+      codeLength: code.length,
+    });
+  }
+
   try {
-    const task = {lang: "0002", code};
-    const { id } = await postTask({auth: {token: authToken}, task, ephemeral: true, isPublic: false});
-    const  compileResponse = await getData({authToken, id});
+    const task = { lang: "0002", code };
+    const { id } = await postTask({
+      auth: { token: authToken },
+      task,
+      ephemeral: true,
+      isPublic: false,
+    });
+    const compileResponse = await getData({ authToken, id });
     // Check if the response indicates an error but doesn't have a standardized error format
     if (compileResponse.status === "error" && !compileResponse.error) {
       // Provide a standardized error object
       compileResponse.error = {
         message: "Compilation failed",
-        details: compileResponse.data?.errors || "Unknown error"
+        details: compileResponse.data?.errors || "Unknown error",
       };
     }
 
     // Check for specific error patterns in the response data
     if (/*compileResponse.status === "success" &&*/ compileResponse.data) {
       // Sometimes errors are embedded in the data object
-      if (compileResponse.data.errors && compileResponse.data.errors.length > 0) {
+      if (
+        compileResponse.data.errors &&
+        compileResponse.data.errors.length > 0
+      ) {
         compileResponse.status = "error";
         compileResponse.errors = {
           message: "Compilation succeeded but found errors in code",
-          details: compileResponse.data.errors
+          details: compileResponse.data.errors,
         };
       }
     }
+    if (rid) {
+      ragLog(rid, "verification.complete", {
+        status: compileResponse.status,
+        hasErrors:
+          !!compileResponse.errors || compileResponse.status === "error",
+        errorSummary: compileResponse.errors
+          ? JSON.stringify(compileResponse.errors).substring(0, 300)
+          : null,
+        latency: Date.now() - startTime,
+      });
+    }
+
     return compileResponse;
   } catch (error) {
     console.error("Error verifying Graffiticode:", error);
+
+    if (rid) {
+      ragLog(rid, "verification.error", {
+        error: error.message,
+        latency: Date.now() - startTime,
+      });
+    }
+
     return {
       status: "error",
       error: { message: error.message },
-      data: null
+      data: null,
     };
   }
 }
@@ -673,7 +861,7 @@ async function verifyCode(code, authToken) {
  * @returns {string} - Formatted error details
  */
 function parseGraffiticodeErrors(errorInfo) {
-  let formattedErrors = '';
+  let formattedErrors = "";
 
   // Handle different error formats
   if (errorInfo.error && errorInfo.error.message) {
@@ -684,36 +872,38 @@ function parseGraffiticodeErrors(errorInfo) {
       ? errorInfo.data.errors
       : [errorInfo.data.errors];
 
-    formattedErrors = errors.map(err => {
-      let errMsg = '';
+    formattedErrors = errors
+      .map((err) => {
+        let errMsg = "";
 
-      if (typeof err === 'string') {
-        return err;
-      }
+        if (typeof err === "string") {
+          return err;
+        }
 
-      if (err.message) {
-        errMsg += err.message;
-      }
+        if (err.message) {
+          errMsg += err.message;
+        }
 
-      if (err.line) {
-        errMsg += ` at line ${err.line}`;
-      }
+        if (err.line) {
+          errMsg += ` at line ${err.line}`;
+        }
 
-      if (err.col) {
-        errMsg += `, column ${err.col}`;
-      }
+        if (err.col) {
+          errMsg += `, column ${err.col}`;
+        }
 
-      if (err.expected) {
-        errMsg += `\nExpected: ${err.expected}`;
-      }
+        if (err.expected) {
+          errMsg += `\nExpected: ${err.expected}`;
+        }
 
-      if (err.found) {
-        errMsg += `\nFound: ${err.found}`;
-      }
+        if (err.found) {
+          errMsg += `\nFound: ${err.found}`;
+        }
 
-      return errMsg;
-    }).join('\n\n');
-  } else if (typeof errorInfo === 'string') {
+        return errMsg;
+      })
+      .join("\n\n");
+  } else if (typeof errorInfo === "string") {
     formattedErrors = errorInfo;
   } else {
     formattedErrors = JSON.stringify(errorInfo, null, 2);
@@ -732,8 +922,9 @@ function createErrorFixPrompt(code, errorInfo) {
   // Parse and format the error information
   const formattedErrors = parseGraffiticodeErrors(errorInfo);
 
-  return JSON.stringify({
-    system: `You are an expert Graffiticode programmer tasked with fixing code errors.
+  return JSON.stringify(
+    {
+      system: `You are an expert Graffiticode programmer tasked with fixing code errors.
 Graffiticode is a minimal, prefix, expression-oriented language with these key features:
 - \`let\` bindings with syntax: \`let name = value..\`
 - No infix operators; use prefix calls like \`add 1 2\`
@@ -765,13 +956,16 @@ When fixing code:
 3. Return ONLY the corrected code with no additional commentary
 4. Ensure all code is syntactically valid
 5. Add helpful comments where appropriate with the pipe character |`,
-    messages: [
-      {
-        role: "user",
-        content: `The following Graffiticode has compilation errors:\n\n${code}\n\nError details:\n${formattedErrors}\n\nPlease fix the code and return only the corrected version.`
-      }
-    ]
-  }, null, 2);
+      messages: [
+        {
+          role: "user",
+          content: `The following Graffiticode has compilation errors:\n\n${code}\n\nError details:\n${formattedErrors}\n\nPlease fix the code and return only the corrected version.`,
+        },
+      ],
+    },
+    null,
+    2,
+  );
 }
 
 /**
@@ -781,31 +975,55 @@ When fixing code:
  * @param {string} lang - Language code (e.g., "0002")
  * @param {boolean} verified - Whether the code passed verification
  */
-async function storeSuccessfulGeneration(prompt, code, lang = "0002", verified = true) {
+async function storeSuccessfulGeneration(
+  prompt,
+  code,
+  lang = "0002",
+  verified = true,
+  rid = null,
+) {
   try {
     const db = getFirestoreDb();
 
     // Store in a separate collection for successful generations with embedding
-    await addDocumentWithEmbedding({
+    const docRef = await addDocumentWithEmbedding({
       db: db,
-      collection: 'successful_generations',
+      collection: "successful_generations",
       data: {
         prompt,
         code,
-        lang: lang,  // Store the language code
+        lang: lang, // Store the language code
         verified,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         // Extract keywords for better searchability
-        keywords: prompt.toLowerCase()
+        keywords: prompt
+          .toLowerCase()
           .split(/\s+/)
-          .filter(word => word.length > 3)
-      }
+          .filter((word) => word.length > 3),
+      },
     });
 
-    console.log(`Stored successful generation with embedding for language ${lang}`);
+    console.log(
+      `Stored successful generation with embedding for language ${lang}`,
+    );
+
+    if (rid) {
+      ragLog(rid, "persistence.success", {
+        docId: docRef?.id,
+        lang,
+        verified,
+        timestamp: new Date().toISOString(),
+      });
+    }
   } catch (error) {
     // Just log error but don't interrupt the main flow
-    console.error('Failed to store successful generation:', error);
+    console.error("Failed to store successful generation:", error);
+
+    if (rid) {
+      ragLog(rid, "persistence.error", {
+        error: error.message,
+      });
+    }
   }
 }
 
@@ -814,13 +1032,12 @@ async function storeSuccessfulGeneration(prompt, code, lang = "0002", verified =
  * @param {string} content - The content returned from Claude API
  * @returns {string} - The processed code with fixes applied
  */
-function processGeneratedCode(content) {
-  console.log(
-    "processGeneratedCode()",
-    "content=" + content
-  );
+function processGeneratedCode(content, rid = null) {
+  console.log("processGeneratedCode()", "content=" + content);
 
   if (!content) return content;
+
+  const originalLength = content.length;
 
   // Try to extract code from between triple backticks
   const codeBlockRegex = /```(?:[\w]*\n|\n)?([\s\S]*?)```/;
@@ -828,22 +1045,28 @@ function processGeneratedCode(content) {
 
   // If we found a code block, extract it
   let code = match ? match[1].trim() : content;
+  const codeBlockExtracted = !!match;
 
   // Replace all double backslashes with single backslashes
-  let processed = code.replace(/\\\\/g, '\\');
+  let processed = code.replace(/\\\\/g, "\\");
 
   // Replace literal "\n" with actual newlines
-  processed = processed.replace(/\\n/g, '\n');
+  processed = processed.replace(/\\n/g, "\n");
 
   // Replace escaped quotes with bare quotes
-  processed = processed.replace(/\\"/g, '"');   // Replace \" with "
-  processed = processed.replace(/\\'/g, "'");   // Replace \' with '
-  processed = processed.replace(/\\`/g, "`");   // Replace \` with `
+  processed = processed.replace(/\\"/g, '"'); // Replace \" with "
+  processed = processed.replace(/\\'/g, "'"); // Replace \' with '
+  processed = processed.replace(/\\`/g, "`"); // Replace \` with `
 
-  console.log(
-    "processGeneratedCode()",
-    "processed=" + processed
-  );
+  console.log("processGeneratedCode()", "processed=" + processed);
+
+  if (rid) {
+    ragLog(rid, "postprocess", {
+      codeBlockExtracted,
+      lengthBefore: originalLength,
+      lengthAfter: processed.length,
+    });
+  }
 
   return processed;
 }
@@ -863,27 +1086,43 @@ interface GenerateCodeOptions {
   maxTokens?: number;
 }
 
-export async function generateCode({ auth, prompt, lang = "0002", options = {}, currentCode = null }: {
+export async function generateCode({
+  auth,
+  prompt,
+  lang = "0002",
+  options = {},
+  currentCode = null,
+  rid = null,
+}: {
   auth: any;
   prompt: string;
   lang?: string;
   options?: GenerateCodeOptions;
   currentCode?: string | null;
+  rid?: string | null;
 }) {
-
   const accessToken = auth?.token;
-  console.log(
-    "generateCode()",
-    "prompt=" + prompt,
-  );
-
+  console.log("generateCode()", "prompt=" + prompt);
 
   try {
     // Retrieve relevant examples for this prompt, filtered by language
-    const relevantExamples = await getRelevantExamples({prompt, lang, limit: 3});
-    console.log(`Found ${relevantExamples.length} relevant examples for the prompt in language ${lang}`);
+    const relevantExamples = await getRelevantExamples({
+      prompt,
+      lang,
+      limit: 3,
+      rid,
+    });
+    console.log(
+      `Found ${relevantExamples.length} relevant examples for the prompt in language ${lang}`,
+    );
     // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
-    const formattedPrompt = await createCodeGenerationPrompt(prompt, relevantExamples, lang, currentCode);
+    const formattedPrompt = await createCodeGenerationPrompt(
+      prompt,
+      relevantExamples,
+      lang,
+      currentCode,
+      rid,
+    );
 
     // Use Claude-4 Opus for Graffiticode generation - best model for code generation
     const model = options.model || CLAUDE_MODELS.OPUS;
@@ -892,22 +1131,16 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {}, 
     const apiOptions = {
       model,
       temperature: options.temperature || 0.2, // Lower temperature for more deterministic code generation
-      max_tokens: options.maxTokens || 4000
+      max_tokens: options.maxTokens || 4000,
     };
 
-    console.log(
-      "generateCode()",
-      "formattedPrompt=" + formattedPrompt,
-    );
+    console.log("generateCode()", "formattedPrompt=" + formattedPrompt);
 
     // Call the Claude API
-    const response = await callClaudeAPI(formattedPrompt, apiOptions);
+    const response = await callClaudeAPI(formattedPrompt, apiOptions, rid);
     // Process the generated code to fix double backslashes and other issues
-    let generatedCode = processGeneratedCode(response.content);
-    console.log(
-      "[1] generateCode()",
-      "generatedCode=" + generatedCode,
-    );
+    let generatedCode = processGeneratedCode(response.content, rid);
+    console.log("[1] generateCode()", "generatedCode=" + generatedCode);
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
@@ -917,35 +1150,62 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {}, 
     if (accessToken) {
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
       while (fixAttempts < MAX_FIX_ATTEMPTS) {
-        verificationResult = await verifyCode(generatedCode, accessToken);
+        verificationResult = await verifyCode(generatedCode, accessToken, rid);
 
         // If compilation was successful, break the loop
-        if (verificationResult.status === "success" && !verificationResult.error) {
+        if (
+          verificationResult.status === "success" &&
+          !verificationResult.error
+        ) {
           // Store this successful generation for future training
-          await storeSuccessfulGeneration(prompt, generatedCode, lang, true);
+          await storeSuccessfulGeneration(
+            prompt,
+            generatedCode,
+            lang,
+            true,
+            rid,
+          );
           break;
         }
 
         // If there were errors, try to fix them
-        if (verificationResult.errors || verificationResult.status === "error") {
-          console.log(`Code has errors, attempting fix (${fixAttempts + 1}/${MAX_FIX_ATTEMPTS})...`);
+        if (
+          verificationResult.errors ||
+          verificationResult.status === "error"
+        ) {
+          console.log(
+            `Code has errors, attempting fix (${fixAttempts + 1}/${MAX_FIX_ATTEMPTS})...`,
+          );
+
+          if (rid) {
+            ragLog(rid, "fix.attempt", {
+              attemptNumber: fixAttempts + 1,
+              maxAttempts: MAX_FIX_ATTEMPTS,
+              errorSummary: JSON.stringify(
+                verificationResult.errors || verificationResult.error,
+              ).substring(0, 300),
+            });
+          }
 
           // Create a prompt to fix the errors
-          const fixPrompt = createErrorFixPrompt(generatedCode, verificationResult);
-
+          const fixPrompt = createErrorFixPrompt(
+            generatedCode,
+            verificationResult,
+          );
 
           // Call the Claude API again to fix the code
-          const fixResponse = await callClaudeAPI(fixPrompt, {
-            ...apiOptions,
-            temperature: 0.1 // Lower temperature for more deterministic fixes
-          });
+          const fixResponse = await callClaudeAPI(
+            fixPrompt,
+            {
+              ...apiOptions,
+              temperature: 0.1, // Lower temperature for more deterministic fixes
+            },
+            rid,
+          );
 
           // Update the generated code with the fixed version and process to fix escaping issues
-          generatedCode = processGeneratedCode(fixResponse.content);
-          console.log(
-            "[2] generateCode()",
-            "generatedCode=" + generatedCode,
-          );
+          generatedCode = processGeneratedCode(fixResponse.content, rid);
+          console.log("[2] generateCode()", "generatedCode=" + generatedCode);
 
           // Add fix attempt usage to total
           finalUsage.prompt_tokens += fixResponse.usage.prompt_tokens;
@@ -960,15 +1220,25 @@ export async function generateCode({ auth, prompt, lang = "0002", options = {}, 
       }
 
       // If we've reached max fix attempts but code still works, store it anyway
-      if (fixAttempts >= MAX_FIX_ATTEMPTS && verificationResult.status !== "error") {
-        await storeSuccessfulGeneration(prompt, generatedCode, lang, false);
+      if (
+        fixAttempts >= MAX_FIX_ATTEMPTS &&
+        verificationResult.status !== "error"
+      ) {
+        await storeSuccessfulGeneration(
+          prompt,
+          generatedCode,
+          lang,
+          false,
+          rid,
+        );
       }
     }
 
     // Generate a description of the code
     // Create a prompt for Claude to describe the code
-    const descriptionPrompt = JSON.stringify({
-      system: `
+    const descriptionPrompt = JSON.stringify(
+      {
+        system: `
 You are an expert Graffiticode programmer tasked with describing in simple terms
 the solution that the generated code creates. Analyze the provided Graffiticode
 and explain what it does in a single sentence of plain English. Focus on
@@ -978,22 +1248,27 @@ understand.
 IMPORTANT: Always phrase your description to describe the effect of the code, not
 the code itself.
 `,
-      messages: [
-        {
-          role: "user",
-          content: `
+        messages: [
+          {
+            role: "user",
+            content: `
 Please provide a brief, clear description of what application that this
 generated Graffiticode does in a single sentence:
 
 ${generatedCode}
 
 Explain it in one sentence of simple language that anyone can understand.
-`
-        }
-      ]
-    }, null, 2);
+`,
+          },
+        ],
+      },
+      null,
+      2,
+    );
 
-    console.log("\n============= DESCRIPTION GENERATION PROMPT =============\n");
+    console.log(
+      "\n============= DESCRIPTION GENERATION PROMPT =============\n",
+    );
     console.log(descriptionPrompt);
     console.log("\n============= END DESCRIPTION PROMPT =============\n");
 
@@ -1001,9 +1276,8 @@ Explain it in one sentence of simple language that anyone can understand.
     const descriptionResponse = await callClaudeAPI(descriptionPrompt, {
       model: CLAUDE_MODELS.SONNET, // Use Claude-4 Sonnet for better descriptions
       temperature: 0.2,
-      max_tokens: 200 // Short description only
+      max_tokens: 200, // Short description only
     });
-
 
     console.log(
       "generateCode()",
@@ -1026,10 +1300,10 @@ Explain it in one sentence of simple language that anyone can understand.
       model: response.model,
       usage: {
         input_tokens: finalUsage.prompt_tokens,
-        output_tokens: finalUsage.completion_tokens
+        output_tokens: finalUsage.completion_tokens,
       },
       verification: verificationResult,
-      fixAttempts
+      fixAttempts,
     };
   } catch (error) {
     console.error(`Error generating code for ${lang}:`, error);

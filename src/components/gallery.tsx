@@ -87,6 +87,14 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
           console.error('Failed to parse editor data:', e);
         }
       }
+
+      // Also check URL parameters for editor mode
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('editorMode') === 'true' && urlParams.get('editorOrigin')) {
+        isEditorMode.current = true;
+        editorOrigin.current = urlParams.get('editorOrigin');
+        console.log('Editor mode enabled via URL parameters, origin:', editorOrigin.current);
+      }
     }
   }, []);
   // Load items from the API only once on initialization
@@ -269,14 +277,18 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
 
   // Send compiled data updates to editor when taskId changes
   useEffect(() => {
+    console.log('Data update effect - isEditorMode:', isEditorMode.current, 'editorOrigin:', editorOrigin.current, 'hasOpener:', !!window.opener, 'taskId:', taskId);
     if (isEditorMode.current && editorOrigin.current && window.opener && taskId) {
+      console.log('Sending data-updated message for taskId:', taskId, 'selectedItemId:', selectedItemId);
       // Fetch the compiled data for this taskId
       getData({ user, id: taskId }).then(compiledData => {
-        window.opener.postMessage({
+        const message = {
           type: 'data-updated',
           itemId: selectedItemId,
           data: compiledData
-        }, editorOrigin.current);
+        };
+        console.log('Posting data-updated message:', message, 'to origin:', editorOrigin.current);
+        window.opener.postMessage(message, editorOrigin.current);
       }).catch(err => {
         console.error('Failed to fetch compiled data:', err);
       });

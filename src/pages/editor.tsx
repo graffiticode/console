@@ -9,7 +9,7 @@ import Gallery from '../components/gallery';
 
 export default function Editor({ language, setLanguage, mark }) {
   const router = useRouter();
-  const { lang: rawLang, itemId, mode, origin } = router.query;
+  const { lang: rawLang, itemId, mode, origin, editorMode, editorOrigin } = router.query;
   const lang = Array.isArray(rawLang) ? rawLang[0] : rawLang;
   const { user } = useGraffiticodeAuth();
   const [isCreating, setIsCreating] = useState(false);
@@ -19,8 +19,21 @@ export default function Editor({ language, setLanguage, mark }) {
 
   useEffect(() => {
     // Only proceed if we have the necessary parameters
-    if (!lang || mode !== 'editor' || !origin) {
+    const effectiveOrigin = origin || editorOrigin;
+    console.log('Editor useEffect - lang:', lang, 'mode:', mode, 'effectiveOrigin:', effectiveOrigin, 'itemId:', itemId);
+
+    if (!lang || mode !== 'editor' || !effectiveOrigin) {
       return;
+    }
+
+    // Always refresh the sessionStorage when editor loads to ensure correct origin
+    if (typeof window !== 'undefined') {
+      const editorData = {
+        origin: String(effectiveOrigin),
+        itemId: itemId || null
+      };
+      sessionStorage.setItem('graffiticode:editor', JSON.stringify(editorData));
+      console.log('Set editor sessionStorage:', editorData);
     }
 
     // If editing an existing item, set up editor mode for the Gallery
@@ -28,7 +41,7 @@ export default function Editor({ language, setLanguage, mark }) {
       // Store editor mode data in sessionStorage so Gallery knows to send messages
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('graffiticode:editor', JSON.stringify({
-          origin: String(origin),
+          origin: String(effectiveOrigin),
           itemId: itemId
         }));
         // Also set the selected item and language in localStorage
@@ -47,11 +60,12 @@ export default function Editor({ language, setLanguage, mark }) {
       creationStarted.current = true;
       handleCreateNewItem();
     }
-  }, [lang, itemId, mode, origin, user]);
+  }, [lang, itemId, mode, origin, editorOrigin, user]);
 
   const handleCreateNewItem = async () => {
     setIsCreating(true);
     setError(null);
+    const effectiveOrigin = origin || editorOrigin;
 
     try {
       // Create a new item
@@ -71,12 +85,12 @@ export default function Editor({ language, setLanguage, mark }) {
         setIsCreating(false);
 
         // Send message back to parent window
-        if (window.opener && origin) {
+        if (window.opener && effectiveOrigin) {
           window.opener.postMessage({
             type: 'item-created',
             itemId: newItem.id,
             lang: lang
-          }, String(origin));
+          }, String(effectiveOrigin));
         }
 
         // Store the selected item ID in localStorage so it will be selected in the items view
@@ -89,7 +103,7 @@ export default function Editor({ language, setLanguage, mark }) {
           }));
           // Store editor mode data in sessionStorage
           sessionStorage.setItem('graffiticode:editor', JSON.stringify({
-            origin: String(origin),
+            origin: String(effectiveOrigin),
             itemId: newItem.id
           }));
         }
