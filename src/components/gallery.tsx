@@ -53,7 +53,6 @@ const useTaskIdFormUrl = ({ lang, id }) => {
 export default function Gallery({ lang, mark, hideItemsNav = false }) {
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
-  const [ editorHeight, setEditorHeight ] = useState(600);
   const [ taskId, setTaskId ] = useState("");
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
   const [ isItemsPanelCollapsed, setIsItemsPanelCollapsed ] = useState(
@@ -69,16 +68,100 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   const [ selectedItemId, setSelectedItemId ] = useState("");
   const [ editorCode, setEditorCode ] = useState("");
   const [ editorHelp, setEditorHelp ] = useState([]);
+  const [ editorPanelWidth, setEditorPanelWidth ] = useState(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:editorPanelWidth') : null;
+    return saved ? parseFloat(saved) : 50;
+  }); // Percentage width for desktop
+  const [ previewPanelHeight, setPreviewPanelHeight ] = useState(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:previewPanelHeight') : null;
+    return saved ? parseFloat(saved) : 50;
+  }); // Percentage height for mobile
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
     getAccessToken,
   );
   const editorRef = useRef<any>(null);
+  const editorPanelRef = useRef<HTMLDivElement>(null);
+  const previewPanelRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Detect if we're in editor mode
   const isEditorMode = useRef(false);
   const editorOrigin = useRef(null);
+
+  // Track current viewport type to detect changes
+  const [ currentViewport, setCurrentViewport ] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 1024 ? 'desktop' : 'mobile'
+  );
+
+  // Handle viewport changes
+  useEffect(() => {
+    const handleViewportChange = () => {
+      const newViewport = window.innerWidth >= 1024 ? 'desktop' : 'mobile';
+      if (newViewport !== currentViewport) {
+        setCurrentViewport(newViewport);
+        // Restore saved sizes for the new viewport
+        if (newViewport === 'desktop') {
+          const saved = localStorage.getItem('graffiticode:editorPanelWidth');
+          if (saved) setEditorPanelWidth(parseFloat(saved));
+        } else {
+          const saved = localStorage.getItem('graffiticode:previewPanelHeight');
+          if (saved) setPreviewPanelHeight(parseFloat(saved));
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleViewportChange);
+    return () => window.removeEventListener('resize', handleViewportChange);
+  }, [currentViewport]);
+
+  // Handle panel resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (!editorPanelRef.current || !previewPanelRef.current || !containerRef.current) return;
+      if (isEditorPanelCollapsed || isFormPanelCollapsed) return;
+
+      const isDesktop = window.innerWidth >= 1024;
+
+      if (isDesktop) {
+        // Desktop: track horizontal resize of editor panel
+        const containerWidth = containerRef.current.offsetWidth;
+        const editorWidth = editorPanelRef.current.offsetWidth;
+        const editorWidthPercent = (editorWidth / containerWidth) * 100;
+
+        // Only update if the width has changed significantly (more than 1%)
+        if (Math.abs(editorWidthPercent - editorPanelWidth) > 1) {
+          setEditorPanelWidth(editorWidthPercent);
+          localStorage.setItem('graffiticode:editorPanelWidth', editorWidthPercent.toString());
+        }
+      } else {
+        // Mobile: track vertical resize of preview panel
+        const containerHeight = containerRef.current.offsetHeight;
+        const previewHeight = previewPanelRef.current.offsetHeight;
+        const previewHeightPercent = (previewHeight / containerHeight) * 100;
+
+        // Only update if the height has changed significantly (more than 1%)
+        if (Math.abs(previewHeightPercent - previewPanelHeight) > 1) {
+          setPreviewPanelHeight(previewHeightPercent);
+          localStorage.setItem('graffiticode:previewPanelHeight', previewHeightPercent.toString());
+        }
+      }
+    };
+
+    // Create ResizeObserver to watch for panel resize
+    const resizeObserver = new ResizeObserver(handleResize);
+
+    if (window.innerWidth >= 1024 && editorPanelRef.current) {
+      resizeObserver.observe(editorPanelRef.current);
+    } else if (window.innerWidth < 1024 && previewPanelRef.current) {
+      resizeObserver.observe(previewPanelRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [editorPanelWidth, previewPanelHeight, isEditorPanelCollapsed, isFormPanelCollapsed]);
 
   useEffect(() => {
     // Check if we were opened from editor (has opener and sessionStorage flag)
@@ -383,24 +466,34 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
         </div>
         )}
         <div className="flex flex-col grow">
-          <div className={classNames(
+          <div
+               ref={containerRef}
+               className={classNames(
                  hideEditor ? "block" : "flex flex-col lg:flex-row",
                  "gap-4",
                  "w-full",
                  "h-[calc(100vh-90px)]"
                )}>
             <div
+              ref={editorPanelRef}
               className={classNames(
-                "relative ring-0 border border-gray-200 rounded-none transition-all duration-300",
+                "relative ring-0 border border-gray-200 rounded-none",
                 "order-2 lg:order-1",
-                isEditorPanelCollapsed
-                  ? "lg:w-10"
-                  : isFormPanelCollapsed
-                    ? "w-full lg:flex-1"
-                    : "w-full lg:w-1/2",
-                isEditorPanelCollapsed ? "h-10" : "h-[50vh] lg:h-full",
-                !isEditorPanelCollapsed && "min-h-[300px]"
+                isEditorPanelCollapsed ? "h-10" : "lg:h-full",
+                !isEditorPanelCollapsed && "lg:min-h-[300px]",
+                !isEditorPanelCollapsed && !isFormPanelCollapsed && "lg:resize-x overflow-auto"
               )}
+              style={{
+                width: isEditorPanelCollapsed ? '40px' :
+                       isFormPanelCollapsed ? 'calc(100% - 16px)' :
+                       window.innerWidth >= 1024 ? `${editorPanelWidth}%` : '100%',
+                height: isEditorPanelCollapsed ? '40px' :
+                        window.innerWidth < 1024 && isFormPanelCollapsed ? 'calc(100% - 56px)' :
+                        window.innerWidth < 1024 && !isFormPanelCollapsed ? `calc(${100 - previewPanelHeight}% - 16px)` : undefined,
+                minHeight: !isEditorPanelCollapsed && window.innerWidth < 1024 && !isFormPanelCollapsed ? '100px' : undefined,
+                minWidth: !isEditorPanelCollapsed && !isFormPanelCollapsed && window.innerWidth >= 1024 ? '200px' : undefined,
+                maxWidth: !isEditorPanelCollapsed && !isFormPanelCollapsed && window.innerWidth >= 1024 ? '80%' : undefined
+              }}
             >
               <div className="flex justify-between items-center p-2 border-b border-gray-200">
                 <span className={classNames(
@@ -425,7 +518,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
               <div
                 ref={editorRef}
                 className={classNames(
-                  isEditorPanelCollapsed && "hidden"
+                  isEditorPanelCollapsed && "hidden",
+                  "overflow-hidden"
                 )}
                 style={{ height: 'calc(100% - 42px)' }}
               >
@@ -435,7 +529,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                 lang={lang}
                 mark={mark}
                 setTaskId={setTaskId}
-                height={editorHeight}
+                height="100%"
                 onCodeChange={setEditorCode}
                 onHelpChange={setEditorHelp}
                 initialCode={editorCode}
@@ -444,17 +538,26 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
               </div>
             </div>
             <div
+              ref={previewPanelRef}
               className={classNames(
-                "relative ring-0 border border-gray-300 rounded-none transition-all duration-300",
+                "relative ring-0 border border-gray-300 rounded-none",
                 "order-1 lg:order-2",
-                isFormPanelCollapsed
-                  ? "lg:w-10"
-                  : isEditorPanelCollapsed
-                    ? "w-full lg:flex-1"
-                    : "w-full lg:w-1/2",
-                isFormPanelCollapsed ? "h-10" : "h-[50vh] lg:h-full",
-                !isFormPanelCollapsed && "min-h-[200px]"
+                isFormPanelCollapsed ? "h-10" : "lg:h-full",
+                !isFormPanelCollapsed && "lg:min-h-[200px]",
+                !isFormPanelCollapsed && "overflow-auto",
+                !isFormPanelCollapsed && !isEditorPanelCollapsed && "resize-y lg:resize-none"
               )}
+              style={{
+                width: isFormPanelCollapsed ? '40px' :
+                       isEditorPanelCollapsed ? 'calc(100% - 56px)' :
+                       window.innerWidth >= 1024 ? `calc(${100 - editorPanelWidth}% - 16px)` : '100%',
+                height: isFormPanelCollapsed ? '40px' :
+                        window.innerWidth < 1024 && isEditorPanelCollapsed ? 'calc(100% - 56px)' :
+                        window.innerWidth < 1024 && !isEditorPanelCollapsed ? `${previewPanelHeight}%` : undefined,
+                minWidth: !isFormPanelCollapsed && window.innerWidth >= 1024 ? '200px' : undefined,
+                minHeight: !isFormPanelCollapsed && window.innerWidth < 1024 && !isEditorPanelCollapsed ? '100px' : undefined,
+                maxHeight: !isFormPanelCollapsed && window.innerWidth < 1024 && !isEditorPanelCollapsed ? 'calc(100% - 116px)' : undefined
+              }}
             >
               <div className="flex justify-between items-center p-2 border-b border-gray-200">
                 <span className={classNames(

@@ -9,6 +9,12 @@
   position: relative;
 }
 
+.resize-y {
+  resize: vertical;
+  overflow: auto;
+  position: relative;
+}
+
 .resize {
   resize: both;
   overflow: auto;

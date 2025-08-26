@@ -178,7 +178,7 @@ export default function Editor({
   }, [postTaskResp.data, isPostingTask, user, lang, code, help, mark.id, isPublic]);
 
   return (
-    <div className="flex items-start space-x-4 h-full min-h-[calc(100vh-120px)]">
+    <div className="flex items-start h-full">
       <div className="min-w-0 flex-1 relative flex flex-col h-full">
         {/* Sticky tabs container */}
         <div
@@ -194,9 +194,9 @@ export default function Editor({
 
         {/* Content container with scrolling */}
         <div
-          className="flex-grow overflow-auto"
+          className="flex-1 overflow-auto"
           style={{
-            height: "calc(100vh - 120px)" // Full viewport height minus tabs and navbar
+            height: height === "100%" ? undefined : (height || "calc(100vh - 120px)") // Use flexbox when 100%
           }}
         >
           {

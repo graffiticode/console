@@ -366,6 +366,20 @@ export const CodePanel = ({
   return (
     <>
       <style jsx global>{`
+        /* Editor container styles */
+        #editor {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+        #editor .cm-editor {
+          flex: 1;
+          height: 100%;
+        }
+        .cm-scroller {
+          flex: 1;
+          padding-bottom: 4px;
+        }
         /* Inline error highlighting */
         .cm-error-highlight {
           background-color: rgba(255, 0, 0, 0.2);
@@ -455,6 +469,7 @@ export const CodePanel = ({
       <div
         id="editor"
         ref={ref}
+        style={{ height: '100%' }}
       />
     </>
   );
