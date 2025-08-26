@@ -59,6 +59,12 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   const [ isItemsPanelCollapsed, setIsItemsPanelCollapsed ] = useState(
     typeof window !== 'undefined' && localStorage.getItem('graffiticode:itemsPanelCollapsed') === 'true'
   );
+  const [ isEditorPanelCollapsed, setIsEditorPanelCollapsed ] = useState(
+    typeof window !== 'undefined' && localStorage.getItem('graffiticode:editorPanelCollapsed') === 'true'
+  );
+  const [ isFormPanelCollapsed, setIsFormPanelCollapsed ] = useState(
+    typeof window !== 'undefined' && localStorage.getItem('graffiticode:formPanelCollapsed') === 'true'
+  );
   const [ items, setItems ] = useState([]);
   const [ selectedItemId, setSelectedItemId ] = useState("");
   const [ editorCode, setEditorCode ] = useState("");
@@ -142,6 +148,22 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
       localStorage.setItem('graffiticode:itemsPanelCollapsed', newState.toString());
     }
   }, [isItemsPanelCollapsed]);
+
+  const toggleEditorPanel = useCallback(() => {
+    const newState = !isEditorPanelCollapsed;
+    setIsEditorPanelCollapsed(newState);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('graffiticode:editorPanelCollapsed', newState.toString());
+    }
+  }, [isEditorPanelCollapsed]);
+
+  const toggleFormPanel = useCallback(() => {
+    const newState = !isFormPanelCollapsed;
+    setIsFormPanelCollapsed(newState);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('graffiticode:formPanelCollapsed', newState.toString());
+    }
+  }, [isFormPanelCollapsed]);
 
   const handleCreateItem = async () => {
     if (isCreatingItem) return;
@@ -308,65 +330,105 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   return (
     <div className="flex h-[calc(100vh-64px)] w-full">
       {/* Main content area */}
-      <div className="flex grow">
+      <div className="flex grow w-full overflow-hidden">
         {/* ItemsNav panel with collapse functionality */}
         {!hideItemsNav && (
         <div className={classNames(
-          "flex-none h-full transition-all duration-300",
-          isItemsPanelCollapsed ? "w-10" : "w-[210px]"
+          "flex-none transition-all duration-300 border border-gray-200 rounded-none mr-4",
+          isItemsPanelCollapsed ? "w-10" : "w-[210px]",
+          isItemsPanelCollapsed ? "h-10" : "h-[calc(100vh-90px)]"
         )}>
-          <div className="sticky top-[64px] bg-white z-40 pb-2">
-            <div className="flex flex-col items-start">
-              <button
-                className="text-gray-400 hover:text-gray-500 focus:outline-none p-2"
-                title={isItemsPanelCollapsed ? "Expand items panel" : "Collapse items panel"}
-                onClick={toggleItemsPanel}>
-                {isItemsPanelCollapsed ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-                  </svg>
-                )}
-              </button>
+          <div className="flex justify-between items-center p-2 border-b border-gray-200">
+            <span className={classNames(
+              "text-sm font-medium text-gray-700",
+              isItemsPanelCollapsed && "hidden"
+            )}>Items</span>
+            <button
+              className="text-gray-400 hover:text-gray-500 focus:outline-none"
+              title={isItemsPanelCollapsed ? "Expand items panel" : "Collapse items panel"}
+              onClick={toggleItemsPanel}>
+              {isItemsPanelCollapsed ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+              )}
+            </button>
+          </div>
+          {!isItemsPanelCollapsed && (
+            <div className="mt-2">
               <button
                 onClick={handleCreateItem}
                 disabled={isCreatingItem}
-                className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-100 disabled:opacity-50 ml-2"
+                className="flex items-center justify-start w-full py-1 px-3 hover:bg-green-50 disabled:opacity-50 transition-colors leading-6"
                 title="Create new item"
               >
                 <PlusIcon className="h-4 w-4 text-gray-600" />
               </button>
             </div>
-          </div>
+          )}
           {!isItemsPanelCollapsed && (
-            <ItemsNav
-              items={items}
-              selectedItemId={selectedItemId}
-              onSelectItem={handleSelectItem}
-              onUpdateItem={handleUpdateItem}
-            />
+            <div className="h-[calc(100%-84px)] overflow-auto">
+              <ItemsNav
+                items={items}
+                selectedItemId={selectedItemId}
+                onSelectItem={handleSelectItem}
+                onUpdateItem={handleUpdateItem}
+              />
+            </div>
           )}
         </div>
         )}
-        <div className="flex flex-col grow px-2" style={{paddingTop: "5px"}}>
+        <div className="flex flex-col grow">
           <div className={classNames(
                  hideEditor ? "block" : "flex flex-col lg:flex-row",
-                 "gap-4 items-start"
+                 "gap-4",
+                 "w-full",
+                 "h-[calc(100vh-90px)]"
                )}>
             <div
-              ref={editorRef}
               className={classNames(
-                "relative ring-0 border border-gray-200 rounded-none mb-2",
+                "relative ring-0 border border-gray-200 rounded-none transition-all duration-300",
                 "order-2 lg:order-1",
-                "w-full lg:w-1/2",
-                "h-[50vh] lg:h-[calc(100vh-90px)]",
-                "min-h-[300px]",
-                "lg:min-w-[300px] lg:max-w-[70%]"
+                isEditorPanelCollapsed
+                  ? "lg:w-10"
+                  : isFormPanelCollapsed
+                    ? "w-full lg:flex-1"
+                    : "w-full lg:w-1/2",
+                isEditorPanelCollapsed ? "h-10" : "h-[50vh] lg:h-full",
+                !isEditorPanelCollapsed && "min-h-[300px]"
               )}
             >
+              <div className="flex justify-between items-center p-2 border-b border-gray-200">
+                <span className={classNames(
+                  "text-sm font-medium text-gray-700",
+                  isEditorPanelCollapsed && "hidden"
+                )}>Editor</span>
+                <button
+                  className="text-gray-400 hover:text-gray-500 focus:outline-none"
+                  title={isEditorPanelCollapsed ? "Expand editor panel" : "Collapse editor panel"}
+                  onClick={toggleEditorPanel}>
+                  {isEditorPanelCollapsed ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              <div
+                ref={editorRef}
+                className={classNames(
+                  isEditorPanelCollapsed && "hidden"
+                )}
+                style={{ height: 'calc(100% - 42px)' }}
+              >
               <Editor
                 accessToken={accessToken}
                 taskId={taskId}
@@ -379,17 +441,45 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                 initialCode={editorCode}
                 initialHelp={editorHelp}
               />
+              </div>
             </div>
             <div
               className={classNames(
-                "relative ring-0 border border-gray-300 rounded-none",
+                "relative ring-0 border border-gray-300 rounded-none transition-all duration-300",
                 "order-1 lg:order-2",
-                "w-full lg:w-1/2",
-                "h-[50vh] lg:h-[calc(100vh-90px)]",
-                "min-h-[200px]",
-                "lg:min-w-[300px] lg:max-w-[70%]"
+                isFormPanelCollapsed
+                  ? "lg:w-10"
+                  : isEditorPanelCollapsed
+                    ? "w-full lg:flex-1"
+                    : "w-full lg:w-1/2",
+                isFormPanelCollapsed ? "h-10" : "h-[50vh] lg:h-full",
+                !isFormPanelCollapsed && "min-h-[200px]"
               )}
             >
+              <div className="flex justify-between items-center p-2 border-b border-gray-200">
+                <span className={classNames(
+                  "text-sm font-medium text-gray-700",
+                  isFormPanelCollapsed && "hidden"
+                )}>Preview</span>
+                <button
+                  className="text-gray-400 hover:text-gray-500 focus:outline-none"
+                  title={isFormPanelCollapsed ? "Expand preview panel" : "Collapse preview panel"}
+                  onClick={toggleFormPanel}>
+                  {isFormPanelCollapsed ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              <div className={classNames(
+                isFormPanelCollapsed && "hidden",
+                "h-[calc(100%-42px)]"
+              )}>
               <FormView
                 key="form"
                 id={taskId}
@@ -400,6 +490,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                 setId={() => {}}
                 setNewTask={() => {}}
               />
+              </div>
             </div>
           </div>
         </div>

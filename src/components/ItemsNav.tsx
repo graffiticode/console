@@ -211,7 +211,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                 <li key={item.id}>
                   <div
                     className={classNames(
-                      item.id === selectedItemId ? 'bg-gray-50' : 'hover:bg-gray-50',
+                      item.id === selectedItemId ? 'bg-gray-100' : 'hover:bg-gray-100',
                       "flex flex-row justify-between pr-2"
                     )}
                     onMouseOver={() => {
@@ -223,7 +223,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                     <button
                       onClick={() => onSelectItem(item.id)}
                       className={classNames(
-                        item.id === selectedItemId ? 'bg-gray-50' : 'hover:bg-gray-50',
+                        item.id === selectedItemId ? 'bg-gray-100' : 'hover:bg-gray-100',
                         'block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left'
                       )}
                       title={item.name}
