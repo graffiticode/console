@@ -1742,10 +1742,10 @@ export const HelpPanel = ({
                 </div>
               )}
 
-              {/* User messages in chronological order, oldest first */}
+              {/* User messages in reverse chronological order, newest first */}
               <div className="space-y-2">
                 {userMessages
-                  // Displaying messages in chronological order (oldest first)
+                  .reverse() // Display messages in reverse chronological order (newest first)
                   .map((message, index) => {
                     // Check if this message is pending (waiting for a response)
                     // We use the same logic as in handleDeleteMessagePair for consistency

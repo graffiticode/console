@@ -6,6 +6,7 @@ This dialect is used for generating spreadsheet based assessments.
 
 - **IMPORTANT**: Whatever the user request is, the response should always be a complete spreadsheet with all necessary data, formulas, and formatting included.
 - **DEFAULT BEHAVIOR**: If no specific instructions are given but table data is present, create a simple spreadsheet that represents the data with appropriate headers and formatting.
+- If the user does not explicitly ask for a title and/or instructions then don't include them in the program.
 
 ## Program structure
 
