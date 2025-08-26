@@ -358,13 +358,14 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                )}>
             <div
               ref={editorRef}
-              className="relative ring-0 border border-gray-200 rounded-none mb-2 order-2 lg:order-1 resize-x"
-              style={{
-                height: "calc(100vh - 90px)",
-                width: hideItemsNav ? "49%" : (isItemsPanelCollapsed ? "49%" : "48%"),
-                minWidth: "300px",
-                maxWidth: hideItemsNav ? "80%" : (isItemsPanelCollapsed ? "80%" : "70%")
-              }}
+              className={classNames(
+                "relative ring-0 border border-gray-200 rounded-none mb-2",
+                "order-2 lg:order-1",
+                "w-full lg:w-1/2",
+                "h-[50vh] lg:h-[calc(100vh-90px)]",
+                "min-h-[300px]",
+                "lg:min-w-[300px] lg:max-w-[70%]"
+              )}
             >
               <Editor
                 accessToken={accessToken}
@@ -380,15 +381,14 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
               />
             </div>
             <div
-              className="relative ring-0 border border-gray-300 rounded-none resize-both order-1 lg:order-2"
-              style={{
-                height: "calc(100vh - 90px)",
-                width: hideItemsNav ? "49%" : (isItemsPanelCollapsed ? "49%" : "48%"),
-                minHeight: "200px",
-                maxHeight: "calc(100vh - 90px)",
-                minWidth: "300px",
-                maxWidth: hideItemsNav ? "80%" : (isItemsPanelCollapsed ? "80%" : "70%")
-              }}
+              className={classNames(
+                "relative ring-0 border border-gray-300 rounded-none",
+                "order-1 lg:order-2",
+                "w-full lg:w-1/2",
+                "h-[50vh] lg:h-[calc(100vh-90px)]",
+                "min-h-[200px]",
+                "lg:min-w-[300px] lg:max-w-[70%]"
+              )}
             >
               <FormView
                 key="form"

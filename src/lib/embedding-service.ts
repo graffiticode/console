@@ -164,37 +164,31 @@ export async function generateBatchEmbeddings(
  * @returns {string} - Combined text for embedding
  */
 export function createEmbeddingText(example) {
-  let textParts = [];
+  // If there's a help field, use only that for embedding
+  if (example.help) {
+    return example.help;
+  }
 
-  // Add task/prompt if available
+  // Otherwise, prioritize the user's prompt/task only
   if (example.task) {
-    textParts.push(`Task: ${example.task}`);
+    return example.task;
   }
 
-  // Add description if available
+  // If no help or task, use description
   if (example.description) {
-    textParts.push(`Description: ${example.description}`);
+    return example.description;
   }
 
-  // Add code with context
-  if (example.code) {
-    textParts.push(`Code: ${example.code}`);
-  }
-
-  // Add messages if available (for dialog-based examples)
+  // For dialog-based examples, use only the user's message
   if (example.messages && Array.isArray(example.messages)) {
-    const messageText = example.messages
-      .map((msg) => `${msg.role}: ${msg.content}`)
-      .join("\n");
-    textParts.push(`Dialog:\n${messageText}`);
+    const userMessage = example.messages.find(msg => msg.role === 'user');
+    if (userMessage) {
+      return userMessage.content;
+    }
   }
 
-  // Add explanation if available
-  if (example.explanation) {
-    textParts.push(`Explanation: ${example.explanation}`);
-  }
-
-  return textParts.join("\n\n");
+  // Fallback to empty string if nothing else
+  return "";
 }
 
 /**

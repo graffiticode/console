@@ -23,12 +23,12 @@ import {
   addDocumentWithEmbedding,
 } from "./embedding-service";
 
-// Define available Claude models
+// Define available Claude models with best practices
 const CLAUDE_MODELS = {
-  OPUS: "claude-opus-4-20250514", // Correct name for Claude Opus 4
-  SONNET: "claude-sonnet-4-20250514", // Correct name for Claude Sonnet 4
-  HAIKU: "claude-3-haiku-20240307",
-  DEFAULT: "claude-sonnet-4-20250514", // Default to Sonnet 4 as a good balance
+  OPUS: "claude-opus-4-20250514",        // Claude Opus 4 (2025)
+  SONNET: "claude-sonnet-4-20250514",    // Claude Sonnet 4 (2025) - recommended for code
+  HAIKU: "claude-3-5-haiku-20241022",      // Fast and cheap for simple tasks
+  DEFAULT: "claude-sonnet-4-20250514",   // Default to Sonnet 4 for best performance
 };
 
 /**
@@ -1104,6 +1104,11 @@ export async function generateCode({
   const accessToken = auth?.token;
   console.log("generateCode()", "prompt=" + prompt);
 
+  // Model selection best practices:
+  // - Default (Sonnet 3.5): Best for code generation, most tasks
+  // - Override with OPUS only for: Very complex logic, multi-step reasoning
+  // - Override with HAIKU for: Simple templates, basic transformations
+
   try {
     // Retrieve relevant examples for this prompt, filtered by language
     const relevantExamples = await getRelevantExamples({
@@ -1124,8 +1129,8 @@ export async function generateCode({
       rid,
     );
 
-    // Use Claude-4 Opus for Graffiticode generation - best model for code generation
-    const model = options.model || CLAUDE_MODELS.OPUS;
+    // Use Claude 3.5 Sonnet for code generation - best balance of performance and cost
+    const model = options.model || CLAUDE_MODELS.DEFAULT;
 
     // Set up API call options
     const apiOptions = {
@@ -1274,7 +1279,7 @@ Explain it in one sentence of simple language that anyone can understand.
 
     // Call Claude API to get the description
     const descriptionResponse = await callClaudeAPI(descriptionPrompt, {
-      model: CLAUDE_MODELS.SONNET, // Use Claude-4 Sonnet for better descriptions
+      model: CLAUDE_MODELS.HAIKU, // Use Haiku for simple description generation (fast and cheap)
       temperature: 0.2,
       max_tokens: 200, // Short description only
     });

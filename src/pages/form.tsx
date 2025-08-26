@@ -49,9 +49,9 @@ export default function Form() {
           content="A software studio"
         />
       </Head>
-      <div className="min-h-full">
-          <div className="min-w-full mx-auto py-6 sm:px-6 lg:px-8">
-            <FormView lang={lang} id={id} className="w-full h-screen"/>
+      <div className="h-screen w-full overflow-hidden">
+          <div className="h-full w-full">
+            <FormView lang={lang} id={id} className="w-full h-full"/>
           </div>
       </div>
     </>

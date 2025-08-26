@@ -48,7 +48,7 @@ export default function FormView({ lang, id, setData, setId, setNewTask, classNa
 
   const Form = reactForms.includes(lang) && FormReact || FormIFrame;
   return (
-    <div className="justify-center min-w-full h-full">
+    <div className="h-full w-full">
       <Form
         accessToken={accessToken}
         lang={lang}
@@ -56,8 +56,8 @@ export default function FormView({ lang, id, setData, setId, setNewTask, classNa
         data={{}}
         setData={setData}
         setId={setId}
-        className={className}
-        height={height}
+        className={className || "w-full h-full"}
+        height={height || "100%"}
         user={user}
       />
     </div>
