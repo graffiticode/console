@@ -116,52 +116,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
     return () => window.removeEventListener('resize', handleViewportChange);
   }, [currentViewport]);
 
-  // Handle panel resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (!editorPanelRef.current || !previewPanelRef.current || !containerRef.current) return;
-      if (isEditorPanelCollapsed || isFormPanelCollapsed) return;
 
-      const isDesktop = window.innerWidth >= 1024;
-
-      if (isDesktop) {
-        // Desktop: track horizontal resize of editor panel
-        const containerWidth = containerRef.current.offsetWidth;
-        const editorWidth = editorPanelRef.current.offsetWidth;
-        const editorWidthPercent = (editorWidth / containerWidth) * 100;
-
-        // Only update if the width has changed significantly (more than 1%)
-        if (Math.abs(editorWidthPercent - editorPanelWidth) > 1) {
-          setEditorPanelWidth(editorWidthPercent);
-          localStorage.setItem('graffiticode:editorPanelWidth', editorWidthPercent.toString());
-        }
-      } else {
-        // Mobile: track vertical resize of preview panel
-        const containerHeight = containerRef.current.offsetHeight;
-        const previewHeight = previewPanelRef.current.offsetHeight;
-        const previewHeightPercent = (previewHeight / containerHeight) * 100;
-
-        // Only update if the height has changed significantly (more than 1%)
-        if (Math.abs(previewHeightPercent - previewPanelHeight) > 1) {
-          setPreviewPanelHeight(previewHeightPercent);
-          localStorage.setItem('graffiticode:previewPanelHeight', previewHeightPercent.toString());
-        }
-      }
-    };
-
-    // Create ResizeObserver to watch for panel resize
-    const resizeObserver = new ResizeObserver(handleResize);
-
-    if (window.innerWidth >= 1024 && editorPanelRef.current) {
-      resizeObserver.observe(editorPanelRef.current);
-    } else if (window.innerWidth < 1024 && previewPanelRef.current) {
-      resizeObserver.observe(previewPanelRef.current);
-    }
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [editorPanelWidth, previewPanelHeight, isEditorPanelCollapsed, isFormPanelCollapsed]);
 
   useEffect(() => {
     // Check if we were opened from editor (has opener and sessionStorage flag)
@@ -247,6 +202,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
       localStorage.setItem('graffiticode:formPanelCollapsed', newState.toString());
     }
   }, [isFormPanelCollapsed]);
+
+
 
   const handleCreateItem = async () => {
     if (isCreatingItem) return;
@@ -469,10 +426,10 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
           <div
                ref={containerRef}
                className={classNames(
-                 hideEditor ? "block" : "flex flex-col lg:flex-row",
-                 "gap-4",
-                 "w-full",
-                 "h-[calc(100vh-90px)]"
+               hideEditor ? "block" : "flex flex-col lg:flex-row",
+               "gap-4 lg:gap-0",
+               "w-full",
+               "h-[calc(100vh-90px)]"
                )}>
             <div
               ref={editorPanelRef}
@@ -481,7 +438,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                 "order-2 lg:order-1",
                 isEditorPanelCollapsed ? "h-10" : "lg:h-full",
                 !isEditorPanelCollapsed && "lg:min-h-[300px]",
-                !isEditorPanelCollapsed && !isFormPanelCollapsed && "lg:resize-x overflow-auto"
+                !isEditorPanelCollapsed && !isFormPanelCollapsed && "overflow-auto"
               )}
               style={{
                 width: isEditorPanelCollapsed ? '40px' :
@@ -537,15 +494,76 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
               />
               </div>
             </div>
+            {/* Vertical resize bar between editor and preview (desktop) */}
+            {!isEditorPanelCollapsed && !isFormPanelCollapsed && (
+              <div
+                className="hidden lg:block w-1 bg-gray-300 hover:bg-gray-400 cursor-col-resize transition-colors lg:order-2 mx-1"
+                onPointerDown={(e) => {
+                e.preventDefault();
+                let isDragging = false;
+                let holdTimeout = null;
+
+                // Capture the pointer to ensure we get all events
+                const target = e.currentTarget;
+                target.setPointerCapture(e.pointerId);
+
+                const handlePointerMove = (moveEvent) => {
+                  // Only act after hold timeout
+                if (!isDragging || !containerRef.current) return;
+
+                  const rect = containerRef.current.getBoundingClientRect();
+                  const x = moveEvent.clientX - rect.left;
+                const containerWidth = rect.width;
+
+                // Calculate new width percentage for editor
+                const minEditorWidth = 200;
+                const minPreviewWidth = 200;
+                const maxEditorX = containerWidth - minPreviewWidth;
+
+                const newEditorX = Math.max(minEditorWidth, Math.min(maxEditorX, x));
+                const editorWidthPercent = (newEditorX / containerWidth) * 100;
+
+                setEditorPanelWidth(editorWidthPercent);
+
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('graffiticode:editorPanelWidth', editorWidthPercent.toString());
+                }
+                };
+
+                const handlePointerUp = () => {
+                if (holdTimeout) {
+                    clearTimeout(holdTimeout);
+                    holdTimeout = null;
+                  }
+                isDragging = false;
+                target.releasePointerCapture(e.pointerId);
+                target.removeEventListener('pointermove', handlePointerMove);
+                target.removeEventListener('pointerup', handlePointerUp);
+                target.removeEventListener('pointercancel', handlePointerUp);
+                };
+
+                // Attach listeners to the target element
+                target.addEventListener('pointermove', handlePointerMove);
+                target.addEventListener('pointerup', handlePointerUp);
+                target.addEventListener('pointercancel', handlePointerUp);
+
+                // Start drag after holding for 200ms
+                  holdTimeout = setTimeout(() => {
+                    isDragging = true;
+                  }, 200);
+                }}
+                title="Drag to resize horizontally"
+              />
+            )}
             <div
               ref={previewPanelRef}
               className={classNames(
                 "relative ring-0 border border-gray-300 rounded-none",
-                "order-1 lg:order-2",
+                "order-1 lg:order-3",
                 isFormPanelCollapsed ? "h-10" : "lg:h-full",
                 !isFormPanelCollapsed && "lg:min-h-[200px]",
                 !isFormPanelCollapsed && "overflow-auto",
-                !isFormPanelCollapsed && !isEditorPanelCollapsed && "resize-y lg:resize-none"
+                !isFormPanelCollapsed && !isEditorPanelCollapsed && "lg:resize-none"
               )}
               style={{
                 width: isFormPanelCollapsed ? '40px' :
