@@ -555,6 +555,10 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                 title="Drag to resize horizontally"
               />
             )}
+            {/* Spacer to maintain gap when drag bar is hidden */}
+            {(isEditorPanelCollapsed || isFormPanelCollapsed) && (
+              <div className="hidden lg:block w-1 lg:order-2 mx-1" />
+            )}
             <div
               ref={previewPanelRef}
               className={classNames(
