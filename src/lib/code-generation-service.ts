@@ -25,10 +25,10 @@ import {
 
 // Define available Claude models with best practices
 const CLAUDE_MODELS = {
-  OPUS: "claude-opus-4-20250514",        // Claude Opus 4 (2025)
-  SONNET: "claude-sonnet-4-20250514",    // Claude Sonnet 4 (2025) - recommended for code
-  HAIKU: "claude-3-5-haiku-20241022",      // Fast and cheap for simple tasks
-  DEFAULT: "claude-sonnet-4-20250514",   // Default to Sonnet 4 for best performance
+  OPUS: "claude-opus-4-20250514",
+  SONNET: "claude-sonnet-4-20250514",
+  HAIKU: "claude-3-5-haiku-20241022",
+  DEFAULT: "claude-opus-4-20250514",
 };
 
 /**
@@ -1033,8 +1033,6 @@ async function storeSuccessfulGeneration(
  * @returns {string} - The processed code with fixes applied
  */
 function processGeneratedCode(content, rid = null) {
-  console.log("processGeneratedCode()", "content=" + content);
-
   if (!content) return content;
 
   const originalLength = content.length;
@@ -1057,8 +1055,6 @@ function processGeneratedCode(content, rid = null) {
   processed = processed.replace(/\\"/g, '"'); // Replace \" with "
   processed = processed.replace(/\\'/g, "'"); // Replace \' with '
   processed = processed.replace(/\\`/g, "`"); // Replace \` with `
-
-  console.log("processGeneratedCode()", "processed=" + processed);
 
   if (rid) {
     ragLog(rid, "postprocess", {

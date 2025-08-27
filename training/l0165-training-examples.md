@@ -9,7 +9,7 @@
 
 **User**: add 10 and 20 in a table
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates a simple spreadsheet with two columns (A and B) that demonstrates basic addition. The spreadsheet contains the numbers 10 and 20 in cells A1 and A2, and cell A3 contains a formula that adds these two numbers together. The code also includes an automatic assessment feature that checks whether the formula correctly calculates the sum as 30.
 ```
 
@@ -68,43 +68,43 @@ bold the cells with the given values"
 
 **User**: create a table of the prime number up to 100
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates a table that displays all the prime numbers from 2 to 100. The table is organized in a 5-column grid format, with each prime number placed in its own cell, starting with 2, 3, 5, 7, and 11 in the first row and continuing through all 25 prime numbers up to 97. The code also includes a title and helpful instructions explaining what prime numbers are for anyone viewing the table.
 ```
 
 **User**: turn it into a puzzle where you provide the solution to about a third of the cells but validate all of them
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This code generates an interactive math worksheet that teaches students about prime numbers from 2 to 100. The generated worksheet displays a 5x5 grid where some prime numbers are already filled in as hints, and students need to complete the missing prime numbers in the empty cells. When students enter their answers, the system automatically checks if they've entered the correct prime numbers, making it a self-grading educational exercise.
 ```
 
 **User**: add validation for the cells with given values
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This code generates an interactive math puzzle that teaches students about prime numbers up to 100. The generated puzzle creates a grid where some prime numbers are already filled in as hints (like 2, 7, 17, 29), while students need to fill in the missing prime numbers in the empty cells. The system automatically checks whether students enter the correct prime numbers and provides feedback on their answers.
 ```
 
 **User**: make the table 5 by 5
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive math puzzle in the form of a 5x5 grid where students need to fill in missing prime numbers. The puzzle displays the first 25 prime numbers in sequential order, with some numbers already provided as hints (like 2, 5, 17, 29, etc.) and empty cells where students must enter the correct missing prime numbers. The code automatically checks whether each answer matches the expected prime number, making it a self-grading educational exercise for learning about prime numbers.
 ```
 
 **User**: center align all columns
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive prime numbers puzzle presented as a 5x5 grid table. The puzzle challenges users to fill in missing prime numbers from the first 25 prime numbers in sequential order, with some numbers already provided as hints (like 2, 5, 17, 29, etc.). The code automatically checks whether users enter the correct prime numbers in each empty cell, making it a self-grading educational exercise for learning about prime numbers.
 ```
 
 **User**: make all columns 50px wide
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive prime numbers puzzle presented as a 5x5 grid table. The puzzle challenges users to fill in missing prime numbers from the first 25 prime numbers in sequence, with some numbers already provided as hints (like 2, 5, 17, 29, etc.). The code automatically checks whether users enter the correct prime numbers in each empty cell, making it a self-grading educational exercise for learning about prime numbers.
 ```
 
 **User**: bold the cells with the given values
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive math puzzle in the form of a 5x5 grid where students need to fill in missing prime numbers. The puzzle displays the first 25 prime numbers in sequential order, with some numbers already provided as hints (shown in bold) and empty cells where students must enter the correct prime numbers. The code automatically checks whether the answers entered are correct, making it a self-grading educational exercise for learning about prime numbers.
 ```
 
@@ -381,13 +381,13 @@ bold column b"
 
 **User**: protect the cells in column B
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a spreadsheet-like structure with two columns, A and B. Column A has cells with the numbers "100" and "200", and these cells are set up to be automatically assessed to ensure their values match the expected values. Column B has cells with the text "cows" and "pigs", and these cells are marked as protected, meaning they cannot be edited. The code also includes a version number of "0.0.1" at the end.
 ```
 
 **User**: bold column b
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a spreadsheet-like table with two columns, A and B. Column A has cells with the numbers "100" and "200", which are set up to be automatically assessed for their values. Column B has cells with the words "cows" and "pigs", which are formatted to be in bold text. The code also includes some configuration settings, such as the width of the columns and the justification of the text.
 ```
 
@@ -451,7 +451,7 @@ cells {
 
 **User**: create a starter template with one cell
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a simple spreadsheet with a title of "Untitled Spreadsheet" and a single cell in the A1 position. The spreadsheet has a column width of 100 units for the A column. The code also includes a version number of "0.0.1" at the end.
 ```
 
@@ -523,55 +523,55 @@ make row 1 bold"
 | Savings |  | 20% of your total income |
 | Miscellaneous |  | Remaining income after all other expenses |
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates a monthly budget assessment table. The table includes categories like Rent, Food, Transportation, and Savings, which are calculated as percentages of the total monthly income of $4,000. The table also has fixed expenses like Utilities and Entertainment, and a Miscellaneous category for the remaining income after all other expenses. The purpose of this generated code is to help the user calculate and track their monthly budget.
 ```
 
 **User**: change the income value to 5000
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The code also includes fixed expenses for utilities and entertainment, and the remaining income is allocated to a miscellaneous category.
 ```
 
 **User**: use unformatted value in the text field
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a given monthly income of $5,000. The code also includes fixed expenses like utilities and entertainment, and the remaining income is allocated to a miscellaneous category.
 ```
 
 **User**: format column B as Currency
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a monthly budget assessment tool. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a given monthly income of $5,000. The tool also includes fixed expenses like utilities and entertainment, and the remaining income is categorized as "Miscellaneous." The purpose is to help the user understand how their income should be allocated across different budget items.
 ```
 
 **User**: score by formula rather than value
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
 ```
 
 **User**: make columns A and C protected
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses like utilities and entertainment, and a miscellaneous category for the remaining income after all other expenses are accounted for.
 ```
 
 **User**: make cell b1 protected
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories based on a $5,000 monthly income. The code sets up the spreadsheet structure, including formulas to automatically calculate the budget items as percentages of the total income or as fixed expenses.
 ```
 
 **User**: make cells b2, b4 and b7 protected
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses for utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
 ```
 
 **User**: make row 1 bold
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a monthly budget assessment spreadsheet. It calculates the missing dollar amounts for various budget categories, such as rent, food, transportation, and savings, based on a fixed monthly income of $5,000. The spreadsheet also includes fixed expenses for utilities and entertainment, and the remaining income is calculated as the "Miscellaneous" category.
 ```
 
@@ -747,13 +747,13 @@ make the unvalidated cells protected"
 
 **User**: add the validation for a3 that the value is 300
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates a simple spreadsheet-like structure with three columns and three rows. The first two rows contain the values "100" and "200" respectively, and the third row calculates the sum of those two values and checks if the result is "300". The generated code sets the width of the first column to 100 and defines the text and assessment criteria for each cell in the spreadsheet.
 ```
 
 **User**: make the unvalidated cells protected
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a spreadsheet-like structure with three cells in a single column. The first two cells contain the values "100" and "200", which are marked as protected. The third cell contains a formula that calculates the sum of the values in the first two cells, and it is set up to be assessed to ensure the result is "300".
 ```
 
@@ -822,73 +822,73 @@ make cells without validations protected"
 
 **User**: create a times table for integers up to 4
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a spreadsheet-like grid where students need to fill in the empty cells with the correct products of multiplying the row and column numbers (like 2×3=6). The system automatically checks if the answers are correct, making it a self-grading math practice exercise.
 ```
 
 **User**: remove the validations for redundant cells and make their background gray
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This code generates an interactive multiplication table worksheet for numbers 1 through 4. The generated spreadsheet has some cells pre-filled with example answers (highlighted in gray) while other cells are left blank for students to complete, with the system automatically checking if the entered answers match the correct multiplication results. It creates a learning exercise where students can practice their times tables by filling in the missing products in a structured grid format.
 ```
 
 **User**: revert the last change and remove validations from duplicates
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a grid where students need to fill in the missing products by multiplying the row and column numbers, with some cells already completed as examples and others left blank for practice. It includes automatic checking to verify that students enter the correct answers in the empty cells.
 ```
 
 **User**: mark the unvalidated cells including the headers protected
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a spreadsheet-like grid where students need to fill in the missing products by multiplying the row and column numbers, with some cells left blank as practice problems and others pre-filled or protected. When students enter their answers, the system automatically checks if they've entered the correct multiplication results.
 ```
 
 **User**: change the background of the cells without validations light gray
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a spreadsheet-like grid where students need to fill in the missing products by multiplying the row and column numbers, with some cells already filled in as examples and others left blank for practice. The system automatically checks if the entered answers are correct and includes some grayed-out cells that can't be edited to guide students through the exercise.
 ```
 
 **User**: use the attribute 'background' for background color
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a spreadsheet-like grid where students need to fill in the missing products by multiplying the row and column numbers, with some cells intentionally left blank or grayed out to create a progressive learning exercise. The system automatically checks if students enter the correct answers in the empty cells, making it a self-grading math practice tool.
 ```
 
 **User**: center justify the headings
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a grid where students can practice their times tables by filling in empty cells with the correct products, while the row and column headers (showing the numbers being multiplied) are pre-filled and protected from editing. Some cells are intentionally left blank for students to complete, and the system can automatically check if their answers match the expected multiplication results.
 ```
 
 **User**: now make the column width half as wide
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a grid where students need to fill in the missing products by multiplying the row and column numbers, with the headers and number labels already provided in gray boxes. Each empty cell automatically checks if the student entered the correct answer, making it a self-grading math practice exercise.
 ```
 
 **User**: now remove the validations the duplicate facts
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a grid where students can practice their times tables by filling in empty cells with the correct products, while the row and column headers (showing the numbers being multiplied) are pre-filled and protected from editing. Some cells have built-in answer checking that will verify if students entered the correct multiplication results.
 ```
 
 **User**: make unprotected call white
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a 5x5 grid where students can practice their times tables by filling in the missing products, with the row and column headers (showing the numbers being multiplied) already provided in gray boxes. When students enter answers in the blank cells, the system automatically checks if their responses match the correct multiplication results.
 ```
 
 **User**: make calls cells cells without validations light gray
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a grid where students can fill in the missing products, with some cells left blank for practice and others pre-filled with the row and column headers. It includes automatic checking that validates whether students entered the correct answers in the empty cells, making it a self-grading math exercise.
 ```
 
 **User**: make cells without validations protected
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive multiplication table worksheet for numbers 1 through 4. The code sets up a grid where students need to fill in the missing products by multiplying the row and column numbers, with some cells already completed as examples and others left blank for practice. It includes automatic checking to verify that students enter the correct answers in the empty cells, making it a self-grading math exercise.
 ```
 
@@ -1159,25 +1159,25 @@ excellent! now bold all the protected cells"
 
 **User**: create a five by five table with integer values of your choosing where every other cell is protected
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a spreadsheet-like grid with 5 columns and 5 rows. Each cell in the grid contains a number, and some of the cells are marked as "protected", meaning their values cannot be changed. The purpose of this generated code is to create a structured data layout that could be used for various applications, such as displaying numerical information in a tabular format.
 ```
 
 **User**: now prefix all the values in the protected cells with a letter P
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a table with 5 columns and 5 rows. The table cells contain a mix of numbers and text, some of which are marked as "protected". The purpose of this generated code is likely to create a structured data layout, potentially for a spreadsheet or other tabular application.
 ```
 
 **User**: add validations for all the unprotected cells
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a grid-like structure with 5 columns and 5 rows. Each cell in the grid contains either a number that needs to be entered correctly, or a protected value that the user cannot modify. This code is likely part of an interactive learning or assessment tool, where the user is expected to input the correct values in the unprotected cells.
 ```
 
 **User**: excellent! now bold all the protected cells
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a grid-like structure with 5 columns and 5 rows. Each cell in the grid contains either a number or a protected label (e.g., "P12", "P19"). The numbers in the cells have associated "assess" attributes that specify the expected value for that cell, which could be used for some kind of assessment or evaluation.
 ```
 
@@ -1408,13 +1408,13 @@ let's play tic tac toe"
 
 **User**: create a starter template with one cell
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a simple spreadsheet with a title of "Untitled Spreadsheet" and a single cell in the A1 position. The spreadsheet has a column width of 100 units for the A column. The code also includes a version number of "0.0.1" at the end.
 ```
 
 **User**: let's play tic tac toe
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This code generates a Tic Tac Toe game interface. The generated code sets up a 3x3 grid with cells that can be filled with "X" or "O" by players. The goal is to get 3 of your symbols in a row, either horizontally, vertically, or diagonally, to win the game.
 ```
 
@@ -1510,13 +1510,13 @@ make b1 protected"
 
 **User**: make column A protected
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a simple spreadsheet-like layout with two columns, A and B, each 100 pixels wide. The first column, A, has its width protected, meaning it cannot be resized. The code then defines four cells within this layout, labeled A1, A2, B1, and B2, each with a text value.
 ```
 
 **User**: make b1 protected
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a simple spreadsheet-like structure with two columns, A and B, each 100 pixels wide. Within this structure, it defines four cells: A1 with the text "A1", A2 with the text "A2", B1 with the text "B1" and marked as protected, and B2 with the text "B2". The code also includes a version number of "0.0.2".
 ```
 
@@ -1563,31 +1563,31 @@ Remove the instructions about revenue and operating expenses"
 
 **User**: Create a spreadsheet assessment for a simple income statement.
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated Graffiticode creates an income statement assessment tool. It allows users to input the total revenue, and the code will automatically calculate the gross profit, operating expenses, operating income, income tax, and net income based on the provided formulas. The purpose of this generated code is to provide a simple and interactive way for users to assess their income statement without needing to perform the calculations manually.
 ```
 
 **User**: Add to the instructions what the Revenue should be
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates an income statement assessment template. It prompts the user to fill in missing values, such as the total revenue, operating expenses, and income tax. The code then calculates the gross profit, operating income, income tax, and net income based on the provided information. The goal is to guide the user through the process of completing an income statement.
 ```
 
 **User**: Add the values for Revenue and Operating Expenses and instruct the student to complete the rest of the statement
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an income statement assessment template. It provides instructions for the user to fill in missing values, such as the cost of goods sold, operating expenses, income tax, and net income. The code also sets up the layout of the income statement, including column widths and text alignment, to make it easy for the user to input and view the financial information.
 ```
 
 **User**: Change the label Net Income to After Tax Income
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an income statement assessment template. It provides instructions for the user to fill in missing values, such as the cost of goods sold, operating expenses, and income tax rate. The code then calculates the gross profit, operating income, income tax, and after-tax income based on the provided information, and allows the user to check their work by assessing the formulas used in the calculations.
 ```
 
 **User**: Remove the instructions about revenue and operating expenses
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This code generates an income statement assessment template. The template includes fields for revenue, cost of goods sold, gross profit, operating expenses, operating income, income tax, and after-tax income. The user is instructed to fill in the missing values, and the code will automatically calculate the gross profit, operating income, income tax, and after-tax income based on the provided formulas.
 ```
 
@@ -1716,43 +1716,43 @@ remove the values from the validated cells"
 |  | Accounts Payable |  | 8 000 |
 |  | Share issue costs on credit ABN Stockbroking Pty Ltd |  |  |
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a table with a general journal entry assessment. It records the cash received from the issuance of 400,000 ordinary shares at $1.50 per share, the allotment of those shares, and the share issue costs incurred. The purpose of this code is to provide a structured way to account for the share issuance transaction.
 ```
 
 **User**: left justify column B
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a table that represents the general journal entries for a company's share issue. The table includes details such as the date, description, debit, and credit amounts related to the cash received from the share application, the allotment of shares, and the share issue costs. The purpose of this generated code is to provide a clear and organized record of the accounting transactions involved in the share issue process.
 ```
 
 **User**: remove (1) from c13
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a table that represents the general journal entries for a share issue. The table includes details such as the date, description, debit, and credit amounts related to the cash received from the share application, the allotment of the shares, and the share issue costs. The purpose of this generated code is to provide a structured way to record the accounting transactions associated with the share issue.
 ```
 
 **User**: bold row 1
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a table with a general journal entry for a share issue. It includes details such as the date, description, debit and credit amounts related to the cash received from the share application, the allotment of shares, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the accounting entries associated with the share issue.
 ```
 
 **User**: format columns c and d as currency
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a table with a general journal entry for a share issue. It includes details such as the date, description, debit and credit amounts related to the cash received from the share application, the recording of the share capital, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the accounting entries associated with the share issue.
 ```
 
 **User**: validate the numeric values in columns   c and d
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a table with a general journal entry to record the issuance of 400,000 ordinary shares at $1.50 per share. The code sets up the table structure, column widths, and formatting, and then populates the cells with the relevant financial details, such as the date, description, debit, and credit amounts. The purpose of this generated code is to provide a template for recording the share issue transaction in the general journal.
 ```
 
 **User**: remove the values from the validated cells
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a table with a general journal entry for a share issue. The table includes columns for the date, details, debit, and credit, and the rows contain specific entries related to the cash received from the share application, the allotment of the shares, and the share issue costs. The purpose of this generated code is to provide a structured format for recording the financial transactions associated with the share issue.
 ```
 
@@ -1894,7 +1894,7 @@ cells {
 
 **User**: print fizzbuzz
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates an interactive FizzBuzz learning exercise in the form of a spreadsheet. The code sets up a two-column table where students can practice the classic FizzBuzz problem by filling in the correct answers for numbers 1 through 15 - writing "Fizz" for multiples of 3, "Buzz" for multiples of 5, "FizzBuzz" for multiples of both, and the number itself otherwise. The system automatically checks each answer against the expected solution to provide immediate feedback to learners.
 ```
 
@@ -1995,55 +1995,55 @@ set the border underline for a2"
 
 **User**: i want to create a vertical math assessment for basic arithmetic. you pick the values to assess
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates a basic arithmetic assessment with six questions. The user is presented with arithmetic problems, and they must enter the correct answers in the empty cells. The code includes instructions for the user and sets up the layout of the assessment, with the questions in the left column and the answer cells in the right column.
 ```
 
 **User**: that's interesting, but I want to create a single problem arranged vertically
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a vertical arithmetic problem where the user needs to solve the addition of 4327 and 958. The code sets up a table with a single column, and the first three rows display the numbers to be added vertically. The fourth row is left blank for the user to enter the solution, which is expected to be 5285.
 ```
 
 **User**: that's good, but remove row 3 and add a border bottom true to b2
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This code generates a simple arithmetic problem where the user needs to add two numbers vertically. The problem is presented with the first number "4327" and the second number "+958" displayed, and the user is expected to enter the correct result of "5285" in the empty cell below. The generated code sets up the layout and formatting for this arithmetic problem.
 ```
 
 **User**: sorry, i wasn't being clear. set border to "bottom"
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a simple arithmetic problem where the user needs to add two numbers vertically. The problem is presented with the first number "4327" and the second number "+958" displayed, and the user is expected to enter the correct result of "5285" in the empty cell below. This type of interactive arithmetic exercise can be used to test or practice basic math skills.
 ```
 
 **User**: format numbers using #,##0
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a simple arithmetic problem where the user needs to add two numbers, 4,327 and 958, and enter the result in the third cell. The code sets up the layout and formatting of the problem, including the column width, text formatting, and a bottom border for the second row. The third cell is set up to assess the user's input, expecting the correct answer of 5,285.
 ```
 
 **User**: move coumn a to column b
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a simple arithmetic problem where the user needs to solve the addition of two numbers, 4,327 and 958, and enter the result in the provided cell. The code sets up the layout and formatting of the problem, including the instructions, column widths, and the expected result of 5,285.
 ```
 
 **User**: move the + in B2 to A2
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a simple arithmetic problem where the user needs to solve the addition of two numbers, 4,327 and 958, and enter the result in the provided cell. The code sets up the layout of the problem, including the column widths and the formatting of the numbers, and includes an assessment to check if the user's answer is correct.
 ```
 
 **User**: change the value in b2 to 6345
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 The generated code creates a simple arithmetic problem where the user needs to solve the addition of two large numbers, "4,327" and "6,345", and enter the result in the provided cell. The code sets up the layout of the problem, including the column widths and the formatting of the numbers, and includes an assessment to check if the user's answer is correct.
 ```
 
 **User**: set the border underline for a2
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated Graffiticode creates a simple vertical arithmetic problem. It displays two large numbers, one above the other, with a "+" symbol between them. The user is instructed to solve the problem by entering the result in the cell below. The generated code formats the numbers with commas for readability and includes an assessment to check if the user's answer is correct.
 ```
 
@@ -2121,7 +2121,7 @@ add the validation for a3 that the value is 300"
 
 **User**: add the validation for a3 that the value is 300
 
-**Assistant**: ```ocaml
+**Assistant**: ```
 This generated code creates a simple spreadsheet-like structure with three columns and three rows. The first two rows contain the values "100" and "200" respectively, and the third row calculates the sum of those two values and checks if the result is "300". The generated code sets the width of the first column to 100 and defines the text and assessment criteria for each cell in the spreadsheet.
 ```
 

@@ -71,3 +71,7 @@ cells {
   v: "0.0.1"
 }..
 ```
+
+## Function and Formula Usage
+
+- IMPORTANT: Use the SUM function when adding or subtracting contiguous numeric cells with a formula
