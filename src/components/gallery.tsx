@@ -373,8 +373,9 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
       <div className="flex grow w-full overflow-hidden">
         {/* ItemsNav panel with collapse functionality */}
         {!hideItemsNav && (
+        <>
         <div className={classNames(
-          "flex-none transition-all duration-300 border border-gray-200 rounded-none mr-4",
+          "flex-none transition-all duration-300 border border-gray-200 rounded-none mr-1",
           isItemsPanelCollapsed ? "w-10" : "w-[210px]",
           isItemsPanelCollapsed ? "h-10" : "h-[calc(100vh-90px)]"
         )}>
@@ -421,6 +422,9 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
             </div>
           )}
         </div>
+        {/* Spacer between ItemsNav and editor panels */}
+        <div className="w-1 ml-1" />
+        </>
         )}
         <div className="flex flex-col grow">
           <div
