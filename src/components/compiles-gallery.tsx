@@ -39,20 +39,20 @@ export default function CompilesGallery({ lang }) {
   const [ dataHeight, setDataHeight ] = useState(350);
   const [ selectedTaskId, setSelectedTaskId ] = useState("");
   const [ isTasksPanelCollapsed, setIsTasksPanelCollapsed ] = useState(
-    typeof window !== 'undefined' && localStorage.getItem('graffiticode:tasksPanelCollapsed') === 'true'
+    typeof window !== 'undefined' && localStorage.getItem('graffiticode:compiles:tasksPanelCollapsed') === 'true'
   );
   const [ isDataPanelCollapsed, setIsDataPanelCollapsed ] = useState(
-    typeof window !== 'undefined' && localStorage.getItem('graffiticode:dataPanelCollapsed') === 'true'
+    typeof window !== 'undefined' && localStorage.getItem('graffiticode:compiles:dataPanelCollapsed') === 'true'
   );
   const [ isFormPanelCollapsed, setIsFormPanelCollapsed ] = useState(
-    typeof window !== 'undefined' && localStorage.getItem('graffiticode:formPanelCollapsed') === 'true'
+    typeof window !== 'undefined' && localStorage.getItem('graffiticode:compiles:formPanelCollapsed') === 'true'
   );
-  const [ editorPanelWidth, setEditorPanelWidth ] = useState(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:editorPanelWidth') : null;
+  const [ dataPanelWidth, setDataPanelWidth ] = useState(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:compiles:dataPanelWidth') : null;
     return saved ? parseFloat(saved) : 400;
   }); // Pixel width for data panel
   const [ previewPanelHeight, setPreviewPanelHeight ] = useState(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:previewPanelHeight') : null;
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:compiles:previewPanelHeight') : null;
     return saved ? parseFloat(saved) : 50;
   }); // Percentage height for mobile
   const { user } = useGraffiticodeAuth();
@@ -136,7 +136,7 @@ export default function CompilesGallery({ lang }) {
     const newState = !isTasksPanelCollapsed;
     setIsTasksPanelCollapsed(newState);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('graffiticode:tasksPanelCollapsed', newState.toString());
+      localStorage.setItem('graffiticode:compiles:tasksPanelCollapsed', newState.toString());
     }
   }, [isTasksPanelCollapsed]);
 
@@ -144,7 +144,7 @@ export default function CompilesGallery({ lang }) {
     const newState = !isDataPanelCollapsed;
     setIsDataPanelCollapsed(newState);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('graffiticode:dataPanelCollapsed', newState.toString());
+      localStorage.setItem('graffiticode:compiles:dataPanelCollapsed', newState.toString());
     }
   }, [isDataPanelCollapsed]);
 
@@ -152,7 +152,7 @@ export default function CompilesGallery({ lang }) {
     const newState = !isFormPanelCollapsed;
     setIsFormPanelCollapsed(newState);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('graffiticode:formPanelCollapsed', newState.toString());
+      localStorage.setItem('graffiticode:compiles:formPanelCollapsed', newState.toString());
     }
   }, [isFormPanelCollapsed]);
 
@@ -283,7 +283,7 @@ export default function CompilesGallery({ lang }) {
                     ? '40px'
                     : isFormPanelCollapsed
                       ? '100%'
-                      : `${editorPanelWidth}px`
+                      : `${dataPanelWidth}px`
                 }}
               >
                 <div className="flex justify-between items-center p-2 border-b border-gray-200">
@@ -350,10 +350,10 @@ export default function CompilesGallery({ lang }) {
 
                   const newDataWidth = Math.max(minDataWidth, Math.min(maxDataWidth, x));
 
-                   setEditorPanelWidth(newDataWidth);
+                  setDataPanelWidth(newDataWidth);
 
-                   if (typeof window !== 'undefined') {
-                    localStorage.setItem('graffiticode:editorPanelWidth', newDataWidth.toString());
+                  if (typeof window !== 'undefined') {
+                  localStorage.setItem('graffiticode:compiles:dataPanelWidth', newDataWidth.toString());
                   }
                   };
 
@@ -402,7 +402,7 @@ export default function CompilesGallery({ lang }) {
                   ? '40px'
                   : isDataPanelCollapsed
                     ? '100%'
-                    : `calc(100% - ${editorPanelWidth + (isFormPanelCollapsed ? 0 : 4)}px)`
+                    : `calc(100% - ${dataPanelWidth + (isFormPanelCollapsed ? 0 : 4)}px)`
               }}
             >
               <div className="flex justify-between items-center p-2 border-b border-gray-200">
