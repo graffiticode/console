@@ -286,14 +286,7 @@ export const getTask = async ({ user, id }) => {
       task(id: $id) {
         id
         lang
-        src
         code
-        help
-        isPublic
-        taskId
-        created
-        name
-        mark
       }
     }
   `;

@@ -490,26 +490,13 @@ export async function getItems({ auth, lang, mark }) {
 
 export async function getTask({ auth, id }) {
   try {
-    // First try to get from user's tasks
-    const taskDoc = await db.doc(`users/${auth.uid}/taskIds/${id}`).get();
-    if (!taskDoc.exists) {
-      return null;
-    }
-    const taskData = taskDoc.data();
-    // Get the actual task code from the API
+    // Get the task code from the API
     const apiTask = await getApiTask({ id, auth });
-    const apiTaskData = apiTask[0] || apiTask;
+    const taskData = apiTask[0] || apiTask;
     return {
       id: id,
       lang: taskData.lang,
-      code: apiTaskData.code, // code is already a string, don't stringify it
-      src: taskData.src,
-      help: taskData.help || "[]",
-      isPublic: taskData.isPublic,
-      taskId: id,
-      created: taskData.created ? String(taskData.created) : "",
-      name: taskData.name,
-      mark: taskData.mark,
+      code: JSON.stringify(taskData.code), // Serialize the AST object to string
     };
   } catch (error) {
     console.error("getTask()", "ERROR", error);

@@ -10,6 +10,8 @@ import { getAccessToken, loadCompiles, getData } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView";
 import { DataPanel } from "./DataPanel";
+import { ReadOnlyCodePanel } from "./ReadOnlyCodePanel";
+import { CompilerTabs } from "./CompilerTabs";
 
 // Helper to elide task IDs, showing only characters 18-25
 const elideTaskId = (id) => {
@@ -55,6 +57,7 @@ export default function CompilesGallery({ lang }) {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:compiles:previewPanelHeight') : null;
     return saved ? parseFloat(saved) : 50;
   }); // Percentage height for mobile
+  const [ tab, setTab ] = useState("Data"); // State for the active tab
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
@@ -290,7 +293,7 @@ export default function CompilesGallery({ lang }) {
                   <span className={classNames(
                     "text-sm font-medium text-gray-700",
                     isDataPanelCollapsed && "hidden"
-                  )}>Data</span>
+                  )}>Compile</span>
                   <button
                     className="text-gray-400 hover:text-gray-500 focus:outline-none"
                     title={isDataPanelCollapsed ? "Expand data panel" : "Collapse data panel"}
@@ -306,19 +309,32 @@ export default function CompilesGallery({ lang }) {
                     )}
                   </button>
                 </div>
+                <div className={classNames(
+                  "border-b border-gray-200",
+                  isDataPanelCollapsed && "hidden"
+                )}>
+                  <CompilerTabs tab={tab} setTab={setTab} />
+                </div>
                 <div
                   ref={dataRef}
                   className={classNames(
                     isDataPanelCollapsed && "hidden",
                     "overflow-hidden"
                   )}
-                  style={{ height: 'calc(100% - 42px)' }}
+                  style={{ height: 'calc(100% - 84px)' }}
                 >
                   <div className="h-full overflow-auto p-2">
-                    <DataPanel
-                      id={selectedTaskId}
-                      user={user}
-                    />
+                    {tab === "Data" ? (
+                      <DataPanel
+                        id={selectedTaskId}
+                        user={user}
+                      />
+                    ) : (
+                      <ReadOnlyCodePanel
+                        id={selectedTaskId}
+                        user={user}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
