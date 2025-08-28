@@ -224,12 +224,12 @@ export default function CompilesGallery({ lang }) {
                 </div>
               ) : (
                 <nav className="flex flex-1 flex-col p-2">
-                  <ul role="list" className="flex flex-1 flex-col gap-y-1 font-mono">
+                  <ul role="list" className="space-y-1 font-mono pr-1">
                     {taskIds.map((task) => (
                       <li key={task.id}>
                         <div
                           className={classNames(
-                            task.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                            task.current ? 'bg-gray-100' : 'hover:bg-gray-100',
                             "flex flex-row justify-between pr-2"
                           )}
                           onMouseOver={() => {
@@ -241,8 +241,8 @@ export default function CompilesGallery({ lang }) {
                           <button
                             onClick={() => handleSelectTask(task.id)}
                             className={classNames(
-                              task.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                              'block rounded-none py-1 pr-2 pl-2 font-normal leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 w-full text-left'
+                              task.current ? 'bg-gray-100' : 'hover:bg-gray-100',
+                              'block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 w-full text-left truncate'
                             )}
                           >
                             {elideCompoundId(task.id)}

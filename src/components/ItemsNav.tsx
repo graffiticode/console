@@ -197,56 +197,50 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
   const [ showId, setShowId ] = useState("");
 
   return (
-    <div
-      className="w-[210px] flex-none flex flex-col gap-y-2 overflow-visible bg-white pt-2 max-h-[calc(100vh-110px)] sticky top-[84px] z-40"
-    >
+    <div className="w-full flex flex-col gap-y-1 bg-white pt-1">
       <nav className="flex flex-1 flex-col">
-        <ul role="list" className="flex flex-1 flex-col gap-y-7 font-mono">
-          <li className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100vh - 180px)' }}>
-            {items.length === 0 ? (
-              <p className="text-xs text-gray-500 text-left pl-4 py-0 leading-6">No items found</p>
-            ) : (
-            <ul role="list" className="space-y-1">
-              {items.map((item) => (
-                <li key={item.id}>
-                  <div
+        {items.length === 0 ? (
+          <p className="text-xs text-gray-500 text-left pl-4 py-0 leading-6">No items found</p>
+        ) : (
+          <ul role="list" className="space-y-1 font-mono pr-1">
+            {items.map((item) => (
+              <li key={item.id}>
+                <div
+                  className={classNames(
+                    item.id === selectedItemId ? 'bg-gray-100' : 'hover:bg-gray-100',
+                    'flex flex-row justify-between pr-2'
+                  )}
+                  onMouseOver={() => {
+                    if (showId !== item.id) {
+                      setShowId(item.id);
+                    }
+                  }}
+                >
+                  <button
+                    onClick={() => onSelectItem(item.id)}
                     className={classNames(
                       item.id === selectedItemId ? 'bg-gray-100' : 'hover:bg-gray-100',
-                      "flex flex-row justify-between pr-2"
+                      'block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left'
                     )}
-                    onMouseOver={() => {
-                      if (showId !== item.id) {
-                        setShowId(item.id);
-                      }
-                    }}
+                    title={item.name}
                   >
-                    <button
-                      onClick={() => onSelectItem(item.id)}
-                      className={classNames(
-                        item.id === selectedItemId ? 'bg-gray-100' : 'hover:bg-gray-100',
-                        'block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left'
-                      )}
-                      title={item.name}
-                    >
-                      {item.name}
-                    </button>
-                    { item.id === showId &&
-                      <EllipsisMenu
-                        itemId={item.id}
-                        name={item.name}
-                        taskId={item.taskId}
-                        mark={item.mark}
-                        isPublic={item.isPublic}
-                        onChange={onUpdateItem}
-                      /> || <div />
-                    }
-                  </div>
-                </li>
-              ))}
-            </ul>
-            )}
-          </li>
-        </ul>
+                    {item.name}
+                  </button>
+                  { item.id === showId &&
+                    <EllipsisMenu
+                      itemId={item.id}
+                      name={item.name}
+                      taskId={item.taskId}
+                      mark={item.mark}
+                      isPublic={item.isPublic}
+                      onChange={onUpdateItem}
+                    /> || <div />
+                  }
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </nav>
     </div>
   )
