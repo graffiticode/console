@@ -23,10 +23,10 @@ export const ReadOnlyCodePanel = ({ id, user }: any) => {
       "ReadOnlyCodePanel() - useEffect triggered",
       "taskData=" + JSON.stringify(taskData, null, 2),
     );
-    
+
     if (taskData) {
       console.log("ReadOnlyCodePanel() - taskData.code:", taskData.code);
-      
+
       if (taskData.code) {
         setCode(taskData.code);
         console.log("ReadOnlyCodePanel() - Set code from taskData.code:", taskData.code);
