@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
 
 // Note: This is the client-side Firebase config for authentication
 // The server-side scripts use 'graffiticode-app' as the project ID
@@ -18,7 +18,7 @@ const apiApp = initializeApp(apiFirebaseConfig);
 const apiAuthInternal = getAuth(apiApp);
 
 if (process.env.NODE_ENV === "development") {
-  // connectAuthEmulator(apiAuthInternal, "http://localhost:9099", { disableWarnings: true });
+  connectAuthEmulator(apiAuthInternal, "http://localhost:9099", { disableWarnings: true });
 }
 
 export const apiAuth = apiAuthInternal;

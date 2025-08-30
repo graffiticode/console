@@ -12,7 +12,9 @@ export default function AuthWrapper({ children }) {
 
   useEffect(() => {
     if (user && !loading && !checkingInviteCode) {
-      checkUserInviteCode();
+      // Temporarily disable invite code check
+      // checkUserInviteCode();
+      setHasInviteCode(true);
     }
   }, [user, loading]);
 
