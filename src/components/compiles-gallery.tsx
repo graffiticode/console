@@ -12,6 +12,7 @@ import FormView from "./FormView";
 import { DataPanel } from "./DataPanel";
 import { ReadOnlyCodePanel } from "./ReadOnlyCodePanel";
 import { CompilerTabs } from "./CompilerTabs";
+import { useRouter } from 'next/router';
 
 // Helper to elide task IDs, showing only characters 18-25
 const elideTaskId = (id) => {
@@ -36,6 +37,7 @@ function classNames(...classes) {
 }
 
 export default function CompilesGallery({ lang }) {
+  const router = useRouter();
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ dataHeight, setDataHeight ] = useState(350);
@@ -107,14 +109,22 @@ export default function CompilesGallery({ lang }) {
     uniqueTaskIds.sort((a, b) => +b.timestamp - +a.timestamp);
     setTaskIds(uniqueTaskIds);
 
-    // Try to restore the previously selected task ID from localStorage
+    // Try to restore the selected task ID from URL query or localStorage
     let taskIdFound = false;
     if (uniqueTaskIds.length > 0) {
       try {
+        // First check URL query parameter
+        const queryTaskId = router.query.taskId as string;
+        // Then check localStorage for saved taskId from Items view
         const savedTaskId = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:selected:taskId') : null;
-        if (savedTaskId) {
-          // Find matching task ID
-          const matchingTask = uniqueTaskIds.find(task => task.id === savedTaskId);
+
+        const taskIdToSelect = queryTaskId || savedTaskId;
+
+        if (taskIdToSelect) {
+          // Find matching task ID (handle both full ID and partial matches)
+          const matchingTask = uniqueTaskIds.find(task =>
+            task.id === taskIdToSelect || task.id.startsWith(taskIdToSelect)
+          );
           if (matchingTask) {
             setSelectedTaskId(matchingTask.id);
             matchingTask.current = true;
@@ -133,7 +143,7 @@ export default function CompilesGallery({ lang }) {
     }
 
     setTaskIds([...uniqueTaskIds]); // Force update with current flags
-  }, [compilesData]);
+  }, [compilesData, router.query.taskId]);
 
   const toggleTasksPanel = useCallback(() => {
     const newState = !isTasksPanelCollapsed;

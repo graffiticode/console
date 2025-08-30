@@ -55,6 +55,13 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
+
+  // Save the current taskId to localStorage when it changes so it can be used in Compiles view
+  useEffect(() => {
+    if (taskId && typeof window !== 'undefined') {
+      localStorage.setItem('graffiticode:selected:taskId', taskId);
+    }
+  }, [taskId]);
   const [ isItemsPanelCollapsed, setIsItemsPanelCollapsed ] = useState(
     typeof window !== 'undefined' && localStorage.getItem('graffiticode:itemsPanelCollapsed') === 'true'
   );
