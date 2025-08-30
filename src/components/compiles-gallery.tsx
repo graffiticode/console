@@ -72,6 +72,8 @@ export default function CompilesGallery({ lang }) {
   const [ compiles, setCompiles ] = useState([]);
   const [ taskIds, setTaskIds ] = useState([]);
   const [ showId, setShowId ] = useState("");
+  const taskItemsRef = useRef({});
+  const tasksListRef = useRef(null);
 
   // Load compiles from the API
   const type = "*";  // { "*" | "persistent" | "ephemeral" }
@@ -129,6 +131,22 @@ export default function CompilesGallery({ lang }) {
             setSelectedTaskId(matchingTask.id);
             matchingTask.current = true;
             taskIdFound = true;
+
+            // Scroll the selected task into view with a few items offset from top
+            setTimeout(() => {
+              if (taskItemsRef.current[matchingTask.id] && tasksListRef.current) {
+                const taskElement = taskItemsRef.current[matchingTask.id];
+                const listContainer = tasksListRef.current;
+
+                // Calculate scroll position to show task a few items from top
+                const taskRect = taskElement.getBoundingClientRect();
+                const containerRect = listContainer.getBoundingClientRect();
+                const offsetFromTop = 100; // Pixels from top (roughly 3-4 items)
+
+                const scrollTop = taskElement.offsetTop - offsetFromTop;
+                listContainer.scrollTop = scrollTop;
+              }
+            }, 100); // Small delay to ensure DOM is updated
           }
         }
       } catch (e) {
@@ -226,7 +244,7 @@ export default function CompilesGallery({ lang }) {
             </button>
           </div>
           {!isTasksPanelCollapsed && (
-            <div className="h-[calc(100%-42px)] overflow-auto">
+            <div className="h-[calc(100%-42px)] overflow-auto" ref={tasksListRef}>
               {isLoadingCompiles ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-sm text-gray-500">Loading tasks...</div>
@@ -239,7 +257,7 @@ export default function CompilesGallery({ lang }) {
                 <nav className="flex flex-1 flex-col p-2">
                   <ul role="list" className="space-y-1 font-mono pr-1">
                     {taskIds.map((task) => (
-                      <li key={task.id}>
+                      <li key={task.id} ref={el => { taskItemsRef.current[task.id] = el; }}>
                         <div
                           className={classNames(
                             task.current ? 'bg-gray-100' : 'hover:bg-gray-100',
