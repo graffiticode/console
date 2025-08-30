@@ -132,19 +132,25 @@ export default function CompilesGallery({ lang }) {
             matchingTask.current = true;
             taskIdFound = true;
 
-            // Scroll the selected task into view with a few items offset from top
+            // Scroll the selected task into view in the middle of the viewport
             setTimeout(() => {
               if (taskItemsRef.current[matchingTask.id] && tasksListRef.current) {
                 const taskElement = taskItemsRef.current[matchingTask.id];
                 const listContainer = tasksListRef.current;
 
-                // Calculate scroll position to show task a few items from top
-                const taskRect = taskElement.getBoundingClientRect();
-                const containerRect = listContainer.getBoundingClientRect();
-                const offsetFromTop = 100; // Pixels from top (roughly 3-4 items)
+                // Get the container's visible height
+                const containerHeight = listContainer.clientHeight;
 
-                const scrollTop = taskElement.offsetTop - offsetFromTop;
-                listContainer.scrollTop = scrollTop;
+                // Get the task element's position and height
+                const taskTop = taskElement.offsetTop;
+                const taskHeight = taskElement.offsetHeight;
+
+                // Calculate scroll position to center the task
+                // Task center position - half of container height
+                const scrollTop = taskTop + (taskHeight / 2) - (containerHeight / 2);
+
+                // Set the scroll position (constrained to valid range)
+                listContainer.scrollTop = Math.max(0, scrollTop);
               }
             }, 100); // Small delay to ensure DOM is updated
           }
