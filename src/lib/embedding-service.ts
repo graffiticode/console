@@ -164,31 +164,110 @@ export async function generateBatchEmbeddings(
  * @returns {string} - Combined text for embedding
  */
 export function createEmbeddingText(example) {
-  // If there's a help field, use only that for embedding
-  if (example.help) {
-    return example.help;
+  // Helper: extract simple feature tags from code without embedding the code itself
+  function extractFeatureTags(code) {
+    if (!code || typeof code !== "string") return [];
+    const tags = new Set();
+
+    // Common L0165/Graffiticode constructs
+    const keywordMatches = code.match(/\b(title|instructions|columns|cells|width|justify|border|format|assess|expected|method|text)\b/gi);
+    if (keywordMatches) keywordMatches.forEach((k) => tags.add(k.toLowerCase()));
+
+    // Cell references like A1, B12, AA3
+    const cellRefs = code.match(/\b[A-Z]{1,2}\d{1,3}\b/g);
+    if (cellRefs) cellRefs.slice(0, 25).forEach((r) => tags.add(r));
+
+    // Detect formulas that start with '=' and simple operators
+    if (/text\s*:\s*"?=/.test(code) || /=\s*[A-Z]{1,2}\d+/.test(code)) tags.add("formula");
+
+    // Common attribute values
+    if (/justify\s*:\s*"center"/i.test(code)) tags.add("center");
+    if (/justify\s*:\s*"right"/i.test(code)) tags.add("right");
+    if (/border\s*:\s*"bottom"/i.test(code) || /border\s*:\s*bottom/i.test(code)) tags.add("border bottom");
+    const formatMatch = code.match(/format\s*:\s*"([^"]+)"/i);
+    if (formatMatch) tags.add(`format ${formatMatch[1]}`);
+
+    // Version marker often appears at end
+    if (/\bv:\s*"[0-9.]+"/.test(code)) tags.add("version");
+
+    // Limit total tags to keep vector text concise
+    return Array.from(tags).slice(0, 40);
   }
 
-  // Otherwise, prioritize the user's prompt/task only
-  if (example.task) {
-    return example.task;
-  }
+  // Helper: pull concatenated user turns from messages/help
+  function extractUserTurns(obj) {
+    const userTexts = [];
 
-  // If no help or task, use description
-  if (example.description) {
-    return example.description;
-  }
-
-  // For dialog-based examples, use only the user's message
-  if (example.messages && Array.isArray(example.messages)) {
-    const userMessage = example.messages.find(msg => msg.role === 'user');
-    if (userMessage) {
-      return userMessage.content;
+    if (Array.isArray(obj?.messages)) {
+      obj.messages.forEach((m) => {
+        if (m && m.role === "user" && m.content) userTexts.push(String(m.content));
+      });
+    } else if (obj?.help) {
+      // help may be a JSON string or an array of {type:'user'|'bot', ...}
+      try {
+        const helpArr = typeof obj.help === "string" ? JSON.parse(obj.help) : obj.help;
+        if (Array.isArray(helpArr)) {
+          helpArr.forEach((h) => {
+            if (h?.type === "user" && h.user) userTexts.push(String(h.user));
+          });
+        }
+      } catch (_) {
+        // ignore parse errors; fall back below
+      }
     }
+
+    return userTexts.filter(Boolean).join("\n");
   }
 
-  // Fallback to empty string if nothing else
-  return "";
+  // Language marker
+  const lang = example.lang || example.language || "";
+
+  // Prompt/task fields
+  const prompt = example.prompt || example.task || "";
+  const userTurns = extractUserTurns(example);
+
+  // Code features (do not include raw code in the vector text)
+  const code = example.code || example.src || "";
+  const tags = extractFeatureTags(code);
+
+  // Compose vector text per recommendations
+  const parts = [];
+  if (lang) parts.push(`L${lang}`);
+  if (prompt) parts.push(`Prompt: ${prompt}`);
+  if (userTurns) parts.push(`User: ${userTurns}`);
+  if (tags.length) parts.push(`Features: ${tags.join(", ")}`);
+
+  // If nothing useful, fall back to description or empty string
+  if (parts.length === 0) {
+    if (example.description) return example.description;
+    // As a last resort, avoid embedding raw code; return empty string
+    return "";
+  }
+
+  return parts.join(". ");
+}
+
+/**
+ * Extract concise feature tags from example/code for metadata storage
+ * (kept in sync with createEmbeddingText's internal logic)
+ */
+export function buildFeatureTags(example: any): string[] {
+  const code = example?.code || example?.src || "";
+  if (!code) return [];
+  // Reuse the same heuristics as in createEmbeddingText
+  const tags = new Set<string>();
+  const keywordMatches = code.match(/\b(title|instructions|columns|cells|width|justify|border|format|assess|expected|method|text)\b/gi);
+  if (keywordMatches) keywordMatches.forEach((k) => tags.add(k.toLowerCase()));
+  const cellRefs = code.match(/\b[A-Z]{1,2}\d{1,3}\b/g);
+  if (cellRefs) cellRefs.slice(0, 25).forEach((r) => tags.add(r));
+  if (/text\s*:\s*"?=/.test(code) || /=\s*[A-Z]{1,2}\d+/.test(code)) tags.add("formula");
+  if (/justify\s*:\s*"center"/i.test(code)) tags.add("center");
+  if (/justify\s*:\s*"right"/i.test(code)) tags.add("right");
+  if (/border\s*:\s*"bottom"/i.test(code) || /border\s*:\s*bottom/i.test(code)) tags.add("border bottom");
+  const formatMatch = code.match(/format\s*:\s*"([^"]+)"/i);
+  if (formatMatch) tags.add(`format ${formatMatch[1]}`);
+  if (/\bv:\s*"[0-9.]+"/.test(code)) tags.add("version");
+  return Array.from(tags).slice(0, 40);
 }
 
 /**

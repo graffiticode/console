@@ -13,7 +13,10 @@
     "start": "cross-env NODE_NO_WARNINGS=1 next start",
     "lint": "next lint",
     "lint:fix": "eslint --fix \"src/**/*.{ts,tsx}\"",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "download-training-examples": "node --experimental-strip-types scripts/download-training-examples.ts",
+    "update-embeddings": "node --experimental-strip-types scripts/update-embeddings.ts --collection training_examples",
+    "update-embeddings-from-md": "node --experimental-strip-types scripts/update-embeddings-from-md.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",

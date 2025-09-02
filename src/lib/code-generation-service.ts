@@ -20,7 +20,6 @@ import {
   createEmbeddingText,
   vectorSearch,
   hybridSearch,
-  addDocumentWithEmbedding,
 } from "./embedding-service";
 
 // Define available Claude models with best practices
@@ -155,13 +154,33 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
           `Found ${results.length} relevant examples using vector search for L${lang}`,
         );
 
+        // Transform the results to match the expected format
+        const transformedResults = results.map(doc => {
+          // The new format has these fields: lang, prompt, code, messages, tags, etc.
+          return {
+            task: doc.prompt || doc.task,
+            code: doc.code,
+            messages: doc.messages || [
+              { role: "user", content: doc.prompt },
+              { role: "assistant", content: `\`\`\`\n${doc.code}\n\`\`\`` }
+            ],
+            description: doc.prompt || doc.description,
+            tags: doc.tags || [],
+            expectedValues: doc.expectedValues || [],
+            // Include scoring information
+            similarity: doc.similarity,
+            keywordScore: doc.keywordScore,
+            combinedScore: doc.combinedScore
+          };
+        });
+
         if (rid) {
           ragLog(rid, "retrieval.result", {
             mode: "hybrid",
             k: limit,
             lang,
-            resultCount: results.length,
-            ids: results.map((r) => r.id || r.description?.substring(0, 50)),
+            resultCount: transformedResults.length,
+            ids: results.map((r) => r.id || r.prompt?.substring(0, 50)),
             scores: results.map((r) => ({
               similarity: r.similarity,
               keywordScore: r.keywordScore,
@@ -170,7 +189,7 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
           });
         }
 
-        return results;
+        return transformedResults;
       }
     } catch (vectorError) {
       console.warn(
@@ -279,99 +298,6 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
   }
 }
 
-/**
- * Add a new training example to the database
- * @param {Object} example - The example to add
- * @param {string} example.description - Description of the example (optional if messages provided)
- * @param {string} example.code - The code for the example
- * @param {string} example.explanation - Explanation of how the code works (optional if messages provided)
- * @param {string} example.lang - Language code (e.g., "0002" for L0002)
- * @param {Array} example.messages - Optional array of message objects with {role, content} format
- * @returns {Promise<Object>} - Result of the operation
- */
-export async function addTrainingExample(example) {
-  try {
-    // Validate example structure - either traditional format or dialog-based format
-    const hasTraditionalFormat = example.description && example.code;
-    const hasDialogFormat =
-      example.messages &&
-      Array.isArray(example.messages) &&
-      example.messages.length > 0 &&
-      example.code;
-
-    if (!hasTraditionalFormat && !hasDialogFormat) {
-      return {
-        success: false,
-        message:
-          "Example must include either (description and code) or (messages array and code)",
-      };
-    }
-
-    const db = getFirestoreDb();
-    const trainingCollRef = db.collection("training_examples");
-
-    // Generate keywords from all available text
-    let textToIndexForKeywords = "";
-
-    // For dialog-based examples, extract text from all messages
-    if (example.messages && Array.isArray(example.messages)) {
-      textToIndexForKeywords = example.messages
-        .map((m) => m.content || "")
-        .join(" ");
-
-      // Generate a description from the first user message if none provided
-      if (!example.description) {
-        const userMessage = example.messages.find((m) => m.role === "user");
-        if (userMessage) {
-          example.description =
-            userMessage.content.substring(0, 100) +
-            (userMessage.content.length > 100 ? "..." : "");
-        }
-      }
-    }
-    // Fall back to description or code
-    else if (example.description) {
-      textToIndexForKeywords = example.description;
-    }
-
-    // Extract keywords for better searchability
-    const keywords = textToIndexForKeywords
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(
-        (word) =>
-          word.length > 3 &&
-          !["function", "const", "return", "this", "that"].includes(word),
-      );
-
-    // Ensure the example has a language code (default to "0002" if not provided)
-    const lang = example.lang || "0002";
-
-    // Add the example to Firestore with embedding
-    const docId = await addDocumentWithEmbedding({
-      db: db,
-      collection: "training_examples",
-      data: {
-        ...example,
-        lang, // Make sure language is explicitly included
-        keywords,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-    });
-
-    return {
-      success: true,
-      message: `Training example added successfully for language ${lang} with embedding`,
-      id: docId,
-    };
-  } catch (error) {
-    console.error("Error adding training example:", error);
-    return {
-      success: false,
-      message: `Failed to add example: ${error.message}`,
-    };
-  }
-}
 
 /**
  * Reads dialect-specific instructions from markdown files in the training directory
@@ -968,64 +894,6 @@ When fixing code:
   );
 }
 
-/**
- * Store successful code generation in Firebase for future reference
- * @param {string} prompt - User's original prompt
- * @param {string} code - Successfully generated code
- * @param {string} lang - Language code (e.g., "0002")
- * @param {boolean} verified - Whether the code passed verification
- */
-async function storeSuccessfulGeneration(
-  prompt,
-  code,
-  lang = "0002",
-  verified = true,
-  rid = null,
-) {
-  try {
-    const db = getFirestoreDb();
-
-    // Store in a separate collection for successful generations with embedding
-    const docRef = await addDocumentWithEmbedding({
-      db: db,
-      collection: "successful_generations",
-      data: {
-        prompt,
-        code,
-        lang: lang, // Store the language code
-        verified,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        // Extract keywords for better searchability
-        keywords: prompt
-          .toLowerCase()
-          .split(/\s+/)
-          .filter((word) => word.length > 3),
-      },
-    });
-
-    console.log(
-      `Stored successful generation with embedding for language ${lang}`,
-    );
-
-    if (rid) {
-      ragLog(rid, "persistence.success", {
-        docId: docRef?.id,
-        lang,
-        verified,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  } catch (error) {
-    // Just log error but don't interrupt the main flow
-    console.error("Failed to store successful generation:", error);
-
-    if (rid) {
-      ragLog(rid, "persistence.error", {
-        error: error.message,
-      });
-    }
-  }
-}
 
 /**
  * Processes generated code to fix common issues and extract only the code portion
@@ -1158,14 +1026,6 @@ export async function generateCode({
           verificationResult.status === "success" &&
           !verificationResult.error
         ) {
-          // Store this successful generation for future training
-          await storeSuccessfulGeneration(
-            prompt,
-            generatedCode,
-            lang,
-            true,
-            rid,
-          );
           break;
         }
 
@@ -1220,19 +1080,6 @@ export async function generateCode({
         }
       }
 
-      // If we've reached max fix attempts but code still works, store it anyway
-      if (
-        fixAttempts >= MAX_FIX_ATTEMPTS &&
-        verificationResult.status !== "error"
-      ) {
-        await storeSuccessfulGeneration(
-          prompt,
-          generatedCode,
-          lang,
-          false,
-          rid,
-        );
-      }
     }
 
     // Generate a description of the code
