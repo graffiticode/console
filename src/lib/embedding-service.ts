@@ -11,8 +11,9 @@ import { ragLog } from "./logger";
 // VectorValue may not be available in older Firebase Admin SDK versions
 let VectorValue: any;
 try {
-  const firestoreModule = require("firebase-admin/firestore");
-  VectorValue = firestoreModule.VectorValue;
+  // VectorValue is available as a static property on firestore namespace
+  // @ts-ignore - VectorValue exists at runtime but not in type definitions
+  VectorValue = admin.firestore.VectorValue;
 } catch (e) {
   // VectorValue not available, will use arrays directly
   VectorValue = null;
@@ -319,7 +320,7 @@ export async function vectorSearch({
 
     // Convert to VectorValue if available, otherwise use array directly
     const vectorQuery = VectorValue
-      ? VectorValue.fromArray(queryEmbedding)
+      ? new VectorValue(queryEmbedding)
       : queryEmbedding;
 
     // Perform vector similarity search
@@ -455,12 +456,6 @@ export async function hybridSearch({
       };
     });
 
-    console.log(
-      "hybridSearch()",
-      "scoreResults[].combinedScore=" +
-        JSON.stringify(scoredResults.map((r) => r.combinedScore)),
-      "scoredResults=" + JSON.stringify(scoredResults),
-    );
 
     // Sort by combined score and return top results
     const topResults = scoredResults
@@ -522,7 +517,7 @@ export async function addDocumentWithEmbedding({
 
     // Convert to VectorValue if available, otherwise use array directly
     const vectorValue = VectorValue
-      ? VectorValue.fromArray(embedding)
+      ? new VectorValue(embedding)
       : embedding;
 
     // Add or update document with embedding

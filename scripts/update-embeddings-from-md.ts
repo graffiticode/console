@@ -84,6 +84,20 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+// Import VectorValue after Firebase is initialized
+let VectorValue: any;
+try {
+  // VectorValue is available as a static property on firestore namespace
+  // @ts-ignore - VectorValue exists at runtime but not in type definitions
+  VectorValue = admin.firestore.VectorValue;
+  if (!VectorValue) {
+    throw new Error('VectorValue not found');
+  }
+} catch (e) {
+  // VectorValue not available, will use arrays directly
+  VectorValue = null;
+}
+
 interface TrainingExample {
   lang: string;
   exampleId: number;
@@ -415,7 +429,10 @@ async function storeExamplesWithEmbeddings(examples: TrainingExample[]) {
       
       docsToStore.forEach((doc, index) => {
         const docRef = db.collection(collectionName).doc(doc.id);
-        const vectorValue = embeddings[index];
+        // Convert to VectorValue if available, otherwise use array directly
+        const vectorValue = VectorValue 
+          ? new VectorValue(embeddings[index])
+          : embeddings[index];
         
         writeBatch.set(docRef, {
           ...doc.data,

@@ -15,7 +15,6 @@
     "lint:fix": "eslint --fix \"src/**/*.{ts,tsx}\"",
     "typecheck": "tsc",
     "download-training-examples": "node --experimental-strip-types scripts/download-training-examples.ts",
-    "update-embeddings": "node --experimental-strip-types scripts/update-embeddings.ts --collection training_examples",
     "update-embeddings-from-md": "node --experimental-strip-types scripts/update-embeddings-from-md.ts"
   },
   "dependencies": {
@@ -57,7 +56,7 @@
     "d3": "^7.6.1",
     "dashify": "^2.0.0",
     "firebase": "^9.23.0",
-    "firebase-admin": "^12.2.0",
+    "firebase-admin": "^13.5.0",
     "fs": "^0.0.1-security",
     "graphiql": "^2.4.0",
     "graphql": "^16.6.0",

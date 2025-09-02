@@ -22,9 +22,35 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "embedding",
+          "vectorConfig": {
+            "dimension": 1536,
+            "flat": {}
+          }
+        }
+      ]
+    },
+    {
+      "collectionGroup": "training_examples",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "lang",
           "order": "ASCENDING"
         },
+        {
+          "fieldPath": "embedding",
+          "vectorConfig": {
+            "dimension": 1536,
+            "flat": {}
+          }
+        }
+      ]
+    },
+    {
+      "collectionGroup": "successful_generations",
+      "queryScope": "COLLECTION",
+      "fields": [
         {
           "fieldPath": "embedding",
           "vectorConfig": {
