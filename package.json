@@ -15,7 +15,7 @@
     "lint:fix": "eslint --fix \"src/**/*.{ts,tsx}\"",
     "typecheck": "tsc",
     "download-training-examples": "node --experimental-strip-types scripts/download-training-examples.ts",
-    "update-embeddings-from-md": "node --experimental-strip-types scripts/update-embeddings-from-md.ts"
+    "update-embeddings": "node --experimental-strip-types scripts/update-embeddings-from-md.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",

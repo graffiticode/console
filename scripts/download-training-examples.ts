@@ -245,7 +245,7 @@ function processItems(items: any[]): any[] {
         if (helpObj.type === "text" && helpObj.text) {
           content = helpObj.text;
         } else if (helpObj.type === "code" && helpObj.text) {
-          content = `\`\`\`${helpObj.language || "ocaml"}\n${helpObj.text}\n\`\`\``;
+          content = `\`\`\`${helpObj.language || "graffiticode"}\n${helpObj.text}\n\`\`\``;
         }
         
         if (content) {
