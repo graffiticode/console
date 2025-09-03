@@ -1008,7 +1008,7 @@ export async function generateCode({
         model: options.model || CLAUDE_MODELS.DEFAULT,
         temperature: options.temperature || 0.2,
         maxTokens: options.maxTokens || 4096,
-        maxContinuations: options.maxContinuations || 5  // Conservative default
+        maxContinuations: options.maxContinuations || 10  // Conservative default
       },
       onProgress: rid ? (message) => ragLog(rid, "streaming.progress", { message }) : undefined
     });
@@ -1073,7 +1073,7 @@ export async function generateCode({
               model: options.model || CLAUDE_MODELS.DEFAULT,
               temperature: 0.1, // Lower temperature for more deterministic fixes
               maxTokens: options.maxTokens || 4096,
-              maxContinuations: 2  // Limit continuations for fixes
+              maxContinuations: 10
             },
             onProgress: rid ? (message) => ragLog(rid, "fix.progress", { message }) : undefined
           });

@@ -56,6 +56,11 @@ class ClaudeStreamParser {
         try {
           const parsed = JSON.parse(data);
 
+          // Debug logging for event types (can be removed later)
+          if (parsed.type && !['content_block_delta', 'message_delta'].includes(parsed.type)) {
+            console.debug('SSE event type:', parsed.type);
+          }
+
           // Handle different event types
           if (parsed.type === 'content_block_delta') {
             chunks.push({
@@ -73,6 +78,9 @@ class ClaudeStreamParser {
                 }
               });
             }
+          } else if (parsed.type === 'message_stop' || parsed.type === 'content_block_stop') {
+            // Claude API sends these events when content is complete
+            chunks.push({ type: "complete" });
           } else if (parsed.type === 'error') {
             chunks.push({
               type: "error",
@@ -108,45 +116,73 @@ function appearsTruncated(content: string): boolean {
     return true;
   }
 
-  // If we have complete code blocks, check if the Graffiticode inside ends with ..
+  // If we have complete code blocks, check if ANY substantial code block ends with ..
   if (codeBlockCount > 0) {
-    // Extract the last code block's content
-    const lastCodeBlockMatch = content.match(/```(?:[\w]*\n|\n)?([\s\S]*?)```(?![\s\S]*```)/);
-    if (lastCodeBlockMatch) {
-      const codeContent = lastCodeBlockMatch[1].trim();
-      if (codeContent && !codeContent.endsWith('..')) {
-        // Graffiticode inside code block doesn't end with ..
-        return true;
-      }
-    }
-  }
+    // Extract ALL code blocks
+    const codeBlocks = content.split('```');
+    if (codeBlocks.length >= 3 && codeBlocks.length % 2 === 1) {
+      // Check each code block (they're at even indices: 1, 3, 5, etc.)
+      for (let i = 1; i < codeBlocks.length; i += 2) {
+        const blockContent = codeBlocks[i];
+        // Remove language identifier if present (e.g., "javascript\n")
+        const codeContent = blockContent.replace(/^[\w]*\n/, '').trim();
 
-  // For content outside code blocks or after the last code block
-  // Check if there's significant content after the last ```
-  const lastCodeBlockEnd = content.lastIndexOf('```');
-  if (lastCodeBlockEnd !== -1) {
-    const afterCodeBlock = content.substring(lastCodeBlockEnd + 3).trim();
-    // If there's substantial content after the code block, check if it looks incomplete
-    if (afterCodeBlock.length > 50) {
-      // Check for truncation indicators in the trailing content
-      const truncationIndicators = [
-        /[^\\]["']$/,  // Ends with unescaped quote
-        /[\[{(,]$/,  // Ends with opening bracket or comma
-        /[=+\-*/<>!&|:]$/,  // Ends with operator or colon
-      ];
+        // Skip empty or very short code blocks (likely just snippets)
+        if (codeContent.length < 10) continue;
 
-      for (const pattern of truncationIndicators) {
-        if (pattern.test(afterCodeBlock)) {
+        // Check if this looks like a complete Graffiticode program
+        // A complete program should have substantial content and end with ..
+        const hasSubstantialContent =
+          codeContent.includes('{') ||
+          codeContent.includes('let') ||
+          codeContent.includes('map') ||
+          codeContent.includes('cells') ||
+          codeContent.includes('columns');
+
+        if (hasSubstantialContent && codeContent.endsWith('..')) {
+          // Found a complete Graffiticode program
+          return false;
+        } else if (hasSubstantialContent && !codeContent.endsWith('..')) {
+          // Found a substantial code block that doesn't end with ..
           return true;
         }
       }
+
+      // If we only found small snippets or fragments, check the longest one
+      let longestBlock = '';
+      for (let i = 1; i < codeBlocks.length; i += 2) {
+        const blockContent = codeBlocks[i].replace(/^[\w]*\n/, '').trim();
+        if (blockContent.length > longestBlock.length) {
+          longestBlock = blockContent;
+        }
+      }
+
+      if (longestBlock && !longestBlock.endsWith('..')) {
+        return true;
+      }
     }
+    // If all code blocks are properly terminated, consider it complete
+    return false;
   }
 
-  // Check if the last line is extremely long (likely mid-sentence)
+  // Only check for truncation in non-code content if there are no code blocks at all
+  // This handles cases where the response is pure text without code
   const lastLine = trimmed.split('\n').pop() || '';
-  if (lastLine.length > 200 && !lastLine.includes('```')) {
+  if (lastLine.length > 200) {
     return true;
+  }
+
+  // Check for obvious truncation indicators at the very end
+  const truncationIndicators = [
+    /[^\\]["']$/,  // Ends with unescaped quote
+    /[\[{(,]$/,  // Ends with opening bracket or comma
+    /[=+\-*/<>!&|:]$/,  // Ends with operator or colon
+  ];
+
+  for (const pattern of truncationIndicators) {
+    if (pattern.test(trimmed)) {
+      return true;
+    }
   }
 
   return false;
@@ -259,16 +295,27 @@ export async function* streamClaudeCode({
     }
 
     // Primary check: Did the API signal completion naturally?
-    if (isComplete && !appearsTruncated(chunkContent)) {
+    const isTruncated = appearsTruncated(chunkContent);
+    console.log(
+      "streamClaudeCode()",
+      "isTruncated=" + isTruncated,
+      "isComplete=" + isComplete,
+    );
+    if (isComplete && !isTruncated) {
       console.log(`Response completed naturally after ${continuationCount + 1} chunk(s)`);
       break;
+    }
+
+    // Debug logging
+    if (isComplete && isTruncated) {
+      console.log(`API signaled complete but content appears truncated`);
     }
 
     // Check if response was cut off (likely hit token limit)
     const likelyHitTokenLimit = chunkContent.length >= (options.maxTokens || 4096) * 3;
 
     // If response is very short and API signals complete, trust it
-    if (chunkContent.length < 500 && isComplete) {
+    if (chunkContent.length < 500 && isComplete && !isTruncated) {
       consecutiveShortResponses++;
       if (consecutiveShortResponses >= 2) {
         console.log(`Response appears complete (consecutive short responses)`);
@@ -278,10 +325,11 @@ export async function* streamClaudeCode({
       consecutiveShortResponses = 0;
     }
 
-    // Decide if we need continuation based on truncation detection
-    const needsContinuation =
-      !isComplete ||  // API didn't signal completion
-      (likelyHitTokenLimit && appearsTruncated(chunkContent));  // Hit limit and looks truncated
+    // Decide if we need continuation
+    // Continue if:
+    // 1. API didn't signal completion (!isComplete)
+    // 2. Content appears truncated (isTruncated), regardless of why
+    const needsContinuation = !isComplete || isTruncated;
 
     if (needsContinuation) {
       console.log(`Continuing generation (chunk ${continuationCount + 2}/${maxContinuations})`);
