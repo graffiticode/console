@@ -12,6 +12,7 @@
  *   --file <path>        Specific markdown file to process
  *   --batch-size <num>   Number of documents to process at once (default: 10)
  *   --collection <name>  Target collection name (default: training_examples)
+ *   --refresh            Delete existing docs for the language before uploading new ones
  */
 
 import admin from 'firebase-admin';
@@ -39,6 +40,7 @@ const lang = getArg('lang');
 const specificFile = getArg('file');
 const batchSize = parseInt(getArg('batch-size', '10') || '10');
 const collectionName = getArg('collection', 'training_examples');
+const refresh = args.includes('--refresh');
 
 // Show help if requested
 if (args.includes('--help')) {
@@ -50,12 +52,14 @@ Options:
   --file <path>        Specific markdown file to process
   --batch-size <num>   Number of documents to process at once (default: 10)
   --collection <name>  Target collection name (default: training_examples)
+  --refresh            Delete existing docs for the language before uploading new ones
   --help               Show this help message
 
 Examples:
   npm run update-embeddings-from-md -- --lang 0165
   npm run update-embeddings-from-md -- --file training/l0165-training-examples.md
   npm run update-embeddings-from-md -- --lang 0002 --batch-size 5
+  npm run update-embeddings-from-md -- --lang 0165 --refresh
 `);
   process.exit(0);
 }
@@ -308,6 +312,53 @@ function parseMarkdownFile(filePath: string, langCode: string): TrainingExample[
 }
 
 /**
+ * Delete existing documents for specified language(s)
+ */
+async function deleteExistingDocs(languages: string[]): Promise<number> {
+  console.log(`\nDeleting existing documents for language(s): ${languages.join(', ')}`);
+  
+  let totalDeleted = 0;
+  
+  for (const langCode of languages) {
+    console.log(`  Querying documents for language ${langCode}...`);
+    
+    // Query all documents with this language
+    const snapshot = await db.collection(collectionName)
+      .where('lang', '==', langCode)
+      .get();
+    
+    if (snapshot.empty) {
+      console.log(`  No existing documents found for language ${langCode}`);
+      continue;
+    }
+    
+    console.log(`  Found ${snapshot.size} documents for language ${langCode}`);
+    
+    // Delete in batches (Firestore batch limit is 500)
+    const batchSize = 500;
+    const docs = snapshot.docs;
+    
+    for (let i = 0; i < docs.length; i += batchSize) {
+      const batch = db.batch();
+      const batchDocs = docs.slice(i, Math.min(i + batchSize, docs.length));
+      
+      batchDocs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      await batch.commit();
+      const deletedCount = batchDocs.length;
+      totalDeleted += deletedCount;
+      console.log(`  Deleted batch of ${deletedCount} documents`);
+    }
+    
+    console.log(`  ✓ Deleted ${snapshot.size} documents for language ${langCode}`);
+  }
+  
+  return totalDeleted;
+}
+
+/**
  * Get markdown files to process
  */
 function getMarkdownFiles(): Array<{path: string, lang: string}> {
@@ -479,6 +530,13 @@ async function main() {
     
     console.log(`Found ${files.length} file(s) to process:`);
     files.forEach(f => console.log(`  - ${f.path} (language: ${f.lang})`));
+    
+    // If refresh flag is set, delete existing documents for these languages
+    if (refresh) {
+      const languages = [...new Set(files.map(f => f.lang))]; // Get unique languages
+      const deletedCount = await deleteExistingDocs(languages);
+      console.log(`\n✓ Deleted ${deletedCount} existing documents`);
+    }
     
     // Parse all files
     const allExamples: TrainingExample[] = [];

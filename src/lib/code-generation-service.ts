@@ -21,6 +21,7 @@ import {
   vectorSearch,
   hybridSearch,
 } from "./embedding-service";
+import { generateCodeWithContinuation } from "./claude-stream-service";
 
 // Define available Claude models with best practices
 const CLAUDE_MODELS = {
@@ -948,6 +949,8 @@ interface GenerateCodeOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  useStreaming?: boolean;  // Default: true. Set to false to disable streaming
+  maxContinuations?: number;  // Max number of continuation chunks (default: 5)
 }
 
 export async function generateCode({
@@ -974,6 +977,48 @@ export async function generateCode({
   // - Override with HAIKU for: Simple templates, basic transformations
 
   try {
+    // Use streaming by default unless explicitly disabled
+    if (options.useStreaming !== false) {
+      console.log("Using streaming mode for code generation");
+
+      // Use the streaming service for long responses
+      const streamResult = await generateCodeWithContinuation({
+        prompt,
+        lang,
+        currentCode,
+        options: {
+          model: options.model || CLAUDE_MODELS.DEFAULT,
+          temperature: options.temperature || 0.2,
+          maxTokens: options.maxTokens || 4096,
+          maxContinuations: options.maxContinuations || 5  // Conservative default
+        },
+        onProgress: (message) => console.log(`Streaming progress: ${message}`)
+      });
+
+      if (streamResult.error) {
+        throw new Error(streamResult.error);
+      }
+
+      console.log(`Generated code using ${streamResult.chunks} chunk(s)`);
+
+      // Return the result in the expected format
+      return {
+        code: streamResult.code,
+        description: `Generated code in ${streamResult.chunks} chunk(s)`,
+        lang: lang,
+        model: options.model || CLAUDE_MODELS.DEFAULT,
+        usage: {
+          input_tokens: streamResult.usage.inputTokens,
+          output_tokens: streamResult.usage.outputTokens,
+        },
+        verification: null,
+        fixAttempts: 0,
+        streaming: true,
+        chunks: streamResult.chunks
+      };
+    }
+
+    // Original non-streaming code path
     // Retrieve relevant examples for this prompt, filtered by language
     const relevantExamples = await getRelevantExamples({
       prompt,

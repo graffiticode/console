@@ -14,8 +14,10 @@
     "lint": "next lint",
     "lint:fix": "eslint --fix \"src/**/*.{ts,tsx}\"",
     "typecheck": "tsc",
-    "download-training-examples": "node --experimental-strip-types scripts/download-training-examples.ts",
-    "update-embeddings": "node --experimental-strip-types scripts/update-embeddings-from-md.ts"
+    "download-training-examples": "npx tsx scripts/download-training-examples.ts",
+    "update-embeddings": "npx tsx scripts/update-embeddings.ts",
+    "update-embeddings-refresh": "npx tsx scripts/update-embeddings.ts",
+    "test:streaming": "npx tsx scripts/test-streaming.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",
