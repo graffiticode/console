@@ -24,7 +24,7 @@ import {
 import { generateCodeWithContinuation } from "./claude-stream-service";
 
 // Define available Claude models with best practices
-const CLAUDE_MODELS = {
+export const CLAUDE_MODELS = {
   OPUS: "claude-opus-4-20250514",
   SONNET: "claude-sonnet-4-20250514",
   HAIKU: "claude-3-5-haiku-20241022",

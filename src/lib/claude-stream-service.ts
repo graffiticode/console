@@ -9,6 +9,7 @@
  */
 
 import axios from "axios";
+import { CLAUDE_MODELS } from "./code-generation-service";
 
 interface StreamOptions {
   model?: string;
@@ -98,95 +99,6 @@ class ClaudeStreamParser {
   }
 }
 
-/**
- * Check if the generated content appears to be truncated mid-generation
- * For Graffiticode:
- * - All valid programs end with .. (double dots)
- * - Code blocks must be properly closed with matching ```
- */
-function appearsTruncated(content: string): boolean {
-  if (!content || content.length === 0) return false;
-
-  const trimmed = content.trim();
-
-  // Check for incomplete code blocks (odd number of ```)
-  const codeBlockCount = (content.match(/```/g) || []).length;
-  if (codeBlockCount % 2 !== 0) {
-    // Unclosed code block - definitely truncated
-    return true;
-  }
-
-  // If we have complete code blocks, check if ANY substantial code block ends with ..
-  if (codeBlockCount > 0) {
-    // Extract ALL code blocks
-    const codeBlocks = content.split('```');
-    if (codeBlocks.length >= 3 && codeBlocks.length % 2 === 1) {
-      // Check each code block (they're at even indices: 1, 3, 5, etc.)
-      for (let i = 1; i < codeBlocks.length; i += 2) {
-        const blockContent = codeBlocks[i];
-        // Remove language identifier if present (e.g., "javascript\n")
-        const codeContent = blockContent.replace(/^[\w]*\n/, '').trim();
-
-        // Skip empty or very short code blocks (likely just snippets)
-        if (codeContent.length < 10) continue;
-
-        // Check if this looks like a complete Graffiticode program
-        // A complete program should have substantial content and end with ..
-        const hasSubstantialContent =
-          codeContent.includes('{') ||
-          codeContent.includes('let') ||
-          codeContent.includes('map') ||
-          codeContent.includes('cells') ||
-          codeContent.includes('columns');
-
-        if (hasSubstantialContent && codeContent.endsWith('..')) {
-          // Found a complete Graffiticode program
-          return false;
-        } else if (hasSubstantialContent && !codeContent.endsWith('..')) {
-          // Found a substantial code block that doesn't end with ..
-          return true;
-        }
-      }
-
-      // If we only found small snippets or fragments, check the longest one
-      let longestBlock = '';
-      for (let i = 1; i < codeBlocks.length; i += 2) {
-        const blockContent = codeBlocks[i].replace(/^[\w]*\n/, '').trim();
-        if (blockContent.length > longestBlock.length) {
-          longestBlock = blockContent;
-        }
-      }
-
-      if (longestBlock && !longestBlock.endsWith('..')) {
-        return true;
-      }
-    }
-    // If all code blocks are properly terminated, consider it complete
-    return false;
-  }
-
-  // Only check for truncation in non-code content if there are no code blocks at all
-  // This handles cases where the response is pure text without code
-  const lastLine = trimmed.split('\n').pop() || '';
-  if (lastLine.length > 200) {
-    return true;
-  }
-
-  // Check for obvious truncation indicators at the very end
-  const truncationIndicators = [
-    /[^\\]["']$/,  // Ends with unescaped quote
-    /[\[{(,]$/,  // Ends with opening bracket or comma
-    /[=+\-*/<>!&|:]$/,  // Ends with operator or colon
-  ];
-
-  for (const pattern of truncationIndicators) {
-    if (pattern.test(trimmed)) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 /**
  * Stream code generation from Claude with automatic continuation
@@ -219,7 +131,6 @@ export async function* streamClaudeCode({
   let conversationHistory = [...messages];
   let fullContent = "";
   let totalUsage = { inputTokens: 0, outputTokens: 0 };
-  let consecutiveShortResponses = 0;  // Track short responses that might indicate completion
 
   // Add initial user message if prompt provided
   if (prompt) {
@@ -236,7 +147,7 @@ export async function* streamClaudeCode({
       const response = await axios.post(
         "https://api.anthropic.com/v1/messages",
         {
-          model: options.model || "claude-3-5-sonnet-20241022",
+          model: options.model || CLAUDE_MODELS.DEFAULT,
           system: systemPrompt,
           messages: conversationHistory,
           max_tokens: options.maxTokens || 4096,
@@ -294,41 +205,37 @@ export async function* streamClaudeCode({
       return;
     }
 
-    // Primary check: Did the API signal completion naturally?
-    const isTruncated = appearsTruncated(chunkContent);
+    // Check for truncation:
+    // 1. Odd number of ``` (unclosed block) OR
+    // 2. No .. anywhere in the code
+    let isTruncated = false;
+
+    const codeBlockCount = (fullContent.match(/```/g) || []).length;
+
+    if (codeBlockCount % 2 !== 0) {
+      // Odd number of ``` means unclosed code block - definitely truncated
+      isTruncated = true;
+    } else if (codeBlockCount > 0) {
+      // Even number of ``` - check if any code contains ..
+      isTruncated = !fullContent.includes('..');
+    }
+
     console.log(
       "streamClaudeCode()",
-      "isTruncated=" + isTruncated,
+      "fullContent=" + fullContent,
+      "codeBlockCount=" + codeBlockCount,
       "isComplete=" + isComplete,
+      "chunkLength=" + chunkContent.length,
+      "isTruncated=" + isTruncated,
     );
+
+    // If API says complete AND code ends with .., we're done
     if (isComplete && !isTruncated) {
-      console.log(`Response completed naturally after ${continuationCount + 1} chunk(s)`);
+      console.log(`Response completed after ${continuationCount + 1} chunk(s)`);
       break;
     }
 
-    // Debug logging
-    if (isComplete && isTruncated) {
-      console.log(`API signaled complete but content appears truncated`);
-    }
-
-    // Check if response was cut off (likely hit token limit)
-    const likelyHitTokenLimit = chunkContent.length >= (options.maxTokens || 4096) * 3;
-
-    // If response is very short and API signals complete, trust it
-    if (chunkContent.length < 500 && isComplete && !isTruncated) {
-      consecutiveShortResponses++;
-      if (consecutiveShortResponses >= 2) {
-        console.log(`Response appears complete (consecutive short responses)`);
-        break;
-      }
-    } else {
-      consecutiveShortResponses = 0;
-    }
-
-    // Decide if we need continuation
-    // Continue if:
-    // 1. API didn't signal completion (!isComplete)
-    // 2. Content appears truncated (isTruncated), regardless of why
+    // Continue if API says not complete OR if code doesn't end with ..
     const needsContinuation = !isComplete || isTruncated;
 
     if (needsContinuation) {
