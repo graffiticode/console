@@ -91,44 +91,62 @@ class ClaudeStreamParser {
 }
 
 /**
- * Check if the generated content appears to be complete
+ * Check if the generated content appears to be truncated mid-generation
+ * For Graffiticode:
+ * - All valid programs end with .. (double dots)
+ * - Code blocks must be properly closed with matching ```
  */
-function isContentComplete(content: string): boolean {
+function appearsTruncated(content: string): boolean {
+  if (!content || content.length === 0) return false;
+
   const trimmed = content.trim();
 
-  // Check for common code completion indicators
-  const completionIndicators = [
-    // Code block endings
-    '```',
-    // Common Graffiticode terminators
-    '..',
-    // End of function/block in various languages
-    '}',
-    ')',
-    'end',
-    // End of sentence for natural language
-    '.',
-    '!',
-    '?'
-  ];
+  // Check for incomplete code blocks (odd number of ```)
+  const codeBlockCount = (content.match(/```/g) || []).length;
+  if (codeBlockCount % 2 !== 0) {
+    // Unclosed code block - definitely truncated
+    return true;
+  }
 
-  // Check if content ends with any completion indicator
-  for (const indicator of completionIndicators) {
-    if (trimmed.endsWith(indicator)) {
-      return true;
+  // If we have complete code blocks, check if the Graffiticode inside ends with ..
+  if (codeBlockCount > 0) {
+    // Extract the last code block's content
+    const lastCodeBlockMatch = content.match(/```(?:[\w]*\n|\n)?([\s\S]*?)```(?![\s\S]*```)/);
+    if (lastCodeBlockMatch) {
+      const codeContent = lastCodeBlockMatch[1].trim();
+      if (codeContent && !codeContent.endsWith('..')) {
+        // Graffiticode inside code block doesn't end with ..
+        return true;
+      }
     }
   }
 
-  // Check if we're in the middle of a word (incomplete)
-  const lastChar = trimmed[trimmed.length - 1];
-  if (lastChar && /[a-zA-Z0-9]/.test(lastChar)) {
-    // Ends with alphanumeric - might be incomplete
-    const lastLine = trimmed.split('\n').pop() || '';
+  // For content outside code blocks or after the last code block
+  // Check if there's significant content after the last ```
+  const lastCodeBlockEnd = content.lastIndexOf('```');
+  if (lastCodeBlockEnd !== -1) {
+    const afterCodeBlock = content.substring(lastCodeBlockEnd + 3).trim();
+    // If there's substantial content after the code block, check if it looks incomplete
+    if (afterCodeBlock.length > 50) {
+      // Check for truncation indicators in the trailing content
+      const truncationIndicators = [
+        /[^\\]["']$/,  // Ends with unescaped quote
+        /[\[{(,]$/,  // Ends with opening bracket or comma
+        /[=+\-*/<>!&|:]$/,  // Ends with operator or colon
+      ];
 
-    // If the last line is very long, we're probably mid-sentence
-    if (lastLine.length > 80) {
-      return false;
+      for (const pattern of truncationIndicators) {
+        if (pattern.test(afterCodeBlock)) {
+          return true;
+        }
+      }
     }
+  }
+
+  // Check if the last line is extremely long (likely mid-sentence)
+  const lastLine = trimmed.split('\n').pop() || '';
+  if (lastLine.length > 200 && !lastLine.includes('```')) {
+    return true;
   }
 
   return false;
@@ -160,7 +178,7 @@ export async function* streamClaudeCode({
     return;
   }
 
-  const maxContinuations = options.maxContinuations || 5;
+  const maxContinuations = options.maxContinuations || 10;
   let continuationCount = 0;
   let conversationHistory = [...messages];
   let fullContent = "";
@@ -240,14 +258,17 @@ export async function* streamClaudeCode({
       return;
     }
 
-    // Check if the response appears complete
-    if (isContentComplete(chunkContent)) {
-      console.log(`Response appears complete after ${continuationCount + 1} chunk(s)`);
+    // Primary check: Did the API signal completion naturally?
+    if (isComplete && !appearsTruncated(chunkContent)) {
+      console.log(`Response completed naturally after ${continuationCount + 1} chunk(s)`);
       break;
     }
 
-    // If response is very short, it might be naturally complete
-    if (chunkContent.length < 500) {
+    // Check if response was cut off (likely hit token limit)
+    const likelyHitTokenLimit = chunkContent.length >= (options.maxTokens || 4096) * 3;
+
+    // If response is very short and API signals complete, trust it
+    if (chunkContent.length < 500 && isComplete) {
       consecutiveShortResponses++;
       if (consecutiveShortResponses >= 2) {
         console.log(`Response appears complete (consecutive short responses)`);
@@ -257,10 +278,10 @@ export async function* streamClaudeCode({
       consecutiveShortResponses = 0;
     }
 
-    // Check if we hit the token limit (response stopped mid-content)
-    // Only continue if response is substantial and appears truncated
-    const appearsTruncated = chunkContent.length >= (options.maxTokens || 4096) * 2.5;
-    const needsContinuation = !isComplete || (appearsTruncated && !isContentComplete(chunkContent));
+    // Decide if we need continuation based on truncation detection
+    const needsContinuation =
+      !isComplete ||  // API didn't signal completion
+      (likelyHitTokenLimit && appearsTruncated(chunkContent));  // Hit limit and looks truncated
 
     if (needsContinuation) {
       console.log(`Continuing generation (chunk ${continuationCount + 2}/${maxContinuations})`);
@@ -375,12 +396,14 @@ export function extractCodeBlocks(content: string): string[] {
  */
 export async function generateCodeWithContinuation({
   prompt,
+  formattedPrompt,  // Accept pre-formatted prompt with examples
   lang = "0002",
   currentCode = null,
   options = {},
   onProgress
 }: {
-  prompt: string;
+  prompt?: string;  // Original prompt (optional if formattedPrompt provided)
+  formattedPrompt?: string;  // Pre-formatted prompt with examples and system instructions
   lang?: string;
   currentCode?: string | null;
   options?: StreamOptions;
@@ -391,25 +414,46 @@ export async function generateCodeWithContinuation({
   chunks: number;
   error?: string;
 }> {
-  // Build the system prompt (reuse logic from code-generation-service.ts)
-  const systemPrompt = `You are a programming assistant that translates natural language into code written in Graffiticode dialect L${lang}.
+  // Parse formatted prompt if provided, otherwise build from scratch
+  let systemPrompt: string;
+  let messages: Array<{ role: string; content: string }> = [];
+
+  if (formattedPrompt) {
+    // Parse the JSON formatted prompt that includes system and messages
+    try {
+      const parsed = JSON.parse(formattedPrompt);
+      systemPrompt = parsed.system;
+      messages = parsed.messages;
+    } catch (e) {
+      console.error("Failed to parse formatted prompt, falling back to simple format");
+      // Treat it as a simple prompt if parsing fails
+      systemPrompt = `You are a programming assistant that translates natural language into code written in Graffiticode dialect L${lang}.
   
 Generate ONLY valid Graffiticode code. Put the code between triple backticks (\`\`\`).
 Do not include any explanatory text outside the code blocks unless specifically requested.`;
-
-  // Build messages array
-  const messages: Array<{ role: string; content: string }> = [];
-
-  if (currentCode) {
-    messages.push({
-      role: "user",
-      content: `Current code:\n\`\`\`\n${currentCode}\n\`\`\`\n\nModify it to: ${prompt}`
-    });
+      messages.push({
+        role: "user",
+        content: formattedPrompt
+      });
+    }
   } else {
-    messages.push({
-      role: "user",
-      content: prompt
-    });
+    // Fallback to original logic if no formatted prompt provided
+    systemPrompt = `You are a programming assistant that translates natural language into code written in Graffiticode dialect L${lang}.
+    
+Generate ONLY valid Graffiticode code. Put the code between triple backticks (\`\`\`).
+Do not include any explanatory text outside the code blocks unless specifically requested.`;
+
+    if (currentCode && prompt) {
+      messages.push({
+        role: "user",
+        content: `Current code:\n\`\`\`\n${currentCode}\n\`\`\`\n\nModify it to: ${prompt}`
+      });
+    } else if (prompt) {
+      messages.push({
+        role: "user",
+        content: prompt
+      });
+    }
   }
 
   // Track progress

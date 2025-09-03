@@ -125,8 +125,6 @@ function parseMarkdownExamples(markdownContent) {
 
 async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
   try {
-    console.log(`Getting relevant examples for language: ${lang}`);
-
     if (rid) {
       ragLog(rid, "retrieval.start", {
         query: prompt.substring(0, 100),
@@ -151,10 +149,6 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
       });
 
       if (results && results.length > 0) {
-        console.log(
-          `Found ${results.length} relevant examples using vector search for L${lang}`,
-        );
-
         // Transform the results to match the expected format
         const transformedResults = results.map(doc => {
           // The new format has these fields: lang, prompt, code, messages, tags, etc.
@@ -207,8 +201,6 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
     }
 
     // Fallback to keyword-based search if vector search fails or returns no results
-    console.log("Falling back to keyword-based search...");
-
     // Import local training data from markdown format only
     const fs = require("fs");
     const path = require("path");
@@ -225,9 +217,6 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
       // Read and parse the markdown file
       const markdownContent = fs.readFileSync(mdFilePath, "utf8");
       examples = parseMarkdownExamples(markdownContent);
-      console.log(
-        `Loaded ${examples.length} examples from markdown file for L${lang}`,
-      );
     } else {
       console.warn(`No training examples file found for L${lang}`);
       return [];
@@ -268,8 +257,6 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
     const topExamples = scoredExamples
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
-
-    console.log(`Found ${topExamples.length} relevant examples for the prompt`);
 
     if (rid) {
       ragLog(rid, "retrieval.result", {
@@ -318,12 +305,10 @@ function readDialectInstructions(lang) {
 
     // Check if file exists
     if (fs.existsSync(instructionsPath)) {
-      console.log(`Found dialect instructions for L${lang}`);
       // Read the file content
       const instructions = fs.readFileSync(instructionsPath, "utf8");
       return `\n${instructions}\n`;
     } else {
-      console.log(`No dialect instructions file found for L${lang}`);
       return "";
     }
   } catch (error) {
@@ -709,7 +694,6 @@ function getFallbackResponse(prompt, options) {
  * @returns {Promise<Object>} - Compilation results including any errors
  */
 async function verifyCode(code, authToken, rid = null) {
-  console.log("verifyCode()", "code=" + code);
 
   const startTime = Date.now();
 
@@ -721,12 +705,36 @@ async function verifyCode(code, authToken, rid = null) {
 
   try {
     const task = { lang: "0002", code };
-    const { id } = await postTask({
-      auth: { token: authToken },
-      task,
-      ephemeral: true,
-      isPublic: false,
-    });
+    let id;
+    try {
+      const result = await postTask({
+        auth: { token: authToken },
+        task,
+        ephemeral: true,
+        isPublic: false,
+      });
+      id = result?.id;
+    } catch (postError) {
+      console.error("postTask() ERROR", postError);
+      // Return error response if postTask fails
+      return {
+        status: "error",
+        error: {
+          message: `Failed to post task: ${postError.message || 'Internal Server Error'}`,
+          statusCode: postError.statusCode || 500
+        },
+        data: null,
+      };
+    }
+
+    if (!id) {
+      return {
+        status: "error",
+        error: { message: "No task ID returned from postTask" },
+        data: null,
+      };
+    }
+
     const compileResponse = await getData({ authToken, id });
     // Check if the response indicates an error but doesn't have a standardized error format
     if (compileResponse.status === "error" && !compileResponse.error) {
@@ -949,7 +957,6 @@ interface GenerateCodeOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
-  useStreaming?: boolean;  // Default: true. Set to false to disable streaming
   maxContinuations?: number;  // Max number of continuation chunks (default: 5)
 }
 
@@ -969,7 +976,6 @@ export async function generateCode({
   rid?: string | null;
 }) {
   const accessToken = auth?.token;
-  console.log("generateCode()", "prompt=" + prompt);
 
   // Model selection best practices:
   // - Default (Sonnet 3.5): Best for code generation, most tasks
@@ -977,48 +983,6 @@ export async function generateCode({
   // - Override with HAIKU for: Simple templates, basic transformations
 
   try {
-    // Use streaming by default unless explicitly disabled
-    if (options.useStreaming !== false) {
-      console.log("Using streaming mode for code generation");
-
-      // Use the streaming service for long responses
-      const streamResult = await generateCodeWithContinuation({
-        prompt,
-        lang,
-        currentCode,
-        options: {
-          model: options.model || CLAUDE_MODELS.DEFAULT,
-          temperature: options.temperature || 0.2,
-          maxTokens: options.maxTokens || 4096,
-          maxContinuations: options.maxContinuations || 5  // Conservative default
-        },
-        onProgress: (message) => console.log(`Streaming progress: ${message}`)
-      });
-
-      if (streamResult.error) {
-        throw new Error(streamResult.error);
-      }
-
-      console.log(`Generated code using ${streamResult.chunks} chunk(s)`);
-
-      // Return the result in the expected format
-      return {
-        code: streamResult.code,
-        description: `Generated code in ${streamResult.chunks} chunk(s)`,
-        lang: lang,
-        model: options.model || CLAUDE_MODELS.DEFAULT,
-        usage: {
-          input_tokens: streamResult.usage.inputTokens,
-          output_tokens: streamResult.usage.outputTokens,
-        },
-        verification: null,
-        fixAttempts: 0,
-        streaming: true,
-        chunks: streamResult.chunks
-      };
-    }
-
-    // Original non-streaming code path
     // Retrieve relevant examples for this prompt, filtered by language
     const relevantExamples = await getRelevantExamples({
       prompt,
@@ -1026,9 +990,6 @@ export async function generateCode({
       limit: 3,
       rid,
     });
-    console.log(
-      `Found ${relevantExamples.length} relevant examples for the prompt in language ${lang}`,
-    );
     // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
     const formattedPrompt = await createCodeGenerationPrompt(
       prompt,
@@ -1038,27 +999,34 @@ export async function generateCode({
       rid,
     );
 
-    // Use Claude 3.5 Sonnet for code generation - best balance of performance and cost
-    const model = options.model || CLAUDE_MODELS.DEFAULT;
+    // Use the streaming service (always, as it handles both short and long responses)
+    const streamResult = await generateCodeWithContinuation({
+      formattedPrompt,  // Using the formatted prompt with examples
+      lang,
+      currentCode,
+      options: {
+        model: options.model || CLAUDE_MODELS.DEFAULT,
+        temperature: options.temperature || 0.2,
+        maxTokens: options.maxTokens || 4096,
+        maxContinuations: options.maxContinuations || 5  // Conservative default
+      },
+      onProgress: rid ? (message) => ragLog(rid, "streaming.progress", { message }) : undefined
+    });
 
-    // Set up API call options
-    const apiOptions = {
-      model,
-      temperature: options.temperature || 0.2, // Lower temperature for more deterministic code generation
-      max_tokens: options.maxTokens || 4000,
-    };
+    if (streamResult.error) {
+      throw new Error(streamResult.error);
+    }
 
-    console.log("generateCode()", "formattedPrompt=" + formattedPrompt);
-
-    // Call the Claude API
-    const response = await callClaudeAPI(formattedPrompt, apiOptions, rid);
-    // Process the generated code to fix double backslashes and other issues
-    let generatedCode = processGeneratedCode(response.content, rid);
-    console.log("[1] generateCode()", "generatedCode=" + generatedCode);
+    // Process the generated code to fix any issues
+    let generatedCode = processGeneratedCode(streamResult.code, rid);
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
-    let finalUsage = { ...response.usage };
+    let finalUsage = {
+      prompt_tokens: streamResult.usage.inputTokens,
+      completion_tokens: streamResult.usage.outputTokens,
+      total_tokens: streamResult.usage.inputTokens + streamResult.usage.outputTokens
+    };
 
     // Verify the code if an access token is provided
     if (accessToken) {
@@ -1079,9 +1047,6 @@ export async function generateCode({
           verificationResult.errors ||
           verificationResult.status === "error"
         ) {
-          console.log(
-            `Code has errors, attempting fix (${fixAttempts + 1}/${MAX_FIX_ATTEMPTS})...`,
-          );
 
           if (rid) {
             ragLog(rid, "fix.attempt", {
@@ -1099,24 +1064,33 @@ export async function generateCode({
             verificationResult,
           );
 
-          // Call the Claude API again to fix the code
-          const fixResponse = await callClaudeAPI(
-            fixPrompt,
-            {
-              ...apiOptions,
+          // Use streaming service to fix the code
+          const fixResult = await generateCodeWithContinuation({
+            formattedPrompt: fixPrompt,
+            lang,
+            currentCode: generatedCode,
+            options: {
+              model: options.model || CLAUDE_MODELS.DEFAULT,
               temperature: 0.1, // Lower temperature for more deterministic fixes
+              maxTokens: options.maxTokens || 4096,
+              maxContinuations: 2  // Limit continuations for fixes
             },
-            rid,
-          );
+            onProgress: rid ? (message) => ragLog(rid, "fix.progress", { message }) : undefined
+          });
+
+          if (fixResult.error) {
+            console.error("Failed to fix code:", fixResult.error);
+            break;
+          }
 
           // Update the generated code with the fixed version and process to fix escaping issues
-          generatedCode = processGeneratedCode(fixResponse.content, rid);
+          generatedCode = processGeneratedCode(fixResult.code, rid);
           console.log("[2] generateCode()", "generatedCode=" + generatedCode);
 
           // Add fix attempt usage to total
-          finalUsage.prompt_tokens += fixResponse.usage.prompt_tokens;
-          finalUsage.completion_tokens += fixResponse.usage.completion_tokens;
-          finalUsage.total_tokens += fixResponse.usage.total_tokens;
+          finalUsage.prompt_tokens += fixResult.usage.inputTokens;
+          finalUsage.completion_tokens += fixResult.usage.outputTokens;
+          finalUsage.total_tokens += fixResult.usage.inputTokens + fixResult.usage.outputTokens;
 
           fixAttempts++;
         } else {
@@ -1172,11 +1146,6 @@ Explain it in one sentence of simple language that anyone can understand.
       max_tokens: 200, // Short description only
     });
 
-    console.log(
-      "generateCode()",
-      "descriptionResponse=" + JSON.stringify(descriptionResponse, null, 2),
-    );
-
     // Add the description tokens to the usage metrics
     finalUsage.prompt_tokens += descriptionResponse.usage.prompt_tokens;
     finalUsage.completion_tokens += descriptionResponse.usage.completion_tokens;
@@ -1190,13 +1159,15 @@ Explain it in one sentence of simple language that anyone can understand.
       code: finalProcessedCode,
       description: descriptionResponse.content,
       lang: lang,
-      model: response.model,
+      model: options.model || CLAUDE_MODELS.DEFAULT,
       usage: {
         input_tokens: finalUsage.prompt_tokens,
         output_tokens: finalUsage.completion_tokens,
       },
       verification: verificationResult,
       fixAttempts,
+      streaming: true,
+      chunks: streamResult.chunks
     };
   } catch (error) {
     console.error(`Error generating code for ${lang}:`, error);
