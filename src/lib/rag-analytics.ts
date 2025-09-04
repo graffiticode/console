@@ -32,6 +32,9 @@ export interface RetrievedDocument {
   position: number;
   wasUsedInPrompt: boolean;
   features?: string[];
+  embeddingText?: string;  // Text used for embedding
+  prompt?: string;         // Original prompt/task from the document
+  codeSnippet?: string;    // Snippet of code from the document
 }
 
 // Generation metrics
@@ -89,6 +92,16 @@ export interface RAGAnalyticsRecord {
     language: string;
     keywords?: string[];
     embeddingVector?: number[]; // Store first N dimensions for analysis
+    embeddingDimensions?: number; // Total number of dimensions
+    embeddingText?: string; // The actual text that was embedded
+    embeddingModel?: string; // Model used for embedding
+  };
+
+  // Embedding information
+  embedding?: {
+    latencyMs: number;
+    vectorSize: number;
+    model: string;
   };
 
   // Retrieval information
@@ -273,15 +286,35 @@ export class RAGAnalyticsService {
   public trackEmbedding(
     requestId: string,
     embeddingVector: number[],
-    latencyMs: number
+    latencyMs: number,
+    embeddingText?: string,
+    model?: string
   ): void {
     const record = this.activeRequests.get(requestId);
     if (!record) return;
 
-    // Store first 10 dimensions for analysis (to save space)
+    // Store embedding details for analysis
     if (record.query) {
-      record.query.embeddingVector = embeddingVector.slice(0, 10);
+      record.query.embeddingVector = embeddingVector.slice(0, 10); // Store first 10 dimensions
+      record.query.embeddingDimensions = embeddingVector.length;
+
+      // Store the actual text that was embedded (for debugging and enhancement)
+      if (embeddingText) {
+        record.query.embeddingText = embeddingText;
+      }
+
+      // Store model information
+      if (model) {
+        record.query.embeddingModel = model;
+      }
     }
+
+    // Track embedding performance metrics
+    record.embedding = {
+      latencyMs: latencyMs,
+      vectorSize: embeddingVector.length,
+      model: model || "text-embedding-3-small"
+    };
 
     this.endStage(requestId, "embedding");
   }
@@ -297,6 +330,9 @@ export class RAGAnalyticsService {
       keywordScore?: number;
       combinedScore?: number;
       features?: string[];
+      embeddingText?: string;
+      code?: string;
+      prompt?: string;
     }>,
     strategy: "vector" | "hybrid" | "keyword",
     latencyMs: number,
@@ -313,6 +349,9 @@ export class RAGAnalyticsService {
       position: index,
       wasUsedInPrompt: false, // Will be updated later
       features: doc.features,
+      embeddingText: doc.embeddingText,  // Text used for embedding
+      prompt: doc.prompt,                 // Original prompt/task from the document
+      codeSnippet: doc.code ? doc.code.substring(0, 200) : undefined, // First 200 chars of code
     }));
 
     record.retrieval = {

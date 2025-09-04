@@ -80,13 +80,16 @@ export async function generateEmbedding(
       ragLog(options.rid, "embedding.complete", {
         model,
         elapsedMs,
+        textLength: cleanedText.length,
       });
 
-      // Track in analytics
+      // Track in analytics with enhanced information
       safeRAGAnalytics.trackEmbedding(
         options.rid,
         response.data[0].embedding,
-        elapsedMs
+        elapsedMs,
+        cleanedText,  // Pass the actual text that was embedded
+        model         // Pass the model used
       );
     }
 
@@ -335,6 +338,15 @@ export async function vectorSearch({
       ? new VectorValue(queryEmbedding)
       : queryEmbedding;
 
+    // Log the query text for analysis
+    if (rid) {
+      ragLog(rid, "vectorSearch.queryText", {
+        query: query,
+        queryLength: query.length,
+        embeddingDimensions: queryEmbedding.length,
+      });
+    }
+
     // Perform vector similarity search
     // Note: Firebase requires a specific index for vector search
     const results = await searchQuery
@@ -368,13 +380,16 @@ export async function vectorSearch({
         })),
       });
 
-      // Track retrieval in analytics
+      // Track retrieval in analytics with enhanced information
       safeRAGAnalytics.trackRetrieval(
         rid,
         documents.map(doc => ({
           id: doc.id,
           similarity: doc.similarity,
           features: buildFeatureTags(doc),
+          embeddingText: createEmbeddingText(doc),  // Include embedding text
+          code: doc.code || doc.src,                // Include code
+          prompt: doc.prompt || doc.task,           // Include prompt
         })),
         "vector",
         Date.now() - startTime,
@@ -437,6 +452,8 @@ export async function hybridSearch({
         k: limit,
         lang,
         vectorWeight,
+        query: query,  // Log the query text
+        queryLength: query.length,
       });
     }
 
@@ -500,7 +517,7 @@ export async function hybridSearch({
         })),
       });
 
-      // Track hybrid search in analytics
+      // Track hybrid search in analytics with enhanced information
       safeRAGAnalytics.trackRetrieval(
         rid,
         topResults.map(doc => ({
@@ -509,6 +526,9 @@ export async function hybridSearch({
           keywordScore: doc.keywordScore,
           combinedScore: doc.combinedScore,
           features: buildFeatureTags(doc),
+          embeddingText: createEmbeddingText(doc),  // Include embedding text
+          code: doc.code || doc.src,                // Include code
+          prompt: doc.prompt || doc.task,           // Include prompt
         })),
         "hybrid",
         Date.now() - startTime,

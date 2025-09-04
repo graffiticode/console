@@ -59,11 +59,11 @@ class SafeRAGAnalytics {
   /**
    * Safely track embedding
    */
-  trackEmbedding(requestId: string, embeddingVector: number[], latencyMs: number): void {
+  trackEmbedding(requestId: string, embeddingVector: number[], latencyMs: number, embeddingText?: string, model?: string): void {
     if (!this.isEnabled()) return;
 
     try {
-      ragAnalytics.trackEmbedding(requestId, embeddingVector, latencyMs);
+      ragAnalytics.trackEmbedding(requestId, embeddingVector, latencyMs, embeddingText, model);
     } catch (error) {
       this.handleError("trackEmbedding", error);
     }
