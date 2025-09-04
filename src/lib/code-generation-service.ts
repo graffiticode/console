@@ -14,7 +14,7 @@ import axios from "axios";
 import { postApiCompile } from "./api";
 import { postTask, getData } from "../pages/api/resolvers";
 import admin from "firebase-admin";
-import { ragLog } from "./logger";
+import { ragLog, generateRequestId } from "./logger";
 import {
   generateEmbedding,
   createEmbeddingText,
@@ -22,6 +22,8 @@ import {
   hybridSearch,
 } from "./embedding-service";
 import { generateCodeWithContinuation } from "./claude-stream-service";
+import { safeRAGAnalytics } from "./rag-analytics-safe";
+import { getRAGConfig, withRAGFallback } from "./rag-config";
 
 // Define available Claude models with best practices
 export const CLAUDE_MODELS = {
@@ -967,6 +969,8 @@ export async function generateCode({
   options = {},
   currentCode = null,
   rid = null,
+  userId = null,
+  sessionId = null,
 }: {
   auth: any;
   prompt: string;
@@ -974,8 +978,20 @@ export async function generateCode({
   options?: GenerateCodeOptions;
   currentCode?: string | null;
   rid?: string | null;
+  userId?: string | null;
+  sessionId?: string | null;
 }) {
   const accessToken = auth?.token;
+
+  // Generate request ID if not provided
+  const requestId = rid || generateRequestId();
+
+  // Start analytics tracking (safe - won't break if unavailable)
+  safeRAGAnalytics.startRequest(requestId, prompt, userId, sessionId, {
+    lang,
+    hasCurrentCode: !!currentCode,
+    model: options.model || CLAUDE_MODELS.DEFAULT,
+  });
 
   // Model selection best practices:
   // - Default (Sonnet 3.5): Best for code generation, most tasks
@@ -983,13 +999,51 @@ export async function generateCode({
   // - Override with HAIKU for: Simple templates, basic transformations
 
   try {
-    // Retrieve relevant examples for this prompt, filtered by language
-    const relevantExamples = await getRelevantExamples({
-      prompt,
-      lang,
-      limit: 3,
-      rid,
-    });
+    const config = getRAGConfig();
+    let relevantExamples = [];
+
+    // Only attempt retrieval if enabled
+    if (config.enableVectorSearch || config.fallbackToKeywordSearch) {
+      // Start retrieval stage
+      safeRAGAnalytics.startStage(requestId, "retrieval");
+
+      try {
+        // Retrieve relevant examples with timeout protection
+        relevantExamples = await withRAGFallback(
+          async () => {
+            return await getRelevantExamples({
+              prompt,
+              lang,
+              limit: 3,
+              rid: requestId,
+            });
+          },
+          () => {
+            // Fallback: return empty array if retrieval fails completely
+            console.warn(`RAG retrieval failed for request ${requestId}, continuing without examples`);
+            return [];
+          },
+          "example_retrieval"
+        );
+      } catch (error) {
+        // Even if withRAGFallback fails, continue without examples
+        console.warn("Failed to retrieve examples, continuing without them:", error.message);
+        relevantExamples = [];
+      }
+
+      safeRAGAnalytics.endStage(requestId, "retrieval");
+
+      // Mark which documents will be used
+      if (relevantExamples && relevantExamples.length > 0) {
+        safeRAGAnalytics.markDocumentsUsed(
+          requestId,
+          relevantExamples.map((ex, idx) => ex.id || `example-${idx}`)
+        );
+      }
+    } else {
+      console.log("RAG retrieval disabled by configuration");
+    }
+
     // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
     const formattedPrompt = await createCodeGenerationPrompt(
       prompt,
@@ -998,6 +1052,10 @@ export async function generateCode({
       currentCode,
       rid,
     );
+
+    // Start generation stage
+    safeRAGAnalytics.startStage(requestId, "generation");
+    const generationStartTime = Date.now();
 
     // Use the streaming service (always, as it handles both short and long responses)
     const streamResult = await generateCodeWithContinuation({
@@ -1010,12 +1068,32 @@ export async function generateCode({
         maxTokens: options.maxTokens || 4096,
         maxContinuations: options.maxContinuations || 10  // Conservative default
       },
-      onProgress: rid ? (message) => ragLog(rid, "streaming.progress", { message }) : undefined
+      onProgress: requestId ? (message) => ragLog(requestId, "streaming.progress", { message }) : undefined
     });
 
+    const generationLatency = Date.now() - generationStartTime;
+    safeRAGAnalytics.endStage(requestId, "generation");
+
     if (streamResult.error) {
+      safeRAGAnalytics.trackError(requestId, "generation", streamResult.error);
+      safeRAGAnalytics.trackGeneration(requestId, {
+        model: options.model || CLAUDE_MODELS.DEFAULT,
+        latencyMs: generationLatency,
+        success: false,
+        errorMessage: streamResult.error,
+      }, "");
       throw new Error(streamResult.error);
     }
+
+    // Track successful generation
+    safeRAGAnalytics.trackGeneration(requestId, {
+      model: options.model || CLAUDE_MODELS.DEFAULT,
+      totalTokens: streamResult.totalTokens || 0,
+      latencyMs: generationLatency,
+      temperature: options.temperature || 0.2,
+      maxTokens: options.maxTokens || 4096,
+      success: true,
+    }, streamResult.code);
 
     // Process the generated code to fix any issues
     let generatedCode = processGeneratedCode(streamResult.code, rid);
@@ -1030,15 +1108,24 @@ export async function generateCode({
 
     // Verify the code if an access token is provided
     if (accessToken) {
+      safeRAGAnalytics.startStage(requestId, "compilation");
+
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
       while (fixAttempts < MAX_FIX_ATTEMPTS) {
-        verificationResult = await verifyCode(generatedCode, accessToken, rid);
+        verificationResult = await verifyCode(generatedCode, accessToken, requestId);
 
         // If compilation was successful, break the loop
         if (
           verificationResult.status === "success" &&
           !verificationResult.error
         ) {
+          safeRAGAnalytics.endStage(requestId, "compilation");
+          safeRAGAnalytics.trackCompilation(requestId, {
+            success: true,
+            taskId: verificationResult.taskId,
+            retryCount: fixAttempts,
+            finalCode: generatedCode,
+          });
           break;
         }
 
@@ -1099,6 +1186,17 @@ export async function generateCode({
         }
       }
 
+      // Track final compilation result if we exited due to max attempts
+      if (fixAttempts >= MAX_FIX_ATTEMPTS && verificationResult) {
+        safeRAGAnalytics.endStage(requestId, "compilation");
+        safeRAGAnalytics.trackCompilation(requestId, {
+          success: false,
+          errorMessage: verificationResult.error?.message || "Max fix attempts reached",
+          retryCount: fixAttempts,
+          finalCode: generatedCode,
+        });
+      }
+
     }
 
     // Generate a description of the code
@@ -1154,8 +1252,11 @@ Explain it in one sentence of simple language that anyone can understand.
     // Ensure the code is properly processed one final time before returning
     const finalProcessedCode = processGeneratedCode(generatedCode);
 
+    // Complete analytics tracking
+    await safeRAGAnalytics.completeRequest(requestId, true);
+
     // Return formatted response with the language name and description
-    return {
+    const result = {
       code: finalProcessedCode,
       description: descriptionResponse.content,
       lang: lang,
@@ -1167,10 +1268,20 @@ Explain it in one sentence of simple language that anyone can understand.
       verification: verificationResult,
       fixAttempts,
       streaming: true,
-      chunks: streamResult.chunks
+      chunks: streamResult.chunks,
+      requestId: requestId  // Include for feedback tracking
     };
+
+    return result;
   } catch (error) {
     console.error(`Error generating code for ${lang}:`, error);
+
+    // Track the error in analytics
+    if (requestId) {
+      safeRAGAnalytics.trackError(requestId, "request", error);
+      await safeRAGAnalytics.completeRequest(requestId, false);
+    }
+
     throw new Error(`Failed to generate code for ${lang}: ${error.message}`);
   }
 }

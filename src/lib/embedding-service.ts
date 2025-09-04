@@ -7,6 +7,7 @@ import OpenAI from "openai";
 import admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { ragLog } from "./logger";
+import { safeRAGAnalytics } from "./rag-analytics-safe";
 
 // VectorValue may not be available in older Firebase Admin SDK versions
 let VectorValue: any;
@@ -73,11 +74,20 @@ export async function generateEmbedding(
       encoding_format: "float",
     });
 
+    const elapsedMs = Date.now() - startTime;
+
     if (options.rid) {
       ragLog(options.rid, "embedding.complete", {
         model,
-        elapsedMs: Date.now() - startTime,
+        elapsedMs,
       });
+
+      // Track in analytics
+      safeRAGAnalytics.trackEmbedding(
+        options.rid,
+        response.data[0].embedding,
+        elapsedMs
+      );
     }
 
     return response.data[0].embedding;
@@ -289,6 +299,8 @@ export async function vectorSearch({
   db,
   rid = null,
 }) {
+  const startTime = Date.now();
+
   try {
     if (rid) {
       ragLog(rid, "vectorSearch.start", {
@@ -355,6 +367,19 @@ export async function vectorSearch({
           similarity: doc.similarity,
         })),
       });
+
+      // Track retrieval in analytics
+      safeRAGAnalytics.trackRetrieval(
+        rid,
+        documents.map(doc => ({
+          id: doc.id,
+          similarity: doc.similarity,
+          features: buildFeatureTags(doc),
+        })),
+        "vector",
+        Date.now() - startTime,
+        undefined
+      );
     }
 
     return documents;
@@ -403,6 +428,8 @@ export async function hybridSearch({
   vectorWeight = 0.7,
   rid = null,
 }) {
+  const startTime = Date.now();
+
   try {
     if (rid) {
       ragLog(rid, "hybridSearch.start", {
@@ -472,6 +499,21 @@ export async function hybridSearch({
           combinedScore: doc.combinedScore,
         })),
       });
+
+      // Track hybrid search in analytics
+      safeRAGAnalytics.trackRetrieval(
+        rid,
+        topResults.map(doc => ({
+          id: doc.id,
+          similarity: doc.vectorScore,
+          keywordScore: doc.keywordScore,
+          combinedScore: doc.combinedScore,
+          features: buildFeatureTags(doc),
+        })),
+        "hybrid",
+        Date.now() - startTime,
+        vectorWeight
+      );
     }
 
     return topResults;
