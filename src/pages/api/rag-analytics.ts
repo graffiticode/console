@@ -41,14 +41,23 @@ export default async function handler(
       endDate,
       userId,
       requestId,
-      limit = 100,
+      limit = "100",
       minSimilarity,
-      onlyWithFeedback = false,
-    } = req.query as unknown as AnalyticsQuery;
+      onlyWithFeedback = "false",
+    } = req.query;
+
+    // Ensure query params are strings (not arrays)
+    const startDateStr = Array.isArray(startDate) ? startDate[0] : startDate;
+    const endDateStr = Array.isArray(endDate) ? endDate[0] : endDate;
+    const userIdStr = Array.isArray(userId) ? userId[0] : userId;
+    const requestIdStr = Array.isArray(requestId) ? requestId[0] : requestId;
+    const limitStr = Array.isArray(limit) ? limit[0] : limit;
+    const minSimilarityStr = Array.isArray(minSimilarity) ? minSimilarity[0] : minSimilarity;
+    const onlyWithFeedbackStr = Array.isArray(onlyWithFeedback) ? onlyWithFeedback[0] : onlyWithFeedback;
 
     // Parse dates if provided
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Default: last 7 days
-    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDateStr ? new Date(startDateStr) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Default: last 7 days
+    const end = endDateStr ? new Date(endDateStr) : new Date();
 
     switch (action) {
       case "metrics": {
@@ -74,22 +83,23 @@ export default async function handler(
       case "details": {
         // Get detailed records
         const filters: any = {
-          userId,
+          userId: userIdStr,
           startDate: start,
           endDate: end,
-          minSimilarity: minSimilarity ? parseFloat(minSimilarity as string) : undefined,
+          minSimilarity: minSimilarityStr ? parseFloat(minSimilarityStr) : undefined,
         };
 
-        let records = await ragAnalytics.queryAnalytics(filters, limit);
+        const parsedLimit = parseInt(limitStr, 10);
+        let records = await ragAnalytics.queryAnalytics(filters, parsedLimit);
 
         // Filter for only records with feedback if requested
-        if (onlyWithFeedback) {
+        if (onlyWithFeedbackStr === "true") {
           records = records.filter(r => r.feedback);
         }
 
         // If specific requestId is provided, get that single record
-        if (requestId) {
-          records = records.filter(r => r.requestId === requestId);
+        if (requestIdStr) {
+          records = records.filter(r => r.requestId === requestIdStr);
         }
 
         return res.status(200).json({
@@ -108,7 +118,7 @@ export default async function handler(
           {
             startDate: start,
             endDate: end,
-            userId,
+            userId: userIdStr,
           },
           1000 // Max export size
         );

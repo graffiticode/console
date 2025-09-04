@@ -1088,7 +1088,7 @@ export async function generateCode({
     // Track successful generation
     safeRAGAnalytics.trackGeneration(requestId, {
       model: options.model || CLAUDE_MODELS.DEFAULT,
-      totalTokens: streamResult.totalTokens || 0,
+      totalTokens: (streamResult.usage.inputTokens + streamResult.usage.outputTokens) || 0,
       latencyMs: generationLatency,
       temperature: options.temperature || 0.2,
       maxTokens: options.maxTokens || 4096,
