@@ -301,6 +301,7 @@ export class RAGAnalyticsService {
       // Store the actual text that was embedded (for debugging and enhancement)
       if (embeddingText) {
         record.query.embeddingText = embeddingText;
+        console.log(`[RAG Analytics] Tracking embedding text for ${requestId}:`, embeddingText.substring(0, 100) + "...");
       }
 
       // Store model information
@@ -495,6 +496,17 @@ export class RAGAnalyticsService {
 
       // Clean the record before saving to Firestore
       const cleanedRecord = this.cleanForFirestore(record);
+
+      // Debug log to check what we're saving
+      if (cleanedRecord.query?.embeddingText || cleanedRecord.embedding) {
+        console.log("[RAG Analytics] Saving enhanced data for", requestId, {
+          hasEmbeddingText: !!cleanedRecord.query?.embeddingText,
+          embeddingTextLength: cleanedRecord.query?.embeddingText?.length,
+          hasEmbeddingMetrics: !!cleanedRecord.embedding,
+          embeddingModel: cleanedRecord.embedding?.model,
+          retrievalDocsWithText: cleanedRecord.retrieval?.documents?.filter(d => d.embeddingText)?.length || 0,
+        });
+      }
 
       // Save to Firestore
       await this.db

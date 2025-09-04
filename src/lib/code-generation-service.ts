@@ -147,6 +147,7 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
         limit: limit,
         lang: lang,
         db: db,
+        rid: rid,  // Pass the request ID for analytics tracking
         vectorWeight: 0.7, // Balance between semantic and keyword matching
       });
 
