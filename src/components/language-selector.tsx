@@ -48,6 +48,7 @@ const languages: Language[] = [
   {id: 21, name: 'L0163', desc: "Code editors", domains: ["hide"]},
   {id: 22, name: 'L0164', desc: "Code generators", domains: ["hide"]},
   {id: 23, name: 'L0165', desc: "Spreadsheet questions", domains: ["graffiticode"]},
+  {id: 24, name: 'L0166', desc: "Spreadsheet questions", domains: ["graffiticode"]},
 ];
 
 function classNames(...classes) {
