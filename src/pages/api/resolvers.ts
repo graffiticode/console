@@ -221,7 +221,7 @@ export async function generateCode({
     // Check if this is the specific prompt for template generation
     if (prompt === "Create a minimal starting template") {
       const cacheKey = `L${language}`;
-      
+
       // Check cache first
       if (templateCache.has(cacheKey)) {
         code = templateCache.get(cacheKey);
