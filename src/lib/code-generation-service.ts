@@ -11,7 +11,7 @@
  */
 
 import axios from "axios";
-import { postApiCompile } from "./api";
+import { postApiCompile, getLanguageAsset } from "./api";
 import { postTask, getData } from "../pages/api/resolvers";
 import admin from "firebase-admin";
 import { ragLog, generateRequestId } from "./logger";
@@ -24,6 +24,12 @@ import {
 import { generateCodeWithContinuation } from "./claude-stream-service";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
 import { getRAGConfig, withRAGFallback } from "./rag-config";
+
+// Global cache for language assets to avoid repeated fetches
+const languageAssetsCache = {
+  instructions: new Map<string, string>(),
+  templates: new Map<string, string>(),
+};
 
 // Define available Claude models with best practices
 export const CLAUDE_MODELS = {
@@ -210,7 +216,7 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
 
     let examples = [];
 
-    // Load the markdown file
+    // Load the markdown file from local /training directory
     const mdFilePath = path.join(
       process.cwd(),
       `./training/l${lang}-training-examples.md`,
@@ -291,31 +297,35 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
 
 
 /**
- * Reads dialect-specific instructions from markdown files in the training directory
+ * Reads dialect-specific instructions from the language server with caching
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
- * @returns {string} - The dialect-specific instructions, or empty string if none found
+ * @returns {Promise<string>} - The dialect-specific instructions, or empty string if none found
  */
-function readDialectInstructions(lang) {
+async function readDialectInstructions(lang) {
+  // Check cache first
+  const cacheKey = `L${lang}`;
+  if (languageAssetsCache.instructions.has(cacheKey)) {
+    const cached = languageAssetsCache.instructions.get(cacheKey);
+    return cached;
+  }
+
   try {
-    const fs = require("fs");
-    const path = require("path");
-
-    // Form the path to the dialect instructions file
-    const instructionsPath = path.join(
-      process.cwd(),
-      `./training/l${lang}-instructions.md`,
-    );
-
-    // Check if file exists
-    if (fs.existsSync(instructionsPath)) {
-      // Read the file content
-      const instructions = fs.readFileSync(instructionsPath, "utf8");
-      return `\n${instructions}\n`;
+    // Fetch instructions from the language server
+    const instructions = await getLanguageAsset(`L${lang}`, 'instructions.md');
+    if (instructions) {
+      const formatted = `\n${instructions}\n`;
+      // Cache the result
+      languageAssetsCache.instructions.set(cacheKey, formatted);
+      return formatted;
     } else {
+      // Cache empty result to avoid repeated failed fetches
+      languageAssetsCache.instructions.set(cacheKey, "");
       return "";
     }
   } catch (error) {
-    console.error(`Error reading dialect instructions for L${lang}:`, error);
+    console.error(`Error fetching dialect instructions from language server for L${lang}:`, error);
+    // Cache empty result to avoid repeated failed fetches
+    languageAssetsCache.instructions.set(cacheKey, "");
     return "";
   }
 }
@@ -323,17 +333,17 @@ function readDialectInstructions(lang) {
 /**
  * Returns the appropriate system prompt for a given dialect
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
- * @returns {string} - The customized system prompt
+ * @returns {Promise<string>} - The customized system prompt
  */
-function getSystemPromptForDialect(lang) {
+async function getSystemPromptForDialect(lang) {
   // Start with the base prompt
   let prompt = `
 You are a programming assistant that translates natural language into code written in a functional DSL called **Graffiticode**, specifically dialect L${lang}.
 
 Graffiticode is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.`;
 
-  // Try to read dialect-specific instructions from file first
-  const fileInstructions = readDialectInstructions(lang);
+  // Try to fetch dialect-specific instructions from language server
+  const fileInstructions = await readDialectInstructions(lang);
 
   if (fileInstructions) {
     // Use file-based instructions if available
@@ -494,7 +504,7 @@ async function createCodeGenerationPrompt(
   const examplesSection = generateExamplesSection(examples);
 
   // Get the dialect-specific system prompt
-  const dialectSystemPrompt = getSystemPromptForDialect(lang);
+  const dialectSystemPrompt = await getSystemPromptForDialect(lang);
 
   // Combine dialect-specific system prompt with examples
   const enhancedSystemPrompt = dialectSystemPrompt + examplesSection;

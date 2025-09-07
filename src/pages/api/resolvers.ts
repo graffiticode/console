@@ -2,12 +2,15 @@ import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
 import { getFirestore } from "../../utils/db";
-import { getApiTask, getBaseUrlForApi } from "../../lib/api";
+import { getApiTask, getBaseUrlForApi, getLanguageAsset } from "../../lib/api";
 import { generateCode as codeGenerationService } from "../../lib/code-generation-service";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import fs from "fs";
 import path from "path";
 // import { buildDynamicSchema } from "./schemas";
+
+// Global cache for templates to avoid repeated fetches
+const templateCache = new Map<string, string>();
 
 const taskDaoFactory = buildTaskDaoFactory();
 const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
@@ -217,31 +220,47 @@ export async function generateCode({
 
     // Check if this is the specific prompt for template generation
     if (prompt === "Create a minimal starting template") {
-      try {
-        // Read template from file system
-        const templatePath = path.join(
-          process.cwd(),
-          "training",
-          `template.l${language.toLowerCase()}.gc`,
-        );
-        if (fs.existsSync(templatePath)) {
-          code = fs.readFileSync(templatePath, "utf8");
-          description = "Template loaded from file";
-          model = "template-file";
-          ragLog(rid, "template.loaded", {
-            templatePath,
-            codeLength: code.length,
-          });
-        }
-      } catch (error) {
-        console.log(
-          "generateCode()",
-          "Template file not found or error reading, falling back to service",
-          error.message,
-        );
-        ragLog(rid, "template.error", {
-          error: error.message,
+      const cacheKey = `L${language}`;
+      
+      // Check cache first
+      if (templateCache.has(cacheKey)) {
+        code = templateCache.get(cacheKey);
+        description = "Template loaded from cache";
+        model = "template-file";
+        ragLog(rid, "template.loaded", {
+          source: "cache",
+          lang: cacheKey,
+          codeLength: code.length,
         });
+      } else {
+        try {
+          // Fetch template from language server
+          const templateCode = await getLanguageAsset(`L${language}`, 'template.gc');
+          if (templateCode) {
+            code = templateCode;
+            // Cache the template
+            templateCache.set(cacheKey, templateCode);
+            description = "Template loaded from language server";
+            model = "template-file";
+            ragLog(rid, "template.loaded", {
+              source: "language-server",
+              lang: cacheKey,
+              codeLength: code.length,
+            });
+          }
+        } catch (error) {
+          console.log(
+            "generateCode()",
+            "Template not found on language server, falling back to service",
+            error.message,
+          );
+          ragLog(rid, "template.error", {
+            error: error.message,
+            source: "language-server",
+          });
+          // Cache empty result to avoid repeated failed fetches
+          templateCache.set(cacheKey, "");
+        }
       }
     }
     // If no template was loaded, fall back to code generation service
