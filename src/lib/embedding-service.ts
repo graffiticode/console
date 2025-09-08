@@ -80,7 +80,7 @@ export async function generateEmbedding(
       ragLog(options.rid, "embedding.complete", {
         model,
         elapsedMs,
-        textLength: cleanedText.length,
+        // textLength: cleanedText.length,
       });
 
       // Track in analytics with enhanced information
@@ -335,8 +335,8 @@ export async function vectorSearch({
 
     // Convert to VectorValue if available, otherwise use array directly
     const vectorQuery = VectorValue
-      ? new VectorValue(queryEmbedding)
-      : queryEmbedding;
+          ? new VectorValue(queryEmbedding)
+          : queryEmbedding;
 
     // Log the query text for analysis
     if (rid) {
@@ -350,11 +350,11 @@ export async function vectorSearch({
     // Perform vector similarity search
     // Note: Firebase requires a specific index for vector search
     const results = await searchQuery
-      .findNearest("embedding", vectorQuery, {
-        limit: limit,
-        distanceMeasure: "COSINE", // or 'EUCLIDEAN', 'DOT_PRODUCT'
-      })
-      .get();
+          .findNearest("embedding", vectorQuery, {
+            limit: limit,
+            distanceMeasure: "COSINE", // or 'EUCLIDEAN', 'DOT_PRODUCT'
+          })
+          .get();
 
     // Extract documents and add similarity scores
     const documents = [];
@@ -411,7 +411,7 @@ export async function vectorSearch({
     // This might happen if indexes aren't configured yet
     if (
       error.message.includes("index") ||
-      error.message.includes("findNearest")
+        error.message.includes("findNearest")
     ) {
       console.warn(
         "Vector search not available, indexes may need to be configured",
@@ -469,9 +469,9 @@ export async function hybridSearch({
 
     // Extract keywords from query
     const keywords = query
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((word) => word.length > 3);
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((word) => word.length > 3);
 
     // Score results based on both vector similarity and keyword matching
     const scoredResults = vectorResults.map((doc) => {
@@ -490,7 +490,7 @@ export async function hybridSearch({
 
       // Combined score
       const combinedScore =
-        vectorScore * vectorWeight + keywordScore * (1 - vectorWeight);
+            vectorScore * vectorWeight + keywordScore * (1 - vectorWeight);
 
       return {
         ...doc,
@@ -503,8 +503,8 @@ export async function hybridSearch({
 
     // Sort by combined score and return top results
     const topResults = scoredResults
-      .sort((a, b) => b.combinedScore - a.combinedScore)
-      .slice(0, limit);
+          .sort((a, b) => b.combinedScore - a.combinedScore)
+          .slice(0, limit);
 
     if (rid) {
       ragLog(rid, "hybridSearch.complete", {
@@ -579,13 +579,13 @@ export async function addDocumentWithEmbedding({
 
     // Convert to VectorValue if available, otherwise use array directly
     const vectorValue = VectorValue
-      ? new VectorValue(embedding)
-      : embedding;
+          ? new VectorValue(embedding)
+          : embedding;
 
     // Add or update document with embedding
     const docRef = docId
-      ? db.collection(collection).doc(docId)
-      : db.collection(collection).doc();
+          ? db.collection(collection).doc(docId)
+          : db.collection(collection).doc();
 
     await docRef.set(
       {
@@ -599,54 +599,6 @@ export async function addDocumentWithEmbedding({
     return docRef.id;
   } catch (error) {
     console.error("Error adding document with embedding:", error);
-    throw error;
-  }
-}
-
-/**
- * Update embeddings for existing documents in batch
- * @param {Object} params - Parameters
- * @param {Object} params.db - Firestore database instance
- * @param {string} params.collection - Collection name
- * @param {Array} params.documents - Array of documents to update
- * @returns {Promise<number>} - Number of documents updated
- */
-export async function updateEmbeddingsInBatch({ db, collection, documents }) {
-  try {
-    let updatedCount = 0;
-    const batchSize = 10; // Process in smaller batches to avoid timeouts
-
-    for (let i = 0; i < documents.length; i += batchSize) {
-      const batch = documents.slice(i, i + batchSize);
-      const texts = batch.map((doc) => createEmbeddingText(doc));
-
-      // Generate embeddings in batch
-      const embeddings = await generateBatchEmbeddings(texts);
-
-      // Update documents in Firestore batch
-      const writeBatch = db.batch();
-
-      batch.forEach((doc, index) => {
-        const docRef = db.collection(collection).doc(doc.id);
-        const vectorValue = embeddings[index];
-
-        writeBatch.update(docRef, {
-          embedding: vectorValue,
-          embeddingUpdatedAt: FieldValue.serverTimestamp(),
-        });
-      });
-
-      await writeBatch.commit();
-      updatedCount += batch.length;
-
-      console.log(
-        `Updated embeddings for ${updatedCount}/${documents.length} documents`,
-      );
-    }
-
-    return updatedCount;
-  } catch (error) {
-    console.error("Error updating embeddings in batch:", error);
     throw error;
   }
 }

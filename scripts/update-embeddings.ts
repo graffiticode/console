@@ -16,8 +16,8 @@
  */
 
 import admin from 'firebase-admin';
-import { generateBatchEmbeddings } from '../src/lib/embedding-service.ts';
 import { FieldValue } from 'firebase-admin/firestore';
+import OpenAI from "openai";
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -87,6 +87,66 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+
+// Initialize OpenAI client
+let openaiClient: OpenAI | null = null;
+
+/**
+ * Get or initialize OpenAI client
+ */
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY environment variable is not set");
+    }
+    openaiClient = new OpenAI({
+      apiKey: apiKey,
+    });
+  }
+  return openaiClient;
+}
+
+/**
+ * Generate embeddings for multiple texts in batch
+ * Local version without analytics dependencies
+ */
+async function generateBatchEmbeddings(
+  texts: string[],
+  options: { model?: string } = {},
+): Promise<number[][]> {
+  const startTime = Date.now();
+
+  try {
+    const model = options.model || "text-embedding-3-small";
+    const openai = getOpenAIClient();
+
+    // Clean and prepare texts (OpenAI can handle up to 2048 inputs per batch)
+    const batchSize = 100;
+    const embeddings: number[][] = [];
+
+    console.log(`  Generating embeddings for ${texts.length} texts...`);
+
+    for (let i = 0; i < texts.length; i += batchSize) {
+      const batch = texts.slice(i, i + batchSize);
+      const cleanedBatch = batch.map((text) => text.trim().substring(0, 8000));
+
+      const response = await openai.embeddings.create({
+        model: model,
+        input: cleanedBatch,
+        encoding_format: "float",
+      });
+
+      embeddings.push(...response.data.map((item) => item.embedding));
+    }
+
+    console.log(`  Embeddings generated in ${Date.now() - startTime}ms`);
+    return embeddings;
+  } catch (error: any) {
+    console.error("Error generating batch embeddings:", error);
+    throw new Error(`Failed to generate batch embeddings: ${error.message}`);
+  }
+}
 
 // Import VectorValue after Firebase is initialized
 let VectorValue: any;
