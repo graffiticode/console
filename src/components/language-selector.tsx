@@ -42,7 +42,7 @@ const languages: Language[] = [
   {id: 15, name: 'L0157', desc: "Geoboard manipulatives", domains: ["hide"]},
   {id: 16, name: 'L0158', desc: "Learnosity integrations", domains: ["hide"]},
   {id: 17, name: 'L0159', desc: "Flashcard sets", domains: ["graffiticode"]},
-  {id: 18, name: 'L0160', desc: "XML transformers", domains: ["hide"]},
+  {id: 18, name: 'L0160', desc: "Learnosity QTI Importer", domains: ["hide"]},
   {id: 19, name: 'L0161', desc: "Expression translators", domains: ["hide"]},
   {id: 20, name: 'L0162', desc: "Walking routes", domains: ["hide"]},
   {id: 21, name: 'L0163', desc: "Code editors", domains: ["hide"]},

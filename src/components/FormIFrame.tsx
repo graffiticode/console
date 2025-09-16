@@ -30,20 +30,26 @@ const HEIGHTS = [150, 240, 360, 480, 640, 860, 1020];
 
 const cache = {};
 
-const IFrame = ({ id, src, setData, className, width, height }) => (
+const IFrame = ({ id, src, setData, className, width, height, onFocus }) => (
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.origin === window.location.origin) {
         return;
       }
+      // Check for focus events first
+      if (event.data.focus) {
+        onFocus && onFocus(event.data.focus);
+        // Also dispatch a custom event that HelpPanel can listen to
+        const focusEvent = new CustomEvent('formIFrameFocus', {
+          detail: { focus: event.data.focus }
+        });
+        window.dispatchEvent(focusEvent);
+        return;
+      }
       const data = event.data[id];
-      // console.log("IFrame() id=" + id),
-      // console.log("IFrame() event.orgin=" + event.origin);
-      // console.log("IFrame() event.data=" + JSON.stringify(event.data, null, 2));
       if (!data) {
         return;
       }
-      console.log("IFrame() data=" + JSON.stringify(data, null, 2));
       const hash = JSON.stringify(data);
       if (cache[id] !== hash) {
         cache[id] = hash;
@@ -54,7 +60,7 @@ const IFrame = ({ id, src, setData, className, width, height }) => (
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [id]),
+  }, [id, onFocus]),
   <iframe
     id={id}
     src={src}
@@ -82,7 +88,8 @@ export const FormIFrame = ({
   setId,
   data,
   className,
-  height
+  height,
+  onFocus
 }) => {
   const origin = window.location.origin;
   const src = useTaskIdFormUrl({accessToken, lang, id, origin});
@@ -91,6 +98,7 @@ export const FormIFrame = ({
       id={id}
       src={src}
       setData={setData}
+      onFocus={onFocus}
       className={className || "w-full h-full"}
       width="100%"
       height={height || "100vh"}

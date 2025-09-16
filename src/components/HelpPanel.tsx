@@ -19,6 +19,7 @@ import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/prism';
 import tomorrow from 'react-syntax-highlighter/dist/cjs/styles/prism/tomorrow';
 import { useDropzone } from 'react-dropzone';
 import { createPortal } from 'react-dom';
+import { getLanguageAsset } from "../lib/api";
 
 // Add custom CSS for dropzone
 const dropzoneStyles = `
@@ -65,8 +66,282 @@ export const HelpPanel = ({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadNotification, setUploadNotification] = useState(null);
 
+  // Property editor state - will be populated from focus events
+  const [contextProperties, setContextProperties] = useState({});
+  const [focusedElement, setFocusedElement] = useState(null);
+  const [languageSchema, setLanguageSchema] = useState(null);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+
   // Create a ref for the state to avoid circular dependencies
   const stateRef = useRef(null);
+
+  // Fetch language schema when language changes
+  useEffect(() => {
+    const fetchSchema = async () => {
+      if (!language) {
+        return;
+      }
+
+      setSchemaLoading(true);
+      try {
+        const langCode = language.startsWith('L') ? language : `L${language}`;
+        const schemaText = await getLanguageAsset(langCode, "schema.json");
+        const schema = JSON.parse(schemaText || "{}");
+        setLanguageSchema(schema);
+      } catch (error) {
+        console.error(`HelpPanel: Failed to load schema for language ${language}:`, error);
+        setLanguageSchema(null);
+      } finally {
+        setSchemaLoading(false);
+      }
+    };
+
+    fetchSchema();
+  }, [language]);
+
+  // Function to get schema definition for a given context
+  // Helper function to resolve JSON Schema $ref
+  const resolveSchemaRef = useCallback((ref, schema) => {
+    if (!ref || !schema) return null;
+
+    // Remove the # prefix and split the path
+    const path = ref.replace(/^#\//, '').split('/');
+
+    // Navigate through the schema to find the referenced definition
+    let current = schema;
+    for (const segment of path) {
+      current = current[segment];
+      if (!current) return null;
+    }
+
+    return current;
+  }, []);
+
+  // Function to get schema definition for a given context
+  const getSchemaForContext = useCallback((focusData) => {
+    if (!languageSchema || !focusData) {
+      return null;
+    }
+
+    // For spreadsheet cells (L0166 style)
+    if (focusData.type === 'cell' && focusData.name) {
+      // Check if this matches the cell pattern (e.g., A1, B2, etc.)
+      const cellPattern = /^[A-Z]+[0-9]+$/;
+      if (cellPattern.test(focusData.name)) {
+        // Look for cell definition in the schema
+        if (languageSchema.properties?.interaction?.properties?.cells?.patternProperties) {
+          const cellPatternKey = Object.keys(languageSchema.properties.interaction.properties.cells.patternProperties)[0];
+          const cellSchema = languageSchema.properties.interaction.properties.cells.patternProperties[cellPatternKey];
+
+          if (cellSchema?.$ref) {
+            // Resolve the reference to get the actual cell schema
+            const resolved = resolveSchemaRef(cellSchema.$ref, languageSchema);
+            return resolved;
+          }
+          return cellSchema;
+        }
+
+        // Fallback: check definitions directly
+        if (languageSchema.definitions?.cell) {
+          return languageSchema.definitions.cell;
+        }
+      }
+    }
+
+    // Generic lookup in definitions based on type
+    if (focusData.type && languageSchema.definitions?.[focusData.type]) {
+      return languageSchema.definitions[focusData.type];
+    }
+
+    return null;
+  }, [languageSchema, resolveSchemaRef]);
+
+  // Function to process focus data and update properties
+  const processFocusData = useCallback((focusData) => {
+
+    // Get schema for this context
+    const contextSchema = getSchemaForContext(focusData);
+
+    // Build properties based on schema and focus data
+    let properties = {};
+
+    if (contextSchema && contextSchema.properties) {
+          // Use schema to define ALL properties for this context
+          Object.entries(contextSchema.properties).forEach(([key, propSchema]) => {
+
+            // Handle $ref if present
+            let resolvedSchema = propSchema;
+            if (propSchema.$ref) {
+              resolvedSchema = resolveSchemaRef(propSchema.$ref, languageSchema) || propSchema;
+            }
+
+            // Get value from focus data
+            let value = focusData.value?.[key];
+
+            // Check if this is a nested object with properties
+            if (resolvedSchema.type === 'object' && resolvedSchema.properties) {
+
+              // Initialize the value as an object if undefined
+              if (value === undefined) {
+                value = {};
+                // Only initialize with schema defaults if explicitly provided
+                Object.entries(resolvedSchema.properties).forEach(([nestedKey, nestedSchema]) => {
+                  if (nestedSchema.default !== undefined) {
+                    value[nestedKey] = nestedSchema.default;
+                  }
+                  // Don't initialize other values - leave them undefined/empty
+                });
+              }
+
+              // Create nested properties structure
+              properties[key] = {
+                value,
+                type: 'nested-object',
+                label: resolvedSchema.title || resolvedSchema.label || key,  // Keep original case
+                description: resolvedSchema.description,
+                schema: resolvedSchema,
+                properties: {},
+                group: resolvedSchema.group || (key === 'assess' ? 'assessment' : 'default')
+              };
+
+              // Process nested properties
+              Object.entries(resolvedSchema.properties).forEach(([nestedKey, nestedSchema]) => {
+                // Handle nested $ref
+                let resolvedNestedSchema = nestedSchema;
+                if (nestedSchema.$ref) {
+                  resolvedNestedSchema = resolveSchemaRef(nestedSchema.$ref, languageSchema) || nestedSchema;
+                }
+
+                // Handle oneOf for nested properties (like expected in assess)
+                if (resolvedNestedSchema.oneOf) {
+                  const currentValue = value?.[nestedKey];
+                  resolvedNestedSchema = resolvedNestedSchema.oneOf.find(option => {
+                    if (currentValue !== undefined) {
+                      if (option.type === typeof currentValue) return true;
+                      if (option.type === 'number' && !isNaN(Number(currentValue))) return true;
+                      if (option.format === 'date' && !isNaN(Date.parse(currentValue))) return true;
+                    }
+                    return false;
+                  }) || resolvedNestedSchema.oneOf[0];
+                }
+
+                properties[key].properties[nestedKey] = {
+                  value: value?.[nestedKey] ?? resolvedNestedSchema.default ?? '',
+                  type: resolvedNestedSchema.type || 'string',
+                  format: resolvedNestedSchema.format,
+                  label: resolvedNestedSchema.title || nestedKey,  // Keep original case
+                  description: resolvedNestedSchema.description,
+                  enum: resolvedNestedSchema.enum,
+                  min: resolvedNestedSchema.minimum,
+                  max: resolvedNestedSchema.maximum,
+                  required: resolvedSchema.required?.includes(nestedKey) || false,
+                  readonly: resolvedNestedSchema.readOnly || false,
+                  placeholder: resolvedNestedSchema.placeholder
+                };
+              });
+            } else {
+              // Non-nested property - handle as before
+              if (value === undefined) {
+                value = resolvedSchema.default ?? '';
+              }
+
+              properties[key] = {
+                value,
+                type: resolvedSchema.type || 'string',
+                label: resolvedSchema.title || resolvedSchema.label || key,  // Keep original case
+                description: resolvedSchema.description,
+                enum: resolvedSchema.enum,
+                min: resolvedSchema.minimum,
+                max: resolvedSchema.maximum,
+                required: contextSchema.required?.includes(key) || false,
+                readonly: resolvedSchema.readOnly || resolvedSchema.readonly || false,
+                hidden: resolvedSchema.hidden || false,
+                placeholder: resolvedSchema.placeholder,
+                pattern: resolvedSchema.pattern,
+                group: resolvedSchema.group || 'default'
+              };
+            }
+          });
+
+          // Also include any additional values from focus data that aren't in schema
+          // (for backward compatibility and flexibility)
+          if (focusData.value) {
+            Object.entries(focusData.value).forEach(([key, val]) => {
+              if (!properties[key]) {
+                properties[key] = {
+                  value: val,
+                  type: typeof val === 'boolean' ? 'boolean' :
+                        typeof val === 'number' ? 'number' : 'string',
+                  label: key,
+                  group: 'additional'
+                };
+              }
+            });
+          }
+        } else {
+          // Fallback to simple property extraction if no schema
+          if (focusData.type === 'cell' && focusData.value) {
+            properties = {
+              name: { value: focusData.name || '', type: 'string', label: 'Name' },
+              value: { value: focusData.value.text || '', type: 'string', label: 'Value' },
+              type: { value: focusData.type, type: 'string', label: 'Type', readonly: true },
+            };
+            // Add any additional properties from the value object
+            Object.entries(focusData.value).forEach(([key, val]) => {
+              if (key !== 'text' && !properties[key]) {
+                properties[key] = {
+                  value: val,
+                  type: typeof val === 'boolean' ? 'boolean' :
+                        typeof val === 'number' ? 'number' : 'string',
+                  label: key
+                };
+              }
+            });
+          } else if (focusData.value) {
+            // For other types, convert value object to properties
+            Object.entries(focusData.value).forEach(([key, val]) => {
+              properties[key] = {
+                value: val,
+                type: typeof val === 'boolean' ? 'boolean' :
+                      typeof val === 'number' ? 'number' : 'string',
+                label: key
+              };
+            });
+          }
+        }
+
+    setContextProperties(properties);
+  }, [getSchemaForContext, languageSchema, resolveSchemaRef]);
+
+  // Re-process focus data when schema loads
+  useEffect(() => {
+    if (focusedElement && languageSchema && !schemaLoading) {
+      processFocusData(focusedElement);
+    }
+  }, [languageSchema, schemaLoading, focusedElement, processFocusData]);
+
+  // Listen for focus events from FormIFrame
+  useEffect(() => {
+    const handleFormFocus = (event) => {
+      if (event.detail && event.detail.focus) {
+        const focusData = event.detail.focus;
+
+        setFocusedElement(focusData);
+
+        // Process immediately if schema is loaded, otherwise it will be processed when schema loads
+        if (languageSchema && !schemaLoading) {
+          processFocusData(focusData);
+        }
+      }
+    };
+
+    // Listen for custom focus events
+    window.addEventListener('formIFrameFocus', handleFormFocus);
+
+    return () => {
+      window.removeEventListener('formIFrameFocus', handleFormFocus);
+    };
+  }, [languageSchema, schemaLoading, processFocusData]);
 
   // Integration with TextEditor component - will be properly initialized after ChatBot setup
   const [state] = useState(createState({}, (data, { type, args }) => {
@@ -83,7 +358,6 @@ export const HelpPanel = ({
       case "csv-upload":
         // For CSV uploads, we don't want to trigger handleSendMessage
         // We just want to update the editor content
-        console.log("CSV upload:", args.filename);
         return {
           ...data,
           content: args.content,
@@ -105,7 +379,6 @@ export const HelpPanel = ({
     if (acceptedFiles.length === 0) return;
 
     const file = acceptedFiles[0];
-    console.log("Dropped file:", file.name);
 
     // Read the file contents
     const reader = new FileReader();
@@ -124,7 +397,6 @@ export const HelpPanel = ({
             document.querySelector("[role='textbox']");
 
           if (editorElement) {
-            console.log("Found editor element:", editorElement);
             // Focus and clear the editor
             editorElement.focus();
 
@@ -135,7 +407,6 @@ export const HelpPanel = ({
               document.execCommand('delete', false, null);
               document.execCommand('insertText', false, fileContent);
               updateSuccess = true;
-              console.log("Successfully inserted content via execCommand");
             } catch (insertErr) {
               console.error("execCommand insertion failed:", insertErr);
 
@@ -144,7 +415,6 @@ export const HelpPanel = ({
                 editorElement.innerHTML = '';
                 editorElement.innerHTML = fileContent.replace(/\n/g, '<br>');
                 updateSuccess = true;
-                console.log("Successfully inserted content via innerHTML");
               } catch (innerErr) {
                 console.error("innerHTML insertion failed:", innerErr);
               }
@@ -166,7 +436,6 @@ export const HelpPanel = ({
               }
             });
             updateSuccess = true;
-            console.log("Successfully updated content via state update");
           } catch (err) {
             console.error("State update failed:", err);
           }
@@ -533,7 +802,6 @@ export const HelpPanel = ({
     // Check if any lines contain quoted values
     const linesWithQuotes = nonEmptyLines.filter(line => /"[^"]*"/.test(line));
     const hasQuotedValues = linesWithQuotes.length > 0;
-    console.log(`CSV detection starting with ${nonEmptyLines.length} lines, ${linesWithQuotes.length} contain quotes`);
     // Check for adjacent rows with matching cell counts - required for CSV detection
     if (nonEmptyLines.length >= 2) {
       try {
@@ -556,7 +824,6 @@ export const HelpPanel = ({
           if (currentCellCount >= 2 && nextCellCount >= 2 &&
               Math.abs(currentCellCount - nextCellCount) <= 1) {
             hasAdjacentMatch = true;
-            console.log(`Found adjacent rows with matching cell counts: row ${i} (${currentCellCount} cells) and row ${i+1} (${nextCellCount} cells)`);
             break;
           }
         }
@@ -573,14 +840,11 @@ export const HelpPanel = ({
           ).length;
           const consistentRatio = consistentLines / cellCounts.length;
 
-          console.log(`CSV consistency check: ${consistentLines}/${cellCounts.length} lines (${(consistentRatio * 100).toFixed(1)}%) have consistent cell counts`);
 
           if (consistentRatio >= 0.6) {
-            console.log("Detected CSV based on adjacent row matching and consistency");
             return true;
           }
         } else {
-          console.log("No adjacent rows with matching cell counts found - not CSV");
         }
       } catch (e) {
         console.error("Error checking for adjacent row matches:", e);
@@ -588,7 +852,6 @@ export const HelpPanel = ({
     }
     // Single line check - NEVER consider a single line as CSV, regardless of commas
     if (nonEmptyLines.length === 1) {
-      console.log("Single line detected - not treating as CSV (requires at least 2 rows)");
       return false;
     }
     // If we don't have at least 2 non-empty lines, it's not a multi-line CSV
@@ -1057,8 +1320,7 @@ export const HelpPanel = ({
               document.querySelector("[role='textbox']");
 
             if (editorElement) {
-              console.log("Found editor element:", editorElement);
-              // Focus and clear the editor
+                // Focus and clear the editor
               editorElement.focus();
 
               // Try multiple approaches to insert text
@@ -1068,8 +1330,7 @@ export const HelpPanel = ({
                 document.execCommand('delete', false, null);
                 document.execCommand('insertText', false, fileContent);
                 updateSuccess = true;
-                console.log("Successfully inserted content via execCommand");
-              } catch (insertErr) {
+                } catch (insertErr) {
                 console.error("execCommand insertion failed:", insertErr);
 
                 // Try direct innerHTML approach
@@ -1099,8 +1360,7 @@ export const HelpPanel = ({
                 }
               });
               updateSuccess = true;
-              console.log("Successfully updated content via state update");
-            } catch (err) {
+              } catch (err) {
               console.error("State update failed:", err);
             }
           }
@@ -1344,7 +1604,6 @@ export const HelpPanel = ({
               }
             });
             updateSuccess = true;
-            console.log("Successfully updated content via state update");
           } catch (err) {
             console.error("State update failed:", err);
           }
@@ -1617,6 +1876,279 @@ export const HelpPanel = ({
             />
           </div>
         </div>
+
+        {/* Property Editor */}
+        {Object.keys(contextProperties).length > 0 && (
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="text-xs font-semibold text-gray-600 mb-2">
+              {focusedElement?.type === 'cell' ?
+                `Cell ${focusedElement.name} Properties` :
+                focusedElement?.type ?
+                  `${focusedElement.type.charAt(0).toUpperCase() + focusedElement.type.slice(1)} Properties` :
+                  'Context Properties'}
+              {schemaLoading && <span className="ml-2 text-gray-400">(Loading schema...)</span>}
+            </div>
+            <div className="space-y-2">
+              {/* Group properties by their group attribute */}
+              {(() => {
+                const groupedProps = {};
+                Object.entries(contextProperties).forEach(([key, prop]) => {
+                  if (!prop.hidden) {
+                    const group = prop.group || 'default';
+                    if (!groupedProps[group]) groupedProps[group] = {};
+                    groupedProps[group][key] = prop;
+                  }
+                });
+
+                return Object.entries(groupedProps).map(([groupName, groupProps]) => (
+                  <div key={groupName} className="space-y-2">
+                    {groupName !== 'default' && groupName !== 'additional' && groupName !== 'assessment' && (
+                      <div className="text-xs font-semibold text-gray-400 mt-2 mb-1 uppercase tracking-wider">
+                        {groupName}
+                      </div>
+                    )}
+                    {Object.entries(groupProps).map(([key, propDef]) => (
+                      <div key={key} className="flex flex-col space-y-1">
+                        {propDef.type === 'nested-object' ? (
+                          // Render nested object properties
+                          <>
+                            <div className="text-xs font-medium text-gray-500 mb-1">
+                              {propDef.label}:
+                              {propDef.required && <span className="text-red-400 ml-0.5">*</span>}
+                            </div>
+                            <div className="pl-3 ml-2">
+                              {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]) => (
+                              <div key={nestedKey} className="flex items-center space-x-2 mb-2">
+                                <label
+                                  className="text-xs font-medium text-gray-500 w-20"
+                                  title={nestedProp.description}
+                                >
+                                  {nestedProp.label}:
+                                  {nestedProp.required && <span className="text-red-400 ml-0.5">*</span>}
+                                </label>
+                                {/* Render nested property input */}
+                                {nestedProp.enum ? (
+                                  <select
+                                    value={nestedProp.value}
+                                    onChange={(e) => {
+                                      const newNestedValue = { ...propDef.value };
+                                      newNestedValue[nestedKey] = e.target.value;
+                                      setContextProperties(prev => ({
+                                        ...prev,
+                                        [key]: { ...propDef, value: newNestedValue }
+                                      }));
+                                    }}
+                                    disabled={nestedProp.readonly}
+                                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                  >
+                                    <option value="">-- Select --</option>
+                                    {nestedProp.enum.map(option => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : nestedProp.type === 'boolean' ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={nestedProp.value}
+                                    onChange={(e) => {
+                                      const newNestedValue = { ...propDef.value };
+                                      newNestedValue[nestedKey] = e.target.checked;
+                                      setContextProperties(prev => ({
+                                        ...prev,
+                                        [key]: { ...propDef, value: newNestedValue }
+                                      }));
+                                    }}
+                                    disabled={nestedProp.readonly}
+                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                                  />
+                                ) : nestedProp.type === 'number' ? (
+                                  <input
+                                    type="number"
+                                    value={nestedProp.value}
+                                    min={nestedProp.min}
+                                    max={nestedProp.max}
+                                    onChange={(e) => {
+                                      const newNestedValue = { ...propDef.value };
+                                      newNestedValue[nestedKey] = parseFloat(e.target.value) || 0;
+                                      setContextProperties(prev => ({
+                                        ...prev,
+                                        [key]: { ...propDef, value: newNestedValue }
+                                      }));
+                                    }}
+                                    disabled={nestedProp.readonly}
+                                    placeholder={nestedProp.placeholder}
+                                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                  />
+                                ) : (
+                                  <input
+                                    type={nestedProp.format === 'date' ? 'date' : 'text'}
+                                    value={nestedProp.value || ''}
+                                    onChange={(e) => {
+                                      const newNestedValue = { ...propDef.value };
+                                      newNestedValue[nestedKey] = e.target.value;
+                                      setContextProperties(prev => ({
+                                        ...prev,
+                                        [key]: { ...propDef, value: newNestedValue }
+                                      }));
+                                    }}
+                                    disabled={nestedProp.readonly}
+                                    placeholder={nestedProp.placeholder}
+                                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                  />
+                                )}
+                              </div>
+                            ))}
+                            </div>
+                          </>
+                        ) : (
+                          // Render regular property
+                          <>
+                            <div className="flex items-center space-x-2">
+                              <label
+                                className="text-xs font-medium text-gray-500 w-24"
+                                title={propDef.description}
+                              >
+                                {propDef.label || key}:
+                                {propDef.required && <span className="text-red-400 ml-0.5">*</span>}
+                              </label>
+
+                              {propDef.enum ? (
+                                <select
+                                  value={propDef.value}
+                                  onChange={(e) => setContextProperties(prev => ({
+                                    ...prev,
+                                    [key]: { ...propDef, value: e.target.value }
+                                  }))}
+                                  disabled={propDef.readonly}
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                >
+                                  <option value="">-- Select --</option>
+                                  {propDef.enum.map(option => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : propDef.type === 'boolean' ? (
+                                <input
+                                  type="checkbox"
+                                  checked={propDef.value}
+                                  onChange={(e) => setContextProperties(prev => ({
+                                    ...prev,
+                                    [key]: { ...propDef, value: e.target.checked }
+                                  }))}
+                                  disabled={propDef.readonly}
+                                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                                />
+                              ) : propDef.type === 'number' || propDef.type === 'integer' ? (
+                                // Number input
+                                <input
+                                  type="number"
+                                  value={propDef.value}
+                                  min={propDef.min}
+                                  max={propDef.max}
+                                  step={propDef.type === 'integer' ? 1 : 'any'}
+                                  onChange={(e) => setContextProperties(prev => ({
+                                    ...prev,
+                                    [key]: { ...propDef, value: propDef.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0 }
+                                  }))}
+                                  disabled={propDef.readonly}
+                                  placeholder={propDef.placeholder}
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                />
+                              ) : propDef.type === 'array' ? (
+                                // Array input - show as JSON for now
+                                <textarea
+                                  value={JSON.stringify(propDef.value || [], null, 2)}
+                                  onChange={(e) => {
+                                    try {
+                                      const parsed = JSON.parse(e.target.value);
+                                      setContextProperties(prev => ({
+                                        ...prev,
+                                        [key]: { ...propDef, value: parsed }
+                                      }));
+                                    } catch (err) {
+                                      // Invalid JSON, don't update
+                                    }
+                                  }}
+                                  disabled={propDef.readonly}
+                                  placeholder={propDef.placeholder || '[]'}
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 font-mono"
+                                  rows={2}
+                                />
+                              ) : propDef.type === 'object' ? (
+                                // Object input - show as JSON for now
+                                <textarea
+                                  value={JSON.stringify(propDef.value || {}, null, 2)}
+                                  onChange={(e) => {
+                                    try {
+                                      const parsed = JSON.parse(e.target.value);
+                                      setContextProperties(prev => ({
+                                        ...prev,
+                                        [key]: { ...propDef, value: parsed }
+                                      }));
+                                    } catch (err) {
+                                      // Invalid JSON, don't update
+                                    }
+                                  }}
+                                  disabled={propDef.readonly}
+                                  placeholder={propDef.placeholder || '{}'}
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 font-mono"
+                                  rows={2}
+                                />
+                              ) : (
+                                // Text input (default)
+                                <input
+                                  type="text"
+                                  value={propDef.value || ''}
+                                  onChange={(e) => setContextProperties(prev => ({
+                                    ...prev,
+                                    [key]: { ...propDef, value: e.target.value }
+                                  }))}
+                                  disabled={propDef.readonly}
+                                  placeholder={propDef.placeholder}
+                                  pattern={propDef.pattern}
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                />
+                              )}
+                        </div>
+                        </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ));
+              })()}
+            </div>
+
+            {/* Action buttons for applying changes */}
+            <div className="mt-3 flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  // Send updated properties back to FormIFrame
+                  const updatedValues = {};
+                  Object.entries(contextProperties).forEach(([key, prop]) => {
+                    updatedValues[key] = prop.value !== undefined ? prop.value : prop;
+                  });
+
+                  const updateEvent = new CustomEvent('updateFormProperties', {
+                    detail: {
+                      elementId: focusedElement?.name || focusedElement?.id,
+                      type: focusedElement?.type,
+                      properties: updatedValues
+                    }
+                  });
+                  window.dispatchEvent(updateEvent);
+                }}
+                className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
         {/* File Upload Notification */}
         {uploadNotification && (
           <div className={`absolute left-1/2 transform -translate-x-1/2 top-24 px-4 py-2 rounded-md shadow-md z-50 flex items-center text-sm ${
