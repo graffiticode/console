@@ -1238,11 +1238,11 @@ export const HelpPanel = ({
     // If there's no bot response yet, this is the initial message from the user
     if (!botResponse) {
       console.log("Processing initial user message:", userMessage.substring(0, 50) + (userMessage.length > 50 ? "..." : ""));
-      // Check if the message starts with a code block
-      const isCodeBlock = userMessage.trim().startsWith("```") && userMessage.trim().includes("```", 3);
-      // Skip CSV processing for code blocks as they should be preserved as-is
+      // Check if the message contains code blocks
+      const containsCodeBlock = userMessage.includes("```");
+      // Skip CSV processing for messages with code blocks as they should be preserved as-is
       let processedUserMessage;
-      if (isCodeBlock) {
+      if (containsCodeBlock) {
         processedUserMessage = userMessage;
       } else {
         // Process message to handle mixed content and format tables
@@ -1914,7 +1914,7 @@ export const HelpPanel = ({
                           <>
                             <div className="text-xs font-medium text-gray-500 mb-1">
                               {propDef.label}:
-                              {propDef.required && <span className="text-red-400 ml-0.5">*</span>}
+                              {/*propDef.required && <span className="text-red-400 ml-0.5">*</span>*/}
                             </div>
                             <div className="pl-3 ml-2">
                               {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]) => (
@@ -1924,7 +1924,7 @@ export const HelpPanel = ({
                                   title={nestedProp.description}
                                 >
                                   {nestedProp.label}:
-                                  {nestedProp.required && <span className="text-red-400 ml-0.5">*</span>}
+                                  {/*nestedProp.required && <span className="text-red-400 ml-0.5">*</span>*/}
                                 </label>
                                 {/* Render nested property input */}
                                 {nestedProp.enum ? (
@@ -2011,7 +2011,7 @@ export const HelpPanel = ({
                                 title={propDef.description}
                               >
                                 {propDef.label || key}:
-                                {propDef.required && <span className="text-red-400 ml-0.5">*</span>}
+                                {/*propDef.required && <span className="text-red-400 ml-0.5">*</span>*/}
                               </label>
 
                               {propDef.enum ? (
@@ -2127,24 +2127,52 @@ export const HelpPanel = ({
             <div className="mt-3 flex justify-end space-x-2">
               <button
                 onClick={() => {
-                  // Send updated properties back to FormIFrame
+                  // Collect the updated property values
                   const updatedValues = {};
                   Object.entries(contextProperties).forEach(([key, prop]) => {
-                    updatedValues[key] = prop.value !== undefined ? prop.value : prop;
-                  });
-
-                  const updateEvent = new CustomEvent('updateFormProperties', {
-                    detail: {
-                      elementId: focusedElement?.name || focusedElement?.id,
-                      type: focusedElement?.type,
-                      properties: updatedValues
+                    if (prop.value !== undefined && prop.value !== '' && prop.value !== null) {
+                      // For nested objects, only include if they have non-empty children
+                      if (prop.type === 'nested-object' && typeof prop.value === 'object') {
+                        const hasNonEmptyChildren = Object.values(prop.value).some(
+                          childValue => childValue !== undefined && childValue !== '' && childValue !== null
+                        );
+                        if (hasNonEmptyChildren) {
+                          // Filter out empty nested properties
+                          const filteredNested = {};
+                          Object.entries(prop.value).forEach(([nestedKey, nestedValue]) => {
+                            if (nestedValue !== undefined && nestedValue !== '' && nestedValue !== null) {
+                              filteredNested[nestedKey] = nestedValue;
+                            }
+                          });
+                          updatedValues[key] = filteredNested;
+                        }
+                      } else {
+                        updatedValues[key] = prop.value;
+                      }
                     }
                   });
-                  window.dispatchEvent(updateEvent);
+
+                  // Generate and send ChatBot prompt with context info
+                  const contextType = focusedElement?.type || 'context';
+                  const contextName = focusedElement?.name || '';
+
+                  let prompt = `Update the current code for ${contextType}`;
+                  if (contextName) {
+                    prompt += ` ${contextName}`;
+                  }
+                  // Use 4-space indentation and ensure proper formatting
+                  const jsonString = JSON.stringify(updatedValues, null, 4);
+                  prompt += ` with these properties:\n\`\`\`json\n${jsonString}\n\`\`\``;
+
+                  // Send the message using ChatBot
+                  if (handleSendMessage && !isLoading) {
+                    handleSendMessage(prompt);
+                  }
                 }}
-                className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isLoading}
+                className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Apply
+                {isLoading ? 'Updating...' : 'Apply'}
               </button>
             </div>
           </div>
