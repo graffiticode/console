@@ -1954,7 +1954,7 @@ export const HelpPanel = ({
                                       });
                                       // Build the complete nested value from all nested properties
                                       const newNestedValue = {};
-                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]) => {
+                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]: [string, any]) => {
                                         if (nKey === nestedKey) {
                                           newNestedValue[nKey] = e.target.value;
                                         } else {
@@ -1998,7 +1998,7 @@ export const HelpPanel = ({
                                     onChange={(e) => {
                                       // Build the complete nested value from all nested properties
                                       const newNestedValue = {};
-                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]) => {
+                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]: [string, any]) => {
                                         if (nKey === nestedKey) {
                                           newNestedValue[nKey] = e.target.checked;
                                         } else {
@@ -2032,7 +2032,7 @@ export const HelpPanel = ({
                                     onChange={(e) => {
                                       // Build the complete nested value from all nested properties
                                       const newNestedValue = {};
-                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]) => {
+                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]: [string, any]) => {
                                         if (nKey === nestedKey) {
                                           newNestedValue[nKey] = parseFloat(e.target.value) || 0;
                                         } else {
@@ -2073,7 +2073,7 @@ export const HelpPanel = ({
                                       });
                                       // Build the complete nested value from all nested properties
                                       const newNestedValue = {};
-                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]) => {
+                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]: [string, any]) => {
                                         if (nKey === nestedKey) {
                                           newNestedValue[nKey] = e.target.value;
                                         } else {
