@@ -157,7 +157,7 @@ export const HelpPanel = ({
   }, [languageSchema, resolveSchemaRef]);
 
   // Function to process focus data and update properties
-  const processFocusData = useCallback((focusData) => {
+  const processFocusData = useCallback((focusData, preserveEdits = false) => {
 
     // Get schema for this context
     const contextSchema = getSchemaForContext(focusData);
@@ -313,10 +313,19 @@ export const HelpPanel = ({
     setContextProperties(properties);
   }, [getSchemaForContext, languageSchema, resolveSchemaRef]);
 
-  // Re-process focus data when schema loads
+  // Track the last processed focus element to avoid unnecessary reprocessing
+  const lastProcessedElementRef = useRef(null);
+
+  // Re-process focus data when schema loads or focused element actually changes
   useEffect(() => {
     if (focusedElement && languageSchema && !schemaLoading) {
-      processFocusData(focusedElement);
+      // Only process if the focused element has actually changed
+      const elementKey = `${focusedElement.type}-${focusedElement.name}`;
+      if (lastProcessedElementRef.current !== elementKey) {
+        console.log('[PropertyEditor] Processing new focus element:', elementKey);
+        processFocusData(focusedElement);
+        lastProcessedElementRef.current = elementKey;
+      }
     }
   }, [languageSchema, schemaLoading, focusedElement, processFocusData]);
 
@@ -330,7 +339,12 @@ export const HelpPanel = ({
 
         // Process immediately if schema is loaded, otherwise it will be processed when schema loads
         if (languageSchema && !schemaLoading) {
-          processFocusData(focusData);
+          const elementKey = `${focusData.type}-${focusData.name}`;
+          if (lastProcessedElementRef.current !== elementKey) {
+            console.log('[PropertyEditor] Processing new focus from event:', elementKey);
+            processFocusData(focusData);
+            lastProcessedElementRef.current = elementKey;
+          }
         }
       }
     };
@@ -341,7 +355,7 @@ export const HelpPanel = ({
     return () => {
       window.removeEventListener('formIFrameFocus', handleFormFocus);
     };
-  }, [languageSchema, schemaLoading, processFocusData]);
+  }, [languageSchema, schemaLoading, processFocusData, lastProcessedElementRef]);
 
   // Integration with TextEditor component - will be properly initialized after ChatBot setup
   const [state] = useState(createState({}, (data, { type, args }) => {
@@ -1929,14 +1943,43 @@ export const HelpPanel = ({
                                 {/* Render nested property input */}
                                 {nestedProp.enum ? (
                                   <select
-                                    value={nestedProp.value}
+                                    value={nestedProp.value || ''}
                                     onChange={(e) => {
-                                      const newNestedValue = { ...propDef.value };
-                                      newNestedValue[nestedKey] = e.target.value;
-                                      setContextProperties(prev => ({
-                                        ...prev,
-                                        [key]: { ...propDef, value: newNestedValue }
-                                      }));
+                                      console.log(`[PropertyEditor] Nested select change:`, {
+                                        key,
+                                        nestedKey,
+                                        currentValue: propDef.value,
+                                        newValue: e.target.value,
+                                        propDef
+                                      });
+                                      // Build the complete nested value from all nested properties
+                                      const newNestedValue = {};
+                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]) => {
+                                        if (nKey === nestedKey) {
+                                          newNestedValue[nKey] = e.target.value;
+                                        } else {
+                                          newNestedValue[nKey] = nProp.value;
+                                        }
+                                      });
+                                      console.log(`[PropertyEditor] New nested value:`, newNestedValue);
+                                      setContextProperties(prev => {
+                                        const updated = {
+                                          ...prev,
+                                          [key]: {
+                                            ...propDef,
+                                            value: newNestedValue,
+                                            properties: {
+                                              ...propDef.properties,
+                                              [nestedKey]: {
+                                                ...propDef.properties[nestedKey],
+                                                value: e.target.value
+                                              }
+                                            }
+                                          }
+                                        };
+                                        console.log(`[PropertyEditor] Updated context properties:`, updated);
+                                        return updated;
+                                      });
                                     }}
                                     disabled={nestedProp.readonly}
                                     className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
@@ -1953,11 +1996,28 @@ export const HelpPanel = ({
                                     type="checkbox"
                                     checked={nestedProp.value}
                                     onChange={(e) => {
-                                      const newNestedValue = { ...propDef.value };
-                                      newNestedValue[nestedKey] = e.target.checked;
+                                      // Build the complete nested value from all nested properties
+                                      const newNestedValue = {};
+                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]) => {
+                                        if (nKey === nestedKey) {
+                                          newNestedValue[nKey] = e.target.checked;
+                                        } else {
+                                          newNestedValue[nKey] = nProp.value;
+                                        }
+                                      });
                                       setContextProperties(prev => ({
                                         ...prev,
-                                        [key]: { ...propDef, value: newNestedValue }
+                                        [key]: {
+                                          ...propDef,
+                                          value: newNestedValue,
+                                          properties: {
+                                            ...propDef.properties,
+                                            [nestedKey]: {
+                                              ...propDef.properties[nestedKey],
+                                              value: e.target.checked
+                                            }
+                                          }
+                                        }
                                       }));
                                     }}
                                     disabled={nestedProp.readonly}
@@ -1970,11 +2030,28 @@ export const HelpPanel = ({
                                     min={nestedProp.min}
                                     max={nestedProp.max}
                                     onChange={(e) => {
-                                      const newNestedValue = { ...propDef.value };
-                                      newNestedValue[nestedKey] = parseFloat(e.target.value) || 0;
+                                      // Build the complete nested value from all nested properties
+                                      const newNestedValue = {};
+                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]) => {
+                                        if (nKey === nestedKey) {
+                                          newNestedValue[nKey] = parseFloat(e.target.value) || 0;
+                                        } else {
+                                          newNestedValue[nKey] = nProp.value;
+                                        }
+                                      });
                                       setContextProperties(prev => ({
                                         ...prev,
-                                        [key]: { ...propDef, value: newNestedValue }
+                                        [key]: {
+                                          ...propDef,
+                                          value: newNestedValue,
+                                          properties: {
+                                            ...propDef.properties,
+                                            [nestedKey]: {
+                                              ...propDef.properties[nestedKey],
+                                              value: parseFloat(e.target.value) || 0
+                                            }
+                                          }
+                                        }
                                       }));
                                     }}
                                     disabled={nestedProp.readonly}
@@ -1986,12 +2063,42 @@ export const HelpPanel = ({
                                     type={nestedProp.format === 'date' ? 'date' : 'text'}
                                     value={nestedProp.value || ''}
                                     onChange={(e) => {
-                                      const newNestedValue = { ...propDef.value };
-                                      newNestedValue[nestedKey] = e.target.value;
-                                      setContextProperties(prev => ({
-                                        ...prev,
-                                        [key]: { ...propDef, value: newNestedValue }
-                                      }));
+                                      console.log(`[PropertyEditor] Nested text input change:`, {
+                                        key,
+                                        nestedKey,
+                                        currentValue: propDef.value,
+                                        newValue: e.target.value,
+                                        nestedProp,
+                                        propDef
+                                      });
+                                      // Build the complete nested value from all nested properties
+                                      const newNestedValue = {};
+                                      Object.entries(propDef.properties || {}).forEach(([nKey, nProp]) => {
+                                        if (nKey === nestedKey) {
+                                          newNestedValue[nKey] = e.target.value;
+                                        } else {
+                                          newNestedValue[nKey] = nProp.value;
+                                        }
+                                      });
+                                      console.log(`[PropertyEditor] New nested value:`, newNestedValue);
+                                      setContextProperties(prev => {
+                                        const updated = {
+                                          ...prev,
+                                          [key]: {
+                                            ...propDef,
+                                            value: newNestedValue,
+                                            properties: {
+                                              ...propDef.properties,
+                                              [nestedKey]: {
+                                                ...propDef.properties[nestedKey],
+                                                value: e.target.value
+                                              }
+                                            }
+                                          }
+                                        };
+                                        console.log(`[PropertyEditor] Updated context properties:`, updated);
+                                        return updated;
+                                      });
                                     }}
                                     disabled={nestedProp.readonly}
                                     placeholder={nestedProp.placeholder}
@@ -2156,13 +2263,13 @@ export const HelpPanel = ({
                   const contextType = focusedElement?.type || 'context';
                   const contextName = focusedElement?.name || '';
 
-                  let prompt = `Update the current code for ${contextType}`;
+                  let prompt = `Use these properties to update the code for ${contextType}`;
                   if (contextName) {
                     prompt += ` ${contextName}`;
                   }
                   // Use 4-space indentation and ensure proper formatting
                   const jsonString = JSON.stringify(updatedValues, null, 4);
-                  prompt += ` with these properties:\n\`\`\`json\n${jsonString}\n\`\`\``;
+                  prompt += `:\n\`\`\`json\n${jsonString}\n\`\`\``;
 
                   // Send the message using ChatBot
                   if (handleSendMessage && !isLoading) {

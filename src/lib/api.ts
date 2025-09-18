@@ -1,6 +1,10 @@
 import bent from "bent";
 
 const apiUrl = process.env.NEXT_PUBLIC_GC_API_URL || "https://api.graffiticode.org";
+console.log(
+  "HelpPanel()",
+  "apiUrl=" + apiUrl,
+);
 
 const getApiString = bent(apiUrl, "GET", "string");
 const getApiJSON = bent(apiUrl, "GET", "json");

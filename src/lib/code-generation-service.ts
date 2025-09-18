@@ -997,11 +997,14 @@ export async function generateCode({
   // Generate request ID if not provided
   const requestId = rid || generateRequestId();
 
+  // Initial model selection (may be overridden later based on formatted prompt)
+  let modelToUse = options.model || CLAUDE_MODELS.DEFAULT;
+
   // Start analytics tracking (safe - won't break if unavailable)
   safeRAGAnalytics.startRequest(requestId, prompt, userId, sessionId, {
     lang,
     hasCurrentCode: !!currentCode,
-    model: options.model || CLAUDE_MODELS.DEFAULT,
+    model: modelToUse,
   });
 
   // Model selection best practices:
@@ -1064,6 +1067,61 @@ export async function generateCode({
       rid,
     );
 
+    // Check formatted prompt for property update pattern and adjust model if needed
+    if (!options.model) {
+      try {
+        // Parse the JSON formatted prompt to check the actual user content
+        const promptData = JSON.parse(formattedPrompt);
+        const lastUserMessage = promptData.messages[promptData.messages.length - 1];
+        const userContent = lastUserMessage.content;
+
+        console.log(`[generateCode] Checking user content for pattern. Length: ${userContent.length} chars`);
+        console.log(`[generateCode] First 200 chars: "${userContent.substring(0, 200)}..."`);
+        console.log(`[generateCode] Last 200 chars: "...${userContent.substring(userContent.length - 200)}"`);
+
+        // Check if user content contains the specific pattern for property updates
+        // Must have both "Now, please address this new request:" followed by "Use these properties to update the code for"
+        const hasNewRequestPattern = userContent.includes("Now, please address this new request:");
+        const hasPropertyUpdatePattern = userContent.includes("Use these properties to update the code for");
+
+        console.log(`[generateCode] Pattern check: hasNewRequestPattern=${hasNewRequestPattern}, hasPropertyUpdatePattern=${hasPropertyUpdatePattern}`);
+
+        if (hasNewRequestPattern && hasPropertyUpdatePattern) {
+          // Find the LAST occurrence of "Now, please address..." which should be the current request
+          const newRequestIndex = userContent.lastIndexOf("Now, please address this new request:");
+          // Find the first occurrence of "Use these properties..." AFTER the "Now, please address..." marker
+          const afterNewRequest = userContent.substring(newRequestIndex);
+          const propertyUpdateInSection = afterNewRequest.indexOf("Use these properties to update the code for");
+
+          console.log(`[generateCode] Pattern positions: newRequest=${newRequestIndex}, propertyUpdateInNewSection=${propertyUpdateInSection}`);
+
+          if (newRequestIndex >= 0 && propertyUpdateInSection >= 0) {
+            // Check if current code is small enough for simple property updates
+            // Typical streaming block size is 4KB, so code under 2KB should easily fit
+            const currentCodeSize = currentCode ? currentCode.length : 0;
+            console.log(`[generateCode] Current code size: ${currentCodeSize} bytes`);
+            if (currentCodeSize < 2000) {
+              // Use Haiku for property update prompts with small code (simple transformations)
+              modelToUse = CLAUDE_MODELS.HAIKU;
+              console.log(`[generateCode] Switching to Haiku model for property update, code size: ${currentCodeSize} bytes`);
+            } else {
+              console.log(`[generateCode] Code too large for Haiku (${currentCodeSize} >= 2000 bytes)`);
+            }
+          } else {
+            console.log(`[generateCode] Pattern order check failed`);
+          }
+        } else {
+          console.log(`[generateCode] Pattern not found in user content`);
+        }
+      } catch (e) {
+        console.warn(`Failed to parse formatted prompt for model selection: ${e.message}`);
+      }
+    } else {
+      console.log(`[generateCode] Model already specified in options: ${options.model}`);
+    }
+
+    console.log(`[generateCode] Using model: ${modelToUse}, formatted prompt length: ${formattedPrompt.length} chars${currentCode ? `, code size: ${currentCode.length} bytes` : ''}`);
+
     // Start generation stage
     safeRAGAnalytics.startStage(requestId, "generation");
     const generationStartTime = Date.now();
@@ -1074,7 +1132,7 @@ export async function generateCode({
       lang,
       currentCode,
       options: {
-        model: options.model || CLAUDE_MODELS.DEFAULT,
+        model: modelToUse,
         temperature: options.temperature || 0.2,
         maxTokens: options.maxTokens || 4096,
         maxContinuations: options.maxContinuations || 10  // Conservative default
@@ -1088,7 +1146,7 @@ export async function generateCode({
     if (streamResult.error) {
       safeRAGAnalytics.trackError(requestId, "generation", streamResult.error);
       safeRAGAnalytics.trackGeneration(requestId, {
-        model: options.model || CLAUDE_MODELS.DEFAULT,
+        model: modelToUse,
         latencyMs: generationLatency,
         success: false,
         errorMessage: streamResult.error,
@@ -1098,7 +1156,7 @@ export async function generateCode({
 
     // Track successful generation
     safeRAGAnalytics.trackGeneration(requestId, {
-      model: options.model || CLAUDE_MODELS.DEFAULT,
+      model: modelToUse,
       totalTokens: (streamResult.usage.inputTokens + streamResult.usage.outputTokens) || 0,
       latencyMs: generationLatency,
       temperature: options.temperature || 0.2,
