@@ -170,9 +170,9 @@ export const HelpPanel = ({
           Object.entries(contextSchema.properties).forEach(([key, propSchema]) => {
 
             // Handle $ref if present
-            let resolvedSchema = propSchema;
-            if (propSchema.$ref) {
-              resolvedSchema = resolveSchemaRef(propSchema.$ref, languageSchema) || propSchema;
+            let resolvedSchema: any = propSchema;
+            if (propSchema && typeof propSchema === 'object' && '$ref' in propSchema) {
+              resolvedSchema = resolveSchemaRef((propSchema as any).$ref, languageSchema) || propSchema;
             }
 
             // Get value from focus data
@@ -186,8 +186,8 @@ export const HelpPanel = ({
                 value = {};
                 // Only initialize with schema defaults if explicitly provided
                 Object.entries(resolvedSchema.properties).forEach(([nestedKey, nestedSchema]) => {
-                  if (nestedSchema.default !== undefined) {
-                    value[nestedKey] = nestedSchema.default;
+                  if ((nestedSchema as any).default !== undefined) {
+                    value[nestedKey] = (nestedSchema as any).default;
                   }
                   // Don't initialize other values - leave them undefined/empty
                 });
@@ -207,9 +207,9 @@ export const HelpPanel = ({
               // Process nested properties
               Object.entries(resolvedSchema.properties).forEach(([nestedKey, nestedSchema]) => {
                 // Handle nested $ref
-                let resolvedNestedSchema = nestedSchema;
-                if (nestedSchema.$ref) {
-                  resolvedNestedSchema = resolveSchemaRef(nestedSchema.$ref, languageSchema) || nestedSchema;
+                let resolvedNestedSchema: any = nestedSchema;
+                if (nestedSchema && typeof nestedSchema === 'object' && '$ref' in nestedSchema) {
+                  resolvedNestedSchema = resolveSchemaRef((nestedSchema as any).$ref, languageSchema) || nestedSchema;
                 }
 
                 // Handle oneOf for nested properties (like expected in assess)
@@ -1891,8 +1891,8 @@ export const HelpPanel = ({
             <div className="space-y-2">
               {/* Group properties by their group attribute */}
               {(() => {
-                const groupedProps = {};
-                Object.entries(contextProperties).forEach(([key, prop]) => {
+                const groupedProps: any = {};
+                Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
                   if (!prop.hidden) {
                     const group = prop.group || 'default';
                     if (!groupedProps[group]) groupedProps[group] = {};
@@ -1917,7 +1917,7 @@ export const HelpPanel = ({
                               {/*propDef.required && <span className="text-red-400 ml-0.5">*</span>*/}
                             </div>
                             <div className="pl-3 ml-2">
-                              {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]) => (
+                              {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]: [string, any]) => (
                               <div key={nestedKey} className="flex items-center space-x-2 mb-2">
                                 <label
                                   className="text-xs font-medium text-gray-500 w-20"
@@ -2128,8 +2128,8 @@ export const HelpPanel = ({
               <button
                 onClick={() => {
                   // Collect the updated property values
-                  const updatedValues = {};
-                  Object.entries(contextProperties).forEach(([key, prop]) => {
+                  const updatedValues: any = {};
+                  Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
                     if (prop.value !== undefined && prop.value !== '' && prop.value !== null) {
                       // For nested objects, only include if they have non-empty children
                       if (prop.type === 'nested-object' && typeof prop.value === 'object') {
@@ -2138,7 +2138,7 @@ export const HelpPanel = ({
                         );
                         if (hasNonEmptyChildren) {
                           // Filter out empty nested properties
-                          const filteredNested = {};
+                          const filteredNested: any = {};
                           Object.entries(prop.value).forEach(([nestedKey, nestedValue]) => {
                             if (nestedValue !== undefined && nestedValue !== '' && nestedValue !== null) {
                               filteredNested[nestedKey] = nestedValue;

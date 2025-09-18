@@ -59,6 +59,7 @@ export default function FormView({ lang, id, setData, setId, setNewTask, classNa
         className={className || "w-full h-full"}
         height={height || "100%"}
         user={user}
+        onFocus={() => {}}
       />
     </div>
   );
