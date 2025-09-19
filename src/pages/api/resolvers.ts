@@ -278,7 +278,6 @@ export async function generateCode({
         rid,
       });
       code = result.code;
-      description = result.description;
       model = result.model;
       usage = result.usage;
     }
