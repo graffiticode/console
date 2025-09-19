@@ -70,6 +70,8 @@ export const HelpPanel = ({
   const [contextProperties, setContextProperties] = useState({});
   const [focusedElement, setFocusedElement] = useState(null);
   const [languageSchema, setLanguageSchema] = useState(null);
+  // Track initial property values to detect changes
+  const [initialProperties, setInitialProperties] = useState({});
   const [schemaLoading, setSchemaLoading] = useState(false);
 
   // Create a ref for the state to avoid circular dependencies
@@ -311,6 +313,8 @@ export const HelpPanel = ({
         }
 
     setContextProperties(properties);
+    // Store the initial values for comparison
+    setInitialProperties(JSON.parse(JSON.stringify(properties)));
   }, [getSchemaForContext, languageSchema, resolveSchemaRef]);
 
   // Track the last processed focus element to avoid unnecessary reprocessing
@@ -1279,25 +1283,6 @@ export const HelpPanel = ({
     // If we have a bot response but need to skip adding user message (to avoid duplication)
     const skipUserMessage = botResponse.skipUserMessage;
 
-    // Only add the bot's description to the chat if one is available
-    const displayText = botResponse?.description || "Code generated and sent to editor.";
-
-    // Store bot response with the current code for future reference
-    setHelp(prev => [
-      ...prev,
-      {
-        user: displayText,
-        help: {
-          type: botResponse?.type === 'code' ? 'code' : 'text',
-          text: displayText,
-          code: botResponse?.type === 'code' ? botResponse.text : undefined,  // Store the code in the help history
-          model: botResponse?.model || 'unknown',
-          usage: botResponse?.usage || {}
-        },
-        type: 'bot'
-      }
-    ]);
-
     // If the bot response is code, automatically update the code panel
     if (botResponse?.type === 'code' && typeof setCode === 'function') {
       console.log("Setting code panel with new code:",
@@ -2234,42 +2219,55 @@ export const HelpPanel = ({
             <div className="mt-3 flex justify-end space-x-2">
               <button
                 onClick={() => {
-                  // Collect the updated property values
-                  const updatedValues: any = {};
+                  // Collect only the changed property values
+                  const changedValues: any = {};
                   Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
-                    if (prop.value !== undefined && prop.value !== '' && prop.value !== null) {
-                      // For nested objects, only include if they have non-empty children
+                    const initialProp = initialProperties[key];
+
+                    // Check if the value has changed from the initial value
+                    const hasChanged = initialProp && JSON.stringify(prop.value) !== JSON.stringify(initialProp.value);
+
+                    if (hasChanged && prop.value !== undefined && prop.value !== '' && prop.value !== null) {
+                      // For nested objects, only include changed children
                       if (prop.type === 'nested-object' && typeof prop.value === 'object') {
-                        const hasNonEmptyChildren = Object.values(prop.value).some(
-                          childValue => childValue !== undefined && childValue !== '' && childValue !== null
-                        );
-                        if (hasNonEmptyChildren) {
-                          // Filter out empty nested properties
-                          const filteredNested: any = {};
-                          Object.entries(prop.value).forEach(([nestedKey, nestedValue]) => {
-                            if (nestedValue !== undefined && nestedValue !== '' && nestedValue !== null) {
-                              filteredNested[nestedKey] = nestedValue;
-                            }
-                          });
-                          updatedValues[key] = filteredNested;
+                        const changedNested: any = {};
+                        const initialNested = initialProp.value || {};
+
+                        Object.entries(prop.value).forEach(([nestedKey, nestedValue]) => {
+                          // Only include if this nested property has changed
+                          if (JSON.stringify(nestedValue) !== JSON.stringify(initialNested[nestedKey]) &&
+                              nestedValue !== undefined && nestedValue !== '' && nestedValue !== null) {
+                            changedNested[nestedKey] = nestedValue;
+                          }
+                        });
+
+                        // Only add the nested object if it has changed properties
+                        if (Object.keys(changedNested).length > 0) {
+                          changedValues[key] = changedNested;
                         }
                       } else {
-                        updatedValues[key] = prop.value;
+                        changedValues[key] = prop.value;
                       }
                     }
                   });
+
+                  // Only proceed if there are changed values
+                  if (Object.keys(changedValues).length === 0) {
+                    console.log('[PropertyEditor] No properties have changed');
+                    return;
+                  }
 
                   // Generate and send ChatBot prompt with context info
                   const contextType = focusedElement?.type || 'context';
                   const contextName = focusedElement?.name || '';
 
-                  let prompt = `Use these properties to update the code for ${contextType}`;
+                  let prompt = `Use these changed properties to update the code for ${contextType}`;
                   if (contextName) {
                     prompt += ` ${contextName}`;
                   }
                   // Use 4-space indentation and ensure proper formatting
-                  const jsonString = JSON.stringify(updatedValues, null, 4);
-                  prompt += `:\n\`\`\`json\n${jsonString}\n\`\`\``;
+                  const jsonString = JSON.stringify(changedValues, null, 4);
+                  prompt += `:\n\`\`\`json\n${jsonString}\n\`\`\`\n\nNote: Only the properties shown above have changed and need to be updated.`;
 
                   // Send the message using ChatBot
                   if (handleSendMessage && !isLoading) {
@@ -2322,86 +2320,9 @@ export const HelpPanel = ({
 
           return (
             <>
-              {/* Last bot response at the top */}
-              {lastBotResponse && (
-                <div className="mb-6">
-                  <div className="text-left">
-                    <div className="bg-gray-100 rounded-lg p-3">
-                      <div className="text-sm prose prose-sm prose-slate max-w-none">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            code({className, children, ...props}) {
-                              const match = /language-(\w+)/.exec(className || '');
-                              return match ? (
-                                <SyntaxHighlighter
-                                  style={tomorrow}
-                                  language={match[1]}
-                                  PreTag="div"
-                                  {...props}
-                                >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
-                              ) : (
-                                <code className={className} {...props}>
-                                  {children}
-                                </code>
-                              );
-                            },
-                            table({node, className, children, ...props}) {
-                              return (
-                                <div className="overflow-x-auto my-2 w-full">
-                                  <table className="table-auto border-collapse w-full text-xs" {...props}>
-                                    {children}
-                                  </table>
-                                </div>
-                              );
-                            },
-                            thead({node, children, ...props}) {
-                              return (
-                                <thead className="bg-gray-100" {...props}>
-                                  {children}
-                                </thead>
-                              );
-                            },
-                            tbody({node, children, ...props}) {
-                              return (
-                                <tbody className="divide-y divide-gray-200" {...props}>
-                                  {children}
-                                </tbody>
-                              );
-                            },
-                            tr({node, children, ...props}) {
-                              return (
-                                <tr className="hover:bg-gray-50" {...props}>
-                                  {children}
-                                </tr>
-                              );
-                            },
-                            th({node, children, ...props}) {
-                              return (
-                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border whitespace-nowrap" {...props}>
-                                  {children}
-                                </th>
-                              );
-                            },
-                            td({node, children, ...props}) {
-                              return (
-                                <td className="px-2 py-1 text-xs text-gray-500 border" {...props}>
-                                  {children}
-                                </td>
-                              );
-                            }
-                          }}
-                        >
-                          {lastBotResponse.help.text}
-                        </ReactMarkdown>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* Divider between assistant response and user history */}
-              {lastBotResponse && userMessages.length > 0 && (
+              {/* Divider for user history - show when there are user messages */}
+              {userMessages.length > 0 && (
                 <div className="flex items-center mb-6">
                   <div className="flex-grow border-t border-gray-200"></div>
                   <div className="mx-4 text-xs text-gray-500">Requests</div>

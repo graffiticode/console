@@ -1079,27 +1079,55 @@ export async function generateCode({
         console.log(`[generateCode] First 200 chars: "${userContent.substring(0, 200)}..."`);
         console.log(`[generateCode] Last 200 chars: "...${userContent.substring(userContent.length - 200)}"`);
 
-        // Check if user content contains the specific pattern for property updates
-        // Must have both "Now, please address this new request:" followed by "Use these properties to update the code for"
-        const hasNewRequestPattern = userContent.includes("Now, please address this new request:");
-        const hasPropertyUpdatePattern = userContent.includes("Use these properties to update the code for");
+        // More robust detection of property updates
+        // Look for the word "properties" followed by a JSON object in code blocks
+        const propertiesPattern = /\bproperties\b.*```json\s*\n\s*\{[\s\S]*?\}\s*\n\s*```/i;
+        const hasPropertiesWithJson = propertiesPattern.test(userContent);
 
-        console.log(`[generateCode] Pattern check: hasNewRequestPattern=${hasNewRequestPattern}, hasPropertyUpdatePattern=${hasPropertyUpdatePattern}`);
+        // Also check for specific property update phrases
+        const propertyUpdatePhrases = [
+          "use these properties",
+          "use these changed properties",
+          "apply these properties",
+          "update.*properties",
+          "property changes",
+          "property updates"
+        ];
 
-        if (hasNewRequestPattern && hasPropertyUpdatePattern) {
-          // Find the LAST occurrence of "Now, please address..." which should be the current request
-          const newRequestIndex = userContent.lastIndexOf("Now, please address this new request:");
-          // Find the first occurrence of "Use these properties..." AFTER the "Now, please address..." marker
-          const afterNewRequest = userContent.substring(newRequestIndex);
-          const propertyUpdateInSection = afterNewRequest.indexOf("Use these properties to update the code for");
+        const hasPropertyPhrase = propertyUpdatePhrases.some(phrase =>
+          new RegExp(phrase, 'i').test(userContent)
+        );
 
-          console.log(`[generateCode] Pattern positions: newRequest=${newRequestIndex}, propertyUpdateInNewSection=${propertyUpdateInSection}`);
+        // Check if this looks like a property update request
+        let isPropertyUpdate = hasPropertiesWithJson || (hasPropertyPhrase && userContent.includes('```json'));
 
-          if (newRequestIndex >= 0 && propertyUpdateInSection >= 0) {
+        console.log(`[generateCode] Property update detection: hasPropertiesWithJson=${hasPropertiesWithJson}, hasPropertyPhrase=${hasPropertyPhrase}, isPropertyUpdate=${isPropertyUpdate}`);
+
+        if (isPropertyUpdate) {
+          // Additional check: is this within a conversation context or direct?
+          const hasNewRequestPattern = userContent.includes("Now, please address this new request:");
+
+          // For property updates in conversation, check if they're in the current request
+          if (hasNewRequestPattern) {
+            const newRequestIndex = userContent.lastIndexOf("Now, please address this new request:");
+            const afterNewRequest = userContent.substring(newRequestIndex);
+            const propertyUpdateInCurrentRequest = propertiesPattern.test(afterNewRequest) ||
+                                                  propertyUpdatePhrases.some(phrase =>
+                                                    new RegExp(phrase, 'i').test(afterNewRequest)
+                                                  );
+
+            if (!propertyUpdateInCurrentRequest) {
+              console.log(`[generateCode] Property update not in current request, skipping Haiku optimization`);
+              isPropertyUpdate = false;
+            }
+          }
+
+          if (isPropertyUpdate) {
             // Check if current code is small enough for simple property updates
             // Typical streaming block size is 4KB, so code under 2KB should easily fit
             const currentCodeSize = currentCode ? currentCode.length : 0;
-            console.log(`[generateCode] Current code size: ${currentCodeSize} bytes`);
+            console.log(`[generateCode] Property update detected. Current code size: ${currentCodeSize} bytes`);
+
             if (currentCodeSize < 2000) {
               // Use Haiku for property update prompts with small code (simple transformations)
               modelToUse = CLAUDE_MODELS.HAIKU;
@@ -1107,11 +1135,9 @@ export async function generateCode({
             } else {
               console.log(`[generateCode] Code too large for Haiku (${currentCodeSize} >= 2000 bytes)`);
             }
-          } else {
-            console.log(`[generateCode] Pattern order check failed`);
           }
         } else {
-          console.log(`[generateCode] Pattern not found in user content`);
+          console.log(`[generateCode] Not detected as property update request`);
         }
       } catch (e) {
         console.warn(`Failed to parse formatted prompt for model selection: ${e.message}`);
@@ -1268,66 +1294,15 @@ export async function generateCode({
 
     }
 
-    // Generate a description of the code
-    // Create a prompt for Claude to describe the code
-    const descriptionPrompt = JSON.stringify(
-      {
-        system: `
-You are an expert Graffiticode programmer tasked with describing in simple terms
-the solution that the generated code creates. Analyze the provided Graffiticode
-and explain what it does in a single sentence of plain English. Focus on
-explaining the purpose and functionality without technical jargon. Keep your
-description concise and user-friendly, so people unfamiliar with programming can
-understand.
-IMPORTANT: Always phrase your description to describe the effect of the code, not
-the code itself.
-`,
-        messages: [
-          {
-            role: "user",
-            content: `
-Please provide a brief, clear description of what application that this
-generated Graffiticode does in a single sentence:
-
-${generatedCode}
-
-Explain it in one sentence of simple language that anyone can understand.
-`,
-          },
-        ],
-      },
-      null,
-      2,
-    );
-
-    console.log(
-      "\n============= DESCRIPTION GENERATION PROMPT =============\n",
-    );
-    console.log(descriptionPrompt);
-    console.log("\n============= END DESCRIPTION PROMPT =============\n");
-
-    // Call Claude API to get the description
-    const descriptionResponse = await callClaudeAPI(descriptionPrompt, {
-      model: CLAUDE_MODELS.HAIKU, // Use Haiku for simple description generation (fast and cheap)
-      temperature: 0.2,
-      max_tokens: 200, // Short description only
-    });
-
-    // Add the description tokens to the usage metrics
-    finalUsage.prompt_tokens += descriptionResponse.usage.prompt_tokens;
-    finalUsage.completion_tokens += descriptionResponse.usage.completion_tokens;
-    finalUsage.total_tokens += descriptionResponse.usage.total_tokens;
-
     // Ensure the code is properly processed one final time before returning
     const finalProcessedCode = processGeneratedCode(generatedCode);
 
     // Complete analytics tracking
     await safeRAGAnalytics.completeRequest(requestId, true);
 
-    // Return formatted response with the language name and description
+    // Return formatted response with the language name
     const result = {
       code: finalProcessedCode,
-      description: descriptionResponse.content,
       lang: lang,
       model: options.model || CLAUDE_MODELS.DEFAULT,
       usage: {

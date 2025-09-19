@@ -66,7 +66,6 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
     return {
       text: result.code,
       type: 'code',
-      description: result.description || '',  // Use the actual description from the API
       language: result.language || 'graffiticode',
       model: result.model,
       usage: result.usage
@@ -84,22 +83,19 @@ const fallbackResponse = (message) => {
   if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
     return {
       text: 'Hello! What do you want to make with Graffiticode today?',
-      type: 'text',
-      description: 'Hello! What do you want to make with Graffiticode today?'
+      type: 'text'
     };
   } else if (message.toLowerCase().includes('help')) {
     return {
       text: 'I can help you make things with Graffiticode. What specific functionality would you like me to implement?',
-      type: 'text',
-      description: 'I can help you make things with Graffiticode. What specific functionality would you like me to implement?'
+      type: 'text'
     };
   } else if (message.toLowerCase().includes('example')) {
     return {
       text: `let double = <x: add x x>..
 let result = map (double) [1 2 3]..`,
       type: 'code',
-      language: 'graffiticode',
-      description: 'This code creates a function to double numbers and applies it to the list [1, 2, 3], resulting in [2, 4, 6].'
+      language: 'graffiticode'
     };
   } else {
     return {
@@ -107,8 +103,7 @@ let result = map (double) [1 2 3]..`,
 let greeting = <name: concat "Hello, " name>..
 greeting "user"..`,
       type: 'code',
-      language: 'graffiticode',
-      description: 'This code creates a greeting function that adds "Hello, " before a name, and then applies it to "user".'
+      language: 'graffiticode'
     };
   }
 };
@@ -193,7 +188,6 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
         const errorResponse = {
           text: 'I encountered an error processing your request. Please try again.',
           type: 'text',
-          description: 'I encountered an error processing your request. Please try again.',
           skipUserMessage: true
         };
         onSendMessage(message, errorResponse);
