@@ -1911,7 +1911,7 @@ export const HelpPanel = ({
                         {propDef.type === 'nested-object' ? (
                           // Render nested object properties
                           <>
-                            <div className="text-xs font-medium text-gray-500 mb-1">
+                            <div className="text-xs font-medium text-gray-500 mb-1 whitespace-nowrap">
                               {propDef.label}:
                               {/*propDef.required && <span className="text-red-400 ml-0.5">*</span>*/}
                             </div>
@@ -1919,7 +1919,7 @@ export const HelpPanel = ({
                               {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]: [string, any]) => (
                               <div key={nestedKey} className="flex items-center space-x-2 mb-2">
                                 <label
-                                  className="text-xs font-medium text-gray-500 w-20"
+                                  className="text-xs font-medium text-gray-500 w-20 whitespace-nowrap"
                                   title={nestedProp.description}
                                 >
                                   {nestedProp.label}:
@@ -2099,7 +2099,7 @@ export const HelpPanel = ({
                           <>
                             <div className="flex items-center space-x-2">
                               <label
-                                className="text-xs font-medium text-gray-500 w-24"
+                                className="text-xs font-medium text-gray-500 w-24 whitespace-nowrap"
                                 title={propDef.description}
                               >
                                 {propDef.label || key}:
