@@ -1882,6 +1882,10 @@ export const HelpPanel = ({
             <div className="text-xs font-semibold text-gray-600 mb-2">
               {focusedElement?.type === 'cell' ?
                 `Cell ${focusedElement.name} Properties` :
+                focusedElement?.type === 'column' ?
+                  `Column ${focusedElement.name} Properties` :
+                focusedElement?.type === 'row' ?
+                  `Row ${focusedElement.name} Properties` :
                 focusedElement?.type ?
                   `${focusedElement.type.charAt(0).toUpperCase() + focusedElement.type.slice(1)} Properties` :
                   'Context Properties'}
