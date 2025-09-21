@@ -332,6 +332,13 @@ export const HelpPanel = ({
     // Listen for custom focus events
     window.addEventListener('formIFrameFocus', handleFormFocus);
 
+    // Request focus when component mounts (e.g., when returning to Make tab)
+    // Send a message to request the current focus state
+    const requestFocusEvent = new CustomEvent('requestFormFocus');
+    setTimeout(() => {
+      window.dispatchEvent(requestFocusEvent);
+    }, 100);
+
     return () => {
       window.removeEventListener('formIFrameFocus', handleFormFocus);
     };

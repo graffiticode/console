@@ -59,6 +59,9 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
     }
   }, [id]);
 
+  // Store last focus data to re-send when requested
+  const lastFocusDataRef = useRef(null);
+
   useEffect(() => {
     const handleMessage = (event) => {
 
@@ -71,6 +74,7 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
       if (event.data.focus) {
         console.log('[FormIFrame] Received focus event:', event.data.focus);
         hasReceivedFocus.current = true;
+        lastFocusDataRef.current = event.data.focus; // Store for re-sending
         onFocus && onFocus(event.data.focus);
         // Also dispatch a custom event that HelpPanel can listen to
         const focusEvent = new CustomEvent('formIFrameFocus', {
@@ -122,15 +126,18 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
 
               console.log(`[FormIFrame] Sending initial focus for cell ${firstCellName}`);
 
+              const focusData = {
+                type: 'cell',
+                name: firstCellName,
+                value: firstCellData || { text: '' }
+              };
+
+              // Store this as the last focus
+              lastFocusDataRef.current = focusData;
+
               // Create a proper focus event
               const focusEvent = new CustomEvent('formIFrameFocus', {
-                detail: {
-                  focus: {
-                    type: 'cell',
-                    name: firstCellName,
-                    value: firstCellData || { text: '' }
-                  }
-                }
+                detail: { focus: focusData }
               });
 
               // Delay slightly to ensure everything is initialized
@@ -146,8 +153,48 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
     };
     window.addEventListener('message', handleMessage);
 
+    // Listen for requests to re-send focus (e.g., when returning to Make tab)
+    const handleRequestFocus = () => {
+      if (lastFocusDataRef.current) {
+        console.log('[FormIFrame] Re-sending focus on request:', lastFocusDataRef.current);
+        const focusEvent = new CustomEvent('formIFrameFocus', {
+          detail: { focus: lastFocusDataRef.current }
+        });
+        window.dispatchEvent(focusEvent);
+      } else if (cache[id]) {
+        // If we have cached data but no focus yet, try to create focus from cached data
+        const cachedData = JSON.parse(cache[id]);
+        if (cachedData && cachedData.interaction && cachedData.interaction.cells) {
+          const cellKeys = Object.keys(cachedData.interaction.cells).filter(key =>
+            key.match(/^[A-Z]+\d+$/)
+          ).sort();
+
+          if (cellKeys.length > 0) {
+            const firstCellName = cellKeys[0];
+            const firstCellData = cachedData.interaction.cells[firstCellName];
+            const focusData = {
+              type: 'cell',
+              name: firstCellName,
+              value: firstCellData || { text: '' }
+            };
+
+            console.log('[FormIFrame] Creating focus from cached data:', focusData);
+            lastFocusDataRef.current = focusData;
+
+            const focusEvent = new CustomEvent('formIFrameFocus', {
+              detail: { focus: focusData }
+            });
+            window.dispatchEvent(focusEvent);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('requestFormFocus', handleRequestFocus);
+
     return () => {
       window.removeEventListener('message', handleMessage);
+      window.removeEventListener('requestFormFocus', handleRequestFocus);
     };
   }, [id, onFocus]);
 
