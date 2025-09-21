@@ -303,8 +303,17 @@ export const HelpPanel = ({
   // Listen for focus events from FormIFrame
   useEffect(() => {
     const handleFormFocus = (event) => {
-      if (event.detail && event.detail.focus) {
+      if (event.detail) {
         const focusData = event.detail.focus;
+
+        // Handle null focus (form change/reset)
+        if (!focusData) {
+          console.log('[PropertyEditor] Clearing focus and properties');
+          setFocusedElement(null);
+          setContextProperties({});
+          lastProcessedElementRef.current = null;
+          return;
+        }
 
         setFocusedElement(focusData);
 

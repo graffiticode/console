@@ -34,6 +34,30 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
   const iframeRef = useRef(null);
   const hasReceivedInitialData = useRef(false);
   const hasReceivedFocus = useRef(false);
+  const currentIdRef = useRef(id);
+
+  // Reset state when ID changes (new form loaded)
+  useEffect(() => {
+    if (currentIdRef.current !== id) {
+      console.log('[FormIFrame] Form ID changed, resetting state');
+
+      // Clear the cache for the old ID
+      if (cache[currentIdRef.current]) {
+        delete cache[currentIdRef.current];
+      }
+
+      // Update refs
+      hasReceivedInitialData.current = false;
+      hasReceivedFocus.current = false;
+      currentIdRef.current = id;
+
+      // Clear any existing focus
+      const clearFocusEvent = new CustomEvent('formIFrameFocus', {
+        detail: { focus: null }
+      });
+      window.dispatchEvent(clearFocusEvent);
+    }
+  }, [id]);
 
   useEffect(() => {
     const handleMessage = (event) => {
