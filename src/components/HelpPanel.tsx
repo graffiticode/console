@@ -164,6 +164,12 @@ export const HelpPanel = ({
     // Get schema for this context
     const contextSchema = getSchemaForContext(focusData);
 
+    // If no schema is available, don't show any properties
+    if (!contextSchema || !contextSchema.properties) {
+      setContextProperties({});
+      return;
+    }
+
     // Build properties based on schema and focus data
     let properties = {};
 
@@ -265,51 +271,12 @@ export const HelpPanel = ({
             }
           });
 
-          // Also include any additional values from focus data that aren't in schema
-          // (for backward compatibility and flexibility)
-          if (focusData.value) {
-            Object.entries(focusData.value).forEach(([key, val]) => {
-              if (!properties[key]) {
-                properties[key] = {
-                  value: val,
-                  type: typeof val === 'boolean' ? 'boolean' :
-                        typeof val === 'number' ? 'number' : 'string',
-                  label: key,
-                  group: 'additional'
-                };
-              }
-            });
-          }
+          // Don't add additional properties that aren't in the schema
+          // Only show properties defined in schema.json
         } else {
-          // Fallback to simple property extraction if no schema
-          if (focusData.type === 'cell' && focusData.value) {
-            properties = {
-              name: { value: focusData.name || '', type: 'string', label: 'Name' },
-              value: { value: focusData.value.text || '', type: 'string', label: 'Value' },
-              type: { value: focusData.type, type: 'string', label: 'Type', readonly: true },
-            };
-            // Add any additional properties from the value object
-            Object.entries(focusData.value).forEach(([key, val]) => {
-              if (key !== 'text' && !properties[key]) {
-                properties[key] = {
-                  value: val,
-                  type: typeof val === 'boolean' ? 'boolean' :
-                        typeof val === 'number' ? 'number' : 'string',
-                  label: key
-                };
-              }
-            });
-          } else if (focusData.value) {
-            // For other types, convert value object to properties
-            Object.entries(focusData.value).forEach(([key, val]) => {
-              properties[key] = {
-                value: val,
-                type: typeof val === 'boolean' ? 'boolean' :
-                      typeof val === 'number' ? 'number' : 'string',
-                label: key
-              };
-            });
-          }
+          // No schema available - don't show any properties
+          // This should not happen as we check for schema at the beginning
+          properties = {};
         }
 
     setContextProperties(properties);
