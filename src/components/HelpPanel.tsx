@@ -20,6 +20,7 @@ import tomorrow from 'react-syntax-highlighter/dist/cjs/styles/prism/tomorrow';
 import { useDropzone } from 'react-dropzone';
 import { createPortal } from 'react-dom';
 import { getLanguageAsset } from "../lib/api";
+import useLocalStorage from '../hooks/use-local-storage';
 
 // Add custom CSS for dropzone
 const dropzoneStyles = `
@@ -64,7 +65,12 @@ export const HelpPanel = ({
   const messageInputRef = useRef(null);
   const { user } = useGraffiticodeAuth();
   const [showUploadModal, setShowUploadModal] = useState(false);
+
+  // Resizable panel state
+  const isResizing = useRef(false);
+  const containerRef = useRef(null);
   const [uploadNotification, setUploadNotification] = useState(null);
+  const [maxHeaderHeight, setMaxHeaderHeight] = useState(null);  // Will be set to initial content height
 
   // Property editor state - will be populated from focus events
   const [contextProperties, setContextProperties] = useState({});
@@ -76,6 +82,8 @@ export const HelpPanel = ({
 
   // Create a ref for the state to avoid circular dependencies
   const stateRef = useRef(null);
+  // Create a ref to store setHeaderHeight function
+  const setHeaderHeightRef = useRef(null);
 
   // Fetch language schema when language changes
   useEffect(() => {
@@ -1681,6 +1689,50 @@ export const HelpPanel = ({
     return `Input: ${usage.input_tokens} | Output: ${usage.output_tokens} | Total: ${usage.input_tokens + usage.output_tokens}`;
   };
 
+  // Resize handlers
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!isResizing.current || !containerRef.current) return;
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const newHeight = e.clientY - containerRect.top;
+
+    // Set min and max heights
+    const minHeight = 80;  // Allow smaller header
+    const maxHeight = maxHeaderHeight || window.innerHeight * 0.8; // Use dynamic max or 80% of window
+
+    const clampedHeight = Math.min(Math.max(newHeight, minHeight), maxHeight);
+    // Use the ref to call setHeaderHeight
+    if (setHeaderHeightRef.current) {
+      setHeaderHeightRef.current(clampedHeight);
+      // Manual resize - this will be preserved until content changes
+    }
+  }, [maxHeaderHeight]);
+
+  const handleMouseUp = useCallback(() => {
+    if (isResizing.current) {
+      isResizing.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+  }, []);
+
+  // Add global mouse event listeners for resize
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [handleMouseMove, handleMouseUp]);
+
   // Function to handle deleting a message
   const handleDeleteMessagePair = (index) => {
     // Check if this is a pending message
@@ -1735,35 +1787,118 @@ export const HelpPanel = ({
 
   // Create refs and state for UI elements
   const headerRef = useRef(null);
-  const [headerHeight, setHeaderHeight] = useState(130);  // Default initial height
+  const [headerHeight, setHeaderHeight] = useState(null);  // Start with auto-fit
   const [processingTime, setProcessingTime] = useState(0);
   const processingTimeRef = useRef(null);
+  const lastContentHeightRef = useRef(null);  // Track last content height to detect changes
 
-  // Update header height when it changes
+  // Update the ref when setHeaderHeight is available
   useEffect(() => {
-    if (headerRef.current) {
-      const resizeObserver = new ResizeObserver(entries => {
-        for (let entry of entries) {
-          setHeaderHeight(entry.contentRect.height);
+    setHeaderHeightRef.current = setHeaderHeight;
+  }, [setHeaderHeight]);
+
+  // Adjust height and max height when content changes
+  useEffect(() => {
+    const adjustHeight = () => {
+      if (headerRef.current) {
+        // Temporarily set height to auto to get true content height
+        const originalHeight = headerRef.current.style.height;
+        headerRef.current.style.height = 'auto';
+
+        // Force a reflow to get accurate measurement
+        headerRef.current.offsetHeight;
+
+        // Measure the natural height of the content including padding
+        const computedStyle = window.getComputedStyle(headerRef.current);
+        const paddingTop = parseFloat(computedStyle.paddingTop);
+        const paddingBottom = parseFloat(computedStyle.paddingBottom);
+        const contentHeight = headerRef.current.scrollHeight;
+
+        // Restore the original height
+        headerRef.current.style.height = originalHeight;
+
+        // Get available window height (leave some space for the message area)
+        const windowHeight = window.innerHeight;
+        const availableHeight = Math.max(windowHeight * 0.8, 200); // Use 80% of window or min 200px
+
+        // Update max height to exact content height
+        const exactHeight = contentHeight;
+        const newMaxHeight = Math.min(exactHeight, availableHeight);
+        setMaxHeaderHeight(newMaxHeight);
+
+        // Check if this is first measurement or if content has changed
+        if (lastContentHeightRef.current === null) {
+          // First measurement - set exact height
+          setHeaderHeight(newMaxHeight);
+          lastContentHeightRef.current = contentHeight;
+          return;
         }
+
+        // Check if content height has actually changed (with small threshold for rounding)
+        if (Math.abs(lastContentHeightRef.current - contentHeight) < 2) {
+          // Content hasn't changed meaningfully, keep current height (could be manual)
+          return;
+        }
+
+        // Content has changed, update to fit
+        lastContentHeightRef.current = contentHeight;
+
+        // Always resize to fit the new content exactly
+        setHeaderHeight(newMaxHeight);
+      }
+    };
+
+    // Delay initial measurement slightly to ensure content is rendered
+    const timeoutId = setTimeout(() => {
+      requestAnimationFrame(adjustHeight);
+    }, 10);
+
+    // Set up MutationObserver to watch for content changes
+    let observer;
+    if (headerRef.current) {
+      observer = new MutationObserver(() => {
+        // Debounce the height adjustment
+        requestAnimationFrame(adjustHeight);
       });
 
-      resizeObserver.observe(headerRef.current);
-
-      // Initial height measurement
-      setHeaderHeight(headerRef.current.offsetHeight);
-
-      return () => {
-        resizeObserver.disconnect();
-      };
+      observer.observe(headerRef.current, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        characterData: true
+      });
     }
-  }, []);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (observer) {
+        observer.disconnect();
+      }
+    };
+  }, [contextProperties, help.length]); // Re-measure when properties or help messages change
+
+  // Adjust height when window resizes
+  useEffect(() => {
+    const handleWindowResize = () => {
+      if (headerRef.current && headerHeight) {
+        const windowHeight = window.innerHeight;
+        const availableHeight = Math.max(windowHeight * 0.6, 200);
+
+        // Only adjust if current height exceeds available space
+        if (headerHeight > availableHeight) {
+          const naturalHeight = headerRef.current.scrollHeight;
+          const clampedHeight = Math.min(Math.max(naturalHeight, 80), availableHeight);
+          setHeaderHeight(clampedHeight);
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, [headerHeight]);
 
   // Update header height when loading state changes
   useEffect(() => {
-    if (headerRef.current) {
-      setHeaderHeight(headerRef.current.offsetHeight);
-    }
 
     // Track processing time when isLoading changes
     if (isLoading) {
@@ -1813,7 +1948,7 @@ export const HelpPanel = ({
   };
 
   return (
-    <div {...getRootProps()} className={`flex flex-col h-[calc(100vh-120px)] ${isDragActive ? 'drag-active' : ''}`}>
+    <div {...getRootProps()} ref={containerRef} className={`flex flex-col h-[calc(100vh-120px)] ${isDragActive ? 'drag-active' : ''}`}>
       {/* Add style tag for dropzone styles */}
       <style>{dropzoneStyles}</style>
 
@@ -1831,8 +1966,16 @@ export const HelpPanel = ({
         </div>
       )}
 
-      {/* Input field at the top */}
-      <div ref={headerRef} className="flex-none sticky top-0 z-20 bg-white px-4 py-3 border-b shadow-md">
+      {/* Input field at the top - resizable */}
+      <div
+        ref={headerRef}
+        className="flex-none bg-white px-4 py-3 overflow-y-auto"
+        style={{
+          height: headerHeight ? `${headerHeight}px` : 'auto',
+          maxHeight: headerHeight ? `${headerHeight}px` : maxHeaderHeight ? `${maxHeaderHeight}px` : '80vh',
+          minHeight: '80px',
+          boxSizing: 'border-box'
+        }}>
         <div className="flex justify-between items-center text-xs mb-2">
           <div className="font-light text-gray-500">
             <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for newlines, {' '}
@@ -2295,12 +2438,19 @@ export const HelpPanel = ({
         {showUploadModal && <CsvDropzone />}
       </div>
 
-      {/* Scrollable messages container - now takes most of the space */}
+      {/* Resize handle */}
       <div
-        className="flex-grow overflow-auto px-4 py-4"
-        style={{
-          height: 'calc(100vh - 240px)' // Adjusted to account for input at top
-        }}
+        className="h-1 bg-gray-300 hover:bg-gray-400 cursor-row-resize transition-colors relative my-1"
+        onMouseDown={handleMouseDown}
+      >
+        <div className="absolute inset-x-0 -top-1 -bottom-1 flex items-center justify-center">
+          <div className="w-16 h-1 bg-gray-400 rounded-full opacity-50"></div>
+        </div>
+      </div>
+
+      {/* Scrollable messages container - dynamically sized */}
+      <div
+        className="flex-1 overflow-auto px-4 py-4"
       >
         {help.length > 0 && (() => {
           const { lastBotResponse, userMessages } = prepareMessagesForDisplay();

@@ -508,7 +508,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
             {/* Vertical resize bar between editor and preview (desktop) */}
             {!isEditorPanelCollapsed && !isFormPanelCollapsed && (
               <div
-                className="hidden lg:block w-1 bg-gray-300 hover:bg-gray-400 cursor-col-resize transition-colors lg:order-2 mx-1"
+                className="hidden lg:block w-1 bg-gray-300 hover:bg-gray-400 cursor-col-resize transition-colors relative lg:order-2 mx-1"
                 onPointerDown={(e) => {
                 e.preventDefault();
                 let isDragging = false;
@@ -564,7 +564,11 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                   }, 200);
                 }}
                 title="Drag to resize horizontally"
-              />
+              >
+                <div className="absolute inset-y-0 -left-1 -right-1 flex items-center justify-center">
+                  <div className="h-16 w-1 bg-gray-400 rounded-full opacity-50"></div>
+                </div>
+              </div>
             )}
             {/* Spacer to maintain gap when drag bar is hidden */}
             {(isEditorPanelCollapsed || isFormPanelCollapsed) && (

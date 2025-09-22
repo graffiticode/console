@@ -1,0 +1,3 @@
+- I prefer the more concise versions
+- jusr show me the more concise commit comments
+- don't automatically commit changes
