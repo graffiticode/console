@@ -16,7 +16,7 @@
     "typecheck": "tsc",
     "download-training-examples": "npx tsx scripts/download-training-examples.ts",
     "update-embeddings": "npx tsx scripts/update-embeddings.ts",
-    "update-embeddings-refresh": "npx tsx scripts/update-embeddings.ts",
+    "update-embeddings-refresh": "npx tsx scripts/update-embeddings.ts --refresh",
     "test:streaming": "npx tsx scripts/test-streaming.ts"
   },
   "dependencies": {
