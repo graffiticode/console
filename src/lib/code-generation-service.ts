@@ -24,6 +24,7 @@ import {
 import { generateCodeWithContinuation } from "./claude-stream-service";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
 import { getRAGConfig, withRAGFallback } from "./rag-config";
+import { parser } from "@graffiticode/parser";
 
 // Global cache for language assets to avoid repeated fetches
 const languageAssetsCache = {
@@ -920,9 +921,10 @@ When fixing code:
 /**
  * Processes generated code to fix common issues and extract only the code portion
  * @param {string} content - The content returned from Claude API
- * @returns {string} - The processed code with fixes applied
+ * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
+ * @returns {Promise<string>} - The processed and reformatted code with fixes applied
  */
-function processGeneratedCode(content, rid = null) {
+async function processGeneratedCode(content, lang = "0002", rid = null) {
   if (!content) return content;
 
   const originalLength = content.length;
@@ -945,6 +947,47 @@ function processGeneratedCode(content, rid = null) {
   processed = processed.replace(/\\"/g, '"'); // Replace \" with "
   processed = processed.replace(/\\'/g, "'"); // Replace \' with '
   processed = processed.replace(/\\`/g, "`"); // Replace \` with `
+
+  // Try to reformat the code using the parser
+  try {
+    // Get the lexicon for the language
+    const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.js');
+    let lexicon = null;
+
+    if (lexiconData) {
+      // Parse the lexicon if it's a string
+      if (typeof lexiconData === 'string') {
+        const lexiconStr = lexiconData.substring(lexiconData.indexOf("{"));
+        try {
+          lexicon = JSON.parse(lexiconStr);
+        } catch (e) {
+          console.warn(`Failed to parse lexicon for L${lang}:`, e.message);
+        }
+      } else {
+        lexicon = lexiconData;
+      }
+    }
+
+    // Use parser.reformat with the lang identifier (without L prefix)
+    processed = await parser.reformat(lang, processed, lexicon, {});
+
+    if (rid) {
+      ragLog(rid, "reformat.success", {
+        lang: `L${lang}`,
+        lengthBefore: code.length,
+        lengthAfter: processed.length,
+      });
+    }
+  } catch (reformatError) {
+    // If reformatting fails, log it but continue with the processed code
+    if (rid) {
+      ragLog(rid, "reformat.error", {
+        error: reformatError.message,
+        lang: `L${lang}`,
+      });
+    }
+    console.warn(`Failed to reformat code for L${lang}:`, reformatError.message);
+  }
 
   if (rid) {
     ragLog(rid, "postprocess", {
@@ -1191,7 +1234,7 @@ export async function generateCode({
     }, streamResult.code);
 
     // Process the generated code to fix any issues
-    let generatedCode = processGeneratedCode(streamResult.code, rid);
+    let generatedCode = await processGeneratedCode(streamResult.code, lang, rid);
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
@@ -1266,7 +1309,7 @@ export async function generateCode({
           }
 
           // Update the generated code with the fixed version and process to fix escaping issues
-          generatedCode = processGeneratedCode(fixResult.code, rid);
+          generatedCode = await processGeneratedCode(fixResult.code, lang, rid);
           console.log("[2] generateCode()", "generatedCode=" + generatedCode);
 
           // Add fix attempt usage to total
@@ -1295,7 +1338,7 @@ export async function generateCode({
     }
 
     // Ensure the code is properly processed one final time before returning
-    const finalProcessedCode = processGeneratedCode(generatedCode);
+    const finalProcessedCode = await processGeneratedCode(generatedCode, lang, rid);
 
     // Complete analytics tracking
     await safeRAGAnalytics.completeRequest(requestId, true);
