@@ -948,46 +948,55 @@ async function processGeneratedCode(content, lang = "0002", rid = null) {
   processed = processed.replace(/\\'/g, "'"); // Replace \' with '
   processed = processed.replace(/\\`/g, "`"); // Replace \` with `
 
+  console.log(
+    "[1] processGeneratedCode()",
+    "processed=" + processed,
+  );
   // Try to reformat the code using the parser
-  try {
-    // Get the lexicon for the language
-    const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.js');
-    let lexicon = null;
+  // try {
+  //   // Get the lexicon for the language
+  //   const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.js');
+  //   let lexicon = null;
 
-    if (lexiconData) {
-      // Parse the lexicon if it's a string
-      if (typeof lexiconData === 'string') {
-        const lexiconStr = lexiconData.substring(lexiconData.indexOf("{"));
-        try {
-          lexicon = JSON.parse(lexiconStr);
-        } catch (e) {
-          console.warn(`Failed to parse lexicon for L${lang}:`, e.message);
-        }
-      } else {
-        lexicon = lexiconData;
-      }
-    }
+  //   if (lexiconData) {
+  //     // Parse the lexicon if it's a string
+  //     if (typeof lexiconData === 'string') {
+  //       const lexiconStr = lexiconData.substring(lexiconData.indexOf("{"));
+  //       try {
+  //         lexicon = JSON.parse(lexiconStr);
+  //       } catch (e) {
+  //         console.warn(`Failed to parse lexicon for L${lang}:`, e.message);
+  //       }
+  //     } else {
+  //       lexicon = lexiconData;
+  //     }
+  //   }
 
-    // Use parser.reformat with the lang identifier (without L prefix)
-    processed = await parser.reformat(lang, processed, lexicon, {});
+  //   // Use parser.reformat with the lang identifier (without L prefix)
+  //   processed = await parser.reformat(lang, processed, lexicon, {});
 
-    if (rid) {
-      ragLog(rid, "reformat.success", {
-        lang: `L${lang}`,
-        lengthBefore: code.length,
-        lengthAfter: processed.length,
-      });
-    }
-  } catch (reformatError) {
-    // If reformatting fails, log it but continue with the processed code
-    if (rid) {
-      ragLog(rid, "reformat.error", {
-        error: reformatError.message,
-        lang: `L${lang}`,
-      });
-    }
-    console.warn(`Failed to reformat code for L${lang}:`, reformatError.message);
-  }
+  //   if (rid) {
+  //     ragLog(rid, "reformat.success", {
+  //       lang: `L${lang}`,
+  //       lengthBefore: code.length,
+  //       lengthAfter: processed.length,
+  //     });
+  //   }
+  // } catch (reformatError) {
+  //   // If reformatting fails, log it but continue with the processed code
+  //   if (rid) {
+  //     ragLog(rid, "reformat.error", {
+  //       error: reformatError.message,
+  //       lang: `L${lang}`,
+  //     });
+  //   }
+  //   console.warn(`Failed to reformat code for L${lang}:`, reformatError.message);
+  // }
+
+  // console.log(
+  //   "[2] processGeneratedCode()",
+  //   "processed=" + processed,
+  // );
 
   if (rid) {
     ragLog(rid, "postprocess", {
