@@ -985,11 +985,6 @@ async function processGeneratedCode(content, lang = "0002", rid = null) {
   // Replace literal "\n" with actual newlines
   processed = processed.replace(/\\n/g, "\n");
 
-  // Replace escaped quotes with bare quotes
-  processed = processed.replace(/\\"/g, '"'); // Replace \" with "
-  processed = processed.replace(/\\'/g, "'"); // Replace \' with '
-  processed = processed.replace(/\\`/g, "`"); // Replace \` with `
-
   if (rid) {
     ragLog(rid, "postprocess", {
       codeBlockExtracted,
