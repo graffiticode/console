@@ -59,6 +59,7 @@ export default function Editor({
   accessToken,
   taskId,
   setTaskId,
+  onLoadTaskFromHelp,
   lang,
   mark: initMark,
   height,
@@ -221,6 +222,9 @@ export default function Editor({
                         setCode(newCode);
                       }
                     }}
+                    setTaskId={setTaskId}
+                    onLoadTaskFromHelp={onLoadTaskFromHelp}
+                    taskId={taskId}
                   />
                 );
               } else {

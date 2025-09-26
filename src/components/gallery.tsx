@@ -108,20 +108,27 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
       const newViewport = window.innerWidth >= 1024 ? 'desktop' : 'mobile';
       if (newViewport !== currentViewport) {
         setCurrentViewport(newViewport);
-        // Restore saved sizes for the new viewport
+        // Only restore saved sizes for the new viewport if panels are at default sizes
+        // This prevents resizing when taskId changes or other state updates occur
         if (newViewport === 'desktop') {
-          const saved = localStorage.getItem('graffiticode:editorPanelWidth');
-          if (saved) setEditorPanelWidth(parseFloat(saved));
+          // Only restore if editor panel is at default 50% width
+          if (editorPanelWidth === 50) {
+            const saved = localStorage.getItem('graffiticode:editorPanelWidth');
+            if (saved) setEditorPanelWidth(parseFloat(saved));
+          }
         } else {
-          const saved = localStorage.getItem('graffiticode:previewPanelHeight');
-          if (saved) setPreviewPanelHeight(parseFloat(saved));
+          // Only restore if preview panel is at default 50% height
+          if (previewPanelHeight === 50) {
+            const saved = localStorage.getItem('graffiticode:previewPanelHeight');
+            if (saved) setPreviewPanelHeight(parseFloat(saved));
+          }
         }
       }
     };
 
     window.addEventListener('resize', handleViewportChange);
     return () => window.removeEventListener('resize', handleViewportChange);
-  }, [currentViewport]);
+  }, [currentViewport, editorPanelWidth, previewPanelHeight]);
 
 
 
@@ -319,6 +326,39 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
     }
   };
 
+  // Handle loading a task from help panel (when user clicks a previous request)
+  const handleLoadTaskFromHelp = async (taskIdToLoad) => {
+    if (!taskIdToLoad || !user) return;
+
+    try {
+      // Import getTask from fetchers
+      const { getTask } = await import('../utils/swr/fetchers');
+
+      // Load the task data
+      const taskData = await getTask({ user, id: taskIdToLoad });
+
+      if (taskData) {
+        // Update the taskId which updates the preview
+        setTaskId(taskIdToLoad);
+
+        // Update the code and help panels
+        if (taskData.code !== undefined) {
+          setEditorCode(taskData.code);
+        }
+
+        // Parse help if it's a string
+        if (taskData.help !== undefined) {
+          const helpData = typeof taskData.help === "string" ?
+            JSON.parse(taskData.help || "[]") :
+            (taskData.help || []);
+          setEditorHelp(helpData);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load task from help panel:', error);
+    }
+  };
+
   // Update the selected item's state when editor changes
   useEffect(() => {
     if (selectedItemId && items.length > 0) {
@@ -497,6 +537,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                 lang={lang}
                 mark={mark}
                 setTaskId={setTaskId}
+                onLoadTaskFromHelp={handleLoadTaskFromHelp}
                 height="100%"
                 onCodeChange={setEditorCode}
                 onHelpChange={setEditorHelp}

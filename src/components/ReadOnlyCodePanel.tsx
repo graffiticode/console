@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { getTask } from '../utils/swr/fetchers';
-import { Form } from "@graffiticode/l0012";
 
 export const ReadOnlyCodePanel = ({ id, user }: any) => {
   const [code, setCode] = useState("");
@@ -40,28 +39,14 @@ export const ReadOnlyCodePanel = ({ id, user }: any) => {
     console.error("ReadOnlyCodePanel() - Error loading task:", error);
   }
 
-  // Parse the JSON string to get the actual data
-  let parsedCode;
-  try {
-    if (code && typeof code === 'string') {
-      parsedCode = JSON.parse(code);
-    } else {
-      parsedCode = code; // Use as-is if not a string
-    }
-  } catch (error) {
-    console.error("ReadOnlyCodePanel() - Failed to parse code JSON:", error);
-    parsedCode = code; // Fall back to raw string if parsing fails
-  }
-
+  // The code is now unparsed source code, not JSON
+  // Display it directly as a string
   return (
     code ? (
-      <div>
-        <Form
-          state={{
-            apply: () => {},
-            data: parsedCode
-          }}
-        />
+      <div className="p-4">
+        <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto">
+          <code className="text-sm font-mono">{code}</code>
+        </pre>
       </div>
     ) : (
       <div className="p-4 text-gray-500">No code available</div>

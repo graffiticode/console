@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-09-22T23:44:52.258Z*
+*Downloaded on 2025-09-24T22:50:19.533Z*
 
 ## Language L0166
 
@@ -142,6 +142,17 @@ Use these changed properties to update the code for cell A1:
 }
 ```
 
+Note: Only the properties shown above have changed and need to be updated.
+
+Use these changed properties to update the code for cell A1:
+```json
+{
+    "assess": {
+        "expected": "20"
+    }
+}
+```
+
 Note: Only the properties shown above have changed and need to be updated."
 
 #### Chat Transcript
@@ -164,50 +175,35 @@ This code appears to be setting up a simple assessment cell where a value of "10
 
 Note: Only the properties shown above have changed and need to be updated.
 
+**User**: Use these changed properties to update the code for cell A1:
+```json
+{
+    "assess": {
+        "expected": "20"
+    }
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
 #### Code
 
 ```
 columns [
-  column "A" width 50 {}
-]
-cells [
-  cell A1 text "10" assess [method "value" expected "10"] {}
-]
-{
-  v: "0.0.3"
+  column 'A' width 50 {}
+] cells [
+  cell A1 text '20' assess [
+    method 'value'
+    expected '20'
+  ] {}
+] {
+  v: '0.0.3'
 }..
 ```
 
 ---
 
 ### Example 4
-
-#### Prompt
-"make row 1 bold"
-
-#### Chat Transcript
-
-**User**: make row 1 bold
-
-#### Code
-
-```
-columns [
-  column A width 100 align "center" {}
-  column B width 100 align "center" {}
-]
-cells [
-  cell A1 text "A1" {fontWeight: "bold"}
-  cell B1 text "B1" {fontWeight: "bold"}
-]
-{
-  v: "0.0.1"
-}..
-```
-
----
-
-### Example 5
 
 #### Prompt
 "format column A using ($#,##0)"
@@ -236,7 +232,7 @@ cells [
 
 ---
 
-### Example 6
+### Example 5
 
 #### Prompt
 "make a single cell table"
@@ -265,7 +261,7 @@ cells [
 
 ---
 
-### Example 7
+### Example 6
 
 #### Prompt
 "make a spreadsheet that allows me to track my stocks. see the sheet with a few dummy examples
@@ -383,7 +379,7 @@ cells [
 
 ---
 
-### Example 8
+### Example 7
 
 #### Prompt
 "Make a home budget assessment using the following data:
@@ -546,6 +542,131 @@ cells [
 ]
 {
   v: "0.0.1"
+}..
+```
+
+---
+
+### Example 8
+
+#### Prompt
+"Use these changed properties to update the code for cell A1:
+```json
+{
+    "protected": true
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+Use these changed properties to update the code for row 1:
+```json
+{
+    "protected": true
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+Use these changed properties to update the code for column A:
+```json
+{
+    "protected": true
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated."
+
+#### Chat Transcript
+
+**User**: Use these changed properties to update the code for cell A1:
+```json
+{
+    "protected": true
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+**User**: Use these changed properties to update the code for row 1:
+```json
+{
+    "protected": true
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+**User**: Use these changed properties to update the code for column A:
+```json
+{
+    "protected": true
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" protected true {}
+]
+rows [
+  row 1 background-color "#eee" protected true {}
+]
+cells [
+  cell A1 text "A1" protected true {}
+]
+{
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 9
+
+#### Prompt
+"add three columns
+
+add two rows
+
+make row 1 bold"
+
+#### Chat Transcript
+
+**User**: add three columns
+
+**User**: add two rows
+
+**User**: make row 1 bold
+
+#### Code
+
+```
+columns [
+  column A width 100 align 'center' {}
+  column B width 100 align 'center' {}
+  column C width 100 align 'center' {}
+  column D width 100 align 'center' {}
+] rows [
+  row 1 background-color '#eee' {}
+] cells [
+  cell A1 text 'A1' font-weight 'bold' {}
+  cell B1 text 'B1' font-weight 'bold' {}
+  cell C1 text 'C1' font-weight 'bold' {}
+  cell D1 text 'D1' font-weight 'bold' {}
+  cell A2 text 'A2' {}
+  cell B2 text 'B2' {}
+  cell C2 text 'C2' {}
+  cell D2 text 'D2' {}
+  cell A3 text 'A3' {}
+  cell B3 text 'B3' {}
+  cell C3 text 'C3' {}
+  cell D3 text 'D3' {}
+] {
+  v: '0.0.1'
 }..
 ```
 

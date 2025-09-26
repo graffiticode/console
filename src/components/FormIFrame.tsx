@@ -50,17 +50,25 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
       hasReceivedInitialData.current = false;
       hasReceivedFocus.current = false;
       currentIdRef.current = id;
+      justChangedTaskRef.current = true;
 
-      // Clear any existing focus
+      // Clear any existing focus - mark as task change
       const clearFocusEvent = new CustomEvent('formIFrameFocus', {
-        detail: { focus: null }
+        detail: { focus: null, isTaskChange: true }
       });
       window.dispatchEvent(clearFocusEvent);
+
+      // Reset the flag after a delay
+      setTimeout(() => {
+        justChangedTaskRef.current = false;
+      }, 1000);
     }
   }, [id]);
 
   // Store last focus data to re-send when requested
   const lastFocusDataRef = useRef(null);
+  // Track if we just changed tasks
+  const justChangedTaskRef = useRef(false);
 
   useEffect(() => {
     const handleMessage = (event) => {
@@ -72,13 +80,16 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
 
       // Check for focus events first
       if (event.data.focus) {
-        console.log('[FormIFrame] Received focus event:', event.data.focus);
+        console.log('[FormIFrame] Received focus event:', event.data.focus, 'isTaskChange:', justChangedTaskRef.current);
         hasReceivedFocus.current = true;
         lastFocusDataRef.current = event.data.focus; // Store for re-sending
         onFocus && onFocus(event.data.focus);
         // Also dispatch a custom event that HelpPanel can listen to
         const focusEvent = new CustomEvent('formIFrameFocus', {
-          detail: { focus: event.data.focus }
+          detail: {
+            focus: event.data.focus,
+            isTaskChange: justChangedTaskRef.current
+          }
         });
         window.dispatchEvent(focusEvent);
         return;

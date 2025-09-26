@@ -2,9 +2,10 @@ import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
 import { getFirestore } from "../../utils/db";
-import { getApiTask, getBaseUrlForApi, getLanguageAsset } from "../../lib/api";
+import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } from "../../lib/api";
 import { generateCode as codeGenerationService } from "../../lib/code-generation-service";
 import { ragLog, generateRequestId } from "../../lib/logger";
+import { parser } from "@graffiticode/parser";
 import fs from "fs";
 import path from "path";
 // import { buildDynamicSchema } from "./schemas";
@@ -511,10 +512,27 @@ export async function getTask({ auth, id }) {
     // Get the task code from the API
     const apiTask = await getApiTask({ id, auth });
     const taskData = apiTask[0] || apiTask;
+
+    // Get the language from the task (remove L prefix if present)
+    const lang = taskData.lang.startsWith('L') ? taskData.lang.substring(1) : taskData.lang;
+
+    // Get the lexicon for the language
+    const lexicon = await getLanguageLexicon(lang);
+
+    // Unparse the AST to get source code
+    let sourceCode;
+    try {
+      sourceCode = parser.unparse(taskData.code, lexicon);
+    } catch (error) {
+      console.error("getTask()", "Failed to unparse AST", error);
+      // Fallback to stringifying if unparsing fails
+      sourceCode = JSON.stringify(taskData.code);
+    }
+
     return {
       id: id,
       lang: taskData.lang,
-      code: JSON.stringify(taskData.code), // Serialize the AST object to string
+      code: sourceCode,
     };
   } catch (error) {
     console.error("getTask()", "ERROR", error);

@@ -12,6 +12,34 @@ const getApiJSON = bent(apiUrl, "GET", "json");
 export const getBaseUrlForApi = () => apiUrl;
 export const getLanguageAsset = (lang, file) => getApiString(`/${lang}/${file}`);
 
+// Get and parse lexicon for a language
+export const getLanguageLexicon = async (lang: string) => {
+  try {
+    // Get the lexicon for the language
+    const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.js');
+    let lexicon = null;
+
+    if (lexiconData) {
+      // Parse the lexicon if it's a string
+      if (typeof lexiconData === 'string') {
+        const lexiconStr = lexiconData.substring(lexiconData.indexOf("{"));
+        try {
+          lexicon = JSON.parse(lexiconStr);
+        } catch (e) {
+          console.warn(`Failed to parse lexicon for L${lang}:`, e.message);
+        }
+      } else {
+        lexicon = lexiconData;
+      }
+    }
+
+    return lexicon;
+  } catch (error) {
+    console.warn(`Failed to fetch lexicon for L${lang}:`, error.message);
+    return null;
+  }
+};
+
 export const getApiTask = async ({ auth, id }) => {
   try {
     const headers = { "Authorization": auth.token };

@@ -11,7 +11,7 @@
  */
 
 import axios from "axios";
-import { postApiCompile, getLanguageAsset } from "./api";
+import { postApiCompile, getLanguageAsset, getLanguageLexicon } from "./api";
 import { postTask, getData } from "../pages/api/resolvers";
 import admin from "firebase-admin";
 import { ragLog, generateRequestId } from "./logger";
@@ -941,22 +941,7 @@ async function processGeneratedCode(content, lang = "0002", rid = null) {
   // Try to reformat the code using the parser
   try {
     // Get the lexicon for the language
-    const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.js');
-    let lexicon = null;
-
-    if (lexiconData) {
-      // Parse the lexicon if it's a string
-      if (typeof lexiconData === 'string') {
-        const lexiconStr = lexiconData.substring(lexiconData.indexOf("{"));
-        try {
-          lexicon = JSON.parse(lexiconStr);
-        } catch (e) {
-          console.warn(`Failed to parse lexicon for L${lang}:`, e.message);
-        }
-      } else {
-        lexicon = lexiconData;
-      }
-    }
+    const lexicon = await getLanguageLexicon(lang);
 
     // Use parser.reformat with the lang identifier (without L prefix)
     processed = await parser.reformat(lang, processed, lexicon, {});

@@ -59,7 +59,10 @@ export const HelpPanel = ({
   setHelp,
   language,
   code,
-  setCode
+  setCode,
+  setTaskId,
+  onLoadTaskFromHelp,
+  taskId
 }) => {
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
@@ -1280,6 +1283,22 @@ export const HelpPanel = ({
         botResponse.text ? botResponse.text.substring(0, 50) + "..." : "none");
       setCode(botResponse.text);
     }
+
+    // If the bot response includes a taskId, update the last user message with it
+    if (botResponse?.taskId) {
+      console.log("Bot response includes taskId:", botResponse.taskId);
+      setHelp(prev => {
+        const newHelp = [...prev];
+        // Find the last user message and add the taskId to it
+        for (let i = newHelp.length - 1; i >= 0; i--) {
+          if (newHelp[i].type === 'user') {
+            newHelp[i].taskId = botResponse.taskId;
+            break;
+          }
+        }
+        return newHelp;
+      });
+    }
   }, [setCode]);
 
   // State for the input field
@@ -1711,7 +1730,8 @@ export const HelpPanel = ({
     // Use the ref to call setHeaderHeight
     if (setHeaderHeightRef.current) {
       setHeaderHeightRef.current(clampedHeight);
-      // Manual resize - this will be preserved until content changes
+      // Mark as manual resize - this will be preserved until content from form changes
+      isManualResizeRef.current = true;
     }
   }, [maxHeaderHeight]);
 
@@ -1791,11 +1811,23 @@ export const HelpPanel = ({
   const [processingTime, setProcessingTime] = useState(0);
   const processingTimeRef = useRef(null);
   const lastContentHeightRef = useRef(null);  // Track last content height to detect changes
+  const isManualResizeRef = useRef(false);  // Track if user manually resized
+  const justLoadedTaskRef = useRef(false);  // Track if we just loaded a task (cleared on first focus)
+  const lastTaskIdRef = useRef(taskId);  // Track the last taskId to detect changes
 
   // Update the ref when setHeaderHeight is available
   useEffect(() => {
     setHeaderHeightRef.current = setHeaderHeight;
   }, [setHeaderHeight]);
+
+  // Track when taskId changes (task is being loaded)
+  useEffect(() => {
+    if (taskId && taskId !== lastTaskIdRef.current) {
+      console.log('[HelpPanel] Task changed from', lastTaskIdRef.current, 'to', taskId);
+      justLoadedTaskRef.current = true;  // Set flag - will be cleared on first context change
+      lastTaskIdRef.current = taskId;
+    }
+  }, [taskId]);
 
   // Adjust height and max height when content changes
   useEffect(() => {
@@ -1826,7 +1858,7 @@ export const HelpPanel = ({
         const newMaxHeight = Math.min(exactHeight, availableHeight);
         setMaxHeaderHeight(newMaxHeight);
 
-        // Check if this is first measurement or if content has changed
+        // Check if this is first measurement
         if (lastContentHeightRef.current === null) {
           // First measurement - set exact height
           setHeaderHeight(newMaxHeight);
@@ -1834,23 +1866,27 @@ export const HelpPanel = ({
           return;
         }
 
-        // Check if content height has actually changed (with small threshold for rounding)
-        if (Math.abs(lastContentHeightRef.current - contentHeight) < 2) {
+        // Check if content height has actually changed significantly
+        // Use a larger threshold to avoid resetting on minor changes
+        if (Math.abs(lastContentHeightRef.current - contentHeight) < 10) {
           // Content hasn't changed meaningfully, keep current height (could be manual)
           return;
         }
 
-        // Content has changed, update to fit
+        // Content has changed significantly, update to fit
         lastContentHeightRef.current = contentHeight;
 
-        // Always resize to fit the new content exactly
-        setHeaderHeight(newMaxHeight);
+        // Only resize if not manually resized (help content changes)
+        // Manual resize is always respected
+        if (!isManualResizeRef.current) {
+          setHeaderHeight(newMaxHeight);
+        }
       }
     };
 
     // Delay initial measurement slightly to ensure content is rendered
     const timeoutId = setTimeout(() => {
-      requestAnimationFrame(adjustHeight);
+      requestAnimationFrame(() => adjustHeight());
     }, 10);
 
     // Set up MutationObserver to watch for content changes
@@ -1858,7 +1894,7 @@ export const HelpPanel = ({
     if (headerRef.current) {
       observer = new MutationObserver(() => {
         // Debounce the height adjustment
-        requestAnimationFrame(adjustHeight);
+        requestAnimationFrame(() => adjustHeight());
       });
 
       observer.observe(headerRef.current, {
@@ -1875,7 +1911,86 @@ export const HelpPanel = ({
         observer.disconnect();
       }
     };
-  }, [contextProperties, help.length]); // Re-measure when properties or help messages change
+  }, [help.length]); // Re-measure when help messages change
+
+  // Separate effect for contextProperties changes - skip resize if just loaded task
+  useEffect(() => {
+    if (headerRef.current && Object.keys(contextProperties).length > 0) {
+      // Check if this is the first context change after loading a task
+      if (justLoadedTaskRef.current) {
+        console.log('[HelpPanel] First context change after task load - preserving manual height');
+        justLoadedTaskRef.current = false;  // Clear the flag - next focus will trigger resize
+
+        // Just update the max height but preserve the current height
+        const adjustMaxHeight = () => {
+          if (headerRef.current) {
+            // Temporarily set height to auto to get true content height
+            const originalHeight = headerRef.current.style.height;
+            headerRef.current.style.height = 'auto';
+
+            // Measure the natural height of the content
+            const contentHeight = headerRef.current.scrollHeight;
+
+            // Restore the original height
+            headerRef.current.style.height = originalHeight;
+
+            // Get available window height
+            const windowHeight = window.innerHeight;
+            const availableHeight = Math.max(windowHeight * 0.8, 200);
+
+            // Update max height only
+            const newMaxHeight = Math.min(contentHeight, availableHeight);
+            setMaxHeaderHeight(newMaxHeight);
+            lastContentHeightRef.current = contentHeight;
+
+            // Keep the manual resize flag as is
+          }
+        };
+
+        const timeoutId = setTimeout(() => {
+          requestAnimationFrame(adjustMaxHeight);
+        }, 10);
+
+        return () => clearTimeout(timeoutId);
+      } else {
+        console.log('[HelpPanel] User interaction focus event - forcing resize');
+        // Force resize when properties change from user interaction in the form
+        const adjustHeight = () => {
+          if (headerRef.current) {
+            // Temporarily set height to auto to get true content height
+            const originalHeight = headerRef.current.style.height;
+            headerRef.current.style.height = 'auto';
+
+            // Measure the natural height of the content
+            const contentHeight = headerRef.current.scrollHeight;
+
+            // Restore the original height
+            headerRef.current.style.height = originalHeight;
+
+            // Get available window height
+            const windowHeight = window.innerHeight;
+            const availableHeight = Math.max(windowHeight * 0.8, 200);
+
+            // Update to exact content height
+            const newMaxHeight = Math.min(contentHeight, availableHeight);
+            setMaxHeaderHeight(newMaxHeight);
+            setHeaderHeight(newMaxHeight);
+            lastContentHeightRef.current = contentHeight;
+
+            // Reset manual resize flag when we auto-resize from form focus
+            isManualResizeRef.current = false;
+          }
+        };
+
+        // Small delay to ensure content is rendered
+        const timeoutId = setTimeout(() => {
+          requestAnimationFrame(adjustHeight);
+        }, 10);
+
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [contextProperties]); // Resize when context properties change (conditionally)
 
   // Adjust height when window resizes
   useEffect(() => {
@@ -2491,8 +2606,16 @@ export const HelpPanel = ({
                           </svg>
                         </button>
 
-
-                        <div className={`bg-blue-100 rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''}`}>
+                        <div
+                          className={`bg-blue-100 rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:bg-blue-200 transition-colors' : ''}`}
+                          onClick={() => {
+                            if (message.taskId && onLoadTaskFromHelp) {
+                              console.log('Loading task from help panel:', message.taskId);
+                              onLoadTaskFromHelp(message.taskId);
+                            }
+                          }}
+                          title={message.taskId && onLoadTaskFromHelp ? `Click to load task ${message.taskId.slice(0, 8)}` : ''}
+                        >
                           {isPending && (
                             <div className="flex items-center justify-start mb-2 text-xs text-blue-600 font-medium">
                               <div className="text-blue-500 mr-2 text-sm flex items-center">

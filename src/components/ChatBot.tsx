@@ -68,7 +68,8 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       type: 'code',
       language: result.language || 'graffiticode',
       model: result.model,
-      usage: result.usage
+      usage: result.usage,
+      taskId: result.taskId
     };
   } catch (error) {
     console.error('Error generating code:', error);
