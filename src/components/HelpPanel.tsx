@@ -1811,7 +1811,7 @@ export const HelpPanel = ({
   const [processingTime, setProcessingTime] = useState(0);
   const processingTimeRef = useRef(null);
   const lastContentHeightRef = useRef(null);  // Track last content height to detect changes
-  const isManualResizeRef = useRef(false);  // Track if user manually resized
+  const isManualResizeRef = useRef(false);  // Track if user manually resized (or task loaded)
   const justLoadedTaskRef = useRef(false);  // Track if we just loaded a task (cleared on first focus)
   const lastTaskIdRef = useRef(taskId);  // Track the last taskId to detect changes
 
@@ -1824,6 +1824,10 @@ export const HelpPanel = ({
   useEffect(() => {
     if (taskId && taskId !== lastTaskIdRef.current) {
       console.log('[HelpPanel] Task changed from', lastTaskIdRef.current, 'to', taskId);
+
+      // When taskId changes, ALWAYS treat it as if the height was manually set
+      // Never change the height, just like we do for manual resizes
+      isManualResizeRef.current = true;
       justLoadedTaskRef.current = true;  // Set flag - will be cleared on first context change
       lastTaskIdRef.current = taskId;
     }
@@ -1918,42 +1922,16 @@ export const HelpPanel = ({
     if (headerRef.current && Object.keys(contextProperties).length > 0) {
       // Check if this is the first context change after loading a task
       if (justLoadedTaskRef.current) {
-        console.log('[HelpPanel] First context change after task load - preserving manual height');
+        console.log('[HelpPanel] First context change after task load - height is locked');
         justLoadedTaskRef.current = false;  // Clear the flag - next focus will trigger resize
 
-        // Just update the max height but preserve the current height
-        const adjustMaxHeight = () => {
-          if (headerRef.current) {
-            // Temporarily set height to auto to get true content height
-            const originalHeight = headerRef.current.style.height;
-            headerRef.current.style.height = 'auto';
-
-            // Measure the natural height of the content
-            const contentHeight = headerRef.current.scrollHeight;
-
-            // Restore the original height
-            headerRef.current.style.height = originalHeight;
-
-            // Get available window height
-            const windowHeight = window.innerHeight;
-            const availableHeight = Math.max(windowHeight * 0.8, 200);
-
-            // Update max height only
-            const newMaxHeight = Math.min(contentHeight, availableHeight);
-            setMaxHeaderHeight(newMaxHeight);
-            lastContentHeightRef.current = contentHeight;
-
-            // Keep the manual resize flag as is
-          }
-        };
-
-        const timeoutId = setTimeout(() => {
-          requestAnimationFrame(adjustMaxHeight);
-        }, 10);
-
-        return () => clearTimeout(timeoutId);
+        // Don't resize - the height is locked because we're treating taskId changes
+        // the same as manual resizes (isManualResizeRef is true)
       } else {
         console.log('[HelpPanel] User interaction focus event - forcing resize');
+        // Clear the manual resize flag since this is user interaction in the form
+        isManualResizeRef.current = false;
+
         // Force resize when properties change from user interaction in the form
         const adjustHeight = () => {
           if (headerRef.current) {
@@ -2607,7 +2585,7 @@ export const HelpPanel = ({
                         </button>
 
                         <div
-                          className={`bg-blue-100 rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:bg-blue-200 transition-colors' : ''}`}
+                          className={`bg-blue-100 rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${message.taskId && message.taskId === taskId ? 'border-2 border-blue-500' : ''} ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:bg-blue-200 transition-colors' : ''}`}
                           onClick={() => {
                             if (message.taskId && onLoadTaskFromHelp) {
                               console.log('Loading task from help panel:', message.taskId);
