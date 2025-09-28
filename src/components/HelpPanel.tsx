@@ -82,6 +82,8 @@ export const HelpPanel = ({
   // Track initial property values to detect changes
   const [initialProperties, setInitialProperties] = useState({});
   const [schemaLoading, setSchemaLoading] = useState(false);
+  // Track collapsed state for property groups - initialize as collapsed
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   // Create a ref for the state to avoid circular dependencies
   const stateRef = useRef(null);
@@ -220,7 +222,8 @@ export const HelpPanel = ({
                 description: resolvedSchema.description,
                 schema: resolvedSchema,
                 properties: {},
-                group: resolvedSchema.group || (key === 'assess' ? 'assessment' : 'default')
+                // Nested properties automatically get grouped under their parent key
+                group: key
               };
 
               // Process nested properties
@@ -277,7 +280,7 @@ export const HelpPanel = ({
                 hidden: resolvedSchema.hidden || false,
                 placeholder: resolvedSchema.placeholder,
                 pattern: resolvedSchema.pattern,
-                group: resolvedSchema.group || 'default'
+                group: resolvedSchema.group !== undefined ? resolvedSchema.group : ''
               };
             }
           });
@@ -2111,35 +2114,94 @@ export const HelpPanel = ({
               {schemaLoading && <span className="ml-2 text-gray-400">(Loading schema...)</span>}
             </div>
             <div className="space-y-2">
-              {/* Group properties by their group attribute */}
+              {/* Group properties by their group attribute from schema */}
               {(() => {
                 const groupedProps: any = {};
+
+                // Group properties based on their group field from schema
                 Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
                   if (!prop.hidden) {
-                    const group = prop.group || 'default';
+                    // Use the group value from schema for all properties including nested objects
+                    const group = prop.group === "" || prop.group === undefined || prop.group === 'default' ? 'no-group' : prop.group;
                     if (!groupedProps[group]) groupedProps[group] = {};
                     groupedProps[group][key] = prop;
                   }
                 });
 
-                return Object.entries(groupedProps).map(([groupName, groupProps]) => (
-                  <div key={groupName} className="space-y-2">
-                    {groupName !== 'default' && groupName !== 'additional' && groupName !== 'assessment' && (
-                      <div className="text-xs font-semibold text-gray-400 mt-2 mb-1 uppercase tracking-wider">
-                        {groupName}
-                      </div>
-                    )}
-                    {Object.entries(groupProps).map(([key, propDef]) => (
-                      <div key={key} className="flex flex-col space-y-1">
-                        {propDef.type === 'nested-object' ? (
-                          // Render nested object properties
-                          <>
-                            <div className="text-xs font-medium text-gray-500 mb-1 whitespace-nowrap">
-                              {propDef.label}:
-                              {/*propDef.required && <span className="text-red-400 ml-0.5">*</span>*/}
+                // Sort groups to show no-group first, then alphabetically
+                const sortedGroups = Object.entries(groupedProps).sort(([a], [b]) => {
+                  if (a === 'no-group') return -1;
+                  if (b === 'no-group') return 1;
+                  return a.localeCompare(b);
+                });
+
+                return sortedGroups.map(([groupName, groupProps]) => {
+                  // Initialize collapsed state - true means collapsed by default
+                  // First click will set it to false (expanded)
+                  const isCollapsed = collapsedGroups[groupName] ?? true;
+                  // Check if this group contains a nested object
+                  const hasNestedObject = Object.values(groupProps).some((prop: any) => prop.type === 'nested-object');
+                  // For nested object groups, count the child properties instead of the parent
+                  let propertyCount = Object.keys(groupProps).length;
+                  let propertyNames: string[] = [];
+                  if (hasNestedObject && propertyCount === 1) {
+                    const nestedProp = Object.values(groupProps)[0] as any;
+                    if (nestedProp.type === 'nested-object' && nestedProp.properties) {
+                      propertyCount = Object.keys(nestedProp.properties).length;
+                      // Get nested property names
+                      propertyNames = Object.keys(nestedProp.properties);
+                    }
+                  } else {
+                    // Get regular property names
+                    propertyNames = Object.keys(groupProps);
+                  }
+                  // Create a sample of property names
+                  const propertySample = propertyNames.slice(0, 3).join(', ') + (propertyNames.length > 3 ? ', ...' : '');
+                  // Show header for: actual groups (not 'no-group') AND (multiple properties OR nested object)
+                  const showGroupHeader = groupName !== 'no-group' && (propertyCount > 1 || hasNestedObject);
+
+                  return (
+                    <div key={groupName} className="space-y-2">
+                      {showGroupHeader && (
+                        <div
+                          className="flex items-center justify-between mt-2 mb-1 cursor-pointer hover:bg-gray-100 -mx-2 px-2 py-1 rounded"
+                          onClick={() => setCollapsedGroups(prev => ({
+                            ...prev,
+                            [groupName]: !isCollapsed
+                          }))}
+                        >
+                          <div className="flex items-center space-x-1 flex-1 min-w-0">
+                            <svg
+                              className={`w-3 h-3 text-gray-400 transform transition-transform flex-shrink-0 ${isCollapsed ? '' : 'rotate-90'}`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <div className="text-xs font-semibold text-gray-400 tracking-wider flex-shrink-0">
+                              {groupName}
                             </div>
-                            <div className="pl-3 ml-2">
-                              {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]: [string, any]) => (
+                            {isCollapsed && propertySample && (
+                              <div className="text-xs text-gray-300 truncate">
+                                ({propertySample})
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400 flex-shrink-0">
+                            ({propertyCount})
+                          </div>
+                        </div>
+                      )}
+                      {!isCollapsed && (
+                        <div className={showGroupHeader ? 'pl-4 space-y-2' : 'space-y-2'}>
+                    {Object.entries(groupProps).map(([key, propDef]) => {
+                      // For nested objects in their own group, only show the child properties
+                      if (propDef.type === 'nested-object' && groupName === key) {
+                        // Only render the nested properties, not the parent label
+                        return (
+                          <div key={key} className="space-y-2">
+                            {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]: [string, any]) => (
                               <div key={nestedKey} className="flex items-center space-x-2 mb-2">
                                 <label
                                   className="text-xs font-medium text-gray-500 w-20 whitespace-nowrap"
@@ -2192,7 +2254,7 @@ export const HelpPanel = ({
                                     disabled={nestedProp.readonly}
                                     className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
                                   >
-                                    <option value="">-- Select --</option>
+                                    <option value=""></option>
                                     {nestedProp.enum.map(option => (
                                       <option key={option} value={option}>
                                         {option}
@@ -2315,9 +2377,175 @@ export const HelpPanel = ({
                                 )}
                               </div>
                             ))}
-                            </div>
-                          </>
-                        ) : (
+                          </div>
+                        );
+                      }
+
+                      // For nested objects not in their own group, or regular properties
+                      return (
+                        <div key={key} className="flex flex-col space-y-1">
+                          {propDef.type === 'nested-object' ? (
+                            // Render nested object properties with parent label
+                            <>
+                              <div className="text-xs font-medium text-gray-500 mb-1 whitespace-nowrap">
+                                {propDef.label}:
+                                {/*propDef.required && <span className="text-red-400 ml-0.5">*</span>*/}
+                              </div>
+                              <div className="pl-3 ml-2">
+                                {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]: [string, any]) => (
+                                  <div key={nestedKey} className="flex items-center space-x-2 mb-2">
+                                    <label
+                                      className="text-xs font-medium text-gray-500 w-20 whitespace-nowrap"
+                                      title={nestedProp.description}
+                                    >
+                                      {nestedProp.label}:
+                                      {/*nestedProp.required && <span className="text-red-400 ml-0.5">*</span>*/}
+                                    </label>
+                                    {/* Render nested property input */}
+                                    {nestedProp.enum ? (
+                                      <select
+                                        value={nestedProp.value || ''}
+                                        onChange={(e) => {
+                                          // Build the complete nested value from all nested properties
+                                          const newNestedValue = {};
+                                          Object.entries(propDef.properties || {}).forEach(([nKey, nProp]: [string, any]) => {
+                                            if (nKey === nestedKey) {
+                                              newNestedValue[nKey] = e.target.value;
+                                            } else {
+                                              newNestedValue[nKey] = nProp.value;
+                                            }
+                                          });
+                                          setContextProperties(prev => ({
+                                            ...prev,
+                                            [key]: {
+                                              ...propDef,
+                                              value: newNestedValue,
+                                              properties: {
+                                                ...propDef.properties,
+                                                [nestedKey]: {
+                                                  ...propDef.properties[nestedKey],
+                                                  value: e.target.value
+                                                }
+                                              }
+                                            }
+                                          }));
+                                        }}
+                                        disabled={nestedProp.readonly}
+                                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                      >
+                                        <option value=""></option>
+                                        {nestedProp.enum.map(option => (
+                                          <option key={option} value={option}>
+                                            {option}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : nestedProp.type === 'boolean' ? (
+                                      <input
+                                        type="checkbox"
+                                        checked={nestedProp.value}
+                                        onChange={(e) => {
+                                          // Build the complete nested value from all nested properties
+                                          const newNestedValue = {};
+                                          Object.entries(propDef.properties || {}).forEach(([nKey, nProp]: [string, any]) => {
+                                            if (nKey === nestedKey) {
+                                              newNestedValue[nKey] = e.target.checked;
+                                            } else {
+                                              newNestedValue[nKey] = nProp.value;
+                                            }
+                                          });
+                                          setContextProperties(prev => ({
+                                            ...prev,
+                                            [key]: {
+                                              ...propDef,
+                                              value: newNestedValue,
+                                              properties: {
+                                                ...propDef.properties,
+                                                [nestedKey]: {
+                                                  ...propDef.properties[nestedKey],
+                                                  value: e.target.checked
+                                                }
+                                              }
+                                            }
+                                          }));
+                                        }}
+                                        disabled={nestedProp.readonly}
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                                      />
+                                    ) : nestedProp.type === 'number' ? (
+                                      <input
+                                        type="number"
+                                        value={nestedProp.value}
+                                        min={nestedProp.min}
+                                        max={nestedProp.max}
+                                        onChange={(e) => {
+                                          // Build the complete nested value from all nested properties
+                                          const newNestedValue = {};
+                                          Object.entries(propDef.properties || {}).forEach(([nKey, nProp]: [string, any]) => {
+                                            if (nKey === nestedKey) {
+                                              newNestedValue[nKey] = parseFloat(e.target.value) || 0;
+                                            } else {
+                                              newNestedValue[nKey] = nProp.value;
+                                            }
+                                          });
+                                          setContextProperties(prev => ({
+                                            ...prev,
+                                            [key]: {
+                                              ...propDef,
+                                              value: newNestedValue,
+                                              properties: {
+                                                ...propDef.properties,
+                                                [nestedKey]: {
+                                                  ...propDef.properties[nestedKey],
+                                                  value: parseFloat(e.target.value) || 0
+                                                }
+                                              }
+                                            }
+                                          }));
+                                        }}
+                                        disabled={nestedProp.readonly}
+                                        placeholder={nestedProp.placeholder}
+                                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                      />
+                                    ) : (
+                                      <input
+                                        type={nestedProp.format === 'date' ? 'date' : 'text'}
+                                        value={nestedProp.value || ''}
+                                        onChange={(e) => {
+                                          // Build the complete nested value from all nested properties
+                                          const newNestedValue = {};
+                                          Object.entries(propDef.properties || {}).forEach(([nKey, nProp]: [string, any]) => {
+                                            if (nKey === nestedKey) {
+                                              newNestedValue[nKey] = e.target.value;
+                                            } else {
+                                              newNestedValue[nKey] = nProp.value;
+                                            }
+                                          });
+                                          setContextProperties(prev => ({
+                                            ...prev,
+                                            [key]: {
+                                              ...propDef,
+                                              value: newNestedValue,
+                                              properties: {
+                                                ...propDef.properties,
+                                                [nestedKey]: {
+                                                  ...propDef.properties[nestedKey],
+                                                  value: e.target.value
+                                                }
+                                              }
+                                            }
+                                          }));
+                                        }}
+                                        disabled={nestedProp.readonly}
+                                        placeholder={nestedProp.placeholder}
+                                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                      />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          ) : (
                           // Render regular property
                           <>
                             <div className="flex items-center space-x-2">
@@ -2339,7 +2567,7 @@ export const HelpPanel = ({
                                   disabled={propDef.readonly}
                                   className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
                                 >
-                                  <option value="">-- Select --</option>
+                                  <option value=""></option>
                                   {propDef.enum.map(option => (
                                     <option key={option} value={option}>
                                       {option}
@@ -2431,10 +2659,14 @@ export const HelpPanel = ({
                         </div>
                         </>
                         )}
-                      </div>
-                    ))}
-                  </div>
-                ));
+                        </div>
+                      );
+                    })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
               })()}
             </div>
 
