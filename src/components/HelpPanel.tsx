@@ -2781,7 +2781,7 @@ export const HelpPanel = ({
                     // Check if the value has changed from the initial value
                     const hasChanged = initialProp && JSON.stringify(prop.value) !== JSON.stringify(initialProp.value);
 
-                    if (hasChanged && prop.value !== undefined && prop.value !== '' && prop.value !== null) {
+                    if (hasChanged) {
                       // For nested objects, only include changed children
                       if (prop.type === 'nested-object' && typeof prop.value === 'object') {
                         const changedNested: any = {};
@@ -2789,8 +2789,8 @@ export const HelpPanel = ({
 
                         Object.entries(prop.value).forEach(([nestedKey, nestedValue]) => {
                           // Only include if this nested property has changed
-                          if (JSON.stringify(nestedValue) !== JSON.stringify(initialNested[nestedKey]) &&
-                              nestedValue !== undefined && nestedValue !== '' && nestedValue !== null) {
+                          if (JSON.stringify(nestedValue) !== JSON.stringify(initialNested[nestedKey])) {
+                            // Include the value even if it's empty (user cleared it)
                             changedNested[nestedKey] = nestedValue;
                           }
                         });
@@ -2800,6 +2800,8 @@ export const HelpPanel = ({
                           changedValues[key] = changedNested;
                         }
                       } else {
+                        // Include the value even if it's empty (user cleared it)
+                        // Empty string means the user wants to clear the property
                         changedValues[key] = prop.value;
                       }
                     }
@@ -2819,9 +2821,9 @@ export const HelpPanel = ({
                   if (contextName) {
                     prompt += ` ${contextName}`;
                   }
-                  // Use 4-space indentation and ensure proper formatting
-                  const jsonString = JSON.stringify(changedValues, null, 4);
-                  prompt += `:\n\`\`\`json\n${jsonString}\n\`\`\`\n\nNote: Only the properties shown above have changed and need to be updated.`;
+                  // Use more compact JSON formatting (2-space indent instead of 4)
+                  const jsonString = JSON.stringify(changedValues, null, 2);
+                  prompt += `:\n\`\`\`json\n${jsonString}\n\`\`\`\nNote: Only the properties shown above have changed and need to be updated. Empty strings ("") mean the property should be cleared/removed.`;
 
                   // Send the message using ChatBot
                   if (handleSendMessage && !isLoading) {
