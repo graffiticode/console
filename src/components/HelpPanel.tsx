@@ -451,13 +451,122 @@ export const HelpPanel = ({
     };
   }, [languageSchema, schemaLoading, processFocusData, lastProcessedElementRef]);
 
+  // Function to get the current text from the editor
+  const getCurrentEditorText = () => {
+    const editorElement = document.querySelector("[contenteditable=true]") as HTMLElement;
+    if (editorElement) {
+      // Get the text content from the editor
+      const content = editorElement.textContent || editorElement.innerText || '';
+      return content.trim();
+    }
+    return '';
+  };
+
+  // Function to clear the text editor
+  const clearTextEditor = () => {
+    const editorElement = document.querySelector("[contenteditable=true]") as HTMLElement;
+    if (editorElement) {
+      editorElement.focus();
+      document.execCommand('selectAll', false, null);
+      document.execCommand('delete', false, null);
+    }
+  };
+
+  // Function to combine text input and property changes and send them
+  const sendCombinedMessage = (textContent: string = '') => {
+    if (!handleSendMessage || isLoading) return;
+
+    // Get text content if not provided
+    const messageText = textContent || getCurrentEditorText();
+
+    // Check for property changes
+    const changedValues: Record<string, any> = {};
+
+    Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
+      const initialProp = initialProperties[key];
+      if (!initialProp) return;
+
+      // Check if the value has changed from the initial value
+      const hasChanged = initialProp && JSON.stringify(prop.value) !== JSON.stringify(initialProp.value);
+
+      if (hasChanged) {
+        // For nested objects, only include changed children
+        if (prop.type === 'nested-object' && typeof prop.value === 'object') {
+          const changedNested: any = {};
+          const initialNested = initialProp.value || {};
+
+          Object.entries(prop.value).forEach(([nestedKey, nestedValue]) => {
+            // Only include if this nested property has changed
+            if (JSON.stringify(nestedValue) !== JSON.stringify(initialNested[nestedKey])) {
+              // Include the value even if it's empty (user cleared it)
+              changedNested[nestedKey] = nestedValue;
+            }
+          });
+
+          // Only add the nested object if it has changed properties
+          if (Object.keys(changedNested).length > 0) {
+            changedValues[key] = changedNested;
+          }
+        } else {
+          // Include the value even if it's empty (user cleared it)
+          // Empty string means the user wants to clear the property
+          changedValues[key] = prop.value;
+        }
+      }
+    });
+
+    // Build the combined message
+    let fullMessage = '';
+
+    // Add text message if present
+    if (messageText) {
+      fullMessage = messageText;
+    }
+
+    // Add property changes if present
+    if (Object.keys(changedValues).length > 0) {
+      const contextType = focusedElement?.type || 'context';
+      const contextName = focusedElement?.name || '';
+
+      if (fullMessage) {
+        fullMessage += '\n\n';
+      }
+
+      fullMessage += `Also, use these changed properties to update the code for ${contextType}`;
+      if (contextName) {
+        fullMessage += ` ${contextName}`;
+      }
+      // Use more compact JSON formatting (2-space indent instead of 4)
+      const jsonString = JSON.stringify(changedValues, null, 2);
+      fullMessage += `:\n\`\`\`json\n${jsonString}\n\`\`\`\nNote: Only the properties shown above have changed and need to be updated.`;
+
+      // Check if any property has an empty string value
+      const hasEmptyStringValue = Object.values(changedValues).some(value =>
+        value === '' ||
+        (typeof value === 'object' && value !== null && Object.values(value).some(v => v === ''))
+      );
+
+      if (hasEmptyStringValue) {
+        fullMessage += ' Empty strings ("") mean the property should be cleared/removed.';
+      }
+    }
+
+    // Only send if we have something to send
+    if (fullMessage) {
+      handleSendMessage(fullMessage);
+      // Clear the text editor after sending
+      clearTextEditor();
+    }
+  };
+
   // Integration with TextEditor component - will be properly initialized after ChatBot setup
   const [state] = useState(createState({}, (data, { type, args }) => {
     switch (type) {
       case "update":
-        // Handle message sending only if we have the right functions
+        // Handle message sending with both text and property changes
         if (args.content && data.handleSendMessage && !data.isLoading) {
-          data.handleSendMessage(args.content);
+          // Send combined message with text from editor and property changes
+          data.sendCombinedMessage(args.content);
         }
         return {
           ...data,
@@ -1792,11 +1901,12 @@ export const HelpPanel = ({
         type: 'config',
         args: {
           handleSendMessage,
+          sendCombinedMessage,
           isLoading
         }
       });
     }
-  }, [handleSendMessage, isLoading, state]);
+  }, [handleSendMessage, sendCombinedMessage, isLoading, state]);
 
   // Function to format token usage display
   const formatTokenUsage = (usage) => {
@@ -2773,67 +2883,13 @@ export const HelpPanel = ({
             <div className="mt-3 flex justify-end space-x-2">
               <button
                 onClick={() => {
-                  // Collect only the changed property values
-                  const changedValues: any = {};
-                  Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
-                    const initialProp = initialProperties[key];
-
-                    // Check if the value has changed from the initial value
-                    const hasChanged = initialProp && JSON.stringify(prop.value) !== JSON.stringify(initialProp.value);
-
-                    if (hasChanged) {
-                      // For nested objects, only include changed children
-                      if (prop.type === 'nested-object' && typeof prop.value === 'object') {
-                        const changedNested: any = {};
-                        const initialNested = initialProp.value || {};
-
-                        Object.entries(prop.value).forEach(([nestedKey, nestedValue]) => {
-                          // Only include if this nested property has changed
-                          if (JSON.stringify(nestedValue) !== JSON.stringify(initialNested[nestedKey])) {
-                            // Include the value even if it's empty (user cleared it)
-                            changedNested[nestedKey] = nestedValue;
-                          }
-                        });
-
-                        // Only add the nested object if it has changed properties
-                        if (Object.keys(changedNested).length > 0) {
-                          changedValues[key] = changedNested;
-                        }
-                      } else {
-                        // Include the value even if it's empty (user cleared it)
-                        // Empty string means the user wants to clear the property
-                        changedValues[key] = prop.value;
-                      }
-                    }
-                  });
-
-                  // Only proceed if there are changed values
-                  if (Object.keys(changedValues).length === 0) {
-                    console.log('[PropertyEditor] No properties have changed');
-                    return;
-                  }
-
-                  // Generate and send ChatBot prompt with context info
-                  const contextType = focusedElement?.type || 'context';
-                  const contextName = focusedElement?.name || '';
-
-                  let prompt = `Use these changed properties to update the code for ${contextType}`;
-                  if (contextName) {
-                    prompt += ` ${contextName}`;
-                  }
-                  // Use more compact JSON formatting (2-space indent instead of 4)
-                  const jsonString = JSON.stringify(changedValues, null, 2);
-                  prompt += `:\n\`\`\`json\n${jsonString}\n\`\`\`\nNote: Only the properties shown above have changed and need to be updated. Empty strings ("") mean the property should be cleared/removed.`;
-
-                  // Send the message using ChatBot
-                  if (handleSendMessage && !isLoading) {
-                    handleSendMessage(prompt);
-                  }
+                  // Send combined message with text from editor and property changes
+                  sendCombinedMessage();
                 }}
                 disabled={isLoading}
                 className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Updating...' : 'Apply'}
+                {isLoading ? 'Updating...' : 'Send'}
               </button>
             </div>
           </div>
