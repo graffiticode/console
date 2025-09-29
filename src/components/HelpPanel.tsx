@@ -2138,7 +2138,8 @@ export const HelpPanel = ({
                 return sortedGroups.map(([groupName, groupProps]) => {
                   // Initialize collapsed state - true means collapsed by default
                   // First click will set it to false (expanded)
-                  const isCollapsed = collapsedGroups[groupName] ?? true;
+                  // IMPORTANT: 'no-group' should never be collapsed since it has no header
+                  const isCollapsed = groupName === 'no-group' ? false : (collapsedGroups[groupName] ?? true);
                   // Check if this group contains a nested object
                   const hasNestedObject = Object.values(groupProps).some((prop: any) => prop.type === 'nested-object');
                   // For nested object groups, count the child properties instead of the parent
