@@ -84,6 +84,8 @@ export const HelpPanel = ({
   const [schemaLoading, setSchemaLoading] = useState(false);
   // Track collapsed state for property groups - initialize as collapsed
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  // Track which groups have been manually toggled by the user
+  const [manuallyToggledGroups, setManuallyToggledGroups] = useState<Set<string>>(new Set());
 
   // Create a ref for the state to avoid circular dependencies
   const stateRef = useRef(null);
@@ -313,6 +315,97 @@ export const HelpPanel = ({
       }
     }
   }, [languageSchema, schemaLoading, focusedElement, processFocusData]);
+
+  // Track the previous focused element type to detect type changes
+  const prevFocusedTypeRef = useRef(null);
+  const prevTaskIdRef = useRef(taskId);
+
+  // Clear manual toggles when element type changes or new task is loaded
+  useEffect(() => {
+    // Check if task changed
+    if (prevTaskIdRef.current !== taskId) {
+      setManuallyToggledGroups(new Set());
+      prevTaskIdRef.current = taskId;
+      prevFocusedTypeRef.current = null; // Reset type tracking on new task
+      return;
+    }
+
+    // Check if element type changed (e.g., cell to column)
+    if (focusedElement && prevFocusedTypeRef.current && focusedElement.type !== prevFocusedTypeRef.current) {
+      setManuallyToggledGroups(new Set());
+    }
+
+    if (focusedElement) {
+      prevFocusedTypeRef.current = focusedElement.type;
+    }
+  }, [focusedElement, taskId]);
+
+  // Auto-expand groups that have properties with values when context changes
+  useEffect(() => {
+    if (Object.keys(contextProperties).length === 0) return;
+
+    // Build groups to check which ones have values
+    const groupsWithValues = new Set<string>();
+
+    Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
+      if (!prop.hidden) {
+        const group = prop.group === "" || prop.group === undefined || prop.group === 'default' ? 'no-group' : prop.group;
+
+        // Check if property has a meaningful value
+        let hasValue = false;
+        if (prop.type === 'nested-object') {
+          // Check if any nested property has a value
+          hasValue = Object.values(prop.properties || {}).some((nestedProp: any) => {
+            return nestedProp.value !== undefined &&
+                   nestedProp.value !== '' &&
+                   nestedProp.value !== null &&
+                   nestedProp.value !== false &&
+                   nestedProp.value !== 0;
+          });
+        } else {
+          // Check if regular property has a value
+          hasValue = prop.value !== undefined &&
+                     prop.value !== '' &&
+                     prop.value !== null &&
+                     prop.value !== false &&
+                     (prop.type !== 'number' || prop.value !== 0);
+        }
+
+        if (hasValue) {
+          groupsWithValues.add(group);
+        }
+      }
+    });
+
+    // Update collapsed state to expand groups with values
+    setCollapsedGroups(prev => {
+      const newState = { ...prev };
+
+      // Expand groups that have values (unless manually toggled)
+      groupsWithValues.forEach(group => {
+        if (group !== 'no-group' && !manuallyToggledGroups.has(group)) { // no-group is always expanded
+          newState[group] = false; // false means expanded
+        }
+      });
+
+      // Collapse groups without values (unless manually toggled)
+      const allGroups = new Set<string>();
+      Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
+        if (!prop.hidden) {
+          const group = prop.group === "" || prop.group === undefined || prop.group === 'default' ? 'no-group' : prop.group;
+          allGroups.add(group);
+        }
+      });
+
+      allGroups.forEach(group => {
+        if (!groupsWithValues.has(group) && group !== 'no-group' && !manuallyToggledGroups.has(group)) {
+          newState[group] = true; // true means collapsed
+        }
+      });
+
+      return newState;
+    });
+  }, [contextProperties, manuallyToggledGroups]);
 
   // Listen for focus events from FormIFrame
   useEffect(() => {
@@ -2166,10 +2259,15 @@ export const HelpPanel = ({
                       {showGroupHeader && (
                         <div
                           className="flex items-center justify-between mt-2 mb-1 cursor-pointer hover:bg-gray-100 -mx-2 px-2 py-1 rounded"
-                          onClick={() => setCollapsedGroups(prev => ({
-                            ...prev,
-                            [groupName]: !isCollapsed
-                          }))}
+                          onClick={() => {
+                            // Mark this group as manually toggled
+                            setManuallyToggledGroups(prev => new Set(prev).add(groupName));
+                            // Toggle the collapsed state
+                            setCollapsedGroups(prev => ({
+                              ...prev,
+                              [groupName]: !isCollapsed
+                            }));
+                          }}
                         >
                           <div className="flex items-center space-x-1 flex-1 min-w-0">
                             <svg
