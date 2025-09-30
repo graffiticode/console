@@ -1339,20 +1339,41 @@ export const HelpPanel = ({
           minHeight: '80px',
           boxSizing: 'border-box'
         }}>
-        <div className="flex justify-between items-center text-xs mb-2">
-          <div className="font-light text-gray-500">
-            <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Shift+Enter</span> for newlines, {' '}
-            <span className="font-medium py-0.5">CSV</span> for tables, {' '}
-            <span className="font-medium py-0.5 px-1 rounded-sm bg-[#f8f8f8] font-mono">```</span> for code.
-            Drag & drop to
-            <span title="Drag & drop to upload file" className="mx-1 text-blue-500 flex items-center inline-flex">
+        <div className="flex justify-between items-start text-xs mb-2 gap-2">
+          <div className="font-light text-gray-500 flex items-center flex-wrap">
+            <span className="font-medium">CSV</span>
+            <span className="mx-1">for tables,</span>
+            <span className="font-medium py-0.5 px-1 rounded-sm bg-[#f8f8f8] font-mono">```</span>
+            <span className="mx-1">for code. Drag & drop to</span>
+            <span title="Drag & drop to upload file" className="text-blue-500 inline-flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </span>
-            file.{' '}
-            <span className="font-medium border py-0.5 px-1 rounded-sm bg-[#f8f8f8]">Enter</span> to send.
+            <span className="ml-1">file.</span>
           </div>
+          <button
+            onClick={() => {
+              // Send combined message with text from editor and property changes
+              sendCombinedMessage();
+            }}
+            disabled={isLoading}
+            className="px-4 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 flex-shrink-0"
+          >
+            {isLoading ? (
+              <>
+                <span>Sending</span>
+                <div className="flex items-center">
+                  <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
+                  <div className="w-1 h-1 bg-white rounded-full mx-0.5 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
+                  <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}></div>
+                </div>
+                <div className="text-white text-xs">{`${processingTime}s`}</div>
+              </>
+            ) : (
+              'Send'
+            )}
+          </button>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="p-1 pb-0">
@@ -1944,20 +1965,6 @@ export const HelpPanel = ({
                 });
               })()}
             </div>
-
-            {/* Action buttons for applying changes */}
-            <div className="mt-3 flex justify-end space-x-2">
-              <button
-                onClick={() => {
-                  // Send combined message with text from editor and property changes
-                  sendCombinedMessage();
-                }}
-                disabled={isLoading}
-                className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Sending...' : 'Send'}
-              </button>
-            </div>
           </div>
         )}
         {/* File Upload Notification */}
@@ -2012,20 +2019,6 @@ export const HelpPanel = ({
           return (
             <>
 
-
-              {/* Timer animation shown once at the top when loading */}
-              {isLoading && (
-                <div className="flex items-center justify-start mb-4 text-xs text-blue-600 font-medium">
-                  <div className="text-blue-500 mr-2 text-sm flex items-center">
-                    {`${processingTime}s`}
-                  </div>
-                  <div className="flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}></div>
-                  </div>
-                </div>
-              )}
 
               {/* User messages in reverse chronological order, newest first */}
               <div className="space-y-2">

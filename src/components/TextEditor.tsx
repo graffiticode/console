@@ -173,38 +173,10 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
     if (!editorRef.current) {
       return;
     }
-    const enterKeyPlugin = new Plugin({
-      props: {
-        handleKeyDown(view, event) {
-          if (disabled) return false;
-
-          if (event.key === "Enter") {
-            if (event.shiftKey) {
-              const { state, dispatch } = view;
-              dispatch(state.tr.split(state.selection.from));
-            } else {
-              const content = getEditorContent(view);
-              if (!content || content.trim() === "") return true;
-
-              clearEditor(view);
-              state.apply({
-                type: "update",
-                args: {content},
-              });
-            }
-            event.preventDefault();
-            return true;
-          }
-          return false;
-        }
-      }
-    });
-
     const editorView = new EditorView(editorRef.current, {
       state: EditorState.create({
         schema,
         plugins: [
-          enterKeyPlugin,
           ...plugins,
         ],
       }),
