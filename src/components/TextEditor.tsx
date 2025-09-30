@@ -111,6 +111,7 @@ const createPlaceholderPlugin = (placeholder) => {
 export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
   const [ editorView, setEditorView ] = useState(null);
   const [ hasFocus, setHasFocus ] = useState(false);
+  const [ hasContent, setHasContent ] = useState(false);
   const editorRef = useRef(null);
   // Function to toggle a code block
   const toggleCodeBlock = (state, dispatch) => {
@@ -212,6 +213,8 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
 
         const editorState = editorView.state.apply(transaction);
         editorView.updateState(editorState);
+        // Update hasContent state when document changes
+        setHasContent(editorState.doc.textContent.length > 0);
         // debouncedStateUpdate({
         //   state,
         //   editorState: editorState.toJSON()
@@ -263,6 +266,8 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
         plugins,
       }, editorState);
       editorView.updateState(newEditorState);
+      // Update hasContent when editor state changes from props
+      setHasContent(newEditorState.doc.textContent.length > 0);
     }
   }, [editorState]);
 
@@ -273,12 +278,9 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
         className={`rounded p-1 bg-white text-sm font-sans min-h-[32px] ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
       />
       {/* Show placeholder manually instead of using ProseMirror decorations */}
-      {placeholder && (
+      {placeholder && !hasFocus && !hasContent && (
         <div
           className="absolute top-[8px] left-[8px] text-gray-400 pointer-events-none"
-          style={{
-            display: (editorView && editorView.state.doc.textContent.length > 0) ? 'none' : 'block'
-          }}
         >
           {placeholder}
         </div>
