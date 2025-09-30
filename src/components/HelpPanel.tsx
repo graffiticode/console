@@ -537,7 +537,9 @@ export const HelpPanel = ({
         fullMessage += ` ${contextName}`;
       }
       // Use more compact JSON formatting (2-space indent instead of 4)
-      const jsonString = JSON.stringify(changedValues, null, 2);
+      const jsonString = Object.keys(changedValues).length === 1 &&
+            JSON.stringify(changedValues) ||
+            JSON.stringify(changedValues, null, 2);
       fullMessage += `:\n\`\`\`json\n${jsonString}\n\`\`\`\nNote: Only the properties shown above have changed and need to be updated.`;
 
       // Check if any property has an empty string value
@@ -2889,7 +2891,16 @@ export const HelpPanel = ({
                 disabled={isLoading}
                 className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Updating...' : 'Send'}
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <span className="mr-1">{`${processingTime}s`}</span>
+                    <div className="flex items-center">
+                      <div className="w-1 h-1 bg-white rounded-full mr-0.5 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
+                      <div className="w-1 h-1 bg-white rounded-full mr-0.5 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
+                      <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}></div>
+                    </div>
+                  </div>
+                ) : 'Send'}
               </button>
             </div>
           </div>
@@ -2983,18 +2994,6 @@ export const HelpPanel = ({
                           }}
                           title={message.taskId && onLoadTaskFromHelp ? `Click to load task ${message.taskId.slice(0, 8)}` : ''}
                         >
-                          {isPending && (
-                            <div className="flex items-center justify-start mb-2 text-xs text-blue-600 font-medium">
-                              <div className="text-blue-500 mr-2 text-sm flex items-center">
-                                {`${processingTime}s`}
-                              </div>
-                              <div className="flex items-center justify-center">
-                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
-                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
-                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1 animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}></div>
-                              </div>
-                            </div>
-                          )}
                           <div className="text-sm prose prose-sm prose-blue max-w-none">
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
