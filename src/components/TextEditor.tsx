@@ -277,7 +277,7 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
         <div
           className="absolute top-[8px] left-[8px] text-gray-400 pointer-events-none"
           style={{
-            display: (editorView && editorView.state.doc.textContent.length > 0) || hasFocus ? 'none' : 'block'
+            display: (editorView && editorView.state.doc.textContent.length > 0) ? 'none' : 'block'
           }}
         >
           {placeholder}
