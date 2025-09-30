@@ -2313,8 +2313,10 @@ export const HelpPanel = ({
                   `Column ${focusedElement.name} Properties` :
                 focusedElement?.type === 'row' ?
                   `Row ${focusedElement.name} Properties` :
+                focusedElement?.type === 'region' ?
+                  `Region ${focusedElement.name} Properties` :
                 focusedElement?.type ?
-                  `${focusedElement.type.charAt(0).toUpperCase() + focusedElement.type.slice(1)} Properties` :
+                  `${focusedElement.type.charAt(0).toUpperCase() + focusedElement.type.slice(1)} ${focusedElement.name ? focusedElement.name + ' ' : ''}Properties` :
                   'Context Properties'}
               {schemaLoading && <span className="ml-2 text-gray-400">(Loading schema...)</span>}
             </div>
