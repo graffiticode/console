@@ -156,6 +156,30 @@ export const HelpPanel = ({
       }
     }
 
+    // For columns (L0166 style)
+    if (focusData.type === 'column' && focusData.name) {
+      // Check if this matches the column pattern (e.g., A, B, C, etc.)
+      const columnPattern = /^[A-Z]+$/;
+      if (columnPattern.test(focusData.name)) {
+        // Look for column definition in the schema
+        if (languageSchema.properties?.columns?.items) {
+          const columnSchema = languageSchema.properties.columns.items;
+
+          if (columnSchema?.$ref) {
+            // Resolve the reference to get the actual column schema
+            const resolved = resolveSchemaRef(columnSchema.$ref, languageSchema);
+            return resolved;
+          }
+          return columnSchema;
+        }
+
+        // Fallback: check definitions directly
+        if (languageSchema.definitions?.column) {
+          return languageSchema.definitions.column;
+        }
+      }
+    }
+
     // Generic lookup in definitions based on type
     if (focusData.type && languageSchema.definitions?.[focusData.type]) {
       return languageSchema.definitions[focusData.type];
@@ -190,7 +214,17 @@ export const HelpPanel = ({
             }
 
             // Get value from focus data
-            let value = focusData.value?.[key];
+            let value;
+            if (focusData.type === 'column' && focusData.value && typeof focusData.value === 'object') {
+              // Column values are nested under the column name (e.g., focusData.value.B.width)
+              const columnData = focusData.value[focusData.name];
+              if (columnData) {
+                value = columnData[key];
+              }
+            } else {
+              // For cells and other types, look for nested property values
+              value = focusData.value?.[key];
+            }
 
             // Check if this is a nested object with properties
             if (resolvedSchema.type === 'object' && resolvedSchema.properties) {
@@ -300,7 +334,6 @@ export const HelpPanel = ({
       // Only process if the focused element has actually changed
       const elementKey = `${focusedElement.type}-${focusedElement.name}`;
       if (lastProcessedElementRef.current !== elementKey) {
-        console.log('[PropertyEditor] Processing new focus element:', elementKey);
         processFocusData(focusedElement);
         lastProcessedElementRef.current = elementKey;
       }
@@ -406,7 +439,6 @@ export const HelpPanel = ({
 
         // Handle null focus (form change/reset)
         if (!focusData) {
-          console.log('[PropertyEditor] Clearing focus and properties');
           setFocusedElement(null);
           setContextProperties({});
           lastProcessedElementRef.current = null;
@@ -419,7 +451,6 @@ export const HelpPanel = ({
         if (languageSchema && !schemaLoading) {
           const elementKey = `${focusData.type}-${focusData.name}`;
           if (lastProcessedElementRef.current !== elementKey) {
-            console.log('[PropertyEditor] Processing new focus from event:', elementKey);
             processFocusData(focusData);
             lastProcessedElementRef.current = elementKey;
           }
@@ -743,10 +774,6 @@ export const HelpPanel = ({
   // ChatBot integration
   const { handleSendMessage, cancelGeneration, isLoading } = ChatBot({
     onSendMessage: (userMessage, botResponse) => {
-      console.log(
-        "Help/onSendMessage()",
-        "botResponse=" + JSON.stringify(botResponse, null, 2),
-      );
       // When we receive a message from the chatbot
       handleMessage(userMessage, botResponse);
     },
@@ -789,11 +816,8 @@ export const HelpPanel = ({
 
   // Handle sending a new message
   const handleMessage = useCallback(async (userMessage, botResponse = null) => {
-    console.log("Handling message, bot response:", botResponse ? botResponse.type : "none");
-
     // If there's no bot response yet, this is the initial message from the user
     if (!botResponse) {
-      console.log("Processing initial user message:", userMessage.substring(0, 50) + (userMessage.length > 50 ? "..." : ""));
       // Check if the message contains code blocks
       const containsCodeBlock = userMessage.includes("```");
       // Skip CSV processing for messages with code blocks as they should be preserved as-is
@@ -823,14 +847,11 @@ export const HelpPanel = ({
 
     // If the bot response is code, automatically update the code panel
     if (botResponse?.type === 'code' && typeof setCode === 'function') {
-      console.log("Setting code panel with new code:",
-        botResponse.text ? botResponse.text.substring(0, 50) + "..." : "none");
       setCode(botResponse.text);
     }
 
     // If the bot response includes a taskId, update the last user message with it
     if (botResponse?.taskId) {
-      console.log("Bot response includes taskId:", botResponse.taskId);
       setHelp(prev => {
         const newHelp = [...prev];
         // Find the last user message and add the taskId to it
@@ -858,7 +879,6 @@ export const HelpPanel = ({
 
     try {
       const file = event.target.files[0];
-      console.log("Uploaded file:", file.name);
       // Read the file contents
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -875,7 +895,6 @@ export const HelpPanel = ({
             // Insert the content
             document.execCommand('insertText', false, fileContent);
             updateSuccess = true;
-            console.log("Successfully inserted content via contenteditable element");
           }
         } catch (err) {
           console.error("DOM manipulation failed:", err);
@@ -961,7 +980,6 @@ export const HelpPanel = ({
   // Re-create ChatBot when help (chat history) changes
   // This ensures that new messages are included in the context
   useEffect(() => {
-    console.log("Chat history updated, messages count:", help.length);
   }, [help]);
 
   // Update state handler after ChatBot is initialized
@@ -1034,7 +1052,6 @@ export const HelpPanel = ({
 
     // If this is a pending message, cancel code generation first
     if (isPendingMessage) {
-      console.log('Cancelling code generation for pending message');
       cancelGeneration();
 
       // Clear the timer if it's running
@@ -1095,7 +1112,6 @@ export const HelpPanel = ({
   // Track when taskId changes (task is being loaded)
   useEffect(() => {
     if (taskId && taskId !== lastTaskIdRef.current) {
-      console.log('[HelpPanel] Task changed from', lastTaskIdRef.current, 'to', taskId);
 
       // When taskId changes, ALWAYS treat it as if the height was manually set
       // Never change the height, just like we do for manual resizes
@@ -1194,13 +1210,11 @@ export const HelpPanel = ({
     if (headerRef.current && Object.keys(contextProperties).length > 0) {
       // Check if this is the first context change after loading a task
       if (justLoadedTaskRef.current) {
-        console.log('[HelpPanel] First context change after task load - height is locked');
         justLoadedTaskRef.current = false;  // Clear the flag - next focus will trigger resize
 
         // Don't resize - the height is locked because we're treating taskId changes
         // the same as manual resizes (isManualResizeRef is true)
       } else {
-        console.log('[HelpPanel] User interaction focus event - forcing resize');
         // Clear the manual resize flag since this is user interaction in the form
         isManualResizeRef.current = false;
 
@@ -1514,13 +1528,6 @@ export const HelpPanel = ({
                                   <select
                                     value={nestedProp.value || ''}
                                     onChange={(e) => {
-                                      console.log(`[PropertyEditor] Nested select change:`, {
-                                        key,
-                                        nestedKey,
-                                        currentValue: propDef.value,
-                                        newValue: e.target.value,
-                                        propDef
-                                      });
                                       // Build the complete nested value from all nested properties
                                       const newNestedValue = {};
                                       Object.entries(propDef.properties || {}).forEach(([nKey, nProp]: [string, any]) => {
@@ -1530,7 +1537,6 @@ export const HelpPanel = ({
                                           newNestedValue[nKey] = nProp.value;
                                         }
                                       });
-                                      console.log(`[PropertyEditor] New nested value:`, newNestedValue);
                                       setContextProperties(prev => {
                                         const updated = {
                                           ...prev,
@@ -1546,7 +1552,6 @@ export const HelpPanel = ({
                                             }
                                           }
                                         };
-                                        console.log(`[PropertyEditor] Updated context properties:`, updated);
                                         return updated;
                                       });
                                     }}
@@ -1632,14 +1637,6 @@ export const HelpPanel = ({
                                     type={nestedProp.format === 'date' ? 'date' : 'text'}
                                     value={nestedProp.value || ''}
                                     onChange={(e) => {
-                                      console.log(`[PropertyEditor] Nested text input change:`, {
-                                        key,
-                                        nestedKey,
-                                        currentValue: propDef.value,
-                                        newValue: e.target.value,
-                                        nestedProp,
-                                        propDef
-                                      });
                                       // Build the complete nested value from all nested properties
                                       const newNestedValue = {};
                                       Object.entries(propDef.properties || {}).forEach(([nKey, nProp]: [string, any]) => {
@@ -1649,7 +1646,6 @@ export const HelpPanel = ({
                                           newNestedValue[nKey] = nProp.value;
                                         }
                                       });
-                                      console.log(`[PropertyEditor] New nested value:`, newNestedValue);
                                       setContextProperties(prev => {
                                         const updated = {
                                           ...prev,
@@ -1665,7 +1661,6 @@ export const HelpPanel = ({
                                             }
                                           }
                                         };
-                                        console.log(`[PropertyEditor] Updated context properties:`, updated);
                                         return updated;
                                       });
                                     }}
@@ -2052,7 +2047,6 @@ export const HelpPanel = ({
                             className={`bg-blue-100 rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${message.taskId && message.taskId === taskId ? 'border-2 border-blue-500' : ''} ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:bg-blue-200 transition-colors' : ''}`}
                             onClick={() => {
                               if (message.taskId && onLoadTaskFromHelp) {
-                                console.log('Loading task from help panel:', message.taskId);
                                 onLoadTaskFromHelp(message.taskId);
                               }
                             }}
