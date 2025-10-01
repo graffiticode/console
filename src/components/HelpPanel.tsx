@@ -31,26 +31,8 @@ import {
   formatTokenUsage,
 } from "../utils/helpPanelUtils";
 
-// Add custom CSS for dropzone
-const dropzoneStyles = `
-  .drag-active {
-    position: relative;
-  }
-  
-  .drag-active::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(59, 130, 246, 0.08);
-    border: 2px dashed rgba(59, 130, 246, 0.5);
-    border-radius: 0.5rem;
-    z-index: 40;
-    pointer-events: none;
-  }
-`;
+// Add custom CSS for dropzone (removed duplicate overlay to prevent flashing)
+const dropzoneStyles = ``;
 
 const isNullOrEmptyObject = (obj) => !obj || Object.keys(obj).length === 0;
 
@@ -464,9 +446,29 @@ export const HelpPanel = ({
   const getCurrentEditorText = () => {
     const editorElement = document.querySelector("[contenteditable=true]") as HTMLElement;
     if (editorElement) {
-      // Get the text content from the editor
-      const content = editorElement.textContent || editorElement.innerText || '';
-      return content.trim();
+      // Check if this is a ProseMirror editor
+      if (editorElement.classList.contains('ProseMirror')) {
+        // For ProseMirror, we need to handle line breaks properly
+        // Get all the text nodes and preserve structure
+        const lines: string[] = [];
+        const blocks = editorElement.querySelectorAll('p, div, pre');
+
+        if (blocks.length > 0) {
+          blocks.forEach((block, index) => {
+            const text = (block as HTMLElement).innerText || block.textContent || '';
+            lines.push(text);
+          });
+          return lines.join('\n').trim();
+        } else {
+          // Fallback for inline text
+          return editorElement.innerText || '';
+        }
+      } else {
+        // For regular contenteditable elements
+        // innerText preserves line breaks, textContent does not
+        const content = editorElement.innerText || '';
+        return content.trim();
+      }
     }
     return '';
   };
@@ -1311,23 +1313,24 @@ export const HelpPanel = ({
   };
 
   return (
-    <div {...getRootProps()} ref={containerRef} className={`flex flex-col h-[calc(100vh-120px)] ${isDragActive ? 'drag-active' : ''}`}>
-      {/* Add style tag for dropzone styles */}
-      <style>{dropzoneStyles}</style>
+    <div {...getRootProps()} ref={containerRef} className="flex flex-col h-[calc(100vh-120px)]">
 
       <input {...getInputProps()} />
 
-      {/* Drag overlay - only visible when dragging */}
-      {isDragActive && (
-        <div className="absolute inset-0 bg-blue-100 bg-opacity-50 flex items-center justify-center z-50 border-4 border-dashed border-blue-400 rounded-lg">
-          <div className="bg-white p-6 rounded-lg shadow-lg text-center">
+      {/* Drag overlay with smooth transition */}
+      <div
+        className={`fixed inset-0 pointer-events-none z-50 transition-opacity duration-200 ${isDragActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        style={{ display: isDragActive ? 'block' : 'none' }}
+      >
+        <div className="absolute inset-0 bg-blue-50 bg-opacity-40 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg shadow-xl text-center transform transition-transform duration-200 scale-100">
             <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             <p className="mt-4 text-lg font-semibold text-blue-700">Drop text file here</p>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Input field at the top - resizable */}
       <div

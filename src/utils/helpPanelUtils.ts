@@ -21,7 +21,6 @@ export const formatAsMarkdownTable = (text) => {
   };
   // Single line data should NOT be formatted as a table - requires at least 2 rows
   if (nonEmptyLines.length === 1) {
-    console.log("Single line detected - not formatting as table (requires at least 2 rows)");
     return text;
   }
   // For multi-line CSV data
@@ -79,16 +78,14 @@ export const formatAsMarkdownTable = (text) => {
 export const processMixedContent = (text) => {
   if (!text || typeof text !== 'string') return text;
 
-  // Debug logging
-  console.log("Processing mixed content input:", text.substring(0, 50) + (text.length > 50 ? "..." : ""));
   // Check if this might be an entire CSV table from the first line
   const lines = text.trim().split('\n');
   // Check if any lines contain quoted values that might include commas
   const hasQuotedValues = lines.some(line => /"[^"]*"/.test(line));
+
     // Special handling for content that looks like a CSV table from the start
     if (lines.length >= 2) {
       if (hasQuotedValues) {
-        console.log("Detected quoted values in potential CSV");
         // For CSV with quotes, we need to use our proper CSV parser
         try {
           // Parse the first line to see if it has multiple cells
@@ -109,13 +106,11 @@ export const processMixedContent = (text) => {
                 // Skip parsing errors
               }
             }
-            const nonEmptyLines = lines.filter(line => line.trim() !== '').length - 1; // Exclude first line
+            const nonEmptyLines = lines.slice(1).filter(line => line.trim() !== '').length; // Count non-empty lines after first
             const validRatio = nonEmptyLines > 0 ? validCellsCount / nonEmptyLines : 0;
-            console.log(`CSV with quotes: ${validCellsCount}/${nonEmptyLines} lines (${(validRatio * 100).toFixed(1)}%) match first line cell pattern`);
             // If at least 50% of non-empty lines have a similar cell structure,
             // this is likely a CSV table from the start
             if (validRatio >= 0.5 || validCellsCount >= 2) {
-              console.log("Detected CSV table with quotes from the first line");
               return formatAsMarkdownTable(text);
             }
           }
@@ -134,11 +129,9 @@ export const processMixedContent = (text) => {
             return lineCommaCount >= commaCount - 1 && lineCommaCount <= commaCount + 1;
           });
           const csvConsistencyRatio = linesWithCommas.length / lines.length;
-          console.log(`CSV consistency from first line: ${linesWithCommas.length}/${lines.length} lines (${(csvConsistencyRatio * 100).toFixed(1)}%) have consistent comma counts`);
           // If at least 60% of lines have consistent comma patterns and there are at least 2 columns,
           // this is likely a CSV table from the start
           if (csvConsistencyRatio >= 0.6 && commaCount >= 1) {
-            console.log("Detected CSV table from the first line");
             return formatAsMarkdownTable(text);
           }
         }
@@ -146,7 +139,6 @@ export const processMixedContent = (text) => {
     }
     // Single-line input should not be treated as CSV - requires at least 2 rows
     if (!text.includes('\n')) {
-      console.log("Single line input detected - not treating as CSV (requires at least 2 rows)");
       return text;
     }
 
@@ -169,7 +161,6 @@ export const processMixedContent = (text) => {
       const hasQuotedValues = tableLines.some(line => /"[^"]*"/.test(line));
   // For content with quoted values, use our CSV parser instead of simple comma counting
   if (hasQuotedValues) {
-    console.log(`Table check at line ${i+1} contains quoted values`);
     try {
       // Check if first line can be parsed as CSV with multiple cells
       const firstLineCells = parseCSVLine(tableLines[0]);
@@ -187,14 +178,12 @@ export const processMixedContent = (text) => {
           }
         }
         const validRatio = validLinesCount / (tableLines.length - 1);
-        console.log(`CSV with quotes in mixed content: ${validLinesCount}/${tableLines.length - 1} lines (${(validRatio * 100).toFixed(1)}%) match cell pattern`);
         // Also check if the last line of text ends with a colon - this is a stronger indicator
         const endsWithColon = textPart.trim().endsWith(':');
         // For quoted CSV, accept it if either:
         // 1. The text ends with a colon and we have at least one valid line, OR
         // 2. At least 50% of lines match the pattern
         if ((endsWithColon && validLinesCount > 0) || validRatio >= 0.5) {
-          console.log(`Detected text followed by CSV table with quotes at line ${i+1}`);
           // Format just the table part as a table
           const formattedTable = formatAsMarkdownTable(tablePart);
           // Return the text part with the formatted table
@@ -211,14 +200,12 @@ export const processMixedContent = (text) => {
     const hasEnoughLines = tableLines.length >= 2;
     const hasEnoughCommas = commaLines.length >= Math.ceil(tableLines.length * 0.4); // At least 40% of lines should have commas
 
-    console.log(`Table check at line ${i+1}: ${hasEnoughLines ? 'has enough lines' : 'not enough lines'}, ${hasEnoughCommas ? 'has enough commas' : 'not enough commas'}, comma lines: ${commaLines.length}/${tableLines.length}`);
 
     // Also check if the last line of text ends with a colon - this is a stronger indicator
     const endsWithColon = textPart.trim().endsWith(':');
 
     // The best boundary would be text ending with a colon, but we'll accept other boundaries too
     if (hasEnoughLines && hasEnoughCommas && (endsWithColon || commaLines.length >= 3)) {
-      console.log(`Detected text followed by table data at line ${i+1}${endsWithColon ? ' (ends with colon)' : ''}`);
 
       // Format just the table part as a table
       const formattedTable = formatAsMarkdownTable(tablePart);
@@ -233,30 +220,25 @@ export const processMixedContent = (text) => {
 
 // First check: If it's a simple all-table content, process it directly
 if (isTabularData(text)) {
-  console.log("Detected as complete tabular data");
   return formatAsMarkdownTable(text);
 }
 
 // For mixed content, identify the sections
 const sections = identifyTabularSections(text);
-console.log("Found sections:", sections.length);
 
 // If no mixed content is detected, return the original text
 if (sections.length <= 1) {
   // Special case: if we have exactly one section and it's a table section
   if (sections.length === 1 && sections[0].type === 'table') {
     const tableText = sections[0].lines.join('\n');
-    console.log("Processing single table section:", tableText.substring(0, 50) + (tableText.length > 50 ? "..." : ""));
     return formatAsMarkdownTable(tableText);
   }
-  console.log("Not detected as mixed content");
   return text;
 }
 
 // Check if any section is identified as a table
 const hasTableSection = sections.some(section => section.type === 'table');
 if (!hasTableSection) {
-  console.log("No valid table sections found");
   return text;
 }
 
@@ -264,19 +246,15 @@ if (!hasTableSection) {
 const processedText = sections.map(section => {
   if (section.type === 'table') {
     const tableText = section.lines.join('\n');
-    console.log("Processing table section:", tableText.substring(0, 50) + (tableText.length > 50 ? "..." : ""));
 
     // For single-line tables, we've already validated them during section identification
     if (section.lines.length === 1) {
-      console.log("Converting single-line table section to markdown table");
       return formatAsMarkdownTable(tableText);
     }
     // For multi-line tables, do an extra validation
     if (section.lines.length >= 2 && isTabularData(tableText)) {
-      console.log("Converting multi-line table section to markdown table");
       return formatAsMarkdownTable(tableText);
     } else {
-      console.log("Section failed tabular validation, keeping as text");
       return tableText;
     }
   } else {
@@ -285,7 +263,6 @@ const processedText = sections.map(section => {
   }
 }).join('\n\n');
 
-console.log("Processed mixed content result:", processedText.substring(0, 50) + (processedText.length > 50 ? "..." : ""));
 return processedText;
 };
 
@@ -589,14 +566,12 @@ export const isTabularData = (text) => {
 
   // For text with quoted values, we need a more careful approach
   if (hasQuotedValues) {
-    console.log("CSV contains quoted values, using cell-based detection");
     try {
       // Parse each line using our CSV parser that properly handles quoted values
       const parsedLines = nonEmptyLines.map(line => parseCSVLine(line));
       // Count how many lines have at least 2 cells after parsing
       const validLines = parsedLines.filter(cells => cells.length >= 2);
       const validRatio = validLines.length / nonEmptyLines.length;
-      console.log(`CSV with quotes: ${validLines.length}/${nonEmptyLines.length} lines (${(validRatio * 100).toFixed(1)}%) have at least 2 cells`);
       // If at least 50% of lines have 2+ cells, it's likely CSV
       if (validRatio >= 0.5) {
         return true;
@@ -613,11 +588,9 @@ export const isTabularData = (text) => {
       );
 
       const consistentRatio = consistentLines.length / parsedLines.length;
-      console.log(`CSV consistency with quotes: ${consistentLines.length}/${parsedLines.length} lines (${(consistentRatio * 100).toFixed(1)}%) have consistent column counts, most common count: ${mostCommonColumnCount}`);
 
       // More lenient threshold (50%) for quoted content and at least 2 columns
       if (consistentRatio >= 0.5 && mostCommonColumnCount >= 2) {
-        console.log("Detected as CSV via column consistency with quoted values");
         return true;
       }
     } catch (e) {
@@ -635,7 +608,6 @@ export const isTabularData = (text) => {
 
     // More lenient check for comma frequency - allow as low as 0.7 commas per line on average
     if (avgCommasPerLine < 0.7) {
-      console.log("Not likely CSV - too few commas per line on average");
       return false;
     }
 
@@ -655,11 +627,9 @@ export const isTabularData = (text) => {
       );
 
       const consistentRatio = consistentLines.length / parsedLines.length;
-      console.log(`CSV consistency check: ${consistentLines.length}/${parsedLines.length} lines (${(consistentRatio * 100).toFixed(1)}%) have consistent column counts, most common count: ${mostCommonColumnCount}`);
 
       // At least 60% of lines should have consistent columns and there should be at least 2 columns
       if (consistentRatio >= 0.6 && mostCommonColumnCount >= 2) {
-        console.log("Detected as CSV via column consistency");
         return true;
       }
     } catch (e) {
@@ -670,7 +640,6 @@ export const isTabularData = (text) => {
   // Finally, check using the isLineTabular to detect if most lines look like CSV
   const tabularLineCount = nonEmptyLines.filter(isLineTabular).length;
   const tabularRatio = tabularLineCount / nonEmptyLines.length;
-  console.log(`CSV line-by-line check: ${tabularLineCount}/${nonEmptyLines.length} lines (${(tabularRatio * 100).toFixed(1)}%) are tabular`);
 
   // Reduced threshold to 50% to be more lenient with mixed content, especially with quoted values
   return tabularRatio >= 0.5;
