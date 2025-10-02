@@ -459,6 +459,10 @@ export async function getItems({ auth, lang, mark }) {
     const itemsSnapshot = await query.orderBy("created", "desc").get();
     const items = [];
 
+    // Get the user's sharedItems data to add to items
+    const userDoc = await db.doc(`users/${auth.uid}`).get();
+    const sharedItemsData = userDoc.data()?.sharedItems || {};
+
     // Process items and fetch legacy data if needed
     for (const doc of itemsSnapshot.docs) {
       const data = doc.data();
@@ -489,6 +493,9 @@ export async function getItems({ auth, lang, mark }) {
         }
       }
 
+      // Get the sharedWith list for this item
+      const sharedWith = sharedItemsData[doc.id]?.sharedWith || [];
+
       items.push({
         id: doc.id,
         ...data,
@@ -498,6 +505,7 @@ export async function getItems({ auth, lang, mark }) {
         isPublic: data.isPublic || false,
         created: String(data.created),
         updated: data.updated ? String(data.updated) : String(data.created),
+        sharedWith: sharedWith,
       });
     }
     return items;
@@ -537,5 +545,92 @@ export async function getTask({ auth, id }) {
   } catch (error) {
     console.error("getTask()", "ERROR", error);
     throw new Error(`Failed to get task: ${error.message}`);
+  }
+}
+
+export async function shareItem({ auth, itemId, targetUserId }) {
+  try {
+    // Validate that the source item exists and belongs to the current user
+    const itemRef = db.doc(`users/${auth.uid}/items/${itemId}`);
+    const itemDoc = await itemRef.get();
+
+    if (!itemDoc.exists) {
+      return {
+        success: false,
+        message: "Item not found",
+        newItemId: null,
+      };
+    }
+
+    // Validate that the target user exists
+    const targetUserRef = db.doc(`users/${targetUserId}`);
+    const targetUserDoc = await targetUserRef.get();
+
+    if (!targetUserDoc.exists) {
+      return {
+        success: false,
+        message: "Target user not found",
+        newItemId: null,
+      };
+    }
+
+    const itemData = itemDoc.data();
+
+    // Create a new item in the target user's collection with "(from <uid>)" suffix
+    const targetItemRef = db.collection(`users/${targetUserId}/items`).doc();
+    const newItemId = targetItemRef.id;
+    const timestamp = Date.now();
+
+    const sharedItem = {
+      ...itemData,
+      id: newItemId,
+      name: `${itemData.name} (from ${auth.uid})`,
+      created: timestamp,
+      updated: timestamp,
+      // Don't copy the isPublic flag - let the recipient decide
+      isPublic: false,
+    };
+
+    await targetItemRef.set(sharedItem);
+
+    // Update the sender's user document to track shared items
+    const senderUserRef = db.doc(`users/${auth.uid}`);
+    const senderUserDoc = await senderUserRef.get();
+
+    const sharedItems = senderUserDoc.data()?.sharedItems || {};
+
+    // Initialize the item's share record if it doesn't exist
+    if (!sharedItems[itemId]) {
+      sharedItems[itemId] = {
+        sharedWith: [],
+        sharedAt: {},
+      };
+    }
+
+    // Add the target user if not already shared with
+    if (!sharedItems[itemId].sharedWith.includes(targetUserId)) {
+      sharedItems[itemId].sharedWith.push(targetUserId);
+    }
+
+    // Record when it was shared
+    sharedItems[itemId].sharedAt[targetUserId] = timestamp;
+
+    // Update the sender's user document
+    await senderUserRef.update({
+      sharedItems: sharedItems,
+    });
+
+    return {
+      success: true,
+      message: `Item shared successfully with ${targetUserId}`,
+      newItemId: newItemId,
+    };
+  } catch (error) {
+    console.error("shareItem()", "ERROR", error);
+    return {
+      success: false,
+      message: `Failed to share item: ${error.message}`,
+      newItemId: null,
+    };
   }
 }

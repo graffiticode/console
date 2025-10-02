@@ -207,6 +207,7 @@ export const loadItems = async ({ user, lang, mark }) => {
         isPublic
         created
         updated
+        sharedWith
       }
     }
   `;
@@ -269,6 +270,42 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, code, isP
     }
   `;
   return client.request(mutation, { id, name, taskId, mark, help, code, isPublic }).then(data => data.updateItem);
+};
+
+export const shareItem = async ({ user, itemId, targetUserId }) => {
+  if (!user) {
+    return null;
+  }
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const mutation = gql`
+    mutation shareItem($itemId: String!, $targetUserId: String!) {
+      shareItem(itemId: $itemId, targetUserId: $targetUserId) {
+        success
+        message
+        newItemId
+      }
+    }
+  `;
+  return client.request(mutation, { itemId, targetUserId }).then(data => data.shareItem);
+};
+
+export const getUsers = async () => {
+  try {
+    const response = await fetch('/api/users');
+    if (!response.ok) {
+      throw new Error('Failed to fetch users');
+    }
+    const data = await response.json();
+    return data.usersData || [];
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return [];
+  }
 };
 
 export const getTask = async ({ user, id }) => {

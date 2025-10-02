@@ -156,7 +156,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
     }
   }, []);
   // Load items from the API only once on initialization
-  const { data: loadedItems } = useSWR(
+  const { data: loadedItems, mutate } = useSWR(
     user && lang && mark ? `items-${lang}-${mark.id}` : null,
     () => loadItems({ user, lang, mark: mark.id }),
     {
@@ -465,6 +465,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                 selectedItemId={selectedItemId}
                 onSelectItem={handleSelectItem}
                 onUpdateItem={handleUpdateItem}
+                onRefresh={() => mutate()}
               />
             </div>
           )}

@@ -17,6 +17,7 @@ import {
   createItem,
   updateItem,
   getItems,
+  shareItem,
 } from "./resolvers";
 import { client } from "../../lib/auth";
 
@@ -52,6 +53,7 @@ const typeDefs = `
     isPublic: Boolean
     created: String!
     updated: String
+    sharedWith: [String]
   }
 
   type GeneratedCode {
@@ -76,12 +78,19 @@ const typeDefs = `
     items(lang: String!, mark: Int): [Item!]
   }
 
+  type ShareItemResult {
+    success: Boolean!
+    message: String
+    newItemId: String
+  }
+
   type Mutation {
     logCompile(id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
     generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String): GeneratedCode!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
+    shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
   }
 
   input CodeGenerationOptions {
@@ -166,6 +175,12 @@ const resolvers = {
       const { id, name, taskId, mark, help, code, isPublic } = args;
       const { uid } = await client.verifyToken(token);
       return await updateItem({ auth: { uid, token }, id, name, taskId, mark, help, code, isPublic });
+    },
+    shareItem: async (_, args, ctx) => {
+      const { token } = ctx;
+      const { itemId, targetUserId } = args;
+      const { uid } = await client.verifyToken(token);
+      return await shareItem({ auth: { uid, token }, itemId, targetUserId });
     },
   },
 };

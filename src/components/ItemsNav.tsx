@@ -1,17 +1,19 @@
 import { Menu, Transition } from '@headlessui/react'
 import { Fragment, useEffect, useState, useRef } from 'react';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
-import { PlusIcon } from '@heroicons/react/20/solid';
+import { PlusIcon, ShareIcon } from '@heroicons/react/20/solid';
 import MarkSelector, { marks } from './mark-selector';
 import PublicToggle from './public-toggle';
+import ShareItemDialog from './ShareItemDialog';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, isPublic, onChange }) {
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], onChange, onRefresh }) {
   const [isOpen, setIsOpen] = useState(false);
   const [nameValue, setNameValue] = useState(name);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const nameInputRef = useRef(null);
@@ -185,15 +187,43 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, onChange }) {
                   />
                 </div>
               </div>
+
+              <div className="mt-4 border-t pt-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowShareDialog(true);
+                    setIsOpen(false);
+                  }}
+                  className="flex items-center w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-none"
+                >
+                  <ShareIcon className="h-4 w-4 mr-2" />
+                  <span>Share with user</span>
+                  {sharedWith.length > 0 && (
+                    <span className="ml-auto text-xs text-gray-500">
+                      ({sharedWith.length})
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      <ShareItemDialog
+        isOpen={showShareDialog}
+        onClose={() => setShowShareDialog(false)}
+        itemId={itemId}
+        itemName={name}
+        sharedWith={sharedWith}
+        onShareSuccess={onRefresh}
+      />
     </div>
   )
 }
 
-export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem }) {
+export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh }) {
   const [ showId, setShowId ] = useState("");
 
   return (
@@ -220,11 +250,14 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                     onClick={() => onSelectItem(item.id)}
                     className={classNames(
                       item.id === selectedItemId ? 'bg-gray-100' : 'hover:bg-gray-100',
-                      'block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left'
+                      'flex items-center rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left'
                     )}
                     title={item.name}
                   >
-                    {item.name}
+                    <span className="truncate">{item.name}</span>
+                    {item.sharedWith && item.sharedWith.length > 0 && (
+                      <ShareIcon className="h-3 w-3 ml-1 text-gray-400 flex-shrink-0" title={`Shared with ${item.sharedWith.length} user(s)`} />
+                    )}
                   </button>
                   { item.id === showId &&
                     <EllipsisMenu
@@ -233,7 +266,9 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                       taskId={item.taskId}
                       mark={item.mark}
                       isPublic={item.isPublic}
+                      sharedWith={item.sharedWith}
                       onChange={onUpdateItem}
+                      onRefresh={onRefresh}
                     /> || <div />
                   }
                 </div>
