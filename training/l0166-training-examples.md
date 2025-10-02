@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-09-24T22:50:19.533Z*
+*Downloaded on 2025-10-01T20:58:01.236Z*
 
 ## Language L0166
 
@@ -235,6 +235,178 @@ cells [
 ### Example 5
 
 #### Prompt
+"add row 2 with font height 24px
+
+Use these changed properties to update the code for cell A1:
+```json
+{
+    "assess": {
+        "method": "value",
+        "expected": "A2"
+    }
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+Use these changed properties to update the code for cell A2:
+```json
+{
+    "assess": {
+        "method": "value",
+        "expected": "A2"
+    }
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+Use these changed properties to update the code for cell A1:
+```json
+{
+    "assess": {
+        "method": "formula"
+    }
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+Use these changed properties to update the code for cell A2:
+```json
+{
+    "font-family": "monospaced"
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+Use these changed properties to update the code for cell A2:
+```json
+{
+    "font-family": "monospace"
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+Use these changed properties to update the code for cell A2:
+```json
+{
+    "font-family": "Arial"
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+Use these changed properties to update the code for column A:
+```json
+{
+    "width": 1000
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated."
+
+#### Chat Transcript
+
+**User**: add row 2 with font height 24px
+
+**User**: Use these changed properties to update the code for cell A1:
+```json
+{
+    "assess": {
+        "method": "value",
+        "expected": "A2"
+    }
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+**User**: Use these changed properties to update the code for cell A2:
+```json
+{
+    "assess": {
+        "method": "value",
+        "expected": "A2"
+    }
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+**User**: Use these changed properties to update the code for cell A1:
+```json
+{
+    "assess": {
+        "method": "formula"
+    }
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+**User**: Use these changed properties to update the code for cell A2:
+```json
+{
+    "font-family": "monospaced"
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+**User**: Use these changed properties to update the code for cell A2:
+```json
+{
+    "font-family": "monospace"
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+**User**: Use these changed properties to update the code for cell A2:
+```json
+{
+    "font-family": "Arial"
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+**User**: Use these changed properties to update the code for column A:
+```json
+{
+    "width": 1000
+}
+```
+
+Note: Only the properties shown above have changed and need to be updated.
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+] rows [
+  row 1 {}
+  row 2 font-size "24px" {}
+] cells [
+  cell A1 text "A1" {}
+  cell A2 text "A2" font-family "Arial" assess [
+    method "value"
+    expected "A2"
+  ] {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 6
+
+#### Prompt
 "make a single cell table"
 
 #### Chat Transcript
@@ -261,7 +433,7 @@ cells [
 
 ---
 
-### Example 6
+### Example 7
 
 #### Prompt
 "make a spreadsheet that allows me to track my stocks. see the sheet with a few dummy examples
@@ -379,7 +551,7 @@ cells [
 
 ---
 
-### Example 7
+### Example 8
 
 #### Prompt
 "Make a home budget assessment using the following data:
@@ -420,6 +592,12 @@ Use these changed properties to update the code for column B:
 }
 ```
 
+Note: Only the properties shown above have changed and need to be updated.
+
+Also, use these changed properties to update the code for cell B2:
+```json
+{"text":"5000"}
+```
 Note: Only the properties shown above have changed and need to be updated."
 
 #### Chat Transcript
@@ -464,90 +642,71 @@ Note: Only the properties shown above have changed and need to be updated.
 
 Note: Only the properties shown above have changed and need to be updated.
 
+**User**: Also, use these changed properties to update the code for cell B2:
+```json
+{"text":"5000"}
+```
+Note: Only the properties shown above have changed and need to be updated.
+
 #### Code
 
 ```
-title "Home Budget Assessment"
-instructions `
-- Calculate your monthly budget based on income percentages
-- Fill in the empty cells with the correct formulas
-- Ensure all expenses and savings are properly allocated
-`
-columns [
+title "Home Budget Assessment" columns [
   column A width 150 align "left" {}
   column B width 100 format "($#,##0)" {}
   column C width 250 align "left" {}
-]
-cells [
+] cells [
   cell A1 text "CATEGORY" font-weight "bold" {}
   cell B1 text "AMOUNT" font-weight "bold" {}
   cell C1 text "DETAILS" font-weight "bold" {}
-
   cell A2 text "Income" {}
-  cell B2 text "4000" {}
+  cell B2 text "5000" {}
   cell C2 text "Total monthly income" {}
-
   cell A3 text "Rent" {}
-  cell B3
-    text "",
-    assess [
-      method "value"
-      expected "1400"
-    ] {}
+  cell B3 text "" assess [
+    method "value"
+    expected "1400"
+  ] {}
   cell C3 text "35% of your total income" {}
-
   cell A4 text "Utilities" {}
   cell B4 text "200" {}
   cell C4 text "Fixed expense" {}
-
   cell A5 text "Food" {}
-  cell B5
-    text "",
-    assess [
-      method "value"
-      expected "600"
-    ] {}
+  cell B5 text "" assess [
+    method "value"
+    expected "600"
+  ] {}
   cell C5 text "15% of your total income" {}
-
   cell A6 text "Transportation" {}
-  cell B6
-    text "",
-    assess [
-      method "value"
-      expected "400"
-    ] {}
+  cell B6 text "" assess [
+    method "value"
+    expected "400"
+  ] {}
   cell C6 text "10% of your total income" {}
-
   cell A7 text "Entertainment" {}
   cell B7 text "150" {}
   cell C7 text "Fixed expense" {}
-
   cell A8 text "Savings" {}
-  cell B8
-    text "",
-    assess [
-      method "value"
-      expected "800"
-    ] {}
+  cell B8 text "" assess [
+    method "value"
+    expected "800"
+  ] {}
   cell C8 text "20% of your total income" {}
-
   cell A9 text "Miscellaneous" {}
-  cell B9
-    text "",
-    assess [
-      method "value"
-      expected "450"
-    ] {}
+  cell B9 text "" assess [
+    method "value"
+    expected "450"
+  ] {}
   cell C9 text "Remaining income after all other expenses" {}
-]
-{
+] {
+  hideMenu: true
   v: "0.0.1"
 }..
 ```
 
 ---
 
-### Example 8
+### Example 9
 
 #### Prompt
 "Use these changed properties to update the code for cell A1:
@@ -625,7 +784,7 @@ cells [
 
 ---
 
-### Example 9
+### Example 10
 
 #### Prompt
 "add three columns
@@ -646,27 +805,27 @@ make row 1 bold"
 
 ```
 columns [
-  column A width 100 align 'center' {}
-  column B width 100 align 'center' {}
-  column C width 100 align 'center' {}
-  column D width 100 align 'center' {}
+  column A width 100 align "center" font-weight "normal" {}
+  column B width 100 align "center" {}
+  column C width 100 align "center" {}
+  column D width 100 align "center" {}
 ] rows [
-  row 1 background-color '#eee' {}
+  row 1 background-color "#eee" {}
 ] cells [
-  cell A1 text 'A1' font-weight 'bold' {}
-  cell B1 text 'B1' font-weight 'bold' {}
-  cell C1 text 'C1' font-weight 'bold' {}
-  cell D1 text 'D1' font-weight 'bold' {}
-  cell A2 text 'A2' {}
-  cell B2 text 'B2' {}
-  cell C2 text 'C2' {}
-  cell D2 text 'D2' {}
-  cell A3 text 'A3' {}
-  cell B3 text 'B3' {}
-  cell C3 text 'C3' {}
-  cell D3 text 'D3' {}
+  cell A1 text "A1" font-weight "bold" {}
+  cell B1 text "B1" font-weight "bold" {}
+  cell C1 text "C1" font-weight "bold" {}
+  cell D1 text "D1" font-weight "bold" {}
+  cell A2 text "A2" {}
+  cell B2 text "B2" {}
+  cell C2 text "C2" {}
+  cell D2 text "D2" {}
+  cell A3 text "A3" {}
+  cell B3 text "B3" {}
+  cell C3 text "C3" {}
+  cell D3 text "D3" {}
 ] {
-  v: '0.0.1'
+  v: "0.0.1"
 }..
 ```
 
