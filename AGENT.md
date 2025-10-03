@@ -2,7 +2,7 @@
 
 ## Build/Lint/Test Commands
 - `npm run dev` - Start development server (port 3000)
-- `npm run build` - Build for production  
+- `npm run build` - Build for production
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Auto-fix ESLint errors
 - `npm run typecheck` - Run TypeScript type checking

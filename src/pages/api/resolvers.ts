@@ -410,10 +410,6 @@ export async function updateItem({
   code,
   isPublic,
 }) {
-  console.log(
-    "updateItem()",
-    "id=" + id,
-  );
   try {
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
     const itemDoc = await itemRef.get();
