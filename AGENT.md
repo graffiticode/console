@@ -2,11 +2,12 @@
 
 ## Build/Lint/Test Commands
 - `npm run dev` - Start development server (port 3000)
-- `npm run build` - Build for production
+- `npm run build` - Build for production  
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Auto-fix ESLint errors
-- `npm run storybook` - Run Storybook (port 6006)
-- **No test runner configured** - test files exist (*.spec.js) but no npm test script
+- `npm run typecheck` - Run TypeScript type checking
+- `npx tsx scripts/test-streaming.ts` - Run streaming tests
+- **No formal test runner** - test files exist (*.spec.ts) but no Jest/Vitest configured
 
 ## Architecture
 - **Next.js 15 + React 18** web application with GraphQL API at `/api`

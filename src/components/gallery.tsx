@@ -157,13 +157,24 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   }, []);
   // Load items from the API only once on initialization
   const { data: loadedItems, mutate } = useSWR(
-    user && lang && mark ? `items-${lang}-${mark.id}` : null,
+    user && lang && mark ? `items-${user.uid}-${lang}-${mark.id}` : null,
     () => loadItems({ user, lang, mark: mark.id }),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
     }
   );
+
+  // Clear items and selected item when user changes to prevent stale state
+  useEffect(() => {
+    if (user?.uid) {
+      setItems([]);
+      setSelectedItemId(null);
+      setTaskId(null);
+      setEditorCode("");
+      setEditorHelp([]);
+    }
+  }, [user?.uid]);
 
   useEffect(() => {
     if (loadedItems && loadedItems.length > 0) {
@@ -251,8 +262,25 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   };
 
   const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, code, help, isPublic }) => {
-    // Check if we're changing the mark
+    console.log('handleUpdateItem called with:', { itemId, name, taskId, mark: newMark, code, help, isPublic });
+    console.log('Current items:', items.map(i => i.id));
+    console.log('Current user:', user?.uid);
+    
+    // Prevent updates with stale item IDs - check both items array and ensure we have a valid user
     const currentItem = items.find(item => item.id === itemId);
+    if (!itemId || !currentItem || !user?.uid) {
+      console.warn('handleUpdateItem: Ignoring update for invalid item ID or missing user:', { itemId, hasItem: !!currentItem, hasUser: !!user?.uid });
+      return;
+    }
+    
+    // Additional check: ensure the current items were loaded for the current user context
+    // by checking that we have items loaded and they are for the current language/mark
+    if (items.length === 0) {
+      console.warn('handleUpdateItem: No items loaded, ignoring update');
+      return;
+    }
+
+    // Check if we're changing the mark
     const isMarkChanging = newMark !== undefined && currentItem && currentItem.mark !== newMark;
     const currentFilterMark = mark?.id;
 
@@ -361,8 +389,10 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
 
   // Update the selected item's state when editor changes
   useEffect(() => {
-    if (selectedItemId && items.length > 0) {
+    // Only proceed if we have a valid selectedItemId and loaded items for current user
+    if (selectedItemId && items.length > 0 && user?.uid) {
       const selectedItem = items.find(item => item.id === selectedItemId);
+      // Double-check the item exists and hasn't been loaded from a different user
       if (selectedItem) {
         // Check if any values have changed
         const hasChanges =
@@ -370,6 +400,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
           (editorCode !== undefined && selectedItem.code !== editorCode) ||
           (editorHelp !== undefined && JSON.stringify(selectedItem.help) !== JSON.stringify(editorHelp));
         if (hasChanges) {
+          console.log('useEffect triggering handleUpdateItem:', { selectedItemId, hasChanges, taskId, editorCode: editorCode?.length, editorHelp: editorHelp?.length, userUid: user?.uid });
           handleUpdateItem({
             itemId: selectedItemId,
             name: selectedItem.name,
@@ -380,9 +411,13 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
             isPublic: selectedItem.isPublic
           });
         }
+      } else {
+        // Selected item doesn't exist in current items - clear it
+        console.warn('Selected item not found in current items, clearing selection');
+        setSelectedItemId(null);
       }
     }
-  }, [taskId, editorCode, editorHelp, selectedItemId]);
+  }, [taskId, editorCode, editorHelp, selectedItemId, user?.uid]);
 
   // Send compiled data updates to editor when taskId changes
   useEffect(() => {

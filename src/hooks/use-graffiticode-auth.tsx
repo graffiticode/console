@@ -34,11 +34,21 @@ export function GraffiticodeAuthProvider({ children }) {
     };
   }
 
+  const handleSignOut = useCallback(async () => {
+    // Clear localStorage to avoid cross-user contamination
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('graffiticode:selected:itemId');
+      localStorage.removeItem('graffiticode:selected:taskId');
+      localStorage.removeItem('graffiticode:language');
+    }
+    await signOut(auth);
+  }, [auth]);
+
   const value = {
     loading: firebaseUserStatus === "loading",
     user,
     signInWithEthereum,
-    signOut: () => signOut(auth),
+    signOut: handleSignOut,
   };
 
   return (
