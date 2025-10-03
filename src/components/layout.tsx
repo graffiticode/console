@@ -125,15 +125,17 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                   </div>
                   <div className="hidden md:block">
                     <div className="text-sm font-medium ml-4 flex items-center md:ml-6 space-x-8">
+                      <div className="text-gray-400 hover:text-white">
+                        <SignIn />
+                      </div>
                       <a
                         href="https://forum.graffiticode.org/"
+                        target="graffiticode_community"
+                        rel="opener"
                         className="text-sky-300 hover:text-sky-400"
                       >
                         Community
                       </a>
-                      <div className="text-gray-400 hover:text-white">
-                        <SignIn />
-                      </div>
                     </div>
                   </div>
                   <div className="-mr-2 flex md:hidden">
@@ -169,15 +171,17 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                 </div>
                 <div className="pt-4 pb-3 border-t border-gray-700">
                   <div className="flex items-center px-5">
+                    <div className="text-gray-400 hover:text-white mr-8">
+                      <SignIn />
+                    </div>
                     <a
-                      href="https://forum.graffiticode.com/"
-                      className="text-sky-300 hover:text-sky-400 text-sm mr-8"
+                      href="https://forum.graffiticode.org/"
+                      target="graffiticode_community"
+                      rel="opener"
+                      className="text-sky-300 hover:text-sky-400 text-sm"
                     >
                       Community
                     </a>
-                    <div className="text-gray-400 hover:text-white">
-                      <SignIn />
-                    </div>
                     <button
                       type="button"
                       className="ml-auto bg-gray-800 flex-shrink-0 p-1 rounded-none text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
