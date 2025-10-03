@@ -65,7 +65,11 @@ export default function UserSearchCombobox({
 
   // Filter users based on query (client-side search)
   // Always show all users when no query, filter when typing
+  // Exclude current user from the list
   const filteredUsers = users.filter((user) => {
+    // Exclude current user
+    if (user.id === currentUserId) return false;
+
     if (query === '') return true; // Show all users when no query
 
     const searchQuery = query.toLowerCase();
@@ -127,23 +131,17 @@ export default function UserSearchCombobox({
                   {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} available
                 </div>
               )}
-              {filteredUsers.map((user) => {
-                const isCurrentUser = user.id === currentUserId;
-                return (
+              {filteredUsers.map((user) => (
                 <Combobox.Option
                   key={user.id}
                   value={user}
-                  disabled={isCurrentUser}
                   onClick={() => {
-                    if (!isCurrentUser) {
-                      setTimeout(() => setIsOpen(false), 0);
-                    }
+                    setTimeout(() => setIsOpen(false), 0);
                   }}
                   className={({ active }) =>
                     classNames(
-                      'relative select-none py-2 pl-8 pr-4',
-                      isCurrentUser ? 'cursor-not-allowed opacity-50' : 'cursor-default',
-                      active && !isCurrentUser ? 'bg-gray-600 text-white' : 'text-gray-900'
+                      'relative cursor-default select-none py-2 pl-8 pr-4',
+                      active ? 'bg-gray-600 text-white' : 'text-gray-900'
                     )
                   }
                 >
@@ -151,10 +149,10 @@ export default function UserSearchCombobox({
                   <>
                     <div className="flex flex-col">
                       <span className={classNames('block truncate', selected ? 'font-semibold' : 'font-normal')}>
-                        {user.id} {isCurrentUser && '(You)'}
+                        {user.id}
                       </span>
                       {user.email && (
-                        <span className={classNames('block truncate text-xs', active && !isCurrentUser ? 'text-gray-200' : 'text-gray-500')}>
+                        <span className={classNames('block truncate text-xs', active ? 'text-gray-200' : 'text-gray-500')}>
                           {user.email}
                         </span>
                       )}
@@ -172,8 +170,7 @@ export default function UserSearchCombobox({
                   </>
                 )}
               </Combobox.Option>
-              );
-            })}
+            ))}
             </>
           )}
         </Combobox.Options>

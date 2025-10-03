@@ -1,7 +1,7 @@
 import { Menu, Transition } from '@headlessui/react'
 import { Fragment, useEffect, useState, useRef } from 'react';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
-import { PlusIcon, ShareIcon } from '@heroicons/react/20/solid';
+import { PlusIcon, ShareIcon, UserIcon } from '@heroicons/react/20/solid';
 import MarkSelector, { marks } from './mark-selector';
 import PublicToggle from './public-toggle';
 import ShareItemDialog from './ShareItemDialog';
@@ -255,8 +255,9 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                     title={item.name}
                   >
                     <span className="truncate">{item.name}</span>
-                    {item.sharedWith && item.sharedWith.length > 0 && (
-                      <ShareIcon className="h-3 w-3 ml-1 text-gray-400 flex-shrink-0" title={`Shared with ${item.sharedWith.length} user(s)`} />
+                    {/* Show icon if item was shared with the user */}
+                    {item.name.includes('(from ') && (
+                      <UserIcon className="h-3 w-3 ml-1 text-gray-400 flex-shrink-0" title="Shared with you" />
                     )}
                   </button>
                   { item.id === showId &&

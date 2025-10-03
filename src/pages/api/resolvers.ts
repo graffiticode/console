@@ -468,12 +468,41 @@ export async function getItems({ auth, lang, mark }) {
       const data = doc.data();
       let code = data.code;
       let help = data.help;
+      let taskId = data.taskId;
+
+      // If item doesn't have a taskId (e.g., shared item), post the task to create one
+      if (!taskId && code) {
+        try {
+          const taskData = await postTask({
+            auth,
+            task: {
+              lang: data.lang,
+              code: code,
+            },
+            ephemeral: false,
+            isPublic: false,
+          });
+
+          if (taskData && taskData.id) {
+            taskId = taskData.id;
+            // Update the item with the new taskId
+            await doc.ref.update({ taskId });
+          }
+        } catch (error) {
+          console.error(
+            "getItems()",
+            "Failed to create task for item",
+            doc.id,
+            error,
+          );
+        }
+      }
 
       // For backward compatibility: if item doesn't have code, fetch from taskIds collection
-      if (!code && data.taskId) {
+      if (!code && taskId) {
         try {
           const taskDoc = await db
-            .doc(`users/${auth.uid}/taskIds/${data.taskId}`)
+            .doc(`users/${auth.uid}/taskIds/${taskId}`)
             .get();
           if (taskDoc.exists) {
             const taskData = taskDoc.data();
@@ -499,6 +528,7 @@ export async function getItems({ auth, lang, mark }) {
       items.push({
         id: doc.id,
         ...data,
+        taskId, // Include the potentially new taskId
         mark: data.mark || 1, // Default to mark 1 if not set
         help: help || "[]",
         code: code || "",
@@ -584,6 +614,7 @@ export async function shareItem({ auth, itemId, targetUserId }) {
     const sharedItem = {
       ...itemData,
       id: newItemId,
+      taskId: null, // Clear the task ID - it will be created when the user loads the item
       name: `${itemData.name} (from ${auth.uid})`,
       created: timestamp,
       updated: timestamp,
