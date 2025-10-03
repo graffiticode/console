@@ -16,7 +16,7 @@ export default function Example() {
   const { user } = useGraffiticodeAuth();
   if (!user) {
     return (
-      <div className="justify-center w-full">
+      <div className="flex items-center justify-center h-[calc(100vh-100px)]">
         <SignIn
           className="rounded-none border-2 px-3 py-2 text-center hover:border-gray-400 focus:outline-none"
           label={<span className="block font-medium">Sign in to continue</span>}

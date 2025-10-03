@@ -36,7 +36,7 @@ export default function FormView({ lang, id, setData, setId, setNewTask, classNa
   );
   if (!user) {
     return (
-      <div className="justify-center w-full">
+      <div className="flex items-center justify-center h-[calc(100vh-100px)]">
         <SignIn
           label="Sign in to continue"
         />

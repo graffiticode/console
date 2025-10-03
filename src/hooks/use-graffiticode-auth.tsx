@@ -7,7 +7,7 @@ import { signInWithCustomToken, signOut } from "firebase/auth";
 const GraffiticodeAuthContext = createContext({
   loading: true,
   user: null as any,
-  signInWithEthereum: async (): Promise<any> => {},
+  signInWithEthereum: async (selectedWallet?: any): Promise<any> => {},
   signOut: () => {}
 });
 
@@ -16,12 +16,12 @@ export function GraffiticodeAuthProvider({ children }) {
   const { status: firebaseUserStatus, data: firebaseUser } = useUser();
   const { signInWithEthereum: siwe } = useSignInWithEthereum();
 
-  const signInWithEthereum = useCallback(async () => {
+  const signInWithEthereum = useCallback(async (selectedWallet?: any) => {
     if (firebaseUser) {
       console.warn(`User ${firebaseUser.uid} is already signed in`);
       return auth;
     }
-    const { firebaseCustomToken } = await siwe();
+    const { firebaseCustomToken } = await siwe(selectedWallet);
     await signInWithCustomToken(auth, firebaseCustomToken);
 
   }, [firebaseUser, siwe]);

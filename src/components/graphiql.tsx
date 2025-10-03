@@ -16,12 +16,10 @@ export default function GraphiQL() {
 
   if (!user) {
     return (
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      <div className="justify-center w-full">
+      <div className="flex items-center justify-center h-[calc(100vh-100px)]">
         <SignIn
           label="Sign in to continue"
         />
-      </div>
       </div>
     );
   }
