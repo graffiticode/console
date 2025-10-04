@@ -2048,7 +2048,10 @@ export const HelpPanel = ({
                           )}
 
                           <div
-                            className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${message.role !== 'system' && message.taskId && message.taskId === taskId ? 'border-2 border-blue-500' : ''} ${message.taskId && onLoadTaskFromHelp ? `cursor-pointer ${message.role === 'system' ? 'hover:bg-gray-200' : 'hover:bg-blue-200'} transition-colors` : ''}`}
+                            className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${
+                              // Highlight both system notes and user messages if they have the current taskId
+                              message.taskId && message.taskId === taskId ? 'border-2 border-blue-500' : ''
+                            } ${message.taskId && onLoadTaskFromHelp ? `cursor-pointer ${message.role === 'system' ? 'hover:bg-gray-200' : 'hover:bg-blue-200'} transition-colors` : ''}`}
                             onClick={() => {
                               if (message.taskId && onLoadTaskFromHelp) {
                                 onLoadTaskFromHelp(message.taskId);
