@@ -525,10 +525,11 @@ export async function getItems({ auth, lang, mark }) {
       // Get the sharedWith list for this item
       const sharedWith = sharedItemsData[doc.id]?.sharedWith || [];
 
-      items.push({
+      const item = {
         id: doc.id,
-        ...data,
+        name: data.name,
         taskId, // Include the potentially new taskId
+        lang: data.lang,
         mark: data.mark || 1, // Default to mark 1 if not set
         help: help || "[]",
         code: code || "",
@@ -536,7 +537,10 @@ export async function getItems({ auth, lang, mark }) {
         created: String(data.created),
         updated: data.updated ? String(data.updated) : String(data.created),
         sharedWith: sharedWith,
-      });
+        sharedFrom: data.sharedFrom || null, // Include sharedFrom field if present
+      };
+
+      items.push(item);
     }
     return items;
   } catch (error) {
@@ -611,11 +615,35 @@ export async function shareItem({ auth, itemId, targetUserId }) {
     const newItemId = targetItemRef.id;
     const timestamp = Date.now();
 
+    // Add a note to the help transcript about where the item was shared from
+    let updatedHelp = itemData.help || "[]";
+    try {
+      const helpArray = JSON.parse(updatedHelp);
+      // Add a note at the end of the help transcript (since display is reversed)
+      helpArray.push({
+        role: "system",
+        content: `Shared by ${auth.uid} on ${new Date(timestamp).toISOString().split('T')[0]}`,
+        timestamp: timestamp,
+        taskId: itemData.taskId // Include the original task ID for clickability
+      });
+      updatedHelp = JSON.stringify(helpArray);
+    } catch (error) {
+      // If help is not valid JSON, create a new array with the note
+      updatedHelp = JSON.stringify([{
+        role: "system",
+        content: `Shared by ${auth.uid} on ${new Date(timestamp).toISOString().split('T')[0]}`,
+        timestamp: timestamp,
+        taskId: itemData.taskId // Include the original task ID for clickability
+      }]);
+    }
+
     const sharedItem = {
       ...itemData,
       id: newItemId,
       taskId: null, // Clear the task ID - it will be created when the user loads the item
-      name: `${itemData.name} (from ${auth.uid})`,
+      name: itemData.name,
+      help: updatedHelp,
+      sharedFrom: auth.uid, // Track who shared this item
       created: timestamp,
       updated: timestamp,
       // Don't copy the isPublic flag - let the recipient decide

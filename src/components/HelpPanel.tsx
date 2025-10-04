@@ -1304,9 +1304,10 @@ export const HelpPanel = ({
 
   // Function to prepare messages for display
   const prepareMessagesForDisplay = () => {
-    // Find all user messages in chronological order (oldest to newest)
+    // Find all user and system messages in chronological order (oldest to newest)
+    // Include both user messages and system messages (e.g., sharing notes)
     const userMessages = help
-      .filter(item => item.type === 'user')
+      .filter(item => item.type === 'user' || item.role === 'system')
       .map((msg, idx) => ({
         ...msg,
         index: help.indexOf(msg)
@@ -2044,7 +2045,7 @@ export const HelpPanel = ({
                           </button>
 
                           <div
-                            className={`bg-blue-100 rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${message.taskId && message.taskId === taskId ? 'border-2 border-blue-500' : ''} ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:bg-blue-200 transition-colors' : ''}`}
+                            className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${message.role !== 'system' && message.taskId && message.taskId === taskId ? 'border-2 border-blue-500' : ''} ${message.taskId && onLoadTaskFromHelp ? `cursor-pointer ${message.role === 'system' ? 'hover:bg-gray-200' : 'hover:bg-blue-200'} transition-colors` : ''}`}
                             onClick={() => {
                               if (message.taskId && onLoadTaskFromHelp) {
                                 onLoadTaskFromHelp(message.taskId);
@@ -2117,7 +2118,7 @@ export const HelpPanel = ({
                               }
                             }}
                           >
-                            {message.user}
+                            {message.role === 'system' ? message.content : message.user}
                           </ReactMarkdown>
                             </div>
                           </div>

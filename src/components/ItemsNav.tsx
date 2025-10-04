@@ -256,8 +256,8 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                   >
                     <span className="truncate">{item.name}</span>
                     {/* Show icon if item was shared with the user */}
-                    {item.name.includes('(from ') && (
-                      <UserIcon className="h-3 w-3 ml-1 text-gray-400 flex-shrink-0" title="Shared with you" />
+                    {item.sharedFrom && (
+                      <UserIcon className="h-3 w-3 ml-1 text-gray-400 flex-shrink-0" title={`Shared from ${item.sharedFrom}`} />
                     )}
                   </button>
                   { item.id === showId &&
