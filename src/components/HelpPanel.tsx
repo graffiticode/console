@@ -2034,15 +2034,18 @@ export const HelpPanel = ({
                       <div key={index} className="mb-2 w-full">
                         <div className="relative group">
                           {/* Delete button for each user message - highlighted for pending messages but only visible on hover */}
-                          <button
-                            className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10 ${isPending ? 'text-red-400 hover:text-red-600 bg-white rounded-full shadow-sm' : 'text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm'}`}
-                            onClick={() => handleDeleteMessagePair(message.index)}
-                            title={isPending ? "Cancel and delete request" : "Delete message"}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
+                          {/* Don't show delete button for system messages */}
+                          {message.role !== 'system' && (
+                            <button
+                              className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10 ${isPending ? 'text-red-400 hover:text-red-600 bg-white rounded-full shadow-sm' : 'text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm'}`}
+                              onClick={() => handleDeleteMessagePair(message.index)}
+                              title={isPending ? "Cancel and delete request" : "Delete message"}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
 
                           <div
                             className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${message.role !== 'system' && message.taskId && message.taskId === taskId ? 'border-2 border-blue-500' : ''} ${message.taskId && onLoadTaskFromHelp ? `cursor-pointer ${message.role === 'system' ? 'hover:bg-gray-200' : 'hover:bg-blue-200'} transition-colors` : ''}`}
