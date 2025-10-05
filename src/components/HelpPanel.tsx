@@ -77,6 +77,10 @@ export const HelpPanel = ({
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   // Track which groups have been manually toggled by the user
   const [manuallyToggledGroups, setManuallyToggledGroups] = useState<Set<string>>(new Set());
+  // Track collapsed state for user messages
+  const [collapsedMessages, setCollapsedMessages] = useState<Record<number, boolean>>({});
+  // Track recently collapsed messages to prevent hover preview
+  const [recentlyCollapsed, setRecentlyCollapsed] = useState<Set<number>>(new Set());
 
   // Create a ref for the state to avoid circular dependencies
   const stateRef = useRef(null);
@@ -2030,9 +2034,36 @@ export const HelpPanel = ({
                                      (message.index === help.length - 1 ||
                                       help[message.index + 1]?.type !== 'bot');
 
+                    const isCollapsed = collapsedMessages[message.index] ?? true;
+
                     return (
                       <div key={index} className="mb-2 w-full">
-                        <div className="relative group">
+                        <div
+                          className="relative group"
+                          onMouseEnter={() => {
+                            // Clear recently collapsed flag when mouse re-enters after a delay
+                            if (recentlyCollapsed.has(message.index)) {
+                              setTimeout(() => {
+                                setRecentlyCollapsed(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(message.index);
+                                  return newSet;
+                                });
+                              }, 300);
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            // Clear recently collapsed flag when mouse leaves
+                            if (recentlyCollapsed.has(message.index)) {
+                              setTimeout(() => {
+                                setRecentlyCollapsed(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(message.index);
+                                  return newSet;
+                                });
+                              }, 100);
+                            }
+                          }}>
                           {/* Delete button for each user message - highlighted for pending messages but only visible on hover */}
                           {/* Don't show delete button for system messages */}
                           {message.role !== 'system' && (
@@ -2048,18 +2079,184 @@ export const HelpPanel = ({
                           )}
 
                           <div
-                            className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg p-3 overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${
+                            className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${
                               // Highlight both system notes and user messages if they have the current taskId
                               message.taskId && message.taskId === taskId ? 'border-2 border-blue-500' : ''
-                            } ${message.taskId && onLoadTaskFromHelp ? `cursor-pointer ${message.role === 'system' ? 'hover:bg-gray-200' : 'hover:bg-blue-200'} transition-colors` : ''}`}
-                            onClick={() => {
-                              if (message.taskId && onLoadTaskFromHelp) {
-                                onLoadTaskFromHelp(message.taskId);
-                              }
-                            }}
-                            title={message.taskId && onLoadTaskFromHelp ? `Click to load task ${message.taskId.slice(0, 8)}` : ''}
+                            }`}
                           >
-                            <div className="text-sm prose prose-sm prose-blue max-w-none">
+                            {/* Hover preview - shown when hovering over collapsed header */}
+                            {isCollapsed && !recentlyCollapsed.has(message.index) && (
+                              <div className="absolute left-4 right-4 top-full mt-3 p-4 bg-white border-2 border-gray-400 rounded-lg shadow-2xl z-30 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 max-h-80 overflow-auto transform group-hover:translate-y-1">
+                                {/* Arrow pointing up to the parent */}
+                                <div className="absolute -top-2 left-8 w-4 h-4 bg-white border-l-2 border-t-2 border-gray-400 transform rotate-45"></div>
+                                <div className="text-sm prose prose-sm prose-blue max-w-none">
+                                  <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    components={{
+                                      code({className, children, ...props}) {
+                                        const match = /language-(\w+)/.exec(className || '');
+                                        return match ? (
+                                          <SyntaxHighlighter
+                                            style={tomorrow}
+                                            language={match[1]}
+                                            PreTag="div"
+                                            {...props}
+                                          >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
+                                        ) : (
+                                          <code className={className} {...props}>
+                                            {children}
+                                          </code>
+                                        );
+                                      },
+                                      table({node, className, children, ...props}) {
+                                        return (
+                                          <div className="overflow-x-auto my-2 w-full">
+                                            <table className="table-auto border-collapse w-full text-xs" {...props}>
+                                              {children}
+                                            </table>
+                                          </div>
+                                        );
+                                      },
+                                      thead({node, children, ...props}) {
+                                        return (
+                                          <thead className="bg-blue-50" {...props}>
+                                            {children}
+                                          </thead>
+                                        );
+                                      },
+                                      tbody({node, children, ...props}) {
+                                        return (
+                                          <tbody className="divide-y divide-blue-100" {...props}>
+                                            {children}
+                                          </tbody>
+                                        );
+                                      },
+                                      tr({node, children, ...props}) {
+                                        return (
+                                          <tr className="hover:bg-blue-50" {...props}>
+                                            {children}
+                                          </tr>
+                                        );
+                                      },
+                                      th({node, children, ...props}) {
+                                        return (
+                                          <th className="px-2 py-1 text-left text-xs font-medium text-blue-600 uppercase tracking-wider border border-blue-200 whitespace-nowrap" {...props}>
+                                            {children}
+                                          </th>
+                                        );
+                                      },
+                                      td({node, children, ...props}) {
+                                        return (
+                                          <td className="px-2 py-1 text-xs text-blue-700 border border-blue-200" {...props}>
+                                            {children}
+                                          </td>
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    {message.role === 'system' ? message.content : message.user}
+                                  </ReactMarkdown>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Collapsible header */}
+                            <div
+                              className={`flex items-center justify-between p-3 ${message.taskId && onLoadTaskFromHelp ? `cursor-pointer ${message.role === 'system' ? 'hover:bg-gray-200' : 'hover:bg-blue-200'} transition-colors` : ''}`}
+                              onClick={() => {
+                                // If expanding this message, collapse all others first
+                                if (isCollapsed) {
+                                  // Clear recently collapsed flag for this message
+                                  setRecentlyCollapsed(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(message.index);
+                                    return newSet;
+                                  });
+                                  // Collapse all messages first
+                                  const allCollapsed = {};
+                                  userMessages.forEach(msg => {
+                                    allCollapsed[msg.index] = true;
+                                  });
+                                  // Then expand only this one
+                                  setCollapsedMessages({
+                                    ...allCollapsed,
+                                    [message.index]: false
+                                  });
+                                  // If there's a task ID, load the task
+                                  if (message.taskId && onLoadTaskFromHelp) {
+                                    onLoadTaskFromHelp(message.taskId);
+                                  }
+                                } else {
+                                  // If collapsing, just collapse this one
+                                  setCollapsedMessages(prev => ({
+                                    ...prev,
+                                    [message.index]: true
+                                  }));
+                                  // Add to recently collapsed to prevent hover preview
+                                  setRecentlyCollapsed(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.add(message.index);
+                                    return newSet;
+                                  });
+                                }
+                              }}
+                              title={message.taskId && onLoadTaskFromHelp ? `Click to ${isCollapsed ? 'expand and load' : 'collapse'} task ${message.taskId.slice(0, 8)}` : 'Click to expand/collapse'}
+                            >
+                              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                <svg
+                                  className={`w-4 h-4 text-gray-600 transform transition-transform flex-shrink-0 ${isCollapsed ? '' : 'rotate-90'}`}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                <div className="flex items-center flex-1 min-w-0">
+                                  {isCollapsed ? (
+                                    // Single line format when collapsed
+                                    <div className="flex items-center min-w-0 flex-1">
+                                      <span className="text-sm font-medium text-gray-700 flex-shrink-0">
+                                        {message.role === 'system' ? 'Note:' : 'User:'}
+                                      </span>
+                                      <span className="text-sm text-gray-600 truncate ml-2">
+                                        {(() => {
+                                          const content = message.role === 'system' ? message.content : message.user;
+                                          const firstLine = content.split('\n')[0];
+                                          // Remove markdown formatting for cleaner preview
+                                          const cleanPreview = firstLine.replace(/[`*_#]/g, '');
+                                          return cleanPreview;
+                                        })()}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    // Expanded format
+                                    <div className="text-sm font-medium text-gray-700">
+                                      {message.role === 'system' ? 'System Note' : 'User Request'}
+                                      {message.taskId && (
+                                        <span className="ml-2 text-xs text-gray-500">
+                                          (Task: {message.taskId.slice(0, 8)}...)
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              {isPending && (
+                                <div className="flex items-center text-xs text-blue-600">
+                                  <span>Processing</span>
+                                  <div className="flex items-center ml-1">
+                                    <div className="w-1 h-1 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
+                                    <div className="w-1 h-1 bg-blue-600 rounded-full mx-0.5 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
+                                    <div className="w-1 h-1 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}></div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Collapsible content */}
+                            {!isCollapsed && (
+                              <div className="px-3 pb-3 pt-0">
+                                <div className="text-sm prose prose-sm prose-blue max-w-none">
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             components={{
@@ -2126,7 +2323,9 @@ export const HelpPanel = ({
                           >
                             {message.role === 'system' ? message.content : message.user}
                           </ReactMarkdown>
-                            </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
