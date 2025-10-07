@@ -578,10 +578,7 @@ export const HelpPanel = ({
         fullMessage += '\n\n';
       }
 
-      fullMessage += `Also, use these changed properties to update the code for ${contextType}`;
-      if (contextName) {
-        fullMessage += ` ${contextName}`;
-      }
+      fullMessage += `Update the code for column A using these property values`;
       // Use more compact JSON formatting (2-space indent instead of 4)
       const jsonString = Object.keys(changedValues).length === 1 &&
             JSON.stringify(changedValues) ||
@@ -839,7 +836,8 @@ export const HelpPanel = ({
         {
           user: processedUserMessage,
           help: getHelp(processedUserMessage),
-          type: 'user'
+          type: 'user',
+          timestamp: new Date().toISOString()
         }
       ]);
 
@@ -854,14 +852,20 @@ export const HelpPanel = ({
       setCode(botResponse.text);
     }
 
-    // If the bot response includes a taskId, update the last user message with it
-    if (botResponse?.taskId) {
+    // If the bot response includes a taskId or timestamp, update the last user message
+    if (botResponse?.taskId || botResponse?.timestamp) {
       setHelp(prev => {
         const newHelp = [...prev];
-        // Find the last user message and add the taskId to it
+        // Find the last user message and update it
         for (let i = newHelp.length - 1; i >= 0; i--) {
           if (newHelp[i].type === 'user') {
-            newHelp[i].taskId = botResponse.taskId;
+            if (botResponse.taskId) {
+              newHelp[i].taskId = botResponse.taskId;
+            }
+            // Use the bot response timestamp if available, otherwise keep the existing one
+            if (botResponse.timestamp) {
+              newHelp[i].timestamp = botResponse.timestamp;
+            }
             break;
           }
         }
@@ -2213,31 +2217,22 @@ export const HelpPanel = ({
                                 </svg>
                                 <div className="flex items-center flex-1 min-w-0">
                                   {isCollapsed ? (
-                                    // Single line format when collapsed
+                                    // Single line format when collapsed - show only timestamp
                                     <div className="flex items-center min-w-0 flex-1">
-                                      <span className="text-sm font-medium text-gray-700 flex-shrink-0">
-                                        {message.role === 'system' ? 'Note:' : 'User:'}
-                                      </span>
-                                      <span className="text-sm text-gray-600 truncate ml-2">
-                                        {(() => {
-                                          const content = message.role === 'system' ? message.content : message.user;
-                                          const firstLine = content.split('\n')[0];
-                                          // Remove markdown formatting for cleaner preview
-                                          const cleanPreview = firstLine.replace(/[`*_#]/g, '');
-                                          return cleanPreview;
-                                        })()}
+                                      <span className="text-sm text-gray-600">
+                                        {message.timestamp ?
+                                          new Date(message.timestamp).toLocaleString() :
+                                          'No timestamp'
+                                        }
                                       </span>
                                     </div>
                                   ) : (
-                                    // Expanded format
-                                    <div className="text-sm font-medium text-gray-700">
-                                      {message.role === 'system' ? 'System Note' : 'User Request'}
-                                      {message.taskId && (
-                                        <span className="ml-2 text-xs text-gray-500">
-                                          (Task: {message.taskId.slice(0, 8)}...)
-                                        </span>
-                                      )}
-                                    </div>
+                                    // Expanded format - show timestamp if present
+                                    message.timestamp ? (
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(message.timestamp).toLocaleString()}
+                                      </div>
+                                    ) : null
                                   )}
                                 </div>
                               </div>

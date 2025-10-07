@@ -69,7 +69,8 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       language: result.language || 'graffiticode',
       model: result.model,
       usage: result.usage,
-      taskId: result.taskId
+      taskId: result.taskId,
+      timestamp: new Date().toISOString()
     };
   } catch (error) {
     console.error('Error generating code:', error);
@@ -81,22 +82,26 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
  * Fallback response generator used when API calls fail
  */
 const fallbackResponse = (message) => {
+  const timestamp = new Date().toISOString();
   if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
     return {
       text: 'Hello! What do you want to make with Graffiticode today?',
-      type: 'text'
+      type: 'text',
+      timestamp
     };
   } else if (message.toLowerCase().includes('help')) {
     return {
       text: 'I can help you make things with Graffiticode. What specific functionality would you like me to implement?',
-      type: 'text'
+      type: 'text',
+      timestamp
     };
   } else if (message.toLowerCase().includes('example')) {
     return {
       text: `let double = <x: add x x>..
 let result = map (double) [1 2 3]..`,
       type: 'code',
-      language: 'graffiticode'
+      language: 'graffiticode',
+      timestamp
     };
   } else {
     return {
@@ -104,7 +109,8 @@ let result = map (double) [1 2 3]..`,
 let greeting = <name: concat "Hello, " name>..
 greeting "user"..`,
       type: 'code',
-      language: 'graffiticode'
+      language: 'graffiticode',
+      timestamp
     };
   }
 };
@@ -189,7 +195,8 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
         const errorResponse = {
           text: 'I encountered an error processing your request. Please try again.',
           type: 'text',
-          skipUserMessage: true
+          skipUserMessage: true,
+          timestamp: new Date().toISOString()
         };
         onSendMessage(message, errorResponse);
       }

@@ -622,7 +622,7 @@ export async function shareItem({ auth, itemId, targetUserId }) {
       // Add a note at the end of the help transcript (since display is reversed)
       helpArray.push({
         role: "system",
-        content: `Shared by ${auth.uid} on ${new Date(timestamp).toISOString().split('T')[0]}`,
+        content: `Shared by ${auth.uid}`,
         timestamp: timestamp,
         taskId: itemData.taskId // Include the original task ID for clickability
       });
@@ -631,7 +631,7 @@ export async function shareItem({ auth, itemId, targetUserId }) {
       // If help is not valid JSON, create a new array with the note
       updatedHelp = JSON.stringify([{
         role: "system",
-        content: `Shared by ${auth.uid} on ${new Date(timestamp).toISOString().split('T')[0]}`,
+        content: `Shared by ${auth.uid}`,
         timestamp: timestamp,
         taskId: itemData.taskId // Include the original task ID for clickability
       }]);
