@@ -2039,7 +2039,8 @@ export const HelpPanel = ({
                                      (message.index === help.length - 1 ||
                                       help[message.index + 1]?.type !== 'bot');
 
-                    const isCollapsed = collapsedMessages[message.index] ?? true;
+                    // Expand the first message (most recent) by default
+                    const isCollapsed = collapsedMessages[message.index] ?? (index !== 0);
 
                     return (
                       <div key={index} className="mb-2 w-full">
@@ -2165,11 +2166,11 @@ export const HelpPanel = ({
                               </div>
                             )}
 
-                            {/* Collapsible header */}
+                            {/* Collapsible header - only toggles expand/collapse */}
                             <div
-                              className={`flex items-center justify-between p-3 ${message.taskId && onLoadTaskFromHelp ? `cursor-pointer ${message.role === 'system' ? 'hover:bg-gray-200' : 'hover:bg-blue-200'} transition-colors` : ''}`}
+                              className={`flex items-center justify-between p-3 cursor-pointer ${message.role === 'system' ? 'hover:bg-gray-200' : 'hover:bg-blue-200'} transition-colors`}
                               onClick={() => {
-                                // If expanding this message, collapse all others first
+                                // Only handle expand/collapse, no task loading
                                 if (isCollapsed) {
                                   // Clear recently collapsed flag for this message
                                   setRecentlyCollapsed(prev => {
@@ -2187,10 +2188,6 @@ export const HelpPanel = ({
                                     ...allCollapsed,
                                     [message.index]: false
                                   });
-                                  // If there's a task ID, load the task
-                                  if (message.taskId && onLoadTaskFromHelp) {
-                                    onLoadTaskFromHelp(message.taskId);
-                                  }
                                 } else {
                                   // If collapsing, just collapse this one
                                   setCollapsedMessages(prev => ({
@@ -2205,7 +2202,7 @@ export const HelpPanel = ({
                                   });
                                 }
                               }}
-                              title={message.taskId && onLoadTaskFromHelp ? `Click to ${isCollapsed ? 'expand and load' : 'collapse'} task` : 'Click to expand/collapse'}
+                              title={`Click to ${isCollapsed ? 'expand' : 'collapse'}`}
                             >
                               <div className="flex items-center space-x-2 flex-1 min-w-0">
                                 <svg
@@ -2239,9 +2236,18 @@ export const HelpPanel = ({
                               </div>
                             </div>
 
-                            {/* Collapsible content */}
+                            {/* Collapsible content - clicking loads the task if available */}
                             {!isCollapsed && (
-                              <div className="px-3 pb-3 pt-0">
+                              <div
+                                className={`px-3 pb-3 pt-0 ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:bg-blue-50 transition-colors' : ''}`}
+                                onClick={() => {
+                                  // Load task when clicking on the body
+                                  if (message.taskId && onLoadTaskFromHelp) {
+                                    onLoadTaskFromHelp(message.taskId);
+                                  }
+                                }}
+                                title={message.taskId && onLoadTaskFromHelp ? 'Click to load task' : ''}
+                              >
                                 <div className="text-sm prose prose-sm prose-blue max-w-none">
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
