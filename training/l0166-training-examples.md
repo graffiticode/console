@@ -1,10 +1,137 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-01T20:58:01.236Z*
+*Downloaded on 2025-10-07T21:35:23.003Z*
 
 ## Language L0166
 
 ### Example 1
+
+#### Prompt
+"column a align center"
+
+#### Chat Transcript
+
+**User**: column a align center
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 2
+
+#### Prompt
+"set column a width 150 left aligned column b 200 width right aligned column c width 100 center aligned"
+
+#### Chat Transcript
+
+**User**: set column a width 150 left aligned column b 200 width right aligned column c width 100 center aligned
+
+#### Code
+
+```
+columns [
+  column A width 150 align "left" {}
+  column B width 200 align "right" {}
+  column C width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell C1 {}
+  cell A2 {}
+  cell B2 {}
+  cell C2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 3
+
+#### Prompt
+"Update the code for column A using these property values:
+```json
+{
+  "align": "",
+  "width": 0
+}
+```
+Note: Only the properties shown above have changed and need to be updated. Empty strings ("") mean the property should be cleared/removed."
+
+#### Chat Transcript
+
+**User**: Update the code for column A using these property values:
+```json
+{
+  "align": "",
+  "width": 0
+}
+```
+Note: Only the properties shown above have changed and need to be updated. Empty strings ("") mean the property should be cleared/removed.
+
+#### Code
+
+```
+columns [
+  column A {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 4
+
+#### Prompt
+"make row 1 protected"
+
+#### Chat Transcript
+
+**User**: make row 1 protected
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+  column B width 100 align "center" {}
+] rows [
+  row 1 protected true {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 5
 
 #### Prompt
 "make a simple income statement assessment
@@ -98,7 +225,7 @@ cells [
 
 ---
 
-### Example 2
+### Example 6
 
 #### Prompt
 "make column a bold"
@@ -127,7 +254,99 @@ cells [
 
 ---
 
-### Example 3
+### Example 7
+
+#### Prompt
+"Update the code for column A using these property values:
+```json
+{"align":"right"}
+```
+Note: Only the properties shown above have changed and need to be updated."
+
+#### Chat Transcript
+
+**User**: Update the code for column A using these property values:
+```json
+{"align":"right"}
+```
+Note: Only the properties shown above have changed and need to be updated.
+
+#### Code
+
+```
+columns [
+  column A width 100 align "right" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 8
+
+#### Prompt
+"give column a a large width"
+
+#### Chat Transcript
+
+**User**: give column a a large width
+
+#### Code
+
+```
+columns [
+  column A width 150 align "left" {}
+  column B width 200 align "right" {}
+  column C width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell C1 {}
+  cell A2 {}
+  cell B2 {}
+  cell C2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 9
+
+#### Prompt
+"set column a to width 200"
+
+#### Chat Transcript
+
+**User**: set column a to width 200
+
+#### Code
+
+```
+columns [
+  column A width 200 align "center" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 10
 
 #### Prompt
 "make a table with a single cell with an assessment
@@ -203,7 +422,210 @@ columns [
 
 ---
 
-### Example 4
+### Example 11
+
+#### Prompt
+"remove width from column a"
+
+#### Chat Transcript
+
+**User**: remove width from column a
+
+#### Code
+
+```
+columns [
+  column A align "center" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 12
+
+#### Prompt
+"make row 1 bold"
+
+#### Chat Transcript
+
+**User**: make row 1 bold
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+  column B width 100 align "center" {}
+] rows [
+  row 1 font-weight "bold" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 13
+
+#### Prompt
+"give row 1 the height of 24px"
+
+#### Chat Transcript
+
+**User**: give row 1 the height of 24px
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+  column B width 100 align "center" {}
+] rows [
+  row 1 font-size "24px" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 14
+
+#### Prompt
+"Update the code for column A using these property values:
+```json
+{"width":500}
+```
+Note: Only the properties shown above have changed and need to be updated."
+
+#### Chat Transcript
+
+**User**: Update the code for column A using these property values:
+```json
+{"width":500}
+```
+Note: Only the properties shown above have changed and need to be updated.
+
+#### Code
+
+```
+columns [
+  column A width 500 align "center" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 15
+
+#### Prompt
+"align cell a1 right"
+
+#### Chat Transcript
+
+**User**: align cell a1 right
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 align "right" {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 16
+
+#### Prompt
+"make column a right align with width 150 and column b left align with width 50"
+
+#### Chat Transcript
+
+**User**: make column a right align with width 150 and column b left align with width 50
+
+#### Code
+
+```
+columns [
+  column A width 150 align "right" {}
+  column B width 50 align "left" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 17
+
+#### Prompt
+"add to cell A1 attributes the property "foo" with value 10"
+
+#### Chat Transcript
+
+**User**: add to cell A1 attributes the property "foo" with value 10
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1
+  {foo:
+  10}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 18
 
 #### Prompt
 "format column A using ($#,##0)"
@@ -232,7 +654,7 @@ cells [
 
 ---
 
-### Example 5
+### Example 19
 
 #### Prompt
 "add row 2 with font height 24px
@@ -389,7 +811,7 @@ Note: Only the properties shown above have changed and need to be updated.
 columns [
   column A width 100 align "center" {}
 ] rows [
-  row 1 {}
+  row 1 background-color "#eee" {}
   row 2 font-size "24px" {}
 ] cells [
   cell A1 text "A1" {}
@@ -404,7 +826,34 @@ columns [
 
 ---
 
-### Example 6
+### Example 20
+
+#### Prompt
+"align column a and b to the right"
+
+#### Chat Transcript
+
+**User**: align column a and b to the right
+
+#### Code
+
+```
+columns [
+  column A width 100 align "right" {}
+  column B width 100 align "right" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 21
 
 #### Prompt
 "make a single cell table"
@@ -433,7 +882,164 @@ cells [
 
 ---
 
-### Example 7
+### Example 22
+
+#### Prompt
+"Update the code for column A using these property values:
+```json
+{"align":""}
+```
+Note: Only the properties shown above have changed and need to be updated. Empty strings ("") mean the property should be cleared/removed."
+
+#### Chat Transcript
+
+**User**: Update the code for column A using these property values:
+```json
+{"align":""}
+```
+Note: Only the properties shown above have changed and need to be updated. Empty strings ("") mean the property should be cleared/removed.
+
+#### Code
+
+```
+columns [
+  column A width 100 {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 23
+
+#### Prompt
+"column a align center
+
+Update the code for column A using these property values:
+```json
+{"align":"right"}
+```
+Note: Only the properties shown above have changed and need to be updated."
+
+#### Chat Transcript
+
+**User**: column a align center
+
+**User**: Update the code for column A using these property values:
+```json
+{"align":"right"}
+```
+Note: Only the properties shown above have changed and need to be updated.
+
+#### Code
+
+```
+columns [
+  column A width 100 align "right" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 24
+
+#### Prompt
+"left align column A"
+
+#### Chat Transcript
+
+**User**: left align column A
+
+#### Code
+
+```
+columns [
+  column A width 100 align "left" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 text "A1" {}
+  cell B1 text "B1" {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 25
+
+#### Prompt
+"remove alignment on column b"
+
+#### Chat Transcript
+
+**User**: remove alignment on column b
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+  column B width 100 {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 26
+
+#### Prompt
+"make column C width 250"
+
+#### Chat Transcript
+
+**User**: make column C width 250
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+  column B width 100 align "center" {}
+  column C width 250 {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+  cell C2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 27
 
 #### Prompt
 "make a spreadsheet that allows me to track my stocks. see the sheet with a few dummy examples
@@ -551,7 +1157,7 @@ cells [
 
 ---
 
-### Example 8
+### Example 28
 
 #### Prompt
 "Make a home budget assessment using the following data:
@@ -700,131 +1306,6 @@ title "Home Budget Assessment" columns [
   cell C9 text "Remaining income after all other expenses" {}
 ] {
   hideMenu: true
-  v: "0.0.1"
-}..
-```
-
----
-
-### Example 9
-
-#### Prompt
-"Use these changed properties to update the code for cell A1:
-```json
-{
-    "protected": true
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
-
-Use these changed properties to update the code for row 1:
-```json
-{
-    "protected": true
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
-
-Use these changed properties to update the code for column A:
-```json
-{
-    "protected": true
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated."
-
-#### Chat Transcript
-
-**User**: Use these changed properties to update the code for cell A1:
-```json
-{
-    "protected": true
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
-
-**User**: Use these changed properties to update the code for row 1:
-```json
-{
-    "protected": true
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
-
-**User**: Use these changed properties to update the code for column A:
-```json
-{
-    "protected": true
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
-
-#### Code
-
-```
-columns [
-  column A width 100 align "center" protected true {}
-]
-rows [
-  row 1 background-color "#eee" protected true {}
-]
-cells [
-  cell A1 text "A1" protected true {}
-]
-{
-  v: "0.0.1"
-}..
-```
-
----
-
-### Example 10
-
-#### Prompt
-"add three columns
-
-add two rows
-
-make row 1 bold"
-
-#### Chat Transcript
-
-**User**: add three columns
-
-**User**: add two rows
-
-**User**: make row 1 bold
-
-#### Code
-
-```
-columns [
-  column A width 100 align "center" font-weight "normal" {}
-  column B width 100 align "center" {}
-  column C width 100 align "center" {}
-  column D width 100 align "center" {}
-] rows [
-  row 1 background-color "#eee" {}
-] cells [
-  cell A1 text "A1" font-weight "bold" {}
-  cell B1 text "B1" font-weight "bold" {}
-  cell C1 text "C1" font-weight "bold" {}
-  cell D1 text "D1" font-weight "bold" {}
-  cell A2 text "A2" {}
-  cell B2 text "B2" {}
-  cell C2 text "C2" {}
-  cell D2 text "D2" {}
-  cell A3 text "A3" {}
-  cell B3 text "B3" {}
-  cell C3 text "C3" {}
-  cell D3 text "D3" {}
-] {
   v: "0.0.1"
 }..
 ```

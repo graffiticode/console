@@ -14,23 +14,23 @@ Use these as slots/checklist items; fill in titles/instructions and vary letters
 ### A. Column styling & layout (width / align) — 18
 
 * [x] **FP01**: Set column `"A"` `width 100`
-* **FP02**: Set column `"A"` `width 200`
-* **FP03**: Set column `"C"` `width 150`
-* **FP04**: Set column `"D"` `width 500`
-* **FP05**: Set column `"A"` `align "left"`
-* **FP06**: Set column `"A"` `align "center"`
-* **FP07**: Set column `"A"` `align "right"`
-* **FP08**: Set column `"B"` `align "justify"` (valid per spec)
-* **FP09**: Columns block with two: `"A"` width 100 align "right"; `"B"` width 150 align "left"
-* **FP10**: Columns block with three: A 150 left; B 200 center; C 100 right
-* **FP11**: Update `"A"` width and `"B"` align in the same program
-* **FP12**: Set only `"B"` `width` with no `align`
-* **FP13**: Set only `"C"` `align` with no `width`
-* **FP14**: Wide layout: A 500 center
-* **FP15**: Narrow layout: C 80 right
-* **FP16**: Mixed: A width 200 align "left"
-* **FP17**: Mixed: B width 300 align "justify"
-* **FP18**: Columns with trailing empty `{}` blocks (canonical form)
+* [x] **FP02**: Set column `"A"` `width 200`
+* [x] **FP03**: Set column `"C"` `width 150`
+* [x] **FP04**: Set column `"D"` `width 500`
+* [x] **FP05**: Set column `"A"` `align "left"`
+* [x] **FP06**: Set column `"A"` `align "center"`
+* [x] **FP07**: Set column `"A"` `align "right"`
+* [ ] **FP08**: Set column `"B"` `align "justify"` (valid per spec)
+* [x] **FP09**: Columns block with two: `"A"` width 100 align "right"; `"B"` width 150 align "left"
+* [x] **FP10**: Columns block with three: A 150 left; B 200 center; C 100 right
+* [x] **FP11**: Update `"A"` width and `"B"` align in the same program
+* [x] **FP12**: Set only `"B"` `width` with no `align`
+* [x] **FP13**: Set only `"C"` `align` with no `width`
+* [x] **FP14**: Wide layout: A 500 center
+* [x] **FP15**: Narrow layout: C 80 right
+* [x] **FP16**: Mixed: A width 200 align "left"
+* [ ] **FP17**: Mixed: B width 300 align "justify"
+* [x] **FP18**: Columns with trailing empty `{}` blocks (canonical form)
 
 ### B. Cell text & basic cells block — 10
 
