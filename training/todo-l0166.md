@@ -13,7 +13,7 @@ Use these as slots/checklist items; fill in titles/instructions and vary letters
 
 ### A. Column styling & layout (width / align) — 18
 
-* **FP01**: Set column `"A"` `width 100`
+[ ] **FP01**: Set column `"A"` `width 100`
 * **FP02**: Set column `"A"` `width 200`
 * **FP03**: Set column `"C"` `width 150`
 * **FP04**: Set column `"D"` `width 500`
