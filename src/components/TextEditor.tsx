@@ -108,7 +108,7 @@ const createPlaceholderPlugin = (placeholder) => {
   });
 };
 
-export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
+export const TextEditor = ({ state, placeholder = "", disabled = false, onSubmit = null }) => {
   const [ editorView, setEditorView ] = useState(null);
   const [ hasFocus, setHasFocus ] = useState(false);
   const [ hasContent, setHasContent ] = useState(false);
@@ -174,10 +174,43 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
       return;
     }
 
+    const enterKeyPlugin = new Plugin({
+      props: {
+        handleKeyDown(view, event) {
+          if (disabled) return false;
+
+          if (event.key === "Enter") {
+            if (event.shiftKey) {
+              const { state, dispatch } = view;
+              dispatch(state.tr.split(state.selection.from));
+            } else {
+              const content = getEditorContent(view);
+              if (!content || content.trim() === "") return true;
+
+              clearEditor(view);
+              // Use onSubmit if provided, otherwise use state.apply for backward compatibility
+              if (onSubmit) {
+                onSubmit(content);
+              } else if (state) {
+                state.apply({
+                  type: "update",
+                  args: {content},
+                });
+              }
+            }
+            event.preventDefault();
+            return true;
+          }
+          return false;
+        }
+      }
+    });
+
     const editorView = new EditorView(editorRef.current, {
       state: EditorState.create({
         schema,
         plugins: [
+          enterKeyPlugin,
           ...plugins,
         ],
       }),

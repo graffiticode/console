@@ -1408,6 +1408,7 @@ export const HelpPanel = ({
               state={state}
               disabled={isLoading}
               placeholder={help.length > 0 ? "Reply to make changes..." : "What do you want to make today?"}
+              onSubmit={sendCombinedMessage}
             />
           </div>
         </div>
