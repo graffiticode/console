@@ -108,7 +108,7 @@ const createPlaceholderPlugin = (placeholder) => {
   });
 };
 
-export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
+export const TextEditor = ({ state, placeholder = "", disabled = false, onSubmit = null }) => {
   const [ editorView, setEditorView ] = useState(null);
   const [ hasFocus, setHasFocus ] = useState(false);
   const [ hasContent, setHasContent ] = useState(false);
@@ -153,32 +153,62 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
     return false;
   };
 
-  const plugins = [
-    history(),
-    keymap({"Mod-z": undo, "Mod-y": redo, "Mod-`": toggleCodeBlock}),
-    keymap(baseKeymap),
-    new Plugin({
-      props: {
-        handleTextInput: handleBacktickInput
-      }
-    })
-  ];
-
-  // Add placeholder plugin if placeholder is provided
-  if (placeholder) {
-    plugins.push(createPlaceholderPlugin(placeholder));
-  }
-
   useEffect(() => {
     if (!editorRef.current) {
       return;
     }
+
+    // Handle Enter key to submit (Shift+Enter for new line)
+    const handleEnterKey = (state, dispatch, view) => {
+      // Only submit on plain Enter, not Shift+Enter
+      if (onSubmit && !disabled) {
+        const content = getEditorContent({ state });
+        if (content && content.trim()) {
+          onSubmit(content);
+          // Clear the editor after submission
+          if (dispatch) {
+            const tr = state.tr.replaceWith(0, state.doc.content.size, schema.nodes.paragraph.create());
+            dispatch(tr);
+          }
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const customKeymap = {
+      "Mod-z": undo,
+      "Mod-y": redo,
+      "Mod-`": toggleCodeBlock
+    };
+
+    // Only add Enter handler if onSubmit is provided
+    if (onSubmit) {
+      customKeymap["Enter"] = handleEnterKey;
+      // Allow Shift+Enter for new lines
+      customKeymap["Shift-Enter"] = () => false; // Let default behavior handle it
+    }
+
+    // Build plugins dynamically based on props
+    const dynamicPlugins = [
+      history(),
+      keymap(customKeymap),
+      keymap(baseKeymap),
+      new Plugin({
+        props: {
+          handleTextInput: handleBacktickInput
+        }
+      })
+    ];
+
+    if (placeholder) {
+      dynamicPlugins.push(createPlaceholderPlugin(placeholder));
+    }
+
     const editorView = new EditorView(editorRef.current, {
       state: EditorState.create({
         schema,
-        plugins: [
-          ...plugins,
-        ],
+        plugins: dynamicPlugins,
       }),
       dispatchTransaction(transaction) {
         if (disabled) return;
@@ -216,7 +246,7 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
         editorView.destroy();
       }
     };
-  }, [disabled]);
+  }, [disabled, onSubmit, placeholder]);
 
   // Update editor when disabled prop changes
   useEffect(() => {
@@ -233,6 +263,48 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
   const { editorState } = state.data;
   useEffect(() => {
     if (editorState && editorView) {
+      // Rebuild plugins for state update
+      const handleEnterKey = (state, dispatch, view) => {
+        if (onSubmit && !disabled) {
+          const content = getEditorContent({ state });
+          if (content && content.trim()) {
+            onSubmit(content);
+            if (dispatch) {
+              const tr = state.tr.replaceWith(0, state.doc.content.size, schema.nodes.paragraph.create());
+              dispatch(tr);
+            }
+            return true;
+          }
+        }
+        return false;
+      };
+
+      const customKeymap = {
+        "Mod-z": undo,
+        "Mod-y": redo,
+        "Mod-`": toggleCodeBlock
+      };
+
+      if (onSubmit) {
+        customKeymap["Enter"] = handleEnterKey;
+        customKeymap["Shift-Enter"] = () => false;
+      }
+
+      const plugins = [
+        history(),
+        keymap(customKeymap),
+        keymap(baseKeymap),
+        new Plugin({
+          props: {
+            handleTextInput: handleBacktickInput
+          }
+        })
+      ];
+
+      if (placeholder) {
+        plugins.push(createPlaceholderPlugin(placeholder));
+      }
+
       const newEditorState = EditorState.fromJSON({
         schema,
         plugins,
@@ -241,7 +313,7 @@ export const TextEditor = ({ state, placeholder = "", disabled = false }) => {
       // Update hasContent when editor state changes from props
       setHasContent(newEditorState.doc.textContent.length > 0);
     }
-  }, [editorState]);
+  }, [editorState, editorView, onSubmit, disabled, placeholder]);
 
   return (
     <div className="relative">

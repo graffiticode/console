@@ -1408,6 +1408,7 @@ export const HelpPanel = ({
               state={state}
               disabled={isLoading}
               placeholder={help.length > 0 ? "Reply to make changes..." : "What do you want to make today?"}
+              onSubmit={sendCombinedMessage}
             />
           </div>
         </div>
@@ -2204,7 +2205,7 @@ export const HelpPanel = ({
                                   });
                                 }
                               }}
-                              title={message.taskId && onLoadTaskFromHelp ? `Click to ${isCollapsed ? 'expand and load' : 'collapse'} task ${message.taskId.slice(0, 8)}` : 'Click to expand/collapse'}
+                              title={message.taskId && onLoadTaskFromHelp ? `Click to ${isCollapsed ? 'expand and load' : 'collapse'} task` : 'Click to expand/collapse'}
                             >
                               <div className="flex items-center space-x-2 flex-1 min-w-0">
                                 <svg
@@ -2236,16 +2237,6 @@ export const HelpPanel = ({
                                   )}
                                 </div>
                               </div>
-                              {isPending && (
-                                <div className="flex items-center text-xs text-blue-600">
-                                  <span>Processing</span>
-                                  <div className="flex items-center ml-1">
-                                    <div className="w-1 h-1 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
-                                    <div className="w-1 h-1 bg-blue-600 rounded-full mx-0.5 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
-                                    <div className="w-1 h-1 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}></div>
-                                  </div>
-                                </div>
-                              )}
                             </div>
 
                             {/* Collapsible content */}
