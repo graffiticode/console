@@ -519,8 +519,10 @@ export const HelpPanel = ({
   };
 
   // Function to combine text input and property changes and send them
-  const sendCombinedMessage = (textContent: string = '') => {
-    if (!handleSendMessage || isLoading) return;
+  const sendCombinedMessage = useCallback((textContent: string = '') => {
+    // Get the handleSendMessage from the state data
+    const stateData = stateRef.current?.data;
+    if (!stateData?.handleSendMessage || stateData?.isLoading) return;
 
     // Get text content if not provided
     const messageText = textContent || getCurrentEditorText();
@@ -578,7 +580,18 @@ export const HelpPanel = ({
         fullMessage += '\n\n';
       }
 
-      fullMessage += `Update the code for column A using these property values`;
+      // Build context-aware message
+      if (contextType === 'column' && contextName) {
+        fullMessage += `Update the code for column ${contextName} using these property values`;
+      } else if (contextType === 'cell' && contextName) {
+        fullMessage += `Update the code for cell ${contextName} using these property values`;
+      } else if (contextType === 'row' && contextName) {
+        fullMessage += `Update the code for row ${contextName} using these property values`;
+      } else if (contextType === 'region' && contextName) {
+        fullMessage += `Update the code for region ${contextName} using these property values`;
+      } else {
+        fullMessage += `Update the code using these property values`;
+      }
       // Use more compact JSON formatting (2-space indent instead of 4)
       const jsonString = Object.keys(changedValues).length === 1 &&
             JSON.stringify(changedValues) ||
@@ -598,11 +611,11 @@ export const HelpPanel = ({
 
     // Only send if we have something to send
     if (fullMessage) {
-      handleSendMessage(fullMessage);
+      stateData.handleSendMessage(fullMessage);
       // Clear the text editor after sending
       clearTextEditor();
     }
-  };
+  }, [focusedElement, contextProperties, initialProperties]);
 
   // Integration with TextEditor component - will be properly initialized after ChatBot setup
   const [state] = useState(createState({}, (data, { type, args }) => {
