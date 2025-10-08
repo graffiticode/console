@@ -37,7 +37,7 @@ export const CLAUDE_MODELS = {
   OPUS: "claude-opus-4-20250514",
   SONNET: "claude-sonnet-4-20250514",
   HAIKU: "claude-3-5-haiku-20241022",
-  DEFAULT: "claude-opus-4-20250514",
+  DEFAULT: "claude-sonnet-4-20250514",  // Sonnet is now the default
 };
 
 /**
@@ -1032,7 +1032,7 @@ export async function generateCode({
   });
 
   // Model selection best practices:
-  // - Default (Sonnet 3.5): Best for code generation, most tasks
+  // - Default (Sonnet): Best for code generation, most tasks - faster and more cost-effective
   // - Override with OPUS only for: Very complex logic, multi-step reasoning
   // - Override with HAIKU for: Simple templates, basic transformations
 

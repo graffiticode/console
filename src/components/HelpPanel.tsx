@@ -1433,9 +1433,9 @@ export const HelpPanel = ({
               {focusedElement?.type === 'cell' ?
                 `Cell ${focusedElement.name} Properties` :
                 focusedElement?.type === 'column' ?
-                  `Column ${focusedElement.name} Properties` :
+                  `Column${focusedElement.name?.includes(',') ? 's' : ''} ${focusedElement.name} Properties` :
                 focusedElement?.type === 'row' ?
-                  `Row ${focusedElement.name} Properties` :
+                  `Row${focusedElement.name?.includes(',') ? 's' : ''} ${focusedElement.name} Properties` :
                 focusedElement?.type === 'region' ?
                   `Region ${focusedElement.name} Properties` :
                 focusedElement?.type ?
