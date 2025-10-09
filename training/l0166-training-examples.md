@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-07T21:35:23.003Z*
+*Downloaded on 2025-10-09T23:58:31.434Z*
 
 ## Language L0166
 
@@ -64,6 +64,35 @@ columns [
 ### Example 3
 
 #### Prompt
+"add the attribute to B2 of foo="bar""
+
+#### Chat Transcript
+
+**User**: add the attribute to B2 of foo="bar"
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 {}
+  cell B1 {}
+  cell A2 {}
+  cell B2 {
+    foo: "bar"
+  }
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 4
+
+#### Prompt
 "Update the code for column A using these property values:
 ```json
 {
@@ -102,7 +131,7 @@ columns [
 
 ---
 
-### Example 4
+### Example 5
 
 #### Prompt
 "make row 1 protected"
@@ -131,7 +160,7 @@ columns [
 
 ---
 
-### Example 5
+### Example 6
 
 #### Prompt
 "make a simple income statement assessment
@@ -225,7 +254,7 @@ cells [
 
 ---
 
-### Example 6
+### Example 7
 
 #### Prompt
 "make column a bold"
@@ -254,7 +283,7 @@ cells [
 
 ---
 
-### Example 7
+### Example 8
 
 #### Prompt
 "Update the code for column A using these property values:
@@ -289,7 +318,7 @@ columns [
 
 ---
 
-### Example 8
+### Example 9
 
 #### Prompt
 "give column a a large width"
@@ -302,16 +331,13 @@ columns [
 
 ```
 columns [
-  column A width 150 align "left" {}
-  column B width 200 align "right" {}
-  column C width 100 align "center" {}
+  column A width 500 align "center" {}
+  column B width 100 align "center" {}
 ] cells [
   cell A1 {}
   cell B1 {}
-  cell C1 {}
   cell A2 {}
   cell B2 {}
-  cell C2 {}
 ] {
   v: "0.0.1"
 }..
@@ -319,7 +345,7 @@ columns [
 
 ---
 
-### Example 9
+### Example 10
 
 #### Prompt
 "set column a to width 200"
@@ -346,7 +372,7 @@ columns [
 
 ---
 
-### Example 10
+### Example 11
 
 #### Prompt
 "make a table with a single cell with an assessment
@@ -422,7 +448,7 @@ columns [
 
 ---
 
-### Example 11
+### Example 12
 
 #### Prompt
 "remove width from column a"
@@ -449,7 +475,7 @@ columns [
 
 ---
 
-### Example 12
+### Example 13
 
 #### Prompt
 "make row 1 bold"
@@ -478,7 +504,7 @@ columns [
 
 ---
 
-### Example 13
+### Example 14
 
 #### Prompt
 "give row 1 the height of 24px"
@@ -507,7 +533,7 @@ columns [
 
 ---
 
-### Example 14
+### Example 15
 
 #### Prompt
 "Update the code for column A using these property values:
@@ -542,7 +568,7 @@ columns [
 
 ---
 
-### Example 15
+### Example 16
 
 #### Prompt
 "align cell a1 right"
@@ -569,7 +595,7 @@ columns [
 
 ---
 
-### Example 16
+### Example 17
 
 #### Prompt
 "make column a right align with width 150 and column b left align with width 50"
@@ -586,35 +612,6 @@ columns [
   column B width 50 align "left" {}
 ] cells [
   cell A1 {}
-  cell B1 {}
-  cell A2 {}
-  cell B2 {}
-] {
-  v: "0.0.1"
-}..
-```
-
----
-
-### Example 17
-
-#### Prompt
-"add to cell A1 attributes the property "foo" with value 10"
-
-#### Chat Transcript
-
-**User**: add to cell A1 attributes the property "foo" with value 10
-
-#### Code
-
-```
-columns [
-  column A width 100 align "center" {}
-  column B width 100 align "center" {}
-] cells [
-  cell A1
-  {foo:
-  10}
   cell B1 {}
   cell A2 {}
   cell B2 {}
@@ -959,6 +956,35 @@ columns [
 ### Example 24
 
 #### Prompt
+"add metadata to cell A1 that sets x=10"
+
+#### Chat Transcript
+
+**User**: add metadata to cell A1 that sets x=10
+
+#### Code
+
+```
+columns [
+  column A width 100 align "center" {}
+  column B width 100 align "center" {}
+] cells [
+  cell A1 {
+    x: 10
+  }
+  cell B1 {}
+  cell A2 {}
+  cell B2 {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 25
+
+#### Prompt
 "left align column A"
 
 #### Chat Transcript
@@ -983,7 +1009,7 @@ columns [
 
 ---
 
-### Example 25
+### Example 26
 
 #### Prompt
 "remove alignment on column b"
@@ -1010,7 +1036,7 @@ columns [
 
 ---
 
-### Example 26
+### Example 27
 
 #### Prompt
 "make column C width 250"
@@ -1039,7 +1065,7 @@ columns [
 
 ---
 
-### Example 27
+### Example 28
 
 #### Prompt
 "make a spreadsheet that allows me to track my stocks. see the sheet with a few dummy examples
@@ -1157,7 +1183,7 @@ cells [
 
 ---
 
-### Example 28
+### Example 29
 
 #### Prompt
 "Make a home budget assessment using the following data:

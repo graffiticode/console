@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-09T16:48:05.769Z*
+*Downloaded on 2025-10-09T23:58:15.326Z*
 
 ## Language L0002
 
@@ -30,6 +30,26 @@ hello 'world'
 ### Example 2
 
 #### Prompt
+"simple case expression"
+
+#### Chat Transcript
+
+**User**: simple case expression
+
+#### Code
+
+```
+case 42 of
+  42: "Found forty-two"
+  _: "Something else"
+end..
+```
+
+---
+
+### Example 3
+
+#### Prompt
 "get the first element in a list of strings"
 
 #### Chat Transcript
@@ -51,7 +71,7 @@ firstFruit..
 
 ---
 
-### Example 3
+### Example 4
 
 #### Prompt
 "get the value of binding 'x' from and object that contains 'x'"
@@ -72,7 +92,7 @@ xValue..
 
 ---
 
-### Example 4
+### Example 5
 
 #### Prompt
 "sum the values in an array of the first 100 integers"
@@ -95,7 +115,7 @@ sum..
 
 ---
 
-### Example 5
+### Example 6
 
 #### Prompt
 "compute fizzbuzz through 100"
@@ -124,7 +144,7 @@ results..
 
 ---
 
-### Example 6
+### Example 7
 
 #### Prompt
 "create an record with field named foo to 10 and then set another field named bar to 20"
@@ -145,7 +165,7 @@ updatedRecord..
 
 ---
 
-### Example 7
+### Example 8
 
 #### Prompt
 "double a list of integers"
@@ -163,7 +183,7 @@ map (double) [1 2 3]..
 
 ---
 
-### Example 8
+### Example 9
 
 #### Prompt
 "create a program with a let definition and an expression that calls the let definition"
@@ -181,7 +201,7 @@ x..
 
 ---
 
-### Example 9
+### Example 10
 
 #### Prompt
 "write a program that translates integers from 1 to 10 to their french names
@@ -256,13 +276,12 @@ let frenchTens = <n:
 >..
 let numbers = range 10 110 10..
 let frenchNumbers = map (frenchTens) numbers..
-let isSixty = eq "soixante" nth 5 frenchNumbers..
 frenchNumbers..
 ```
 
 ---
 
-### Example 10
+### Example 11
 
 #### Prompt
 "define a function and call it"
@@ -280,7 +299,7 @@ myFunction 42..
 
 ---
 
-### Example 11
+### Example 12
 
 #### Prompt
 "use parenthesis to call a higher order function"
@@ -298,7 +317,24 @@ map (double) [1 2 3]..
 
 ---
 
-### Example 12
+### Example 13
+
+#### Prompt
+"write a program with a simple conditional expression"
+
+#### Chat Transcript
+
+**User**: write a program with a simple conditional expression
+
+#### Code
+
+```
+if gt 5 3 then "five is greater" else "three is greater"..
+```
+
+---
+
+### Example 14
 
 #### Prompt
 "get the tail of a list of integers"
