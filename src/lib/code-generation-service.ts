@@ -1219,6 +1219,7 @@ export async function generateCode({
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
+    let usedOpusForFix = false;  // Track if we upgraded to Opus for fixing
     let finalUsage = {
       prompt_tokens: streamResult.usage.inputTokens,
       completion_tokens: streamResult.usage.outputTokens,
@@ -1270,13 +1271,29 @@ export async function generateCode({
             verificationResult,
           );
 
+          // Determine which model to use for fixes
+          // If the initial generation used Sonnet or Haiku and failed, upgrade to Opus for better error fixing
+          let fixModel = options.model || CLAUDE_MODELS.DEFAULT;
+          if (fixAttempts === 0 && (fixModel === CLAUDE_MODELS.SONNET || fixModel === CLAUDE_MODELS.HAIKU)) {
+            fixModel = CLAUDE_MODELS.OPUS;
+            usedOpusForFix = true;
+            console.log(`[generateCode] Upgrading to Opus model for error fixing (initial model: ${options.model || CLAUDE_MODELS.DEFAULT})`);
+            if (rid) {
+              ragLog(rid, "fix.model.upgrade", {
+                originalModel: options.model || CLAUDE_MODELS.DEFAULT,
+                upgradedModel: CLAUDE_MODELS.OPUS,
+                reason: "First fix attempt after initial generation failure"
+              });
+            }
+          }
+
           // Use streaming service to fix the code
           const fixResult = await generateCodeWithContinuation({
             formattedPrompt: fixPrompt,
             lang,
             currentCode: generatedCode,
             options: {
-              model: options.model || CLAUDE_MODELS.DEFAULT,
+              model: fixModel,
               temperature: 0.1, // Lower temperature for more deterministic fixes
               maxTokens: options.maxTokens || 4096,
               maxContinuations: 10
@@ -1327,13 +1344,14 @@ export async function generateCode({
     const result = {
       code: finalProcessedCode,
       lang: lang,
-      model: options.model || CLAUDE_MODELS.DEFAULT,
+      model: modelToUse,  // Use the actual model that was used
       usage: {
         input_tokens: finalUsage.prompt_tokens,
         output_tokens: finalUsage.completion_tokens,
       },
       verification: verificationResult,
       fixAttempts,
+      usedOpusForFix,  // Indicate if we had to upgrade to Opus for fixing
       streaming: true,
       chunks: streamResult.chunks,
       requestId: requestId  // Include for feedback tracking
