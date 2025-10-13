@@ -41,7 +41,6 @@ const navigation: NavigationItem[] = [
   { name: 'Items', href: '/items', current: false },
 //  { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Compiles', href: '/compiles', current: false },
-  { name: 'Settings', href: '/settings', current: false },
   { name: 'Docs', href: '/docs', current: false },
 //  { name: 'Explorer', href: '/explorer', current: false },
 ]
