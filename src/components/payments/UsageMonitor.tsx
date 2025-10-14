@@ -17,6 +17,18 @@ interface BillingSettings {
   overageBlocksUsedThisPeriod: number;
 }
 
+interface PricingInfo {
+  plan: string;
+  overageAvailable: boolean;
+  currentOverageBalance: number;
+  blockSize: number;
+  pricePerBlock: number;
+  pricePerUnit: number;
+  minBlocks: number;
+  description: string;
+  suggestedBlocks: number[];
+}
+
 interface UsageMonitorProps {
   userId: string;
 }
@@ -24,8 +36,10 @@ interface UsageMonitorProps {
 export default function UsageMonitor({ userId }: UsageMonitorProps) {
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [billing, setBilling] = useState<BillingSettings | null>(null);
+  const [pricing, setPricing] = useState<PricingInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
+  const [selectedBlocks, setSelectedBlocks] = useState(1);
 
   useEffect(() => {
     fetchUsageData();
@@ -33,12 +47,14 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
   const fetchUsageData = async () => {
     try {
-      const [usageResponse, billingResponse] = await Promise.all([
+      const [usageResponse, billingResponse, pricingResponse] = await Promise.all([
         axios.get(`/api/payments/usage?userId=${userId}`),
-        axios.get(`/api/payments/billing-settings?userId=${userId}`)
+        axios.get(`/api/payments/billing-settings?userId=${userId}`),
+        axios.get(`/api/payments/purchase-overage?userId=${userId}`)
       ]);
       setUsage(usageResponse.data);
       setBilling(billingResponse.data);
+      setPricing(pricingResponse.data);
     } catch (error) {
       console.error('Error fetching usage data:', error);
     } finally {
@@ -49,9 +65,13 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
   const handlePurchaseOverage = async () => {
     setPurchasing(true);
     try {
-      await axios.post('/api/payments/purchase-overage', { userId });
+      const result = await axios.post('/api/payments/purchase-overage', {
+        userId,
+        blocks: selectedBlocks
+      });
       await fetchUsageData();
-      alert('Successfully purchased 10,000 additional compile units!');
+      const units = result.data.units || (selectedBlocks * (pricing?.blockSize || 1000));
+      alert(`Successfully purchased ${units.toLocaleString()} additional compile units!`);
     } catch (error) {
       console.error('Error purchasing overage:', error);
       alert('Failed to purchase overage units. Please try again.');
@@ -196,7 +216,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
               </Switch>
             </div>
 
-            {billing.autoRecharge && (
+            {billing.autoRecharge && pricing && (
               <div className="ml-4 pb-4 border-b">
                 <label className="text-sm font-medium text-gray-700">
                   Monthly limit
@@ -206,10 +226,10 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                   onChange={(e) => handleLimitChange(Number(e.target.value))}
                   className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 >
-                  <option value={1}>1 block (10,000 units)</option>
-                  <option value={3}>3 blocks (30,000 units)</option>
-                  <option value={5}>5 blocks (50,000 units)</option>
-                  <option value={10}>10 blocks (100,000 units)</option>
+                  <option value={1}>1 block ({(pricing.blockSize).toLocaleString()} units)</option>
+                  <option value={3}>3 blocks ({(3 * pricing.blockSize).toLocaleString()} units)</option>
+                  <option value={5}>5 blocks ({(5 * pricing.blockSize).toLocaleString()} units)</option>
+                  <option value={10}>10 blocks ({(10 * pricing.blockSize).toLocaleString()} units)</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
                   {billing.overageBlocksUsedThisPeriod} of {billing.autoRechargeLimit} blocks used this month
@@ -217,22 +237,70 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
               </div>
             )}
 
-            <div className="pt-4">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Purchase Overage Block</p>
-                  <p className="text-sm text-gray-500">10,000 compile units for $150</p>
+            {pricing && pricing.overageAvailable && (
+              <div className="pt-4">
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-gray-900 mb-2">Purchase Overage Blocks</p>
+                  <p className="text-sm text-gray-500 mb-3">
+                    {pricing.description} • {pricing.blockSize.toLocaleString()} units per block
+                  </p>
+
+                  <div className="flex items-center space-x-4">
+                    <select
+                      value={selectedBlocks}
+                      onChange={(e) => setSelectedBlocks(Number(e.target.value))}
+                      className="block w-40 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                    >
+                      {pricing.suggestedBlocks?.map(blocks => (
+                        <option key={blocks} value={blocks}>
+                          {blocks} {blocks === 1 ? 'block' : 'blocks'}
+                        </option>
+                      )) || [1, 5, 10, 20].map(blocks => (
+                        <option key={blocks} value={blocks}>
+                          {blocks} {blocks === 1 ? 'block' : 'blocks'}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {(selectedBlocks * pricing.blockSize).toLocaleString()} units
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Total: ${(selectedBlocks * pricing.pricePerBlock).toFixed(2)}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handlePurchaseOverage}
+                      disabled={purchasing}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    >
+                      <BoltIcon className="w-4 h-4 mr-2" />
+                      {purchasing ? 'Processing...' : 'Purchase'}
+                    </button>
+                  </div>
+
+                  {pricing.currentOverageBalance > 0 && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Current overage balance: {pricing.currentOverageBalance.toLocaleString()} units
+                    </p>
+                  )}
                 </div>
-                <button
-                  onClick={handlePurchaseOverage}
-                  disabled={purchasing}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  <BoltIcon className="w-4 h-4 mr-2" />
-                  {purchasing ? 'Processing...' : 'Purchase Now'}
-                </button>
               </div>
-            </div>
+            )}
+
+            {pricing && !pricing.overageAvailable && (
+              <div className="pt-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-600">
+                    {pricing.plan === 'free'
+                      ? 'Upgrade to Pro or Max plan to purchase additional compile units'
+                      : 'Overage purchases are not available for your plan'}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

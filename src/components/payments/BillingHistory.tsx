@@ -28,7 +28,8 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
   const fetchInvoices = async () => {
     try {
       const response = await axios.get(`/api/payments/invoices?userId=${userId}`);
-      setInvoices(response.data);
+      // Extract invoices array from response object
+      setInvoices(response.data.invoices || []);
     } catch (error) {
       console.error('Error fetching invoices:', error);
       // Mock data for development

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { CreditCardIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import axios from 'axios';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_51LhI57LUz4JwpsJ6p6lzznvkbFNQj8k9LnAYckCJZ4Tv9AZzYHxKafXTKsTS12F8vUpKyELdBvXtvgSmNOzdqug200VALmBhSl');
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_PwlNxtmtkJ5hH6Ze0eMPsOaS');
 
 interface PaymentMethod {
   id: string;
@@ -19,7 +19,7 @@ interface PaymentMethodsProps {
   userId: string;
 }
 
-function AddPaymentMethodForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
+function AddPaymentMethodForm({ userId, onSuccess, onCancel }: { userId: string; onSuccess: () => void; onCancel: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState<string | null>(null);
@@ -35,25 +35,67 @@ function AddPaymentMethodForm({ onSuccess, onCancel }: { onSuccess: () => void; 
     setProcessing(true);
     setError(null);
 
-    const { error } = await stripe.confirmSetup({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/payments`,
-      },
-      redirect: 'if_required'
+    // Get the CardElement
+    const cardElement = elements.getElement(CardElement);
+
+    if (!cardElement) {
+      setError('Card element not found');
+      setProcessing(false);
+      return;
+    }
+
+    // Create a payment method directly
+    const { error, paymentMethod } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
     });
 
     if (error) {
       setError(error.message || 'An error occurred');
       setProcessing(false);
-    } else {
-      onSuccess();
+    } else if (paymentMethod) {
+      // Save the payment method to our backend
+      try {
+        const response = await axios.post(`/api/payments/methods?userId=${userId}`, {
+          paymentMethodId: paymentMethod.id,
+          setAsDefault: false
+        });
+
+        if (response.data.success) {
+          onSuccess();
+        } else {
+          setError('Failed to save payment method');
+          setProcessing(false);
+        }
+      } catch (err: any) {
+        console.error('Error saving payment method:', err);
+        const errorMessage = err.response?.data?.details || err.response?.data?.error || 'Failed to save payment method';
+        setError(errorMessage);
+        setProcessing(false);
+      }
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement />
+      <div className="p-4 border border-gray-300 rounded-md">
+        <CardElement
+          options={{
+            style: {
+              base: {
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': {
+                  color: '#aab7c4',
+                },
+              },
+              invalid: {
+                color: '#9e2146',
+              },
+            },
+          }}
+        />
+      </div>
       {error && (
         <div className="text-sm text-red-600">{error}</div>
       )}
@@ -81,7 +123,6 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPaymentMethods();
@@ -90,34 +131,21 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
   const fetchPaymentMethods = async () => {
     try {
       const response = await axios.get(`/api/payments/methods?userId=${userId}`);
-      setPaymentMethods(response.data);
+      // Extract paymentMethods array from response object
+      const methods = response.data.paymentMethods || response.data || [];
+      // Ensure it's always an array
+      setPaymentMethods(Array.isArray(methods) ? methods : []);
     } catch (error) {
       console.error('Error fetching payment methods:', error);
-      // Mock data for development
-      setPaymentMethods([
-        {
-          id: 'pm_1',
-          brand: 'Visa',
-          last4: '4242',
-          expMonth: 12,
-          expYear: 2025,
-          isDefault: true
-        }
-      ]);
+      // Set to empty array on error rather than mock data
+      setPaymentMethods([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddPaymentMethod = async () => {
-    try {
-      const response = await axios.post('/api/payments/setup-intent', { userId });
-      setClientSecret(response.data.clientSecret);
-      setShowAddForm(true);
-    } catch (error) {
-      console.error('Error creating setup intent:', error);
-      alert('Failed to initialize payment method setup.');
-    }
+  const handleAddPaymentMethod = () => {
+    setShowAddForm(true);
   };
 
   const handleRemovePaymentMethod = async (methodId: string) => {
@@ -178,23 +206,26 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
       </div>
 
       {/* Add Payment Method Form */}
-      {showAddForm && clientSecret && (
+      {showAddForm && (
         <div className="bg-gray-50 rounded-lg p-6">
           <h4 className="text-sm font-medium text-gray-900 mb-4">Add New Payment Method</h4>
-          <Elements stripe={stripePromise} options={{ clientSecret }}>
+          <Elements stripe={stripePromise}>
             <AddPaymentMethodForm
+              userId={userId}
               onSuccess={() => {
                 setShowAddForm(false);
                 fetchPaymentMethods();
               }}
-              onCancel={() => setShowAddForm(false)}
+              onCancel={() => {
+                setShowAddForm(false);
+              }}
             />
           </Elements>
         </div>
       )}
 
       {/* Payment Methods List */}
-      {paymentMethods.length === 0 ? (
+      {!Array.isArray(paymentMethods) || paymentMethods.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
           <CreditCardIcon className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No payment methods</h3>

@@ -85,7 +85,7 @@ const typeDefs = `
   }
 
   type Mutation {
-    logCompile(id: String!, status: String!, timestamp: String!, data: String!): String!
+    logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
     generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String): GeneratedCode!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
@@ -159,9 +159,13 @@ const resolvers = {
     },
     logCompile: async (_, args, ctx) => {
       const { token } = ctx;
-      const { id, timestamp, status, data } = args;
+      const { units, id, timestamp, status, data } = args;
+      console.log(
+        "logCompile()",
+        "units=" + units,
+      );
       const { uid } = await client.verifyToken(token);
-      const resp = await logCompile({ auth: { uid, token }, id, timestamp, status, data });
+      const resp = await logCompile({ auth: { uid, token }, units, id, timestamp, status, data });
       return resp;
     },
     createItem: async (_, args, ctx) => {

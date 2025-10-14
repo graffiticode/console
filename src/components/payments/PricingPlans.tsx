@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 
@@ -70,6 +70,42 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [highlightedPlan, setHighlightedPlan] = useState<string>('pro');
+  const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
+  const [currentUserPlan, setCurrentUserPlan] = useState<string>('free');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check user's subscription status and payment methods
+    fetchUserData();
+  }, [userId]);
+
+  const fetchUserData = async () => {
+    try {
+      // Check current subscription
+      const [subscriptionResponse, methodsResponse] = await Promise.all([
+        axios.get(`/api/payments/subscription?userId=${userId}`),
+        axios.get(`/api/payments/methods?userId=${userId}`)
+      ]);
+
+      // Set current plan
+      const subscription = subscriptionResponse.data;
+      if (subscription.plan) {
+        setCurrentUserPlan(subscription.plan === 'teams' ? 'teams' : subscription.plan);
+        // If user has a paid plan, highlight it
+        if (subscription.plan !== 'free') {
+          setHighlightedPlan(subscription.plan === 'teams' ? 'teams' : subscription.plan);
+        }
+      }
+
+      // Check payment methods
+      const methods = methodsResponse.data.paymentMethods || [];
+      setHasPaymentMethod(methods.length > 0 && methods.some(m => m.isDefault));
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubscribe = async (planId: string) => {
     if (planId === 'free') return;
@@ -78,6 +114,42 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
     setProcessing(true);
 
     try {
+      // If user has a saved payment method, try quick subscribe first
+      if (hasPaymentMethod) {
+        const confirmMessage = `Subscribe to ${planId === 'pro' ? 'Pro' : 'Max'} plan using your saved payment method?`;
+
+        if (confirm(confirmMessage)) {
+          try {
+            const quickResponse = await axios.post('/api/payments/quick-subscribe', {
+              userId,
+              planId,
+              interval: billingInterval
+            });
+
+            if (quickResponse.data.success) {
+              alert('Successfully subscribed!');
+              // Refresh the data to show the new plan
+              await fetchUserData();
+              setProcessing(false);
+              setSelectedPlan(null);
+              return;
+            } else if (quickResponse.data.requiresAction) {
+              // Handle 3D Secure or other authentication
+              alert('Your bank requires additional authentication. Redirecting to checkout...');
+              // Fall through to regular checkout
+            }
+          } catch (quickError: any) {
+            if (quickError.response?.data?.requiresCheckout) {
+              // Fall through to regular checkout
+              console.log('Quick subscribe not available, using checkout...');
+            } else {
+              throw quickError;
+            }
+          }
+        }
+      }
+
+      // Fall back to regular Stripe Checkout
       const response = await axios.post('/api/payments/create-checkout-session', {
         userId,
         planId,
@@ -89,12 +161,20 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
         window.location.href = response.data.checkoutUrl;
       }
     } catch (error) {
-      console.error('Error creating checkout session:', error);
+      console.error('Error creating subscription:', error);
       alert('Failed to start checkout process. Please try again.');
       setProcessing(false);
       setSelectedPlan(null);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -133,7 +213,7 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => {
           const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
-          const isCurrentPlan = plan.id === 'free'; // This should be dynamic based on user's actual plan
+          const isCurrentPlan = plan.id === currentUserPlan;
 
           return (
             <div
@@ -196,6 +276,8 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
                   ? 'Processing...'
                   : isCurrentPlan
                   ? 'Current Plan'
+                  : hasPaymentMethod
+                  ? `${plan.cta} (Quick)`
                   : plan.cta}
               </button>
             </div>

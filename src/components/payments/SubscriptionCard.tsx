@@ -85,8 +85,8 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
     return <div>Error loading subscription data</div>;
   }
 
-  const plan = planDetails[subscription.plan];
-  const currentPrice = subscription.interval && subscription.plan !== 'free'
+  const plan = planDetails[subscription.plan] || planDetails.free;
+  const currentPrice = subscription.interval && subscription.plan !== 'free' && plan.price && typeof plan.price === 'object'
     ? plan.price[subscription.interval]
     : 0;
 

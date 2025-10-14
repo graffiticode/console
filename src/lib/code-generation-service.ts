@@ -1099,23 +1099,29 @@ export async function generateCode({
         const lastUserMessage = promptData.messages[promptData.messages.length - 1];
         const userContent = lastUserMessage.content;
 
-        console.log(`[generateCode] Checking user content for pattern. Length: ${userContent.length} chars`);
-        console.log(`[generateCode] First 200 chars: "${userContent.substring(0, 200)}..."`);
-        console.log(`[generateCode] Last 200 chars: "...${userContent.substring(userContent.length - 200)}"`);
-
         // More robust detection of property updates
-        // Look for the word "properties" followed by a JSON object in code blocks
-        const propertiesPattern = /\bproperties\b.*```json\s*\n\s*\{[\s\S]*?\}\s*\n\s*```/i;
+        // Look for property-related keywords followed by a JSON object in code blocks
+        const propertiesPattern = /\b(propert(y|ies)(\s+(value|values|change|changes|update|updates))?)\b.*```json\s*[\n\s]*\{[\s\S]*?\}\s*[\n\s]*```/i;
         const hasPropertiesWithJson = propertiesPattern.test(userContent);
 
         // Also check for specific property update phrases
         const propertyUpdatePhrases = [
-          "use these properties",
-          "use these changed properties",
-          "apply these properties",
-          "update.*properties",
-          "property changes",
-          "property updates"
+          "using these property",
+          "use these property",
+          "use these changed property",
+          "apply these property",
+          "apply property",
+          "update.*property",
+          "update.*using.*property",
+          "property value",
+          "property change",
+          "property update",
+          "properties value",
+          "properties change",
+          "properties update",
+          "style.*property",
+          "css.*property",
+          "formatting.*property"
         ];
 
         const hasPropertyPhrase = propertyUpdatePhrases.some(phrase =>
@@ -1124,8 +1130,6 @@ export async function generateCode({
 
         // Check if this looks like a property update request
         let isPropertyUpdate = hasPropertiesWithJson || (hasPropertyPhrase && userContent.includes('```json'));
-
-        console.log(`[generateCode] Property update detection: hasPropertiesWithJson=${hasPropertiesWithJson}, hasPropertyPhrase=${hasPropertyPhrase}, isPropertyUpdate=${isPropertyUpdate}`);
 
         if (isPropertyUpdate) {
           // Additional check: is this within a conversation context or direct?
@@ -1141,36 +1145,28 @@ export async function generateCode({
                                                   );
 
             if (!propertyUpdateInCurrentRequest) {
-              console.log(`[generateCode] Property update not in current request, skipping Haiku optimization`);
               isPropertyUpdate = false;
             }
           }
 
           if (isPropertyUpdate) {
             // Check if current code is small enough for simple property updates
-            // Typical streaming block size is 4KB, so code under 2KB should easily fit
+            // Haiku can handle property updates for code up to 4KB efficiently
             const currentCodeSize = currentCode ? currentCode.length : 0;
-            console.log(`[generateCode] Property update detected. Current code size: ${currentCodeSize} bytes`);
 
-            if (currentCodeSize < 2000) {
-              // Use Haiku for property update prompts with small code (simple transformations)
+            if (currentCodeSize < 4000) {
+              // Use Haiku for property update prompts with code under 4KB
               modelToUse = CLAUDE_MODELS.HAIKU;
-              console.log(`[generateCode] Switching to Haiku model for property update, code size: ${currentCodeSize} bytes`);
-            } else {
-              console.log(`[generateCode] Code too large for Haiku (${currentCodeSize} >= 2000 bytes)`);
+              console.log(`[generateCode] ✅ Using Haiku model for property update (code size: ${currentCodeSize} bytes)`);
             }
           }
-        } else {
-          console.log(`[generateCode] Not detected as property update request`);
         }
       } catch (e) {
         console.warn(`Failed to parse formatted prompt for model selection: ${e.message}`);
       }
-    } else {
-      console.log(`[generateCode] Model already specified in options: ${options.model}`);
     }
 
-    console.log(`[generateCode] Using model: ${modelToUse}, formatted prompt length: ${formattedPrompt.length} chars${currentCode ? `, code size: ${currentCode.length} bytes` : ''}`);
+    console.log(`[generateCode] Using model: ${modelToUse}`);
 
     // Start generation stage
     safeRAGAnalytics.startStage(requestId, "generation");
@@ -1277,7 +1273,6 @@ export async function generateCode({
           if (fixAttempts === 0 && (fixModel === CLAUDE_MODELS.SONNET || fixModel === CLAUDE_MODELS.HAIKU)) {
             fixModel = CLAUDE_MODELS.OPUS;
             usedOpusForFix = true;
-            console.log(`[generateCode] Upgrading to Opus model for error fixing (initial model: ${options.model || CLAUDE_MODELS.DEFAULT})`);
             if (rid) {
               ragLog(rid, "fix.model.upgrade", {
                 originalModel: options.model || CLAUDE_MODELS.DEFAULT,
@@ -1336,6 +1331,164 @@ export async function generateCode({
 
     // Ensure the code is properly processed one final time before returning
     const finalProcessedCode = await processGeneratedCode(generatedCode, lang, rid);
+
+    // Track usage for token consumption
+    if (auth?.uid && finalUsage.total_tokens > 0) {
+      try {
+        const db = getFirestoreDb();
+
+        // Get user's subscription to determine pricing
+        const userDoc = await db.doc(`users/${auth.uid}`).get();
+        const userData = userDoc.data();
+        const subscription = userData?.subscription || {};
+        const plan = subscription.plan || 'free';
+
+        // Define token pricing per million tokens (in dollars) based on model actually used
+        const TOKEN_PRICING = {
+          [CLAUDE_MODELS.OPUS]: { input: 15, output: 75 },
+          [CLAUDE_MODELS.SONNET]: { input: 3, output: 15 },
+          [CLAUDE_MODELS.HAIKU]: { input: 0.25, output: 1.25 },
+          [CLAUDE_MODELS.DEFAULT]: { input: 3, output: 15 }, // Default to Sonnet pricing
+        };
+
+        // Calculate weighted cost if multiple models were used
+        let totalTokenCost = 0;
+        let effectiveModelName = modelToUse;
+
+        if (usedOpusForFix && fixAttempts > 0) {
+          // If Opus was used for fixes, calculate a weighted average cost
+          // Approximate: initial generation used original model, fixes used Opus
+          // Since we don't track tokens per attempt, we'll use a conservative estimate:
+          // - Initial generation: ~70% of tokens (with original model)
+          // - Fix attempts: ~30% of tokens (with Opus)
+          const initialRatio = 0.7;
+          const fixRatio = 0.3;
+
+          const initialModelPricing = TOKEN_PRICING[modelToUse] || TOKEN_PRICING[CLAUDE_MODELS.DEFAULT];
+          const opusPricing = TOKEN_PRICING[CLAUDE_MODELS.OPUS];
+
+          const initialInputCost = (finalUsage.prompt_tokens * initialRatio / 1000000) * initialModelPricing.input;
+          const initialOutputCost = (finalUsage.completion_tokens * initialRatio / 1000000) * initialModelPricing.output;
+
+          const fixInputCost = (finalUsage.prompt_tokens * fixRatio / 1000000) * opusPricing.input;
+          const fixOutputCost = (finalUsage.completion_tokens * fixRatio / 1000000) * opusPricing.output;
+
+          totalTokenCost = initialInputCost + initialOutputCost + fixInputCost + fixOutputCost;
+          effectiveModelName = `${modelToUse}+Opus(fix)`;
+
+        } else {
+          // Single model was used throughout
+          const modelPricing = TOKEN_PRICING[modelToUse] || TOKEN_PRICING[CLAUDE_MODELS.DEFAULT];
+          const inputCost = (finalUsage.prompt_tokens / 1000000) * modelPricing.input;
+          const outputCost = (finalUsage.completion_tokens / 1000000) * modelPricing.output;
+          totalTokenCost = inputCost + outputCost;
+
+          // Show cost savings when using Haiku
+          if (modelToUse === CLAUDE_MODELS.HAIKU) {
+            const sonnetPricing = TOKEN_PRICING[CLAUDE_MODELS.SONNET];
+            const sonnetCost = (finalUsage.prompt_tokens / 1000000) * sonnetPricing.input +
+                               (finalUsage.completion_tokens / 1000000) * sonnetPricing.output;
+            const savings = sonnetCost - totalTokenCost;
+            const savingsPercent = ((savings / sonnetCost) * 100).toFixed(0);
+            console.log(`[generateCode] 💰 Cost savings: ${savingsPercent}% less than Sonnet`);
+          }
+        }
+
+        // Define compile unit pricing (dollars per unit)
+        const UNIT_PRICING = {
+          free: 0, // Free tier doesn't charge but still tracks usage
+          pro: 0.001,  // $50/month for 50,000 units = $0.001 per unit
+          max: 0.0005, // $500/month for 1,000,000 units = $0.0005 per unit
+          teams: 0.0005, // Same as max
+        };
+
+        const unitPrice = UNIT_PRICING[plan] || UNIT_PRICING.pro; // Default to pro pricing if unknown
+
+        // Convert to compile units
+        // Formula: (price_per_token * token_count) / price_per_compile
+        let compileUnits = 0;
+        if (unitPrice > 0) {
+          // For paid plans, calculate units based on cost
+          compileUnits = Math.ceil(totalTokenCost / unitPrice);
+        } else {
+          // For free plan, use a simple token-to-unit conversion (1000 tokens = 1 unit)
+          compileUnits = Math.ceil(finalUsage.total_tokens / 1000);
+        }
+
+        // Ensure at least 1 unit is charged for any generation
+        compileUnits = Math.max(1, compileUnits);
+
+        const now = new Date();
+
+        // Add individual usage record for audit trail
+        await db.collection('usage').add({
+          userId: auth.uid,
+          taskId: requestId,
+          units: compileUnits,
+          createdAt: now,
+          timestamp: now.toISOString(),
+          lang: lang,
+          type: 'ai_generation',
+          model: effectiveModelName,
+          baseModel: modelToUse,
+          tokens: {
+            input: finalUsage.prompt_tokens,
+            output: finalUsage.completion_tokens,
+            total: finalUsage.total_tokens,
+          },
+          cost: {
+            total: totalTokenCost,
+            breakdown: usedOpusForFix ? 'mixed_model' : 'single_model',
+          },
+          plan: plan,
+          unitPrice: unitPrice,
+          fixAttempts: fixAttempts,
+          usedOpusForFix: usedOpusForFix
+        });
+
+        // Update monthly usage total
+        const usageDocRef = db.collection('usage').doc(auth.uid);
+        const usageDoc = await usageDocRef.get();
+
+        if (usageDoc.exists) {
+          const currentData = usageDoc.data();
+          // Check if we need to reset monthly usage (new month)
+          const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
+          const isNewMonth = !lastReset ||
+            lastReset.getMonth() !== now.getMonth() ||
+            lastReset.getFullYear() !== now.getFullYear();
+
+          if (isNewMonth) {
+            // Reset for new month
+            await usageDocRef.set({
+              currentMonthTotal: compileUnits,
+              lastReset: now.toISOString(),
+              lastUpdated: now.toISOString()
+            });
+          } else {
+            // Increment existing month total
+            await usageDocRef.update({
+              currentMonthTotal: (currentData.currentMonthTotal || 0) + compileUnits,
+              lastUpdated: now.toISOString()
+            });
+          }
+        } else {
+          // Create new usage document
+          await usageDocRef.set({
+            currentMonthTotal: compileUnits,
+            lastReset: now.toISOString(),
+            lastUpdated: now.toISOString()
+          });
+        }
+
+        console.log(
+          `[generateCode] Usage tracked: ${compileUnits} units, ${effectiveModelName}`
+        );
+      } catch (error) {
+        console.error("[generateCode] Failed to track usage:", error);
+        // Don't throw - we still want to return the result even if usage tracking fails
+      }
+    }
 
     // Complete analytics tracking
     await safeRAGAnalytics.completeRequest(requestId, true);

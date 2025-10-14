@@ -19,12 +19,66 @@ const taskDao = getTaskDaoForStore("firestore");
 
 const db = getFirestore();
 
-export async function logCompile({ auth, id, timestamp, status, data }) {
+export async function logCompile({ auth, units, id, timestamp, status, data }) {
   try {
     const [{ lang }] = await getApiTask({ id, auth });
     const path = `users/${auth.uid}/compiles/${id}`;
     data = JSON.parse(data);
     await db.doc(path).set({ id, timestamp, status, lang, data });
+
+    // Track usage units if provided
+    if (units && units > 0) {
+      const now = new Date();
+
+      // Add individual usage record for audit trail
+      await db.collection('usage').add({
+        userId: auth.uid,
+        taskId: id,
+        units: units,
+        createdAt: now,
+        timestamp: timestamp,
+        lang: lang,
+        type: 'compile',
+        status: status
+      });
+
+      // Update monthly usage total
+      const usageDocRef = db.collection('usage').doc(auth.uid);
+      const usageDoc = await usageDocRef.get();
+
+      if (usageDoc.exists) {
+        const currentData = usageDoc.data();
+        // Check if we need to reset monthly usage (new month)
+        const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
+        const isNewMonth = !lastReset ||
+          lastReset.getMonth() !== now.getMonth() ||
+          lastReset.getFullYear() !== now.getFullYear();
+
+        if (isNewMonth) {
+          // Reset for new month
+          await usageDocRef.set({
+            currentMonthTotal: units,
+            lastReset: now.toISOString(),
+            lastUpdated: now.toISOString()
+          });
+        } else {
+          // Increment existing month total
+          await usageDocRef.update({
+            currentMonthTotal: (currentData.currentMonthTotal || 0) + units,
+            lastUpdated: now.toISOString()
+          });
+        }
+      } else {
+        // Create new usage document
+        await usageDocRef.set({
+          currentMonthTotal: units,
+          lastReset: now.toISOString(),
+          lastUpdated: now.toISOString()
+        });
+      }
+
+    }
+
     return "ok";
   } catch (x) {
     console.log("logCompile()", "ERROR", x);
@@ -107,7 +161,6 @@ export async function getTasks({ auth, lang, mark }) {
             updated: String(item.updated),
           });
 
-          console.log(`Created item for task ${taskId}`);
         } catch (error) {
           console.error(`Failed to create item for task ${taskId}:`, error);
         }
@@ -126,7 +179,6 @@ export async function getTasks({ auth, lang, mark }) {
     );
 
     await Promise.all(updatePromises);
-    console.log(`Marked ${allTaskIds.docs.length} tasks with mark 5`);
 
     // Convert items to tasks format
     const tasks = await Promise.all(
