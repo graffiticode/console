@@ -33,8 +33,8 @@ const plans = [
     units: 50000,
     features: [
       '50,000 compile units/month',
-      'Additional compiles at $0.001 each',
       'Access to all languages',
+      'Additional compiles at $0.001 each',
       'Email support',
       'Private and public tasks',
       'Advanced IDE features',
@@ -52,8 +52,8 @@ const plans = [
     units: 1000000,
     features: [
       '1,000,000 compile units/month',
-      'Additional compiles at $0.0002 each',
       'Access to all languages',
+      'Additional compiles at $0.0002 each',
       'Priority support',
       'Private and public tasks',
       'Team collaboration features',
