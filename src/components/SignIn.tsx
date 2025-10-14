@@ -1,5 +1,6 @@
 import { useState, Fragment } from "react";
 import { Menu, Transition } from "@headlessui/react";
+import Link from "next/link";
 import {
   ChevronDownIcon,
   CreditCardIcon,
@@ -67,7 +68,7 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
               </div>
               <Menu.Item>
                 {({ active }) => (
-                  <a
+                  <Link
                     href="/profile"
                     className={`${
                       active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
@@ -78,12 +79,12 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
                       aria-hidden="true"
                     />
                     Profile
-                  </a>
+                  </Link>
                 )}
               </Menu.Item>
               <Menu.Item>
                 {({ active }) => (
-                  <a
+                  <Link
                     href="/payments"
                     className={`${
                       active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
@@ -94,12 +95,12 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
                       aria-hidden="true"
                     />
                     Payments & Billing
-                  </a>
+                  </Link>
                 )}
               </Menu.Item>
               <Menu.Item>
                 {({ active }) => (
-                  <a
+                  <Link
                     href="/settings"
                     className={`${
                       active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
@@ -110,7 +111,7 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
                       aria-hidden="true"
                     />
                     Settings
-                  </a>
+                  </Link>
                 )}
               </Menu.Item>
               <div className="border-t border-gray-200 my-1"></div>
