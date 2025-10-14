@@ -27,7 +27,7 @@ const plans = [
   {
     id: 'pro',
     name: 'Pro',
-    description: 'Great for serious developers',
+    description: 'Great for serious creators',
     monthlyPrice: 50,
     annualPrice: 500,
     units: 50000,
@@ -45,8 +45,8 @@ const plans = [
   },
   {
     id: 'teams',
-    name: 'Team',
-    description: 'For professional developers and teams',
+    name: 'Max',
+    description: 'For teams and high volume API calls',
     monthlyPrice: 500,
     annualPrice: 5000,
     units: 1000000,
@@ -56,11 +56,12 @@ const plans = [
       'Access to all languages',
       'Priority support',
       'Private and public tasks',
+      'Team collaboration features',
       'Advanced IDE features',
       'API access',
       'Automatic overage protection'
     ],
-    cta: 'Go Team'
+    cta: 'Go Max'
   }
 ];
 
@@ -156,7 +157,7 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
               </div>
 
               <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900">${price}</span>
+                <span className="text-4xl font-bold text-gray-900">${price.toLocaleString()}</span>
                 {plan.id !== 'free' && (
                   <span className="text-gray-500 ml-1">
                     /{billingInterval === 'monthly' ? 'mo' : 'yr'}
