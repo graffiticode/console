@@ -1,6 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '../../../utils/db';
 import admin from '../../../utils/db';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  apiVersion: '2022-08-01',
+});
 
 interface UsageData {
   compilations: number;
@@ -25,19 +30,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const db = getFirestore();
-
-    // Get current billing period (monthly)
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
+
+    // Get user's subscription to determine billing period
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+    const stripeCustomerId = userData?.stripeCustomerId;
+
+    let firstDayOfPeriod: Date;
+    let lastDayOfPeriod: Date;
+
+    // Try to get billing period from Stripe subscription
+    if (stripeCustomerId) {
+      try {
+        const subscriptions = await stripe.subscriptions.list({
+          customer: stripeCustomerId,
+          status: 'active',
+          limit: 1,
+        });
+
+        if (subscriptions.data.length > 0) {
+          const subscription = subscriptions.data[0];
+          // Use Stripe billing period
+          firstDayOfPeriod = new Date(subscription.current_period_start * 1000);
+          lastDayOfPeriod = new Date(subscription.current_period_end * 1000);
+        } else {
+          // No active subscription, use calendar month
+          const currentMonth = now.getMonth();
+          const currentYear = now.getFullYear();
+          firstDayOfPeriod = new Date(currentYear, currentMonth, 1);
+          lastDayOfPeriod = new Date(currentYear, currentMonth + 1, 0);
+        }
+      } catch (error) {
+        console.error('Error fetching Stripe subscription for billing period:', error);
+        // Fall back to calendar month on error
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        firstDayOfPeriod = new Date(currentYear, currentMonth, 1);
+        lastDayOfPeriod = new Date(currentYear, currentMonth + 1, 0);
+      }
+    } else {
+      // No Stripe customer, use calendar month (free tier)
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      firstDayOfPeriod = new Date(currentYear, currentMonth, 1);
+      lastDayOfPeriod = new Date(currentYear, currentMonth + 1, 0);
+    }
 
     // Query usage data for the current billing period
     const usageRef = db.collection('usage').doc(userId);
     const usageDoc = await usageRef.get();
 
     let totalUsage = 0;
+    let compileUsage = 0;
+    let codeGenerationUsage = 0;
     let dailyUsage: DailyUsage[] = [];
     let lastUpdate: string | null = null;
 
@@ -46,13 +92,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       totalUsage = data?.currentMonthTotal || 0;
       lastUpdate = data?.lastUpdate || null;
 
+      // Get usage breakdown by type from individual usage records
+      const usageRecordsSnapshot = await db
+        .collection('usage')
+        .where('userId', '==', userId)
+        .where('createdAt', '>=', firstDayOfPeriod)
+        .where('createdAt', '<=', lastDayOfPeriod)
+        .get();
+
+      compileUsage = 0;
+      codeGenerationUsage = 0;
+
+      usageRecordsSnapshot.docs.forEach(doc => {
+        const record = doc.data();
+        const units = record.units || 0;
+        if (record.type === 'compile') {
+          compileUsage += units;
+        } else if (record.type === 'ai_generation') {
+          codeGenerationUsage += units;
+        }
+      });
+
       // Get daily breakdown if available
       const dailyRef = await db
         .collection('usage')
         .doc(userId)
         .collection('daily')
-        .where('timestamp', '>=', firstDayOfMonth)
-        .where('timestamp', '<=', lastDayOfMonth)
+        .where('timestamp', '>=', firstDayOfPeriod)
+        .where('timestamp', '<=', lastDayOfPeriod)
         .orderBy('timestamp', 'asc')
         .get();
 
@@ -65,11 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Get subscription info to determine limits
-    const userDoc = await db.collection('users').doc(userId).get();
-    const userData = userDoc.data();
-
-    // Determine plan limits
+    // Determine plan limits from userData (already fetched at the beginning)
     let planUnits = 1000; // Default free tier
     let overageUnits = 0;
 
@@ -106,7 +169,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Calculate estimated end date based on current usage rate
     let estimatedEndDate = null;
     if (totalUsage > 0 && remainingUnits > 0) {
-      const daysElapsed = Math.ceil((now.getTime() - firstDayOfMonth.getTime()) / (1000 * 60 * 60 * 24));
+      const daysElapsed = Math.ceil((now.getTime() - firstDayOfPeriod.getTime()) / (1000 * 60 * 60 * 24));
       const averageDailyUsage = totalUsage / daysElapsed;
       if (averageDailyUsage > 0) {
         const daysRemaining = Math.ceil(remainingUnits / averageDailyUsage);
@@ -119,15 +182,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Return data in the format expected by UsageMonitor component
     return res.status(200).json({
       currentPeriodUnits: totalUsage,
+      compileUnits: compileUsage,
+      codeGenerationUnits: codeGenerationUsage,
       allocatedUnits: planUnits,
       overageUnits: overageUnits,
-      lastResetDate: firstDayOfMonth.toISOString(),
-      currentPeriodEnd: lastDayOfMonth.toISOString(),
+      lastResetDate: firstDayOfPeriod.toISOString(),
+      currentPeriodEnd: lastDayOfPeriod.toISOString(),
       // Additional data for potential future use
       extended: {
         currentPeriod: {
-          start: firstDayOfMonth.toISOString(),
-          end: lastDayOfMonth.toISOString(),
+          start: firstDayOfPeriod.toISOString(),
+          end: lastDayOfPeriod.toISOString(),
         },
         usage: {
           total: totalUsage,

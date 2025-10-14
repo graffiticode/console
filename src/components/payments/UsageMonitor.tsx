@@ -5,6 +5,8 @@ import axios from 'axios';
 
 interface UsageData {
   currentPeriodUnits: number;
+  compileUnits: number;
+  codeGenerationUnits: number;
   allocatedUnits: number;
   overageUnits: number;
   lastResetDate: string;
@@ -123,6 +125,8 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
   const totalUnits = usage.allocatedUnits + usage.overageUnits;
   const remainingUnits = totalUnits - usage.currentPeriodUnits;
   const usagePercentage = (usage.currentPeriodUnits / totalUnits) * 100;
+  const compilePercentage = (usage.compileUnits / totalUnits) * 100;
+  const codeGenPercentage = (usage.codeGenerationUnits / totalUnits) * 100;
   const isNearLimit = usagePercentage > 80;
   const isAtLimit = remainingUnits <= 0;
 
@@ -145,21 +149,37 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
           <div className="mt-2">
             <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>{usage.currentPeriodUnits.toLocaleString()} used</span>
-              <span>{totalUnits.toLocaleString()} total</span>
+              <span>{usage.currentPeriodUnits.toLocaleString()} ({usagePercentage.toFixed(1)}%) compile units used</span>
+              <span className="font-medium">{remainingUnits.toLocaleString()} remaining</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-8">
+            <div className="w-full bg-gray-200 h-8 relative">
+              {/* Compiles bar (bottom layer) */}
               <div
-                className={`h-8 rounded-full flex items-center justify-center text-xs font-medium text-white transition-all duration-300 ${
-                  isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-green-500'
+                className="h-8 bg-blue-500 absolute left-0 top-0 transition-all duration-300"
+                style={{ width: `${Math.min(compilePercentage, 100)}%` }}
+                title={`Compiles: ${usage.compileUnits.toLocaleString()} units`}
+              />
+              {/* Code generation bar (stacked on top) */}
+              <div
+                className={`h-8 absolute top-0 transition-all duration-300 ${
+                  isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-purple-500'
                 }`}
-                style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-              >
-                {usagePercentage.toFixed(0)}%
-              </div>
+                style={{
+                  left: `${Math.min(compilePercentage, 100)}%`,
+                  width: `${Math.min(codeGenPercentage, 100 - compilePercentage)}%`
+                }}
+                title={`Code Generation: ${usage.codeGenerationUnits.toLocaleString()} units`}
+              />
             </div>
-            <div className="mt-2 text-sm text-gray-600">
-              <span className="font-medium">{remainingUnits.toLocaleString()}</span> compile units remaining
+            <div className="mt-2 flex items-center gap-4 text-xs text-gray-600">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-blue-500"></div>
+                <span>Compiles: {usage.compileUnits.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className={`w-3 h-3 ${isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-purple-500'}`}></div>
+                <span>Code Gen: {usage.codeGenerationUnits.toLocaleString()}</span>
+              </div>
             </div>
           </div>
 
@@ -255,7 +275,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                         <option key={blocks} value={blocks}>
                           {blocks} {blocks === 1 ? 'block' : 'blocks'}
                         </option>
-                      )) || [1, 5, 10, 20].map(blocks => (
+                      )) || [1, 3, 5].map(blocks => (
                         <option key={blocks} value={blocks}>
                           {blocks} {blocks === 1 ? 'block' : 'blocks'}
                         </option>

@@ -52,7 +52,7 @@ const plans = [
     units: 1000000,
     features: [
       '1,000,000 compile units/month',
-      'Additional compiles at $0.0002 each',
+      'Additional compiles at $0.0005 each',
       'Access to all languages',
       'Priority support',
       'Private and public tasks',

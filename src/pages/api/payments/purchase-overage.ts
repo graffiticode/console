@@ -10,21 +10,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 const OVERAGE_PRICING = {
   pro: {
     pricePerUnit: 0.001,    // $0.001 per unit = $1 per 1000 units
-    blockSize: 1000,         // Purchase in blocks of 1000
-    minBlocks: 1,            // Minimum 1 block (1000 units)
-    description: '$1 per 1,000 units'
+    blockSize: 10000,        // Purchase in blocks of 10,000
+    minBlocks: 1,            // Minimum 1 block (10,000 units)
+    description: '$10 per 10,000 units'
   },
   max: {
     pricePerUnit: 0.0005,    // $0.0005 per unit = $0.50 per 1000 units
-    blockSize: 1000,         // Purchase in blocks of 1000
-    minBlocks: 1,            // Minimum 1 block (1000 units)
-    description: '$0.50 per 1,000 units'
+    blockSize: 20000,        // Purchase in blocks of 20,000
+    minBlocks: 1,            // Minimum 1 block (20,000 units)
+    description: '$10 per 20,000 units'
   },
   teams: {
     pricePerUnit: 0.0005,    // $0.0005 per unit = $0.50 per 1000 units
-    blockSize: 1000,         // Purchase in blocks of 1000
-    minBlocks: 1,            // Minimum 1 block (1000 units)
-    description: '$0.50 per 1,000 units'
+    blockSize: 10000,        // Purchase in blocks of 10,000
+    minBlocks: 1,            // Minimum 1 block (10,000 units)
+    description: '$5 per 10,000 units'
   },
 };
 
@@ -79,7 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         pricePerUnit: pricing.pricePerUnit,
         minBlocks: pricing.minBlocks,
         description: pricing.description,
-        suggestedBlocks: [1, 5, 10, 20], // Suggested purchase amounts
+        suggestedBlocks: [1, 3, 5], // Suggested purchase amounts
       });
     } catch (error) {
       console.error('Error fetching overage pricing:', error);
