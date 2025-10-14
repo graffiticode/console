@@ -56,10 +56,10 @@ const plans = [
       'Access to all languages',
       'Priority support',
       'Private and public tasks',
-      'Team collaboration features',
       'Advanced IDE features',
       'API access',
-      'Automatic overage protection'
+      'Automatic overage protection',
+      'Team collaboration features'
     ],
     cta: 'Go Max'
   }
