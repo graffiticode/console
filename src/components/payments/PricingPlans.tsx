@@ -72,6 +72,7 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
   const [highlightedPlan, setHighlightedPlan] = useState<string>('pro');
   const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
   const [currentUserPlan, setCurrentUserPlan] = useState<string>('free');
+  const [currentBillingInterval, setCurrentBillingInterval] = useState<'monthly' | 'annual'>('monthly');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -95,6 +96,12 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
         if (subscription.plan !== 'free') {
           setHighlightedPlan(subscription.plan === 'teams' ? 'teams' : subscription.plan);
         }
+      }
+
+      // Set current billing interval
+      if (subscription.interval) {
+        setCurrentBillingInterval(subscription.interval);
+        setBillingInterval(subscription.interval);
       }
 
       // Check payment methods
@@ -214,6 +221,8 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
         {plans.map((plan) => {
           const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
           const isCurrentPlan = plan.id === currentUserPlan;
+          const isSameBillingInterval = billingInterval === currentBillingInterval;
+          const isChangingBilling = isCurrentPlan && !isSameBillingInterval;
 
           return (
             <div
@@ -226,7 +235,13 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
               {plan.id === highlightedPlan && (
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                   <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                    {isCurrentPlan ? 'Current Plan' : plan.id === 'free' ? 'Downgrade Now' : 'Upgrade Now'}
+                    {isChangingBilling
+                      ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
+                      : isCurrentPlan
+                      ? 'Current Plan'
+                      : plan.id === 'free'
+                      ? 'Downgrade Now'
+                      : 'Upgrade Now'}
                   </span>
                 </div>
               )}
@@ -263,18 +278,20 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
 
               <button
                 onClick={() => handleSubscribe(plan.id)}
-                disabled={plan.disabled || processing || isCurrentPlan}
+                disabled={plan.disabled || processing || (isCurrentPlan && isSameBillingInterval)}
                 className={`w-full py-2 px-4 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                   plan.id === highlightedPlan
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500'
                     : 'bg-gray-50 text-gray-900 hover:bg-gray-100 focus:ring-gray-500'
                 } ${
-                  (plan.disabled || processing || isCurrentPlan) ? 'opacity-50 cursor-not-allowed' : ''
+                  (plan.disabled || processing || (isCurrentPlan && isSameBillingInterval)) ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 {processing && selectedPlan === plan.id
                   ? 'Processing...'
-                  : isCurrentPlan
+                  : isChangingBilling
+                  ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
+                  : isCurrentPlan && isSameBillingInterval
                   ? 'Current Plan'
                   : hasPaymentMethod
                   ? `${plan.cta} (Quick)`
