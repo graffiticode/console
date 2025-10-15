@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { getTitle } from '../lib/utils';
+import SignIn from '../components/SignIn';
 import SubscriptionCard from '../components/payments/SubscriptionCard';
 import UsageMonitor from '../components/payments/UsageMonitor';
 import PricingPlans from '../components/payments/PricingPlans';
@@ -40,11 +41,10 @@ export default function Payments() {
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-gray-900">Sign in required</h2>
-          <p className="mt-2 text-gray-600">Please sign in to manage your subscription and billing.</p>
-        </div>
+      <div className="flex items-center justify-center h-[calc(100vh-100px)]">
+        <SignIn
+          label="Sign in to continue"
+        />
       </div>
     );
   }

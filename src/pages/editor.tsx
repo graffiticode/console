@@ -130,7 +130,7 @@ export default function Editor({ language, setLanguage, mark }) {
         </Head>
         <div className="min-h-screen flex items-center justify-center">
           <div className="max-w-md w-full">
-            <h2 className="text-center text-2xl font-bold mb-4">Sign in to Continue</h2>
+            <h2 className="text-center text-2xl font-bold mb-4">Sign in to continue</h2>
             <p className="text-center text-gray-600 mb-8">
               Graffiticode account required to create or edit questions
             </p>
