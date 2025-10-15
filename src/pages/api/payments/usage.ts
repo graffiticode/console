@@ -97,43 +97,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       lastUpdate = data?.lastUpdate || null;
 
       // Get usage breakdown by type from individual usage records
-      const usageRecordsSnapshot = await db
-        .collection('usage')
-        .where('userId', '==', userId)
-        .where('createdAt', '>=', firstDayOfPeriod)
-        .where('createdAt', '<=', lastDayOfPeriod)
-        .get();
+      try {
+        const usageRecordsSnapshot = await db
+          .collection('usage')
+          .where('userId', '==', userId)
+          .where('createdAt', '>=', firstDayOfPeriod)
+          .where('createdAt', '<=', lastDayOfPeriod)
+          .get();
 
-      compileUsage = 0;
-      codeGenerationUsage = 0;
+        compileUsage = 0;
+        codeGenerationUsage = 0;
 
-      usageRecordsSnapshot.docs.forEach(doc => {
-        const record = doc.data();
-        const units = record.units || 0;
-        if (record.type === 'compile') {
-          compileUsage += units;
-        } else if (record.type === 'ai_generation') {
-          codeGenerationUsage += units;
-        }
-      });
+        usageRecordsSnapshot.docs.forEach(doc => {
+          const record = doc.data();
+          const units = record.units || 0;
+          if (record.type === 'compile') {
+            compileUsage += units;
+          } else if (record.type === 'ai_generation') {
+            codeGenerationUsage += units;
+          }
+        });
+      } catch (breakdownError) {
+        console.error('Error fetching usage breakdown (may need Firestore index):', breakdownError);
+        // Fall back to using total usage without breakdown
+        compileUsage = 0;
+        codeGenerationUsage = 0;
+      }
 
       // Get daily breakdown if available
-      const dailyRef = await db
-        .collection('usage')
-        .doc(userId)
-        .collection('daily')
-        .where('timestamp', '>=', firstDayOfPeriod)
-        .where('timestamp', '<=', lastDayOfPeriod)
-        .orderBy('timestamp', 'asc')
-        .get();
+      try {
+        const dailyRef = await db
+          .collection('usage')
+          .doc(userId)
+          .collection('daily')
+          .where('timestamp', '>=', firstDayOfPeriod)
+          .where('timestamp', '<=', lastDayOfPeriod)
+          .orderBy('timestamp', 'asc')
+          .get();
 
-      dailyUsage = dailyRef.docs.map(doc => {
-        const data = doc.data();
-        return {
-          date: data.timestamp.toDate().toISOString().split('T')[0],
-          count: data.count || 0,
-        };
-      });
+        dailyUsage = dailyRef.docs.map(doc => {
+          const data = doc.data();
+          return {
+            date: data.timestamp.toDate().toISOString().split('T')[0],
+            count: data.count || 0,
+          };
+        });
+      } catch (dailyError) {
+        console.error('Error fetching daily usage breakdown:', dailyError);
+        // Continue without daily breakdown
+        dailyUsage = [];
+      }
     }
 
     // Determine plan limits from userData (already fetched at the beginning)
