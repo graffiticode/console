@@ -30,7 +30,7 @@ export default function App({
   Component,
   pageProps: { session, ...pageProps },
 }) {
-  const [language, setLanguage] = useLocalStorage("graffiticode:language", {id: 1, name: "L0001"});
+  const [language, setLanguage] = useLocalStorage("graffiticode:language", {id: 2, name: "L0002"});
   const [mark, setMark] = useLocalStorage("graffiticode:items:mark", marks[0]);
   const router = useRouter();
   const pathName = router.pathname.slice(1);
