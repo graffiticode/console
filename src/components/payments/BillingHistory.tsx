@@ -6,10 +6,10 @@ interface Invoice {
   id: string;
   date: string;
   amount: number;
-  status: 'paid' | 'pending' | 'failed';
+  status: 'paid' | 'pending' | 'failed' | 'completed';
   description: string;
-  invoiceUrl?: string;
-  type: 'subscription' | 'overage';
+  invoicePdf?: string;
+  type: 'subscription' | 'overage' | 'one-time';
 }
 
 interface BillingHistoryProps {
@@ -32,60 +32,20 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
       setInvoices(response.data.invoices || []);
     } catch (error) {
       console.error('Error fetching invoices:', error);
-      // Mock data for development
-      setInvoices([
-        {
-          id: 'inv_1',
-          date: '2024-01-01',
-          amount: 50,
-          status: 'paid',
-          description: 'Pro Plan - Monthly',
-          invoiceUrl: '#',
-          type: 'subscription'
-        },
-        {
-          id: 'inv_2',
-          date: '2024-01-15',
-          amount: 150,
-          status: 'paid',
-          description: 'Overage - 10,000 compile units',
-          invoiceUrl: '#',
-          type: 'overage'
-        },
-        {
-          id: 'inv_3',
-          date: '2024-02-01',
-          amount: 50,
-          status: 'paid',
-          description: 'Pro Plan - Monthly',
-          invoiceUrl: '#',
-          type: 'subscription'
-        }
-      ]);
+      // Set empty array on error - no mock data
+      setInvoices([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDownloadInvoice = async (invoiceId: string, invoiceUrl?: string) => {
-    if (invoiceUrl) {
-      window.open(invoiceUrl, '_blank');
+  const handleDownloadInvoice = async (invoiceId: string, invoicePdf?: string) => {
+    if (invoicePdf) {
+      // Open Stripe invoice PDF in new tab
+      window.open(invoicePdf, '_blank');
     } else {
-      try {
-        const response = await axios.get(`/api/payments/invoice-pdf?invoiceId=${invoiceId}`, {
-          responseType: 'blob'
-        });
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `invoice-${invoiceId}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      } catch (error) {
-        console.error('Error downloading invoice:', error);
-        alert('Failed to download invoice.');
-      }
+      // No invoice PDF available
+      alert('Invoice PDF is not available for this transaction.');
     }
   };
 
@@ -192,8 +152,14 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
-                      onClick={() => handleDownloadInvoice(invoice.id, invoice.invoiceUrl)}
-                      className="text-indigo-600 hover:text-indigo-900 inline-flex items-center"
+                      onClick={() => handleDownloadInvoice(invoice.id, invoice.invoicePdf)}
+                      className={`inline-flex items-center ${
+                        invoice.invoicePdf
+                          ? 'text-indigo-600 hover:text-indigo-900'
+                          : 'text-gray-400 cursor-not-allowed'
+                      }`}
+                      disabled={!invoice.invoicePdf}
+                      title={invoice.invoicePdf ? 'Download invoice' : 'Invoice not available'}
                     >
                       <DocumentArrowDownIcon className="w-4 h-4 mr-1" />
                       Download
