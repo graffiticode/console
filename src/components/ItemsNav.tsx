@@ -2,18 +2,23 @@ import { Menu, Transition } from '@headlessui/react'
 import { Fragment, useEffect, useState, useRef } from 'react';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { PlusIcon, ShareIcon, UserIcon } from '@heroicons/react/20/solid';
+import { DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import MarkSelector, { marks } from './mark-selector';
 import PublicToggle from './public-toggle';
 import ShareItemDialog from './ShareItemDialog';
+import { createItem } from '../utils/swr/fetchers';
+import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], onChange, onRefresh }) {
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, onChange, onRefresh }) {
+  const { user } = useGraffiticodeAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const nameInputRef = useRef(null);
@@ -75,6 +80,37 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], o
   useEffect(() => {
     setNameValue(name);
   }, [name]);
+
+  // Handle copying the item
+  const handleCopyItem = async (e) => {
+    e.stopPropagation();
+    if (!user || isCopying) return;
+
+    setIsCopying(true);
+    try {
+      const newItem = await createItem({
+        user,
+        lang,
+        name: `Copy of ${name}`,
+        taskId,
+        mark,
+        help,
+        code,
+        isPublic: false // Don't copy public status
+      });
+
+      if (newItem && newItem.id) {
+        // Close the menu
+        setIsOpen(false);
+        // Refresh the items list
+        onRefresh();
+      }
+    } catch (error) {
+      console.error('Failed to copy item:', error);
+    } finally {
+      setIsCopying(false);
+    }
+  };
 
   // Reposition on window resize and focus on name input when opened
   useEffect(() => {
@@ -190,6 +226,14 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], o
 
               <div className="mt-4 border-t pt-4">
                 <button
+                  onClick={handleCopyItem}
+                  disabled={isCopying}
+                  className="flex items-center w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
+                  <span>{isCopying ? 'Copying...' : 'Make a copy'}</span>
+                </button>
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowShareDialog(true);
@@ -268,6 +312,9 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                       mark={item.mark}
                       isPublic={item.isPublic}
                       sharedWith={item.sharedWith}
+                      lang={item.lang}
+                      help={item.help}
+                      code={item.code}
                       onChange={onUpdateItem}
                       onRefresh={onRefresh}
                     /> || <div />
