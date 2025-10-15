@@ -3,9 +3,13 @@ import { getFirestore } from '../../../utils/db';
 import admin from '../../../utils/db';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2022-08-01',
-});
+// Initialize Stripe only if secret key is available
+let stripe: Stripe | null = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2022-08-01',
+  });
+}
 
 interface UsageData {
   compilations: number;
@@ -41,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let lastDayOfPeriod: Date;
 
     // Try to get billing period from Stripe subscription
-    if (stripeCustomerId) {
+    if (stripeCustomerId && stripe) {
       try {
         const subscriptions = await stripe.subscriptions.list({
           customer: stripeCustomerId,
@@ -70,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         lastDayOfPeriod = new Date(currentYear, currentMonth + 1, 0);
       }
     } else {
-      // No Stripe customer, use calendar month (free tier)
+      // No Stripe customer or Stripe not configured, use calendar month
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
       firstDayOfPeriod = new Date(currentYear, currentMonth, 1);
