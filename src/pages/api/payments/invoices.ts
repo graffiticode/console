@@ -2,9 +2,13 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2022-08-01',
-});
+// Initialize Stripe only if secret key is available
+let stripe: Stripe | null = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2022-08-01',
+  });
+}
 
 interface Invoice {
   id: string;
@@ -46,8 +50,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const invoices: Invoice[] = [];
 
-    // If user has a Stripe customer, fetch invoices from Stripe
-    if (stripeCustomerId) {
+    // If user has a Stripe customer and Stripe is configured, fetch invoices from Stripe
+    if (stripeCustomerId && stripe) {
       // Fetch subscription invoices from Stripe
       const stripeInvoices = await stripe.invoices.list({
         customer: stripeCustomerId,
@@ -111,26 +115,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Also fetch any manual credits or adjustments from Firestore
-    const creditsQuery = await db
-      .collection('billing_events')
-      .where('userId', '==', userId)
-      .orderBy('timestamp', 'desc')
-      .limit(Number(limit))
-      .get();
+    try {
+      const creditsQuery = await db
+        .collection('billing_events')
+        .where('userId', '==', userId)
+        .orderBy('timestamp', 'desc')
+        .limit(Number(limit))
+        .get();
 
-    creditsQuery.docs.forEach(doc => {
-      const data = doc.data();
-      if (data.type === 'credit' || data.type === 'adjustment') {
-        invoices.push({
-          id: doc.id,
-          date: data.timestamp.toDate().toISOString(),
-          amount: data.amount,
-          status: 'completed',
-          description: data.description || 'Account credit',
-          type: 'one-time',
-        });
-      }
-    });
+      creditsQuery.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.type === 'credit' || data.type === 'adjustment') {
+          invoices.push({
+            id: doc.id,
+            date: data.timestamp.toDate().toISOString(),
+            amount: data.amount,
+            status: 'completed',
+            description: data.description || 'Account credit',
+            type: 'one-time',
+          });
+        }
+      });
+    } catch (creditsError) {
+      console.error('Error fetching billing events (may need Firestore index):', creditsError);
+      // Continue without manual credits
+    }
 
     // Sort all invoices by date (most recent first)
     invoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
