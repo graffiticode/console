@@ -67,7 +67,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Get the default payment method
         const customer = await stripe.customers.retrieve(stripeCustomerId) as Stripe.Customer;
-        const defaultPaymentMethodId = customer.invoice_settings?.default_payment_method;
+        let defaultPaymentMethodId = customer.invoice_settings?.default_payment_method;
+
+        // If there's only one payment method and no default is set, set it as default
+        if (paymentMethods.data.length === 1 && !defaultPaymentMethodId) {
+          await stripe.customers.update(stripeCustomerId, {
+            invoice_settings: {
+              default_payment_method: paymentMethods.data[0].id,
+            },
+          });
+          defaultPaymentMethodId = paymentMethods.data[0].id;
+          console.log('Auto-set single payment method as default:', defaultPaymentMethodId);
+        }
 
         const formattedMethods: PaymentMethod[] = paymentMethods.data.map(pm => ({
           id: pm.id,
@@ -146,8 +157,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
-        // Set as default if requested
-        if (setAsDefault) {
+        // Check if this is the first payment method
+        const existingPaymentMethods = await stripe.paymentMethods.list({
+          customer: stripeCustomerId,
+          type: 'card',
+        });
+
+        // Set as default if requested OR if this is the only payment method
+        const shouldSetAsDefault = setAsDefault || existingPaymentMethods.data.length === 1;
+
+        if (shouldSetAsDefault) {
           await stripe.customers.update(stripeCustomerId, {
             invoice_settings: {
               default_payment_method: paymentMethodId,
@@ -187,7 +206,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             last4: paymentMethod.card?.last4 || '****',
             expMonth: paymentMethod.card?.exp_month || 0,
             expYear: paymentMethod.card?.exp_year || 0,
-            isDefault: setAsDefault || paymentMethod.id === defaultPaymentMethodId,
+            isDefault: shouldSetAsDefault || paymentMethod.id === defaultPaymentMethodId,
             created: new Date(paymentMethod.created * 1000).toISOString(),
           },
         });

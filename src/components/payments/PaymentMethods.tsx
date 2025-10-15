@@ -123,9 +123,11 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
 
   useEffect(() => {
     fetchPaymentMethods();
+    fetchSubscriptionStatus();
   }, [userId]);
 
   const fetchPaymentMethods = async () => {
@@ -144,6 +146,22 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
     }
   };
 
+  const fetchSubscriptionStatus = async () => {
+    try {
+      const response = await axios.get(`/api/payments/subscription?userId=${userId}`);
+      const subscription = response.data;
+      // Check if user has an active paid subscription
+      setHasActiveSubscription(
+        subscription.status === 'active' &&
+        subscription.plan !== 'free' &&
+        subscription.plan !== 'none'
+      );
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+      setHasActiveSubscription(false);
+    }
+  };
+
   const handleAddPaymentMethod = () => {
     setShowAddForm(true);
   };
@@ -156,9 +174,10 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
     try {
       await axios.delete(`/api/payments/methods/${methodId}`, { data: { userId } });
       await fetchPaymentMethods();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error removing payment method:', error);
-      alert('Failed to remove payment method.');
+      const errorMessage = error.response?.data?.error || 'Failed to remove payment method.';
+      alert(errorMessage);
     }
   };
 
@@ -233,50 +252,67 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          {paymentMethods.map((method) => (
-            <div
-              key={method.id}
-              className={`bg-white shadow rounded-lg p-6 ${
-                method.isDefault ? 'ring-2 ring-indigo-500' : ''
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <CreditCardIcon className="h-8 w-8 text-gray-400 mr-4" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {method.brand} ending in {method.last4}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Expires {method.expMonth}/{method.expYear}
-                    </p>
-                    {method.isDefault && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
-                        Default
-                      </span>
+          {paymentMethods.map((method) => {
+            const isLastMethod = paymentMethods.length === 1;
+            const cannotRemove = isLastMethod && hasActiveSubscription;
+
+            return (
+              <div
+                key={method.id}
+                className={`bg-white shadow rounded-lg p-6 ${
+                  method.isDefault ? 'ring-2 ring-indigo-500' : ''
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <CreditCardIcon className="h-8 w-8 text-gray-400 mr-4" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {method.brand} ending in {method.last4}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Expires {method.expMonth}/{method.expYear}
+                      </p>
+                      {method.isDefault && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    {!method.isDefault && (
+                      <button
+                        onClick={() => handleSetDefault(method.id)}
+                        className="text-sm text-indigo-600 hover:text-indigo-500"
+                      >
+                        Set as default
+                      </button>
                     )}
+                    <div className="relative group">
+                      <button
+                        onClick={() => handleRemovePaymentMethod(method.id)}
+                        disabled={cannotRemove}
+                        className={`text-sm inline-flex items-center ${
+                          cannotRemove
+                            ? 'text-gray-400 cursor-not-allowed'
+                            : 'text-red-600 hover:text-red-500'
+                        }`}
+                      >
+                        <TrashIcon className="h-4 w-4 mr-1" />
+                        Remove
+                      </button>
+                      {cannotRemove && (
+                        <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          Cannot remove the only payment method with an active subscription. Add another payment method first.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  {!method.isDefault && (
-                    <button
-                      onClick={() => handleSetDefault(method.id)}
-                      className="text-sm text-indigo-600 hover:text-indigo-500"
-                    >
-                      Set as default
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleRemovePaymentMethod(method.id)}
-                    className="text-sm text-red-600 hover:text-red-500 inline-flex items-center"
-                  >
-                    <TrashIcon className="h-4 w-4 mr-1" />
-                    Remove
-                  </button>
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

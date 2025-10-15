@@ -11,6 +11,14 @@ if (process.env.STRIPE_SECRET_KEY) {
   });
 }
 
+// Map Stripe product/price IDs to our plan names
+const PLAN_MAPPING: Record<string, 'free' | 'pro' | 'teams'> = {
+  [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: 'pro',
+  [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: 'pro',
+  [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: 'teams',
+  [process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID || '']: 'teams',
+};
+
 interface UsageData {
   compilations: number;
   timestamp: string;
@@ -43,8 +51,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let firstDayOfPeriod: Date;
     let lastDayOfPeriod: Date;
+    let billingInterval: 'monthly' | 'annual' | null = null;
+    let currentPlan: 'free' | 'pro' | 'teams' = 'free';
 
-    // Try to get billing period from Stripe subscription
+    // Try to get billing period and plan from Stripe subscription
     if (stripeCustomerId && stripe) {
       try {
         const subscriptions = await stripe.subscriptions.list({
@@ -58,6 +68,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Use Stripe billing period
           firstDayOfPeriod = new Date(subscription.current_period_start * 1000);
           lastDayOfPeriod = new Date(subscription.current_period_end * 1000);
+
+          // Get billing interval and plan
+          const priceId = subscription.items.data[0]?.price.id;
+          const priceInterval = subscription.items.data[0]?.price.recurring?.interval;
+          billingInterval = priceInterval === 'year' ? 'annual' : priceInterval === 'month' ? 'monthly' : null;
+          currentPlan = PLAN_MAPPING[priceId] || 'free';
         } else {
           // No active subscription, use calendar month
           const currentMonth = now.getMonth();
@@ -149,17 +165,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Determine plan limits from userData (already fetched at the beginning)
-    let planUnits = 1000; // Default free tier
-    let overageUnits = 0;
+    // Determine plan limits from Stripe subscription
+    // Base units are monthly - multiply by 12 for annual plans
+    const baseUnitAllocation = {
+      free: 1000,
+      pro: 50000,
+      teams: 1000000,
+    };
 
-    if (userData?.subscription?.plan === 'pro') {
-      planUnits = 50000;
-    } else if (userData?.subscription?.plan === 'teams') {
-      planUnits = 1000000;
+    let planUnits = baseUnitAllocation[currentPlan];
+
+    // Multiply by 12 for annual billing cycles
+    if (billingInterval === 'annual') {
+      planUnits = planUnits * 12;
     }
 
-    overageUnits = userData?.subscription?.overageUnits || 0;
+    const overageUnits = userData?.subscription?.overageUnits || 0;
 
     const totalUnits = planUnits + overageUnits;
     const remainingUnits = Math.max(0, totalUnits - totalUsage);

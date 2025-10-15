@@ -13,7 +13,7 @@ const plans = [
     description: 'Perfect for trying out Graffiticode',
     monthlyPrice: 0,
     annualPrice: 0,
-    units: 1000,
+    monthlyUnits: 1000,
     features: [
       '1,000 compile units/month',
       'Limited language access',
@@ -30,7 +30,7 @@ const plans = [
     description: 'Great for serious creators',
     monthlyPrice: 50,
     annualPrice: 500,
-    units: 50000,
+    monthlyUnits: 50000,
     features: [
       '50,000 compile units/month',
       'Additional compiles at $0.001 each',
@@ -49,7 +49,7 @@ const plans = [
     description: 'For teams and high volume API calls',
     monthlyPrice: 500,
     annualPrice: 5000,
-    units: 1000000,
+    monthlyUnits: 1000000,
     features: [
       '1,000,000 compile units/month',
       'Additional compiles at $0.0005 each',
@@ -73,6 +73,7 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
   const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
   const [currentUserPlan, setCurrentUserPlan] = useState<string>('free');
   const [currentBillingInterval, setCurrentBillingInterval] = useState<'monthly' | 'annual'>('monthly');
+  const [renewalDate, setRenewalDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -99,14 +100,22 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
       }
 
       // Set current billing interval
-      if (subscription.interval) {
-        setCurrentBillingInterval(subscription.interval);
-        setBillingInterval(subscription.interval);
+      // If there's a scheduled interval change, that becomes the "current" selection
+      const effectiveInterval = subscription.scheduledInterval || subscription.interval;
+
+      if (effectiveInterval) {
+        setCurrentBillingInterval(effectiveInterval);
+        setBillingInterval(effectiveInterval);
       }
 
-      // Check payment methods
+      // Set renewal date
+      if (subscription.currentBillingPeriod?.end) {
+        setRenewalDate(subscription.currentBillingPeriod.end);
+      }
+
+      // Check payment methods - any payment method is sufficient for interval changes
       const methods = methodsResponse.data.paymentMethods || [];
-      setHasPaymentMethod(methods.length > 0 && methods.some(m => m.isDefault));
+      setHasPaymentMethod(methods.length > 0);
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
@@ -120,43 +129,61 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
     setSelectedPlan(planId);
     setProcessing(true);
 
+    // Check if this is an interval change on current plan
+    const isChangingInterval = planId === currentUserPlan && billingInterval !== currentBillingInterval;
+
+    // Check if this is an upgrade (Pro -> Max or Monthly -> Annual)
+    const isUpgrade =
+      (currentUserPlan === 'pro' && planId === 'teams') ||
+      (currentBillingInterval === 'monthly' && billingInterval === 'annual');
+
     try {
-      // If user has a saved payment method, try quick subscribe first
-      if (hasPaymentMethod) {
-        const confirmMessage = `Subscribe to ${planId === 'pro' ? 'Pro' : 'Max'} plan using your saved payment method?`;
+      // For plan/interval changes, always try quick subscribe first
+      if (isChangingInterval || currentUserPlan !== 'free') {
+        console.log('Attempting quick subscribe:', { isChangingInterval, isUpgrade, planId, interval: billingInterval });
 
-        if (confirm(confirmMessage)) {
-          try {
-            const quickResponse = await axios.post('/api/payments/quick-subscribe', {
-              userId,
-              planId,
-              interval: billingInterval
-            });
+        // Show confirmation for upgrades only
+        if (isUpgrade) {
+          const upgradeType = currentUserPlan === 'pro' && planId === 'teams'
+            ? 'Max plan'
+            : 'annual billing';
 
-            if (quickResponse.data.success) {
-              alert('Successfully subscribed!');
-              // Refresh the data to show the new plan
-              await fetchUserData();
-              setProcessing(false);
-              setSelectedPlan(null);
-              return;
-            } else if (quickResponse.data.requiresAction) {
-              // Handle 3D Secure or other authentication
-              alert('Your bank requires additional authentication. Redirecting to checkout...');
-              // Fall through to regular checkout
-            }
-          } catch (quickError: any) {
-            if (quickError.response?.data?.requiresCheckout) {
-              // Fall through to regular checkout
-              console.log('Quick subscribe not available, using checkout...');
-            } else {
-              throw quickError;
-            }
+          if (!confirm(`Upgrade to ${upgradeType}? You'll receive credit for the unused portion of your current plan and be charged immediately.`)) {
+            setProcessing(false);
+            setSelectedPlan(null);
+            return;
+          }
+        }
+
+        try {
+          const quickResponse = await axios.post('/api/payments/quick-subscribe', {
+            userId,
+            planId,
+            interval: billingInterval
+          });
+
+          if (quickResponse.data.success) {
+            // Refresh the data to show the new plan
+            await fetchUserData();
+            setProcessing(false);
+            setSelectedPlan(null);
+            return;
+          } else if (quickResponse.data.requiresAction) {
+            // Handle 3D Secure or other authentication
+            // Fall through to regular checkout
+          }
+        } catch (quickError: any) {
+          if (quickError.response?.data?.requiresCheckout) {
+            // Fall through to regular checkout
+            console.log('Quick subscribe not available, using checkout...');
+          } else {
+            throw quickError;
           }
         }
       }
 
-      // Fall back to regular Stripe Checkout
+      // Fall back to regular Stripe Checkout for NEW subscriptions
+      console.log('Falling back to Stripe Checkout:', { userId, planId, interval: billingInterval });
       const response = await axios.post('/api/payments/create-checkout-session', {
         userId,
         planId,
@@ -167,9 +194,22 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
       if (response.data.checkoutUrl) {
         window.location.href = response.data.checkoutUrl;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating subscription:', error);
-      alert('Failed to start checkout process. Please try again.');
+      console.error('Error details:', error.response?.data);
+
+      // Handle specific error cases
+      if (error.response?.data?.requiresPaymentMethod) {
+        alert(error.response.data.message || 'To change your plan or billing interval, please add a payment method in the Payment Methods tab first.');
+      } else if (error.response?.data?.error) {
+        // Show the specific error from the API
+        alert(error.response.data.error + (error.response.data.details ? '\n\n' + error.response.data.details : ''));
+      } else if (error.response?.data?.message) {
+        alert(error.response.data.message);
+      } else {
+        alert('Failed to process your request. Please try again.');
+      }
+
       setProcessing(false);
       setSelectedPlan(null);
     }
@@ -220,9 +260,21 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => {
           const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
+          const units = billingInterval === 'annual' ? plan.monthlyUnits * 12 : plan.monthlyUnits;
           const isCurrentPlan = plan.id === currentUserPlan;
           const isSameBillingInterval = billingInterval === currentBillingInterval;
           const isChangingBilling = isCurrentPlan && !isSameBillingInterval;
+
+          // Check if this plan selection would be an upgrade or downgrade
+          const wouldBeUpgrade =
+            (currentUserPlan === 'pro' && plan.id === 'teams') ||
+            (isCurrentPlan && currentBillingInterval === 'monthly' && billingInterval === 'annual');
+
+          const wouldBeDowngrade =
+            (currentUserPlan === 'teams' && plan.id === 'pro') ||
+            (currentUserPlan === 'teams' && plan.id === 'free') ||
+            (currentUserPlan === 'pro' && plan.id === 'free') ||
+            (isCurrentPlan && currentBillingInterval === 'annual' && billingInterval === 'monthly');
 
           return (
             <div
@@ -239,8 +291,8 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
                       ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
                       : isCurrentPlan
                       ? 'Current Plan'
-                      : plan.id === 'free'
-                      ? 'Downgrade Now'
+                      : wouldBeDowngrade
+                      ? 'Downgrade'
                       : 'Upgrade Now'}
                   </span>
                 </div>
@@ -262,9 +314,11 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
 
               <div className="mb-6">
                 <p className="text-sm font-medium text-gray-900">
-                  {plan.units.toLocaleString()} compile units
+                  {units.toLocaleString()} compile units
                 </p>
-                <p className="text-xs text-gray-500">per month</p>
+                <p className="text-xs text-gray-500">
+                  {billingInterval === 'annual' ? 'per year' : 'per month'}
+                </p>
               </div>
 
               <ul className="space-y-3 mb-6">
@@ -293,10 +347,27 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
                   ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
                   : isCurrentPlan && isSameBillingInterval
                   ? 'Current Plan'
-                  : hasPaymentMethod
-                  ? `${plan.cta} (Quick)`
                   : plan.cta}
               </button>
+
+              {isChangingBilling && renewalDate && !wouldBeUpgrade && (
+                <p className="mt-2 text-xs text-gray-500 text-center">
+                  The new interval will be applied when the subscription is renewed on{' '}
+                  {new Date(renewalDate).toLocaleDateString()}
+                </p>
+              )}
+
+              {wouldBeUpgrade && (
+                <p className="mt-2 text-xs text-green-600 text-center font-medium">
+                  Upgrade applies immediately with credit for unused time
+                </p>
+              )}
+
+              {wouldBeDowngrade && renewalDate && (
+                <p className="mt-2 text-xs text-gray-500 text-center">
+                  Downgrade will take effect on {new Date(renewalDate).toLocaleDateString()}
+                </p>
+              )}
             </div>
           );
         })}

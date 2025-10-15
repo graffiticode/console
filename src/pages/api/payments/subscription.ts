@@ -2,9 +2,13 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2022-08-01',
-});
+// Initialize Stripe only if secret key is available
+let stripe: Stripe | null = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2022-08-01',
+  });
+}
 
 // Map Stripe product/price IDs to our plan names
 const PLAN_MAPPING = {
@@ -37,10 +41,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const userData = userDoc.data();
     let stripeCustomerId = userData?.stripeCustomerId;
 
-    // If no Stripe customer, return free tier
-    if (!stripeCustomerId) {
+    // If Stripe is not configured or no Stripe customer, return free tier
+    if (!stripe || !stripeCustomerId) {
       return res.status(200).json({
         plan: 'free',
+        interval: null,
         status: 'active',
         currentBillingPeriod: null,
         cancelAtPeriodEnd: false,
@@ -60,6 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log(`Customer ${stripeCustomerId} doesn't exist in current Stripe mode`);
         return res.status(200).json({
           plan: 'free',
+          interval: null,
           status: 'active',
           currentBillingPeriod: null,
           cancelAtPeriodEnd: false,
@@ -93,6 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!subscriptions.data.length) {
       return res.status(200).json({
         plan: 'free',
+        interval: null,
         status: 'active',
         currentBillingPeriod: null,
         cancelAtPeriodEnd: false,
@@ -107,12 +114,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const priceId = subscription.items.data[0]?.price.id;
     const planName = PLAN_MAPPING[priceId] || 'free';
 
-    // Get unit allocation based on plan
-    const unitAllocation = {
+    // Get billing interval from Stripe subscription
+    const stripeInterval = subscription.items.data[0]?.price.recurring?.interval;
+    const interval = stripeInterval === 'year' ? 'annual' : stripeInterval === 'month' ? 'monthly' : null;
+
+    // Get unit allocation based on plan (monthly base)
+    const baseUnitAllocation = {
       free: 1000,
       pro: 50000,
       teams: 1000000,
     };
+
+    // Multiply by 12 for annual plans
+    const planUnits = interval === 'annual'
+      ? (baseUnitAllocation[planName] || 1000) * 12
+      : (baseUnitAllocation[planName] || 1000);
 
     // Get overage rate based on plan
     const overageRate = {
@@ -124,18 +140,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get any purchased overage units from metadata or database
     const overageUnits = parseInt(subscription.metadata?.overageUnits || '0');
 
+    // Check for scheduled changes and get the correct renewal date
+    let scheduledPlan = null;
+    let scheduledInterval = null;
+    let effectiveRenewalDate = subscription.current_period_end;
+
+    if (subscription.schedule) {
+      try {
+        const schedule = await stripe.subscriptionSchedules.retrieve(subscription.schedule as string);
+
+        // Check if there are future phases
+        if (schedule.phases && schedule.phases.length > 1) {
+          // Get the current phase (phase[0]) for the renewal date
+          const currentPhase = schedule.phases[0];
+          if (currentPhase.end_date) {
+            effectiveRenewalDate = currentPhase.end_date as number;
+          }
+
+          // Get the next phase (phase[1]) for scheduled changes
+          const nextPhase = schedule.phases[1];
+          if (nextPhase && nextPhase.items && nextPhase.items.length > 0) {
+            const nextPriceId = nextPhase.items[0].price as string;
+            scheduledPlan = PLAN_MAPPING[nextPriceId] || null;
+
+            // Get the scheduled interval from the price
+            const nextPrice = await stripe.prices.retrieve(nextPriceId);
+            const nextInterval = nextPrice.recurring?.interval;
+            scheduledInterval = nextInterval === 'year' ? 'annual' : nextInterval === 'month' ? 'monthly' : null;
+          }
+        }
+      } catch (scheduleError) {
+        console.error('Error fetching subscription schedule:', scheduleError);
+        // Continue without scheduled info
+      }
+    }
+
     return res.status(200).json({
       plan: planName,
+      interval,
+      scheduledPlan,
+      scheduledInterval,
       status: subscription.status,
       currentBillingPeriod: {
         start: new Date(subscription.current_period_start * 1000).toISOString(),
-        end: new Date(subscription.current_period_end * 1000).toISOString(),
+        end: new Date(effectiveRenewalDate * 1000).toISOString(),
       },
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      nextBillingDate: subscription.current_period_end
-        ? new Date(subscription.current_period_end * 1000).toISOString()
+      nextBillingDate: effectiveRenewalDate
+        ? new Date(effectiveRenewalDate * 1000).toISOString()
         : null,
-      units: unitAllocation[planName] || 1000,
+      units: planUnits,
       overageUnits,
       overageRate: overageRate[planName],
       stripeSubscriptionId: subscription.id,

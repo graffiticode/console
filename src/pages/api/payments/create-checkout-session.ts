@@ -2,9 +2,13 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2022-08-01',
-});
+// Initialize Stripe only if secret key is available
+let stripe: Stripe | null = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2022-08-01',
+  });
+}
 
 // Map our plan IDs to Stripe price IDs
 const STRIPE_PRICE_IDS = {
@@ -33,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Validate Stripe configuration
-    if (!process.env.STRIPE_SECRET_KEY) {
+    if (!stripe) {
       console.error('STRIPE_SECRET_KEY is not configured');
       return res.status(500).json({ error: 'Payment system not configured. Please contact support.' });
     }
@@ -109,6 +113,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Check for existing active subscription
+    const existingSubscriptions = await stripe.subscriptions.list({
+      customer: stripeCustomerId,
+      status: 'active',
+      limit: 1,
+    });
+
+    // If user has an existing subscription, they should use quick-subscribe (Payment Methods tab)
+    // Stripe Checkout cannot properly handle subscription upgrades/downgrades with prorations
+    if (existingSubscriptions.data.length > 0) {
+      return res.status(400).json({
+        error: 'Cannot change subscription through checkout',
+        message: 'To upgrade or downgrade your plan, please add a payment method in the Payment Methods tab first.',
+        requiresPaymentMethod: true,
+      });
+    }
+
     // Get customer's default payment method if exists
     let defaultPaymentMethod = null;
     if (stripeCustomerId) {
@@ -116,7 +137,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       defaultPaymentMethod = customer.invoice_settings?.default_payment_method;
     }
 
-    // Create checkout session
+    // Create checkout session for NEW subscriptions only
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
       payment_method_types: ['card'],
@@ -132,6 +153,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Allow modifying quantities, promo codes, etc
       allow_promotion_codes: true,
       billing_address_collection: 'auto',
+      // Save payment method for future use (subscription mode)
+      payment_method_collection: 'always',
       metadata: {
         userId,
         planId,

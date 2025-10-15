@@ -4,11 +4,16 @@ import axios from 'axios';
 
 interface SubscriptionData {
   status: 'active' | 'canceled' | 'past_due' | 'trialing' | 'none';
-  plan: 'free' | 'pro' | 'max';
+  plan: 'free' | 'pro' | 'teams';
   interval: 'monthly' | 'annual' | null;
   currentPeriodEnd?: string;
   cancelAtPeriodEnd?: boolean;
   trialEnd?: string;
+  nextBillingDate?: string;
+  currentBillingPeriod?: {
+    start: string;
+    end: string;
+  };
 }
 
 interface SubscriptionCardProps {
@@ -16,9 +21,9 @@ interface SubscriptionCardProps {
 }
 
 const planDetails = {
-  free: { name: 'Free', units: 1000, price: 0 },
-  pro: { name: 'Pro', units: 50000, price: { monthly: 50, annual: 500 } },
-  max: { name: 'Max', units: 1000000, price: { monthly: 500, annual: 5000 } },
+  free: { name: 'Demo', monthlyUnits: 1000, price: 0 },
+  pro: { name: 'Pro', monthlyUnits: 50000, price: { monthly: 50, annual: 500 } },
+  teams: { name: 'Max', monthlyUnits: 1000000, price: { monthly: 500, annual: 5000 } },
 };
 
 export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
@@ -90,6 +95,11 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
     ? plan.price[subscription.interval]
     : 0;
 
+  // Calculate units: multiply by 12 for annual plans
+  const displayUnits = subscription.interval === 'annual'
+    ? plan.monthlyUnits * 12
+    : plan.monthlyUnits;
+
   const StatusIcon = subscription.status === 'active'
     ? CheckCircleIcon
     : subscription.status === 'past_due'
@@ -111,18 +121,18 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
           </h3>
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
             <StatusIcon className="w-4 h-4 mr-1" />
-            {subscription.status === 'none' ? 'Free Tier' : subscription.status}
+            {subscription.status === 'none' ? 'Demo Tier' : subscription.status}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <dt className="text-sm font-medium text-gray-500">Plan</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
               {plan.name}
             </dd>
             <dd className="mt-1 text-sm text-gray-600">
-              {plan.units.toLocaleString()} compile units per month
+              {displayUnits.toLocaleString()} compile units {subscription.interval === 'annual' ? 'per year' : 'per month'}
             </dd>
           </div>
 
@@ -136,28 +146,35 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
                 </span>
               )}
             </dd>
-            {subscription.currentPeriodEnd && (
+            <dd className="mt-1 text-sm text-gray-600">
+              {subscription.interval ? `Billed ${subscription.interval === 'monthly' ? 'monthly' : 'annually'}` : 'No billing'}
+            </dd>
+          </div>
+
+          <div>
+            <dt className="text-sm font-medium text-gray-500">Renewal Date</dt>
+            <dd className="mt-1 text-2xl font-semibold text-gray-900">
+              {subscription.nextBillingDate || subscription.currentPeriodEnd ? (
+                new Date(subscription.nextBillingDate || subscription.currentPeriodEnd!).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })
+              ) : (
+                '—'
+              )}
+            </dd>
+            {subscription.nextBillingDate || subscription.currentPeriodEnd ? (
               <dd className="mt-1 text-sm text-gray-600">
                 {subscription.cancelAtPeriodEnd
-                  ? 'Cancels on '
-                  : 'Renews on '}
-                {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                  ? 'Subscription ends'
+                  : 'Next payment due'}
               </dd>
+            ) : (
+              <dd className="mt-1 text-sm text-gray-600">No renewal</dd>
             )}
           </div>
         </div>
-
-        {subscription.status === 'active' && !subscription.cancelAtPeriodEnd && (
-          <div className="mt-6">
-            <button
-              onClick={handleCancelSubscription}
-              disabled={cancelling}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              {cancelling ? 'Processing...' : 'Cancel Subscription'}
-            </button>
-          </div>
-        )}
 
         {subscription.cancelAtPeriodEnd && (
           <div className="mt-6 p-4 bg-yellow-50 rounded-md">
