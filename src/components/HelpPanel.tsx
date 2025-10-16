@@ -193,7 +193,7 @@ export const HelpPanel = ({
   }, [languageSchema, resolveSchemaRef]);
 
   // Function to process focus data and update properties
-  const processFocusData = useCallback((focusData, preserveEdits = false) => {
+  const processFocusData = useCallback((focusData, preserveEdits = false, resetInitial = true) => {
 
     // Get schema for this context
     const contextSchema = getSchemaForContext(focusData);
@@ -201,6 +201,9 @@ export const HelpPanel = ({
     // If no schema is available, don't show any properties
     if (!contextSchema || !contextSchema.properties) {
       setContextProperties({});
+      if (resetInitial) {
+        setInitialProperties({});
+      }
       return;
     }
 
@@ -325,8 +328,10 @@ export const HelpPanel = ({
         }
 
     setContextProperties(properties);
-    // Store the initial values for comparison
-    setInitialProperties(JSON.parse(JSON.stringify(properties)));
+    // Store the initial values for comparison only when requested
+    if (resetInitial) {
+      setInitialProperties(JSON.parse(JSON.stringify(properties)));
+    }
   }, [getSchemaForContext, languageSchema, resolveSchemaRef]);
 
   // Track the last processed focus element to avoid unnecessary reprocessing
@@ -338,7 +343,8 @@ export const HelpPanel = ({
       // Only process if the focused element has actually changed
       const elementKey = `${focusedElement.type}-${focusedElement.name}`;
       if (lastProcessedElementRef.current !== elementKey) {
-        processFocusData(focusedElement);
+        // Reset initial properties when focusing a different element
+        processFocusData(focusedElement, false, true);
         lastProcessedElementRef.current = elementKey;
       }
     }
@@ -353,6 +359,9 @@ export const HelpPanel = ({
     // Check if task changed
     if (prevTaskIdRef.current !== taskId) {
       setManuallyToggledGroups(new Set());
+      // Reset initial properties when a new task is loaded
+      // This ensures we start fresh with the new task's values
+      setInitialProperties({});
       prevTaskIdRef.current = taskId;
       prevFocusedTypeRef.current = null; // Reset type tracking on new task
       return;
@@ -441,22 +450,33 @@ export const HelpPanel = ({
       if (event.detail) {
         const focusData = event.detail.focus;
 
-        // Handle null focus (form change/reset)
+        // Handle null focus (form loses focus, e.g. when clicking in text editor)
+        // Keep the property state intact so it can be sent when Enter is pressed
         if (!focusData) {
-          setFocusedElement(null);
-          setContextProperties({});
-          lastProcessedElementRef.current = null;
+          // Don't clear properties here - preserve them for when the user sends the message
+          // Only clear the focus tracking
+          // Note: We keep contextProperties and initialProperties intact
           return;
         }
 
+        // Check if this is a different element
+        const elementKey = `${focusData.type}-${focusData.name}`;
+        const isDifferentElement = lastProcessedElementRef.current !== elementKey;
+
+        // Update the focused element
         setFocusedElement(focusData);
 
         // Process immediately if schema is loaded, otherwise it will be processed when schema loads
         if (languageSchema && !schemaLoading) {
-          const elementKey = `${focusData.type}-${focusData.name}`;
-          if (lastProcessedElementRef.current !== elementKey) {
-            processFocusData(focusData);
+          if (isDifferentElement) {
+            // New element focused - clear old state and load new element's properties
+            // This resets everything for the new element
+            processFocusData(focusData, false, true);
             lastProcessedElementRef.current = elementKey;
+          } else {
+            // Same element re-focused - update current values but keep initial values
+            // This preserves the ability to detect changes
+            processFocusData(focusData, false, false);
           }
         }
       }
@@ -527,15 +547,38 @@ export const HelpPanel = ({
     // Get text content if not provided
     const messageText = textContent || getCurrentEditorText();
 
+    // Check if there's an active input element and capture its current value
+    let activeInputKey: string | null = null;
+    let activeInputValue: any = null;
+    const activeElement = document.activeElement as HTMLInputElement;
+
+    if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'TEXTAREA')) {
+      // Get the property key from the data attribute
+      const propertyKey = activeElement.getAttribute('data-property-key');
+      if (propertyKey) {
+        activeInputKey = propertyKey;
+        // Get the current value based on input type
+        if (activeElement.type === 'checkbox') {
+          activeInputValue = activeElement.checked;
+        } else if (activeElement.type === 'number') {
+          activeInputValue = parseFloat(activeElement.value) || 0;
+        } else {
+          activeInputValue = activeElement.value;
+        }
+      }
+    }
+
     // Check for property changes
     const changedValues: Record<string, any> = {};
 
     Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
+      // Use the active input's current value if this is the active property
+      const currentValue = (key === activeInputKey && activeInputValue !== null) ? activeInputValue : prop.value;
       const initialProp = initialProperties[key];
       if (!initialProp) return;
 
       // Check if the value has changed from the initial value
-      const hasChanged = initialProp && JSON.stringify(prop.value) !== JSON.stringify(initialProp.value);
+      const hasChanged = initialProp && JSON.stringify(currentValue) !== JSON.stringify(initialProp.value);
 
       if (hasChanged) {
         // For nested objects, only include changed children
@@ -558,7 +601,7 @@ export const HelpPanel = ({
         } else {
           // Include the value even if it's empty (user cleared it)
           // Empty string means the user wants to clear the property
-          changedValues[key] = prop.value;
+          changedValues[key] = currentValue;
         }
       }
     });
@@ -1391,28 +1434,6 @@ export const HelpPanel = ({
             </span>
             <span className="ml-1">file.</span>
           </div>
-          <button
-            onClick={() => {
-              // Send combined message with text from editor and property changes
-              sendCombinedMessage();
-            }}
-            disabled={isLoading}
-            className="px-4 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 flex-shrink-0"
-          >
-            {isLoading ? (
-              <>
-                <span>Sending</span>
-                <div className="flex items-center">
-                  <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
-                  <div className="w-1 h-1 bg-white rounded-full mx-0.5 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
-                  <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}></div>
-                </div>
-                <div className="text-white text-xs">{`${processingTime}s`}</div>
-              </>
-            ) : (
-              'Send'
-            )}
-          </button>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="p-1 pb-0">
@@ -1429,19 +1450,43 @@ export const HelpPanel = ({
         {/* Property Editor */}
         {Object.keys(contextProperties).length > 0 && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="text-xs font-semibold text-gray-600 mb-2">
-              {focusedElement?.type === 'cell' ?
-                `Cell ${focusedElement.name} Properties` :
-                focusedElement?.type === 'column' ?
-                  `Column${focusedElement.name?.includes(',') ? 's' : ''} ${focusedElement.name} Properties` :
-                focusedElement?.type === 'row' ?
-                  `Row${focusedElement.name?.includes(',') ? 's' : ''} ${focusedElement.name} Properties` :
-                focusedElement?.type === 'region' ?
-                  `Region ${focusedElement.name} Properties` :
-                focusedElement?.type ?
-                  `${focusedElement.type.charAt(0).toUpperCase() + focusedElement.type.slice(1)} ${focusedElement.name ? focusedElement.name + ' ' : ''}Properties` :
-                  'Context Properties'}
-              {schemaLoading && <span className="ml-2 text-gray-400">(Loading schema...)</span>}
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-xs font-semibold text-gray-600">
+                {focusedElement?.type === 'cell' ?
+                  `Cell ${focusedElement.name} Properties` :
+                  focusedElement?.type === 'column' ?
+                    `Column${focusedElement.name?.includes(',') ? 's' : ''} ${focusedElement.name} Properties` :
+                  focusedElement?.type === 'row' ?
+                    `Row${focusedElement.name?.includes(',') ? 's' : ''} ${focusedElement.name} Properties` :
+                  focusedElement?.type === 'region' ?
+                    `Region ${focusedElement.name} Properties` :
+                  focusedElement?.type ?
+                    `${focusedElement.type.charAt(0).toUpperCase() + focusedElement.type.slice(1)} ${focusedElement.name ? focusedElement.name + ' ' : ''}Properties` :
+                    'Context Properties'}
+                {schemaLoading && <span className="ml-2 text-gray-400">(Loading schema...)</span>}
+              </div>
+              <button
+                onClick={() => {
+                  // Send combined message with text from editor and property changes
+                  sendCombinedMessage();
+                }}
+                disabled={isLoading}
+                className="px-4 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 flex-shrink-0"
+              >
+                {isLoading ? (
+                  <>
+                    <span>Sending</span>
+                    <div className="flex items-center">
+                      <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
+                      <div className="w-1 h-1 bg-white rounded-full mx-0.5 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
+                      <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}></div>
+                    </div>
+                    <div className="text-white text-xs">{`${processingTime}s`}</div>
+                  </>
+                ) : (
+                  'Send'
+                )}
+              </button>
             </div>
             <div className="space-y-2">
               {/* Group properties by their group attribute from schema */}
@@ -1876,6 +1921,7 @@ export const HelpPanel = ({
 
                               {propDef.enum ? (
                                 <select
+                                  data-property-key={key}
                                   value={propDef.value}
                                   onChange={(e) => setContextProperties(prev => ({
                                     ...prev,
@@ -1894,6 +1940,7 @@ export const HelpPanel = ({
                               ) : propDef.type === 'boolean' ? (
                                 <input
                                   type="checkbox"
+                                  data-property-key={key}
                                   checked={propDef.value}
                                   onChange={(e) => setContextProperties(prev => ({
                                     ...prev,
@@ -1906,6 +1953,7 @@ export const HelpPanel = ({
                                 // Number input
                                 <input
                                   type="number"
+                                  data-property-key={key}
                                   value={propDef.value}
                                   min={propDef.min}
                                   max={propDef.max}
@@ -1962,6 +2010,7 @@ export const HelpPanel = ({
                                 // Text input (default)
                                 <input
                                   type="text"
+                                  data-property-key={key}
                                   value={propDef.value || ''}
                                   onChange={(e) => setContextProperties(prev => ({
                                     ...prev,
@@ -1988,6 +2037,35 @@ export const HelpPanel = ({
             </div>
           </div>
         )}
+
+        {/* Send button when no properties are visible */}
+        {Object.keys(contextProperties).length === 0 && (
+          <div className="mt-3 flex justify-end">
+            <button
+              onClick={() => {
+                // Send combined message with text from editor and property changes
+                sendCombinedMessage();
+              }}
+              disabled={isLoading}
+              className="px-4 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 flex-shrink-0"
+            >
+              {isLoading ? (
+                <>
+                  <span>Sending</span>
+                  <div className="flex items-center">
+                    <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
+                    <div className="w-1 h-1 bg-white rounded-full mx-0.5 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
+                    <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1s' }}></div>
+                  </div>
+                  <div className="text-white text-xs">{`${processingTime}s`}</div>
+                </>
+              ) : (
+                'Send'
+              )}
+            </button>
+          </div>
+        )}
+
         {/* File Upload Notification */}
         {uploadNotification && (
           <div className={`absolute left-1/2 transform -translate-x-1/2 top-24 px-4 py-2 rounded-md shadow-md z-50 flex items-center text-sm ${
