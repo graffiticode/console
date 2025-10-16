@@ -41,11 +41,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const db = getFirestore();
       const userDoc = await db.collection('users').doc(userId as string).get();
 
-      if (!userDoc.exists) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      const userData = userDoc.data();
+      // For new users without a document, return free plan info
+      const userData = userDoc.exists ? userDoc.data() : null;
       const subscriptionData = userData?.subscription || {};
       const currentPlan = subscriptionData.plan || 'free';
       const currentOverage = subscriptionData.overageUnits || 0;

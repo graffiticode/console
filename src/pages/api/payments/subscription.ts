@@ -34,8 +34,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const db = getFirestore();
     const userDoc = await db.collection('users').doc(userId).get();
 
+    // For new users without a document, return free tier
     if (!userDoc.exists) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(200).json({
+        plan: 'free',
+        interval: null,
+        status: 'active',
+        currentBillingPeriod: null,
+        cancelAtPeriodEnd: false,
+        nextBillingDate: null,
+        units: 1000, // Free tier units
+        overageUnits: 0,
+        overageRate: null,
+      });
     }
 
     const userData = userDoc.data();

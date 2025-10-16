@@ -90,11 +90,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         lastDayOfPeriod = new Date(currentYear, currentMonth + 1, 0);
       }
     } else {
-      // No Stripe customer or Stripe not configured, use calendar month
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-      firstDayOfPeriod = new Date(currentYear, currentMonth, 1);
-      lastDayOfPeriod = new Date(currentYear, currentMonth + 1, 0);
+      // No Stripe customer - free users don't have billing periods
+      // Use account creation date as the start of their lifetime usage
+      const accountCreated = userData?.created ? new Date(userData.created) : now;
+      firstDayOfPeriod = accountCreated;
+      lastDayOfPeriod = new Date('2099-12-31'); // Far future date (no reset for free users)
     }
 
     // Query usage data for the current billing period
@@ -109,7 +109,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (usageDoc.exists) {
       const data = usageDoc.data();
-      totalUsage = data?.currentMonthTotal || 0;
+
+      // For free users (no Stripe customer), use lifetime total
+      // For paid users, use current period total
+      if (!stripeCustomerId) {
+        totalUsage = data?.lifetimeTotal || data?.currentMonthTotal || 0;
+      } else {
+        totalUsage = data?.currentMonthTotal || 0;
+      }
       lastUpdate = data?.lastUpdate || null;
 
       // Get usage breakdown by type from individual usage records

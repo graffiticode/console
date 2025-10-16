@@ -26,13 +26,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const db = getFirestore();
 
-    // Get user data
+    // Get user data - for new users, treat as having no payment methods
     const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userData = userDoc.data();
+    const userData = userDoc.exists ? userDoc.data() : null;
     let stripeCustomerId = userData?.stripeCustomerId;
 
     // Handle different HTTP methods
@@ -136,9 +132,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           stripeCustomerId = customer.id;
 
           // Save Stripe customer ID to user document
-          await db.collection('users').doc(userId).update({
+          // Use set with merge for new users without a document yet
+          await db.collection('users').doc(userId).set({
             stripeCustomerId,
-          });
+          }, { merge: true });
         }
 
         // Attach the payment method to the customer

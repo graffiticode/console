@@ -132,7 +132,12 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
               {plan.name}
             </dd>
             <dd className="mt-1 text-sm text-gray-600">
-              {displayUnits.toLocaleString()} compile units {subscription.interval === 'annual' ? 'per year' : 'per month'}
+              {displayUnits.toLocaleString()} compile units{' '}
+              {subscription.plan === 'free'
+                ? '(lifetime)'
+                : subscription.interval === 'annual'
+                ? 'per year'
+                : 'per month'}
             </dd>
           </div>
 
@@ -152,9 +157,13 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
           </div>
 
           <div>
-            <dt className="text-sm font-medium text-gray-500">Renewal Date</dt>
+            <dt className="text-sm font-medium text-gray-500">
+              {subscription.plan === 'free' ? 'Status' : 'Renewal Date'}
+            </dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              {subscription.nextBillingDate || subscription.currentPeriodEnd ? (
+              {subscription.plan === 'free' ? (
+                'Active'
+              ) : subscription.nextBillingDate || subscription.currentPeriodEnd ? (
                 new Date(subscription.nextBillingDate || subscription.currentPeriodEnd!).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -164,7 +173,9 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
                 '—'
               )}
             </dd>
-            {subscription.nextBillingDate || subscription.currentPeriodEnd ? (
+            {subscription.plan === 'free' ? (
+              <dd className="mt-1 text-sm text-gray-600">No expiration</dd>
+            ) : subscription.nextBillingDate || subscription.currentPeriodEnd ? (
               <dd className="mt-1 text-sm text-gray-600">
                 {subscription.cancelAtPeriodEnd
                   ? 'Subscription ends'

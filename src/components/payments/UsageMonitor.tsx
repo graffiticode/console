@@ -137,7 +137,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg leading-6 font-medium text-gray-900">
-              Current Period Usage
+              {pricing?.plan === 'free' ? 'Usage Overview' : 'Current Period Usage'}
             </h3>
             {isNearLimit && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
@@ -185,35 +185,46 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
           <div className="mt-4 grid grid-cols-3 gap-4 text-center">
             <div>
-              <dt className="text-sm font-medium text-gray-500">Allocated</dt>
+              <dt className="text-sm font-medium text-gray-500">
+                {pricing?.plan === 'free' ? 'Lifetime Allocation' : 'Allocated'}
+              </dt>
               <dd className="mt-1 text-xl font-semibold text-gray-900">
                 {usage.allocatedUnits.toLocaleString()}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Overage</dt>
+              <dt className="text-sm font-medium text-gray-500">
+                {pricing?.plan === 'free' ? 'Used' : 'Overage'}
+              </dt>
               <dd className="mt-1 text-xl font-semibold text-gray-900">
-                {usage.overageUnits.toLocaleString()}
+                {pricing?.plan === 'free'
+                  ? usage.currentPeriodUnits.toLocaleString()
+                  : usage.overageUnits.toLocaleString()}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Resets</dt>
+              <dt className="text-sm font-medium text-gray-500">
+                {pricing?.plan === 'free' ? 'Status' : 'Resets'}
+              </dt>
               <dd className="mt-1 text-xl font-semibold text-gray-900">
-                {new Date(usage.currentPeriodEnd).toLocaleDateString()}
+                {pricing?.plan === 'free'
+                  ? (remainingUnits > 0 ? 'Active' : 'Depleted')
+                  : new Date(usage.currentPeriodEnd).toLocaleDateString()}
               </dd>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Overage Settings */}
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Overage Settings
-          </h3>
+      {/* Overage Settings - Only show for paid plans */}
+      {pricing && pricing.plan !== 'free' && (
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+              Overage Settings
+            </h3>
 
-          <div className="space-y-4">
+            <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-900">Auto-recharge</p>
@@ -313,17 +324,31 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
             {pricing && !pricing.overageAvailable && (
               <div className="pt-4">
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 mb-2">
                     {pricing.plan === 'free'
-                      ? 'Upgrade to Pro or Max plan to purchase additional compile units'
-                      : 'Overage purchases are not available for your plan'}
+                      ? 'Demo accounts receive 1,000 lifetime compile units.'
+                      : 'Overage purchases are not available for your plan.'}
                   </p>
+                  {pricing.plan === 'free' && isAtLimit && (
+                    <p className="text-sm font-medium text-gray-900">
+                      You've used all your units. Upgrade to Pro or Max for {' '}
+                      {remainingUnits <= 0
+                        ? 'continued access'
+                        : 'more units'}, or contact us for additional Demo units.
+                    </p>
+                  )}
+                  {pricing.plan === 'free' && !isAtLimit && (
+                    <p className="text-sm text-gray-600">
+                      Upgrade to Pro or Max to get monthly allocations and automatic overage protection.
+                    </p>
+                  )}
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

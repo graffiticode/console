@@ -15,7 +15,7 @@ const plans = [
     annualPrice: 0,
     monthlyUnits: 1000,
     features: [
-      '1,000 compile units/month',
+      '1,000 compile units (lifetime)',
       'Limited language access',
       'Community support',
       'Public tasks only',
@@ -317,7 +317,11 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
                   {units.toLocaleString()} compile units
                 </p>
                 <p className="text-xs text-gray-500">
-                  {billingInterval === 'annual' ? 'per year' : 'per month'}
+                  {plan.id === 'free'
+                    ? 'lifetime'
+                    : billingInterval === 'annual'
+                    ? 'per year'
+                    : 'per month'}
                 </p>
               </div>
 
