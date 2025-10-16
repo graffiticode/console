@@ -236,7 +236,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
               </Switch>
             </div>
 
-            {billing.autoRecharge && pricing && (
+            {billing.autoRecharge && pricing && pricing.blockSize && (
               <div className="ml-4 pb-4 border-b">
                 <label className="text-sm font-medium text-gray-700">
                   Monthly limit
@@ -246,7 +246,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                   onChange={(e) => handleLimitChange(Number(e.target.value))}
                   className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 >
-                  <option value={1}>1 block ({(pricing.blockSize).toLocaleString()} units)</option>
+                  <option value={1}>1 block ({pricing.blockSize.toLocaleString()} units)</option>
                   <option value={3}>3 blocks ({(3 * pricing.blockSize).toLocaleString()} units)</option>
                   <option value={5}>5 blocks ({(5 * pricing.blockSize).toLocaleString()} units)</option>
                   <option value={10}>10 blocks ({(10 * pricing.blockSize).toLocaleString()} units)</option>

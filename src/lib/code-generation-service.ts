@@ -944,7 +944,15 @@ async function processGeneratedCode(content, lang = "0002", rid = null) {
     const lexicon = await getLanguageLexicon(lang);
 
     // Use parser.reformat with the lang identifier (without L prefix)
+    console.log(
+      "[1] processGeneratedCode()",
+      "processed=" + processed,
+    );
     processed = await parser.reformat(lang, processed, lexicon, {});
+    console.log(
+      "[2] processGeneratedCode()",
+      "processed=" + processed,
+    );
 
     if (rid) {
       ragLog(rid, "reformat.success", {
