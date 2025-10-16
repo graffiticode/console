@@ -331,7 +331,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                   </p>
                   {pricing.plan === 'free' && isAtLimit && (
                     <p className="text-sm font-medium text-gray-900">
-                      You&apos;ve used all your units. Upgrade to Pro or Max for {' '}
+                      You&apos;ve used all your units. Upgrade to Pro or Team for {' '}
                       {remainingUnits <= 0
                         ? 'continued access'
                         : 'more units'}, or contact us for additional Demo units.
@@ -339,7 +339,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                   )}
                   {pricing.plan === 'free' && !isAtLimit && (
                     <p className="text-sm text-gray-600">
-                      Upgrade to Pro or Max to get monthly allocations and automatic overage protection.
+                      Upgrade to Pro or Team to get monthly allocations and automatic overage protection.
                     </p>
                   )}
                 </div>

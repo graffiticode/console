@@ -23,7 +23,7 @@ interface SubscriptionCardProps {
 const planDetails = {
   free: { name: 'Demo', monthlyUnits: 1000, price: 0 },
   pro: { name: 'Pro', monthlyUnits: 50000, price: { monthly: 50, annual: 500 } },
-  teams: { name: 'Max', monthlyUnits: 1000000, price: { monthly: 500, annual: 5000 } },
+  teams: { name: 'Team', monthlyUnits: 1000000, price: { monthly: 500, annual: 5000 } },
 };
 
 export default function SubscriptionCard({ userId }: SubscriptionCardProps) {

@@ -45,7 +45,7 @@ const plans = [
   },
   {
     id: 'teams',
-    name: 'Max',
+    name: 'Team',
     description: 'For teams and high volume API calls',
     monthlyPrice: 500,
     annualPrice: 5000,
@@ -59,9 +59,9 @@ const plans = [
       'Advanced IDE features',
       'API access',
       'Automatic overage protection',
-      'Team collaboration features'
+      'Up to 10 individual accounts included'
     ],
-    cta: 'Go Max'
+    cta: 'Go Team'
   }
 ];
 
@@ -132,7 +132,7 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
     // Check if this is an interval change on current plan
     const isChangingInterval = planId === currentUserPlan && billingInterval !== currentBillingInterval;
 
-    // Check if this is an upgrade (Pro -> Max or Monthly -> Annual)
+    // Check if this is an upgrade (Pro -> Team or Monthly -> Annual)
     const isUpgrade =
       (currentUserPlan === 'pro' && planId === 'teams') ||
       (currentBillingInterval === 'monthly' && billingInterval === 'annual');
@@ -145,7 +145,7 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
         // Show confirmation for upgrades only
         if (isUpgrade) {
           const upgradeType = currentUserPlan === 'pro' && planId === 'teams'
-            ? 'Max plan'
+            ? 'Team plan'
             : 'annual billing';
 
           if (!confirm(`Upgrade to ${upgradeType}? You'll receive credit for the unused portion of your current plan and be charged immediately.`)) {

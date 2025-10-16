@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           plan: 'free',
           overageAvailable: false,
           currentOverageBalance: 0,
-          message: 'Upgrade to Pro or Max to purchase overage units'
+          message: 'Upgrade to Pro or Team to purchase overage units'
         });
       }
 
