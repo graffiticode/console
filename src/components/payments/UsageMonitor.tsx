@@ -331,7 +331,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                   </p>
                   {pricing.plan === 'free' && isAtLimit && (
                     <p className="text-sm font-medium text-gray-900">
-                      You've used all your units. Upgrade to Pro or Max for {' '}
+                      You&apos;ve used all your units. Upgrade to Pro or Max for {' '}
                       {remainingUnits <= 0
                         ? 'continued access'
                         : 'more units'}, or contact us for additional Demo units.
