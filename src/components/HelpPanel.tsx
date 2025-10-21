@@ -135,58 +135,35 @@ export const HelpPanel = ({
       return null;
     }
 
-    // For spreadsheet cells (L0166 style)
-    if (focusData.type === 'cell' && focusData.name) {
-      // Check if this matches the cell pattern (e.g., A1, B2, etc.)
-      const cellPattern = /^[A-Z]+[0-9]+$/;
-      if (cellPattern.test(focusData.name)) {
-        // Look for cell definition in the schema
-        if (languageSchema.properties?.interaction?.properties?.cells?.patternProperties) {
-          const cellPatternKey = Object.keys(languageSchema.properties.interaction.properties.cells.patternProperties)[0];
-          const cellSchema = languageSchema.properties.interaction.properties.cells.patternProperties[cellPatternKey];
+    const { type, subclass } = focusData;
 
-          if (cellSchema?.$ref) {
-            // Resolve the reference to get the actual cell schema
-            const resolved = resolveSchemaRef(cellSchema.$ref, languageSchema);
-            return resolved;
-          }
-          return cellSchema;
-        }
+    // Simple convention: Check definitions[type]
+    const schema = languageSchema.definitions?.[type];
 
-        // Fallback: check definitions directly
-        if (languageSchema.definitions?.cell) {
-          return languageSchema.definitions.cell;
-        }
+    if (schema) {
+      // Resolve $ref if present
+      let resolvedSchema = schema;
+      if (schema.$ref) {
+        resolvedSchema = resolveSchemaRef(schema.$ref, languageSchema);
       }
-    }
 
-    // For columns (L0166 style)
-    if (focusData.type === 'column' && focusData.name) {
-      // Check if this matches the column pattern (e.g., A, B, C, etc.)
-      const columnPattern = /^[A-Z]+$/;
-      if (columnPattern.test(focusData.name)) {
-        // Look for column definition in the schema
-        if (languageSchema.properties?.columns?.items) {
-          const columnSchema = languageSchema.properties.columns.items;
-
-          if (columnSchema?.$ref) {
-            // Resolve the reference to get the actual column schema
-            const resolved = resolveSchemaRef(columnSchema.$ref, languageSchema);
-            return resolved;
+      // Filter properties based on subclass context
+      if (subclass && resolvedSchema?.properties) {
+        const filteredProperties = {};
+        Object.entries(resolvedSchema.properties).forEach(([key, propSchema]) => {
+          // Include property if no context field or if context includes subclass
+          if (!propSchema.context || propSchema.context.includes(subclass)) {
+            filteredProperties[key] = propSchema;
           }
-          return columnSchema;
-        }
+        });
 
-        // Fallback: check definitions directly
-        if (languageSchema.definitions?.column) {
-          return languageSchema.definitions.column;
-        }
+        return {
+          ...resolvedSchema,
+          properties: filteredProperties
+        };
       }
-    }
 
-    // Generic lookup in definitions based on type
-    if (focusData.type && languageSchema.definitions?.[focusData.type]) {
-      return languageSchema.definitions[focusData.type];
+      return resolvedSchema;
     }
 
     return null;
