@@ -150,7 +150,7 @@ export const HelpPanel = ({
       // Filter properties based on subclass context
       if (subclass && resolvedSchema?.properties) {
         const filteredProperties = {};
-        Object.entries(resolvedSchema.properties).forEach(([key, propSchema]) => {
+        Object.entries(resolvedSchema.properties).forEach(([key, propSchema]: [string, any]) => {
           // Include property if no context field or if context includes subclass
           if (!propSchema.context || propSchema.context.includes(subclass)) {
             filteredProperties[key] = propSchema;
