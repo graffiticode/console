@@ -125,7 +125,6 @@ export const HelpPanel = ({
       current = current[segment];
       if (!current) return null;
     }
-
     return current;
   }, []);
 
@@ -365,11 +364,15 @@ export const HelpPanel = ({
       if (!prop.hidden) {
         const group = prop.group === "" || prop.group === undefined || prop.group === 'default' ? 'no-group' : prop.group;
 
-        // Check if property has a meaningful value
+        // Check if property has a meaningful value or should be shown
         let hasValue = false;
         if (prop.type === 'nested-object') {
-          // Check if any nested property has a value
+          // Check if any nested property has a value or is a text field
           hasValue = Object.values(prop.properties || {}).some((nestedProp: any) => {
+            // For string/text properties, show even if empty to allow editing
+            if (nestedProp.type === 'string' && nestedProp.value !== undefined) {
+              return true;
+            }
             return nestedProp.value !== undefined &&
                    nestedProp.value !== '' &&
                    nestedProp.value !== null &&
@@ -377,12 +380,17 @@ export const HelpPanel = ({
                    nestedProp.value !== 0;
           });
         } else {
-          // Check if regular property has a value
-          hasValue = prop.value !== undefined &&
-                     prop.value !== '' &&
-                     prop.value !== null &&
-                     prop.value !== false &&
-                     (prop.type !== 'number' || prop.value !== 0);
+          // For string/text properties, show even if empty to allow editing
+          if (prop.type === 'string' && prop.value !== undefined) {
+            hasValue = true;
+          } else {
+            // Check if regular property has a value
+            hasValue = prop.value !== undefined &&
+                       prop.value !== '' &&
+                       prop.value !== null &&
+                       prop.value !== false &&
+                       (prop.type !== 'number' || prop.value !== 0);
+          }
         }
 
         if (hasValue) {
@@ -601,14 +609,8 @@ export const HelpPanel = ({
       }
 
       // Build context-aware message
-      if (contextType === 'column' && contextName) {
-        fullMessage += `Update the code for column ${contextName} using these property values`;
-      } else if (contextType === 'cell' && contextName) {
-        fullMessage += `Update the code for cell ${contextName} using these property values`;
-      } else if (contextType === 'row' && contextName) {
-        fullMessage += `Update the code for row ${contextName} using these property values`;
-      } else if (contextType === 'region' && contextName) {
-        fullMessage += `Update the code for region ${contextName} using these property values`;
+      if (contextType && contextName) {
+        fullMessage += `Update the code for ${contextType} ${contextName} using these property values`;
       } else {
         fullMessage += `Update the code using these property values`;
       }
@@ -1429,17 +1431,15 @@ export const HelpPanel = ({
           <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex justify-between items-center mb-2">
               <div className="text-xs font-semibold text-gray-600">
-                {focusedElement?.type === 'cell' ?
-                  `Cell ${focusedElement.name} Properties` :
-                  focusedElement?.type === 'column' ?
-                    `Column${focusedElement.name?.includes(',') ? 's' : ''} ${focusedElement.name} Properties` :
-                  focusedElement?.type === 'row' ?
-                    `Row${focusedElement.name?.includes(',') ? 's' : ''} ${focusedElement.name} Properties` :
-                  focusedElement?.type === 'region' ?
-                    `Region ${focusedElement.name} Properties` :
-                  focusedElement?.type ?
-                    `${focusedElement.type.charAt(0).toUpperCase() + focusedElement.type.slice(1)} ${focusedElement.name ? focusedElement.name + ' ' : ''}Properties` :
-                    'Context Properties'}
+                {focusedElement?.type && focusedElement?.name ?
+                  (() => {
+                    const capitalizedType = focusedElement.type.charAt(0).toUpperCase() + focusedElement.type.slice(1);
+                    const isPlural = (focusedElement.type === 'column' || focusedElement.type === 'row') &&
+                                     focusedElement.name?.includes(',');
+                    const typeLabel = isPlural ? capitalizedType + 's' : capitalizedType;
+                    return `${typeLabel} ${focusedElement.name}`;
+                  })() :
+                  'Context'}
                 {schemaLoading && <span className="ml-2 text-gray-400">(Loading schema...)</span>}
               </div>
               <button
