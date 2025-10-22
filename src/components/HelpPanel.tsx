@@ -6,7 +6,7 @@
   -- use compiler errors to give feedback to the lm
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import useSWR from 'swr';
 import { TextEditor } from "./TextEditor";
 import { createState } from "../lib/state";
@@ -1372,6 +1372,25 @@ export const HelpPanel = ({
     };
   };
 
+  // Calculate if there are any changes to send
+  const hasChangesToSend = useMemo(() => {
+    // Check for property changes
+    const changedValues: Record<string, any> = {};
+
+    Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
+      const initialProp = initialProperties[key];
+      if (!initialProp) return;
+
+      // Check if the value has changed from the initial value
+      const hasChanged = initialProp && JSON.stringify(prop.value) !== JSON.stringify(initialProp.value);
+      if (hasChanged) {
+        changedValues[key] = prop.value;
+      }
+    });
+
+    return Object.keys(changedValues).length > 0;
+  }, [contextProperties, initialProperties]);
+
   return (
     <div {...getRootProps()} ref={containerRef} className="flex flex-col h-[calc(100vh-120px)]">
 
@@ -1449,7 +1468,7 @@ export const HelpPanel = ({
                   // Send combined message with text from editor and property changes
                   sendCombinedMessage();
                 }}
-                disabled={isLoading}
+                disabled={isLoading || !hasChangesToSend}
                 className="px-4 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 flex-shrink-0"
               >
                 {isLoading ? (

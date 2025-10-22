@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-22T00:07:57.809Z*
+*Downloaded on 2025-10-22T21:15:47.824Z*
 
 ## Language L0167
 
@@ -100,6 +100,24 @@ calculator expressions [
 ### Example 6
 
 #### Prompt
+"show the expressions list"
+
+#### Chat Transcript
+
+**User**: show the expressions list
+
+#### Code
+
+```
+show-expressions true calculator expressions [
+] {}..
+```
+
+---
+
+### Example 7
+
+#### Prompt
 "plot two expressions"
 
 #### Chat Transcript
@@ -117,7 +135,7 @@ calculator expressions [
 
 ---
 
-### Example 7
+### Example 8
 
 #### Prompt
 "create a calculator with custom bounding box"
@@ -139,7 +157,7 @@ bounds [
 
 ---
 
-### Example 8
+### Example 9
 
 #### Prompt
 "line-style DASHED on a curve"
@@ -158,7 +176,7 @@ calculator expressions [
 
 ---
 
-### Example 9
+### Example 10
 
 #### Prompt
 "big cross point with opacity 30%"
@@ -177,7 +195,7 @@ calculator expressions [
 
 ---
 
-### Example 10
+### Example 11
 
 #### Prompt
 "make the width 800 and height 600"
@@ -194,7 +212,7 @@ width 800 height 600 calculator expressions [] {}..
 
 ---
 
-### Example 11
+### Example 12
 
 #### Prompt
 "plot a list of points in a single expression"
@@ -213,7 +231,7 @@ calculator expressions [
 
 ---
 
-### Example 12
+### Example 13
 
 #### Prompt
 "curve with color #ff00f1"
@@ -232,7 +250,7 @@ calculator expressions [
 
 ---
 
-### Example 13
+### Example 14
 
 #### Prompt
 "graph a curve with name 'myParabola'"
@@ -251,7 +269,7 @@ calculator expressions [
 
 ---
 
-### Example 14
+### Example 15
 
 #### Prompt
 "make a minimal graph of a parabola"
@@ -270,7 +288,7 @@ calculator expressions [
 
 ---
 
-### Example 15
+### Example 16
 
 #### Prompt
 "point as cross or x"
@@ -289,7 +307,7 @@ calculator expressions [
 
 ---
 
-### Example 16
+### Example 17
 
 #### Prompt
 "plot an expression with a color"
@@ -308,7 +326,7 @@ calculator expressions [
 
 ---
 
-### Example 17
+### Example 18
 
 #### Prompt
 "draw a circle and a line with different opacities
@@ -364,7 +382,7 @@ calculator expressions [
 
 ---
 
-### Example 18
+### Example 19
 
 #### Prompt
 "dotted x^2 dashed x^3"
@@ -384,7 +402,7 @@ calculator expressions [
 
 ---
 
-### Example 19
+### Example 20
 
 #### Prompt
 "create a calculator with a mix of points and lines"
@@ -406,7 +424,7 @@ calculator expressions [
 
 ---
 
-### Example 20
+### Example 21
 
 #### Prompt
 "plot a list of points"
@@ -429,7 +447,7 @@ calculator expressions [
 
 ---
 
-### Example 21
+### Example 22
 
 #### Prompt
 "point using computed size with latex"
@@ -448,7 +466,7 @@ calculator expressions [
 
 ---
 
-### Example 22
+### Example 23
 
 #### Prompt
 "big point"
@@ -467,7 +485,7 @@ calculator expressions [
 
 ---
 
-### Example 23
+### Example 24
 
 #### Prompt
 "plot an expression"
@@ -486,7 +504,7 @@ calculator expressions [
 
 ---
 
-### Example 24
+### Example 25
 
 #### Prompt
 "plot an expression with a color using a record"
@@ -508,7 +526,7 @@ calculator expressions [
 
 ---
 
-### Example 25
+### Example 26
 
 #### Prompt
 "point as open circle"
@@ -527,7 +545,7 @@ calculator expressions [
 
 ---
 
-### Example 26
+### Example 27
 
 #### Prompt
 "plot a curve on graph with non-integer bounds"
@@ -551,7 +569,7 @@ bounds [
 
 ---
 
-### Example 27
+### Example 28
 
 #### Prompt
 "line with width 10"
@@ -570,7 +588,7 @@ calculator expressions [
 
 ---
 
-### Example 28
+### Example 29
 
 #### Prompt
 "Mix colored curve + secret points"
@@ -592,7 +610,7 @@ calculator expressions [
 
 ---
 
-### Example 29
+### Example 30
 
 #### Prompt
 "line opacity 50%"
@@ -611,7 +629,7 @@ calculator expressions [
 
 ---
 
-### Example 30
+### Example 31
 
 #### Prompt
 "plot two expressions (one a string another a record)"
@@ -634,7 +652,7 @@ calculator expressions [
 
 ---
 
-### Example 31
+### Example 32
 
 #### Prompt
 "point opacity 50%"
@@ -653,7 +671,7 @@ calculator expressions [
 
 ---
 
-### Example 32
+### Example 33
 
 #### Prompt
 "dotted blue line of width 5"
@@ -672,7 +690,41 @@ calculator expressions [
 
 ---
 
-### Example 33
+### Example 34
+
+#### Prompt
+"draw a multi expression art work
+
+can you draw the face of a dog
+
+can you make it more newanced"
+
+#### Chat Transcript
+
+**User**: draw a multi expression art work
+
+**User**: can you draw the face of a dog
+
+**User**: can you make it more newanced
+
+#### Code
+
+```
+calculator expressions [
+  expression "x^2 + y^2 = 25" color "brown" line-width 3 {}
+  expression "(x+2)^2 + (y+2)^2 = 1" color "black" fill-opacity 1 {}
+  expression "(x-2)^2 + (y+2)^2 = 1" color "black" fill-opacity 1 {}
+  expression "y = -1 + 0.5|x|" color "black" line-width 4 {}
+  expression "y = -1" color "black" line-width 4 {}
+  expression "y = -3 - 0.2x^2" color "black" line-width 3 {}
+  expression "(x+3)^2 + (y-4)^2 = 4" color "brown" fill-opacity 0.8 {}
+  expression "(x-3)^2 + (y-4)^2 = 4" color "brown" fill-opacity 0.8 {}
+] {}..
+```
+
+---
+
+### Example 35
 
 #### Prompt
 "make a graph with three curves of three different colors"
@@ -693,7 +745,7 @@ calculator expressions [
 
 ---
 
-### Example 34
+### Example 36
 
 #### Prompt
 "make the calculator height 600"
@@ -710,7 +762,7 @@ height 600 calculator expressions [] {}..
 
 ---
 
-### Example 35
+### Example 37
 
 #### Prompt
 "plot a circle using an inequality"
@@ -729,14 +781,26 @@ calculator expressions [
 
 ---
 
-### Example 36
+### Example 38
 
 #### Prompt
-"mixed styles across multiple points lists"
+"mixed styles across multiple points lists
+
+Update the code for calculator using these property values:
+```json
+{"expressions":true}
+```
+Note: Only the properties shown above have changed and need to be updated."
 
 #### Chat Transcript
 
 **User**: mixed styles across multiple points lists
+
+**User**: Update the code for calculator using these property values:
+```json
+{"expressions":true}
+```
+Note: Only the properties shown above have changed and need to be updated.
 
 #### Code
 
@@ -750,7 +814,7 @@ calculator expressions [
 
 ---
 
-### Example 37
+### Example 39
 
 #### Prompt
 "set the calculator graph bounds to 10"
@@ -767,7 +831,7 @@ bounds 10 calculator expressions [] {}..
 
 ---
 
-### Example 38
+### Example 40
 
 #### Prompt
 "create a graph with very wide aspect ratio"
@@ -791,7 +855,7 @@ width 1200 height 200 bounds [
 
 ---
 
-### Example 39
+### Example 41
 
 #### Prompt
 "hidden curve"
@@ -810,7 +874,7 @@ calculator expressions [
 
 ---
 
-### Example 40
+### Example 42
 
 #### Prompt
 "plot a point as a point"
@@ -829,14 +893,26 @@ calculator expressions [
 
 ---
 
-### Example 41
+### Example 43
 
 #### Prompt
-"make a plot of a curve with tight bounds"
+"make a plot of a curve with tight bounds
+
+Update the code using these property values:
+```json
+{"lineStyle":"DASHED"}
+```
+Note: Only the properties shown above have changed and need to be updated."
 
 #### Chat Transcript
 
 **User**: make a plot of a curve with tight bounds
+
+**User**: Update the code using these property values:
+```json
+{"lineStyle":"DASHED"}
+```
+Note: Only the properties shown above have changed and need to be updated.
 
 #### Code
 
@@ -847,13 +923,39 @@ bounds [
   2
   2
 ] calculator expressions [
-  "y=x^3-x"
+  expression "y=x^3-x" line-style "DASHED" line-opacity 0.5 {}
 ] {}..
 ```
 
 ---
 
-### Example 42
+### Example 44
+
+#### Prompt
+"Update the code for calculator using these property values:
+```json
+{"expressions":true}
+```
+Note: Only the properties shown above have changed and need to be updated."
+
+#### Chat Transcript
+
+**User**: Update the code for calculator using these property values:
+```json
+{"expressions":true}
+```
+Note: Only the properties shown above have changed and need to be updated.
+
+#### Code
+
+```
+show-expressions true calculator expressions [
+] {}..
+```
+
+---
+
+### Example 45
 
 #### Prompt
 "non-hidden secret curve"
