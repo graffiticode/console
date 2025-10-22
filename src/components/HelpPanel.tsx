@@ -560,16 +560,16 @@ export const HelpPanel = ({
       // Use the active input's current value if this is the active property
       const currentValue = (key === activeInputKey && activeInputValue !== null) ? activeInputValue : prop.value;
       const initialProp = initialProperties[key];
-      if (!initialProp) return;
 
-      // Check if the value has changed from the initial value
-      const hasChanged = initialProp && JSON.stringify(currentValue) !== JSON.stringify(initialProp.value);
+      // Compare current value with initial value (treating undefined as no value)
+      const initialValue = initialProp?.value;
+      const hasChanged = JSON.stringify(currentValue) !== JSON.stringify(initialValue);
 
       if (hasChanged) {
         // For nested objects, only include changed children
         if (prop.type === 'nested-object' && typeof prop.value === 'object') {
           const changedNested: any = {};
-          const initialNested = initialProp.value || {};
+          const initialNested = initialProp?.value || {};
 
           Object.entries(prop.value).forEach(([nestedKey, nestedValue]) => {
             // Only include if this nested property has changed
@@ -638,6 +638,8 @@ export const HelpPanel = ({
       stateData.handleSendMessage(fullMessage);
       // Clear the text editor after sending
       clearTextEditor();
+      // After sending, update initial properties to the current values
+      setInitialProperties(JSON.parse(JSON.stringify(contextProperties)));
     }
   }, [focusedElement, contextProperties, initialProperties]);
 
@@ -1379,12 +1381,16 @@ export const HelpPanel = ({
 
     Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
       const initialProp = initialProperties[key];
-      if (!initialProp) return;
 
-      // Check if the value has changed from the initial value
-      const hasChanged = initialProp && JSON.stringify(prop.value) !== JSON.stringify(initialProp.value);
+      // Compare current value with initial value (treating undefined as no value)
+      const currentValue = prop.value;
+      const initialValue = initialProp?.value;
+
+      // Any difference is a change (including undefined → value or value → undefined)
+      const hasChanged = JSON.stringify(currentValue) !== JSON.stringify(initialValue);
+
       if (hasChanged) {
-        changedValues[key] = prop.value;
+        changedValues[key] = currentValue;
       }
     });
 
