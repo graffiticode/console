@@ -611,6 +611,8 @@ export const HelpPanel = ({
       // Build context-aware message
       if (contextType && contextName) {
         fullMessage += `Update the code for ${contextType} ${contextName} using these property values`;
+      } else if (contextType) {
+        fullMessage += `Update the code for ${contextType} using these property values`;
       } else {
         fullMessage += `Update the code using these property values`;
       }
@@ -1439,7 +1441,7 @@ export const HelpPanel = ({
                     const typeLabel = isPlural ? capitalizedType + 's' : capitalizedType;
                     return `${typeLabel} ${focusedElement.name}`;
                   })() :
-                  'Context'}
+                  focusedElement.type.charAt(0).toUpperCase() + focusedElement.type.slice(1)}
                 {schemaLoading && <span className="ml-2 text-gray-400">(Loading schema...)</span>}
               </div>
               <button
@@ -1560,9 +1562,9 @@ export const HelpPanel = ({
                         return (
                           <div key={key} className="space-y-2">
                             {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]: [string, any]) => (
-                              <div key={nestedKey} className="flex items-center space-x-2 mb-2">
+                              <div key={nestedKey} className="flex items-center space-x-3 mb-2">
                                 <label
-                                  className="text-xs font-medium text-gray-500 w-20 whitespace-nowrap"
+                                  className="text-xs font-medium text-gray-500 min-w-[120px] flex-shrink-0"
                                   title={nestedProp.description}
                                 >
                                   {nestedProp.label}:
@@ -1732,9 +1734,9 @@ export const HelpPanel = ({
                               </div>
                               <div className="pl-3 ml-2">
                                 {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]: [string, any]) => (
-                                  <div key={nestedKey} className="flex items-center space-x-2 mb-2">
+                                  <div key={nestedKey} className="flex items-center space-x-3 mb-2">
                                     <label
-                                      className="text-xs font-medium text-gray-500 w-20 whitespace-nowrap"
+                                      className="text-xs font-medium text-gray-500 min-w-[120px] flex-shrink-0"
                                       title={nestedProp.description}
                                     >
                                       {nestedProp.label}:
@@ -1887,12 +1889,12 @@ export const HelpPanel = ({
                           ) : (
                           // Render regular property
                           <>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-3">
                               <label
-                                className="text-xs font-medium text-gray-500 w-24 whitespace-nowrap"
+                                className="text-xs font-medium text-gray-500 min-w-[140px] flex-shrink-0"
                                 title={propDef.description}
                               >
-                                {propDef.label || key}:
+                                {propDef.label || key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim()}:
                                 {/*propDef.required && <span className="text-red-400 ml-0.5">*</span>*/}
                               </label>
 
