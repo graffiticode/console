@@ -77,6 +77,10 @@ export const HelpPanel = ({
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   // Track which groups have been manually toggled by the user
   const [manuallyToggledGroups, setManuallyToggledGroups] = useState<Set<string>>(new Set());
+  // Track collapsed state for nested objects - initialize as expanded
+  const [collapsedNestedObjects, setCollapsedNestedObjects] = useState<Record<string, boolean>>({});
+  // Track which nested objects have been manually toggled by the user
+  const [manuallyToggledNestedObjects, setManuallyToggledNestedObjects] = useState<Set<string>>(new Set());
   // Track collapsed state for user messages
   const [collapsedMessages, setCollapsedMessages] = useState<Record<number, boolean>>({});
   // Track recently collapsed messages to prevent hover preview
@@ -193,7 +197,21 @@ export const HelpPanel = ({
             // Handle $ref if present
             let resolvedSchema: any = propSchema;
             if (propSchema && typeof propSchema === 'object' && '$ref' in propSchema) {
-              resolvedSchema = resolveSchemaRef((propSchema as any).$ref, languageSchema) || propSchema;
+              const refResolved = resolveSchemaRef((propSchema as any).$ref, languageSchema);
+              if (refResolved) {
+                // Merge the resolved reference with the original schema to preserve metadata
+                resolvedSchema = {
+                  ...refResolved,
+                  ...propSchema,
+                  // Ensure properties from the resolved ref are used
+                  properties: refResolved.properties || (propSchema as any).properties,
+                  type: refResolved.type || (propSchema as any).type
+                };
+                // Remove the $ref from the merged result
+                delete resolvedSchema.$ref;
+              } else {
+                resolvedSchema = propSchema;
+              }
             }
 
             // Get value from focus data
@@ -207,6 +225,33 @@ export const HelpPanel = ({
             } else {
               // For cells and other types, look for nested property values
               value = focusData.value?.[key];
+            }
+
+            // Handle oneOf for top-level properties (like width/height in size group)
+            if (resolvedSchema.oneOf) {
+              const selectedOption = resolvedSchema.oneOf.find(option => {
+                if (value !== undefined) {
+                  if (option.type === typeof value) return true;
+                  if (option.type === 'number' && !isNaN(Number(value))) return true;
+                  if (option.format === 'date' && !isNaN(Date.parse(value))) return true;
+                }
+                return false;
+              }) || resolvedSchema.oneOf[0];
+
+              // Merge the selected option with the parent schema, preserving metadata like group
+              resolvedSchema = {
+                ...resolvedSchema,
+                ...selectedOption,
+                // Preserve important parent properties
+                group: resolvedSchema.group,
+                description: resolvedSchema.description,
+                title: resolvedSchema.title,
+                label: resolvedSchema.label,
+                context: resolvedSchema.context,
+                readonly: resolvedSchema.readonly || resolvedSchema.readOnly,
+                hidden: resolvedSchema.hidden,
+                placeholder: resolvedSchema.placeholder
+              };
             }
 
             // Check if this is a nested object with properties
@@ -232,8 +277,11 @@ export const HelpPanel = ({
                 description: resolvedSchema.description,
                 schema: resolvedSchema,
                 properties: {},
-                // Nested properties automatically get grouped under their parent key
-                group: key
+                // Use the group from schema, or default to the property key if not specified
+                group: resolvedSchema.group !== undefined ? resolvedSchema.group : key,
+                hidden: resolvedSchema.hidden || false,
+                readonly: resolvedSchema.readonly || resolvedSchema.readOnly || false,
+                required: contextSchema.required?.includes(key) || false
               };
 
               // Process nested properties
@@ -241,7 +289,21 @@ export const HelpPanel = ({
                 // Handle nested $ref
                 let resolvedNestedSchema: any = nestedSchema;
                 if (nestedSchema && typeof nestedSchema === 'object' && '$ref' in nestedSchema) {
-                  resolvedNestedSchema = resolveSchemaRef((nestedSchema as any).$ref, languageSchema) || nestedSchema;
+                  const refResolved = resolveSchemaRef((nestedSchema as any).$ref, languageSchema);
+                  if (refResolved) {
+                    // Merge the resolved reference with the original schema to preserve metadata
+                    resolvedNestedSchema = {
+                      ...refResolved,
+                      ...nestedSchema,
+                      // Ensure properties from the resolved ref are used
+                      properties: refResolved.properties || (nestedSchema as any).properties,
+                      type: refResolved.type || (nestedSchema as any).type
+                    };
+                    // Remove the $ref from the merged result
+                    delete resolvedNestedSchema.$ref;
+                  } else {
+                    resolvedNestedSchema = nestedSchema;
+                  }
                 }
 
                 // Handle oneOf for nested properties (like expected in assess)
@@ -359,6 +421,8 @@ export const HelpPanel = ({
 
     // Build groups to check which ones have values
     const groupsWithValues = new Set<string>();
+    // Track nested objects and whether they have values
+    const nestedObjectsWithValues = new Set<string>();
 
     Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
       if (!prop.hidden) {
@@ -367,30 +431,26 @@ export const HelpPanel = ({
         // Check if property has a meaningful value or should be shown
         let hasValue = false;
         if (prop.type === 'nested-object') {
-          // Check if any nested property has a value or is a text field
+          // Check if any nested property has a value
           hasValue = Object.values(prop.properties || {}).some((nestedProp: any) => {
-            // For string/text properties, show even if empty to allow editing
-            if (nestedProp.type === 'string' && nestedProp.value !== undefined) {
-              return true;
-            }
             return nestedProp.value !== undefined &&
                    nestedProp.value !== '' &&
                    nestedProp.value !== null &&
                    nestedProp.value !== false &&
                    nestedProp.value !== 0;
           });
-        } else {
-          // For string/text properties, show even if empty to allow editing
-          if (prop.type === 'string' && prop.value !== undefined) {
-            hasValue = true;
-          } else {
-            // Check if regular property has a value
-            hasValue = prop.value !== undefined &&
-                       prop.value !== '' &&
-                       prop.value !== null &&
-                       prop.value !== false &&
-                       (prop.type !== 'number' || prop.value !== 0);
+          // Track whether this nested object has values
+          if (hasValue) {
+            nestedObjectsWithValues.add(key);
           }
+        } else {
+          // Check if regular property has a value
+          // For strings, only consider non-empty values as "having value" for auto-expand
+          hasValue = prop.value !== undefined &&
+                     prop.value !== '' &&
+                     prop.value !== null &&
+                     prop.value !== false &&
+                     (prop.type !== 'number' || prop.value !== 0);
         }
 
         if (hasValue) {
@@ -427,7 +487,23 @@ export const HelpPanel = ({
 
       return newState;
     });
-  }, [contextProperties, manuallyToggledGroups]);
+
+    // Update collapsed state for nested objects
+    setCollapsedNestedObjects(prev => {
+      const newState = { ...prev };
+
+      // Go through all nested object properties
+      Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
+        if (prop.type === 'nested-object' && !manuallyToggledNestedObjects.has(key)) {
+          // If it has values, expand it (false = expanded)
+          // If it doesn't have values, collapse it (true = collapsed)
+          newState[key] = !nestedObjectsWithValues.has(key);
+        }
+      });
+
+      return newState;
+    });
+  }, [contextProperties, manuallyToggledGroups, manuallyToggledNestedObjects]);
 
   // Listen for focus events from FormIFrame
   useEffect(() => {
@@ -556,6 +632,10 @@ export const HelpPanel = ({
     // Check for property changes
     const changedValues: Record<string, any> = {};
 
+    // Only detect changes if initialProperties has been set (not empty)
+    // If initialProperties is empty, it means we haven't established a baseline yet
+    const hasInitialBaseline = Object.keys(initialProperties).length > 0;
+
     Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
       // Use the active input's current value if this is the active property
       const currentValue = (key === activeInputKey && activeInputValue !== null) ? activeInputValue : prop.value;
@@ -563,7 +643,9 @@ export const HelpPanel = ({
 
       // Compare current value with initial value (treating undefined as no value)
       const initialValue = initialProp?.value;
-      const hasChanged = JSON.stringify(currentValue) !== JSON.stringify(initialValue);
+
+      // Only consider it changed if we have an initial baseline to compare against
+      const hasChanged = hasInitialBaseline && JSON.stringify(currentValue) !== JSON.stringify(initialValue);
 
       if (hasChanged) {
         // For nested objects, only include changed children
@@ -1379,6 +1461,9 @@ export const HelpPanel = ({
     // Check for property changes
     const changedValues: Record<string, any> = {};
 
+    // Only detect changes if initialProperties has been set (not empty)
+    const hasInitialBaseline = Object.keys(initialProperties).length > 0;
+
     Object.entries(contextProperties).forEach(([key, prop]: [string, any]) => {
       const initialProp = initialProperties[key];
 
@@ -1386,8 +1471,8 @@ export const HelpPanel = ({
       const currentValue = prop.value;
       const initialValue = initialProp?.value;
 
-      // Any difference is a change (including undefined → value or value → undefined)
-      const hasChanged = JSON.stringify(currentValue) !== JSON.stringify(initialValue);
+      // Only consider it changed if we have an initial baseline to compare against
+      const hasChanged = hasInitialBaseline && JSON.stringify(currentValue) !== JSON.stringify(initialValue);
 
       if (hasChanged) {
         changedValues[key] = currentValue;
@@ -1753,12 +1838,31 @@ export const HelpPanel = ({
                           {propDef.type === 'nested-object' ? (
                             // Render nested object properties with parent label
                             <>
-                              <div className="text-xs font-medium text-gray-500 mb-1 whitespace-nowrap">
+                              <div
+                                className="flex items-center text-xs font-medium text-gray-500 mb-1 whitespace-nowrap cursor-pointer hover:text-gray-700"
+                                onClick={() => {
+                                  setManuallyToggledNestedObjects(prev => new Set(prev).add(key));
+                                  setCollapsedNestedObjects(prev => ({
+                                    ...prev,
+                                    [key]: !prev[key]
+                                  }));
+                                }}
+                              >
+                                <svg
+                                  className={`w-3 h-3 mr-1 text-gray-400 transform transition-transform ${collapsedNestedObjects[key] ? '' : 'rotate-90'}`}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
                                 {propDef.label}:
                                 {/*propDef.required && <span className="text-red-400 ml-0.5">*</span>*/}
                               </div>
-                              <div className="pl-3 ml-2">
-                                {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]: [string, any]) => (
+                              {!collapsedNestedObjects[key] && (
+                                <div className="pl-3 ml-2">
+                                  {Object.entries(propDef.properties || {}).map(([nestedKey, nestedProp]: [string, any]) => (
                                   <div key={nestedKey} className="flex items-center space-x-3 mb-2">
                                     <label
                                       className="text-xs font-medium text-gray-500 min-w-[120px] flex-shrink-0"
@@ -1909,7 +2013,8 @@ export const HelpPanel = ({
                                     )}
                                   </div>
                                 ))}
-                              </div>
+                                </div>
+                              )}
                             </>
                           ) : (
                           // Render regular property
