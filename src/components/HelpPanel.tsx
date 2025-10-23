@@ -1334,56 +1334,120 @@ export const HelpPanel = ({
     };
   }, [help.length]); // Re-measure when help messages change
 
+  // Track the previous properties count to detect when going from empty to populated
+  const previousPropertiesCountRef = useRef(0);
+
+  // Function to adjust property editor height
+  const adjustPropertyEditorHeight = useCallback(() => {
+    if (!headerRef.current) return;
+
+    // Clear the manual resize flag since this is user interaction in the form
+    isManualResizeRef.current = false;
+
+    // Temporarily set height to auto to get true content height
+    const originalHeight = headerRef.current.style.height;
+    headerRef.current.style.height = 'auto';
+
+    // Measure the natural height of the content
+    const contentHeight = headerRef.current.scrollHeight;
+
+    // Restore the original height
+    headerRef.current.style.height = originalHeight;
+
+    // Get available window height
+    const windowHeight = window.innerHeight;
+    const availableHeight = Math.max(windowHeight * 0.8, 200);
+
+    // Update to exact content height
+    const newMaxHeight = Math.min(contentHeight, availableHeight);
+    setMaxHeaderHeight(newMaxHeight);
+    setHeaderHeight(newMaxHeight);
+    lastContentHeightRef.current = contentHeight;
+
+    // Reset manual resize flag when we auto-resize from form focus
+    isManualResizeRef.current = false;
+  }, []);
+
   // Separate effect for contextProperties changes - skip resize if just loaded task
   useEffect(() => {
-    if (headerRef.current && Object.keys(contextProperties).length > 0) {
+    const currentPropertiesCount = Object.keys(contextProperties).length;
+
+    if (headerRef.current && currentPropertiesCount > 0) {
+      // Check if this is the first time showing properties (going from 0 to > 0)
+      const isInitialPropertyLoad = previousPropertiesCountRef.current === 0 && currentPropertiesCount > 0;
+
       // Check if this is the first context change after loading a task
       if (justLoadedTaskRef.current) {
         justLoadedTaskRef.current = false;  // Clear the flag - next focus will trigger resize
 
-        // Don't resize - the height is locked because we're treating taskId changes
-        // the same as manual resizes (isManualResizeRef is true)
-      } else {
-        // Clear the manual resize flag since this is user interaction in the form
-        isManualResizeRef.current = false;
+        // Even when loading a task, we should resize if this is the first property display
+        // Only skip if we're updating properties that were already visible
+        if (!isInitialPropertyLoad) {
+          // Don't resize - the height is locked because we're treating taskId changes
+          // the same as manual resizes (isManualResizeRef is true)
+          previousPropertiesCountRef.current = currentPropertiesCount;
+          return;
+        }
+        // If it's initial property load, fall through to resize logic
+      }
 
-        // Force resize when properties change from user interaction in the form
-        const adjustHeight = () => {
-          if (headerRef.current) {
-            // Temporarily set height to auto to get true content height
-            const originalHeight = headerRef.current.style.height;
-            headerRef.current.style.height = 'auto';
-
-            // Measure the natural height of the content
-            const contentHeight = headerRef.current.scrollHeight;
-
-            // Restore the original height
-            headerRef.current.style.height = originalHeight;
-
-            // Get available window height
-            const windowHeight = window.innerHeight;
-            const availableHeight = Math.max(windowHeight * 0.8, 200);
-
-            // Update to exact content height
-            const newMaxHeight = Math.min(contentHeight, availableHeight);
-            setMaxHeaderHeight(newMaxHeight);
-            setHeaderHeight(newMaxHeight);
-            lastContentHeightRef.current = contentHeight;
-
-            // Reset manual resize flag when we auto-resize from form focus
-            isManualResizeRef.current = false;
+      // Proceed with resize logic (both for normal focus and initial load after task)
+      if (isInitialPropertyLoad) {
+        // For initial property load, use a MutationObserver to detect when the property editor is actually rendered
+        const observer = new MutationObserver((mutations) => {
+          // Check if the property editor div was added
+          const propertyEditorExists = headerRef.current?.querySelector('.bg-gray-50.rounded-lg.border-gray-200');
+          if (propertyEditorExists) {
+            // Property editor is now in the DOM, measure it
+            requestAnimationFrame(() => {
+              adjustPropertyEditorHeight();
+            });
+            observer.disconnect();
           }
-        };
+        });
 
-        // Small delay to ensure content is rendered
+        // Start observing for DOM changes
+        observer.observe(headerRef.current, {
+          childList: true,
+          subtree: true
+        });
+
+        // Also schedule fallback resize attempts
         const timeoutId = setTimeout(() => {
-          requestAnimationFrame(adjustHeight);
+          requestAnimationFrame(adjustPropertyEditorHeight);
+          observer.disconnect();
+        }, 100);
+
+        const secondTimeoutId = setTimeout(() => {
+          requestAnimationFrame(adjustPropertyEditorHeight);
+        }, 300);
+
+        // Update the previous count for next comparison
+        previousPropertiesCountRef.current = currentPropertiesCount;
+
+        return () => {
+          observer.disconnect();
+          clearTimeout(timeoutId);
+          clearTimeout(secondTimeoutId);
+        };
+      } else {
+        // For updates to existing properties, use a shorter delay
+        const timeoutId = setTimeout(() => {
+          requestAnimationFrame(adjustPropertyEditorHeight);
         }, 10);
 
-        return () => clearTimeout(timeoutId);
+        // Update the previous count for next comparison
+        previousPropertiesCountRef.current = currentPropertiesCount;
+
+        return () => {
+          clearTimeout(timeoutId);
+        };
       }
     }
-  }, [contextProperties]); // Resize when context properties change (conditionally)
+
+    // Update count even when no properties
+    previousPropertiesCountRef.current = currentPropertiesCount;
+  }, [contextProperties, adjustPropertyEditorHeight]); // Resize when context properties change (conditionally)
 
   // Adjust height when window resizes
   useEffect(() => {
