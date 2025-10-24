@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-22T21:15:47.824Z*
+*Downloaded on 2025-10-24T19:54:23.528Z*
 
 ## Language L0167
 
@@ -100,17 +100,28 @@ calculator expressions [
 ### Example 6
 
 #### Prompt
-"show the expressions list"
+"show the expressions list
+
+Update the code for options using these property values:
+```json
+{"expressions":true}
+```
+Note: Only the properties shown above have changed and need to be updated."
 
 #### Chat Transcript
 
 **User**: show the expressions list
 
+**User**: Update the code for options using these property values:
+```json
+{"expressions":true}
+```
+Note: Only the properties shown above have changed and need to be updated.
+
 #### Code
 
 ```
-show-expressions true calculator expressions [
-] {}..
+show-expressions true calculator expressions [] {}..
 ```
 
 ---
@@ -160,6 +171,46 @@ bounds [
 ### Example 9
 
 #### Prompt
+"Create a point that can be dragged freely in the most natural way, letting the system decide how it moves."
+
+#### Chat Transcript
+
+**User**: Create a point that can be dragged freely in the most natural way, letting the system decide how it moves.
+
+#### Code
+
+```
+calculator expressions [
+  drag-mode AUTO point-size 20 "(0, 0)"
+] {}..
+```
+
+---
+
+### Example 10
+
+#### Prompt
+"Make a scatter plot of the points (1,1), (2,4), and (3,9) without connecting the lines."
+
+#### Chat Transcript
+
+**User**: Make a scatter plot of the points (1,1), (2,4), and (3,9) without connecting the lines.
+
+#### Code
+
+```
+calculator expressions [
+  expression "(1,1)" lines false {}
+  expression "(2,4)" lines false {}
+  expression "(3,9)" lines false {}
+] {}..
+```
+
+---
+
+### Example 11
+
+#### Prompt
 "line-style DASHED on a curve"
 
 #### Chat Transcript
@@ -176,7 +227,46 @@ calculator expressions [
 
 ---
 
-### Example 10
+### Example 12
+
+#### Prompt
+"Create a point that can move freely in both x and y directions."
+
+#### Chat Transcript
+
+**User**: Create a point that can move freely in both x and y directions.
+
+#### Code
+
+```
+calculator expressions [
+  expression "(0, 0)" drag-mode XY {}
+] {}..
+```
+
+---
+
+### Example 13
+
+#### Prompt
+"Show the boundary of y≤−x+4y \le -x + 4y≤−x+4 without shading the region."
+
+#### Chat Transcript
+
+**User**: Show the boundary of y≤−x+4y \le -x + 4y≤−x+4 without shading the region.
+
+#### Code
+
+```
+calculator expressions [
+  expression "y = -x + 4" color "blue" {}
+  expression "y \leq -x + 4" fill-opacity 0 {}
+] {}..
+```
+
+---
+
+### Example 14
 
 #### Prompt
 "big cross point with opacity 30%"
@@ -195,7 +285,27 @@ calculator expressions [
 
 ---
 
-### Example 11
+### Example 15
+
+#### Prompt
+"shade the region below the parabola y = x^2 with fill opacity 0.2"
+
+#### Chat Transcript
+
+**User**: shade the region below the parabola y = x^2 with fill opacity 0.2
+
+#### Code
+
+```
+calculator expressions [
+  expression "y < x^2" color "blue"
+  fill-opacity 0.2 {}
+] {}..
+```
+
+---
+
+### Example 16
 
 #### Prompt
 "make the width 800 and height 600"
@@ -212,7 +322,26 @@ width 800 height 600 calculator expressions [] {}..
 
 ---
 
-### Example 12
+### Example 17
+
+#### Prompt
+"Create a point that can move left and right along the x-axis, but not up or down."
+
+#### Chat Transcript
+
+**User**: Create a point that can move left and right along the x-axis, but not up or down.
+
+#### Code
+
+```
+calculator expressions [
+  expression "(2, 3)" drag-mode X {}
+] {}..
+```
+
+---
+
+### Example 18
 
 #### Prompt
 "plot a list of points in a single expression"
@@ -231,7 +360,45 @@ calculator expressions [
 
 ---
 
-### Example 13
+### Example 19
+
+#### Prompt
+"Create a point that can move only up and down along the y-axis."
+
+#### Chat Transcript
+
+**User**: Create a point that can move only up and down along the y-axis.
+
+#### Code
+
+```
+calculator expressions [
+  expression "(0, 0)" drag-mode Y {}
+] {}..
+```
+
+---
+
+### Example 20
+
+#### Prompt
+"Fill the area under the line that connects the points (1,1), (2,4), and (3,1), keeping both the line and points visible."
+
+#### Chat Transcript
+
+**User**: Fill the area under the line that connects the points (1,1), (2,4), and (3,1), keeping both the line and points visible.
+
+#### Code
+
+```
+calculator expressions [
+  expression "[(1,1), (2,4), (3,1), (1,1)]" color "blue" fill true fill-opacity 0.3 lines true points true {}
+] {}..
+```
+
+---
+
+### Example 21
 
 #### Prompt
 "curve with color #ff00f1"
@@ -250,7 +417,7 @@ calculator expressions [
 
 ---
 
-### Example 14
+### Example 22
 
 #### Prompt
 "graph a curve with name 'myParabola'"
@@ -269,7 +436,7 @@ calculator expressions [
 
 ---
 
-### Example 15
+### Example 23
 
 #### Prompt
 "make a minimal graph of a parabola"
@@ -288,7 +455,28 @@ calculator expressions [
 
 ---
 
-### Example 16
+### Example 24
+
+#### Prompt
+"Plot only the points (1,1), (2,4), and (3,9) without connecting lines or any filled area."
+
+#### Chat Transcript
+
+**User**: Plot only the points (1,1), (2,4), and (3,9) without connecting lines or any filled area.
+
+#### Code
+
+```
+bounds [0 0 5 10] calculator expressions [
+  expression "(1,1)" lines false fill false {}
+  expression "(2,4)" lines false fill false {}
+  expression "(3,9)" lines false fill false {}
+] {}..
+```
+
+---
+
+### Example 25
 
 #### Prompt
 "point as cross or x"
@@ -307,7 +495,7 @@ calculator expressions [
 
 ---
 
-### Example 17
+### Example 26
 
 #### Prompt
 "plot an expression with a color"
@@ -326,7 +514,7 @@ calculator expressions [
 
 ---
 
-### Example 18
+### Example 27
 
 #### Prompt
 "draw a circle and a line with different opacities
@@ -382,7 +570,7 @@ calculator expressions [
 
 ---
 
-### Example 19
+### Example 28
 
 #### Prompt
 "dotted x^2 dashed x^3"
@@ -402,7 +590,7 @@ calculator expressions [
 
 ---
 
-### Example 20
+### Example 29
 
 #### Prompt
 "create a calculator with a mix of points and lines"
@@ -424,7 +612,7 @@ calculator expressions [
 
 ---
 
-### Example 21
+### Example 30
 
 #### Prompt
 "plot a list of points"
@@ -447,7 +635,7 @@ calculator expressions [
 
 ---
 
-### Example 22
+### Example 31
 
 #### Prompt
 "point using computed size with latex"
@@ -466,7 +654,7 @@ calculator expressions [
 
 ---
 
-### Example 23
+### Example 32
 
 #### Prompt
 "big point"
@@ -485,7 +673,7 @@ calculator expressions [
 
 ---
 
-### Example 24
+### Example 33
 
 #### Prompt
 "plot an expression"
@@ -504,7 +692,7 @@ calculator expressions [
 
 ---
 
-### Example 25
+### Example 34
 
 #### Prompt
 "plot an expression with a color using a record"
@@ -526,7 +714,7 @@ calculator expressions [
 
 ---
 
-### Example 26
+### Example 35
 
 #### Prompt
 "point as open circle"
@@ -545,7 +733,27 @@ calculator expressions [
 
 ---
 
-### Example 27
+### Example 36
+
+#### Prompt
+"Connect the points (1,1), (2,4), and (3,9) with lines while keeping the point markers visible."
+
+#### Chat Transcript
+
+**User**: Connect the points (1,1), (2,4), and (3,9) with lines while keeping the point markers visible.
+
+#### Code
+
+```
+calculator expressions [
+  "[(1,1), (2,4), (3,9)]"
+  expression "y = x^2" color "blue" line-width 2 {}
+] {}..
+```
+
+---
+
+### Example 37
 
 #### Prompt
 "plot a curve on graph with non-integer bounds"
@@ -569,7 +777,7 @@ bounds [
 
 ---
 
-### Example 28
+### Example 38
 
 #### Prompt
 "line with width 10"
@@ -588,7 +796,7 @@ calculator expressions [
 
 ---
 
-### Example 29
+### Example 39
 
 #### Prompt
 "Mix colored curve + secret points"
@@ -610,7 +818,7 @@ calculator expressions [
 
 ---
 
-### Example 30
+### Example 40
 
 #### Prompt
 "line opacity 50%"
@@ -629,7 +837,7 @@ calculator expressions [
 
 ---
 
-### Example 31
+### Example 41
 
 #### Prompt
 "plot two expressions (one a string another a record)"
@@ -652,7 +860,7 @@ calculator expressions [
 
 ---
 
-### Example 32
+### Example 42
 
 #### Prompt
 "point opacity 50%"
@@ -671,7 +879,7 @@ calculator expressions [
 
 ---
 
-### Example 33
+### Example 43
 
 #### Prompt
 "dotted blue line of width 5"
@@ -690,41 +898,7 @@ calculator expressions [
 
 ---
 
-### Example 34
-
-#### Prompt
-"draw a multi expression art work
-
-can you draw the face of a dog
-
-can you make it more newanced"
-
-#### Chat Transcript
-
-**User**: draw a multi expression art work
-
-**User**: can you draw the face of a dog
-
-**User**: can you make it more newanced
-
-#### Code
-
-```
-calculator expressions [
-  expression "x^2 + y^2 = 25" color "brown" line-width 3 {}
-  expression "(x+2)^2 + (y+2)^2 = 1" color "black" fill-opacity 1 {}
-  expression "(x-2)^2 + (y+2)^2 = 1" color "black" fill-opacity 1 {}
-  expression "y = -1 + 0.5|x|" color "black" line-width 4 {}
-  expression "y = -1" color "black" line-width 4 {}
-  expression "y = -3 - 0.2x^2" color "black" line-width 3 {}
-  expression "(x+3)^2 + (y-4)^2 = 4" color "brown" fill-opacity 0.8 {}
-  expression "(x-3)^2 + (y-4)^2 = 4" color "brown" fill-opacity 0.8 {}
-] {}..
-```
-
----
-
-### Example 35
+### Example 44
 
 #### Prompt
 "make a graph with three curves of three different colors"
@@ -745,7 +919,7 @@ calculator expressions [
 
 ---
 
-### Example 36
+### Example 45
 
 #### Prompt
 "make the calculator height 600"
@@ -762,7 +936,7 @@ height 600 calculator expressions [] {}..
 
 ---
 
-### Example 37
+### Example 46
 
 #### Prompt
 "plot a circle using an inequality"
@@ -781,7 +955,7 @@ calculator expressions [
 
 ---
 
-### Example 38
+### Example 47
 
 #### Prompt
 "mixed styles across multiple points lists
@@ -814,7 +988,7 @@ calculator expressions [
 
 ---
 
-### Example 39
+### Example 48
 
 #### Prompt
 "set the calculator graph bounds to 10"
@@ -831,7 +1005,7 @@ bounds 10 calculator expressions [] {}..
 
 ---
 
-### Example 40
+### Example 49
 
 #### Prompt
 "create a graph with very wide aspect ratio"
@@ -855,7 +1029,7 @@ width 1200 height 200 bounds [
 
 ---
 
-### Example 41
+### Example 50
 
 #### Prompt
 "hidden curve"
@@ -874,7 +1048,45 @@ calculator expressions [
 
 ---
 
-### Example 42
+### Example 51
+
+#### Prompt
+"make a scatter plot without lines with red open points"
+
+#### Chat Transcript
+
+**User**: make a scatter plot without lines with red open points
+
+#### Code
+
+```
+calculator expressions [
+  expression "[(1,2), (3,4), (5,6), (2,8), (7,1)]" lines false point-style "OPEN" color "red" {}
+] {}..
+```
+
+---
+
+### Example 52
+
+#### Prompt
+"Plot a line through the points (1,1), (2,4), and (3,9) without showing the point markers."
+
+#### Chat Transcript
+
+**User**: Plot a line through the points (1,1), (2,4), and (3,9) without showing the point markers.
+
+#### Code
+
+```
+bounds [0 0 5 10] calculator expressions [
+  expression "[(1,1), (2,4), (3,9)]" lines true points false {}
+] {}..
+```
+
+---
+
+### Example 53
 
 #### Prompt
 "plot a point as a point"
@@ -893,7 +1105,7 @@ calculator expressions [
 
 ---
 
-### Example 43
+### Example 54
 
 #### Prompt
 "make a plot of a curve with tight bounds
@@ -929,7 +1141,26 @@ bounds [
 
 ---
 
-### Example 44
+### Example 55
+
+#### Prompt
+"Connect the points (1,1), (2,4), and (3,9) with lines to form a polygon while keeping the point markers visible."
+
+#### Chat Transcript
+
+**User**: Connect the points (1,1), (2,4), and (3,9) with lines to form a polygon while keeping the point markers visible.
+
+#### Code
+
+```
+bounds [0 0 5 10] calculator expressions [
+  lines true "[(1,1), (2,4), (3,9), (1,1)]"
+] {}..
+```
+
+---
+
+### Example 56
 
 #### Prompt
 "Update the code for calculator using these property values:
@@ -955,7 +1186,7 @@ show-expressions true calculator expressions [
 
 ---
 
-### Example 45
+### Example 57
 
 #### Prompt
 "non-hidden secret curve"
@@ -969,6 +1200,25 @@ show-expressions true calculator expressions [
 ```
 calculator expressions [
   expression "y=x^2" hidden false secret true {}
+] {}..
+```
+
+---
+
+### Example 58
+
+#### Prompt
+"Create a fixed point at (2, 3) that cannot be moved by dragging."
+
+#### Chat Transcript
+
+**User**: Create a fixed point at (2, 3) that cannot be moved by dragging.
+
+#### Code
+
+```
+calculator expressions [
+  expression "(2, 3)" drag-mode NONE {}
 ] {}..
 ```
 
