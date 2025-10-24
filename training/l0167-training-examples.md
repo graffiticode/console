@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-24T19:54:23.528Z*
+*Downloaded on 2025-10-24T23:50:14.578Z*
 
 ## Language L0167
 
@@ -181,7 +181,7 @@ bounds [
 
 ```
 calculator expressions [
-  drag-mode AUTO point-size 20 "(0, 0)"
+  expression "(2, 3)" drag-mode "AUTO" {}
 ] {}..
 ```
 
@@ -363,6 +363,30 @@ calculator expressions [
 ### Example 19
 
 #### Prompt
+"Create an animated slider for a=5a = 5a=5 that runs automatically between 0 and 10 to show how the slope of y=axy = axy=ax changes."
+
+#### Chat Transcript
+
+**User**: Create an animated slider for a=5a = 5a=5 that runs automatically between 0 and 10 to show how the slope of y=axy = axy=ax changes.
+
+#### Code
+
+```
+show-expressions true calculator expressions [
+  expression "a=5" slider-bounds {
+    min: "0"
+    max: "10"
+    step: "0.1"
+  } playing true {}
+  "y=ax"
+] {}..
+```
+
+---
+
+### Example 20
+
+#### Prompt
 "Create a point that can move only up and down along the y-axis."
 
 #### Chat Transcript
@@ -379,7 +403,7 @@ calculator expressions [
 
 ---
 
-### Example 20
+### Example 21
 
 #### Prompt
 "Fill the area under the line that connects the points (1,1), (2,4), and (3,1), keeping both the line and points visible."
@@ -398,7 +422,7 @@ calculator expressions [
 
 ---
 
-### Example 21
+### Example 22
 
 #### Prompt
 "curve with color #ff00f1"
@@ -417,7 +441,7 @@ calculator expressions [
 
 ---
 
-### Example 22
+### Example 23
 
 #### Prompt
 "graph a curve with name 'myParabola'"
@@ -436,7 +460,7 @@ calculator expressions [
 
 ---
 
-### Example 23
+### Example 24
 
 #### Prompt
 "make a minimal graph of a parabola"
@@ -455,7 +479,7 @@ calculator expressions [
 
 ---
 
-### Example 24
+### Example 25
 
 #### Prompt
 "Plot only the points (1,1), (2,4), and (3,9) without connecting lines or any filled area."
@@ -476,7 +500,7 @@ bounds [0 0 5 10] calculator expressions [
 
 ---
 
-### Example 25
+### Example 26
 
 #### Prompt
 "point as cross or x"
@@ -495,7 +519,7 @@ calculator expressions [
 
 ---
 
-### Example 26
+### Example 27
 
 #### Prompt
 "plot an expression with a color"
@@ -514,7 +538,7 @@ calculator expressions [
 
 ---
 
-### Example 27
+### Example 28
 
 #### Prompt
 "draw a circle and a line with different opacities
@@ -570,7 +594,7 @@ calculator expressions [
 
 ---
 
-### Example 28
+### Example 29
 
 #### Prompt
 "dotted x^2 dashed x^3"
@@ -590,7 +614,7 @@ calculator expressions [
 
 ---
 
-### Example 29
+### Example 30
 
 #### Prompt
 "create a calculator with a mix of points and lines"
@@ -612,7 +636,7 @@ calculator expressions [
 
 ---
 
-### Example 30
+### Example 31
 
 #### Prompt
 "plot a list of points"
@@ -635,7 +659,7 @@ calculator expressions [
 
 ---
 
-### Example 31
+### Example 32
 
 #### Prompt
 "point using computed size with latex"
@@ -654,7 +678,36 @@ calculator expressions [
 
 ---
 
-### Example 32
+### Example 33
+
+#### Prompt
+"Make two sliders, a and b, to control the slope and intercept of the line y=ax+by = a x + by=ax+b. Let a move from 0–10 in steps of 0.5 and b move from −5–5 in steps of 1."
+
+#### Chat Transcript
+
+**User**: Make two sliders, a and b, to control the slope and intercept of the line y=ax+by = a x + by=ax+b. Let a move from 0–10 in steps of 0.5 and b move from −5–5 in steps of 1.
+
+#### Code
+
+```
+show-expressions true calculator expressions [
+  expression "a=1" slider-bounds {
+    min: "0"
+    max: "10"
+    step: "0.5"
+  } {}
+  expression "b=0" slider-bounds {
+    min: "-5"
+    max: "5"
+    step: "1"
+  } {}
+  "y=ax+b"
+] {}..
+```
+
+---
+
+### Example 34
 
 #### Prompt
 "big point"
@@ -673,7 +726,7 @@ calculator expressions [
 
 ---
 
-### Example 33
+### Example 35
 
 #### Prompt
 "plot an expression"
@@ -692,7 +745,7 @@ calculator expressions [
 
 ---
 
-### Example 34
+### Example 36
 
 #### Prompt
 "plot an expression with a color using a record"
@@ -714,7 +767,7 @@ calculator expressions [
 
 ---
 
-### Example 35
+### Example 37
 
 #### Prompt
 "point as open circle"
@@ -733,7 +786,7 @@ calculator expressions [
 
 ---
 
-### Example 36
+### Example 38
 
 #### Prompt
 "Connect the points (1,1), (2,4), and (3,9) with lines while keeping the point markers visible."
@@ -753,7 +806,7 @@ calculator expressions [
 
 ---
 
-### Example 37
+### Example 39
 
 #### Prompt
 "plot a curve on graph with non-integer bounds"
@@ -777,7 +830,7 @@ bounds [
 
 ---
 
-### Example 38
+### Example 40
 
 #### Prompt
 "line with width 10"
@@ -796,7 +849,7 @@ calculator expressions [
 
 ---
 
-### Example 39
+### Example 41
 
 #### Prompt
 "Mix colored curve + secret points"
@@ -818,7 +871,31 @@ calculator expressions [
 
 ---
 
-### Example 40
+### Example 42
+
+#### Prompt
+"Add a slider a = 5 with bounds 0 to 10 in steps of 0.5, and use it to control the slope of the line y=axy = axy=ax."
+
+#### Chat Transcript
+
+**User**: Add a slider a = 5 with bounds 0 to 10 in steps of 0.5, and use it to control the slope of the line y=axy = axy=ax.
+
+#### Code
+
+```
+show-expressions true calculator expressions [
+  expression  "a=5" slider-bounds {
+    step: "0.5"
+    max: "10"
+    min: "0"
+  } {}
+  "y=ax"
+] {}..
+```
+
+---
+
+### Example 43
 
 #### Prompt
 "line opacity 50%"
@@ -837,7 +914,7 @@ calculator expressions [
 
 ---
 
-### Example 41
+### Example 44
 
 #### Prompt
 "plot two expressions (one a string another a record)"
@@ -860,7 +937,7 @@ calculator expressions [
 
 ---
 
-### Example 42
+### Example 45
 
 #### Prompt
 "point opacity 50%"
@@ -879,7 +956,7 @@ calculator expressions [
 
 ---
 
-### Example 43
+### Example 46
 
 #### Prompt
 "dotted blue line of width 5"
@@ -898,7 +975,7 @@ calculator expressions [
 
 ---
 
-### Example 44
+### Example 47
 
 #### Prompt
 "make a graph with three curves of three different colors"
@@ -919,7 +996,7 @@ calculator expressions [
 
 ---
 
-### Example 45
+### Example 48
 
 #### Prompt
 "make the calculator height 600"
@@ -936,7 +1013,31 @@ height 600 calculator expressions [] {}..
 
 ---
 
-### Example 46
+### Example 49
+
+#### Prompt
+"Use a slider for a to control the slope of the line y=ax+2y"
+
+#### Chat Transcript
+
+**User**: Use a slider for a to control the slope of the line y=ax+2y
+
+#### Code
+
+```
+show-expressions true calculator expressions [
+  expression "a=1" slider-bounds {
+    min: "-5"
+    max: "5"
+    step: "0.1"
+  } {}
+  "y=ax+2"
+] {}..
+```
+
+---
+
+### Example 50
 
 #### Prompt
 "plot a circle using an inequality"
@@ -955,7 +1056,7 @@ calculator expressions [
 
 ---
 
-### Example 47
+### Example 51
 
 #### Prompt
 "mixed styles across multiple points lists
@@ -988,7 +1089,7 @@ calculator expressions [
 
 ---
 
-### Example 48
+### Example 52
 
 #### Prompt
 "set the calculator graph bounds to 10"
@@ -1005,7 +1106,7 @@ bounds 10 calculator expressions [] {}..
 
 ---
 
-### Example 49
+### Example 53
 
 #### Prompt
 "create a graph with very wide aspect ratio"
@@ -1029,7 +1130,7 @@ width 1200 height 200 bounds [
 
 ---
 
-### Example 50
+### Example 54
 
 #### Prompt
 "hidden curve"
@@ -1048,7 +1149,7 @@ calculator expressions [
 
 ---
 
-### Example 51
+### Example 55
 
 #### Prompt
 "make a scatter plot without lines with red open points"
@@ -1067,7 +1168,7 @@ calculator expressions [
 
 ---
 
-### Example 52
+### Example 56
 
 #### Prompt
 "Plot a line through the points (1,1), (2,4), and (3,9) without showing the point markers."
@@ -1086,7 +1187,7 @@ bounds [0 0 5 10] calculator expressions [
 
 ---
 
-### Example 53
+### Example 57
 
 #### Prompt
 "plot a point as a point"
@@ -1105,7 +1206,7 @@ calculator expressions [
 
 ---
 
-### Example 54
+### Example 58
 
 #### Prompt
 "make a plot of a curve with tight bounds
@@ -1141,7 +1242,7 @@ bounds [
 
 ---
 
-### Example 55
+### Example 59
 
 #### Prompt
 "Connect the points (1,1), (2,4), and (3,9) with lines to form a polygon while keeping the point markers visible."
@@ -1160,7 +1261,7 @@ bounds [0 0 5 10] calculator expressions [
 
 ---
 
-### Example 56
+### Example 60
 
 #### Prompt
 "Update the code for calculator using these property values:
@@ -1186,7 +1287,7 @@ show-expressions true calculator expressions [
 
 ---
 
-### Example 57
+### Example 61
 
 #### Prompt
 "non-hidden secret curve"
@@ -1205,7 +1306,7 @@ calculator expressions [
 
 ---
 
-### Example 58
+### Example 62
 
 #### Prompt
 "Create a fixed point at (2, 3) that cannot be moved by dragging."
