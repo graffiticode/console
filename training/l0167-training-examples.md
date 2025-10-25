@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-24T23:50:14.578Z*
+*Downloaded on 2025-10-25T23:44:37.914Z*
 
 ## Language L0167
 
@@ -43,6 +43,27 @@ width 800 calculator expressions [] {}..
 ### Example 3
 
 #### Prompt
+"collapse expressions list"
+
+#### Chat Transcript
+
+**User**: collapse expressions list
+
+#### Code
+
+```
+expressions-list true expression-collapsed true calculator expressions [] {
+  options: {
+    "expressionsTopbar": true
+  }
+}..
+```
+
+---
+
+### Example 4
+
+#### Prompt
 "secret curve"
 
 #### Chat Transcript
@@ -59,7 +80,7 @@ calculator expressions [
 
 ---
 
-### Example 4
+### Example 5
 
 #### Prompt
 "dotted line"
@@ -78,7 +99,7 @@ calculator expressions [
 
 ---
 
-### Example 5
+### Example 6
 
 #### Prompt
 "red curve"
@@ -93,35 +114,6 @@ calculator expressions [
 calculator expressions [
   color "red" "y=x^2"
 ] {}..
-```
-
----
-
-### Example 6
-
-#### Prompt
-"show the expressions list
-
-Update the code for options using these property values:
-```json
-{"expressions":true}
-```
-Note: Only the properties shown above have changed and need to be updated."
-
-#### Chat Transcript
-
-**User**: show the expressions list
-
-**User**: Update the code for options using these property values:
-```json
-{"expressions":true}
-```
-Note: Only the properties shown above have changed and need to be updated.
-
-#### Code
-
-```
-show-expressions true calculator expressions [] {}..
 ```
 
 ---
@@ -325,6 +317,28 @@ width 800 height 600 calculator expressions [] {}..
 ### Example 17
 
 #### Prompt
+"Plot the polar cardioid r=1−cos⁡θ over θ∈[0,2π] and lightly shade the region"
+
+#### Chat Transcript
+
+**User**: Plot the polar cardioid r=1−cos⁡θ over θ∈[0,2π] and lightly shade the region
+
+#### Code
+
+```
+calculator expressions [
+  expression "r=1-\\cos(\\theta)" polar-domain {
+    min: "0"
+    max: "2\\pi"
+  } fill true fill-opacity 0.3 {}
+] {}..
+```
+
+---
+
+### Example 18
+
+#### Prompt
 "Create a point that can move left and right along the x-axis, but not up or down."
 
 #### Chat Transcript
@@ -341,7 +355,7 @@ calculator expressions [
 
 ---
 
-### Example 18
+### Example 19
 
 #### Prompt
 "plot a list of points in a single expression"
@@ -360,7 +374,7 @@ calculator expressions [
 
 ---
 
-### Example 19
+### Example 20
 
 #### Prompt
 "Create an animated slider for a=5a = 5a=5 that runs automatically between 0 and 10 to show how the slope of y=axy = axy=ax changes."
@@ -384,7 +398,7 @@ show-expressions true calculator expressions [
 
 ---
 
-### Example 20
+### Example 21
 
 #### Prompt
 "Create a point that can move only up and down along the y-axis."
@@ -403,7 +417,7 @@ calculator expressions [
 
 ---
 
-### Example 21
+### Example 22
 
 #### Prompt
 "Fill the area under the line that connects the points (1,1), (2,4), and (3,1), keeping both the line and points visible."
@@ -422,7 +436,7 @@ calculator expressions [
 
 ---
 
-### Example 22
+### Example 23
 
 #### Prompt
 "curve with color #ff00f1"
@@ -441,7 +455,7 @@ calculator expressions [
 
 ---
 
-### Example 23
+### Example 24
 
 #### Prompt
 "graph a curve with name 'myParabola'"
@@ -460,7 +474,7 @@ calculator expressions [
 
 ---
 
-### Example 24
+### Example 25
 
 #### Prompt
 "make a minimal graph of a parabola"
@@ -479,7 +493,7 @@ calculator expressions [
 
 ---
 
-### Example 25
+### Example 26
 
 #### Prompt
 "Plot only the points (1,1), (2,4), and (3,9) without connecting lines or any filled area."
@@ -500,7 +514,7 @@ bounds [0 0 5 10] calculator expressions [
 
 ---
 
-### Example 26
+### Example 27
 
 #### Prompt
 "point as cross or x"
@@ -519,7 +533,7 @@ calculator expressions [
 
 ---
 
-### Example 27
+### Example 28
 
 #### Prompt
 "plot an expression with a color"
@@ -538,7 +552,7 @@ calculator expressions [
 
 ---
 
-### Example 28
+### Example 29
 
 #### Prompt
 "draw a circle and a line with different opacities
@@ -594,7 +608,7 @@ calculator expressions [
 
 ---
 
-### Example 29
+### Example 30
 
 #### Prompt
 "dotted x^2 dashed x^3"
@@ -614,7 +628,7 @@ calculator expressions [
 
 ---
 
-### Example 30
+### Example 31
 
 #### Prompt
 "create a calculator with a mix of points and lines"
@@ -636,7 +650,7 @@ calculator expressions [
 
 ---
 
-### Example 31
+### Example 32
 
 #### Prompt
 "plot a list of points"
@@ -659,7 +673,7 @@ calculator expressions [
 
 ---
 
-### Example 32
+### Example 33
 
 #### Prompt
 "point using computed size with latex"
@@ -678,7 +692,7 @@ calculator expressions [
 
 ---
 
-### Example 33
+### Example 34
 
 #### Prompt
 "Make two sliders, a and b, to control the slope and intercept of the line y=ax+by = a x + by=ax+b. Let a move from 0–10 in steps of 0.5 and b move from −5–5 in steps of 1."
@@ -707,7 +721,24 @@ show-expressions true calculator expressions [
 
 ---
 
-### Example 34
+### Example 35
+
+#### Prompt
+"show expressions list unccollapsed"
+
+#### Chat Transcript
+
+**User**: show expressions list unccollapsed
+
+#### Code
+
+```
+show-expressions true expressions-collapsed false calculator expressions [] {v:1}..
+```
+
+---
+
+### Example 36
 
 #### Prompt
 "big point"
@@ -726,7 +757,7 @@ calculator expressions [
 
 ---
 
-### Example 35
+### Example 37
 
 #### Prompt
 "plot an expression"
@@ -745,7 +776,7 @@ calculator expressions [
 
 ---
 
-### Example 36
+### Example 38
 
 #### Prompt
 "plot an expression with a color using a record"
@@ -767,7 +798,7 @@ calculator expressions [
 
 ---
 
-### Example 37
+### Example 39
 
 #### Prompt
 "point as open circle"
@@ -786,7 +817,7 @@ calculator expressions [
 
 ---
 
-### Example 38
+### Example 40
 
 #### Prompt
 "Connect the points (1,1), (2,4), and (3,9) with lines while keeping the point markers visible."
@@ -806,7 +837,7 @@ calculator expressions [
 
 ---
 
-### Example 39
+### Example 41
 
 #### Prompt
 "plot a curve on graph with non-integer bounds"
@@ -830,7 +861,7 @@ bounds [
 
 ---
 
-### Example 40
+### Example 42
 
 #### Prompt
 "line with width 10"
@@ -849,7 +880,7 @@ calculator expressions [
 
 ---
 
-### Example 41
+### Example 43
 
 #### Prompt
 "Mix colored curve + secret points"
@@ -871,7 +902,29 @@ calculator expressions [
 
 ---
 
-### Example 42
+### Example 44
+
+#### Prompt
+"Plot a polar rose using r=sin⁡(3θ) for θ from 0 to 2π"
+
+#### Chat Transcript
+
+**User**: Plot a polar rose using r=sin⁡(3θ) for θ from 0 to 2π
+
+#### Code
+
+```
+calculator expressions [
+  expression "r=\\sin(3\\theta)" polar-domain {
+    max: "2\\pi"
+    min: "0"
+  } {}
+] {}..
+```
+
+---
+
+### Example 45
 
 #### Prompt
 "Add a slider a = 5 with bounds 0 to 10 in steps of 0.5, and use it to control the slope of the line y=axy = axy=ax."
@@ -895,7 +948,24 @@ show-expressions true calculator expressions [
 
 ---
 
-### Example 43
+### Example 46
+
+#### Prompt
+"don't show expressions list"
+
+#### Chat Transcript
+
+**User**: don't show expressions list
+
+#### Code
+
+```
+show-expressions false calculator expressions [] {}..
+```
+
+---
+
+### Example 47
 
 #### Prompt
 "line opacity 50%"
@@ -914,7 +984,7 @@ calculator expressions [
 
 ---
 
-### Example 44
+### Example 48
 
 #### Prompt
 "plot two expressions (one a string another a record)"
@@ -937,7 +1007,7 @@ calculator expressions [
 
 ---
 
-### Example 45
+### Example 49
 
 #### Prompt
 "point opacity 50%"
@@ -956,7 +1026,7 @@ calculator expressions [
 
 ---
 
-### Example 46
+### Example 50
 
 #### Prompt
 "dotted blue line of width 5"
@@ -975,7 +1045,7 @@ calculator expressions [
 
 ---
 
-### Example 47
+### Example 51
 
 #### Prompt
 "make a graph with three curves of three different colors"
@@ -996,7 +1066,38 @@ calculator expressions [
 
 ---
 
-### Example 48
+### Example 52
+
+#### Prompt
+"Update the code for options using these property values:
+```json
+{
+  "expressions": true,
+  "expressionsCollapsed": true
+}
+```
+Note: Only the properties shown above have changed and need to be updated."
+
+#### Chat Transcript
+
+**User**: Update the code for options using these property values:
+```json
+{
+  "expressions": true,
+  "expressionsCollapsed": true
+}
+```
+Note: Only the properties shown above have changed and need to be updated.
+
+#### Code
+
+```
+calculator show-expressions true expressions-collapsed true expressions [] {}..
+```
+
+---
+
+### Example 53
 
 #### Prompt
 "make the calculator height 600"
@@ -1013,7 +1114,47 @@ height 600 calculator expressions [] {}..
 
 ---
 
-### Example 49
+### Example 54
+
+#### Prompt
+"Create a line y=2x+1 and give it the id "mainLine" so it can be referenced later"
+
+#### Chat Transcript
+
+**User**: Create a line y=2x+1 and give it the id "mainLine" so it can be referenced later
+
+#### Code
+
+```
+calculator expressions [
+  expression "y=2x+1" id "mainLine" {}
+] {}..
+```
+
+---
+
+### Example 55
+
+#### Prompt
+"Place three labeled points A, B, and C at (1,1), (2,2), and (3,3). Assign each an id and position their labels differently: A above, B right, C left"
+
+#### Chat Transcript
+
+**User**: Place three labeled points A, B, and C at (1,1), (2,2), and (3,3). Assign each an id and position their labels differently: A above, B right, C left
+
+#### Code
+
+```
+calculator expressions [
+  expression "(1,1)" id "pointA" label "A" show-label true label-orientation "ABOVE" {}
+  expression "(2,2)" id "pointB" label "B" show-label true label-orientation "RIGHT" {}
+  expression "(3,3)" id "pointC" label "C" show-label true label-orientation "LEFT" {}
+] {}..
+```
+
+---
+
+### Example 56
 
 #### Prompt
 "Use a slider for a to control the slope of the line y=ax+2y"
@@ -1025,7 +1166,7 @@ height 600 calculator expressions [] {}..
 #### Code
 
 ```
-show-expressions true calculator expressions [
+show-expressions true expressions-collapsed true calculator expressions [
   expression "a=1" slider-bounds {
     min: "-5"
     max: "5"
@@ -1037,7 +1178,29 @@ show-expressions true calculator expressions [
 
 ---
 
-### Example 50
+### Example 57
+
+#### Prompt
+"Plot a circle in polar coordinates using r=2 for θ from 0 to 2π"
+
+#### Chat Transcript
+
+**User**: Plot a circle in polar coordinates using r=2 for θ from 0 to 2π
+
+#### Code
+
+```
+calculator expressions [
+  expression "r=2" polar-domain {
+    min: "0"
+    max: "2\\pi"
+  } {}
+] {}..
+```
+
+---
+
+### Example 58
 
 #### Prompt
 "plot a circle using an inequality"
@@ -1056,7 +1219,7 @@ calculator expressions [
 
 ---
 
-### Example 51
+### Example 59
 
 #### Prompt
 "mixed styles across multiple points lists
@@ -1089,7 +1252,7 @@ calculator expressions [
 
 ---
 
-### Example 52
+### Example 60
 
 #### Prompt
 "set the calculator graph bounds to 10"
@@ -1106,7 +1269,7 @@ bounds 10 calculator expressions [] {}..
 
 ---
 
-### Example 53
+### Example 61
 
 #### Prompt
 "create a graph with very wide aspect ratio"
@@ -1130,7 +1293,26 @@ width 1200 height 200 bounds [
 
 ---
 
-### Example 54
+### Example 62
+
+#### Prompt
+"Place a point at (1, 2) labeled “Point A” and make the label visible"
+
+#### Chat Transcript
+
+**User**: Place a point at (1, 2) labeled “Point A” and make the label visible
+
+#### Code
+
+```
+calculator expressions [
+  expression "(1, 2)" label "Point A" show-label true {}
+] {}..
+```
+
+---
+
+### Example 63
 
 #### Prompt
 "hidden curve"
@@ -1149,7 +1331,29 @@ calculator expressions [
 
 ---
 
-### Example 55
+### Example 64
+
+#### Prompt
+"Plot an ellipse using the parametric equations x=2cos⁡(t), y=sin⁡(t), for t from 0 to 2π, with a dashed blue outline and 20% fill opacity"
+
+#### Chat Transcript
+
+**User**: Plot an ellipse using the parametric equations x=2cos⁡(t), y=sin⁡(t), for t from 0 to 2π, with a dashed blue outline and 20% fill opacity
+
+#### Code
+
+```
+calculator expressions [
+  expression "(2\\cos(t), \\sin(t))" parametric-domain {
+    max: "2\\pi"
+    min: "0"
+  } line-style "DASHED" color "blue" fill true fill-opacity 0.2 {}
+] {}..
+```
+
+---
+
+### Example 65
 
 #### Prompt
 "make a scatter plot without lines with red open points"
@@ -1168,7 +1372,7 @@ calculator expressions [
 
 ---
 
-### Example 56
+### Example 66
 
 #### Prompt
 "Plot a line through the points (1,1), (2,4), and (3,9) without showing the point markers."
@@ -1187,7 +1391,7 @@ bounds [0 0 5 10] calculator expressions [
 
 ---
 
-### Example 57
+### Example 67
 
 #### Prompt
 "plot a point as a point"
@@ -1206,7 +1410,29 @@ calculator expressions [
 
 ---
 
-### Example 58
+### Example 68
+
+#### Prompt
+"Plot a unit circle using the parametric curve (cos t, sin t) for t from 0 to 2π"
+
+#### Chat Transcript
+
+**User**: Plot a unit circle using the parametric curve (cos t, sin t) for t from 0 to 2π
+
+#### Code
+
+```
+calculator expressions [
+  expression "(\cos(t), \sin(t))" parametric-domain {
+    min: "0"
+    max: "2\\pi"
+  } {}
+] {}..
+```
+
+---
+
+### Example 69
 
 #### Prompt
 "make a plot of a curve with tight bounds
@@ -1242,7 +1468,7 @@ bounds [
 
 ---
 
-### Example 59
+### Example 70
 
 #### Prompt
 "Connect the points (1,1), (2,4), and (3,9) with lines to form a polygon while keeping the point markers visible."
@@ -1261,33 +1487,7 @@ bounds [0 0 5 10] calculator expressions [
 
 ---
 
-### Example 60
-
-#### Prompt
-"Update the code for calculator using these property values:
-```json
-{"expressions":true}
-```
-Note: Only the properties shown above have changed and need to be updated."
-
-#### Chat Transcript
-
-**User**: Update the code for calculator using these property values:
-```json
-{"expressions":true}
-```
-Note: Only the properties shown above have changed and need to be updated.
-
-#### Code
-
-```
-show-expressions true calculator expressions [
-] {}..
-```
-
----
-
-### Example 61
+### Example 71
 
 #### Prompt
 "non-hidden secret curve"
@@ -1306,7 +1506,26 @@ calculator expressions [
 
 ---
 
-### Example 62
+### Example 72
+
+#### Prompt
+"Label a point “A” at (2, 1), make the label 1.5× the normal size, and place it above the point"
+
+#### Chat Transcript
+
+**User**: Label a point “A” at (2, 1), make the label 1.5× the normal size, and place it above the point
+
+#### Code
+
+```
+calculator expressions [
+  expression "(2, 1)" label "A" show-label true label-size "1.5" label-orientation "ABOVE" {}
+] {}..
+```
+
+---
+
+### Example 73
 
 #### Prompt
 "Create a fixed point at (2, 3) that cannot be moved by dragging."
