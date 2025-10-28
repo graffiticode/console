@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-25T23:44:37.914Z*
+*Downloaded on 2025-10-27T22:16:24.598Z*
 
 ## Language L0167
 
@@ -16,7 +16,7 @@
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x" line-width "\sqrt{16}" {}
 ] {}..
 ```
@@ -35,7 +35,7 @@ calculator expressions [
 #### Code
 
 ```
-width 800 calculator expressions [] {}..
+width 800 graphing expressions [] {}..
 ```
 
 ---
@@ -52,7 +52,7 @@ width 800 calculator expressions [] {}..
 #### Code
 
 ```
-expressions-list true expression-collapsed true calculator expressions [] {
+expressions-list true expression-collapsed true graphing expressions [] {
   options: {
     "expressionsTopbar": true
   }
@@ -73,7 +73,7 @@ expressions-list true expression-collapsed true calculator expressions [] {
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" secret true {}
 ] {}..
 ```
@@ -92,7 +92,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" line-style "DOTTED" {}
 ] {}..
 ```
@@ -111,7 +111,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   color "red" "y=x^2"
 ] {}..
 ```
@@ -130,7 +130,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   "y=x^2"
   "y=2x+1"
 ] {}..
@@ -155,7 +155,7 @@ bounds [
   -5
   5
   5
-] calculator expressions [] {}..
+] graphing expressions [] {}..
 ```
 
 ---
@@ -172,7 +172,7 @@ bounds [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(2, 3)" drag-mode "AUTO" {}
 ] {}..
 ```
@@ -191,7 +191,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(1,1)" lines false {}
   expression "(2,4)" lines false {}
   expression "(3,9)" lines false {}
@@ -212,7 +212,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" line-style "DASHED" {}
 ] {}..
 ```
@@ -231,8 +231,10 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
-  expression "(0, 0)" drag-mode XY {}
+graphing expressions [
+  expression "(0, 0)" id "a" drag-mode XY {}
+  expression "(5, 5)" id "b" {}
+  expression "[a, b]" lines true {}
 ] {}..
 ```
 
@@ -250,7 +252,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y = -x + 4" color "blue" {}
   expression "y \leq -x + 4" fill-opacity 0 {}
 ] {}..
@@ -270,7 +272,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(0, 0)" point-style "CROSS" point-size 20 point-opacity 0.3 {}
 ] {}..
 ```
@@ -289,7 +291,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y < x^2" color "blue"
   fill-opacity 0.2 {}
 ] {}..
@@ -309,7 +311,7 @@ calculator expressions [
 #### Code
 
 ```
-width 800 height 600 calculator expressions [] {}..
+width 800 height 600 graphing expressions [] {}..
 ```
 
 ---
@@ -326,7 +328,7 @@ width 800 height 600 calculator expressions [] {}..
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "r=1-\\cos(\\theta)" polar-domain {
     min: "0"
     max: "2\\pi"
@@ -348,7 +350,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(2, 3)" drag-mode X {}
 ] {}..
 ```
@@ -367,7 +369,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   "[(1,2), (3,4), (5,6), (2,8), (7,1)]"
 ] {}..
 ```
@@ -386,7 +388,7 @@ calculator expressions [
 #### Code
 
 ```
-show-expressions true calculator expressions [
+show-expressions true graphing expressions [
   expression "a=5" slider-bounds {
     min: "0"
     max: "10"
@@ -410,7 +412,7 @@ show-expressions true calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(0, 0)" drag-mode Y {}
 ] {}..
 ```
@@ -429,7 +431,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "[(1,1), (2,4), (3,1), (1,1)]" color "blue" fill true fill-opacity 0.3 lines true points true {}
 ] {}..
 ```
@@ -448,7 +450,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   color "#ff00f1" "y=x^2"
 ] {}..
 ```
@@ -467,7 +469,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" id "myParabola" {}
 ] {}..
 ```
@@ -486,7 +488,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   "y=x^2"
 ] {}..
 ```
@@ -505,7 +507,7 @@ calculator expressions [
 #### Code
 
 ```
-bounds [0 0 5 10] calculator expressions [
+bounds [0 0 5 10] graphing expressions [
   expression "(1,1)" lines false fill false {}
   expression "(2,4)" lines false fill false {}
   expression "(3,9)" lines false fill false {}
@@ -526,7 +528,7 @@ bounds [0 0 5 10] calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(0, 0)" point-style "CROSS" {}
 ] {}..
 ```
@@ -545,7 +547,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   color "red" "y=x^2"
 ] {}..
 ```
@@ -600,7 +602,7 @@ Note: Only the properties shown above have changed and need to be updated.
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "x^2 + y^2 < 25" color "blue" line-opacity 0.3 line-width 5 fill-opacity 0.1 {}
   expression "y = 2x + 1" color "red" line-opacity 0.8 line-width 5 {}
 ] {}..
@@ -620,7 +622,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" line-style "DOTTED" {}
   expression "y=x^3" line-style "DASHED" {}
 ] {}..
@@ -640,7 +642,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(2, 3)" color "red" point-size 8 {}
   expression "(-1, 4)" color "blue" point-size 8 {}
   expression "y = 2x + 1" color "green" line-width 3 {}
@@ -662,7 +664,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   "(1, 2)"
   "(3, 4)"
   "(5, 1)"
@@ -685,7 +687,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(2, 3)" point-size "2 + 3" {}
 ] {}..
 ```
@@ -704,7 +706,7 @@ calculator expressions [
 #### Code
 
 ```
-show-expressions true calculator expressions [
+show-expressions true graphing expressions [
   expression "a=1" slider-bounds {
     min: "0"
     max: "10"
@@ -733,7 +735,7 @@ show-expressions true calculator expressions [
 #### Code
 
 ```
-show-expressions true expressions-collapsed false calculator expressions [] {v:1}..
+show-expressions true expressions-collapsed false graphing expressions [] {v:1}..
 ```
 
 ---
@@ -750,7 +752,7 @@ show-expressions true expressions-collapsed false calculator expressions [] {v:1
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(0, 0)" point-size "20" {}
 ] {}..
 ```
@@ -769,7 +771,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" {}
 ] {}..
 ```
@@ -788,7 +790,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   {
     latex: "y=x^2"
     color: "#ff0000"
@@ -810,7 +812,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(0, 0)" point-style "OPEN" {}
 ] {}..
 ```
@@ -829,7 +831,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   "[(1,1), (2,4), (3,9)]"
   expression "y = x^2" color "blue" line-width 2 {}
 ] {}..
@@ -854,7 +856,7 @@ bounds [
   -1.5
   3.7
   4.2
-] calculator expressions [
+] graphing expressions [
   "y = x^2 - 2x + 1"
 ] {}..
 ```
@@ -873,7 +875,7 @@ bounds [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y = x" line-width 10 {}
 ] {}..
 ```
@@ -892,7 +894,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" color "blue" {}
   expression "(1, 1)" secret true {}
   expression "(2, 4)" secret true {}
@@ -914,7 +916,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "r=\\sin(3\\theta)" polar-domain {
     max: "2\\pi"
     min: "0"
@@ -936,7 +938,7 @@ calculator expressions [
 #### Code
 
 ```
-show-expressions true calculator expressions [
+show-expressions true graphing expressions [
   expression  "a=5" slider-bounds {
     step: "0.5"
     max: "10"
@@ -960,7 +962,7 @@ show-expressions true calculator expressions [
 #### Code
 
 ```
-show-expressions false calculator expressions [] {}..
+show-expressions false graphing expressions [] {}..
 ```
 
 ---
@@ -977,7 +979,7 @@ show-expressions false calculator expressions [] {}..
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" line-opacity 0.5 {}
 ] {}..
 ```
@@ -996,7 +998,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   "y=x^2"
   {
     latex: "y=x^3"
@@ -1019,7 +1021,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(0, 0)" point-opacity 0.5 {}
 ] {}..
 ```
@@ -1038,7 +1040,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" line-style "DOTTED" line-width 5 color "blue" {}
 ] {}..
 ```
@@ -1057,7 +1059,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   color "red" "y=x^2"
   color "blue" "y=x^3"
   color "green" "y=\sin(x)"
@@ -1092,7 +1094,7 @@ Note: Only the properties shown above have changed and need to be updated.
 #### Code
 
 ```
-calculator show-expressions true expressions-collapsed true expressions [] {}..
+graphing show-expressions true expressions-collapsed true expressions [] {}..
 ```
 
 ---
@@ -1109,7 +1111,7 @@ calculator show-expressions true expressions-collapsed true expressions [] {}..
 #### Code
 
 ```
-height 600 calculator expressions [] {}..
+height 600 graphing expressions [] {}..
 ```
 
 ---
@@ -1126,7 +1128,7 @@ height 600 calculator expressions [] {}..
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=2x+1" id "mainLine" {}
 ] {}..
 ```
@@ -1145,7 +1147,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(1,1)" id "pointA" label "A" show-label true label-orientation "ABOVE" {}
   expression "(2,2)" id "pointB" label "B" show-label true label-orientation "RIGHT" {}
   expression "(3,3)" id "pointC" label "C" show-label true label-orientation "LEFT" {}
@@ -1166,7 +1168,7 @@ calculator expressions [
 #### Code
 
 ```
-show-expressions true expressions-collapsed true calculator expressions [
+show-expressions true expressions-collapsed true graphing expressions [
   expression "a=1" slider-bounds {
     min: "-5"
     max: "5"
@@ -1190,7 +1192,7 @@ show-expressions true expressions-collapsed true calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "r=2" polar-domain {
     min: "0"
     max: "2\\pi"
@@ -1212,7 +1214,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   "x^2 + y^2 \leq 25"
 ] {}..
 ```
@@ -1243,7 +1245,7 @@ Note: Only the properties shown above have changed and need to be updated.
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "[(1,2), (3,4), (5,6)]" color "red" point-size 8 {}
   expression "[(2,1), (4,3), (6,5)]" color "blue" point-style "OPEN" point-size 12 {}
   expression "[(-1,2), (-3,4), (-2,1)]" color "green" point-style "CROSS" point-size 10 {}
@@ -1264,7 +1266,7 @@ calculator expressions [
 #### Code
 
 ```
-bounds 10 calculator expressions [] {}..
+bounds 10 graphing expressions [] {}..
 ```
 
 ---
@@ -1286,7 +1288,7 @@ width 1200 height 200 bounds [
   -5
   50
   5
-] calculator expressions [
+] graphing expressions [
   "y = \sin(x)"
 ] {}..
 ```
@@ -1305,7 +1307,7 @@ width 1200 height 200 bounds [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(1, 2)" label "Point A" show-label true {}
 ] {}..
 ```
@@ -1324,7 +1326,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" hidden true {}
 ] {}..
 ```
@@ -1343,7 +1345,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(2\\cos(t), \\sin(t))" parametric-domain {
     max: "2\\pi"
     min: "0"
@@ -1365,7 +1367,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "[(1,2), (3,4), (5,6), (2,8), (7,1)]" lines false point-style "OPEN" color "red" {}
 ] {}..
 ```
@@ -1384,7 +1386,7 @@ calculator expressions [
 #### Code
 
 ```
-bounds [0 0 5 10] calculator expressions [
+bounds [0 0 5 10] graphing expressions [
   expression "[(1,1), (2,4), (3,9)]" lines true points false {}
 ] {}..
 ```
@@ -1403,7 +1405,7 @@ bounds [0 0 5 10] calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   "(2, 3)"
 ] {}..
 ```
@@ -1422,7 +1424,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(\cos(t), \sin(t))" parametric-domain {
     min: "0"
     max: "2\\pi"
@@ -1461,7 +1463,7 @@ bounds [
   -2
   2
   2
-] calculator expressions [
+] graphing expressions [
   expression "y=x^3-x" line-style "DASHED" line-opacity 0.5 {}
 ] {}..
 ```
@@ -1480,7 +1482,7 @@ bounds [
 #### Code
 
 ```
-bounds [0 0 5 10] calculator expressions [
+graphing [0 0 5 10] calculator expressions [
   lines true "[(1,1), (2,4), (3,9), (1,1)]"
 ] {}..
 ```
@@ -1499,7 +1501,7 @@ bounds [0 0 5 10] calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "y=x^2" hidden false secret true {}
 ] {}..
 ```
@@ -1518,7 +1520,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(2, 1)" label "A" show-label true label-size "1.5" label-orientation "ABOVE" {}
 ] {}..
 ```
@@ -1537,7 +1539,7 @@ calculator expressions [
 #### Code
 
 ```
-calculator expressions [
+graphing expressions [
   expression "(2, 3)" drag-mode NONE {}
 ] {}..
 ```
