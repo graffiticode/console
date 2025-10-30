@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-30T23:00:14.481Z*
+*Downloaded on 2025-10-30T23:10:33.973Z*
 
 ## Language L0168
 
@@ -201,31 +201,6 @@ geometry expressions [
 ### Example 10
 
 #### Prompt
-"Create an assessment where the student is asked to place a point at (2, 3)"
-
-#### Chat Transcript
-
-**User**: Create an assessment where the student is asked to place a point at (2, 3)
-
-#### Code
-
-```
-geometry expressions [
-  expression "(0, 0)"
-  hidden true
-  secret true
-  assess [
-    method "point"
-    expected "(2, 3)"
-  ] {}
-] {}..
-```
-
----
-
-### Example 11
-
-#### Prompt
 "Define a point P that is 2 units to the right of A"
 
 #### Chat Transcript
@@ -243,7 +218,7 @@ geometry expressions [
 
 ---
 
-### Example 12
+### Example 11
 
 #### Prompt
 "Create point M as the midpoint between A and B"
@@ -264,7 +239,7 @@ geometry expressions [
 
 ---
 
-### Example 13
+### Example 12
 
 #### Prompt
 "create a point"
@@ -283,7 +258,7 @@ geometry expressions [
 
 ---
 
-### Example 14
+### Example 13
 
 #### Prompt
 "Create the line with equation y=2x+1"
@@ -302,30 +277,7 @@ geometry expressions [
 
 ---
 
-### Example 15
-
-#### Prompt
-"Create a point that snaps to integer coordinates"
-
-#### Chat Transcript
-
-**User**: Create a point that snaps to integer coordinates
-
-#### Code
-
-```
-geometry expressions [
-  expression "(0, 0)" drag-mode "X" slider-bounds {
-    min: "-5"
-    max: "5"
-    step: "1"
-  } {}
-] {}..
-```
-
----
-
-### Example 16
+### Example 14
 
 #### Prompt
 "Through point A with slope m, draw the line"
@@ -350,30 +302,7 @@ geometry expressions [
 
 ---
 
-### Example 17
-
-#### Prompt
-"Create a point that snaps to the nearest integer coordinates"
-
-#### Chat Transcript
-
-**User**: Create a point that snaps to the nearest integer coordinates
-
-#### Code
-
-```
-geometry expressions [
-  expression "P = (0, 0)" slider-bounds {
-    min: "-10"
-    max: "10"
-    step: "1"
-  } {}
-] {}..
-```
-
----
-
-### Example 18
+### Example 15
 
 #### Prompt
 "Define point P as the intersection of lines L₁ and L₂"
@@ -394,7 +323,7 @@ geometry expressions [
 
 ---
 
-### Example 19
+### Example 16
 
 #### Prompt
 "Add a draggable point D"
@@ -413,7 +342,7 @@ geometry expressions [
 
 ---
 
-### Example 20
+### Example 17
 
 #### Prompt
 "Define the intersection points of line L and circle C"
@@ -434,7 +363,7 @@ geometry expressions [
 
 ---
 
-### Example 21
+### Example 18
 
 #### Prompt
 "Create an assessment where the student is asked to place a point at (2, 3) and its reflection over the y axis. Include points P and Q that the student will drag into place, respectively"
@@ -466,7 +395,7 @@ geometry expressions [
 
 ---
 
-### Example 22
+### Example 19
 
 #### Prompt
 "Add a draggable point called D"
@@ -485,7 +414,7 @@ geometry expressions [
 
 ---
 
-### Example 23
+### Example 20
 
 #### Prompt
 "Add three draggable labeled points A, B, and C"
@@ -506,7 +435,7 @@ geometry expressions [
 
 ---
 
-### Example 24
+### Example 21
 
 #### Prompt
 "Define point P where x = 2a and y = 3b"
@@ -527,7 +456,7 @@ geometry expressions [
 
 ---
 
-### Example 25
+### Example 22
 
 #### Prompt
 "Create two labeled points A and B at (1, 2) and (4, 3)"
@@ -547,7 +476,7 @@ geometry expressions [
 
 ---
 
-### Example 26
+### Example 23
 
 #### Prompt
 "Draw segment AB"
@@ -568,7 +497,7 @@ geometry expressions [
 
 ---
 
-### Example 27
+### Example 24
 
 #### Prompt
 "Define intersection points of circles C₁ and C₂"
@@ -589,7 +518,7 @@ geometry expressions [
 
 ---
 
-### Example 28
+### Example 25
 
 #### Prompt
 "create an assessment where the student is expected to place a point at coordinates x=2 and y=-3"
@@ -611,7 +540,7 @@ geometry expressions [
 
 ---
 
-### Example 29
+### Example 26
 
 #### Prompt
 "Add draggable points A, B, and C"
@@ -632,7 +561,7 @@ geometry expressions [
 
 ---
 
-### Example 30
+### Example 27
 
 #### Prompt
 "Create a vector from the origin to (2, 3)"
@@ -651,7 +580,7 @@ geometry expressions [
 
 ---
 
-### Example 31
+### Example 28
 
 #### Prompt
 "Through point P, draw a line perpendicular to L"
@@ -674,7 +603,7 @@ geometry expressions [
 
 ---
 
-### Example 32
+### Example 29
 
 #### Prompt
 "Create point B by translating point A using vector v"
@@ -696,7 +625,7 @@ geometry expressions [
 
 ---
 
-### Example 33
+### Example 30
 
 #### Prompt
 "Create a draggable point on the circle centered at (0,0) with radius 3"
@@ -716,7 +645,7 @@ geometry expressions [
 
 ---
 
-### Example 34
+### Example 31
 
 #### Prompt
 "Make the line through A and B"
@@ -737,7 +666,7 @@ geometry expressions [
 
 ---
 
-### Example 35
+### Example 32
 
 #### Prompt
 "Define a point P where x = 2a + 1 and y = 3b − 2"
@@ -758,27 +687,7 @@ geometry expressions [
 
 ---
 
-### Example 36
-
-#### Prompt
-"Define point P = (x(t), y(t)) where t controls a curve"
-
-#### Chat Transcript
-
-**User**: Define point P = (x(t), y(t)) where t controls a curve
-
-#### Code
-
-```
-geometry expressions [
-  "y=\cos(x)"
-  "P = (X,Y)"
-] {}..
-```
-
----
-
-### Example 37
+### Example 33
 
 #### Prompt
 "Through point P, draw a line parallel to L"
@@ -801,7 +710,7 @@ geometry expressions [
 
 ---
 
-### Example 38
+### Example 34
 
 #### Prompt
 "Create a line with adjustable slope m passing through point P"
@@ -826,7 +735,7 @@ geometry expressions [
 
 ---
 
-### Example 39
+### Example 35
 
 #### Prompt
 "Add points A (0, 0), B (4, 0), and C (2, 3) to form the vertices of a triangle"
@@ -847,7 +756,7 @@ geometry expressions [
 
 ---
 
-### Example 40
+### Example 36
 
 #### Prompt
 "Draw a ray starting at A and passing through B"
@@ -868,7 +777,7 @@ geometry expressions [
 
 ---
 
-### Example 41
+### Example 37
 
 #### Prompt
 "Define point P as the intersection of line y = 2x + 1 and the circle centered at (2, 3) with radius 2"
@@ -889,7 +798,7 @@ geometry expressions [
 
 ---
 
-### Example 42
+### Example 38
 
 #### Prompt
 "Make a vector from the origin whose head is draggable"
