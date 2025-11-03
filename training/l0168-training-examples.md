@@ -1,10 +1,33 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-30T23:10:33.973Z*
+*Downloaded on 2025-11-03T23:30:30.450Z*
 
 ## Language L0168
 
 ### Example 1
+
+#### Prompt
+"validate the equation of a line"
+
+#### Chat Transcript
+
+**User**: validate the equation of a line
+
+#### Code
+
+```
+geometry expressions [
+  expression "y=2x+1" assess [
+    method "line"
+    expected "y=2x+1"
+    {}
+  ] {}
+] {}..
+```
+
+---
+
+### Example 2
 
 #### Prompt
 "Make draggable points A and B that define a segment"
@@ -25,7 +48,7 @@ geometry expressions [
 
 ---
 
-### Example 2
+### Example 3
 
 #### Prompt
 "Define points A (1, 1) and B (3 + a, 2 − b) using parameters a and b"
@@ -47,7 +70,7 @@ geometry expressions [
 
 ---
 
-### Example 3
+### Example 4
 
 #### Prompt
 "Create points A, B, and C on the same horizontal line"
@@ -68,7 +91,7 @@ geometry expressions [
 
 ---
 
-### Example 4
+### Example 5
 
 #### Prompt
 "Make a draggable point on the line through (0,0) and (4,2)"
@@ -90,7 +113,7 @@ geometry expressions [
 
 ---
 
-### Example 5
+### Example 6
 
 #### Prompt
 "make an assessment where the student is asked to place a point at the midpoint of a line segment. make the expected response to be a integer coordinates"
@@ -102,7 +125,7 @@ geometry expressions [
 #### Code
 
 ```
-bounds 10 geometry expressions [
+show-toolbar false show-expressions false bounds 10 geometry expressions [
   expression "A = (2, 4)" color "blue" {}
   expression "B = (6, 8)" color "blue" {}
   expression "\\segment(A, B)" color "blue" {}
@@ -115,7 +138,31 @@ bounds 10 geometry expressions [
 
 ---
 
-### Example 6
+### Example 7
+
+#### Prompt
+"create an assessment where the student is asked to plot the line y=-3x-1 using a line through two draggable points"
+
+#### Chat Transcript
+
+**User**: create an assessment where the student is asked to plot the line y=-3x-1 using a line through two draggable points
+
+#### Code
+
+```
+geometry expressions [
+  expression "A = (0, -1)" label "A" show-label true drag-mode "XY" {}
+  expression "B = (1, -4)" label "B" show-label true drag-mode "XY" {}
+  expression "\line(A, B)" assess [
+    method "line"
+    expected "y=-3x-1"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 8
 
 #### Prompt
 "Add a labeled point A at (4, 1)"
@@ -134,7 +181,7 @@ geometry expressions [
 
 ---
 
-### Example 7
+### Example 9
 
 #### Prompt
 "Make a dashed line through A and B"
@@ -155,7 +202,7 @@ geometry expressions [
 
 ---
 
-### Example 8
+### Example 10
 
 #### Prompt
 "Draw the perpendicular bisector of segment AB"
@@ -178,7 +225,7 @@ geometry expressions [
 
 ---
 
-### Example 9
+### Example 11
 
 #### Prompt
 "Create a point B that is the reflection of A across the y-axis"
@@ -198,7 +245,7 @@ geometry expressions [
 
 ---
 
-### Example 10
+### Example 12
 
 #### Prompt
 "Define a point P that is 2 units to the right of A"
@@ -218,7 +265,7 @@ geometry expressions [
 
 ---
 
-### Example 11
+### Example 13
 
 #### Prompt
 "Create point M as the midpoint between A and B"
@@ -239,7 +286,28 @@ geometry expressions [
 
 ---
 
-### Example 12
+### Example 14
+
+#### Prompt
+"create a line through two draggable points with the step of one unit"
+
+#### Chat Transcript
+
+**User**: create a line through two draggable points with the step of one unit
+
+#### Code
+
+```
+geometry expressions [
+  expression "A = (0, 0)" label "A" show-label true drag-mode "XY" {}
+  expression "B = (1, 1)" label "B" show-label true drag-mode "XY" {}
+  expression "\line(A,B)" {}
+] {}..
+```
+
+---
+
+### Example 15
 
 #### Prompt
 "create a point"
@@ -258,7 +326,7 @@ geometry expressions [
 
 ---
 
-### Example 13
+### Example 16
 
 #### Prompt
 "Create the line with equation y=2x+1"
@@ -277,7 +345,7 @@ geometry expressions [
 
 ---
 
-### Example 14
+### Example 17
 
 #### Prompt
 "Through point A with slope m, draw the line"
@@ -302,7 +370,7 @@ geometry expressions [
 
 ---
 
-### Example 15
+### Example 18
 
 #### Prompt
 "Define point P as the intersection of lines L₁ and L₂"
@@ -323,7 +391,7 @@ geometry expressions [
 
 ---
 
-### Example 16
+### Example 19
 
 #### Prompt
 "Add a draggable point D"
@@ -342,7 +410,7 @@ geometry expressions [
 
 ---
 
-### Example 17
+### Example 20
 
 #### Prompt
 "Define the intersection points of line L and circle C"
@@ -363,7 +431,7 @@ geometry expressions [
 
 ---
 
-### Example 18
+### Example 21
 
 #### Prompt
 "Create an assessment where the student is asked to place a point at (2, 3) and its reflection over the y axis. Include points P and Q that the student will drag into place, respectively"
@@ -395,7 +463,7 @@ geometry expressions [
 
 ---
 
-### Example 19
+### Example 22
 
 #### Prompt
 "Add a draggable point called D"
@@ -414,7 +482,7 @@ geometry expressions [
 
 ---
 
-### Example 20
+### Example 23
 
 #### Prompt
 "Add three draggable labeled points A, B, and C"
@@ -435,7 +503,7 @@ geometry expressions [
 
 ---
 
-### Example 21
+### Example 24
 
 #### Prompt
 "Define point P where x = 2a and y = 3b"
@@ -456,7 +524,7 @@ geometry expressions [
 
 ---
 
-### Example 22
+### Example 25
 
 #### Prompt
 "Create two labeled points A and B at (1, 2) and (4, 3)"
@@ -476,7 +544,7 @@ geometry expressions [
 
 ---
 
-### Example 23
+### Example 26
 
 #### Prompt
 "Draw segment AB"
@@ -497,7 +565,7 @@ geometry expressions [
 
 ---
 
-### Example 24
+### Example 27
 
 #### Prompt
 "Define intersection points of circles C₁ and C₂"
@@ -518,7 +586,7 @@ geometry expressions [
 
 ---
 
-### Example 25
+### Example 28
 
 #### Prompt
 "create an assessment where the student is expected to place a point at coordinates x=2 and y=-3"
@@ -540,7 +608,7 @@ geometry expressions [
 
 ---
 
-### Example 26
+### Example 29
 
 #### Prompt
 "Add draggable points A, B, and C"
@@ -561,7 +629,7 @@ geometry expressions [
 
 ---
 
-### Example 27
+### Example 30
 
 #### Prompt
 "Create a vector from the origin to (2, 3)"
@@ -580,7 +648,7 @@ geometry expressions [
 
 ---
 
-### Example 28
+### Example 31
 
 #### Prompt
 "Through point P, draw a line perpendicular to L"
@@ -603,7 +671,7 @@ geometry expressions [
 
 ---
 
-### Example 29
+### Example 32
 
 #### Prompt
 "Create point B by translating point A using vector v"
@@ -625,7 +693,7 @@ geometry expressions [
 
 ---
 
-### Example 30
+### Example 33
 
 #### Prompt
 "Create a draggable point on the circle centered at (0,0) with radius 3"
@@ -645,7 +713,7 @@ geometry expressions [
 
 ---
 
-### Example 31
+### Example 34
 
 #### Prompt
 "Make the line through A and B"
@@ -666,7 +734,7 @@ geometry expressions [
 
 ---
 
-### Example 32
+### Example 35
 
 #### Prompt
 "Define a point P where x = 2a + 1 and y = 3b − 2"
@@ -687,7 +755,7 @@ geometry expressions [
 
 ---
 
-### Example 33
+### Example 36
 
 #### Prompt
 "Through point P, draw a line parallel to L"
@@ -710,7 +778,7 @@ geometry expressions [
 
 ---
 
-### Example 34
+### Example 37
 
 #### Prompt
 "Create a line with adjustable slope m passing through point P"
@@ -735,7 +803,7 @@ geometry expressions [
 
 ---
 
-### Example 35
+### Example 38
 
 #### Prompt
 "Add points A (0, 0), B (4, 0), and C (2, 3) to form the vertices of a triangle"
@@ -756,7 +824,32 @@ geometry expressions [
 
 ---
 
-### Example 36
+### Example 39
+
+#### Prompt
+"create a line assessment with a line through two draggable points. add a title and instructions"
+
+#### Chat Transcript
+
+**User**: create a line assessment with a line through two draggable points. add a title and instructions
+
+#### Code
+
+```
+title "Line Assessment" instructions "Move the points so the line is equivalent to $y=-2x$." geometry expressions [
+  expression "A = (1, 2)" label "A" show-label true drag-mode "XY" {}
+  expression "B = (4, 3)" label "B" show-label true drag-mode "XY" {}
+  expression "\line(A, B)" assess [
+    method "line"
+    expected "y=-2x"
+    {}
+  ] {}
+] {}..
+```
+
+---
+
+### Example 40
 
 #### Prompt
 "Draw a ray starting at A and passing through B"
@@ -777,7 +870,7 @@ geometry expressions [
 
 ---
 
-### Example 37
+### Example 41
 
 #### Prompt
 "Define point P as the intersection of line y = 2x + 1 and the circle centered at (2, 3) with radius 2"
@@ -798,7 +891,7 @@ geometry expressions [
 
 ---
 
-### Example 38
+### Example 42
 
 #### Prompt
 "Make a vector from the origin whose head is draggable"
