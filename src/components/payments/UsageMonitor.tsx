@@ -123,16 +123,21 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
   }
 
   const totalUnits = usage.allocatedUnits + usage.overageUnits;
-  const remainingUnits = totalUnits - usage.currentPeriodUnits;
-  const usagePercentage = totalUnits > 0 ? (usage.currentPeriodUnits / totalUnits) * 100 : 0;
+
+  // The actual total usage should be the sum of compile + codeGen
+  // If currentPeriodUnits doesn't match, we'll use the sum instead
+  const actualUsageTotal = usage.compileUnits + usage.codeGenerationUnits;
+  const displayTotal = actualUsageTotal > 0 ? actualUsageTotal : usage.currentPeriodUnits;
+
+  const remainingUnits = totalUnits - displayTotal;
+  const usagePercentage = totalUnits > 0 ? (displayTotal / totalUnits) * 100 : 0;
 
   // Calculate percentages of each type relative to total allocation
   const compilePercentage = totalUnits > 0 ? (usage.compileUnits / totalUnits) * 100 : 0;
   const codeGenPercentage = totalUnits > 0 ? (usage.codeGenerationUnits / totalUnits) * 100 : 0;
 
-  // The total bar should show the sum of both (which should equal currentPeriodUnits)
-  // In case there's a discrepancy, calculate other usage
-  const otherUsage = Math.max(0, usage.currentPeriodUnits - usage.compileUnits - usage.codeGenerationUnits);
+  // Check if there's unaccounted usage (shouldn't happen if data is consistent)
+  const otherUsage = Math.max(0, usage.currentPeriodUnits - actualUsageTotal);
   const otherPercentage = totalUnits > 0 ? (otherUsage / totalUnits) * 100 : 0;
 
   const isNearLimit = usagePercentage > 80;
@@ -157,7 +162,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
           <div className="mt-2">
             <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>{usage.currentPeriodUnits.toLocaleString()} ({usagePercentage.toFixed(1)}%) compile units used</span>
+              <span>{displayTotal.toLocaleString()} ({usagePercentage.toFixed(1)}%) compile units used</span>
               <span className="font-medium">{remainingUnits.toLocaleString()} remaining</span>
             </div>
             <div className="w-full bg-gray-200 h-8 relative overflow-hidden">
@@ -223,7 +228,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
               </dt>
               <dd className="mt-1 text-xl font-semibold text-gray-900">
                 {pricing?.plan === 'free'
-                  ? usage.currentPeriodUnits.toLocaleString()
+                  ? displayTotal.toLocaleString()
                   : usage.overageUnits.toLocaleString()}
               </dd>
             </div>
