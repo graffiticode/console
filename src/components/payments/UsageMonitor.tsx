@@ -124,9 +124,16 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
   const totalUnits = usage.allocatedUnits + usage.overageUnits;
   const remainingUnits = totalUnits - usage.currentPeriodUnits;
-  const usagePercentage = (usage.currentPeriodUnits / totalUnits) * 100;
-  const compilePercentage = (usage.compileUnits / totalUnits) * 100;
-  const codeGenPercentage = (usage.codeGenerationUnits / totalUnits) * 100;
+  const usagePercentage = totalUnits > 0 ? (usage.currentPeriodUnits / totalUnits) * 100 : 0;
+
+  // Calculate individual percentages correctly
+  const compilePercentage = totalUnits > 0 ? (usage.compileUnits / totalUnits) * 100 : 0;
+  const codeGenPercentage = totalUnits > 0 ? (usage.codeGenerationUnits / totalUnits) * 100 : 0;
+
+  // Ensure percentages don't overflow
+  const safeCompilePercentage = Math.min(compilePercentage, 100);
+  const safecodeGenPercentage = Math.min(codeGenPercentage, 100 - safeCompilePercentage);
+
   const isNearLimit = usagePercentage > 80;
   const isAtLimit = remainingUnits <= 0;
 
@@ -152,33 +159,33 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
               <span>{usage.currentPeriodUnits.toLocaleString()} ({usagePercentage.toFixed(1)}%) compile units used</span>
               <span className="font-medium">{remainingUnits.toLocaleString()} remaining</span>
             </div>
-            <div className="w-full bg-gray-200 h-8 relative">
-              {/* Compiles bar (bottom layer) */}
+            <div className="w-full bg-gray-200 h-8 relative overflow-hidden">
+              {/* Compiles bar (first segment) */}
               <div
                 className="h-8 bg-blue-500 absolute left-0 top-0 transition-all duration-300"
-                style={{ width: `${Math.min(compilePercentage, 100)}%` }}
-                title={`Compiles: ${usage.compileUnits.toLocaleString()} units`}
+                style={{ width: `${safeCompilePercentage}%` }}
+                title={`Compiles: ${usage.compileUnits.toLocaleString()} units (${compilePercentage.toFixed(1)}%)`}
               />
-              {/* Code generation bar (stacked on top) */}
+              {/* Code generation bar (second segment, properly positioned) */}
               <div
                 className={`h-8 absolute top-0 transition-all duration-300 ${
                   isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-purple-500'
                 }`}
                 style={{
-                  left: `${Math.min(compilePercentage, 100)}%`,
-                  width: `${Math.min(codeGenPercentage, 100 - compilePercentage)}%`
+                  left: `${safeCompilePercentage}%`,
+                  width: `${safecodeGenPercentage}%`
                 }}
-                title={`Code Generation: ${usage.codeGenerationUnits.toLocaleString()} units`}
+                title={`Code Generation: ${usage.codeGenerationUnits.toLocaleString()} units (${codeGenPercentage.toFixed(1)}%)`}
               />
             </div>
             <div className="mt-2 flex items-center gap-4 text-xs text-gray-600">
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-blue-500"></div>
-                <span>Compiles: {usage.compileUnits.toLocaleString()}</span>
+                <span>Compiles: {usage.compileUnits.toLocaleString()} ({compilePercentage.toFixed(1)}%)</span>
               </div>
               <div className="flex items-center gap-1">
                 <div className={`w-3 h-3 ${isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-purple-500'}`}></div>
-                <span>Code Gen: {usage.codeGenerationUnits.toLocaleString()}</span>
+                <span>Code Gen: {usage.codeGenerationUnits.toLocaleString()} ({codeGenPercentage.toFixed(1)}%)</span>
               </div>
             </div>
           </div>
