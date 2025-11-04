@@ -126,13 +126,14 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
   const remainingUnits = totalUnits - usage.currentPeriodUnits;
   const usagePercentage = totalUnits > 0 ? (usage.currentPeriodUnits / totalUnits) * 100 : 0;
 
-  // Calculate individual percentages correctly
+  // Calculate percentages of each type relative to total allocation
   const compilePercentage = totalUnits > 0 ? (usage.compileUnits / totalUnits) * 100 : 0;
   const codeGenPercentage = totalUnits > 0 ? (usage.codeGenerationUnits / totalUnits) * 100 : 0;
 
-  // Ensure percentages don't overflow
-  const safeCompilePercentage = Math.min(compilePercentage, 100);
-  const safecodeGenPercentage = Math.min(codeGenPercentage, 100 - safeCompilePercentage);
+  // The total bar should show the sum of both (which should equal currentPeriodUnits)
+  // In case there's a discrepancy, calculate other usage
+  const otherUsage = Math.max(0, usage.currentPeriodUnits - usage.compileUnits - usage.codeGenerationUnits);
+  const otherPercentage = totalUnits > 0 ? (otherUsage / totalUnits) * 100 : 0;
 
   const isNearLimit = usagePercentage > 80;
   const isAtLimit = remainingUnits <= 0;
@@ -163,20 +164,31 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
               {/* Compiles bar (first segment) */}
               <div
                 className="h-8 bg-blue-500 absolute left-0 top-0 transition-all duration-300"
-                style={{ width: `${safeCompilePercentage}%` }}
+                style={{ width: `${Math.min(compilePercentage, 100)}%` }}
                 title={`Compiles: ${usage.compileUnits.toLocaleString()} units (${compilePercentage.toFixed(1)}%)`}
               />
-              {/* Code generation bar (second segment, properly positioned) */}
+              {/* Code generation bar (second segment) */}
               <div
                 className={`h-8 absolute top-0 transition-all duration-300 ${
                   isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-purple-500'
                 }`}
                 style={{
-                  left: `${safeCompilePercentage}%`,
-                  width: `${safecodeGenPercentage}%`
+                  left: `${Math.min(compilePercentage, 100)}%`,
+                  width: `${Math.min(codeGenPercentage, Math.max(0, 100 - compilePercentage))}%`
                 }}
                 title={`Code Generation: ${usage.codeGenerationUnits.toLocaleString()} units (${codeGenPercentage.toFixed(1)}%)`}
               />
+              {/* Other usage bar (third segment, if any) */}
+              {otherUsage > 0 && (
+                <div
+                  className="h-8 bg-gray-500 absolute top-0 transition-all duration-300"
+                  style={{
+                    left: `${Math.min(compilePercentage + codeGenPercentage, 100)}%`,
+                    width: `${Math.min(otherPercentage, Math.max(0, 100 - compilePercentage - codeGenPercentage))}%`
+                  }}
+                  title={`Other: ${otherUsage.toLocaleString()} units (${otherPercentage.toFixed(1)}%)`}
+                />
+              )}
             </div>
             <div className="mt-2 flex items-center gap-4 text-xs text-gray-600">
               <div className="flex items-center gap-1">
@@ -187,6 +199,12 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                 <div className={`w-3 h-3 ${isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-purple-500'}`}></div>
                 <span>Code Gen: {usage.codeGenerationUnits.toLocaleString()} ({codeGenPercentage.toFixed(1)}%)</span>
               </div>
+              {otherUsage > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-gray-500"></div>
+                  <span>Other: {otherUsage.toLocaleString()} ({otherPercentage.toFixed(1)}%)</span>
+                </div>
+              )}
             </div>
           </div>
 
