@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-11-03T23:30:30.450Z*
+*Downloaded on 2025-11-06T23:56:13.578Z*
 
 ## Language L0168
 
@@ -268,6 +268,34 @@ geometry expressions [
 ### Example 13
 
 #### Prompt
+"create an assessment that asks the student to plot a line that goes through the point (2,1) and has the slope of -3. provide a draggable line that does not satisfy the solution
+
+add instructions to provide context for the problem"
+
+#### Chat Transcript
+
+**User**: create an assessment that asks the student to plot a line that goes through the point (2,1) and has the slope of -3. provide a draggable line that does not satisfy the solution
+
+**User**: add instructions to provide context for the problem
+
+#### Code
+
+```
+show-toolbar false instructions "Move points A and B so that the line through them has the equation $y = -3x + 7$." geometry expressions [
+  expression "A = (0, 0)" label "A" show-label true drag-mode "XY" {}
+  expression "B = (1, 2)" label "B" show-label true drag-mode "XY" {}
+  expression "\line(A, B)" assess [
+    method "line"
+    expected "y=-3x+7"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 14
+
+#### Prompt
 "Create point M as the midpoint between A and B"
 
 #### Chat Transcript
@@ -286,7 +314,7 @@ geometry expressions [
 
 ---
 
-### Example 14
+### Example 15
 
 #### Prompt
 "create a line through two draggable points with the step of one unit"
@@ -307,7 +335,48 @@ geometry expressions [
 
 ---
 
-### Example 15
+### Example 16
+
+#### Prompt
+"make an assessment where the student is asked to plot a line that matches an expression in slope intercept form. Draw the line through two draggable points and validate the response using the line method. provide context for the student and use latex where appropriate
+
+set the initial line to an incorrect response
+
+hide the toolbar
+
+hide the expressions list"
+
+#### Chat Transcript
+
+**User**: make an assessment where the student is asked to plot a line that matches an expression in slope intercept form. Draw the line through two draggable points and validate the response using the line method. provide context for the student and use latex where appropriate
+
+**User**: set the initial line to an incorrect response
+
+**User**: hide the toolbar
+
+**User**: hide the expressions list
+
+#### Code
+
+```
+title "## Graphing Linear Equations" instructions "
+Plot the line $y = 2x + 3$ by dragging the two points A and B so that the line passes through them.
+
+**Hint**: The line has a slope of 2 and y-intercept of 3.
+"
+show-toolbar false show-expressions false geometry expressions [
+  expression "A = (0, 0)" label "A" show-label true drag-mode "XY" {}
+  expression "B = (1, 1)" label "B" show-label true drag-mode "XY" {}
+  expression "\\line(A, B)" assess [
+    method "line"
+    expected "y=2x+3"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 17
 
 #### Prompt
 "create a point"
@@ -326,7 +395,7 @@ geometry expressions [
 
 ---
 
-### Example 16
+### Example 18
 
 #### Prompt
 "Create the line with equation y=2x+1"
@@ -345,7 +414,7 @@ geometry expressions [
 
 ---
 
-### Example 17
+### Example 19
 
 #### Prompt
 "Through point A with slope m, draw the line"
@@ -370,7 +439,7 @@ geometry expressions [
 
 ---
 
-### Example 18
+### Example 20
 
 #### Prompt
 "Define point P as the intersection of lines L₁ and L₂"
@@ -391,7 +460,7 @@ geometry expressions [
 
 ---
 
-### Example 19
+### Example 21
 
 #### Prompt
 "Add a draggable point D"
@@ -410,7 +479,7 @@ geometry expressions [
 
 ---
 
-### Example 20
+### Example 22
 
 #### Prompt
 "Define the intersection points of line L and circle C"
@@ -431,7 +500,7 @@ geometry expressions [
 
 ---
 
-### Example 21
+### Example 23
 
 #### Prompt
 "Create an assessment where the student is asked to place a point at (2, 3) and its reflection over the y axis. Include points P and Q that the student will drag into place, respectively"
@@ -463,7 +532,7 @@ geometry expressions [
 
 ---
 
-### Example 22
+### Example 24
 
 #### Prompt
 "Add a draggable point called D"
@@ -482,7 +551,7 @@ geometry expressions [
 
 ---
 
-### Example 23
+### Example 25
 
 #### Prompt
 "Add three draggable labeled points A, B, and C"
@@ -503,7 +572,7 @@ geometry expressions [
 
 ---
 
-### Example 24
+### Example 26
 
 #### Prompt
 "Define point P where x = 2a and y = 3b"
@@ -524,7 +593,7 @@ geometry expressions [
 
 ---
 
-### Example 25
+### Example 27
 
 #### Prompt
 "Create two labeled points A and B at (1, 2) and (4, 3)"
@@ -544,7 +613,7 @@ geometry expressions [
 
 ---
 
-### Example 26
+### Example 28
 
 #### Prompt
 "Draw segment AB"
@@ -565,7 +634,7 @@ geometry expressions [
 
 ---
 
-### Example 27
+### Example 29
 
 #### Prompt
 "Define intersection points of circles C₁ and C₂"
@@ -586,7 +655,7 @@ geometry expressions [
 
 ---
 
-### Example 28
+### Example 30
 
 #### Prompt
 "create an assessment where the student is expected to place a point at coordinates x=2 and y=-3"
@@ -608,7 +677,7 @@ geometry expressions [
 
 ---
 
-### Example 29
+### Example 31
 
 #### Prompt
 "Add draggable points A, B, and C"
@@ -629,7 +698,7 @@ geometry expressions [
 
 ---
 
-### Example 30
+### Example 32
 
 #### Prompt
 "Create a vector from the origin to (2, 3)"
@@ -648,7 +717,7 @@ geometry expressions [
 
 ---
 
-### Example 31
+### Example 33
 
 #### Prompt
 "Through point P, draw a line perpendicular to L"
@@ -671,7 +740,7 @@ geometry expressions [
 
 ---
 
-### Example 32
+### Example 34
 
 #### Prompt
 "Create point B by translating point A using vector v"
@@ -693,7 +762,7 @@ geometry expressions [
 
 ---
 
-### Example 33
+### Example 35
 
 #### Prompt
 "Create a draggable point on the circle centered at (0,0) with radius 3"
@@ -713,7 +782,7 @@ geometry expressions [
 
 ---
 
-### Example 34
+### Example 36
 
 #### Prompt
 "Make the line through A and B"
@@ -734,7 +803,7 @@ geometry expressions [
 
 ---
 
-### Example 35
+### Example 37
 
 #### Prompt
 "Define a point P where x = 2a + 1 and y = 3b − 2"
@@ -755,7 +824,7 @@ geometry expressions [
 
 ---
 
-### Example 36
+### Example 38
 
 #### Prompt
 "Through point P, draw a line parallel to L"
@@ -778,7 +847,7 @@ geometry expressions [
 
 ---
 
-### Example 37
+### Example 39
 
 #### Prompt
 "Create a line with adjustable slope m passing through point P"
@@ -803,7 +872,24 @@ geometry expressions [
 
 ---
 
-### Example 38
+### Example 40
+
+#### Prompt
+"hide the toolbar"
+
+#### Chat Transcript
+
+**User**: hide the toolbar
+
+#### Code
+
+```
+show-toolbar false geometry expressions [] {}..
+```
+
+---
+
+### Example 41
 
 #### Prompt
 "Add points A (0, 0), B (4, 0), and C (2, 3) to form the vertices of a triangle"
@@ -824,7 +910,7 @@ geometry expressions [
 
 ---
 
-### Example 39
+### Example 42
 
 #### Prompt
 "create a line assessment with a line through two draggable points. add a title and instructions"
@@ -849,7 +935,24 @@ title "Line Assessment" instructions "Move the points so the line is equivalent 
 
 ---
 
-### Example 40
+### Example 43
+
+#### Prompt
+"hide the expressions"
+
+#### Chat Transcript
+
+**User**: hide the expressions
+
+#### Code
+
+```
+show-expressions false geometry expressions [] {}..
+```
+
+---
+
+### Example 44
 
 #### Prompt
 "Draw a ray starting at A and passing through B"
@@ -870,7 +973,7 @@ geometry expressions [
 
 ---
 
-### Example 41
+### Example 45
 
 #### Prompt
 "Define point P as the intersection of line y = 2x + 1 and the circle centered at (2, 3) with radius 2"
@@ -891,7 +994,41 @@ geometry expressions [
 
 ---
 
-### Example 42
+### Example 46
+
+#### Prompt
+"hide the toolbar and the expressions"
+
+#### Chat Transcript
+
+**User**: hide the toolbar and the expressions
+
+#### Code
+
+```
+show-toolbar false show-expressions false geometry expressions [] {}..
+```
+
+---
+
+### Example 47
+
+#### Prompt
+"hide the expressions list"
+
+#### Chat Transcript
+
+**User**: hide the expressions list
+
+#### Code
+
+```
+show-expressions false geometry expressions [] {}..
+```
+
+---
+
+### Example 48
 
 #### Prompt
 "Make a vector from the origin whose head is draggable"
