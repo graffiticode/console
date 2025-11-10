@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-11-10T19:35:56.495Z*
+*Downloaded on 2025-11-10T22:45:08.550Z*
 
 ## Language L0168
 
@@ -368,30 +368,6 @@ show-expressions true geometry expressions [] {}..
 ### Example 18
 
 #### Prompt
-"create a circle assessment"
-
-#### Chat Transcript
-
-**User**: create a circle assessment
-
-#### Code
-
-```
-geometry expressions [
-  expression "C = (0, 0)" label "C" show-label true drag-mode "XY" {}
-  expression "P = (1, 0)" label "P" show-label true drag-mode "XY" {}
-  expression "\\circle(C, P)" assess [
-    method "circle"
-    expected "\\circle((0,0),(3,0))"
-  ] {}
-] {}..
-```
-
----
-
-### Example 19
-
-#### Prompt
 "create a line through two draggable points with the step of one unit"
 
 #### Chat Transcript
@@ -410,7 +386,7 @@ geometry expressions [
 
 ---
 
-### Example 20
+### Example 19
 
 #### Prompt
 "show expressions list and toolbar"
@@ -427,7 +403,7 @@ show-expressions true show-toolbar true geometry expressions [] {}..
 
 ---
 
-### Example 21
+### Example 20
 
 #### Prompt
 "show expressions list with tools"
@@ -444,7 +420,7 @@ show-expressions true show-expressions-tools true geometry expressions [] {}..
 
 ---
 
-### Example 22
+### Example 21
 
 #### Prompt
 "create a point"
@@ -463,7 +439,7 @@ geometry expressions [
 
 ---
 
-### Example 23
+### Example 22
 
 #### Prompt
 "Create the line with equation y=2x+1"
@@ -482,7 +458,7 @@ geometry expressions [
 
 ---
 
-### Example 24
+### Example 23
 
 #### Prompt
 "Through point A with slope m, draw the line"
@@ -507,7 +483,7 @@ geometry expressions [
 
 ---
 
-### Example 25
+### Example 24
 
 #### Prompt
 "Define point P as the intersection of lines L₁ and L₂"
@@ -528,7 +504,7 @@ geometry expressions [
 
 ---
 
-### Example 26
+### Example 25
 
 #### Prompt
 "Add a draggable point D"
@@ -547,7 +523,7 @@ geometry expressions [
 
 ---
 
-### Example 27
+### Example 26
 
 #### Prompt
 "Define the intersection points of line L and circle C"
@@ -568,7 +544,7 @@ geometry expressions [
 
 ---
 
-### Example 28
+### Example 27
 
 #### Prompt
 "Create an assessment where the student is asked to place a point at (2, 3) and its reflection over the y axis. Include points P and Q that the student will drag into place, respectively"
@@ -600,7 +576,7 @@ geometry expressions [
 
 ---
 
-### Example 29
+### Example 28
 
 #### Prompt
 "Add a draggable point called D"
@@ -619,7 +595,7 @@ geometry expressions [
 
 ---
 
-### Example 30
+### Example 29
 
 #### Prompt
 "Add three draggable labeled points A, B, and C"
@@ -640,7 +616,7 @@ geometry expressions [
 
 ---
 
-### Example 31
+### Example 30
 
 #### Prompt
 "Define point P where x = 2a and y = 3b"
@@ -661,7 +637,7 @@ geometry expressions [
 
 ---
 
-### Example 32
+### Example 31
 
 #### Prompt
 "Create two labeled points A and B at (1, 2) and (4, 3)"
@@ -681,7 +657,7 @@ geometry expressions [
 
 ---
 
-### Example 33
+### Example 32
 
 #### Prompt
 "Draw segment AB"
@@ -702,7 +678,7 @@ geometry expressions [
 
 ---
 
-### Example 34
+### Example 33
 
 #### Prompt
 "Define intersection points of circles C₁ and C₂"
@@ -723,7 +699,7 @@ geometry expressions [
 
 ---
 
-### Example 35
+### Example 34
 
 #### Prompt
 "create an assessment where the student is expected to place a point at coordinates x=2 and y=-3"
@@ -745,7 +721,7 @@ geometry expressions [
 
 ---
 
-### Example 36
+### Example 35
 
 #### Prompt
 "Add draggable points A, B, and C"
@@ -766,7 +742,7 @@ geometry expressions [
 
 ---
 
-### Example 37
+### Example 36
 
 #### Prompt
 "Create a vector from the origin to (2, 3)"
@@ -780,6 +756,30 @@ geometry expressions [
 ```
 geometry expressions [
   expression "\vector((0, 0), (2, 3))" {}
+] {}..
+```
+
+---
+
+### Example 37
+
+#### Prompt
+"make a assessment that asked the student to draw a circle that matches (x-1)^2+(y+2)^2=9"
+
+#### Chat Transcript
+
+**User**: make a assessment that asked the student to draw a circle that matches (x-1)^2+(y+2)^2=9
+
+#### Code
+
+```
+title "Circle Construction Exercise" instructions "Draw a circle that matches the equation $(x-1)^2+(y+2)^2=9$" geometry expressions [
+  expression "C = (0, 0)" label "C" show-label true drag-mode "XY" {}
+  expression "P = (1, 0)" label "P" show-label true drag-mode "XY" {}
+  expression "\circle(C, P)" assess [
+    method "circle"
+    expected "(x-1)^2+(y+2)^2=9"
+  ] {}
 ] {}..
 ```
 
@@ -895,23 +895,6 @@ geometry expressions [
 ### Example 43
 
 #### Prompt
-"show expressions and toolbar"
-
-#### Chat Transcript
-
-**User**: show expressions and toolbar
-
-#### Code
-
-```
-show-expressions true show-toolbar true geometry expressions [] {}..
-```
-
----
-
-### Example 44
-
-#### Prompt
 "Through point P, draw a line parallel to L"
 
 #### Chat Transcript
@@ -932,7 +915,7 @@ geometry expressions [
 
 ---
 
-### Example 45
+### Example 44
 
 #### Prompt
 "Create a line with adjustable slope m passing through point P"
@@ -957,7 +940,7 @@ geometry expressions [
 
 ---
 
-### Example 46
+### Example 45
 
 #### Prompt
 "Add points A (0, 0), B (4, 0), and C (2, 3) to form the vertices of a triangle"
@@ -978,7 +961,7 @@ geometry expressions [
 
 ---
 
-### Example 47
+### Example 46
 
 #### Prompt
 "create a line assessment with a line through two draggable points. add a title and instructions"
@@ -1003,7 +986,7 @@ title "Line Assessment" instructions "Move the points so the line is equivalent 
 
 ---
 
-### Example 48
+### Example 47
 
 #### Prompt
 "Draw a ray starting at A and passing through B"
@@ -1024,7 +1007,7 @@ geometry expressions [
 
 ---
 
-### Example 49
+### Example 48
 
 #### Prompt
 "Define point P as the intersection of line y = 2x + 1 and the circle centered at (2, 3) with radius 2"
@@ -1045,7 +1028,7 @@ geometry expressions [
 
 ---
 
-### Example 50
+### Example 49
 
 #### Prompt
 "Make a vector from the origin whose head is draggable"
