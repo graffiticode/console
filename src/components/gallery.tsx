@@ -501,14 +501,15 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
         <div className="w-1 ml-1" />
         </>
         )}
-        <div className="flex flex-col grow">
+        <div className="flex flex-col grow overflow-hidden">
           <div
                ref={containerRef}
                className={classNames(
                hideEditor ? "block" : "flex flex-col lg:flex-row",
                "gap-4 lg:gap-0",
                "w-full",
-               "h-[calc(100vh-90px)]"
+               "h-[calc(100vh-90px)]",
+               "overflow-hidden"
                )}>
             <div
               ref={editorPanelRef}
@@ -528,7 +529,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                         window.innerWidth < 1024 && !isFormPanelCollapsed ? `calc(${100 - previewPanelHeight}% - 16px)` : undefined,
                 minHeight: !isEditorPanelCollapsed && window.innerWidth < 1024 && !isFormPanelCollapsed ? '100px' : undefined,
                 minWidth: !isEditorPanelCollapsed && !isFormPanelCollapsed && window.innerWidth >= 1024 ? '200px' : undefined,
-                maxWidth: !isEditorPanelCollapsed && !isFormPanelCollapsed && window.innerWidth >= 1024 ? '80%' : undefined
+                maxWidth: !isEditorPanelCollapsed && !isFormPanelCollapsed && window.innerWidth >= 1024 ?
+                  `calc(80% - ${!hideItemsNav ? (isItemsPanelCollapsed ? 25 : 110) : 0}px)` : undefined
               }}
             >
               <div className="flex justify-between items-center p-2 border-b border-gray-200">
@@ -601,7 +603,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                 const maxEditorX = containerWidth - minPreviewWidth;
 
                 const newEditorX = Math.max(minEditorWidth, Math.min(maxEditorX, x));
-                const editorWidthPercent = (newEditorX / containerWidth) * 100;
+                const editorWidthPercent = Math.min(80, Math.max(20, (newEditorX / containerWidth) * 100));
 
                 setEditorPanelWidth(editorWidthPercent);
 
@@ -650,8 +652,9 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                 "order-1 lg:order-3",
                 isFormPanelCollapsed ? "h-10" : "lg:h-full",
                 !isFormPanelCollapsed && "lg:min-h-[200px]",
-                !isFormPanelCollapsed && "overflow-auto",
-                !isFormPanelCollapsed && !isEditorPanelCollapsed && "lg:resize-none"
+                !isFormPanelCollapsed && "overflow-hidden",
+                !isFormPanelCollapsed && !isEditorPanelCollapsed && "lg:resize-none",
+                "flex flex-col"
               )}
               style={{
                 width: isFormPanelCollapsed ? '40px' :
@@ -661,6 +664,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
                         window.innerWidth < 1024 && isEditorPanelCollapsed ? 'calc(100% - 56px)' :
                         window.innerWidth < 1024 && !isEditorPanelCollapsed ? `${previewPanelHeight}%` : undefined,
                 minWidth: !isFormPanelCollapsed && window.innerWidth >= 1024 ? '200px' : undefined,
+                maxWidth: !isFormPanelCollapsed && window.innerWidth >= 1024 ?
+                  `calc(100vw - ${!hideItemsNav ? (isItemsPanelCollapsed ? 50 : 220) : 0}px - 280px)` : undefined,
                 minHeight: !isFormPanelCollapsed && window.innerWidth < 1024 && !isEditorPanelCollapsed ? '100px' : undefined,
                 maxHeight: !isFormPanelCollapsed && window.innerWidth < 1024 && !isEditorPanelCollapsed ? 'calc(100% - 116px)' : undefined
               }}
@@ -687,14 +692,16 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
               </div>
               <div className={classNames(
                 isFormPanelCollapsed && "hidden",
-                "h-[calc(100%-42px)]"
+                "h-[calc(100%-42px)]",
+                "overflow-auto",
+                "flex-1"
               )}>
               <FormView
                 key="form"
                 id={taskId}
                 lang={lang}
                 height="100%"
-                className="h-full overflow-auto p-2"
+                className="h-full w-full p-2"
                 setData={() => {}}
                 setId={() => {}}
                 setNewTask={() => {}}

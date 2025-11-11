@@ -396,7 +396,7 @@ export default function CompilesGallery({ lang }) {
                   // Calculate new width in pixels for data panel
                   const minDataWidth = 200;
                   const minPreviewWidth = 200;
-                  const maxDataWidth = containerWidth - minPreviewWidth;
+                  const maxDataWidth = Math.min(containerWidth - minPreviewWidth, window.innerWidth * 0.7);
 
                   const newDataWidth = Math.max(minDataWidth, Math.min(maxDataWidth, x));
 
@@ -444,15 +444,17 @@ export default function CompilesGallery({ lang }) {
                 "order-1 lg:order-3",
                 isFormPanelCollapsed ? "h-10" : "lg:h-full",
                 !isFormPanelCollapsed && "lg:min-h-[200px]",
-                !isFormPanelCollapsed && "overflow-auto",
-                !isFormPanelCollapsed && !isDataPanelCollapsed && "lg:resize-none"
+                !isFormPanelCollapsed && "overflow-hidden",
+                !isFormPanelCollapsed && !isDataPanelCollapsed && "lg:resize-none",
+                "flex flex-col"
               )}
               style={{
                 width: isFormPanelCollapsed
                   ? '40px'
                   : isDataPanelCollapsed
-                    ? '100%'
-                    : `calc(100% - ${dataPanelWidth + (isFormPanelCollapsed ? 0 : 4)}px)`
+                    ? 'calc(100% - 56px)'
+                    : `calc(100% - ${Math.min(dataPanelWidth, window.innerWidth - 400) + (isFormPanelCollapsed ? 0 : 4)}px)`,
+                maxWidth: !isFormPanelCollapsed ? 'calc(100vw - 280px)' : undefined
               }}
             >
               <div className="flex justify-between items-center p-2 border-b border-gray-200">
@@ -477,14 +479,16 @@ export default function CompilesGallery({ lang }) {
               </div>
               <div className={classNames(
                 isFormPanelCollapsed && "hidden",
-                "h-[calc(100%-42px)]"
+                "h-[calc(100%-42px)]",
+                "overflow-auto",
+                "flex-1"
               )}>
                 <FormView
                   key="form"
                   id={selectedTaskId}
                   lang={lang}
                   height="100%"
-                  className="h-full overflow-auto p-2"
+                  className="h-full w-full p-2"
                   setData={() => {}}
                   setId={() => {}}
                   setNewTask={() => {}}
