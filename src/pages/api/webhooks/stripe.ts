@@ -101,7 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const priceId = subscription.items.data[0]?.price.id;
         const planInfo = PLAN_MAPPING[priceId] || { name: 'free', units: 1000 };
 
-        // Update subscription info
+        // Update subscription info (preserves overage units - they roll over)
         await db.collection('users').doc(userId).update({
           'subscription.status': subscription.status,
           'subscription.plan': planInfo.name,
@@ -111,6 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000).toISOString(),
           'subscription.cancelAtPeriodEnd': subscription.cancel_at_period_end,
           'subscription.updatedAt': new Date().toISOString(),
+          // Note: overageUnits field is intentionally NOT updated here - overage persists across billing cycles
         });
 
         break;
@@ -135,14 +136,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const userDoc = usersQuery.docs[0];
         const userId = userDoc.id;
 
-        // Reset to free tier
+        // Reset to free tier but preserve overage units (they're purchased separately)
         await db.collection('users').doc(userId).update({
           'subscription.status': 'canceled',
           'subscription.plan': 'free',
           'subscription.units': 1000,
           'subscription.stripeSubscriptionId': null,
           'subscription.canceledAt': new Date().toISOString(),
-          'subscription.overageUnits': 0, // Reset overage units
+          // DO NOT reset overage units - they roll over and persist until used
         });
 
         // Log the event
