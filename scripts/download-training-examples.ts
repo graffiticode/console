@@ -206,23 +206,43 @@ async function fetchItemsFromFirestore(lang: string | null, mark: number, limit:
 // Process items into training examples
 function processItems(items: any[]): any[] {
   const trainingExamples: any[] = [];
-  
+  let skippedCount = 0;
+  const skipReasons: { [key: string]: number } = {
+    "invalid_json": 0,
+    "invalid_help": 0,
+    "code_too_short": 0,
+    "no_dialog": 0
+  };
+
   for (const item of items) {
     // Parse help field
     let help = [];
     try {
       help = JSON.parse(item.help);
     } catch (e) {
+      skippedCount++;
+      skipReasons.invalid_json++;
+      console.log(`  ⚠️ Skipped item ${item.id}: Invalid JSON in help field`);
+      console.log(`     Item details:`, JSON.stringify(item, null, 2));
       continue;
     }
-    
+
     if (!help || !Array.isArray(help) || help.length === 0) {
+      skippedCount++;
+      skipReasons.invalid_help++;
+      console.log(`  ⚠️ Skipped item ${item.id}: Help is not a valid array or is empty`);
+      console.log(`     Item details:`, JSON.stringify(item, null, 2));
       continue;
     }
-    
+
     // Get code
     const code = item.src || item.code || "";
     if (!code || code.trim().length < 10) {
+      skippedCount++;
+      skipReasons.code_too_short++;
+      console.log(`  ⚠️ Skipped item ${item.id}: Code too short (${code.trim().length} chars)`);
+      console.log(`     Code content: "${code.trim()}"`);
+      console.log(`     Item details:`, JSON.stringify(item, null, 2));
       continue;
     }
     
@@ -265,12 +285,35 @@ function processItems(items: any[]): any[] {
         item_id: item.id,
         usage_count: item.count || 1
       });
+    } else {
+      skippedCount++;
+      skipReasons.no_dialog++;
+      console.log(`  ⚠️ Skipped item ${item.id}: No valid dialog messages extracted`);
+      console.log(`     Help content:`, JSON.stringify(help, null, 2));
+      console.log(`     Item details:`, JSON.stringify(item, null, 2));
     }
   }
-  
+
+  // Print summary if any items were skipped
+  if (skippedCount > 0) {
+    console.log(`\n  Summary: ${skippedCount} items skipped:`);
+    if (skipReasons.invalid_json > 0) {
+      console.log(`    - Invalid JSON: ${skipReasons.invalid_json}`);
+    }
+    if (skipReasons.invalid_help > 0) {
+      console.log(`    - Invalid help array: ${skipReasons.invalid_help}`);
+    }
+    if (skipReasons.code_too_short > 0) {
+      console.log(`    - Code too short: ${skipReasons.code_too_short}`);
+    }
+    if (skipReasons.no_dialog > 0) {
+      console.log(`    - No dialog messages: ${skipReasons.no_dialog}`);
+    }
+  }
+
   // Sort by usage count
   trainingExamples.sort((a, b) => b.usage_count - a.usage_count);
-  
+
   return trainingExamples;
 }
 

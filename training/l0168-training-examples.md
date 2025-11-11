@@ -1,10 +1,28 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-11-10T23:43:42.554Z*
+*Downloaded on 2025-11-11T19:59:18.891Z*
 
 ## Language L0168
 
 ### Example 1
+
+#### Prompt
+"show segment tool"
+
+#### Chat Transcript
+
+**User**: show segment tool
+
+#### Code
+
+```
+show-line-tool true
+geometry expressions [] {}..
+```
+
+---
+
+### Example 2
 
 #### Prompt
 "show the toolbar"
@@ -21,7 +39,7 @@ show-toolbar true geometry expressions [] {}..
 
 ---
 
-### Example 2
+### Example 3
 
 #### Prompt
 "validate the equation of a line"
@@ -44,7 +62,46 @@ geometry expressions [
 
 ---
 
-### Example 3
+### Example 4
+
+#### Prompt
+"create an assessment that asked the student to plot the solution to the following problem: A boat moves at 5 m/s relative to the water, which flows east at 3 m/s.Find the boat’s velocity relative to the ground and the angle it must aim to go straight north.
+
+show the vector tool"
+
+#### Chat Transcript
+
+**User**: create an assessment that asked the student to plot the solution to the following problem: A boat moves at 5 m/s relative to the water, which flows east at 3 m/s.Find the boat’s velocity relative to the ground and the angle it must aim to go straight north.
+
+**User**: show the vector tool
+
+#### Code
+
+```
+instructions "A boat moves at 5 m/s relative to the water, which flows east at 3 m/s. Draw vectors to show:
+1. The water velocity $\vec{v}_w = (3, 0)$ m/s
+2. The boat's velocity relative to water $\vec{v}_{bw}$ (magnitude 5 m/s, aimed northwest)
+3. The boat's velocity relative to ground $\vec{v}_{bg}$ (pointing straight north)"
+show-line-tool true
+geometry expressions [
+  assess [
+    method "vector"
+    expected "\vector((0,0),(3,0))"
+  ] {}
+  assess [
+    method "vector"
+    expected "\vector((3,0),(0,4))"
+  ] {}
+  assess [
+    method "vector"
+    expected "\vector((0,0),(0,4))"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 5
 
 #### Prompt
 "Make draggable points A and B that define a segment"
@@ -65,7 +122,7 @@ geometry expressions [
 
 ---
 
-### Example 4
+### Example 6
 
 #### Prompt
 "Define points A (1, 1) and B (3 + a, 2 − b) using parameters a and b"
@@ -87,7 +144,7 @@ geometry expressions [
 
 ---
 
-### Example 5
+### Example 7
 
 #### Prompt
 "Create points A, B, and C on the same horizontal line"
@@ -108,7 +165,7 @@ geometry expressions [
 
 ---
 
-### Example 6
+### Example 8
 
 #### Prompt
 "Make a draggable point on the line through (0,0) and (4,2)"
@@ -130,7 +187,7 @@ geometry expressions [
 
 ---
 
-### Example 7
+### Example 9
 
 #### Prompt
 "show the expressions list and the expressions tools"
@@ -147,7 +204,7 @@ show-expressions true show-expressions-tools true geometry expressions [] {}..
 
 ---
 
-### Example 8
+### Example 10
 
 #### Prompt
 "make an assessment where the student is asked to place a point at the midpoint of a line segment. make the expected response to be a integer coordinates"
@@ -172,7 +229,7 @@ show-toolbar false show-expressions false bounds 10 geometry expressions [
 
 ---
 
-### Example 9
+### Example 11
 
 #### Prompt
 "create an assessment where the student is asked to plot the line y=-3x-1 using a line through two draggable points"
@@ -196,7 +253,7 @@ geometry expressions [
 
 ---
 
-### Example 10
+### Example 12
 
 #### Prompt
 "Add a labeled point A at (4, 1)"
@@ -215,7 +272,24 @@ geometry expressions [
 
 ---
 
-### Example 11
+### Example 13
+
+#### Prompt
+"show the point tool"
+
+#### Chat Transcript
+
+**User**: show the point tool
+
+#### Code
+
+```
+show-point-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 14
 
 #### Prompt
 "Make a dashed line through A and B"
@@ -236,7 +310,7 @@ geometry expressions [
 
 ---
 
-### Example 12
+### Example 15
 
 #### Prompt
 "Draw the perpendicular bisector of segment AB"
@@ -259,7 +333,7 @@ geometry expressions [
 
 ---
 
-### Example 13
+### Example 16
 
 #### Prompt
 "Create a point B that is the reflection of A across the y-axis"
@@ -279,7 +353,7 @@ geometry expressions [
 
 ---
 
-### Example 14
+### Example 17
 
 #### Prompt
 "Define a point P that is 2 units to the right of A"
@@ -299,7 +373,59 @@ geometry expressions [
 
 ---
 
-### Example 15
+### Example 18
+
+#### Prompt
+"show the vector tool"
+
+#### Chat Transcript
+
+**User**: show the vector tool
+
+#### Code
+
+```
+show-line-tool true
+geometry expressions [] {}..
+```
+
+---
+
+### Example 19
+
+#### Prompt
+"show the perpendicular tool"
+
+#### Chat Transcript
+
+**User**: show the perpendicular tool
+
+#### Code
+
+```
+show-line-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 20
+
+#### Prompt
+"show the compass tool"
+
+#### Chat Transcript
+
+**User**: show the compass tool
+
+#### Code
+
+```
+show-line-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 21
 
 #### Prompt
 "create an assessment that asks the student to plot a line that goes through the point (2,1) and has the slope of -3. provide a draggable line that does not satisfy the solution
@@ -327,7 +453,7 @@ show-toolbar false instructions "Move points A and B so that the line through th
 
 ---
 
-### Example 16
+### Example 22
 
 #### Prompt
 "make an assessment that asked the student to plot a circle for (x-1)^2+(y+2)^2=9. provide the context for the problem
@@ -357,7 +483,41 @@ Use the center point C and radius point P to construct your circle." geometry ex
 
 ---
 
-### Example 17
+### Example 23
+
+#### Prompt
+"show the directed angle tool"
+
+#### Chat Transcript
+
+**User**: show the directed angle tool
+
+#### Code
+
+```
+show-angle-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 24
+
+#### Prompt
+"show the arc tool"
+
+#### Chat Transcript
+
+**User**: show the arc tool
+
+#### Code
+
+```
+show-circle-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 25
 
 #### Prompt
 "Create point M as the midpoint between A and B"
@@ -378,7 +538,7 @@ geometry expressions [
 
 ---
 
-### Example 18
+### Example 26
 
 #### Prompt
 "show expressions list"
@@ -395,7 +555,7 @@ show-expressions true geometry expressions [] {}..
 
 ---
 
-### Example 19
+### Example 27
 
 #### Prompt
 "create a line through two draggable points with the step of one unit"
@@ -416,7 +576,24 @@ geometry expressions [
 
 ---
 
-### Example 20
+### Example 28
+
+#### Prompt
+"show line tool"
+
+#### Chat Transcript
+
+**User**: show line tool
+
+#### Code
+
+```
+show-line-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 29
 
 #### Prompt
 "show expressions list and toolbar"
@@ -433,7 +610,7 @@ show-expressions true show-toolbar true geometry expressions [] {}..
 
 ---
 
-### Example 21
+### Example 30
 
 #### Prompt
 "show expressions list with tools"
@@ -450,7 +627,7 @@ show-expressions true show-expressions-tools true geometry expressions [] {}..
 
 ---
 
-### Example 22
+### Example 31
 
 #### Prompt
 "create a point"
@@ -469,7 +646,29 @@ geometry expressions [
 
 ---
 
-### Example 23
+### Example 32
+
+#### Prompt
+"create a simple vector assesssment"
+
+#### Chat Transcript
+
+**User**: create a simple vector assesssment
+
+#### Code
+
+```
+show-line-tool true geometry expressions [
+  assess [
+    method "vector"
+    expected "\vector((0,0),(3,4))"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 33
 
 #### Prompt
 "Create the line with equation y=2x+1"
@@ -488,7 +687,24 @@ geometry expressions [
 
 ---
 
-### Example 24
+### Example 34
+
+#### Prompt
+"show polygon tool"
+
+#### Chat Transcript
+
+**User**: show polygon tool
+
+#### Code
+
+```
+show-polygon-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 35
 
 #### Prompt
 "Through point A with slope m, draw the line"
@@ -513,7 +729,7 @@ geometry expressions [
 
 ---
 
-### Example 25
+### Example 36
 
 #### Prompt
 "Define point P as the intersection of lines L₁ and L₂"
@@ -534,7 +750,7 @@ geometry expressions [
 
 ---
 
-### Example 26
+### Example 37
 
 #### Prompt
 "Add a draggable point D"
@@ -553,7 +769,7 @@ geometry expressions [
 
 ---
 
-### Example 27
+### Example 38
 
 #### Prompt
 "make a segment assessment"
@@ -577,7 +793,7 @@ geometry expressions [
 
 ---
 
-### Example 28
+### Example 39
 
 #### Prompt
 "Define the intersection points of line L and circle C"
@@ -598,7 +814,7 @@ geometry expressions [
 
 ---
 
-### Example 29
+### Example 40
 
 #### Prompt
 "Create an assessment where the student is asked to place a point at (2, 3) and its reflection over the y axis. Include points P and Q that the student will drag into place, respectively"
@@ -630,7 +846,7 @@ geometry expressions [
 
 ---
 
-### Example 30
+### Example 41
 
 #### Prompt
 "Add a draggable point called D"
@@ -649,7 +865,7 @@ geometry expressions [
 
 ---
 
-### Example 31
+### Example 42
 
 #### Prompt
 "Add three draggable labeled points A, B, and C"
@@ -670,7 +886,7 @@ geometry expressions [
 
 ---
 
-### Example 32
+### Example 43
 
 #### Prompt
 "Define point P where x = 2a and y = 3b"
@@ -691,7 +907,7 @@ geometry expressions [
 
 ---
 
-### Example 33
+### Example 44
 
 #### Prompt
 "Create two labeled points A and B at (1, 2) and (4, 3)"
@@ -711,7 +927,7 @@ geometry expressions [
 
 ---
 
-### Example 34
+### Example 45
 
 #### Prompt
 "create an assessment that asked the student to draw a graph of adding the vectors (1,-2) and (-4,-3). Use bare assessments that validates all three vectors. write instructions that use latex for the vector notation. show the toolbar"
@@ -741,7 +957,7 @@ show-toolbar true instructions "Draw a graph showing the addition of vectors $\v
 
 ---
 
-### Example 35
+### Example 46
 
 #### Prompt
 "Draw segment AB"
@@ -762,7 +978,41 @@ geometry expressions [
 
 ---
 
-### Example 36
+### Example 47
+
+#### Prompt
+"show all tools"
+
+#### Chat Transcript
+
+**User**: show all tools
+
+#### Code
+
+```
+show-all-tools true geometry expressions [] {}..
+```
+
+---
+
+### Example 48
+
+#### Prompt
+"show ray tool"
+
+#### Chat Transcript
+
+**User**: show ray tool
+
+#### Code
+
+```
+show-line-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 49
 
 #### Prompt
 "Define intersection points of circles C₁ and C₂"
@@ -783,7 +1033,7 @@ geometry expressions [
 
 ---
 
-### Example 37
+### Example 50
 
 #### Prompt
 "create an assessment where the student is expected to place a point at coordinates x=2 and y=-3"
@@ -805,7 +1055,7 @@ geometry expressions [
 
 ---
 
-### Example 38
+### Example 51
 
 #### Prompt
 "Add draggable points A, B, and C"
@@ -826,7 +1076,7 @@ geometry expressions [
 
 ---
 
-### Example 39
+### Example 52
 
 #### Prompt
 "Create a vector from the origin to (2, 3)"
@@ -845,7 +1095,7 @@ geometry expressions [
 
 ---
 
-### Example 40
+### Example 53
 
 #### Prompt
 "make a assessment that asked the student to draw a circle that matches (x-1)^2+(y+2)^2=9"
@@ -869,7 +1119,7 @@ title "Circle Construction Exercise" instructions "Draw a circle that matches th
 
 ---
 
-### Example 41
+### Example 54
 
 #### Prompt
 "Through point P, draw a line perpendicular to L"
@@ -892,7 +1142,7 @@ geometry expressions [
 
 ---
 
-### Example 42
+### Example 55
 
 #### Prompt
 "Create point B by translating point A using vector v"
@@ -914,7 +1164,41 @@ geometry expressions [
 
 ---
 
-### Example 43
+### Example 56
+
+#### Prompt
+"show angle tool"
+
+#### Chat Transcript
+
+**User**: show angle tool
+
+#### Code
+
+```
+show-angle-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 57
+
+#### Prompt
+"show circle tool"
+
+#### Chat Transcript
+
+**User**: show circle tool
+
+#### Code
+
+```
+show-circle-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 58
 
 #### Prompt
 "Create a draggable point on the circle centered at (0,0) with radius 3"
@@ -934,7 +1218,7 @@ geometry expressions [
 
 ---
 
-### Example 44
+### Example 59
 
 #### Prompt
 "Make the line through A and B"
@@ -955,7 +1239,7 @@ geometry expressions [
 
 ---
 
-### Example 45
+### Example 60
 
 #### Prompt
 "Define a point P where x = 2a + 1 and y = 3b − 2"
@@ -976,7 +1260,7 @@ geometry expressions [
 
 ---
 
-### Example 46
+### Example 61
 
 #### Prompt
 "Through point P, draw a line parallel to L"
@@ -999,7 +1283,24 @@ geometry expressions [
 
 ---
 
-### Example 47
+### Example 62
+
+#### Prompt
+"show parallel tool"
+
+#### Chat Transcript
+
+**User**: show parallel tool
+
+#### Code
+
+```
+show-line-tool true geometry expressions [] {}..
+```
+
+---
+
+### Example 63
 
 #### Prompt
 "Create a line with adjustable slope m passing through point P"
@@ -1024,7 +1325,7 @@ geometry expressions [
 
 ---
 
-### Example 48
+### Example 64
 
 #### Prompt
 "Add points A (0, 0), B (4, 0), and C (2, 3) to form the vertices of a triangle"
@@ -1045,7 +1346,7 @@ geometry expressions [
 
 ---
 
-### Example 49
+### Example 65
 
 #### Prompt
 "write instructions that tell the student to draw a graph of adding the vectors (1,2) and (4,3), use latex for vector notation. create a bare assessment that validates all three vectors"
@@ -1075,7 +1376,7 @@ instructions "Draw a graph showing the addition of vectors $\\vec{u} = (1,2)$ an
 
 ---
 
-### Example 50
+### Example 66
 
 #### Prompt
 "create a line assessment with a line through two draggable points. add a title and instructions"
@@ -1100,7 +1401,25 @@ title "Line Assessment" instructions "Move the points so the line is equivalent 
 
 ---
 
-### Example 51
+### Example 67
+
+#### Prompt
+"create a minimal template program"
+
+#### Chat Transcript
+
+**User**: create a minimal template program
+
+#### Code
+
+```
+geometry expressions [
+] {}..
+```
+
+---
+
+### Example 68
 
 #### Prompt
 "Draw a ray starting at A and passing through B"
@@ -1121,7 +1440,7 @@ geometry expressions [
 
 ---
 
-### Example 52
+### Example 69
 
 #### Prompt
 "Define point P as the intersection of line y = 2x + 1 and the circle centered at (2, 3) with radius 2"
@@ -1142,7 +1461,24 @@ geometry expressions [
 
 ---
 
-### Example 53
+### Example 70
+
+#### Prompt
+"hide selection tool"
+
+#### Chat Transcript
+
+**User**: hide selection tool
+
+#### Code
+
+```
+show-selection-tool false geometry expressions [] {}..
+```
+
+---
+
+### Example 71
 
 #### Prompt
 "Make a vector from the origin whose head is draggable"
