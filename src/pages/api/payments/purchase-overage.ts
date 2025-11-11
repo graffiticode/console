@@ -185,28 +185,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    // If payment was confirmed successfully, update the user's overage balance
+    // If payment was confirmed successfully, return success
+    // The actual crediting happens in the webhook to prevent double-crediting
     if (paymentIntent.status === 'succeeded') {
-      // Update user's overage balance in Firestore
       const currentOverage = subscriptionData.overageUnits || 0;
-      await db.collection('users').doc(userId).update({
-        'subscription.overageUnits': currentOverage + units,
-        'subscription.lastOveragePurchase': new Date().toISOString(),
-      });
 
-      // Log the purchase
-      await db.collection('overage_purchases').add({
-        userId,
-        units,
-        blocks,
-        blockSize: pricing.blockSize,
-        pricePerUnit: pricing.pricePerUnit,
-        amount: amount / 100, // Store in dollars
-        plan: currentPlan,
-        paymentIntentId: paymentIntent.id,
-        timestamp: new Date(),
-      });
-
+      // Note: Units will be credited via webhook - not here to prevent double-crediting
+      // Just return success with the expected new balance
       return res.status(200).json({
         success: true,
         units,
@@ -214,9 +199,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         blockSize: pricing.blockSize,
         pricePerBlock: pricing.blockSize * pricing.pricePerUnit,
         amount: amount / 100,
-        newOverageBalance: currentOverage + units,
+        newOverageBalance: currentOverage + units, // This is what it WILL be after webhook processes
         paymentIntentId: paymentIntent.id,
         description: pricing.description,
+        note: 'Units will be credited shortly via payment processing'
       });
     } else if (paymentIntent.status === 'requires_action') {
       // 3D Secure or other additional authentication required

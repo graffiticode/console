@@ -234,6 +234,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (paymentIntent.metadata?.type === 'overage_purchase') {
           const userId = paymentIntent.metadata.userId;
           const units = parseInt(paymentIntent.metadata.units);
+          const blocks = parseInt(paymentIntent.metadata.blocks || '1');
+          const plan = paymentIntent.metadata.plan;
+          const pricePerUnit = parseFloat(paymentIntent.metadata.pricePerUnit || '0');
 
           if (userId && units) {
             // Get current overage balance
@@ -241,21 +244,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const userData = userDoc.data();
             const currentOverage = userData?.subscription?.overageUnits || 0;
 
-            // Update overage balance
+            // Update overage balance (this is the ONLY place units are credited)
             await db.collection('users').doc(userId).update({
               'subscription.overageUnits': currentOverage + units,
               'subscription.lastOveragePurchase': new Date().toISOString(),
             });
 
-            // Log the purchase
+            // Log the purchase with complete metadata
             await db.collection('overage_purchases').add({
               userId,
               units,
+              blocks,
+              plan,
+              pricePerUnit,
               amount: paymentIntent.amount / 100,
               paymentIntentId: paymentIntent.id,
               timestamp: new Date(),
               status: 'completed',
+              webhookProcessed: true,
             });
+
+            console.log(`Credited ${units} overage units to user ${userId} (${blocks} blocks)`);
           }
         }
 
