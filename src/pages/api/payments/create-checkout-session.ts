@@ -12,6 +12,10 @@ if (process.env.STRIPE_SECRET_KEY) {
 
 // Map our plan IDs to Stripe price IDs
 const STRIPE_PRICE_IDS = {
+  free: {  // Internal ID 'free' is used for Starter plan
+    monthly: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID,
+    annual: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID,
+  },
   pro: {
     monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
     annual: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,

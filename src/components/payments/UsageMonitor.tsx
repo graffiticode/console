@@ -375,24 +375,9 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
             {pricing && !pricing.overageAvailable && (
               <div className="pt-4">
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-600 mb-2">
-                    {pricing.plan === 'free'
-                      ? 'Demo accounts receive 1,000 lifetime compile units.'
-                      : 'Overage purchases are not available for your plan.'}
+                  <p className="text-sm text-gray-600">
+                    Overage purchases are not available for your plan.
                   </p>
-                  {pricing.plan === 'free' && isAtLimit && (
-                    <p className="text-sm font-medium text-gray-900">
-                      You&apos;ve used all your units. Upgrade to Pro or Team for {' '}
-                      {remainingUnits <= 0
-                        ? 'continued access'
-                        : 'more units'}, or contact us for additional Demo units.
-                    </p>
-                  )}
-                  {pricing.plan === 'free' && !isAtLimit && (
-                    <p className="text-sm text-gray-600">
-                      Upgrade to Pro or Team to get monthly allocations and automatic overage protection.
-                    </p>
-                  )}
                 </div>
               </div>
             )}

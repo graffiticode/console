@@ -9,30 +9,34 @@ interface PricingPlansProps {
 const plans = [
   {
     id: 'free',
-    name: 'Demo',
+    name: 'Starter',
     description: 'Perfect for trying out Graffiticode',
     monthlyPrice: 0,
     annualPrice: 0,
-    monthlyUnits: 1000,
+    originalMonthlyPrice: 10,  // Original price to show with strikethrough
+    originalAnnualPrice: 100,  // Original price to show with strikethrough
+    monthlyUnits: 2000,
     features: [
-      '1,000 compile units (lifetime)',
+      '2,000 compile units per month',
+      'Additional compiles at $0.005 each',
       'Limited language access',
       'Community support',
       'Public tasks only',
-      'Basic IDE features'
+      'Basic IDE features',
+      'Automatic overage protection'
     ],
-    cta: 'Current Plan',
-    disabled: true
+    cta: 'Get Started',
+    disabled: false
   },
   {
     id: 'pro',
     name: 'Pro',
     description: 'Great for serious creators',
-    monthlyPrice: 50,
-    annualPrice: 500,
-    monthlyUnits: 50000,
+    monthlyPrice: 100,
+    annualPrice: 1000,
+    monthlyUnits: 100000,
     features: [
-      '50,000 compile units/month',
+      '100,000 compile units per month',
       'Additional compiles at $0.001 each',
       'Access to all languages',
       'Email support',
@@ -47,11 +51,11 @@ const plans = [
     id: 'teams',
     name: 'Team',
     description: 'For teams and high volume API calls',
-    monthlyPrice: 500,
-    annualPrice: 5000,
-    monthlyUnits: 1000000,
+    monthlyPrice: 1000,
+    annualPrice: 10000,
+    monthlyUnits: 2000000,
     features: [
-      '1,000,000 compile units/month',
+      '2,000,000 compile units per month',
       'Additional compiles at $0.0005 each',
       'Access to all languages',
       'Priority support',
@@ -260,6 +264,9 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => {
           const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
+          const originalPrice = plan.originalMonthlyPrice
+            ? (billingInterval === 'monthly' ? plan.originalMonthlyPrice : plan.originalAnnualPrice)
+            : null;
           const units = billingInterval === 'annual' ? plan.monthlyUnits * 12 : plan.monthlyUnits;
           const isCurrentPlan = plan.id === currentUserPlan;
           const isSameBillingInterval = billingInterval === currentBillingInterval;
@@ -304,25 +311,22 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
               </div>
 
               <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900">${price.toLocaleString()}</span>
-                {plan.id !== 'free' && (
-                  <span className="text-gray-500 ml-1">
-                    /{billingInterval === 'monthly' ? 'mo' : 'yr'}
-                  </span>
+                {plan.id === 'free' && originalPrice ? (
+                  <>
+                    <span className="text-4xl font-bold text-red-500 line-through">${originalPrice.toLocaleString()}</span>
+                    <span className="text-4xl font-bold text-gray-900 ml-2">$0</span>
+                    <span className="text-gray-500 ml-1">
+                      /{billingInterval === 'monthly' ? 'mo' : 'yr'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-4xl font-bold text-gray-900">${price.toLocaleString()}</span>
+                    <span className="text-gray-500 ml-1">
+                      /{billingInterval === 'monthly' ? 'mo' : 'yr'}
+                    </span>
+                  </>
                 )}
-              </div>
-
-              <div className="mb-6">
-                <p className="text-sm font-medium text-gray-900">
-                  {units.toLocaleString()} compile units
-                </p>
-                <p className="text-xs text-gray-500">
-                  {plan.id === 'free'
-                    ? 'lifetime'
-                    : billingInterval === 'annual'
-                    ? 'per year'
-                    : 'per month'}
-                </p>
               </div>
 
               <ul className="space-y-3 mb-6">
@@ -336,13 +340,13 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
 
               <button
                 onClick={() => handleSubscribe(plan.id)}
-                disabled={plan.disabled || processing || (isCurrentPlan && isSameBillingInterval)}
+                disabled={processing || (isCurrentPlan && isSameBillingInterval)}
                 className={`w-full py-2 px-4 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                   plan.id === highlightedPlan
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500'
                     : 'bg-gray-50 text-gray-900 hover:bg-gray-100 focus:ring-gray-500'
                 } ${
-                  (plan.disabled || processing || (isCurrentPlan && isSameBillingInterval)) ? 'opacity-50 cursor-not-allowed' : ''
+                  (processing || (isCurrentPlan && isSameBillingInterval)) ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 {processing && selectedPlan === plan.id
@@ -351,6 +355,14 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
                   ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
                   : isCurrentPlan && isSameBillingInterval
                   ? 'Current Plan'
+                  : plan.id === 'free' && (currentUserPlan === 'pro' || currentUserPlan === 'teams')
+                  ? 'Downgrade to Starter'
+                  : plan.id === 'pro' && currentUserPlan === 'teams'
+                  ? 'Downgrade to Pro'
+                  : plan.id === 'pro' && currentUserPlan === 'free'
+                  ? 'Upgrade to Pro'
+                  : plan.id === 'teams' && (currentUserPlan === 'free' || currentUserPlan === 'pro')
+                  ? 'Upgrade to Team'
                   : plan.cta}
               </button>
 

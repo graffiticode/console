@@ -8,6 +8,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 
 // Overage pricing based on plan's compile unit price
 const OVERAGE_PRICING = {
+  free: {  // Starter plan
+    pricePerUnit: 0.005,     // $0.005 per unit = $5 per 1000 units
+    blockSize: 1000,         // Purchase in blocks of 1,000
+    minBlocks: 1,            // Minimum 1 block (1,000 units)
+    description: '$5 per 1,000 units'
+  },
   pro: {
     pricePerUnit: 0.001,    // $0.001 per unit = $1 per 1000 units
     blockSize: 10000,        // Purchase in blocks of 10,000
@@ -22,9 +28,9 @@ const OVERAGE_PRICING = {
   },
   teams: {
     pricePerUnit: 0.0005,    // $0.0005 per unit = $0.50 per 1000 units
-    blockSize: 10000,        // Purchase in blocks of 10,000
-    minBlocks: 1,            // Minimum 1 block (10,000 units)
-    description: '$5 per 10,000 units'
+    blockSize: 20000,        // Purchase in blocks of 20,000
+    minBlocks: 1,            // Minimum 1 block (20,000 units)
+    description: '$10 per 20,000 units'
   },
 };
 
@@ -47,14 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const currentPlan = subscriptionData.plan || 'free';
       const currentOverage = subscriptionData.overageUnits || 0;
 
-      if (currentPlan === 'free') {
-        return res.status(200).json({
-          plan: 'free',
-          overageAvailable: false,
-          currentOverageBalance: 0,
-          message: 'Upgrade to Pro or Team to purchase overage units'
-        });
-      }
+      // Starter plan (free) now supports overage purchases
 
       const pricing = OVERAGE_PRICING[currentPlan];
 
@@ -116,13 +115,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get user's current plan
     const subscriptionData = userData?.subscription || {};
     const currentPlan = subscriptionData.plan || 'free';
-
-    if (currentPlan === 'free') {
-      return res.status(400).json({
-        error: 'Overage purchases are not available on the free plan',
-        upgradeRequired: true
-      });
-    }
 
     // Validate purchase amount
     const pricing = OVERAGE_PRICING[currentPlan];

@@ -21,9 +21,9 @@ interface SubscriptionCardProps {
 }
 
 const planDetails = {
-  free: { name: 'Demo', monthlyUnits: 1000, price: 0 },
-  pro: { name: 'Pro', monthlyUnits: 50000, price: { monthly: 50, annual: 500 } },
-  teams: { name: 'Team', monthlyUnits: 1000000, price: { monthly: 500, annual: 5000 } },
+  free: { name: 'Starter', monthlyUnits: 2000, price: { monthly: 0, annual: 0 } },
+  pro: { name: 'Pro', monthlyUnits: 100000, price: { monthly: 100, annual: 1000 } },
+  teams: { name: 'Team', monthlyUnits: 2000000, price: { monthly: 1000, annual: 10000 } },
 };
 
 export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
@@ -91,9 +91,9 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
   }
 
   const plan = planDetails[subscription.plan] || planDetails.free;
-  const currentPrice = subscription.interval && subscription.plan !== 'free' && plan.price && typeof plan.price === 'object'
+  const currentPrice = subscription.interval && plan.price && typeof plan.price === 'object'
     ? plan.price[subscription.interval]
-    : 0;
+    : plan.price && typeof plan.price === 'number' ? plan.price : 0;
 
   // Calculate units: multiply by 12 for annual plans
   const displayUnits = subscription.interval === 'annual'
@@ -121,7 +121,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
           </h3>
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
             <StatusIcon className="w-4 h-4 mr-1" />
-            {subscription.status === 'none' ? 'Demo Tier' : subscription.status}
+            {subscription.status === 'none' ? 'Starter Tier' : subscription.status}
           </span>
         </div>
 
@@ -133,9 +133,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
             </dd>
             <dd className="mt-1 text-sm text-gray-600">
               {displayUnits.toLocaleString()} compile units{' '}
-              {subscription.plan === 'free'
-                ? '(lifetime)'
-                : subscription.interval === 'annual'
+              {subscription.interval === 'annual'
                 ? 'per year'
                 : 'per month'}
             </dd>
@@ -144,26 +142,26 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
           <div>
             <dt className="text-sm font-medium text-gray-500">Billing</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              ${currentPrice}
-              {subscription.interval && (
-                <span className="text-sm text-gray-500 ml-1">
-                  / {subscription.interval === 'monthly' ? 'month' : 'year'}
-                </span>
+              {subscription.plan === 'free' ? (
+                'Free'
+              ) : (
+                <>
+                  ${currentPrice}
+                  <span className="text-sm text-gray-500 ml-1">
+                    / {subscription.interval === 'monthly' || !subscription.interval ? 'month' : 'year'}
+                  </span>
+                </>
               )}
             </dd>
             <dd className="mt-1 text-sm text-gray-600">
-              {subscription.interval ? `Billed ${subscription.interval === 'monthly' ? 'monthly' : 'annually'}` : 'No billing'}
+              {subscription.plan === 'free' ? 'No billing' : subscription.interval ? `Billed ${subscription.interval === 'monthly' ? 'monthly' : 'annually'}` : 'Billed monthly'}
             </dd>
           </div>
 
           <div>
-            <dt className="text-sm font-medium text-gray-500">
-              {subscription.plan === 'free' ? 'Status' : 'Renewal Date'}
-            </dt>
+            <dt className="text-sm font-medium text-gray-500">Renewal Date</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              {subscription.plan === 'free' ? (
-                'Active'
-              ) : subscription.nextBillingDate || subscription.currentPeriodEnd ? (
+              {subscription.nextBillingDate || subscription.currentPeriodEnd ? (
                 new Date(subscription.nextBillingDate || subscription.currentPeriodEnd!).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -173,16 +171,14 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
                 '—'
               )}
             </dd>
-            {subscription.plan === 'free' ? (
-              <dd className="mt-1 text-sm text-gray-600">No expiration</dd>
-            ) : subscription.nextBillingDate || subscription.currentPeriodEnd ? (
+            {subscription.nextBillingDate || subscription.currentPeriodEnd ? (
               <dd className="mt-1 text-sm text-gray-600">
                 {subscription.cancelAtPeriodEnd
                   ? 'Subscription ends'
                   : 'Next payment due'}
               </dd>
             ) : (
-              <dd className="mt-1 text-sm text-gray-600">No renewal</dd>
+              <dd className="mt-1 text-sm text-gray-600">No renewal date set</dd>
             )}
           </div>
         </div>
