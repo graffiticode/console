@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
+import * as admin from 'firebase-admin';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -65,6 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const userData = userDoc.data();
     const stripeCustomerId = userData?.stripeCustomerId;
+    const currentPlan = userData?.subscription?.plan || 'free';
 
     if (!stripeCustomerId) {
       return res.status(400).json({
@@ -129,18 +131,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const existingPriceId = existingSub.items.data[0]?.price.id;
 
       // Determine the current plan and interval from the existing subscription
-      const currentPlan = PLAN_MAPPING[existingPriceId] || 'free';
+      const existingPlan = PLAN_MAPPING[existingPriceId] || 'free';
       const currentPrice = await stripe.prices.retrieve(existingPriceId);
       const currentInterval = currentPrice.recurring?.interval === 'year' ? 'annual' : 'monthly';
 
       // Determine if this is an upgrade or downgrade
       isUpgrade =
-        (currentPlan === 'pro' && planId === 'teams') || // Pro -> Max
+        (existingPlan === 'pro' && planId === 'teams') || // Pro -> Max
         (currentInterval === 'monthly' && interval === 'annual'); // Monthly -> Annual
 
       console.log('Updating existing subscription:', {
         subscriptionId: existingSub.id,
-        currentPlan,
+        currentPlan: existingPlan,
         currentInterval,
         newPlan: planId,
         newInterval: interval,
@@ -179,9 +181,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log('Processing downgrade/lateral move - applying immediately while preserving renewal date and allocation');
 
         // Calculate the old plan's allocation to preserve
-        if (currentPlan === 'teams') {
+        if (existingPlan === 'teams') {
           oldAllocation = 2000000; // Teams monthly allocation
-        } else if (currentPlan === 'pro') {
+        } else if (existingPlan === 'pro') {
           oldAllocation = 100000; // Pro monthly allocation
         } else {
           oldAllocation = 2000; // Starter/free allocation
@@ -193,7 +195,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         console.log('Preserving allocation from old plan:', {
-          currentPlan,
+          currentPlan: existingPlan,
           currentInterval,
           preservedAllocation: oldAllocation
         });
@@ -290,6 +292,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (existingSub && !isUpgrade) {
       updateData['subscription.preservedAllocation'] = oldAllocation;
       updateData['subscription.preservedUntil'] = new Date(subscription.current_period_end * 1000).toISOString();
+    } else if (currentPlan === 'free') {
+      // If upgrading from free, clear any preserved fields and canceledAt
+      updateData['subscription.preservedAllocation'] = admin.firestore.FieldValue.delete();
+      updateData['subscription.preservedUntil'] = admin.firestore.FieldValue.delete();
+      updateData['subscription.canceledAt'] = admin.firestore.FieldValue.delete();
     }
 
     await db.collection('users').doc(userId).update(updateData);

@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
+import * as admin from 'firebase-admin';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2022-08-01',
@@ -130,8 +131,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'subscription.cancelAt': canceledSubscription.cancel_at
         ? new Date(canceledSubscription.cancel_at * 1000).toISOString()
         : null,
-      'subscription.canceledAt': new Date().toISOString(),
     };
+
+    // Only set canceledAt for actual cancellations, not downgrades to free
+    if (!immediately) {
+      updateData['subscription.canceledAt'] = new Date().toISOString();
+    }
 
     // Preserve the renewal date and allocation when downgrading to free
     if (immediately && subscription.current_period_end) {
@@ -140,6 +145,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       updateData['subscription.stripeSubscriptionId'] = null; // Clear Stripe subscription ID
       updateData['subscription.preservedAllocation'] = currentAllocation; // Preserve old plan's allocation
       updateData['subscription.preservedUntil'] = new Date(subscription.current_period_end * 1000).toISOString();
+
+      // Clear any previous canceledAt field for downgrades
+      updateData['subscription.canceledAt'] = admin.firestore.FieldValue.delete();
     }
 
     await db.collection('users').doc(userId).update(updateData);
