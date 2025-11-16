@@ -30,6 +30,42 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
     if (units && units > 0) {
       const now = new Date();
 
+      // Check if user is over limit
+      let wasOverLimit = false;
+      try {
+        const userDoc = await db.collection('users').doc(auth.uid).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          const plan = userData?.subscription?.plan || 'free';
+          const overageUnits = userData?.subscription?.overageUnits || 0;
+
+          // Get plan allocation
+          const planAllocations = {
+            free: 2000,
+            pro: 100000,
+            teams: 2000000
+          };
+          let allocatedUnits = planAllocations[plan] || 2000;
+
+          // Check for preserved allocation (from downgrade)
+          const preservedUntil = userData?.subscription?.preservedUntil;
+          const preservedAllocation = userData?.subscription?.preservedAllocation;
+          if (preservedUntil && preservedAllocation && new Date(preservedUntil) > now) {
+            allocatedUnits = preservedAllocation;
+          }
+
+          // Get current usage
+          const usageDoc = await db.collection('usage').doc(auth.uid).get();
+          const currentUsage = usageDoc.exists ? (usageDoc.data().currentMonthTotal || 0) : 0;
+
+          // Calculate if over limit (before adding these new units)
+          const totalAvailable = allocatedUnits + overageUnits;
+          wasOverLimit = currentUsage >= totalAvailable;
+        }
+      } catch (error) {
+        console.error('Error checking usage limit:', error);
+      }
+
       // Add individual usage record for audit trail
       await db.collection('usage').add({
         userId: auth.uid,
@@ -39,7 +75,8 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
         timestamp: timestamp,
         lang: lang,
         type: 'compile',
-        status: status
+        status: status,
+        wasOverLimit: wasOverLimit
       });
 
       // Update monthly usage total

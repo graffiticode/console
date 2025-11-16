@@ -21,6 +21,7 @@ import {
   BellIcon,
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/SignIn'
+import UsageWarning from '../components/UsageWarning'
 import { getTitle } from '../lib/utils';
 
 export function Logo(props) {
@@ -51,6 +52,7 @@ function classNames(...classes) {
 
 export default function Layout({ children, pathName, language, setLanguage, mark, setMark }) {
   const [userId, setUserId] = useState();
+  const { user } = useGraffiticodeAuth();
   const lang = language.name.slice(1);
   useEffect(() => {
     document.title = getTitle();
@@ -132,7 +134,10 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                       >
                         Community
                       </a>
-                      <div className="text-gray-400 hover:text-white">
+                      <div className="flex items-center gap-2 text-gray-400 hover:text-white">
+                        {user && (
+                          <UsageWarning userId={user.uid} />
+                        )}
                         <SignIn />
                       </div>
                     </div>
@@ -178,7 +183,10 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                     >
                       Community
                     </a>
-                    <div className="text-gray-400 hover:text-white">
+                    <div className="flex items-center gap-2 text-gray-400 hover:text-white">
+                      {user && (
+                        <UsageWarning userId={user.uid} />
+                      )}
                       <SignIn />
                     </div>
                     <button

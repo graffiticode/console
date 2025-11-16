@@ -1428,6 +1428,37 @@ export async function generateCode({
 
         const now = new Date();
 
+        // Check if user is over limit before this operation
+        let wasOverLimit = false;
+        try {
+          const overageUnits = subscription.overageUnits || 0;
+
+          // Get plan allocation
+          const planAllocations = {
+            free: 2000,
+            pro: 100000,
+            teams: 2000000
+          };
+          let allocatedUnits = planAllocations[plan] || 2000;
+
+          // Check for preserved allocation (from downgrade)
+          const preservedUntil = subscription.preservedUntil;
+          const preservedAllocation = subscription.preservedAllocation;
+          if (preservedUntil && preservedAllocation && new Date(preservedUntil) > now) {
+            allocatedUnits = preservedAllocation;
+          }
+
+          // Get current usage
+          const usageDoc = await db.collection('usage').doc(auth.uid).get();
+          const currentUsage = usageDoc.exists ? (usageDoc.data().currentMonthTotal || 0) : 0;
+
+          // Calculate if over limit (before adding these new units)
+          const totalAvailable = allocatedUnits + overageUnits;
+          wasOverLimit = currentUsage >= totalAvailable;
+        } catch (error) {
+          console.error('Error checking usage limit:', error);
+        }
+
         // Add individual usage record for audit trail
         await db.collection('usage').add({
           userId: auth.uid,
@@ -1451,7 +1482,8 @@ export async function generateCode({
           plan: plan,
           unitPrice: unitPrice,
           fixAttempts: fixAttempts,
-          usedOpusForFix: usedOpusForFix
+          usedOpusForFix: usedOpusForFix,
+          wasOverLimit: wasOverLimit
         });
 
         // Update monthly usage total
