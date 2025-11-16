@@ -90,11 +90,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         lastDayOfPeriod = new Date(currentYear, currentMonth + 1, 0);
       }
     } else {
-      // No Stripe customer - free users don't have billing periods
-      // Use account creation date as the start of their lifetime usage
-      const accountCreated = userData?.created ? new Date(userData.created) : now;
-      firstDayOfPeriod = accountCreated;
-      lastDayOfPeriod = new Date('2099-12-31'); // Far future date (no reset for free users)
+      // No Stripe customer - free users don't have billing periods normally
+      // But check if there's a preserved renewal date from a downgrade
+      const preservedRenewalDate = userData?.subscription?.renewalDate;
+      const preservedUntil = userData?.subscription?.preservedUntil;
+
+      if (preservedRenewalDate || preservedUntil) {
+        // Use the preserved dates from the downgrade
+        const renewalDate = preservedUntil || preservedRenewalDate;
+        lastDayOfPeriod = new Date(renewalDate);
+
+        // Calculate the start of the period (assuming monthly for now)
+        firstDayOfPeriod = new Date(lastDayOfPeriod);
+        firstDayOfPeriod.setMonth(firstDayOfPeriod.getMonth() - 1);
+      } else {
+        // No preserved dates - use account creation date as the start
+        const accountCreated = userData?.created ? new Date(userData.created) : now;
+        firstDayOfPeriod = accountCreated;
+        lastDayOfPeriod = new Date('2099-12-31'); // Far future date (no reset for free users)
+      }
     }
 
     // Query usage data for the current billing period
@@ -181,11 +195,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       teams: 2000000,  // Updated to match current Teams plan
     };
 
-    let planUnits = baseUnitAllocation[currentPlan];
+    // Check if we should use preserved allocation (from a downgrade)
+    const preservedUntil = userData?.subscription?.preservedUntil;
+    const preservedAllocation = userData?.subscription?.preservedAllocation;
+    const hasPreservedAllocation = preservedUntil && preservedAllocation && new Date(preservedUntil) > now;
 
-    // Multiply by 12 for annual billing cycles
-    if (billingInterval === 'annual') {
-      planUnits = planUnits * 12;
+    let planUnits;
+    if (hasPreservedAllocation) {
+      // Use the preserved allocation from the previous plan
+      planUnits = preservedAllocation;
+      console.log('Using preserved allocation:', {
+        preservedAllocation,
+        preservedUntil,
+        originalPlan: currentPlan
+      });
+    } else {
+      // Use the normal plan allocation
+      planUnits = baseUnitAllocation[currentPlan];
+
+      // Multiply by 12 for annual billing cycles
+      if (billingInterval === 'annual') {
+        planUnits = planUnits * 12;
+      }
     }
 
     const overageUnits = userData?.subscription?.overageUnits || 0;

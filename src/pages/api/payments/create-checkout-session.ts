@@ -40,6 +40,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    // Validate that Starter plan can only be monthly
+    if (planId === 'free' && interval === 'annual') {
+      return res.status(400).json({
+        error: 'Starter plan is only available with monthly billing'
+      });
+    }
+
     // Validate Stripe configuration
     if (!stripe) {
       console.error('STRIPE_SECRET_KEY is not configured');

@@ -57,6 +57,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const subscription = subscriptions.data[0];
 
+    // Calculate current plan's allocation to preserve on immediate cancellation
+    let currentAllocation = 0;
+    if (immediately) {
+      // Get the current plan details
+      const priceId = subscription.items.data[0]?.price.id;
+      const priceDetails = subscription.items.data[0]?.price;
+      const interval = priceDetails?.recurring?.interval;
+
+      // Determine current plan from userData or price metadata
+      const currentPlan = userData?.subscription?.plan || 'pro'; // Default to pro if unknown
+
+      // Calculate allocation based on plan
+      if (currentPlan === 'teams') {
+        currentAllocation = 2000000; // Teams monthly allocation
+      } else if (currentPlan === 'pro') {
+        currentAllocation = 100000; // Pro monthly allocation
+      } else {
+        currentAllocation = 2000; // Starter allocation (shouldn't happen for cancel)
+      }
+
+      // Multiply by 12 if annual
+      if (interval === 'year') {
+        currentAllocation = currentAllocation * 12;
+      }
+
+      console.log('Preserving allocation on downgrade to free:', {
+        currentPlan,
+        interval,
+        preservedAllocation: currentAllocation
+      });
+    }
+
     // Cancel the subscription
     let canceledSubscription: Stripe.Subscription;
 
@@ -101,11 +133,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'subscription.canceledAt': new Date().toISOString(),
     };
 
-    // Preserve the renewal date when downgrading to free
+    // Preserve the renewal date and allocation when downgrading to free
     if (immediately && subscription.current_period_end) {
       updateData['subscription.renewalDate'] = new Date(subscription.current_period_end * 1000).toISOString();
       updateData['subscription.interval'] = null; // Free plan has no interval
       updateData['subscription.stripeSubscriptionId'] = null; // Clear Stripe subscription ID
+      updateData['subscription.preservedAllocation'] = currentAllocation; // Preserve old plan's allocation
+      updateData['subscription.preservedUntil'] = new Date(subscription.current_period_end * 1000).toISOString();
     }
 
     await db.collection('users').doc(userId).update(updateData);

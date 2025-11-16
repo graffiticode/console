@@ -13,9 +13,9 @@ const plans = [
     name: 'Starter',
     description: 'Perfect for trying out Graffiticode',
     monthlyPrice: 0,
-    annualPrice: 0,
+    annualPrice: null,  // No annual option for Starter
     originalMonthlyPrice: 10,  // Original price to show with strikethrough
-    originalAnnualPrice: 100,  // Original price to show with strikethrough
+    originalAnnualPrice: null,  // No annual strikethrough
     monthlyUnits: 2000,
     features: [
       '2,000 compile units per month',
@@ -298,11 +298,15 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
       {/* Pricing Cards */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => {
-          const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
+          // For Starter plan, always show monthly pricing even if annual is selected
+          const isStarterPlan = plan.id === 'free';
+          const effectiveBilling = isStarterPlan ? 'monthly' : billingInterval;
+
+          const price = effectiveBilling === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
           const originalPrice = plan.originalMonthlyPrice
-            ? (billingInterval === 'monthly' ? plan.originalMonthlyPrice : plan.originalAnnualPrice)
+            ? (effectiveBilling === 'monthly' ? plan.originalMonthlyPrice : plan.originalAnnualPrice)
             : null;
-          const units = billingInterval === 'annual' ? plan.monthlyUnits * 12 : plan.monthlyUnits;
+          const units = effectiveBilling === 'annual' && !isStarterPlan ? plan.monthlyUnits * 12 : plan.monthlyUnits;
           const isCurrentPlan = plan.id === currentUserPlan;
           const isSameBillingInterval = billingInterval === currentBillingInterval;
           const isChangingBilling = isCurrentPlan && !isSameBillingInterval;
@@ -350,9 +354,10 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
                   <>
                     <span className="text-4xl font-bold text-red-500 line-through">${originalPrice.toLocaleString()}</span>
                     <span className="text-4xl font-bold text-gray-900 ml-2">$0</span>
-                    <span className="text-gray-500 ml-1">
-                      /{billingInterval === 'monthly' ? 'mo' : 'yr'}
-                    </span>
+                    <span className="text-gray-500 ml-1">/mo</span>
+                    {billingInterval === 'annual' && (
+                      <div className="mt-1 text-xs text-gray-500">Monthly billing only</div>
+                    )}
                   </>
                 ) : (
                   <>

@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
+import admin from '../../../utils/db';
 import { buffer } from 'micro';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
@@ -189,6 +190,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               currentMonthTotal: 0,
               lastReset: new Date().toISOString(),
             }, { merge: true });
+
+            // Clear preserved allocation on renewal (subscription invoice paid)
+            // This happens when a downgraded plan renews for the first time
+            const userData = userDoc.data();
+            if (userData?.subscription?.preservedAllocation) {
+              console.log('Clearing preserved allocation on renewal for user:', userId);
+              await db.collection('users').doc(userId).update({
+                'subscription.preservedAllocation': admin.firestore.FieldValue.delete(),
+                'subscription.preservedUntil': admin.firestore.FieldValue.delete(),
+              });
+            }
           }
         }
 

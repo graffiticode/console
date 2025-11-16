@@ -269,7 +269,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                 </dt>
                 <dd className="mt-1">
                   <div className="text-2xl font-semibold text-gray-900">
-                    {usage.currentPeriodEnd ?
+                    {usage.currentPeriodEnd && new Date(usage.currentPeriodEnd).getFullYear() < 2099 ?
                       new Date(usage.currentPeriodEnd).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -279,7 +279,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                     }
                   </div>
                   <div className="text-xs text-gray-500">
-                    {usage.currentPeriodEnd ? 'date account resets' : 'no reset date'}
+                    {usage.currentPeriodEnd && new Date(usage.currentPeriodEnd).getFullYear() < 2099 ? 'date account resets' : 'no reset date'}
                   </div>
                 </dd>
               </div>

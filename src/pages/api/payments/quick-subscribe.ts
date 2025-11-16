@@ -48,6 +48,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    // Validate that Starter plan can only be monthly
+    if (planId === 'free' && interval === 'annual') {
+      return res.status(400).json({
+        error: 'Starter plan is only available with monthly billing'
+      });
+    }
+
     // Get user and their Stripe customer
     const db = getFirestore();
     const userDoc = await db.collection('users').doc(userId).get();
@@ -112,10 +119,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     let subscription: Stripe.Subscription;
+    let isUpgrade = false;
+    let oldAllocation = 0;
+    let existingSub: Stripe.Subscription | null = null;
 
     if (existingSubscriptions.data.length > 0) {
       // User has existing subscription - update it
-      const existingSub = existingSubscriptions.data[0];
+      existingSub = existingSubscriptions.data[0];
       const existingPriceId = existingSub.items.data[0]?.price.id;
 
       // Determine the current plan and interval from the existing subscription
@@ -124,7 +134,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const currentInterval = currentPrice.recurring?.interval === 'year' ? 'annual' : 'monthly';
 
       // Determine if this is an upgrade or downgrade
-      const isUpgrade =
+      isUpgrade =
         (currentPlan === 'pro' && planId === 'teams') || // Pro -> Max
         (currentInterval === 'monthly' && interval === 'annual'); // Monthly -> Annual
 
@@ -165,8 +175,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         console.log('Upgrade applied immediately with proration credit');
       } else {
-        // For downgrades/lateral moves: Apply immediately but preserve renewal date
-        console.log('Processing downgrade/lateral move - applying immediately while preserving renewal date');
+        // For downgrades/lateral moves: Apply immediately but preserve renewal date and allocation
+        console.log('Processing downgrade/lateral move - applying immediately while preserving renewal date and allocation');
+
+        // Calculate the old plan's allocation to preserve
+        if (currentPlan === 'teams') {
+          oldAllocation = 2000000; // Teams monthly allocation
+        } else if (currentPlan === 'pro') {
+          oldAllocation = 100000; // Pro monthly allocation
+        } else {
+          oldAllocation = 2000; // Starter/free allocation
+        }
+
+        // Multiply by 12 if current plan is annual
+        if (currentInterval === 'annual') {
+          oldAllocation = oldAllocation * 12;
+        }
+
+        console.log('Preserving allocation from old plan:', {
+          currentPlan,
+          currentInterval,
+          preservedAllocation: oldAllocation
+        });
 
         // If there's an existing schedule, release it first
         if (existingSub.schedule) {
@@ -248,13 +278,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Update user's subscription info in database
-    await db.collection('users').doc(userId).update({
+    const updateData: any = {
       'subscription.status': subscription.status,
       'subscription.stripeSubscriptionId': subscription.id,
       'subscription.plan': planId,
       'subscription.interval': interval,
       'subscription.updatedAt': new Date().toISOString(),
-    });
+    };
+
+    // If this was a downgrade, store the preserved allocation
+    if (existingSub && !isUpgrade) {
+      updateData['subscription.preservedAllocation'] = oldAllocation;
+      updateData['subscription.preservedUntil'] = new Date(subscription.current_period_end * 1000).toISOString();
+    }
+
+    await db.collection('users').doc(userId).update(updateData);
 
     return res.status(200).json({
       success: true,

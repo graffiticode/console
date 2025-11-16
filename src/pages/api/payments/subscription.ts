@@ -115,6 +115,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Check if there's a preserved renewal date from a previous subscription
       const preservedRenewalDate = userData?.subscription?.renewalDate || null;
 
+      // Check for preserved allocation from a downgrade
+      const preservedUntil = userData?.subscription?.preservedUntil;
+      const preservedAllocation = userData?.subscription?.preservedAllocation;
+      const hasPreservedAllocation = preservedUntil && preservedAllocation && new Date(preservedUntil) > new Date();
+
       return res.status(200).json({
         plan: userData?.subscription?.plan || 'free',
         interval: null,
@@ -122,9 +127,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         currentBillingPeriod: null,
         cancelAtPeriodEnd: false,
         nextBillingDate: preservedRenewalDate, // Use preserved renewal date if available
-        units: 2000, // Starter tier units (updated from 1000)
+        units: hasPreservedAllocation ? preservedAllocation : 2000, // Use preserved allocation or Starter tier units
         overageUnits: 0,
         overageRate: null,
+        isUsingPreservedAllocation: hasPreservedAllocation,
+        preservedUntil: hasPreservedAllocation ? preservedUntil : null,
       });
     }
 
@@ -143,10 +150,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       teams: 2000000, // Updated to match current Teams plan
     };
 
-    // Multiply by 12 for annual plans
-    const planUnits = interval === 'annual'
-      ? (baseUnitAllocation[planName] || 1000) * 12
-      : (baseUnitAllocation[planName] || 1000);
+    // Check for preserved allocation from a downgrade
+    const preservedUntil = userData?.subscription?.preservedUntil;
+    const preservedAllocation = userData?.subscription?.preservedAllocation;
+    const hasPreservedAllocation = preservedUntil && preservedAllocation && new Date(preservedUntil) > new Date();
+
+    // Use preserved allocation if available, otherwise calculate normally
+    const planUnits = hasPreservedAllocation
+      ? preservedAllocation
+      : (interval === 'annual'
+        ? (baseUnitAllocation[planName] || 1000) * 12
+        : (baseUnitAllocation[planName] || 1000));
 
     // Get overage rate based on plan
     const overageRate = {
@@ -211,6 +225,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       overageUnits,
       overageRate: overageRate[planName],
       stripeSubscriptionId: subscription.id,
+      isUsingPreservedAllocation: hasPreservedAllocation,
+      preservedUntil: hasPreservedAllocation ? preservedUntil : null,
     });
   } catch (error) {
     console.error('Error fetching subscription:', error);
