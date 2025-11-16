@@ -4,6 +4,7 @@ import axios from 'axios';
 
 interface PricingPlansProps {
   userId: string;
+  onSubscriptionChange?: () => void;
 }
 
 const plans = [
@@ -69,7 +70,7 @@ const plans = [
   }
 ];
 
-export default function PricingPlans({ userId }: PricingPlansProps) {
+export default function PricingPlans({ userId, onSubscriptionChange }: PricingPlansProps) {
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -128,7 +129,38 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
   };
 
   const handleSubscribe = async (planId: string) => {
-    if (planId === 'free') return;
+    // Handle downgrade to free/Starter plan
+    if (planId === 'free') {
+      // Only allow downgrade if user currently has a paid plan
+      if (currentUserPlan === 'free') return;
+
+      setSelectedPlan(planId);
+      setProcessing(true);
+
+      try {
+        // Cancel the subscription immediately
+        const response = await axios.post('/api/payments/cancel-subscription', {
+          userId,
+          immediately: true // Cancel immediately instead of at period end
+        });
+
+        if (response.data.success) {
+          // Refresh the data to show the new plan
+          await fetchUserData();
+          setProcessing(false);
+          setSelectedPlan(null);
+          if (onSubscriptionChange) {
+            onSubscriptionChange(); // Trigger parent component refresh
+          }
+        }
+      } catch (error: any) {
+        console.error('Error canceling subscription:', error);
+        alert('Failed to downgrade to Starter plan. Please try again.');
+        setProcessing(false);
+        setSelectedPlan(null);
+      }
+      return;
+    }
 
     setSelectedPlan(planId);
     setProcessing(true);
@@ -171,6 +203,9 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
             await fetchUserData();
             setProcessing(false);
             setSelectedPlan(null);
+            if (onSubscriptionChange) {
+              onSubscriptionChange(); // Trigger parent component refresh
+            }
             return;
           } else if (quickResponse.data.requiresAction) {
             // Handle 3D Secure or other authentication
@@ -366,10 +401,9 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
                   : plan.cta}
               </button>
 
-              {isChangingBilling && renewalDate && !wouldBeUpgrade && (
+              {isChangingBilling && !wouldBeUpgrade && !wouldBeDowngrade && (
                 <p className="mt-2 text-xs text-gray-500 text-center">
-                  The new interval will be applied when the subscription is renewed on{' '}
-                  {new Date(renewalDate).toLocaleDateString()}
+                  Billing change applies immediately current credits retained
                 </p>
               )}
 
@@ -379,9 +413,9 @@ export default function PricingPlans({ userId }: PricingPlansProps) {
                 </p>
               )}
 
-              {wouldBeDowngrade && renewalDate && (
+              {wouldBeDowngrade && (
                 <p className="mt-2 text-xs text-gray-500 text-center">
-                  Downgrade will take effect on {new Date(renewalDate).toLocaleDateString()}
+                  Downgrades apply immediately current credits retained
                 </p>
               )}
             </div>

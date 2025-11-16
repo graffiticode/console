@@ -54,14 +54,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // If Stripe is not configured or no Stripe customer, return free tier
     if (!stripe || !stripeCustomerId) {
+      const preservedRenewalDate = userData?.subscription?.renewalDate || null;
+
       return res.status(200).json({
-        plan: 'free',
+        plan: userData?.subscription?.plan || 'free',
         interval: null,
         status: 'active',
         currentBillingPeriod: null,
         cancelAtPeriodEnd: false,
-        nextBillingDate: null,
-        units: 1000, // Free tier units
+        nextBillingDate: preservedRenewalDate,
+        units: 2000, // Starter tier units
         overageUnits: 0,
         overageRate: null,
       });
@@ -74,14 +76,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (error.code === 'resource_missing') {
         // Customer doesn't exist in current mode, treat as free tier
         console.log(`Customer ${stripeCustomerId} doesn't exist in current Stripe mode`);
+        const preservedRenewalDate = userData?.subscription?.renewalDate || null;
+
         return res.status(200).json({
-          plan: 'free',
+          plan: userData?.subscription?.plan || 'free',
           interval: null,
           status: 'active',
           currentBillingPeriod: null,
           cancelAtPeriodEnd: false,
-          nextBillingDate: null,
-          units: 1000, // Free tier units
+          nextBillingDate: preservedRenewalDate,
+          units: 2000, // Starter tier units
           overageUnits: 0,
           overageRate: null,
         });
@@ -106,16 +110,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subscriptions.data.push(...trialingSubscriptions.data);
     }
 
-    // If no active subscription, return free tier
+    // If no active subscription, return free tier with preserved renewal date if available
     if (!subscriptions.data.length) {
+      // Check if there's a preserved renewal date from a previous subscription
+      const preservedRenewalDate = userData?.subscription?.renewalDate || null;
+
       return res.status(200).json({
-        plan: 'free',
+        plan: userData?.subscription?.plan || 'free',
         interval: null,
         status: 'active',
         currentBillingPeriod: null,
         cancelAtPeriodEnd: false,
-        nextBillingDate: null,
-        units: 1000, // Free tier units
+        nextBillingDate: preservedRenewalDate, // Use preserved renewal date if available
+        units: 2000, // Starter tier units (updated from 1000)
         overageUnits: 0,
         overageRate: null,
       });
@@ -131,9 +138,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get unit allocation based on plan (monthly base)
     const baseUnitAllocation = {
-      free: 1000,
-      pro: 50000,
-      teams: 1000000,
+      free: 2000,  // Updated to match Starter plan
+      pro: 100000, // Updated to match current Pro plan
+      teams: 2000000, // Updated to match current Teams plan
     };
 
     // Multiply by 12 for annual plans

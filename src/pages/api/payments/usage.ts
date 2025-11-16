@@ -142,8 +142,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       } catch (breakdownError) {
         console.error('Error fetching usage breakdown (may need Firestore index):', breakdownError);
-        // Fall back to using total usage without breakdown
-        compileUsage = 0;
+        // Fall back to using total usage as compile usage when breakdown is not available
+        // This prevents showing an "Other" category when we can't determine the breakdown
+        compileUsage = totalUsage;
         codeGenerationUsage = 0;
       }
 
@@ -175,9 +176,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Determine plan limits from Stripe subscription
     // Base units are monthly - multiply by 12 for annual plans
     const baseUnitAllocation = {
-      free: 1000,
-      pro: 50000,
-      teams: 1000000,
+      free: 2000,      // Updated to match Starter plan
+      pro: 100000,     // Updated to match current Pro plan
+      teams: 2000000,  // Updated to match current Teams plan
     };
 
     let planUnits = baseUnitAllocation[currentPlan];

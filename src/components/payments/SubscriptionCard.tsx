@@ -175,6 +175,8 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
               <dd className="mt-1 text-sm text-gray-600">
                 {subscription.cancelAtPeriodEnd
                   ? 'Subscription ends'
+                  : subscription.plan === 'free'
+                  ? 'No payment due'
                   : 'Next payment due'}
               </dd>
             ) : (

@@ -91,13 +91,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Update user document
-    await db.collection('users').doc(userId).update({
-      'subscription.status': immediately ? 'canceled' : 'canceling',
+    // When immediately canceling (downgrading to free), preserve the renewal date from the subscription
+    const updateData: any = {
+      'subscription.status': immediately ? 'active' : 'canceling', // Keep status as 'active' for free plan
+      'subscription.plan': immediately ? 'free' : userData?.subscription?.plan, // Set to free plan if immediate cancellation
       'subscription.cancelAt': canceledSubscription.cancel_at
         ? new Date(canceledSubscription.cancel_at * 1000).toISOString()
         : null,
       'subscription.canceledAt': new Date().toISOString(),
-    });
+    };
+
+    // Preserve the renewal date when downgrading to free
+    if (immediately && subscription.current_period_end) {
+      updateData['subscription.renewalDate'] = new Date(subscription.current_period_end * 1000).toISOString();
+      updateData['subscription.interval'] = null; // Free plan has no interval
+      updateData['subscription.stripeSubscriptionId'] = null; // Clear Stripe subscription ID
+    }
+
+    await db.collection('users').doc(userId).update(updateData);
 
     return res.status(200).json({
       success: true,

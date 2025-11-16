@@ -30,6 +30,11 @@ const tabs = [
 export default function Payments() {
   const { user, loading } = useGraffiticodeAuth();
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [subscriptionKey, setSubscriptionKey] = useState(0); // Force refresh of subscription components
+
+  const refreshSubscription = () => {
+    setSubscriptionKey(prev => prev + 1); // Increment to trigger re-render
+  };
 
   if (loading) {
     return (
@@ -90,9 +95,9 @@ export default function Payments() {
             <Tab.Panels className="mt-6">
               <Tab.Panel className="rounded-xl bg-white p-6 shadow">
                 <div className="space-y-6">
-                  <SubscriptionCard userId={user.uid} />
+                  <SubscriptionCard key={subscriptionKey} userId={user.uid} />
                   <div className="border-t pt-6">
-                    <PricingPlans userId={user.uid} />
+                    <PricingPlans userId={user.uid} onSubscriptionChange={refreshSubscription} />
                   </div>
                 </div>
               </Tab.Panel>

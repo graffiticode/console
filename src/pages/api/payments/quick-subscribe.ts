@@ -165,80 +165,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         console.log('Upgrade applied immediately with proration credit');
       } else {
-        // For downgrades/lateral moves: Schedule change for renewal date
-        console.log('Processing downgrade/lateral move - scheduling for renewal date');
+        // For downgrades/lateral moves: Apply immediately but preserve renewal date
+        console.log('Processing downgrade/lateral move - applying immediately while preserving renewal date');
 
-        // Use subscription schedules to preserve renewal date across interval changes
-        // IMPORTANT: Always keep the existing subscription's renewal date - never recalculate it
-        console.log('Current subscription details:', {
-          id: existingSub.id,
-          currentPeriodStart: new Date(existingSub.current_period_start * 1000).toISOString(),
-          currentPeriodEnd: new Date(existingSub.current_period_end * 1000).toISOString(),
-          hasSchedule: !!existingSub.schedule
-        });
-
-        // Always use the subscription's existing renewal date
-        let renewalDate: number;
-
+        // If there's an existing schedule, release it first
         if (existingSub.schedule) {
-          // Update existing schedule - preserve the renewal date from current phase
-          const existingSchedule = await stripe.subscriptionSchedules.retrieve(existingSub.schedule as string);
-          const currentPhase = existingSchedule.phases[0];
-          renewalDate = currentPhase.end_date as number;
-
-          console.log('Updating schedule - preserving renewal date:', new Date(renewalDate * 1000).toISOString());
-
-          await stripe.subscriptionSchedules.update(existingSub.schedule as string, {
-            phases: [
-              {
-                items: [{ price: existingPriceId, quantity: 1 }],
-                start_date: currentPhase.start_date,
-                end_date: renewalDate,
-              },
-              {
-                items: [{ price: priceId, quantity: 1 }],
-                start_date: renewalDate,
-              },
-            ],
-          });
-
-          console.log('Updated schedule - renewal date preserved:', new Date(renewalDate * 1000).toISOString());
-        } else {
-          // Create new schedule from subscription - use the subscription's current renewal date
-          renewalDate = existingSub.current_period_end;
-
-          console.log('Creating new schedule with current renewal date:', new Date(renewalDate * 1000).toISOString());
-
-          await stripe.subscriptionSchedules.create({
-            from_subscription: existingSub.id,
-          } as any); // Type assertion needed for from_subscription
-
-          // Retrieve the created schedule
-          const schedules = await stripe.subscriptionSchedules.list({ customer: stripeCustomerId, limit: 1 });
-          if (schedules.data.length > 0) {
-            const schedule = schedules.data[0];
-
-            // Update with our phases using the existing renewal date
-            await stripe.subscriptionSchedules.update(schedule.id, {
-              phases: [
-                {
-                  items: [{ price: existingPriceId, quantity: 1 }],
-                  start_date: existingSub.current_period_start,
-                  end_date: renewalDate,
-                },
-                {
-                  items: [{ price: priceId, quantity: 1 }],
-                  start_date: renewalDate,
-                },
-              ],
-            });
-
-            console.log('Created schedule - renewal date:', new Date(renewalDate * 1000).toISOString());
-          }
+          await stripe.subscriptionSchedules.release(existingSub.schedule as string);
+          console.log('Released existing schedule');
         }
 
-        // Retrieve updated subscription
-        subscription = await stripe.subscriptions.retrieve(existingSub.id);
+        // Store the current renewal date before making changes
+        const preservedRenewalDate = existingSub.current_period_end;
+        console.log('Preserving renewal date:', new Date(preservedRenewalDate * 1000).toISOString());
+
+        // Update subscription immediately to the new plan
+        // Use 'none' proration to avoid charging/crediting - just switch the plan
+        subscription = await stripe.subscriptions.update(existingSub.id, {
+          items: [{
+            id: existingSub.items.data[0].id,
+            price: priceId,
+          }],
+          proration_behavior: 'none', // No proration - immediate switch without credits/charges
+          metadata: {
+            userId,
+            planId,
+            interval,
+          },
+          // Preserve the billing cycle anchor to keep the same renewal date
+          billing_cycle_anchor: 'unchanged',
+        });
+
+        console.log('Downgrade applied immediately - renewal date preserved:', {
+          subscriptionId: subscription.id,
+          newPlan: planId,
+          newInterval: interval,
+          currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString()
+        });
       }
 
       console.log('Subscription updated - renewal date preserved:', {

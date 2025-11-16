@@ -234,34 +234,55 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-4 text-center">
-            <div>
-              <dt className="text-sm font-medium text-gray-500">
-                {pricing?.plan === 'free' ? 'Lifetime Allocation' : 'Allocated'}
-              </dt>
-              <dd className="mt-1 text-xl font-semibold text-gray-900">
-                {usage.allocatedUnits.toLocaleString()}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">
-                {pricing?.plan === 'free' ? 'Used' : 'Overage'}
-              </dt>
-              <dd className="mt-1 text-xl font-semibold text-gray-900">
-                {pricing?.plan === 'free'
-                  ? displayTotal.toLocaleString()
-                  : usage.overageUnits.toLocaleString()}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">
-                {pricing?.plan === 'free' ? 'Status' : 'Resets'}
-              </dt>
-              <dd className="mt-1 text-xl font-semibold text-gray-900">
-                {pricing?.plan === 'free'
-                  ? (remainingUnits > 0 ? 'Active' : 'Depleted')
-                  : new Date(usage.currentPeriodEnd).toLocaleDateString()}
-              </dd>
+          <div className="mt-6 border-t pt-4">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Usage Statistics</h4>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Allocated
+                </dt>
+                <dd className="mt-1">
+                  <div className="text-2xl font-semibold text-gray-900">
+                    {usage.allocatedUnits.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    included compiles
+                  </div>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Overage
+                </dt>
+                <dd className="mt-1">
+                  <div className="text-2xl font-semibold text-gray-900">
+                    {usage.overageUnits.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    overage compiles
+                  </div>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Resets
+                </dt>
+                <dd className="mt-1">
+                  <div className="text-2xl font-semibold text-gray-900">
+                    {usage.currentPeriodEnd ?
+                      new Date(usage.currentPeriodEnd).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      }) :
+                      'N/A'
+                    }
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {usage.currentPeriodEnd ? 'date account resets' : 'no reset date'}
+                  </div>
+                </dd>
+              </div>
             </div>
           </div>
         </div>
