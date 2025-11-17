@@ -11,7 +11,7 @@ const plans = [
   {
     id: 'free',
     name: 'Starter',
-    description: 'Perfect for trying out Graffiticode',
+    description: 'Perfect for getting started with Graffiticode',
     monthlyPrice: 0,
     annualPrice: null,  // No annual option for Starter
     originalMonthlyPrice: 10,  // Original price to show with strikethrough
