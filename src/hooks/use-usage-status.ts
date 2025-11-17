@@ -46,11 +46,13 @@ export function useUsageStatus(userId: string | undefined): UsageStatus {
     }
   );
 
-  // Calculate usage status
-  const totalUnits = data ? (data.allocatedUnits + data.overageUnits) : 0;
-  const usedUnits = data?.currentPeriodUnits || 0;
-  const remainingUnits = totalUnits - usedUnits;
-  const percentageUsed = totalUnits > 0 ? (usedUnits / totalUnits) * 100 : 0;
+  // Calculate usage status - use extended data if available for accuracy
+  const usedUnits = data?.extended?.usage?.total || data?.currentPeriodUnits || 0;
+  const totalUnits = data?.extended?.usage?.limit || (data ? (data.allocatedUnits + data.overageUnits) : 0);
+  const remainingUnits = data?.extended?.usage?.remaining !== undefined
+    ? (data.extended.usage.remaining === 0 && usedUnits > totalUnits ? totalUnits - usedUnits : data.extended.usage.remaining)
+    : totalUnits - usedUnits;
+  const percentageUsed = data?.extended?.usage?.percentage || (totalUnits > 0 ? (usedUnits / totalUnits) * 100 : 0);
 
   const isNearLimit = percentageUsed >= 80 && percentageUsed < 100;
   const isOverLimit = remainingUnits < 0;
