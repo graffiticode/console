@@ -124,12 +124,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (usageDoc.exists) {
       const data = usageDoc.data();
 
-      // For free users (no Stripe customer), use lifetime total
-      // For paid users, use current period total
-      if (!stripeCustomerId) {
-        totalUsage = data?.lifetimeTotal || data?.currentMonthTotal || 0;
+      // Check if we need to reset monthly usage (new billing period)
+      const lastReset = data?.lastReset ? new Date(data.lastReset) : null;
+      const needsReset = lastReset && lastReset < firstDayOfPeriod;
+
+      if (needsReset) {
+        // The stored total is from a previous period, so we should reset it
+        console.log('Monthly usage needs reset - using 0 for stored total');
+        totalUsage = 0;
       } else {
-        totalUsage = data?.currentMonthTotal || 0;
+        // For free users (no Stripe customer), use lifetime total
+        // For paid users, use current period total
+        if (!stripeCustomerId) {
+          totalUsage = data?.lifetimeTotal || data?.currentMonthTotal || 0;
+        } else {
+          totalUsage = data?.currentMonthTotal || 0;
+        }
       }
       lastUpdate = data?.lastUpdate || null;
 
@@ -144,16 +154,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         compileUsage = 0;
         codeGenerationUsage = 0;
+        let calculatedTotal = 0;
 
         usageRecordsSnapshot.docs.forEach(doc => {
           const record = doc.data();
           const units = record.units || 0;
+          calculatedTotal += units;
           if (record.type === 'compile') {
             compileUsage += units;
           } else if (record.type === 'ai_generation') {
             codeGenerationUsage += units;
           }
         });
+
+        // Use the calculated total from actual records if it's higher than stored total
+        // This handles cases where the stored total might be out of sync
+        if (calculatedTotal > totalUsage) {
+          console.log(`Using calculated total (${calculatedTotal}) instead of stored total (${totalUsage})`);
+          totalUsage = calculatedTotal;
+        }
       } catch (breakdownError) {
         console.error('Error fetching usage breakdown (may need Firestore index):', breakdownError);
         // Fall back to using total usage as compile usage when breakdown is not available
