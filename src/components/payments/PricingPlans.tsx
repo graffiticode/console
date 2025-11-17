@@ -309,7 +309,8 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
           const units = effectiveBilling === 'annual' && !isStarterPlan ? plan.monthlyUnits * 12 : plan.monthlyUnits;
           const isCurrentPlan = plan.id === currentUserPlan;
           const isSameBillingInterval = billingInterval === currentBillingInterval;
-          const isChangingBilling = isCurrentPlan && !isSameBillingInterval;
+          // Starter plan doesn't support billing interval changes
+          const isChangingBilling = isCurrentPlan && !isSameBillingInterval && !isStarterPlan;
 
           // Check if this plan selection would be an upgrade or downgrade
           const wouldBeUpgrade =
@@ -380,20 +381,20 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
               <button
                 onClick={() => handleSubscribe(plan.id)}
-                disabled={processing || (isCurrentPlan && isSameBillingInterval)}
+                disabled={processing || (isCurrentPlan && isSameBillingInterval) || (isStarterPlan && isCurrentPlan && billingInterval === 'annual')}
                 className={`w-full py-2 px-4 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                   plan.id === highlightedPlan
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500'
                     : 'bg-gray-50 text-gray-900 hover:bg-gray-100 focus:ring-gray-500'
                 } ${
-                  (processing || (isCurrentPlan && isSameBillingInterval)) ? 'opacity-50 cursor-not-allowed' : ''
+                  (processing || (isCurrentPlan && isSameBillingInterval) || (isStarterPlan && isCurrentPlan && billingInterval === 'annual')) ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 {processing && selectedPlan === plan.id
                   ? 'Processing...'
                   : isChangingBilling
                   ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
-                  : isCurrentPlan && isSameBillingInterval
+                  : isCurrentPlan && (isSameBillingInterval || isStarterPlan)
                   ? 'Current Plan'
                   : plan.id === 'free' && (currentUserPlan === 'pro' || currentUserPlan === 'teams')
                   ? 'Downgrade to Starter'
