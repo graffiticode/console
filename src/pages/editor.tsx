@@ -18,9 +18,7 @@ export default function Editor({ language, setLanguage, mark }) {
   const creationStarted = useRef(false);
 
   useEffect(() => {
-    // Only proceed if we have the necessary parameters
     const effectiveOrigin = origin || editorOrigin;
-    console.log('Editor useEffect - lang:', lang, 'mode:', mode, 'effectiveOrigin:', effectiveOrigin, 'itemId:', itemId);
 
     if (!lang || mode !== 'editor' || !effectiveOrigin) {
       return;
@@ -33,7 +31,6 @@ export default function Editor({ language, setLanguage, mark }) {
         itemId: itemId || null
       };
       sessionStorage.setItem('graffiticode:editor', JSON.stringify(editorData));
-      console.log('Set editor sessionStorage:', editorData);
     }
 
     // If editing an existing item, set up editor mode for the Gallery
@@ -69,16 +66,18 @@ export default function Editor({ language, setLanguage, mark }) {
 
     try {
       // Create a new item
-      const newItem = await createItem({
+      const createParams = {
         user,
-        lang: String(lang).padStart(4, '0'), // Ensure proper format (e.g., "0165")
+        lang: String(lang).padStart(4, '0'),
         name: "Editor Question",
         taskId: null,
         mark: 1,
         help: "[]",
         code: "",
         isPublic: false
-      });
+      };
+
+      const newItem = await createItem(createParams);
 
       if (newItem && newItem.id) {
         setCreatedItemId(newItem.id);
@@ -86,31 +85,34 @@ export default function Editor({ language, setLanguage, mark }) {
 
         // Send message back to parent window
         if (window.opener && effectiveOrigin) {
-          window.opener.postMessage({
+          const message = {
             type: 'item-created',
             itemId: newItem.id,
             lang: lang
-          }, String(effectiveOrigin));
+          };
+          window.opener.postMessage(message, String(effectiveOrigin));
         }
 
         // Store the selected item ID in localStorage so it will be selected in the items view
         if (typeof window !== 'undefined') {
           localStorage.setItem('graffiticode:selected:itemId', newItem.id);
+
           // Also set the language
-          localStorage.setItem('graffiticode:language', JSON.stringify({
+          const langData = {
             id: parseInt(lang),
             name: `L${String(lang).padStart(4, '0')}`
-          }));
+          };
+          localStorage.setItem('graffiticode:language', JSON.stringify(langData));
+
           // Store editor mode data in sessionStorage
-          sessionStorage.setItem('graffiticode:editor', JSON.stringify({
+          const editorData = {
             origin: String(effectiveOrigin),
             itemId: newItem.id
-          }));
+          };
+          sessionStorage.setItem('graffiticode:editor', JSON.stringify(editorData));
         }
-
-        // Don't redirect, Gallery will be shown below
       } else {
-        throw new Error('Failed to create item');
+        throw new Error('Failed to create item - no ID returned');
       }
     } catch (error) {
       console.error("Failed to create item:", error);

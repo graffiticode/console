@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-09T23:58:31.434Z*
+*Downloaded on 2025-11-26T16:43:23.546Z*
 
 ## Language L0166
 
@@ -64,35 +64,6 @@ columns [
 ### Example 3
 
 #### Prompt
-"add the attribute to B2 of foo="bar""
-
-#### Chat Transcript
-
-**User**: add the attribute to B2 of foo="bar"
-
-#### Code
-
-```
-columns [
-  column A width 100 align "center" {}
-  column B width 100 align "center" {}
-] cells [
-  cell A1 {}
-  cell B1 {}
-  cell A2 {}
-  cell B2 {
-    foo: "bar"
-  }
-] {
-  v: "0.0.1"
-}..
-```
-
----
-
-### Example 4
-
-#### Prompt
 "Update the code for column A using these property values:
 ```json
 {
@@ -131,7 +102,7 @@ columns [
 
 ---
 
-### Example 5
+### Example 4
 
 #### Prompt
 "make row 1 protected"
@@ -160,7 +131,7 @@ columns [
 
 ---
 
-### Example 6
+### Example 5
 
 #### Prompt
 "make a simple income statement assessment
@@ -254,7 +225,7 @@ cells [
 
 ---
 
-### Example 7
+### Example 6
 
 #### Prompt
 "make column a bold"
@@ -283,7 +254,7 @@ cells [
 
 ---
 
-### Example 8
+### Example 7
 
 #### Prompt
 "Update the code for column A using these property values:
@@ -318,7 +289,7 @@ columns [
 
 ---
 
-### Example 9
+### Example 8
 
 #### Prompt
 "give column a a large width"
@@ -345,7 +316,7 @@ columns [
 
 ---
 
-### Example 10
+### Example 9
 
 #### Prompt
 "set column a to width 200"
@@ -372,7 +343,7 @@ columns [
 
 ---
 
-### Example 11
+### Example 10
 
 #### Prompt
 "make a table with a single cell with an assessment
@@ -448,7 +419,7 @@ columns [
 
 ---
 
-### Example 12
+### Example 11
 
 #### Prompt
 "remove width from column a"
@@ -475,7 +446,7 @@ columns [
 
 ---
 
-### Example 13
+### Example 12
 
 #### Prompt
 "make row 1 bold"
@@ -504,7 +475,7 @@ columns [
 
 ---
 
-### Example 14
+### Example 13
 
 #### Prompt
 "give row 1 the height of 24px"
@@ -533,7 +504,7 @@ columns [
 
 ---
 
-### Example 15
+### Example 14
 
 #### Prompt
 "Update the code for column A using these property values:
@@ -568,7 +539,7 @@ columns [
 
 ---
 
-### Example 16
+### Example 15
 
 #### Prompt
 "align cell a1 right"
@@ -595,7 +566,7 @@ columns [
 
 ---
 
-### Example 17
+### Example 16
 
 #### Prompt
 "make column a right align with width 150 and column b left align with width 50"
@@ -622,7 +593,7 @@ columns [
 
 ---
 
-### Example 18
+### Example 17
 
 #### Prompt
 "format column A using ($#,##0)"
@@ -651,7 +622,7 @@ cells [
 
 ---
 
-### Example 19
+### Example 18
 
 #### Prompt
 "add row 2 with font height 24px
@@ -823,7 +794,7 @@ columns [
 
 ---
 
-### Example 20
+### Example 19
 
 #### Prompt
 "align column a and b to the right"
@@ -850,7 +821,7 @@ columns [
 
 ---
 
-### Example 21
+### Example 20
 
 #### Prompt
 "make a single cell table"
@@ -879,7 +850,7 @@ cells [
 
 ---
 
-### Example 22
+### Example 21
 
 #### Prompt
 "Update the code for column A using these property values:
@@ -914,7 +885,7 @@ columns [
 
 ---
 
-### Example 23
+### Example 22
 
 #### Prompt
 "column a align center
@@ -953,7 +924,7 @@ columns [
 
 ---
 
-### Example 24
+### Example 23
 
 #### Prompt
 "add metadata to cell A1 that sets x=10"
@@ -972,6 +943,7 @@ columns [
   cell A1 {
     x: 10
   }
+  {}
   cell B1 {}
   cell A2 {}
   cell B2 {}
@@ -982,7 +954,7 @@ columns [
 
 ---
 
-### Example 25
+### Example 24
 
 #### Prompt
 "left align column A"
@@ -1009,7 +981,7 @@ columns [
 
 ---
 
-### Example 26
+### Example 25
 
 #### Prompt
 "remove alignment on column b"
@@ -1036,7 +1008,7 @@ columns [
 
 ---
 
-### Example 27
+### Example 26
 
 #### Prompt
 "make column C width 250"
@@ -1065,7 +1037,7 @@ columns [
 
 ---
 
-### Example 28
+### Example 27
 
 #### Prompt
 "make a spreadsheet that allows me to track my stocks. see the sheet with a few dummy examples
@@ -1183,7 +1155,7 @@ cells [
 
 ---
 
-### Example 29
+### Example 28
 
 #### Prompt
 "Make a home budget assessment using the following data:
@@ -1224,12 +1196,6 @@ Use these changed properties to update the code for column B:
 }
 ```
 
-Note: Only the properties shown above have changed and need to be updated.
-
-Also, use these changed properties to update the code for cell B2:
-```json
-{"text":"5000"}
-```
 Note: Only the properties shown above have changed and need to be updated."
 
 #### Chat Transcript
@@ -1274,12 +1240,6 @@ Note: Only the properties shown above have changed and need to be updated.
 
 Note: Only the properties shown above have changed and need to be updated.
 
-**User**: Also, use these changed properties to update the code for cell B2:
-```json
-{"text":"5000"}
-```
-Note: Only the properties shown above have changed and need to be updated.
-
 #### Code
 
 ```
@@ -1292,7 +1252,7 @@ title "Home Budget Assessment" columns [
   cell B1 text "AMOUNT" font-weight "bold" {}
   cell C1 text "DETAILS" font-weight "bold" {}
   cell A2 text "Income" {}
-  cell B2 text "5000" {}
+  cell B2 text "4000" {}
   cell C2 text "Total monthly income" {}
   cell A3 text "Rent" {}
   cell B3 text "" assess [

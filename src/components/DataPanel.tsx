@@ -11,20 +11,24 @@ export const DataPanel = forwardRef(function DataPanel({
 }: any, ref: any) {
   const [ data, setData ] = useState({});
 
-  const { data: fetchedData } = useSWR(
+  const { data: fetchedData, isLoading } = useSWR(
     user && id ? [`getData-${id}`, { user, id }] : null,
     ([_, params]) => getData(params)
   );
 
   useEffect(() => {
     if (fetchedData) {
-      console.log(
-        "DataPanel()",
-        "fetchedData=" + JSON.stringify(fetchedData, null, 2),
-      );
       setData(fetchedData);
     }
   }, [fetchedData]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   return (
     isNullOrEmptyObject(data) &&

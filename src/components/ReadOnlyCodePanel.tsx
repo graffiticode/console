@@ -5,42 +5,25 @@ import { getTask } from '../utils/swr/fetchers';
 export const ReadOnlyCodePanel = ({ id, user }: any) => {
   const [code, setCode] = useState("");
 
-  console.log("ReadOnlyCodePanel() - Component rendered with:", { id, user: !!user });
-
   const { data: taskData, error, isLoading } = useSWR(
     user && id ? [`getTask-${id}`, { user, id }] : null,
-    ([_, params]) => {
-      console.log("ReadOnlyCodePanel() - Calling getTask with params:", params);
-      return getTask(params);
-    }
+    ([_, params]) => getTask(params)
   );
 
-  console.log("ReadOnlyCodePanel() - SWR state:", { taskData, error, isLoading, hasData: !!taskData });
-
   useEffect(() => {
-    console.log(
-      "ReadOnlyCodePanel() - useEffect triggered",
-      "taskData=" + JSON.stringify(taskData, null, 2),
-    );
-
-    if (taskData) {
-      console.log("ReadOnlyCodePanel() - taskData.code:", taskData.code);
-
-      if (taskData.code) {
-        setCode(taskData.code);
-        console.log("ReadOnlyCodePanel() - Set code from taskData.code:", taskData.code);
-      } else {
-        console.log("ReadOnlyCodePanel() - No code field found in taskData");
-      }
+    if (taskData?.code) {
+      setCode(taskData.code);
     }
   }, [taskData]);
 
-  if (error) {
-    console.error("ReadOnlyCodePanel() - Error loading task:", error);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
   }
 
-  // The code is now unparsed source code, not JSON
-  // Display it directly as a string
   return (
     code ? (
       <div className="p-4">
