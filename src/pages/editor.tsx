@@ -20,9 +20,17 @@ export default function Editor({ language, setLanguage, mark }) {
   useEffect(() => {
     // Only proceed if we have the necessary parameters
     const effectiveOrigin = origin || editorOrigin;
-    console.log('Editor useEffect - lang:', lang, 'mode:', mode, 'effectiveOrigin:', effectiveOrigin, 'itemId:', itemId);
+    console.log('🎯 Editor useEffect triggered:');
+    console.log('  - lang:', lang);
+    console.log('  - mode:', mode);
+    console.log('  - origin:', origin);
+    console.log('  - editorOrigin:', editorOrigin);
+    console.log('  - effectiveOrigin:', effectiveOrigin);
+    console.log('  - itemId:', itemId);
+    console.log('  - user:', user ? `${user.email} (${user.uid})` : 'not authenticated');
 
     if (!lang || mode !== 'editor' || !effectiveOrigin) {
+      console.log('❌ Missing required parameters, returning early');
       return;
     }
 
@@ -33,11 +41,12 @@ export default function Editor({ language, setLanguage, mark }) {
         itemId: itemId || null
       };
       sessionStorage.setItem('graffiticode:editor', JSON.stringify(editorData));
-      console.log('Set editor sessionStorage:', editorData);
+      console.log('💾 Set editor sessionStorage:', editorData);
     }
 
     // If editing an existing item, set up editor mode for the Gallery
     if (itemId) {
+      console.log('✏️  EDIT MODE: Setting up to edit existing item:', itemId);
       // Store editor mode data in sessionStorage so Gallery knows to send messages
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('graffiticode:editor', JSON.stringify({
@@ -50,6 +59,8 @@ export default function Editor({ language, setLanguage, mark }) {
           id: parseInt(lang),
           name: `L${String(lang).padStart(4, '0')}`
         }));
+        console.log('💾 Stored itemId in localStorage:', itemId);
+        console.log('💾 Stored language in localStorage:', `L${String(lang).padStart(4, '0')}`);
       }
       // Don't create a new item, just show the Gallery with the existing item
       return;
@@ -57,19 +68,26 @@ export default function Editor({ language, setLanguage, mark }) {
 
     // If no ID and user is authenticated, create a new item (only once)
     if (user && !creationStarted.current) {
+      console.log('➕ CREATE MODE: No itemId provided, creating new item');
+      console.log('  - creationStarted.current:', creationStarted.current);
       creationStarted.current = true;
       handleCreateNewItem();
+    } else if (!user) {
+      console.log('⏳ Waiting for user authentication...');
+    } else if (creationStarted.current) {
+      console.log('🔄 Item creation already in progress');
     }
   }, [lang, itemId, mode, origin, editorOrigin, user]);
 
   const handleCreateNewItem = async () => {
+    console.log('🚀 handleCreateNewItem started');
     setIsCreating(true);
     setError(null);
     const effectiveOrigin = origin || editorOrigin;
 
     try {
       // Create a new item
-      const newItem = await createItem({
+      const createParams = {
         user,
         lang: String(lang).padStart(4, '0'), // Ensure proper format (e.g., "0165")
         name: "Editor Question",
@@ -78,7 +96,11 @@ export default function Editor({ language, setLanguage, mark }) {
         help: "[]",
         code: "",
         isPublic: false
-      });
+      };
+      console.log('📦 Creating item with params:', createParams);
+
+      const newItem = await createItem(createParams);
+      console.log('✅ Item created successfully:', newItem);
 
       if (newItem && newItem.id) {
         setCreatedItemId(newItem.id);
@@ -86,34 +108,55 @@ export default function Editor({ language, setLanguage, mark }) {
 
         // Send message back to parent window
         if (window.opener && effectiveOrigin) {
-          window.opener.postMessage({
+          const message = {
             type: 'item-created',
             itemId: newItem.id,
             lang: lang
-          }, String(effectiveOrigin));
+          };
+          console.log('📤 Sending postMessage to parent window:');
+          console.log('  - Message:', message);
+          console.log('  - Target origin:', String(effectiveOrigin));
+          console.log('  - window.opener exists:', !!window.opener);
+
+          window.opener.postMessage(message, String(effectiveOrigin));
+          console.log('✅ PostMessage sent successfully');
+        } else {
+          console.log('⚠️  Cannot send postMessage:');
+          console.log('  - window.opener:', !!window.opener);
+          console.log('  - effectiveOrigin:', effectiveOrigin);
         }
 
         // Store the selected item ID in localStorage so it will be selected in the items view
         if (typeof window !== 'undefined') {
           localStorage.setItem('graffiticode:selected:itemId', newItem.id);
+          console.log('💾 Stored new itemId in localStorage:', newItem.id);
+
           // Also set the language
-          localStorage.setItem('graffiticode:language', JSON.stringify({
+          const langData = {
             id: parseInt(lang),
             name: `L${String(lang).padStart(4, '0')}`
-          }));
+          };
+          localStorage.setItem('graffiticode:language', JSON.stringify(langData));
+          console.log('💾 Stored language in localStorage:', langData);
+
           // Store editor mode data in sessionStorage
-          sessionStorage.setItem('graffiticode:editor', JSON.stringify({
+          const editorData = {
             origin: String(effectiveOrigin),
             itemId: newItem.id
-          }));
+          };
+          sessionStorage.setItem('graffiticode:editor', JSON.stringify(editorData));
+          console.log('💾 Stored editor data in sessionStorage:', editorData);
         }
 
         // Don't redirect, Gallery will be shown below
+        console.log('✅ Item creation complete, Gallery will be shown');
       } else {
-        throw new Error('Failed to create item');
+        throw new Error('Failed to create item - no ID returned');
       }
     } catch (error) {
-      console.error("Failed to create item:", error);
+      console.error("❌ Failed to create item:", error);
+      console.error("  - Error message:", error.message);
+      console.error("  - Error stack:", error.stack);
       setError(error.message || 'Failed to create item');
       setIsCreating(false);
       creationStarted.current = false; // Allow retry on error
@@ -122,6 +165,7 @@ export default function Editor({ language, setLanguage, mark }) {
 
   // Show sign in if user is not authenticated
   if (!user) {
+    console.log('🔐 Rendering: Sign-in required view');
     return (
       <>
         <Head>
@@ -150,6 +194,10 @@ export default function Editor({ language, setLanguage, mark }) {
 
   // Show Gallery UI when we have a created item or are in editor mode
   if (createdItemId || (mode === 'editor' && itemId)) {
+    console.log('🎨 Rendering: Gallery view');
+    console.log('  - createdItemId:', createdItemId);
+    console.log('  - itemId:', itemId);
+    console.log('  - lang:', lang);
     return (
       <>
         <Head>
@@ -167,6 +215,7 @@ export default function Editor({ language, setLanguage, mark }) {
 
   // Show loading state while creating item or redirecting
   if (isCreating) {
+    console.log('⏳ Rendering: Creating item loading view');
     return (
       <>
         <Head>
@@ -185,6 +234,8 @@ export default function Editor({ language, setLanguage, mark }) {
 
   // Show error state
   if (error) {
+    console.log('❌ Rendering: Error view');
+    console.log('  - Error:', error);
     return (
       <>
         <Head>
@@ -208,6 +259,7 @@ export default function Editor({ language, setLanguage, mark }) {
   }
 
   // Default loading state
+  console.log('⏳ Rendering: Default loading view');
   return (
     <>
       <Head>
