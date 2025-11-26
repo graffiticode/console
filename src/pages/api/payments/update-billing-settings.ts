@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const updates = {
       autoRecharge: autoRecharge || false,
-      autoRechargeLimit: autoRechargeLimit || 3,
+      autoRechargeLimit: autoRechargeLimit || 1,
       updatedAt: new Date().toISOString(),
     };
 

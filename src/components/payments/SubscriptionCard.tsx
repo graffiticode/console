@@ -142,19 +142,13 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
           <div>
             <dt className="text-sm font-medium text-gray-500">Billing</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              {subscription.plan === 'free' ? (
-                'Free'
-              ) : (
-                <>
-                  ${currentPrice}
-                  <span className="text-sm text-gray-500 ml-1">
-                    / {subscription.interval === 'monthly' || !subscription.interval ? 'month' : 'year'}
-                  </span>
-                </>
-              )}
+              ${subscription.plan === 'free' ? '10' : currentPrice}
+              <span className="text-sm text-gray-500 ml-1">
+                / {subscription.interval === 'annual' ? 'year' : 'month'}
+              </span>
             </dd>
             <dd className="mt-1 text-sm text-gray-600">
-              {subscription.plan === 'free' ? 'No billing' : subscription.interval ? `Billed ${subscription.interval === 'monthly' ? 'monthly' : 'annually'}` : 'Billed monthly'}
+              {subscription.interval ? `Billed ${subscription.interval === 'monthly' ? 'monthly' : 'annually'}` : 'Billed monthly'}
             </dd>
           </div>
 

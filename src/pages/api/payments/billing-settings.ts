@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const defaultSettings = {
         autoRecharge: false,
-        autoRechargeLimit: 3,
+        autoRechargeLimit: 1,
         overageBlocksUsedThisPeriod: 0,
         // Extended settings for future use
         extended: {
@@ -63,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const data = settingsDoc.data();
         settings = {
           autoRecharge: data?.autoRecharge || false,
-          autoRechargeLimit: data?.autoRechargeLimit || 3,
+          autoRechargeLimit: data?.autoRechargeLimit || 1,
           overageBlocksUsedThisPeriod: data?.overageBlocksUsedThisPeriod || 0,
           extended: data?.extended || defaultSettings.extended,
         };
@@ -79,7 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Simple format update
         const simpleUpdate = {
           autoRecharge: updates.autoRecharge,
-          autoRechargeLimit: updates.autoRechargeLimit || 3,
+          autoRechargeLimit: updates.autoRechargeLimit || 1,
           overageBlocksUsedThisPeriod: updates.overageBlocksUsedThisPeriod || 0,
         };
 

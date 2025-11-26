@@ -108,7 +108,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
       await axios.post('/api/payments/update-billing-settings', {
         userId,
         autoRecharge: enabled,
-        autoRechargeLimit: billing?.autoRechargeLimit || 3
+        autoRechargeLimit: billing?.autoRechargeLimit || 1
       });
       setBilling(prev => prev ? { ...prev, autoRecharge: enabled } : null);
     } catch (error) {
@@ -288,8 +288,8 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
         </div>
       </div>
 
-      {/* Overage Settings - Only show for paid plans */}
-      {pricing && pricing.plan !== 'free' && (
+      {/* Overage Settings - Show for all plans */}
+      {pricing && (
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
