@@ -46,6 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         units: 1000, // Free tier units
         overageUnits: 0,
         overageRate: null,
+        hasActiveSubscription: false,
       });
     }
 
@@ -66,6 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         units: 2000, // Starter tier units
         overageUnits: 0,
         overageRate: null,
+        hasActiveSubscription: false,
       });
     }
 
@@ -88,6 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           units: 2000, // Starter tier units
           overageUnits: 0,
           overageRate: null,
+          hasActiveSubscription: false,
         });
       }
       throw error;
@@ -132,6 +135,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         overageRate: null,
         isUsingPreservedAllocation: hasPreservedAllocation,
         preservedUntil: hasPreservedAllocation ? preservedUntil : null,
+        hasActiveSubscription: false,
       });
     }
 
@@ -227,6 +231,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       stripeSubscriptionId: subscription.id,
       isUsingPreservedAllocation: hasPreservedAllocation,
       preservedUntil: hasPreservedAllocation ? preservedUntil : null,
+      hasActiveSubscription: true,
     });
   } catch (error) {
     console.error('Error fetching subscription:', error);

@@ -171,6 +171,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         planId,
         interval,
       },
+      // Add 30-day free trial for Starter plan
+      ...(planId === 'free' && {
+        subscription_data: {
+          trial_period_days: 30,
+        },
+      }),
     };
 
     // If customer has a saved payment method, configure to use it

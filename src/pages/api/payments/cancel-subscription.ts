@@ -127,11 +127,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // When immediately canceling (downgrading to free), preserve the renewal date from the subscription
     const updateData: any = {
       'subscription.status': immediately ? 'active' : 'canceling', // Keep status as 'active' for free plan
-      'subscription.plan': immediately ? 'free' : userData?.subscription?.plan, // Set to free plan if immediate cancellation
+      'subscription.cancelAtPeriodEnd': !immediately, // Track if canceling at period end
       'subscription.cancelAt': canceledSubscription.cancel_at
         ? new Date(canceledSubscription.cancel_at * 1000).toISOString()
         : null,
     };
+
+    // Only update plan if immediately canceling (downgrading to free)
+    if (immediately) {
+      updateData['subscription.plan'] = 'free';
+    }
 
     // Only set canceledAt for actual cancellations, not downgrades to free
     if (!immediately) {
@@ -167,11 +172,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? 'Subscription canceled immediately'
         : `Subscription will be canceled at the end of the current billing period`,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error canceling subscription:', error);
+
+    // Handle Stripe-specific errors
+    if (error.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({
+        error: 'Invalid subscription request',
+        details: error.message,
+        code: error.code
+      });
+    }
+
     return res.status(500).json({
       error: 'Failed to cancel subscription',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
