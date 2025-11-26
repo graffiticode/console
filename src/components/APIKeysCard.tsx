@@ -48,7 +48,11 @@ export default function APIKeysCard() {
   };
 
   if (status === "loading") {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
   } else if (status === "error") {
     return <div>
       <h1>Error</h1>

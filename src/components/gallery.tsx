@@ -156,7 +156,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
     }
   }, []);
   // Load items from the API only once on initialization
-  const { data: loadedItems, mutate } = useSWR(
+  const { data: loadedItems, mutate, isLoading: isLoadingItems } = useSWR(
     user && lang && mark ? `items-${user.uid}-${lang}-${mark.id}` : null,
     () => loadItems({ user, lang, mark: mark.id }),
     {
@@ -487,13 +487,19 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
           )}
           {!isItemsPanelCollapsed && (
             <div className="h-[calc(100%-84px)] overflow-auto">
-              <ItemsNav
-                items={items}
-                selectedItemId={selectedItemId}
-                onSelectItem={handleSelectItem}
-                onUpdateItem={handleUpdateItem}
-                onRefresh={() => mutate()}
-              />
+              {isLoadingItems ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                </div>
+              ) : (
+                <ItemsNav
+                  items={items}
+                  selectedItemId={selectedItemId}
+                  onSelectItem={handleSelectItem}
+                  onUpdateItem={handleUpdateItem}
+                  onRefresh={() => mutate()}
+                />
+              )}
             </div>
           )}
         </div>

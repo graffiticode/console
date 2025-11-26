@@ -53,8 +53,8 @@ export default function Tasks({ language, mark }) {
 
   if (isLoading) {
     return (
-      <div className="justify-center w-full">
-        Loading...
+      <div className="flex items-center justify-center w-full h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
       </div>
     );
   }

@@ -35,12 +35,11 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
   const hasReceivedInitialData = useRef(false);
   const hasReceivedFocus = useRef(false);
   const currentIdRef = useRef(id);
+  const [isLoading, setIsLoading] = useState(!!id);
 
   // Reset state when ID changes (new form loaded)
   useEffect(() => {
     if (currentIdRef.current !== id) {
-      console.log('[FormIFrame] Form ID changed, resetting state');
-
       // Clear the cache for the old ID
       if (cache[currentIdRef.current]) {
         delete cache[currentIdRef.current];
@@ -51,6 +50,7 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
       hasReceivedFocus.current = false;
       currentIdRef.current = id;
       justChangedTaskRef.current = true;
+      setIsLoading(!!id);
 
       // Clear any existing focus - mark as task change
       const clearFocusEvent = new CustomEvent('formIFrameFocus', {
@@ -78,6 +78,7 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
         return;
       }
 
+      console.log('[FormIFrame] Received event:', JSON.stringify(event.data, null, 2));
       // Check for focus events first
       if (event.data.focus) {
         console.log('[FormIFrame] Received focus event:', event.data.focus, 'isTaskChange:', justChangedTaskRef.current);
@@ -102,11 +103,8 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
       if (event.data[id]) {
         data = event.data[id];
       }
-      // Check if this is form structure data (from L0166 forms)
-      else if (event.data && typeof event.data === 'object' &&
-               ('title' in event.data || 'instructions' in event.data ||
-                'validation' in event.data || 'interaction' in event.data)) {
-        console.log('[FormIFrame] Detected L0166 form data structure');
+      // Accept any non-empty object as form data
+      else if (event.data && typeof event.data === 'object' && Object.keys(event.data).length > 0) {
         data = event.data;
       }
 
@@ -117,49 +115,7 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
       if (cache[id] !== hash) {
         cache[id] = hash;
         setData && setData(data);
-
-        // For L0166 forms, send an initial focus event for cell A1
-        if (!hasReceivedInitialData.current && !hasReceivedFocus.current && data) {
-          hasReceivedInitialData.current = true;
-
-          // Check if this is an L0166 form with interaction.cells
-          if (data.interaction && data.interaction.cells && typeof data.interaction.cells === 'object') {
-            console.log('[FormIFrame] L0166 form detected with cells:', Object.keys(data.interaction.cells));
-
-            // Find the first valid cell (skip 'assess' and other non-cell keys)
-            const cellKeys = Object.keys(data.interaction.cells).filter(key =>
-              key.match(/^[A-Z]+\d+$/)  // Match cell names like A1, B2, etc.
-            ).sort(); // Sort to get A1 first
-
-            if (cellKeys.length > 0) {
-              const firstCellName = cellKeys[0];
-              const firstCellData = data.interaction.cells[firstCellName];
-
-              console.log(`[FormIFrame] Sending initial focus for cell ${firstCellName}`);
-
-              const focusData = {
-                type: 'cell',
-                name: firstCellName,
-                value: firstCellData || { text: '' }
-              };
-
-              // Store this as the last focus
-              lastFocusDataRef.current = focusData;
-
-              // Create a proper focus event
-              const focusEvent = new CustomEvent('formIFrameFocus', {
-                detail: { focus: focusData }
-              });
-
-              // Delay slightly to ensure everything is initialized
-              setTimeout(() => {
-                window.dispatchEvent(focusEvent);
-              }, 100);
-            }
-          } else {
-            console.log('[FormIFrame] Not an L0166 form or no cells found');
-          }
-        }
+        setIsLoading(false);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -229,15 +185,22 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
   }, []);
 
   return (
-    <iframe
-      ref={iframeRef}
-      id={id}
-      src={src}
-      key="1"
-      className={className}
-      style={{ width: "100%", height: height || "100vh", border: "none" }}
-      onLoad={handleIframeLoad}
-    />
+    <div className="relative w-full h-full">
+      {isLoading && id && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      )}
+      <iframe
+        ref={iframeRef}
+        id={id}
+        src={src}
+        key="1"
+        className={className}
+        style={{ width: "100%", height: height || "100vh", border: "none" }}
+        onLoad={handleIframeLoad}
+      />
+    </div>
   );
 };
 
