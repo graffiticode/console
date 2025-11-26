@@ -36,6 +36,17 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
   const hasReceivedFocus = useRef(false);
   const currentIdRef = useRef(id);
   const [isLoading, setIsLoading] = useState(!!id);
+  const [showReloadMessage, setShowReloadMessage] = useState(false);
+
+  // Show reload message after 10 seconds if still loading
+  useEffect(() => {
+    if (!isLoading || !id) {
+      setShowReloadMessage(false);
+      return;
+    }
+    const timeout = setTimeout(() => setShowReloadMessage(true), 10000);
+    return () => clearTimeout(timeout);
+  }, [isLoading, id]);
 
   // Reset state when ID changes (new form loaded)
   useEffect(() => {
@@ -188,7 +199,19 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
     <div className="relative w-full h-full">
       {isLoading && id && (
         <div className="absolute inset-0 flex items-center justify-center bg-white">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          {showReloadMessage ? (
+            <div className="text-center">
+              <p className="text-gray-600 mb-2">Taking longer than expected.</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                Reload page
+              </button>
+            </div>
+          ) : (
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          )}
         </div>
       )}
       <iframe
