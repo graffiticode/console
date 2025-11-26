@@ -44,7 +44,7 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
       setShowReloadMessage(false);
       return;
     }
-    const timeout = setTimeout(() => setShowReloadMessage(true), 10000);
+    const timeout = setTimeout(() => setShowReloadMessage(true), 20000);
     return () => clearTimeout(timeout);
   }, [isLoading, id]);
 
