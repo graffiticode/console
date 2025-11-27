@@ -171,7 +171,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg leading-6 font-medium text-gray-900">
-              {pricing?.plan === 'free' ? 'Usage Overview' : 'Current Period Usage'}
+              {pricing?.plan === 'starter' ? 'Usage Overview' : 'Current Period Usage'}
             </h3>
             {isNearLimit && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">

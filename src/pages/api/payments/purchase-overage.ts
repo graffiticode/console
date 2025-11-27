@@ -8,7 +8,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 
 // Overage pricing based on plan's compile unit price
 const OVERAGE_PRICING = {
-  free: {  // Starter plan
+  starter: {
     pricePerUnit: 0.005,     // $0.005 per unit = $5 per 1000 units
     blockSize: 1000,         // Purchase in blocks of 1,000
     minBlocks: 1,            // Minimum 1 block (1,000 units)
@@ -50,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // For new users without a document, return free plan info
       const userData = userDoc.exists ? userDoc.data() : null;
       const subscriptionData = userData?.subscription || {};
-      const currentPlan = subscriptionData.plan || 'free';
+      const currentPlan = subscriptionData.plan || 'starter';
       const currentOverage = subscriptionData.overageUnits || 0;
 
       // Starter plan (free) now supports overage purchases
@@ -114,7 +114,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get user's current plan
     const subscriptionData = userData?.subscription || {};
-    const currentPlan = subscriptionData.plan || 'free';
+    const currentPlan = subscriptionData.plan || 'starter';
 
     // Validate purchase amount
     const pricing = OVERAGE_PRICING[currentPlan];

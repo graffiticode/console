@@ -133,9 +133,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         : null,
     };
 
-    // Only update plan if immediately canceling (downgrading to free)
+    // Only update plan if immediately canceling (downgrading to starter)
     if (immediately) {
-      updateData['subscription.plan'] = 'free';
+      updateData['subscription.plan'] = 'starter';
     }
 
     // Only set canceledAt for actual cancellations, not downgrades to free

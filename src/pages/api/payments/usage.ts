@@ -12,7 +12,7 @@ if (process.env.STRIPE_SECRET_KEY) {
 }
 
 // Map Stripe product/price IDs to our plan names
-const PLAN_MAPPING: Record<string, 'free' | 'pro' | 'teams'> = {
+const PLAN_MAPPING: Record<string, 'starter' | 'pro' | 'teams'> = {
   [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: 'pro',
   [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: 'pro',
   [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: 'teams',
@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let firstDayOfPeriod: Date;
     let lastDayOfPeriod: Date;
     let billingInterval: 'monthly' | 'annual' | null = null;
-    let currentPlan: 'free' | 'pro' | 'teams' = 'free';
+    let currentPlan: 'starter' | 'pro' | 'teams' = 'starter';
 
     // Try to get billing period and plan from Stripe subscription
     if (stripeCustomerId && stripe) {
@@ -73,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const priceId = subscription.items.data[0]?.price.id;
           const priceInterval = subscription.items.data[0]?.price.recurring?.interval;
           billingInterval = priceInterval === 'year' ? 'annual' : priceInterval === 'month' ? 'monthly' : null;
-          currentPlan = PLAN_MAPPING[priceId] || 'free';
+          currentPlan = PLAN_MAPPING[priceId] || 'starter';
         } else {
           // No active subscription, use calendar month
           const currentMonth = now.getMonth();
@@ -209,9 +209,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Determine plan limits from Stripe subscription
     // Base units are monthly - multiply by 12 for annual plans
     const baseUnitAllocation = {
-      free: 2000,      // Updated to match Starter plan
-      pro: 100000,     // Updated to match current Pro plan
-      teams: 2000000,  // Updated to match current Teams plan
+      starter: 2000,
+      pro: 100000,
+      teams: 2000000,
     };
 
     // Check if we should use preserved allocation (from a downgrade)

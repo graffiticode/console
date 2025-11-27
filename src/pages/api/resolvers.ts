@@ -36,12 +36,12 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
         const userDoc = await db.collection('users').doc(auth.uid).get();
         if (userDoc.exists) {
           const userData = userDoc.data();
-          const plan = userData?.subscription?.plan || 'free';
+          const plan = userData?.subscription?.plan || 'starter';
           const overageUnits = userData?.subscription?.overageUnits || 0;
 
           // Get plan allocation
           const planAllocations = {
-            free: 2000,
+            starter: 2000,
             pro: 100000,
             teams: 2000000
           };

@@ -17,8 +17,8 @@ export const config = {
 
 // Map Stripe price IDs to our plan names
 const PLAN_MAPPING = {
-  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || '']: { name: 'free', units: 2000 },  // 'free' is internal ID for Starter plan
-  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || '']: { name: 'free', units: 2000 },
+  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || '']: { name: 'starter', units: 2000 },
+  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || '']: { name: 'starter', units: 2000 },
   [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: { name: 'pro', units: 100000 },
   [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: { name: 'pro', units: 100000 },
   [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: { name: 'teams', units: 2000000 },
@@ -102,7 +102,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Get plan details
         const priceId = subscription.items.data[0]?.price.id;
-        const planInfo = PLAN_MAPPING[priceId] || { name: 'free', units: 2000 };
+        const planInfo = PLAN_MAPPING[priceId] || { name: 'starter', units: 2000 };
 
         // Update subscription info (preserves overage units - they roll over)
         await db.collection('users').doc(userId).update({
@@ -139,10 +139,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const userDoc = usersQuery.docs[0];
         const userId = userDoc.id;
 
-        // Reset to free tier but preserve overage units (they're purchased separately)
+        // Reset to starter tier but preserve overage units (they're purchased separately)
         await db.collection('users').doc(userId).update({
           'subscription.status': 'canceled',
-          'subscription.plan': 'free',
+          'subscription.plan': 'starter',
           'subscription.units': 2000,
           'subscription.stripeSubscriptionId': null,
           'subscription.canceledAt': new Date().toISOString(),

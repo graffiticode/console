@@ -9,7 +9,7 @@ interface PricingPlansProps {
 
 const plans = [
   {
-    id: 'free',
+    id: 'starter',
     name: 'Starter',
     description: 'Perfect for getting started with Graffiticode',
     monthlyPrice: 10,
@@ -76,7 +76,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
   const [highlightedPlan, setHighlightedPlan] = useState<string>('pro');
   const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
-  const [currentUserPlan, setCurrentUserPlan] = useState<string>('free');
+  const [currentUserPlan, setCurrentUserPlan] = useState<string>('starter');
   const [currentBillingInterval, setCurrentBillingInterval] = useState<'monthly' | 'annual'>('monthly');
   const [renewalDate, setRenewalDate] = useState<string | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
@@ -102,7 +102,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
       if (subscription.plan) {
         setCurrentUserPlan(subscription.plan === 'teams' ? 'teams' : subscription.plan);
         // If user has an active paid plan, highlight it
-        if (subscription.hasActiveSubscription && subscription.plan !== 'free') {
+        if (subscription.hasActiveSubscription && subscription.plan !== 'starter') {
           setHighlightedPlan(subscription.plan === 'teams' ? 'teams' : subscription.plan);
         }
       }
@@ -171,7 +171,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
   const handleSubscribe = async (planId: string) => {
     // Handle downgrade to Starter plan (only if user has an active paid subscription)
-    if (planId === 'free' && hasActiveSubscription && currentUserPlan !== 'free') {
+    if (planId === 'starter' && hasActiveSubscription && currentUserPlan !== 'starter') {
       setSelectedPlan(planId);
       setProcessing(true);
 
@@ -213,7 +213,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
     try {
       // For plan/interval changes, try quick subscribe first (only for existing subscribers)
-      if (hasActiveSubscription && (isChangingInterval || currentUserPlan !== 'free')) {
+      if (hasActiveSubscription && (isChangingInterval || currentUserPlan !== 'starter')) {
         console.log('Attempting quick subscribe:', { isChangingInterval, isUpgrade, planId, interval: billingInterval });
 
         // Show confirmation for upgrades only
@@ -337,7 +337,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => {
           // For Starter plan, always show monthly pricing even if annual is selected
-          const isStarterPlan = plan.id === 'free';
+          const isStarterPlan = plan.id === 'starter';
           const effectiveBilling = isStarterPlan ? 'monthly' : billingInterval;
 
           const price = effectiveBilling === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
@@ -356,8 +356,8 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
           const wouldBeDowngrade = hasActiveSubscription && (
             (currentUserPlan === 'teams' && plan.id === 'pro') ||
-            (currentUserPlan === 'teams' && plan.id === 'free') ||
-            (currentUserPlan === 'pro' && plan.id === 'free') ||
+            (currentUserPlan === 'teams' && plan.id === 'starter') ||
+            (currentUserPlan === 'pro' && plan.id === 'starter') ||
             (isCurrentPlan && currentBillingInterval === 'annual' && billingInterval === 'monthly')
           );
 
@@ -445,13 +445,13 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
                   ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
                   : isCurrentPlan && (isSameBillingInterval || isStarterPlan)
                   ? (pendingCancelPlan === plan.id ? 'Confirm Cancel' : 'Cancel Plan')
-                  : plan.id === 'free' && (currentUserPlan === 'pro' || currentUserPlan === 'teams')
+                  : plan.id === 'starter' && (currentUserPlan === 'pro' || currentUserPlan === 'teams')
                   ? 'Downgrade to Starter'
                   : plan.id === 'pro' && currentUserPlan === 'teams'
                   ? 'Downgrade to Pro'
-                  : plan.id === 'pro' && currentUserPlan === 'free'
+                  : plan.id === 'pro' && currentUserPlan === 'starter'
                   ? 'Upgrade to Pro'
-                  : plan.id === 'teams' && (currentUserPlan === 'free' || currentUserPlan === 'pro')
+                  : plan.id === 'teams' && (currentUserPlan === 'starter' || currentUserPlan === 'pro')
                   ? 'Upgrade to Team'
                   : plan.cta}
               </button>

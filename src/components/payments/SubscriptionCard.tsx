@@ -4,7 +4,7 @@ import axios from 'axios';
 
 interface SubscriptionData {
   status: 'active' | 'canceled' | 'past_due' | 'trialing' | 'none';
-  plan: 'free' | 'pro' | 'teams';
+  plan: 'starter' | 'pro' | 'teams';
   interval: 'monthly' | 'annual' | null;
   currentPeriodEnd?: string;
   cancelAtPeriodEnd?: boolean;
@@ -21,7 +21,7 @@ interface SubscriptionCardProps {
 }
 
 const planDetails = {
-  free: { name: 'Starter', monthlyUnits: 2000, price: { monthly: 0, annual: 0 } },
+  starter: { name: 'Starter', monthlyUnits: 2000, price: { monthly: 10, annual: 0 } },
   pro: { name: 'Pro', monthlyUnits: 100000, price: { monthly: 100, annual: 1000 } },
   teams: { name: 'Team', monthlyUnits: 2000000, price: { monthly: 1000, annual: 10000 } },
 };
@@ -41,10 +41,10 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
       setSubscription(response.data);
     } catch (error) {
       console.error('Error fetching subscription:', error);
-      // Default to free tier if no subscription found
+      // Default to starter tier if no subscription found
       setSubscription({
         status: 'none',
-        plan: 'free',
+        plan: 'starter',
         interval: null
       });
     } finally {
@@ -90,7 +90,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
     return <div>Error loading subscription data</div>;
   }
 
-  const plan = planDetails[subscription.plan] || planDetails.free;
+  const plan = planDetails[subscription.plan] || planDetails.starter;
   const currentPrice = subscription.interval && plan.price && typeof plan.price === 'object'
     ? plan.price[subscription.interval]
     : plan.price && typeof plan.price === 'number' ? plan.price : 0;
@@ -142,7 +142,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
           <div>
             <dt className="text-sm font-medium text-gray-500">Billing</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              ${subscription.plan === 'free' ? '10' : currentPrice}
+              ${subscription.plan === 'starter' ? '10' : currentPrice}
               <span className="text-sm text-gray-500 ml-1">
                 / {subscription.interval === 'annual' ? 'year' : 'month'}
               </span>
@@ -169,7 +169,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
               <dd className="mt-1 text-sm text-gray-600">
                 {subscription.cancelAtPeriodEnd
                   ? 'Subscription ends'
-                  : subscription.plan === 'free'
+                  : subscription.plan === 'starter'
                   ? 'No payment due'
                   : 'Next payment due'}
               </dd>

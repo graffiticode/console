@@ -71,6 +71,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } else if (firstLineItem.description?.toLowerCase().includes('team') ||
                      firstLineItem.description?.toLowerCase().includes('max')) {
             planName = 'Max';
+          } else if (firstLineItem.description?.toLowerCase().includes('starter') ||
+                     firstLineItem.description?.toLowerCase().includes('free')) {
+            planName = 'Starter';
           } else if (firstLineItem.description?.toLowerCase().includes('overage')) {
             type = 'overage';
             planName = 'Overage Units';

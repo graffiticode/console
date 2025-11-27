@@ -34,10 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const db = getFirestore();
     const userDoc = await db.collection('users').doc(userId).get();
 
-    // For new users without a document, return free tier
+    // For new users without a document, return starter tier
     if (!userDoc.exists) {
       return res.status(200).json({
-        plan: 'free',
+        plan: 'starter',
         interval: null,
         status: 'active',
         currentBillingPeriod: null,
@@ -53,12 +53,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const userData = userDoc.data();
     let stripeCustomerId = userData?.stripeCustomerId;
 
-    // If Stripe is not configured or no Stripe customer, return free tier
+    // If Stripe is not configured or no Stripe customer, return starter tier
     if (!stripe || !stripeCustomerId) {
       const preservedRenewalDate = userData?.subscription?.renewalDate || null;
 
       return res.status(200).json({
-        plan: userData?.subscription?.plan || 'free',
+        plan: userData?.subscription?.plan || 'starter',
         interval: null,
         status: 'active',
         currentBillingPeriod: null,
@@ -76,12 +76,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await stripe.customers.retrieve(stripeCustomerId);
     } catch (error: any) {
       if (error.code === 'resource_missing') {
-        // Customer doesn't exist in current mode, treat as free tier
+        // Customer doesn't exist in current mode, treat as starter tier
         console.log(`Customer ${stripeCustomerId} doesn't exist in current Stripe mode`);
         const preservedRenewalDate = userData?.subscription?.renewalDate || null;
 
         return res.status(200).json({
-          plan: userData?.subscription?.plan || 'free',
+          plan: userData?.subscription?.plan || 'starter',
           interval: null,
           status: 'active',
           currentBillingPeriod: null,
@@ -124,7 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const hasPreservedAllocation = preservedUntil && preservedAllocation && new Date(preservedUntil) > new Date();
 
       return res.status(200).json({
-        plan: userData?.subscription?.plan || 'free',
+        plan: userData?.subscription?.plan || 'starter',
         interval: null,
         status: 'active',
         currentBillingPeriod: null,
@@ -141,7 +141,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const subscription = subscriptions.data[0];
     const priceId = subscription.items.data[0]?.price.id;
-    const planName = PLAN_MAPPING[priceId] || 'free';
+    const planName = PLAN_MAPPING[priceId] || 'starter';
 
     // Get billing interval from Stripe subscription
     const stripeInterval = subscription.items.data[0]?.price.recurring?.interval;
@@ -149,9 +149,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get unit allocation based on plan (monthly base)
     const baseUnitAllocation = {
-      free: 2000,  // Updated to match Starter plan
-      pro: 100000, // Updated to match current Pro plan
-      teams: 2000000, // Updated to match current Teams plan
+      starter: 2000,
+      pro: 100000,
+      teams: 2000000,
     };
 
     // Check for preserved allocation from a downgrade
@@ -168,7 +168,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get overage rate based on plan
     const overageRate = {
-      free: null,
+      starter: null,
       pro: 0.001, // $0.001 per unit
       teams: 0.0002, // $0.0002 per unit
     };

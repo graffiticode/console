@@ -12,7 +12,7 @@ if (process.env.STRIPE_SECRET_KEY) {
 
 // Map our plan IDs to Stripe price IDs
 const STRIPE_PRICE_IDS = {
-  free: {  // Internal ID 'free' is used for Starter plan
+  starter: {
     monthly: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID,
     annual: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID,
   },
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Validate that Starter plan can only be monthly
-    if (planId === 'free' && interval === 'annual') {
+    if (planId === 'starter' && interval === 'annual') {
       return res.status(400).json({
         error: 'Starter plan is only available with monthly billing'
       });
@@ -172,7 +172,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         interval,
       },
       // Add 30-day free trial for Starter plan
-      ...(planId === 'free' && {
+      ...(planId === 'starter' && {
         subscription_data: {
           trial_period_days: 30,
         },

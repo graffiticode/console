@@ -1349,7 +1349,7 @@ export async function generateCode({
         const userDoc = await db.doc(`users/${auth.uid}`).get();
         const userData = userDoc.data();
         const subscription = userData?.subscription || {};
-        const plan = subscription.plan || 'free';
+        const plan = subscription.plan || 'starter';
 
         // Define token pricing per million tokens (in dollars) based on model actually used
         const TOKEN_PRICING = {
@@ -1435,7 +1435,7 @@ export async function generateCode({
 
           // Get plan allocation
           const planAllocations = {
-            free: 2000,
+            starter: 2000,
             pro: 100000,
             teams: 2000000
           };

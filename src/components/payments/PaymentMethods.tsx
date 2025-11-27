@@ -153,7 +153,7 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
       // Check if user has an active paid subscription
       setHasActiveSubscription(
         subscription.status === 'active' &&
-        subscription.plan !== 'free' &&
+        subscription.plan !== 'starter' &&
         subscription.plan !== 'none'
       );
     } catch (error) {

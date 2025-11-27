@@ -25,6 +25,8 @@ const STRIPE_PRICE_IDS = {
 
 // Map Stripe price IDs back to our plan names
 const PLAN_MAPPING: Record<string, string> = {
+  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || '']: 'starter',
+  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || '']: 'starter',
   [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: 'pro',
   [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: 'pro',
   [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: 'teams',
@@ -50,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Validate that Starter plan can only be monthly
-    if (planId === 'free' && interval === 'annual') {
+    if (planId === 'starter' && interval === 'annual') {
       return res.status(400).json({
         error: 'Starter plan is only available with monthly billing'
       });
@@ -66,7 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const userData = userDoc.data();
     const stripeCustomerId = userData?.stripeCustomerId;
-    const currentPlan = userData?.subscription?.plan || 'free';
+    const currentPlan = userData?.subscription?.plan || 'starter';
 
     if (!stripeCustomerId) {
       return res.status(400).json({
@@ -131,7 +133,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const existingPriceId = existingSub.items.data[0]?.price.id;
 
       // Determine the current plan and interval from the existing subscription
-      const existingPlan = PLAN_MAPPING[existingPriceId] || 'free';
+      const existingPlan = PLAN_MAPPING[existingPriceId] || 'starter';
       const currentPrice = await stripe.prices.retrieve(existingPriceId);
       const currentInterval = currentPrice.recurring?.interval === 'year' ? 'annual' : 'monthly';
 
@@ -186,7 +188,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } else if (existingPlan === 'pro') {
           oldAllocation = 100000; // Pro monthly allocation
         } else {
-          oldAllocation = 2000; // Starter/free allocation
+          oldAllocation = 2000; // Starter allocation
         }
 
         // Multiply by 12 if current plan is annual
@@ -292,8 +294,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (existingSub && !isUpgrade) {
       updateData['subscription.preservedAllocation'] = oldAllocation;
       updateData['subscription.preservedUntil'] = new Date(subscription.current_period_end * 1000).toISOString();
-    } else if (currentPlan === 'free') {
-      // If upgrading from free, clear any preserved fields and canceledAt
+    } else if (currentPlan === 'starter') {
+      // If upgrading from starter, clear any preserved fields and canceledAt
       updateData['subscription.preservedAllocation'] = admin.firestore.FieldValue.delete();
       updateData['subscription.preservedUntil'] = admin.firestore.FieldValue.delete();
       updateData['subscription.canceledAt'] = admin.firestore.FieldValue.delete();
