@@ -9,19 +9,11 @@ interface UserData {
   uid?: string;
   name?: string;
   email?: string;
+  phone?: string;
   created?: string;
   updated?: string;
-  inviteCodeUsed?: string;
-  inviteCodeTimestamp?: string;
+  stripeCreated?: string;
   stripeCustomerId?: string;
-  subscription?: {
-    status?: string;
-    plan?: string;
-    units?: number;
-    currentPeriodStart?: string;
-    currentPeriodEnd?: string;
-    cancelAtPeriodEnd?: boolean;
-  };
 }
 
 export default function Profile() {
@@ -143,6 +135,13 @@ export default function Profile() {
                     </div>
                   )}
 
+                  {userData?.phone && (
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Phone</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{userData.phone}</dd>
+                    </div>
+                  )}
+
                   {userData?.created && (
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Account Created</dt>
@@ -169,91 +168,17 @@ export default function Profile() {
                     </div>
                   )}
 
-                  {userData?.inviteCodeUsed && (
+                  {userData?.stripeCreated && (
                     <div>
-                      <dt className="text-sm font-medium text-gray-500">Invite Code Used</dt>
-                      <dd className="mt-1 text-sm text-gray-900 font-mono">
-                        {userData.inviteCodeUsed}
-                      </dd>
-                    </div>
-                  )}
-
-                  {userData?.inviteCodeTimestamp && (
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Invited On</dt>
+                      <dt className="text-sm font-medium text-gray-500">Billing Account Created</dt>
                       <dd className="mt-1 text-sm text-gray-900">
-                        {new Date(userData.inviteCodeTimestamp).toLocaleDateString('en-US', {
+                        {new Date(userData.stripeCreated).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric',
                         })}
                       </dd>
                     </div>
-                  )}
-
-                  {userData?.subscription?.status && (
-                    <>
-                      <div className="sm:col-span-2 border-t pt-6">
-                        <h3 className="text-base font-semibold text-gray-900 mb-4">Subscription</h3>
-                        <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Status</dt>
-                            <dd className="mt-1">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                userData.subscription.status === 'active' || userData.subscription.status === 'trialing'
-                                  ? 'bg-green-100 text-green-800'
-                                  : userData.subscription.status === 'canceled'
-                                  ? 'bg-red-100 text-red-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {userData.subscription.status === 'trialing' ? 'Active' : userData.subscription.status.charAt(0).toUpperCase() + userData.subscription.status.slice(1)}
-                              </span>
-                            </dd>
-                          </div>
-
-                          {userData.subscription.plan && (
-                            <div>
-                              <dt className="text-sm font-medium text-gray-500">Plan</dt>
-                              <dd className="mt-1 text-sm text-gray-900">
-                                {userData.subscription.plan === 'free' ? 'Starter' : userData.subscription.plan.charAt(0).toUpperCase() + userData.subscription.plan.slice(1)}
-                              </dd>
-                            </div>
-                          )}
-
-                          {userData.subscription.units !== undefined && (
-                            <div>
-                              <dt className="text-sm font-medium text-gray-500">Units</dt>
-                              <dd className="mt-1 text-sm text-gray-900">
-                                {userData.subscription.units.toLocaleString()}
-                              </dd>
-                            </div>
-                          )}
-
-                          {userData.subscription.currentPeriodEnd && (
-                            <div>
-                              <dt className="text-sm font-medium text-gray-500">Current Period Ends</dt>
-                              <dd className="mt-1 text-sm text-gray-900">
-                                {new Date(userData.subscription.currentPeriodEnd).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric',
-                                })}
-                              </dd>
-                            </div>
-                          )}
-
-                          {userData.subscription.cancelAtPeriodEnd && (
-                            <div className="sm:col-span-2">
-                              <div className="rounded-md bg-yellow-50 p-4">
-                                <p className="text-sm text-yellow-800">
-                                  Your subscription will be canceled at the end of the current billing period.
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </dl>
-                      </div>
-                    </>
                   )}
                 </dl>
               </div>

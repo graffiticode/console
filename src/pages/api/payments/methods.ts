@@ -180,9 +180,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           type: 'card',
         });
 
-        // Get the default payment method
+        // Get the default payment method and customer info
         const customer = await stripe.customers.retrieve(stripeCustomerId) as Stripe.Customer;
         const defaultPaymentMethodId = customer.invoice_settings?.default_payment_method;
+
+        // Update user profile with billing details from payment method and Stripe customer
+        const billingDetails = paymentMethod.billing_details;
+        const profileUpdate: Record<string, any> = {
+          updated: new Date().toISOString(),
+        };
+
+        // Get info from billing details (from the payment method)
+        if (billingDetails?.name) {
+          profileUpdate.name = billingDetails.name;
+        }
+        if (billingDetails?.email) {
+          profileUpdate.email = billingDetails.email;
+        }
+        if (billingDetails?.phone) {
+          profileUpdate.phone = billingDetails.phone;
+        }
+
+        // Get Stripe customer created date
+        if (customer.created) {
+          profileUpdate.stripeCreated = new Date(customer.created * 1000).toISOString();
+        }
+
+        // Update user profile if we have any new info
+        if (Object.keys(profileUpdate).length > 1) {
+          await db.collection('users').doc(userId).set(profileUpdate, { merge: true });
+        }
 
         const formattedMethods: PaymentMethod[] = updatedPaymentMethods.data.map(pm => ({
           id: pm.id,

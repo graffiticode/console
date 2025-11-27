@@ -24,6 +24,8 @@ function AddPaymentMethodForm({ userId, onSuccess, onCancel }: { userId: string;
   const elements = useElements();
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,10 +46,14 @@ function AddPaymentMethodForm({ userId, onSuccess, onCancel }: { userId: string;
       return;
     }
 
-    // Create a payment method directly
+    // Create a payment method directly with billing details
     const { error, paymentMethod } = await stripe.createPaymentMethod({
       type: 'card',
       card: cardElement,
+      billing_details: {
+        name: name || undefined,
+        email: email || undefined,
+      },
     });
 
     if (error) {
@@ -78,6 +84,32 @@ function AddPaymentMethodForm({ userId, onSuccess, onCancel }: { userId: string;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+          Full Name
+        </label>
+        <input
+          type="text"
+          id="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          placeholder="John Doe"
+        />
+      </div>
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+          Email
+        </label>
+        <input
+          type="email"
+          id="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          placeholder="john@example.com"
+        />
+      </div>
       <div className="p-4 border border-gray-300 rounded-md">
         <CardElement
           options={{
