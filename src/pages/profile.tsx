@@ -200,13 +200,13 @@ export default function Profile() {
                             <dt className="text-sm font-medium text-gray-500">Status</dt>
                             <dd className="mt-1">
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                userData.subscription.status === 'active'
+                                userData.subscription.status === 'active' || userData.subscription.status === 'trialing'
                                   ? 'bg-green-100 text-green-800'
                                   : userData.subscription.status === 'canceled'
                                   ? 'bg-red-100 text-red-800'
                                   : 'bg-gray-100 text-gray-800'
                               }`}>
-                                {userData.subscription.status}
+                                {userData.subscription.status === 'trialing' ? 'Active' : userData.subscription.status.charAt(0).toUpperCase() + userData.subscription.status.slice(1)}
                               </span>
                             </dd>
                           </div>
@@ -214,7 +214,9 @@ export default function Profile() {
                           {userData.subscription.plan && (
                             <div>
                               <dt className="text-sm font-medium text-gray-500">Plan</dt>
-                              <dd className="mt-1 text-sm text-gray-900">{userData.subscription.plan}</dd>
+                              <dd className="mt-1 text-sm text-gray-900">
+                                {userData.subscription.plan === 'free' ? 'Starter' : userData.subscription.plan.charAt(0).toUpperCase() + userData.subscription.plan.slice(1)}
+                              </dd>
                             </div>
                           )}
 
