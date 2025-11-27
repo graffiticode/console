@@ -47,13 +47,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const db = getFirestore();
       const userDoc = await db.collection('users').doc(userId as string).get();
 
-      // For new users without a document, return free plan info
+      // For new users without a document, return starter plan info
       const userData = userDoc.exists ? userDoc.data() : null;
       const subscriptionData = userData?.subscription || {};
       const currentPlan = subscriptionData.plan || 'starter';
       const currentOverage = subscriptionData.overageUnits || 0;
 
-      // Starter plan (free) now supports overage purchases
+      // Starter plan now supports overage purchases
 
       const pricing = OVERAGE_PRICING[currentPlan];
 

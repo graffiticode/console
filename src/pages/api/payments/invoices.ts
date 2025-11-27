@@ -80,12 +80,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
+        // Always use our generated description to avoid showing "free" from Stripe
+        const displayDescription = `${planName} subscription`;
+
         invoices.push({
           id: invoice.id,
           date: new Date(invoice.created * 1000).toISOString(),
           amount: (invoice.amount_paid || invoice.amount_due) / 100, // Convert from cents
           status: invoice.status || 'pending',
-          description: invoice.description || `${planName} subscription`,
+          description: displayDescription,
           invoicePdf: invoice.invoice_pdf || undefined,
           type,
           plan: planName,

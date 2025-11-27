@@ -1404,7 +1404,7 @@ export async function generateCode({
 
         // Define compile unit pricing (dollars per unit)
         const UNIT_PRICING = {
-          free: 0, // Free tier doesn't charge but still tracks usage
+          starter: 0, // Starter tier doesn't charge but still tracks usage
           pro: 0.001,  // $50/month for 50,000 units = $0.001 per unit
           max: 0.0005, // $500/month for 1,000,000 units = $0.0005 per unit
           teams: 0.0005, // Same as max
@@ -1419,7 +1419,7 @@ export async function generateCode({
           // For paid plans, calculate units based on cost
           compileUnits = Math.ceil(totalTokenCost / unitPrice);
         } else {
-          // For free plan, use a simple token-to-unit conversion (1000 tokens = 1 unit)
+          // For starter plan, use a simple token-to-unit conversion (1000 tokens = 1 unit)
           compileUnits = Math.ceil(finalUsage.total_tokens / 1000);
         }
 

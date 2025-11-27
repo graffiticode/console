@@ -40,13 +40,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    // Validate that Starter plan can only be monthly
-    if (planId === 'starter' && interval === 'annual') {
-      return res.status(400).json({
-        error: 'Starter plan is only available with monthly billing'
-      });
-    }
-
     // Validate Stripe configuration
     if (!stripe) {
       console.error('STRIPE_SECRET_KEY is not configured');
@@ -171,8 +164,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         planId,
         interval,
       },
-      // Add 30-day free trial for Starter plan
-      ...(planId === 'starter' && {
+      // Add 30-day free trial for monthly Starter plan only
+      ...(planId === 'starter' && interval === 'monthly' && {
         subscription_data: {
           trial_period_days: 30,
         },

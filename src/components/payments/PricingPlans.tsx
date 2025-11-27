@@ -13,11 +13,11 @@ const plans = [
     name: 'Starter',
     description: 'Perfect for getting started with Graffiticode',
     monthlyPrice: 10,
-    annualPrice: null,  // No annual option for Starter
+    annualPrice: 100,  // $100/year (save ~17%)
     monthlyUnits: 2000,
     features: [
       '2,000 compile units per month',
-      'First month free',
+      'First month free (monthly only)',
       'Additional compiles at $0.005 each',
       'Limited language access',
       'Community support',
@@ -336,17 +336,12 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
       {/* Pricing Cards */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => {
-          // For Starter plan, always show monthly pricing even if annual is selected
-          const isStarterPlan = plan.id === 'starter';
-          const effectiveBilling = isStarterPlan ? 'monthly' : billingInterval;
-
-          const price = effectiveBilling === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
-          const units = effectiveBilling === 'annual' && !isStarterPlan ? plan.monthlyUnits * 12 : plan.monthlyUnits;
+          const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
+          const units = billingInterval === 'annual' ? plan.monthlyUnits * 12 : plan.monthlyUnits;
           // Only mark as current plan if user has an active subscription
           const isCurrentPlan = hasActiveSubscription && plan.id === currentUserPlan;
           const isSameBillingInterval = billingInterval === currentBillingInterval;
-          // Starter plan doesn't support billing interval changes
-          const isChangingBilling = isCurrentPlan && !isSameBillingInterval && !isStarterPlan;
+          const isChangingBilling = isCurrentPlan && !isSameBillingInterval;
 
           // Check if this plan selection would be an upgrade or downgrade (only relevant if user has active subscription)
           const wouldBeUpgrade = hasActiveSubscription && (
@@ -399,11 +394,8 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
               <div className="mb-6">
                 <span className="text-4xl font-bold text-gray-900">${price.toLocaleString()}</span>
                 <span className="text-gray-500 ml-1">
-                  /{effectiveBilling === 'monthly' ? 'mo' : 'yr'}
+                  /{billingInterval === 'monthly' ? 'mo' : 'yr'}
                 </span>
-                {isStarterPlan && billingInterval === 'annual' && (
-                  <div className="mt-1 text-xs text-gray-500">Monthly billing only</div>
-                )}
               </div>
 
               <ul className="space-y-3 mb-6">
@@ -418,7 +410,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
               <button
                 onClick={() => {
                   // Handle current plan cancel flow
-                  if (isCurrentPlan && (isSameBillingInterval || isStarterPlan) && !cancelAtPeriodEnd) {
+                  if (isCurrentPlan && isSameBillingInterval && !cancelAtPeriodEnd) {
                     handleCancelClick(plan.id);
                   } else {
                     handleSubscribe(plan.id);
@@ -443,7 +435,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
                   ? plan.cta  // No subscription yet - show default CTA
                   : isChangingBilling
                   ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
-                  : isCurrentPlan && (isSameBillingInterval || isStarterPlan)
+                  : isCurrentPlan && isSameBillingInterval
                   ? (pendingCancelPlan === plan.id ? 'Confirm Cancel' : 'Cancel Plan')
                   : plan.id === 'starter' && (currentUserPlan === 'pro' || currentUserPlan === 'teams')
                   ? 'Downgrade to Starter'

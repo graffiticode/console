@@ -21,7 +21,7 @@ interface SubscriptionCardProps {
 }
 
 const planDetails = {
-  starter: { name: 'Starter', monthlyUnits: 2000, price: { monthly: 10, annual: 0 } },
+  starter: { name: 'Starter', monthlyUnits: 2000, price: { monthly: 10, annual: 100 } },
   pro: { name: 'Pro', monthlyUnits: 100000, price: { monthly: 100, annual: 1000 } },
   teams: { name: 'Team', monthlyUnits: 2000000, price: { monthly: 1000, annual: 10000 } },
 };
@@ -100,17 +100,25 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
     ? plan.monthlyUnits * 12
     : plan.monthlyUnits;
 
-  const StatusIcon = subscription.status === 'active'
+  const StatusIcon = (subscription.status === 'active' || subscription.status === 'trialing')
     ? CheckCircleIcon
     : subscription.status === 'past_due'
     ? ClockIcon
     : XCircleIcon;
 
-  const statusColor = subscription.status === 'active'
+  const statusColor = (subscription.status === 'active' || subscription.status === 'trialing')
     ? 'text-green-600 bg-green-100'
     : subscription.status === 'past_due'
     ? 'text-yellow-600 bg-yellow-100'
     : 'text-gray-600 bg-gray-100';
+
+  const getStatusLabel = () => {
+    if (subscription.status === 'none') return 'Starter Tier';
+    if (subscription.status === 'active' || subscription.status === 'trialing') return 'Active';
+    if (subscription.status === 'past_due') return 'Past Due';
+    if (subscription.status === 'canceled') return 'Canceled';
+    return subscription.status;
+  };
 
   return (
     <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -121,7 +129,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
           </h3>
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
             <StatusIcon className="w-4 h-4 mr-1" />
-            {subscription.status === 'none' ? 'Starter Tier' : subscription.status}
+            {getStatusLabel()}
           </span>
         </div>
 

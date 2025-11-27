@@ -144,7 +144,7 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
                     }`}>
                       {invoice.status === 'paid' && <CheckCircleIcon className="w-4 h-4 mr-1" />}
                       {invoice.status === 'failed' && <XCircleIcon className="w-4 h-4 mr-1" />}
-                      {invoice.status}
+                      {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

@@ -83,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         currentAllocation = currentAllocation * 12;
       }
 
-      console.log('Preserving allocation on downgrade to free:', {
+      console.log('Preserving allocation on downgrade to starter:', {
         currentPlan,
         interval,
         preservedAllocation: currentAllocation
@@ -124,9 +124,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Update user document
-    // When immediately canceling (downgrading to free), preserve the renewal date from the subscription
+    // When immediately canceling (downgrading to starter), preserve the renewal date from the subscription
     const updateData: any = {
-      'subscription.status': immediately ? 'active' : 'canceling', // Keep status as 'active' for free plan
+      'subscription.status': immediately ? 'active' : 'canceling',
       'subscription.cancelAtPeriodEnd': !immediately, // Track if canceling at period end
       'subscription.cancelAt': canceledSubscription.cancel_at
         ? new Date(canceledSubscription.cancel_at * 1000).toISOString()
@@ -138,15 +138,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       updateData['subscription.plan'] = 'starter';
     }
 
-    // Only set canceledAt for actual cancellations, not downgrades to free
+    // Only set canceledAt for actual cancellations, not downgrades to starter
     if (!immediately) {
       updateData['subscription.canceledAt'] = new Date().toISOString();
     }
 
-    // Preserve the renewal date and allocation when downgrading to free
+    // Preserve the renewal date and allocation when downgrading to starter
     if (immediately && subscription.current_period_end) {
       updateData['subscription.renewalDate'] = new Date(subscription.current_period_end * 1000).toISOString();
-      updateData['subscription.interval'] = null; // Free plan has no interval
+      updateData['subscription.interval'] = null; // Starter plan has no interval
       updateData['subscription.stripeSubscriptionId'] = null; // Clear Stripe subscription ID
       updateData['subscription.preservedAllocation'] = currentAllocation; // Preserve old plan's allocation
       updateData['subscription.preservedUntil'] = new Date(subscription.current_period_end * 1000).toISOString();

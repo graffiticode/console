@@ -43,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         currentBillingPeriod: null,
         cancelAtPeriodEnd: false,
         nextBillingDate: null,
-        units: 1000, // Free tier units
+        units: 1000, // Starter tier units
         overageUnits: 0,
         overageRate: null,
         hasActiveSubscription: false,
@@ -113,7 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subscriptions.data.push(...trialingSubscriptions.data);
     }
 
-    // If no active subscription, return free tier with preserved renewal date if available
+    // If no active subscription, return starter tier with preserved renewal date if available
     if (!subscriptions.data.length) {
       // Check if there's a preserved renewal date from a previous subscription
       const preservedRenewalDate = userData?.subscription?.renewalDate || null;

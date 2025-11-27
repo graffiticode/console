@@ -13,6 +13,10 @@ if (process.env.STRIPE_SECRET_KEY) {
 
 // Map our plan IDs to Stripe price IDs
 const STRIPE_PRICE_IDS = {
+  starter: {
+    monthly: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID,
+    annual: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID,
+  },
   pro: {
     monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
     annual: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
@@ -49,13 +53,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!userId || !planId || !interval) {
       return res.status(400).json({ error: 'Missing required parameters' });
-    }
-
-    // Validate that Starter plan can only be monthly
-    if (planId === 'starter' && interval === 'annual') {
-      return res.status(400).json({
-        error: 'Starter plan is only available with monthly billing'
-      });
     }
 
     // Get user and their Stripe customer
