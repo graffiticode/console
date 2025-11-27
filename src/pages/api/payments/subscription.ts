@@ -211,12 +211,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    // For Starter plan, show 'active' instead of 'trialing' during free trial
+    const displayStatus = (planName === 'starter' && subscription.status === 'trialing')
+      ? 'active'
+      : subscription.status;
+
     return res.status(200).json({
       plan: planName,
       interval,
       scheduledPlan,
       scheduledInterval,
-      status: subscription.status,
+      status: displayStatus,
       currentBillingPeriod: {
         start: new Date(subscription.current_period_start * 1000).toISOString(),
         end: new Date(effectiveRenewalDate * 1000).toISOString(),
