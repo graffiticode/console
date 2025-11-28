@@ -30,6 +30,9 @@ export function GraffiticodeAuthProvider({ children }) {
   if (firebaseUser) {
     user = {
       uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName,
+      photoURL: firebaseUser.photoURL,
       getToken: () => firebaseUser.getIdToken(),
     };
   }

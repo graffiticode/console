@@ -6,10 +6,10 @@ const handler = async (req, res) => {
   try {
     const db = getFirestore();
     if (req.method === 'PUT') {
-      await db.collection('users').doc(name).update({
+      await db.collection('users').doc(name).set({
         ...req.body,
         updated: new Date().toISOString(),
-      });
+      }, { merge: true });
     } else if (req.method === 'GET') {
       const doc = await db.collection('users').doc(name).get();
       console.log("GET /user doc=" + JSON.stringify(doc, null, 2));

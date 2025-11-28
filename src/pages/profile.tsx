@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
-import { UserCircleIcon } from '@heroicons/react/24/outline';
+import { UserCircleIcon, CameraIcon } from '@heroicons/react/24/outline';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { getTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
@@ -14,6 +14,11 @@ interface UserData {
   updated?: string;
   stripeCreated?: string;
   stripeCustomerId?: string;
+  profileImageUrl?: string;
+  notificationEmail?: string;
+  notificationPhone?: string;
+  notifyByEmail?: boolean;
+  notifyByPhone?: boolean;
 }
 
 export default function Profile() {
@@ -21,12 +26,28 @@ export default function Profile() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [notificationEmail, setNotificationEmail] = useState('');
+  const [notificationPhone, setNotificationPhone] = useState('');
+  const [notifyByEmail, setNotifyByEmail] = useState(true);
+  const [notifyByPhone, setNotifyByPhone] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user && !loading) {
       fetchUserData();
     }
   }, [user, loading]);
+
+  useEffect(() => {
+    if (userData) {
+      setImagePreview(userData.profileImageUrl || null);
+      setNotificationEmail(userData.notificationEmail || '');
+      setNotificationPhone(userData.notificationPhone || '');
+      setNotifyByEmail(userData.notifyByEmail ?? true);
+      setNotifyByPhone(userData.notifyByPhone ?? false);
+    }
+  }, [userData]);
 
   const fetchUserData = async () => {
     try {
@@ -53,6 +74,181 @@ export default function Profile() {
     } finally {
       setLoadingData(false);
     }
+  };
+
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be less than 5MB');
+      return;
+    }
+
+    // Create preview and save
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Image = reader.result as string;
+      setImagePreview(base64Image);
+
+      // Save to server
+      try {
+        const token = await user.getToken();
+        const response = await fetch(`/api/user/${user.uid}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': token,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            profileImageUrl: base64Image,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save profile image');
+        }
+      } catch (err) {
+        console.error('Error saving profile image:', err);
+        alert('Failed to save profile image');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const formatPhoneNumber = (value: string, prevValue: string): string => {
+    // Remove all non-digit characters
+    let digits = value.replace(/\D/g, '');
+
+    // Handle empty input
+    if (digits.length === 0) return '';
+
+    // If user is deleting (value shorter than previous), don't auto-insert 1
+    const isDeleting = value.length < prevValue.length;
+
+    // If just "1", return as-is (allow deleting back to +1)
+    if (digits === '1') {
+      return '+1';
+    }
+
+    // If starts with 1, use it as country code
+    // Otherwise, prepend 1 (but only if not deleting to empty)
+    if (digits[0] !== '1' && !isDeleting) {
+      digits = '1' + digits;
+    } else if (digits[0] !== '1' && isDeleting) {
+      // User is deleting and no country code - just format what's there
+      if (digits.length <= 3) {
+        return `+1 (${digits}`;
+      } else if (digits.length <= 6) {
+        return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
+      } else {
+        return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+      }
+    }
+
+    // Format as +1 (XXX) XXX-XXXX
+    if (digits.length <= 1) {
+      return `+${digits}`;
+    } else if (digits.length <= 4) {
+      return `+${digits[0]} (${digits.slice(1)}`;
+    } else if (digits.length <= 7) {
+      return `+${digits[0]} (${digits.slice(1, 4)}) ${digits.slice(4)}`;
+    } else {
+      return `+${digits[0]} (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 11)}`;
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value, notificationPhone);
+    setNotificationPhone(formatted);
+  };
+
+  const saveNotificationEmail = async (email: string) => {
+    try {
+      const token = await user.getToken();
+      const response = await fetch(`/api/user/${user.uid}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          notificationEmail: email,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save notification email');
+      }
+    } catch (err) {
+      console.error('Error saving notification email:', err);
+    }
+  };
+
+  const saveNotificationPhone = async (phone: string) => {
+    try {
+      const token = await user.getToken();
+      const response = await fetch(`/api/user/${user.uid}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          notificationPhone: phone,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save notification phone');
+      }
+    } catch (err) {
+      console.error('Error saving notification phone:', err);
+    }
+  };
+
+  const saveNotifyPreference = async (byEmail: boolean, byPhone: boolean) => {
+    try {
+      const token = await user.getToken();
+      const response = await fetch(`/api/user/${user.uid}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          notifyByEmail: byEmail,
+          notifyByPhone: byPhone,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save notification preference');
+      }
+    } catch (err) {
+      console.error('Error saving notification preference:', err);
+    }
+  };
+
+  const handleNotifyByEmailChange = (checked: boolean) => {
+    setNotifyByEmail(checked);
+    saveNotifyPreference(checked, notifyByPhone);
+  };
+
+  const handleNotifyByPhoneChange = (checked: boolean) => {
+    setNotifyByPhone(checked);
+    saveNotifyPreference(notifyByEmail, checked);
   };
 
   if (loading) {
@@ -99,15 +295,40 @@ export default function Profile() {
               <p className="text-red-800">{error}</p>
             </div>
           ) : (
+            <>
             <div className="bg-white shadow rounded-lg overflow-hidden">
               <div className="px-6 py-5 border-b border-gray-200 bg-gray-50">
                 <div className="flex items-center">
-                  <UserCircleIcon className="h-12 w-12 text-gray-400 mr-4" />
+                  <div className="relative">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageChange}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      onClick={handleImageClick}
+                      className="relative h-16 w-16 rounded-full overflow-hidden bg-gray-200 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mr-4"
+                    >
+                      {imagePreview || user?.photoURL ? (
+                        <img
+                          src={imagePreview || user?.photoURL}
+                          alt="Profile"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <UserCircleIcon className="h-full w-full text-gray-400" />
+                      )}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 hover:opacity-100 transition-opacity">
+                        <CameraIcon className="h-6 w-6 text-white" />
+                      </div>
+                    </button>
+                  </div>
                   <div>
                     <h2 className="text-xl font-semibold text-gray-900">
-                      {userData?.name || 'User'}
+                      {userData?.name || user?.displayName || 'User'}
                     </h2>
-                    <p className="text-sm text-gray-500">{userData?.email || 'No email on file'}</p>
                   </div>
                 </div>
               </div>
@@ -125,13 +346,6 @@ export default function Profile() {
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Name</dt>
                       <dd className="mt-1 text-sm text-gray-900">{userData.name}</dd>
-                    </div>
-                  )}
-
-                  {userData?.email && (
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Email</dt>
-                      <dd className="mt-1 text-sm text-gray-900">{userData.email}</dd>
                     </div>
                   )}
 
@@ -183,6 +397,73 @@ export default function Profile() {
                 </dl>
               </div>
             </div>
+
+            {/* Notification Settings */}
+            <div className="mt-8 bg-white shadow rounded-lg overflow-hidden">
+              <div className="px-6 py-5 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900">Notification Settings</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Manage where you receive notifications about your account.
+                </p>
+              </div>
+
+              <div className="px-6 py-5 space-y-6">
+                {/* Email Notification */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="notificationEmail" className="block text-sm font-medium text-gray-700">
+                      Email for Notifications
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={notifyByEmail}
+                        onChange={(e) => handleNotifyByEmailChange(e.target.checked)}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <span className="ml-2 text-sm text-gray-600">Enabled</span>
+                    </label>
+                  </div>
+                  <input
+                    type="email"
+                    id="notificationEmail"
+                    value={notificationEmail}
+                    onChange={(e) => setNotificationEmail(e.target.value)}
+                    onBlur={(e) => saveNotificationEmail(e.target.value)}
+                    placeholder="email@example.com"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+
+                {/* Phone Notification */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="notificationPhone" className="block text-sm font-medium text-gray-700">
+                      Phone for SMS Notifications
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={notifyByPhone}
+                        onChange={(e) => handleNotifyByPhoneChange(e.target.checked)}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <span className="ml-2 text-sm text-gray-600">Enabled</span>
+                    </label>
+                  </div>
+                  <input
+                    type="tel"
+                    id="notificationPhone"
+                    value={notificationPhone}
+                    onChange={handlePhoneChange}
+                    onBlur={(e) => saveNotificationPhone(e.target.value)}
+                    placeholder="+1 (555) 123-4567"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+            </>
           )}
         </div>
       </div>
