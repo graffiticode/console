@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { Tab } from '@headlessui/react';
 import {
@@ -7,6 +8,7 @@ import {
   DocumentTextIcon,
   CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
+import axios from 'axios';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { getTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
@@ -28,6 +30,7 @@ const tabs = [
 ];
 
 export default function Payments() {
+  const router = useRouter();
   const { user, loading } = useGraffiticodeAuth();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [subscriptionKey, setSubscriptionKey] = useState(0); // Force refresh of subscription components
@@ -35,6 +38,24 @@ export default function Payments() {
   const refreshSubscription = () => {
     setSubscriptionKey(prev => prev + 1); // Increment to trigger re-render
   };
+
+  // Handle return from checkout after adding payment method for resume
+  useEffect(() => {
+    if (router.query.resumed === 'true' && user) {
+      // Call resume API - payment method now exists so it should succeed
+      axios.post('/api/payments/resume-subscription', { userId: user.uid })
+        .then(() => {
+          refreshSubscription();
+        })
+        .catch((error) => {
+          console.error('Error resuming subscription after checkout:', error);
+        })
+        .finally(() => {
+          // Clear the query param
+          router.replace('/payments', undefined, { shallow: true });
+        });
+    }
+  }, [router.query.resumed, user]);
 
   if (loading) {
     return (

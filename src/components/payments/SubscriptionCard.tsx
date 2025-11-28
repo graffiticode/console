@@ -68,7 +68,14 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
   const handleResumeSubscription = async () => {
     setCancelling(true);
     try {
-      await axios.post('/api/payments/resume-subscription', { userId });
+      const response = await axios.post('/api/payments/resume-subscription', { userId });
+
+      // If payment method required, redirect to checkout
+      if (response.data.requiresPaymentMethod && response.data.checkoutUrl) {
+        window.location.href = response.data.checkoutUrl;
+        return;
+      }
+
       await fetchSubscription();
     } catch (error) {
       console.error('Error resuming subscription:', error);

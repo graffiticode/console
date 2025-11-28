@@ -61,6 +61,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           break;
         }
 
+        // Handle setup mode sessions (e.g., adding payment method to resume subscription)
+        if (session.mode === 'setup' && session.metadata?.action === 'resume_subscription') {
+          const subscriptionId = session.metadata.subscriptionId;
+
+          if (subscriptionId) {
+            // Resume the subscription
+            await stripe.subscriptions.update(subscriptionId, {
+              cancel_at_period_end: false,
+            });
+
+            // Update user document
+            await db.collection('users').doc(userId).update({
+              'subscription.status': 'active',
+              'subscription.cancelAt': null,
+              'subscription.canceledAt': null,
+              'subscription.resumedAt': new Date().toISOString(),
+            });
+
+            // Log the event
+            await db.collection('subscription_events').add({
+              userId,
+              type: 'subscription_resumed_via_checkout',
+              sessionId: session.id,
+              subscriptionId,
+              timestamp: new Date(),
+            });
+
+            console.log(`Resumed subscription ${subscriptionId} for user ${userId}`);
+          }
+
+          break;
+        }
+
         // Update user's subscription status
         await db.collection('users').doc(userId).update({
           'subscription.status': 'active',

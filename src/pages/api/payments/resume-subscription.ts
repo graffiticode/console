@@ -40,6 +40,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       limit: 10,
     });
 
+    // Also check for trialing subscriptions (e.g., Starter plan trial)
+    const trialingSubscriptions = await stripe.subscriptions.list({
+      customer: stripeCustomerId,
+      status: 'trialing',
+      limit: 10,
+    });
+    subscriptions.data.push(...trialingSubscriptions.data);
+
     const cancelingSubscription = subscriptions.data.find(
       sub => sub.cancel_at_period_end === true
     );
@@ -47,6 +55,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!cancelingSubscription) {
       return res.status(400).json({
         error: 'No subscription scheduled for cancellation found'
+      });
+    }
+
+    // Check if customer has a valid payment method
+    const customer = await stripe.customers.retrieve(stripeCustomerId) as Stripe.Customer;
+    const defaultPaymentMethod = customer.invoice_settings?.default_payment_method;
+
+    // Also check for any attached payment methods
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: stripeCustomerId,
+      type: 'card',
+      limit: 1,
+    });
+
+    const hasPaymentMethod = defaultPaymentMethod || paymentMethods.data.length > 0;
+
+    // If no payment method, redirect to checkout to add one
+    if (!hasPaymentMethod) {
+      const session = await stripe.checkout.sessions.create({
+        customer: stripeCustomerId,
+        mode: 'setup',
+        payment_method_types: ['card'],
+        success_url: `${process.env.NEXT_PUBLIC_URL}/payments?resumed=true`,
+        cancel_url: `${process.env.NEXT_PUBLIC_URL}/payments?canceled=true`,
+        metadata: {
+          userId,
+          action: 'resume_subscription',
+          subscriptionId: cancelingSubscription.id,
+        },
+      });
+
+      return res.status(200).json({
+        success: false,
+        requiresPaymentMethod: true,
+        checkoutUrl: session.url,
+        message: 'Please add a payment method to resume your subscription',
       });
     }
 
