@@ -17,14 +17,10 @@ const plans = [
     monthlyUnits: 2000,
     features: [
       '2,000 compile units per month',
-      'First month free (monthly only)',
       'Additional compiles at $0.005 each',
-      'Limited language access',
-      'Community support',
-      'Public tasks only',
-      'Basic IDE features',
-      'Automatic overage protection'
+      'Cancel anytime'
     ],
+    freeTrialBadge: 'First month free',
     cta: 'Get Started',
     disabled: false
   },
@@ -38,12 +34,7 @@ const plans = [
     features: [
       '100,000 compile units per month',
       'Additional compiles at $0.001 each',
-      'Access to all languages',
-      'Email support',
-      'Private and public tasks',
-      'Advanced IDE features',
-      'API access',
-      'Automatic overage protection'
+      'Cancel anytime'
     ],
     cta: 'Go Pro'
   },
@@ -57,13 +48,8 @@ const plans = [
     features: [
       '2,000,000 compile units per month',
       'Additional compiles at $0.0005 each',
-      'Access to all languages',
-      'Priority support',
-      'Private and public tasks',
-      'Advanced IDE features',
-      'API access',
-      'Automatic overage protection',
-      'Up to 10 individual accounts included'
+      'Up to 10 individual accounts included',
+      'Cancel anytime'
     ],
     cta: 'Go Team'
   }
@@ -337,7 +323,6 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => {
           const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
-          const units = billingInterval === 'annual' ? plan.monthlyUnits * 12 : plan.monthlyUnits;
           // Only mark as current plan if user has an active subscription
           const isCurrentPlan = hasActiveSubscription && plan.id === currentUserPlan;
           const isSameBillingInterval = billingInterval === currentBillingInterval;
@@ -396,6 +381,11 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
                 <span className="text-gray-500 ml-1">
                   /{billingInterval === 'monthly' ? 'mo' : 'yr'}
                 </span>
+                {plan.freeTrialBadge && (
+                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    {plan.freeTrialBadge}
+                  </span>
+                )}
               </div>
 
               <ul className="space-y-3 mb-6">

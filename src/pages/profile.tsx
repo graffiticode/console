@@ -29,8 +29,9 @@ export default function Profile() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [notificationEmail, setNotificationEmail] = useState('');
   const [notificationPhone, setNotificationPhone] = useState('');
-  const [notifyByEmail, setNotifyByEmail] = useState(true);
+  const [notifyByEmail, setNotifyByEmail] = useState(false);
   const [notifyByPhone, setNotifyByPhone] = useState(false);
+  const [displayName, setDisplayName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -42,10 +43,12 @@ export default function Profile() {
   useEffect(() => {
     if (userData) {
       setImagePreview(userData.profileImageUrl || null);
+      setDisplayName(userData.name || user?.displayName || '');
       setNotificationEmail(userData.notificationEmail || '');
       setNotificationPhone(userData.notificationPhone || '');
-      setNotifyByEmail(userData.notifyByEmail ?? true);
-      setNotifyByPhone(userData.notifyByPhone ?? false);
+      // Only enable if there's data in the field AND the preference is set
+      setNotifyByEmail(userData.notificationEmail ? (userData.notifyByEmail ?? false) : false);
+      setNotifyByPhone(userData.notificationPhone ? (userData.notifyByPhone ?? false) : false);
     }
   }, [userData]);
 
@@ -174,7 +177,35 @@ export default function Profile() {
     setNotificationPhone(formatted);
   };
 
+  const saveDisplayName = async (name: string) => {
+    try {
+      const token = await user.getToken();
+      const response = await fetch(`/api/user/${user.uid}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: name,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save name');
+      }
+    } catch (err) {
+      console.error('Error saving name:', err);
+    }
+  };
+
   const saveNotificationEmail = async (email: string) => {
+    // If email is cleared, also disable notifications
+    const shouldDisable = !email.trim();
+    if (shouldDisable) {
+      setNotifyByEmail(false);
+    }
+
     try {
       const token = await user.getToken();
       const response = await fetch(`/api/user/${user.uid}`, {
@@ -185,6 +216,7 @@ export default function Profile() {
         },
         body: JSON.stringify({
           notificationEmail: email,
+          ...(shouldDisable && { notifyByEmail: false }),
         }),
       });
 
@@ -197,6 +229,12 @@ export default function Profile() {
   };
 
   const saveNotificationPhone = async (phone: string) => {
+    // If phone is cleared, also disable notifications
+    const shouldDisable = !phone.trim();
+    if (shouldDisable) {
+      setNotifyByPhone(false);
+    }
+
     try {
       const token = await user.getToken();
       const response = await fetch(`/api/user/${user.uid}`, {
@@ -207,6 +245,7 @@ export default function Profile() {
         },
         body: JSON.stringify({
           notificationPhone: phone,
+          ...(shouldDisable && { notifyByPhone: false }),
         }),
       });
 
@@ -326,9 +365,14 @@ export default function Profile() {
                     </button>
                   </div>
                   <div>
-                    <h2 className="text-xl font-semibold text-gray-900">
-                      {userData?.name || user?.displayName || 'User'}
-                    </h2>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      onBlur={(e) => saveDisplayName(e.target.value)}
+                      placeholder="Your name"
+                      className="text-xl font-semibold text-gray-900 bg-transparent border-none focus:outline-none focus:ring-0 p-0 w-full"
+                    />
                   </div>
                 </div>
               </div>
@@ -341,13 +385,6 @@ export default function Profile() {
                       {user.uid}
                     </dd>
                   </div>
-
-                  {userData?.name && (
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Name</dt>
-                      <dd className="mt-1 text-sm text-gray-900">{userData.name}</dd>
-                    </div>
-                  )}
 
                   {userData?.phone && (
                     <div>

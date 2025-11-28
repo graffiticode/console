@@ -164,8 +164,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         planId,
         interval,
       },
-      // Add 30-day free trial for monthly Starter plan only
-      ...(planId === 'starter' && interval === 'monthly' && {
+      // Add 30-day free trial for Starter plan
+      ...(planId === 'starter' && {
         subscription_data: {
           trial_period_days: 30,
         },

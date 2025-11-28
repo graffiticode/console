@@ -63,17 +63,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           limit: 1,
         });
 
+        // Also check for trialing subscriptions
+        if (subscriptions.data.length === 0) {
+          const trialingSubscriptions = await stripe.subscriptions.list({
+            customer: stripeCustomerId,
+            status: 'trialing',
+            limit: 1,
+          });
+          subscriptions.data.push(...trialingSubscriptions.data);
+        }
+
         if (subscriptions.data.length > 0) {
           const subscription = subscriptions.data[0];
-          // Use Stripe billing period
-          firstDayOfPeriod = new Date(subscription.current_period_start * 1000);
-          lastDayOfPeriod = new Date(subscription.current_period_end * 1000);
 
           // Get billing interval and plan
           const priceId = subscription.items.data[0]?.price.id;
           const priceInterval = subscription.items.data[0]?.price.recurring?.interval;
           billingInterval = priceInterval === 'year' ? 'annual' : priceInterval === 'month' ? 'monthly' : null;
           currentPlan = PLAN_MAPPING[priceId] || 'starter';
+
+          // For annual plans, calculate monthly reset periods
+          // For monthly plans, use Stripe's billing period
+          if (billingInterval === 'annual') {
+            // Use subscription start as anchor, calculate current month within annual period
+            const subscriptionStart = new Date(subscription.current_period_start * 1000);
+            const anchorDay = subscriptionStart.getDate();
+
+            // Find the current monthly period based on the anchor day
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            // Calculate period start: the anchor day of current or previous month
+            let periodStart = new Date(currentYear, currentMonth, anchorDay);
+            if (periodStart > now) {
+              // If anchor day hasn't occurred this month, go back one month
+              periodStart = new Date(currentYear, currentMonth - 1, anchorDay);
+            }
+
+            // Period end is one month after period start
+            let periodEnd = new Date(periodStart);
+            periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+            firstDayOfPeriod = periodStart;
+            lastDayOfPeriod = periodEnd;
+          } else {
+            // Monthly plan: use Stripe billing period directly
+            firstDayOfPeriod = new Date(subscription.current_period_start * 1000);
+            lastDayOfPeriod = new Date(subscription.current_period_end * 1000);
+          }
         } else {
           // No active subscription, use calendar month
           const currentMonth = now.getMonth();
@@ -229,13 +266,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         originalPlan: currentPlan
       });
     } else {
-      // Use the normal plan allocation
+      // Use the normal plan allocation (always monthly, even for annual plans)
       planUnits = baseUnitAllocation[currentPlan];
-
-      // Multiply by 12 for annual billing cycles
-      if (billingInterval === 'annual') {
-        planUnits = planUnits * 12;
-      }
     }
 
     const overageUnits = userData?.subscription?.overageUnits || 0;

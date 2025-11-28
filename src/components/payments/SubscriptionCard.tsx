@@ -95,10 +95,8 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
     ? plan.price[subscription.interval]
     : plan.price && typeof plan.price === 'number' ? plan.price : 0;
 
-  // Calculate units: multiply by 12 for annual plans
-  const displayUnits = subscription.interval === 'annual'
-    ? plan.monthlyUnits * 12
-    : plan.monthlyUnits;
+  // Units are always monthly (reset monthly even for annual plans)
+  const displayUnits = plan.monthlyUnits;
 
   const StatusIcon = (subscription.status === 'active' || subscription.status === 'trialing')
     ? CheckCircleIcon
@@ -140,17 +138,14 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
               {plan.name}
             </dd>
             <dd className="mt-1 text-sm text-gray-600">
-              {displayUnits.toLocaleString()} compile units{' '}
-              {subscription.interval === 'annual'
-                ? 'per year'
-                : 'per month'}
+              {displayUnits.toLocaleString()} compile units per month
             </dd>
           </div>
 
           <div>
             <dt className="text-sm font-medium text-gray-500">Billing</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              ${subscription.plan === 'starter' ? '10' : currentPrice}
+              ${currentPrice}
               <span className="text-sm text-gray-500 ml-1">
                 / {subscription.interval === 'annual' ? 'year' : 'month'}
               </span>
@@ -177,8 +172,8 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
               <dd className="mt-1 text-sm text-gray-600">
                 {subscription.cancelAtPeriodEnd
                   ? 'Subscription ends'
-                  : subscription.plan === 'starter'
-                  ? 'No payment due'
+                  : subscription.status === 'trialing'
+                  ? 'First payment due'
                   : 'Next payment due'}
               </dd>
             ) : (
