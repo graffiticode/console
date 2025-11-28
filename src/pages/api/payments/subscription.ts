@@ -47,6 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         overageUnits: 0,
         overageRate: null,
         hasActiveSubscription: false,
+        trialUsedAt: null,
       });
     }
 
@@ -68,6 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         overageUnits: 0,
         overageRate: null,
         hasActiveSubscription: false,
+        trialUsedAt: userData?.trialUsedAt || null,
       });
     }
 
@@ -91,6 +93,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           overageUnits: 0,
           overageRate: null,
           hasActiveSubscription: false,
+          trialUsedAt: userData?.trialUsedAt || null,
         });
       }
       throw error;
@@ -136,6 +139,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         isUsingPreservedAllocation: hasPreservedAllocation,
         preservedUntil: hasPreservedAllocation ? preservedUntil : null,
         hasActiveSubscription: false,
+        trialUsedAt: userData?.trialUsedAt || null,
       });
     }
 
@@ -237,6 +241,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       isUsingPreservedAllocation: hasPreservedAllocation,
       preservedUntil: hasPreservedAllocation ? preservedUntil : null,
       hasActiveSubscription: true,
+      trialUsedAt: userData?.trialUsedAt || null,
     });
   } catch (error) {
     console.error('Error fetching subscription:', error);

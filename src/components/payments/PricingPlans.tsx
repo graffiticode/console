@@ -68,6 +68,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const [pendingCancelPlan, setPendingCancelPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasUsedTrial, setHasUsedTrial] = useState(false);
 
   useEffect(() => {
     // Check user's subscription status and payment methods
@@ -109,6 +110,9 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
       // Track if subscription is set to cancel at period end
       setCancelAtPeriodEnd(subscription.cancelAtPeriodEnd || false);
+
+      // Track if user has used their free trial
+      setHasUsedTrial(!!subscription.trialUsedAt);
 
       // Check payment methods - any payment method is sufficient for interval changes
       const methods = methodsResponse.data.paymentMethods || [];
@@ -381,7 +385,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
                 <span className="text-gray-500 ml-1">
                   /{billingInterval === 'monthly' ? 'mo' : 'yr'}
                 </span>
-                {plan.freeTrialBadge && (
+                {plan.freeTrialBadge && !hasUsedTrial && (
                   <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     {plan.freeTrialBadge}
                   </span>

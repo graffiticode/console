@@ -141,6 +141,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       defaultPaymentMethod = customer.invoice_settings?.default_payment_method;
     }
 
+    // Check if user has already used a trial
+    const hasUsedTrial = !!userData?.trialUsedAt;
+
     // Create checkout session for NEW subscriptions only
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
@@ -164,8 +167,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         planId,
         interval,
       },
-      // Add 30-day free trial for Starter plan
-      ...(planId === 'starter' && {
+      // Add 30-day free trial for Starter plan (only if user hasn't used a trial before)
+      ...(planId === 'starter' && !hasUsedTrial && {
         subscription_data: {
           trial_period_days: 30,
         },

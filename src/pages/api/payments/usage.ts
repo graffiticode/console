@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let firstDayOfPeriod: Date;
     let lastDayOfPeriod: Date;
     let billingInterval: 'monthly' | 'annual' | null = null;
-    let currentPlan: 'starter' | 'pro' | 'teams' = 'starter';
+    let currentPlan: 'starter' | 'pro' | 'teams' | null = null;
 
     // Try to get billing period and plan from Stripe subscription
     if (stripeCustomerId && stripe) {
@@ -265,9 +265,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         preservedUntil,
         originalPlan: currentPlan
       });
-    } else {
+    } else if (currentPlan) {
       // Use the normal plan allocation (always monthly, even for annual plans)
       planUnits = baseUnitAllocation[currentPlan];
+    } else {
+      // No plan selected
+      planUnits = 0;
     }
 
     const overageUnits = userData?.subscription?.overageUnits || 0;

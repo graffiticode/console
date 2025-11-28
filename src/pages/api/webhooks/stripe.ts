@@ -99,13 +99,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const userDoc = usersQuery.docs[0];
         const userId = userDoc.id;
+        const userData = userDoc.data();
 
         // Get plan details
         const priceId = subscription.items.data[0]?.price.id;
         const planInfo = PLAN_MAPPING[priceId] || { name: 'starter', units: 2000 };
 
-        // Update subscription info (preserves overage units - they roll over)
-        await db.collection('users').doc(userId).update({
+        // Build update object
+        const updateData: Record<string, any> = {
           'subscription.status': subscription.status,
           'subscription.plan': planInfo.name,
           'subscription.units': planInfo.units,
@@ -115,7 +116,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'subscription.cancelAtPeriodEnd': subscription.cancel_at_period_end,
           'subscription.updatedAt': new Date().toISOString(),
           // Note: overageUnits field is intentionally NOT updated here - overage persists across billing cycles
-        });
+        };
+
+        // Record trial usage if this is a trialing subscription and user hasn't used trial before
+        if (subscription.status === 'trialing' && !userData?.trialUsedAt) {
+          updateData.trialUsedAt = new Date().toISOString();
+          console.log(`Recording trial usage for user ${userId}`);
+        }
+
+        await db.collection('users').doc(userId).update(updateData);
 
         break;
       }
