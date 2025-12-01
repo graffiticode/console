@@ -96,6 +96,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   // Detect if we're in editor mode
   const isEditorMode = useRef(false);
   const editorOrigin = useRef(null);
+  const lastSentKey = useRef<string | null>(null); // Tracks itemId+taskId combination
+  const isFetchingRef = useRef(false); // Only allow one fetch at a time
 
   // Track current viewport type to detect changes
   const [ currentViewport, setCurrentViewport ] = useState(() =>
@@ -427,11 +429,15 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
       const selectedItem = items.find(item => item.id === selectedItemId);
       // Double-check the item exists and hasn't been loaded from a different user
       if (selectedItem) {
+        // Normalize help values for comparison (both could be string or array)
+        const normalizedItemHelp = typeof selectedItem.help === 'string'
+          ? JSON.parse(selectedItem.help || '[]')
+          : (selectedItem.help || []);
         // Check if any values have changed
         const hasChanges =
           (taskId && selectedItem.taskId !== taskId) ||
           (editorCode !== undefined && selectedItem.code !== editorCode) ||
-          (editorHelp !== undefined && JSON.stringify(selectedItem.help) !== JSON.stringify(editorHelp));
+          (editorHelp !== undefined && JSON.stringify(normalizedItemHelp) !== JSON.stringify(editorHelp));
         if (hasChanges) {
           handleUpdateItem({
             itemId: selectedItemId,
@@ -450,25 +456,48 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
     }
   }, [taskId, editorCode, editorHelp, selectedItemId, user?.uid]);
 
-  // Send compiled data updates to editor when taskId changes
+  // Send compiled data updates to editor when item is selected or task changes
+  // Uses composite key (itemId+taskId) so updates are sent when user edits code
   useEffect(() => {
-    console.log('Data update effect - isEditorMode:', isEditorMode.current, 'editorOrigin:', editorOrigin.current, 'hasOpener:', !!window.opener, 'taskId:', taskId);
-    if (isEditorMode.current && editorOrigin.current && window.opener && taskId) {
-      console.log('Sending data-updated message for taskId:', taskId, 'selectedItemId:', selectedItemId);
-      // Fetch the compiled data for this taskId
-      getData({ user, id: taskId }).then(compiledData => {
-        const message = {
-          type: 'data-updated',
-          itemId: selectedItemId,
-          data: compiledData
-        };
-        console.log('Posting data-updated message:', message, 'to origin:', editorOrigin.current);
-        window.opener.postMessage(message, editorOrigin.current);
-      }).catch(err => {
-        console.error('Failed to fetch compiled data:', err);
-      });
+    if (!isEditorMode.current || !editorOrigin.current || !window.opener || !taskId || !selectedItemId) {
+      return;
     }
-  }, [taskId, selectedItemId, user]);
+
+    // Create composite key to track item+task combination
+    const currentKey = `${selectedItemId}:${taskId}`;
+
+    // Skip if we've already sent for this item+task combination
+    if (lastSentKey.current === currentKey) {
+      return;
+    }
+
+    // Skip if a fetch is already in progress (prevents infinite loop)
+    if (isFetchingRef.current) {
+      return;
+    }
+
+    // Mark as fetching and capture current values
+    isFetchingRef.current = true;
+    const fetchingForItemId = selectedItemId;
+    const fetchingKey = currentKey;
+
+    getData({ user, id: taskId }).then(compiledData => {
+      isFetchingRef.current = false;
+
+      if (!compiledData || lastSentKey.current === fetchingKey) {
+        return;
+      }
+
+      window.opener.postMessage({
+        type: 'data-updated',
+        itemId: fetchingForItemId,
+        data: compiledData
+      }, editorOrigin.current);
+      lastSentKey.current = fetchingKey;
+    }).catch(() => {
+      isFetchingRef.current = false;
+    });
+  }, [taskId, selectedItemId, user?.uid]);
 
   if (!user) {
     return (

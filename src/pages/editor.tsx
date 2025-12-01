@@ -90,7 +90,10 @@ export default function Editor({ language, setLanguage, mark }) {
             itemId: newItem.id,
             lang: lang
           };
+          console.log('[GC->Plugin] Sending message:', JSON.stringify(message));
+          console.log('[GC->Plugin] Target origin:', effectiveOrigin);
           window.opener.postMessage(message, String(effectiveOrigin));
+          console.log('[GC->Plugin] Message sent successfully');
         }
 
         // Store the selected item ID in localStorage so it will be selected in the items view
