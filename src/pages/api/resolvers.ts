@@ -671,6 +671,54 @@ export async function getTask({ auth, id }) {
   }
 }
 
+export async function getItem({ auth, id }) {
+  try {
+    const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+    const itemDoc = await itemRef.get();
+
+    if (!itemDoc.exists) {
+      return null;
+    }
+
+    const data = itemDoc.data();
+    let code = data.code;
+    let help = data.help;
+    let taskId = data.taskId;
+
+    // For backward compatibility: if item doesn't have code, fetch from taskIds collection
+    if (!code && taskId) {
+      try {
+        const taskDoc = await db.doc(`users/${auth.uid}/taskIds/${taskId}`).get();
+        if (taskDoc.exists) {
+          const taskData = taskDoc.data();
+          code = taskData.src || "";
+          if (!help) {
+            help = taskData.help || "[]";
+          }
+        }
+      } catch (error) {
+        console.log("getItem()", "Failed to fetch legacy task data", error);
+      }
+    }
+
+    return {
+      id: id,
+      name: data.name,
+      taskId: taskId,
+      lang: data.lang,
+      mark: data.mark || 1,
+      help: help || "[]",
+      code: code || "",
+      isPublic: data.isPublic || false,
+      created: String(data.created),
+      updated: data.updated ? String(data.updated) : String(data.created),
+    };
+  } catch (error) {
+    console.error("getItem()", "ERROR", error);
+    throw new Error(`Failed to get item: ${error.message}`);
+  }
+}
+
 export async function shareItem({ auth, itemId, targetUserId }) {
   try {
     // Validate that the source item exists and belongs to the current user

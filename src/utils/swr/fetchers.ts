@@ -330,6 +330,35 @@ export const getTask = async ({ user, id }) => {
   return client.request(query, { id }).then(data => data.task);
 };
 
+export const getItem = async ({ user, id }) => {
+  if (!user || !id) {
+    return null;
+  }
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const query = gql`
+    query getItem($id: String!) {
+      item(id: $id) {
+        id
+        name
+        taskId
+        lang
+        mark
+        help
+        code
+        isPublic
+        created
+        updated
+      }
+    }
+  `;
+  return client.request(query, { id }).then(data => data.item);
+};
+
 export const generateCode = async ({ user, prompt, language, options, currentCode }) => {
   console.log(
     "fetchers/generateCode()",

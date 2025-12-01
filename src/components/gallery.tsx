@@ -7,7 +7,7 @@ import {
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
-import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData } from '../utils/swr/fetchers';
+import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData, getItem } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'
@@ -203,6 +203,45 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
       setSelectedItemId("");
     }
   }, [loadedItems]);
+
+  // Direct load of item when itemId is provided via localStorage (edit mode from external)
+  useEffect(() => {
+    const loadItemById = async () => {
+      const savedItemId = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:selected:itemId') : null;
+
+      // Only proceed if we have a saved itemId and user is authenticated
+      if (!savedItemId || !user) return;
+
+      // Check if item is already loaded and selected
+      const existingItem = items.find(item => item.id === savedItemId);
+      if (existingItem && selectedItemId === savedItemId) return; // Already have it selected
+
+      // If found in items list, just select it
+      if (existingItem) {
+        setSelectedItemId(existingItem.id);
+        setTaskId(existingItem.taskId);
+        setEditorCode(existingItem.code || "");
+        setEditorHelp(typeof existingItem.help === "string" ? JSON.parse(existingItem.help || "[]") : (existingItem.help || []));
+        return;
+      }
+
+      // Not in loaded items - fetch directly by ID
+      try {
+        const item = await getItem({ user, id: savedItemId });
+
+        if (item) {
+          setSelectedItemId(item.id);
+          setTaskId(item.taskId);
+          setEditorCode(item.code || "");
+          setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
+        }
+      } catch (error) {
+        console.error('Failed to load item by ID:', error);
+      }
+    };
+
+    loadItemById();
+  }, [user, items, selectedItemId]);
 
   const toggleItemsPanel = useCallback(() => {
     const newState = !isItemsPanelCollapsed;
