@@ -7,7 +7,7 @@ import {
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
-import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData, getItem } from '../utils/swr/fetchers';
+import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'
@@ -50,7 +50,7 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-export default function Gallery({ lang, mark, hideItemsNav = false }) {
+export default function Gallery({ lang, mark, hideItemsNav = false, itemId: initialItemId = null }) {
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
@@ -96,8 +96,6 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   // Detect if we're in editor mode
   const isEditorMode = useRef(false);
   const editorOrigin = useRef(null);
-  const lastSentKey = useRef<string | null>(null); // Tracks itemId+taskId combination
-  const isFetchingRef = useRef(false); // Only allow one fetch at a time
 
   // Track current viewport type to detect changes
   const [ currentViewport, setCurrentViewport ] = useState(() =>
@@ -181,10 +179,11 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
   useEffect(() => {
     if (loadedItems && loadedItems.length > 0) {
       setItems(loadedItems);
-      // Try to restore the previously selected item from localStorage
-      const savedItemId = typeof window !== 'undefined' ? localStorage.getItem(`graffiticode:selected:itemId`) : null;
-      if (savedItemId) {
-        const matchingItem = loadedItems.find(item => item.id === savedItemId);
+      // Priority: 1) initialItemId prop, 2) localStorage, 3) first item
+      const targetItemId = initialItemId ||
+        (typeof window !== 'undefined' ? localStorage.getItem(`graffiticode:selected:itemId`) : null);
+      if (targetItemId) {
+        const matchingItem = loadedItems.find(item => item.id === targetItemId);
         if (matchingItem) {
           setSelectedItemId(matchingItem.id);
           setTaskId(matchingItem.taskId);
@@ -204,46 +203,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
       setItems([]);
       setSelectedItemId("");
     }
-  }, [loadedItems]);
-
-  // Direct load of item when itemId is provided via localStorage (edit mode from external)
-  useEffect(() => {
-    const loadItemById = async () => {
-      const savedItemId = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:selected:itemId') : null;
-
-      // Only proceed if we have a saved itemId and user is authenticated
-      if (!savedItemId || !user) return;
-
-      // Check if item is already loaded and selected
-      const existingItem = items.find(item => item.id === savedItemId);
-      if (existingItem && selectedItemId === savedItemId) return; // Already have it selected
-
-      // If found in items list, just select it
-      if (existingItem) {
-        setSelectedItemId(existingItem.id);
-        setTaskId(existingItem.taskId);
-        setEditorCode(existingItem.code || "");
-        setEditorHelp(typeof existingItem.help === "string" ? JSON.parse(existingItem.help || "[]") : (existingItem.help || []));
-        return;
-      }
-
-      // Not in loaded items - fetch directly by ID
-      try {
-        const item = await getItem({ user, id: savedItemId });
-
-        if (item) {
-          setSelectedItemId(item.id);
-          setTaskId(item.taskId);
-          setEditorCode(item.code || "");
-          setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
-        }
-      } catch (error) {
-        console.error('Failed to load item by ID:', error);
-      }
-    };
-
-    loadItemById();
-  }, [user, items, selectedItemId]);
+  }, [loadedItems, initialItemId]);
 
   const toggleItemsPanel = useCallback(() => {
     const newState = !isItemsPanelCollapsed;
@@ -268,8 +228,6 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
       localStorage.setItem('graffiticode:formPanelCollapsed', newState.toString());
     }
   }, [isFormPanelCollapsed]);
-
-
 
   const handleCreateItem = async () => {
     if (isCreatingItem) return;
@@ -429,15 +387,11 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
       const selectedItem = items.find(item => item.id === selectedItemId);
       // Double-check the item exists and hasn't been loaded from a different user
       if (selectedItem) {
-        // Normalize help values for comparison (both could be string or array)
-        const normalizedItemHelp = typeof selectedItem.help === 'string'
-          ? JSON.parse(selectedItem.help || '[]')
-          : (selectedItem.help || []);
         // Check if any values have changed
         const hasChanges =
           (taskId && selectedItem.taskId !== taskId) ||
           (editorCode !== undefined && selectedItem.code !== editorCode) ||
-          (editorHelp !== undefined && JSON.stringify(normalizedItemHelp) !== JSON.stringify(editorHelp));
+          (editorHelp !== undefined && JSON.stringify(selectedItem.help) !== JSON.stringify(editorHelp));
         if (hasChanges) {
           handleUpdateItem({
             itemId: selectedItemId,
@@ -456,48 +410,25 @@ export default function Gallery({ lang, mark, hideItemsNav = false }) {
     }
   }, [taskId, editorCode, editorHelp, selectedItemId, user?.uid]);
 
-  // Send compiled data updates to editor when item is selected or task changes
-  // Uses composite key (itemId+taskId) so updates are sent when user edits code
+  // Send compiled data updates to editor when taskId changes
   useEffect(() => {
-    if (!isEditorMode.current || !editorOrigin.current || !window.opener || !taskId || !selectedItemId) {
-      return;
+    console.log('Data update effect - isEditorMode:', isEditorMode.current, 'editorOrigin:', editorOrigin.current, 'hasOpener:', !!window.opener, 'taskId:', taskId);
+    if (isEditorMode.current && editorOrigin.current && window.opener && taskId) {
+      console.log('Sending data-updated message for taskId:', taskId, 'selectedItemId:', selectedItemId);
+      // Fetch the compiled data for this taskId
+      getData({ user, id: taskId }).then(compiledData => {
+        const message = {
+          type: 'data-updated',
+          itemId: selectedItemId,
+          data: compiledData
+        };
+        console.log('Posting data-updated message:', message, 'to origin:', editorOrigin.current);
+        window.opener.postMessage(message, editorOrigin.current);
+      }).catch(err => {
+        console.error('Failed to fetch compiled data:', err);
+      });
     }
-
-    // Create composite key to track item+task combination
-    const currentKey = `${selectedItemId}:${taskId}`;
-
-    // Skip if we've already sent for this item+task combination
-    if (lastSentKey.current === currentKey) {
-      return;
-    }
-
-    // Skip if a fetch is already in progress (prevents infinite loop)
-    if (isFetchingRef.current) {
-      return;
-    }
-
-    // Mark as fetching and capture current values
-    isFetchingRef.current = true;
-    const fetchingForItemId = selectedItemId;
-    const fetchingKey = currentKey;
-
-    getData({ user, id: taskId }).then(compiledData => {
-      isFetchingRef.current = false;
-
-      if (!compiledData || lastSentKey.current === fetchingKey) {
-        return;
-      }
-
-      window.opener.postMessage({
-        type: 'data-updated',
-        itemId: fetchingForItemId,
-        data: compiledData
-      }, editorOrigin.current);
-      lastSentKey.current = fetchingKey;
-    }).catch(() => {
-      isFetchingRef.current = false;
-    });
-  }, [taskId, selectedItemId, user?.uid]);
+  }, [taskId, selectedItemId, user]);
 
   if (!user) {
     return (

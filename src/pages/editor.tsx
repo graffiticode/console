@@ -9,8 +9,9 @@ import Gallery from '../components/gallery';
 
 export default function Editor({ language, setLanguage, mark }) {
   const router = useRouter();
-  const { lang: rawLang, itemId, mode, origin, editorMode, editorOrigin } = router.query;
+  const { lang: rawLang, itemId: rawItemId, mode, origin, editorMode, editorOrigin } = router.query;
   const lang = Array.isArray(rawLang) ? rawLang[0] : rawLang;
+  const itemId = Array.isArray(rawItemId) ? rawItemId[0] : rawItemId;
   const { user } = useGraffiticodeAuth();
   const [isCreating, setIsCreating] = useState(false);
   const [createdItemId, setCreatedItemId] = useState(null);
@@ -165,6 +166,7 @@ export default function Editor({ language, setLanguage, mark }) {
           lang={lang}
           mark={mark}
           hideItemsNav={true}
+          itemId={itemId || createdItemId}
         />
       </>
     );
