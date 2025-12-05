@@ -9,6 +9,7 @@ interface FrontSettings {
   emails: string[];
   hasAuthSecret?: boolean;
   apiKeyId?: string;
+  apiKeyToken?: string;
 }
 
 interface IntegrationsSettings {
@@ -25,6 +26,8 @@ export default function IntegrationsCard() {
   // Front integration state
   const [authSecret, setAuthSecret] = useState('');
   const [isEditingSecret, setIsEditingSecret] = useState(false);
+  const [apiKeyId, setApiKeyId] = useState('');
+  const [apiKeyToken, setApiKeyToken] = useState('');
   const [emails, setEmails] = useState<string[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -44,6 +47,8 @@ export default function IntegrationsCard() {
       setSettings(data);
       if (data.front) {
         setAuthSecret(data.front.authSecret || '');
+        setApiKeyId(data.front.apiKeyId || '');
+        setApiKeyToken(data.front.apiKeyToken || '');
         setEmails(data.front.emails || []);
       }
     } catch (err) {
@@ -68,18 +73,23 @@ export default function IntegrationsCard() {
         setNewEmail('');
       }
 
-      // Create an API key if one doesn't exist for this integration
-      let apiKeyId = settings.front?.apiKeyId;
-      if (!apiKeyId) {
+      // Create an API key if one doesn't exist or if we're missing the token
+      let currentApiKeyId = apiKeyId || settings.front?.apiKeyId;
+      let currentApiKeyToken = apiKeyToken;
+      if (!currentApiKeyId || !currentApiKeyToken) {
         const userToken = await user.getToken();
         const newApiKey = await client.apiKeys.create(userToken);
-        apiKeyId = newApiKey.id;
+        currentApiKeyId = newApiKey.id;
+        currentApiKeyToken = newApiKey.token;
+        setApiKeyId(currentApiKeyId);
+        setApiKeyToken(currentApiKeyToken);
       }
 
       const frontSettings: FrontSettings = {
         authSecret: authSecret,
         emails: emailsToSave,
-        apiKeyId: apiKeyId,
+        apiKeyId: currentApiKeyId,
+        apiKeyToken: currentApiKeyToken,
       };
 
       await axios.post(`/api/integrations?userId=${user?.uid}`, {
@@ -128,6 +138,8 @@ export default function IntegrationsCard() {
       // Reset local state
       setSettings({});
       setAuthSecret('');
+      setApiKeyId('');
+      setApiKeyToken('');
       setEmails([]);
       setIsEditingSecret(false);
     } catch (err: any) {

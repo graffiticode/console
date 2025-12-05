@@ -12,10 +12,7 @@ const allowedOrigins = [
 interface FrontEmailEntry {
   userId: string;
   apiKeyId: string;
-}
-
-interface ApiKeyPrivate {
-  token: string;
+  apiKeyToken: string;
 }
 
 function hashEmailAuth(authSecret: string, email: string): string {
@@ -57,30 +54,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Compute hash from auth_secret + email
-    const hash = hashEmailAuth(auth_secret, email.toLowerCase());
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedSecret = auth_secret.trim();
+    const hash = hashEmailAuth(normalizedSecret, normalizedEmail);
+
+    console.log('[front/token] Request received:', {
+      email: normalizedEmail,
+      emailLength: normalizedEmail.length,
+      authSecretPrefix: normalizedSecret.substring(0, 8) + '...',
+      authSecretLength: normalizedSecret.length,
+      computedHash: hash,
+    });
 
     // Look up the integrations/front/emails entry
     const frontEmailDoc = await db.collection('integrations').doc('front').collection('emails').doc(hash).get();
 
+    console.log('[front/token] Firestore lookup:', {
+      path: `integrations/front/emails/${hash}`,
+      exists: frontEmailDoc.exists,
+    });
+
     if (!frontEmailDoc.exists) {
+      console.log('[front/token] Hash not found in Firestore');
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const frontEmailData = frontEmailDoc.data() as FrontEmailEntry;
-    const { apiKeyId } = frontEmailData;
+    const { apiKeyId, apiKeyToken } = frontEmailData;
 
-    // Get the API key token from api-keys-private
-    const apiKeyPrivateDoc = await db.collection('api-keys-private').doc(apiKeyId).get();
-
-    if (!apiKeyPrivateDoc.exists) {
-      console.error('API key private document not found:', apiKeyId);
+    if (!apiKeyId || !apiKeyToken) {
+      console.error('[front/token] API key credentials not found in integration settings');
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const apiKeyPrivate = apiKeyPrivateDoc.data() as ApiKeyPrivate;
-    const { token: apiKeyToken } = apiKeyPrivate;
-
-    // Exchange the API key token for a JWT via the auth service
+    // Exchange the API key for a firebaseCustomToken via the legacy auth service endpoint
+    // The editor needs a Firebase custom token to sign in with signInWithCustomToken()
     const authResponse = await fetch(`${authUrl}/authenticate/api-key`, {
       method: 'POST',
       headers: {
@@ -90,14 +98,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     if (!authResponse.ok) {
-      console.error('Auth service error:', authResponse.status, await authResponse.text());
+      console.error('[front/token] Auth service error:', authResponse.status, await authResponse.text());
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const authData = await authResponse.json();
 
+    console.log('[front/token] Auth service response:', JSON.stringify(authData));
+
+    // Legacy endpoint returns { status: "success", data: { firebaseCustomToken } }
+    if (authData.status !== 'success') {
+      console.error('[front/token] Auth service returned error:', authData.error);
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const firebaseCustomToken = authData.data?.firebaseCustomToken;
+
+    if (!firebaseCustomToken) {
+      console.error('[front/token] No firebaseCustomToken in response');
+      return res.status(500).json({ error: 'Failed to get authentication token' });
+    }
+
+    console.log('[front/token] Got firebaseCustomToken, length:', firebaseCustomToken.length);
+
     return res.status(200).json({
-      access_token: authData.access_token,
+      access_token: firebaseCustomToken,
     });
   } catch (error) {
     console.error('Error in front/token:', error);

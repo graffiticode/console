@@ -1,6 +1,8 @@
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useEffect, useState, useRef } from 'react';
+import { useAuth } from 'reactfire';
+import { signInWithCustomToken } from 'firebase/auth';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { createItem } from '../utils/swr/fetchers';
 import { getTitle } from '../lib/utils';
@@ -9,14 +11,48 @@ import Gallery from '../components/gallery';
 
 export default function Editor({ language, setLanguage, mark }) {
   const router = useRouter();
-  const { lang: rawLang, itemId: rawItemId, mode, origin, editorMode, editorOrigin } = router.query;
+  const { lang: rawLang, itemId: rawItemId, mode, origin, editorMode, editorOrigin, token: rawToken } = router.query;
   const lang = Array.isArray(rawLang) ? rawLang[0] : rawLang;
   const itemId = Array.isArray(rawItemId) ? rawItemId[0] : rawItemId;
+  const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
+  const auth = useAuth();
   const { user } = useGraffiticodeAuth();
   const [isCreating, setIsCreating] = useState(false);
   const [createdItemId, setCreatedItemId] = useState(null);
   const [error, setError] = useState(null);
+  const [isTokenSigningIn, setIsTokenSigningIn] = useState(false);
   const creationStarted = useRef(false);
+  const tokenSignInAttempted = useRef(false);
+
+  // Handle token-based sign-in from URL parameter
+  useEffect(() => {
+    if (!token || user || tokenSignInAttempted.current) return;
+
+    tokenSignInAttempted.current = true;
+    setIsTokenSigningIn(true);
+
+    const signInWithToken = async () => {
+      try {
+        console.log('[Editor] Signing in with token from URL');
+        await signInWithCustomToken(auth, token);
+        console.log('[Editor] Token sign-in successful');
+        // Don't set isTokenSigningIn to false here - let the user state change handle it
+      } catch (err) {
+        console.error('[Editor] Token sign-in failed:', err);
+        setError('Failed to authenticate with provided token');
+        setIsTokenSigningIn(false);
+      }
+    };
+
+    signInWithToken();
+  }, [token, user, auth]);
+
+  // Clear token signing in state when user becomes available
+  useEffect(() => {
+    if (user && isTokenSigningIn) {
+      setIsTokenSigningIn(false);
+    }
+  }, [user, isTokenSigningIn]);
 
   useEffect(() => {
     const effectiveOrigin = origin || editorOrigin;
@@ -71,7 +107,7 @@ export default function Editor({ language, setLanguage, mark }) {
         user,
         lang: String(lang).padStart(4, '0'),
         name: "Editor Question",
-        taskId: null,
+        taskId: "",
         mark: 1,
         help: "[]",
         code: "",
@@ -125,6 +161,24 @@ export default function Editor({ language, setLanguage, mark }) {
       creationStarted.current = false; // Allow retry on error
     }
   };
+
+  // Show loading state while token sign-in is in progress
+  if (isTokenSigningIn) {
+    return (
+      <>
+        <Head>
+          <title>{getTitle()} - Signing In</title>
+          <link rel="icon" type="image/png" href="favicon.png" />
+        </Head>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Signing in...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   // Show sign in if user is not authenticated
   if (!user) {
