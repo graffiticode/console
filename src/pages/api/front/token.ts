@@ -57,12 +57,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Compute hash from auth_secret + email
-    const hash = hashEmailAuth(auth_secret, email.toLowerCase());
+    const normalizedEmail = email.toLowerCase();
+    const hash = hashEmailAuth(auth_secret, normalizedEmail);
+
+    console.log('[front/token] Request received:', {
+      email: normalizedEmail,
+      authSecretPrefix: auth_secret.substring(0, 8) + '...',
+      computedHash: hash,
+    });
 
     // Look up the integrations/front/emails entry
     const frontEmailDoc = await db.collection('integrations').doc('front').collection('emails').doc(hash).get();
 
+    console.log('[front/token] Firestore lookup:', {
+      path: `integrations/front/emails/${hash}`,
+      exists: frontEmailDoc.exists,
+    });
+
     if (!frontEmailDoc.exists) {
+      console.log('[front/token] Hash not found in Firestore');
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
