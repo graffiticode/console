@@ -5,28 +5,37 @@ import { useFirestore, useFirestoreCollectionData, useUser } from "reactfire";
 import moment from "moment";
 import { client } from "../lib/auth";
 import NewAPIKeyDialog from "./NewAPIKeyDialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 
-function APIKeyListItem({ user, apiKey }) {
+function APIKeyListItem({ user, apiKey, isProtected, isPending }) {
   const buildHandleDelete = (apiKey) => async () => {
     const { id } = apiKey;
     const token = await getIdToken(user);
     await client.apiKeys.remove({ token, id });
   };
+  const isDisabled = isProtected || isPending;
   return (
     <li className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
       <div className="flex flex-col">
         <span>{apiKey.id}</span>
         <small className="mb-2 text-sm text-neutral-500 dark:text-neutral-400 font-light italic">
           Created {moment(apiKey.createdAt.toDate()).format("MMMM Do YYYY, h:mm:ss a")}
+          {isProtected && " for Front integration"}
         </small>
       </div>
-      <button
-        type="button"
-        className="inline-block rounded-none"
-        onClick={buildHandleDelete(apiKey)}>
-        <TrashIcon className="h-6 w-6 text-blue-500" />
-      </button>
+      <div className="relative group">
+        <button
+          type="button"
+          className={`inline-block rounded-none ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+          onClick={isDisabled ? undefined : buildHandleDelete(apiKey)}
+          disabled={isDisabled}>
+          <TrashIcon className={`h-6 w-6 ${isDisabled ? 'text-gray-400' : 'text-blue-500'}`} />
+        </button>
+        <span className="absolute right-full top-1/2 -translate-y-1/2 mr-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+          {isProtected ? "Can't delete API key. It is used by an integration." : isPending ? "Verifying..." : "Delete API key"}
+        </span>
+      </div>
     </li>
   );
 }
@@ -34,12 +43,50 @@ function APIKeyListItem({ user, apiKey }) {
 export default function APIKeysCard() {
   const firestore = useFirestore();
   const { data: user } = useUser();
-  const apiKeysQuery = query(
-    collection(firestore, "api-keys"),
-    where("uid", "==", user.uid),
-    orderBy("createdAt"));
-  const { status, data: apiKeys } = useFirestoreCollectionData(apiKeysQuery, { idField: "id" });
   const [newApiKey, setNewApiKey] = useState();
+  const [protectedKeyIds, setProtectedKeyIds] = useState<Set<string>>(new Set());
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
+  const [verifiedKeyIds, setVerifiedKeyIds] = useState<Set<string>>(new Set());
+
+  // Only create query when user is available
+  const apiKeysQuery = user?.uid
+    ? query(
+        collection(firestore, "api-keys"),
+        where("uid", "==", user.uid),
+        orderBy("createdAt"))
+    : null;
+  const { status, data: apiKeys } = useFirestoreCollectionData(apiKeysQuery, { idField: "id" });
+
+  // Fetch integration settings to get protected API key IDs
+  // Re-fetch when apiKeys changes (e.g., new key added)
+  // Delay on updates to allow integration save to complete after API key creation
+  useEffect(() => {
+    if (user?.uid && apiKeys) {
+      const fetchProtectedIds = () => {
+        axios.get(`/api/integrations?userId=${user.uid}`)
+          .then(response => {
+            const protectedIds = new Set<string>();
+            if (response.data?.front?.apiKeyId) {
+              protectedIds.add(response.data.front.apiKeyId);
+            }
+            setProtectedKeyIds(protectedIds);
+            // Mark all current keys as verified
+            const verified = new Set<string>(apiKeys.map((k: any) => k.id));
+            setVerifiedKeyIds(verified);
+            setInitialFetchDone(true);
+          })
+          .catch(err => console.error('Error fetching integrations:', err));
+      };
+
+      // Fetch immediately on first load, delay on subsequent updates
+      if (!initialFetchDone) {
+        fetchProtectedIds();
+      } else {
+        const timeoutId = setTimeout(fetchProtectedIds, 1000);
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [user?.uid, apiKeys, initialFetchDone]);
 
   const handleCreate = async () => {
     const userToken = await getIdToken(user);
@@ -47,7 +94,7 @@ export default function APIKeysCard() {
     setNewApiKey(apiKey);
   };
 
-  if (status === "loading") {
+  if (!user?.uid || status === "loading") {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -75,7 +122,13 @@ export default function APIKeysCard() {
       </div>
       <ul className="list-disc space-y-2 m-1">
         {apiKeys.map(apiKey => (
-          <APIKeyListItem key={apiKey.id} user={user} apiKey={apiKey} />
+          <APIKeyListItem
+            key={apiKey.id}
+            user={user}
+            apiKey={apiKey}
+            isProtected={protectedKeyIds.has(apiKey.id)}
+            isPending={!verifiedKeyIds.has(apiKey.id)}
+          />
         ))}
       </ul>
       <NewAPIKeyDialog apiKey={newApiKey} />

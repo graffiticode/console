@@ -9,6 +9,7 @@
 */
 import BillingCard from "./BillingCard";
 import APIKeysCard from "./APIKeysCard";
+import IntegrationsCard from "./IntegrationsCard";
 import SignIn from "./SignIn";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 
@@ -32,6 +33,16 @@ export default function Example() {
             </aside>
             <div className="lg:col-span-9">
               <APIKeysCard />
+            </div>
+          </div>
+        </div>
+        <div className="relative pt-10">
+          <div className="border lg:grid lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x">
+            <aside className="py-6 lg:col-span-3">
+              <span className="mx-5 text-xl font-bold">Integrations</span>
+            </aside>
+            <div className="lg:col-span-9">
+              <IntegrationsCard />
             </div>
           </div>
         </div>
