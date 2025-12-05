@@ -6,9 +6,7 @@ const authUrl = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticod
 
 // Allowed origins for CORS
 const allowedOrigins = [
-  'https://app.frontapp.com',
-  'http://localhost:5173',
-  'http://localhost:5174',
+  'https://l0166.graffiticode.org',
 ];
 
 interface FrontEmailEntry {
