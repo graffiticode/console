@@ -4,6 +4,13 @@ import { getFirestore } from '../../../utils/db';
 
 const authUrl = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org";
 
+// Allowed origins for CORS
+const allowedOrigins = [
+  'https://app.frontapp.com',
+  'http://localhost:5173',
+  'http://localhost:5174',
+];
+
 interface FrontEmailEntry {
   userId: string;
   apiKeyId: string;
@@ -17,7 +24,23 @@ function hashEmailAuth(authSecret: string, email: string): string {
   return createHash('sha256').update(authSecret + email).digest('hex');
 }
 
+function setCorsHeaders(req: NextApiRequest, res: NextApiResponse) {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  setCorsHeaders(req, res);
+
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
