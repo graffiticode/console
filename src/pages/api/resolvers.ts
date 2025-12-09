@@ -373,20 +373,18 @@ export async function generateCode({
     }
 
     // Post the task to get a task ID
-    try {
-      const taskData = await postTask({
-        auth,
-        task: {
-          lang: language,
-          code: code,
-        },
-        ephemeral: true, // Make it ephemeral since it's just a template
-        isPublic: false,
-      });
-      taskId = taskData.id;
-    } catch (error) {
-      console.error("generateCode()", "Failed to post task", error);
-      // Return without task ID if posting fails
+    const taskData = await postTask({
+      auth,
+      task: {
+        lang: language,
+        code: code,
+      },
+      ephemeral: true, // Make it ephemeral since it's just a template
+      isPublic: false,
+    });
+    taskId = taskData.id;
+    if (!taskId) {
+      throw new Error("Failed to get taskId from postTask");
     }
 
     // Log request end
@@ -449,7 +447,7 @@ export async function createItem({
         currentCode: null,
       });
       taskId = result.taskId;
-      generatedCode = result.code;
+      generatedCode = result.code || generatedCode;
     }
     const timestamp = Date.now();
     const item = {

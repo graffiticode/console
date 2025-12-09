@@ -118,30 +118,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await settingsRef.set(mergedSettings);
 
       // Sync integrations/front collection
-      console.log('[integrations] Checking sync conditions:', {
-        hasAuthSecret: !!newFront?.authSecret,
-        hasApiKeyId: !!newFront?.apiKeyId,
-        hasApiKeyToken: !!newFront?.apiKeyToken,
-        emailCount: newFront?.emails?.length || 0,
-      });
-
       if (newFront?.authSecret && newFront?.apiKeyId && newFront?.apiKeyToken) {
         const oldEmails = currentSettings.front?.emails || [];
         const newEmails = newFront.emails || [];
         const oldAuthSecret = currentSettings.front?.authSecret || '';
         const frontCollection = db.collection('integrations').doc('front').collection('emails');
 
-        console.log('[integrations] Syncing front collection:', {
-          oldEmailCount: oldEmails.length,
-          newEmailCount: newEmails.length,
-        });
-
         // Remove old hashes that are no longer valid
         for (const oldEmail of oldEmails) {
           const oldHash = hashEmailAuth(oldAuthSecret.trim(), oldEmail.toLowerCase().trim());
           // Only delete if email is removed or auth secret changed
           if (!newEmails.map(e => e.toLowerCase().trim()).includes(oldEmail.toLowerCase().trim()) || oldAuthSecret.trim() !== newFront.authSecret.trim()) {
-            console.log('[integrations] Deleting old hash:', oldHash);
             await frontCollection.doc(oldHash).delete();
           }
         }
@@ -151,22 +138,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const trimmedSecret = newFront.authSecret.trim();
           const trimmedEmail = email.toLowerCase().trim();
           const hash = hashEmailAuth(trimmedSecret, trimmedEmail);
-          console.log('[integrations] Creating hash entry:', {
-            email: trimmedEmail,
-            authSecretPrefix: trimmedSecret.substring(0, 8) + '...',
-            authSecretLength: trimmedSecret.length,
-            hash,
-            path: `integrations/front/emails/${hash}`,
-          });
           await frontCollection.doc(hash).set({
             userId: userId,
             apiKeyId: newFront.apiKeyId,
             apiKeyToken: newFront.apiKeyToken,
           });
-          console.log('[integrations] Hash entry created successfully');
         }
-      } else {
-        console.log('[integrations] Skipping sync - missing required fields');
       }
 
       // Return masked version

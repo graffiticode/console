@@ -79,7 +79,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch (error: any) {
       if (error.code === 'resource_missing') {
         // Customer doesn't exist in current mode, treat as starter tier
-        console.log(`Customer ${stripeCustomerId} doesn't exist in current Stripe mode`);
         const preservedRenewalDate = userData?.subscription?.renewalDate || null;
 
         return res.status(200).json({

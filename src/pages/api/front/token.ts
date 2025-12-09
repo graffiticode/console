@@ -58,24 +58,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const normalizedSecret = auth_secret.trim();
     const hash = hashEmailAuth(normalizedSecret, normalizedEmail);
 
-    console.log('[front/token] Request received:', {
-      email: normalizedEmail,
-      emailLength: normalizedEmail.length,
-      authSecretPrefix: normalizedSecret.substring(0, 8) + '...',
-      authSecretLength: normalizedSecret.length,
-      computedHash: hash,
-    });
-
-    // Look up the integrations/front/emails entry
+// Look up the integrations/front/emails entry
     const frontEmailDoc = await db.collection('integrations').doc('front').collection('emails').doc(hash).get();
 
-    console.log('[front/token] Firestore lookup:', {
-      path: `integrations/front/emails/${hash}`,
-      exists: frontEmailDoc.exists,
-    });
-
     if (!frontEmailDoc.exists) {
-      console.log('[front/token] Hash not found in Firestore');
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -104,8 +90,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const authData = await authResponse.json();
 
-    console.log('[front/token] Auth service response:', JSON.stringify(authData));
-
     // Legacy endpoint returns { status: "success", data: { firebaseCustomToken } }
     if (authData.status !== 'success') {
       console.error('[front/token] Auth service returned error:', authData.error);
@@ -118,8 +102,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('[front/token] No firebaseCustomToken in response');
       return res.status(500).json({ error: 'Failed to get authentication token' });
     }
-
-    console.log('[front/token] Got firebaseCustomToken, length:', firebaseCustomToken.length);
 
     return res.status(200).json({
       access_token: firebaseCustomToken,

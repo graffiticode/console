@@ -14,10 +14,8 @@ export default async function handler(req, res) {
       qs.set("access_token", token);
     }
     const formUrl = `${getBaseUrlForApi()}/form?${qs.toString()}`;
-    console.log("GET /form formUrl=" + formUrl);
     res.redirect(formUrl);
   } catch (x) {
-    console.log("catch x=" + x);
     res.status(500).send();
   }
 };

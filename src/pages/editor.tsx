@@ -33,9 +33,7 @@ export default function Editor({ language, setLanguage, mark }) {
 
     const signInWithToken = async () => {
       try {
-        console.log('[Editor] Signing in with token from URL');
         await signInWithCustomToken(auth, token);
-        console.log('[Editor] Token sign-in successful');
         // Don't set isTokenSigningIn to false here - let the user state change handle it
       } catch (err) {
         console.error('[Editor] Token sign-in failed:', err);
@@ -127,10 +125,7 @@ export default function Editor({ language, setLanguage, mark }) {
             itemId: newItem.id,
             lang: lang
           };
-          console.log('[GC->Plugin] Sending message:', JSON.stringify(message));
-          console.log('[GC->Plugin] Target origin:', effectiveOrigin);
           window.opener.postMessage(message, String(effectiveOrigin));
-          console.log('[GC->Plugin] Message sent successfully');
         }
 
         // Store the selected item ID in localStorage so it will be selected in the items view
@@ -237,7 +232,7 @@ export default function Editor({ language, setLanguage, mark }) {
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Creating new question...</p>
+            <p className="mt-4 text-gray-600">Creating new item...</p>
           </div>
         </div>
       </>

@@ -11,10 +11,6 @@ const DEFAULT_INVITE_CODES = [
 // Get invite codes from environment variable or use defaults
 const getValidInviteCodes = () => {
   const envCodes = process.env.VALID_INVITE_CODES;
-  console.log(
-    "getValidInviteCodes()",
-    "envCodes=" + envCodes,
-  );
   if (envCodes) {
     // Parse comma-separated list of codes from environment variable
     // Convert to uppercase for case-insensitive comparison

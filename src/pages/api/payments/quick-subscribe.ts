@@ -49,8 +49,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { userId, planId, interval } = req.body;
 
-    console.log('Quick subscribe request:', { userId, planId, interval });
-
     if (!userId || !planId || !interval) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
@@ -94,7 +92,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             default_payment_method: defaultPaymentMethod,
           },
         });
-        console.log('Auto-set payment method as default:', defaultPaymentMethod);
       } else {
         return res.status(400).json({
           error: 'No payment method on file',
@@ -139,26 +136,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         (existingPlan === 'pro' && planId === 'teams') || // Pro -> Max
         (currentInterval === 'monthly' && interval === 'annual'); // Monthly -> Annual
 
-      console.log('Updating existing subscription:', {
-        subscriptionId: existingSub.id,
-        currentPlan: existingPlan,
-        currentInterval,
-        newPlan: planId,
-        newInterval: interval,
-        isUpgrade,
-        currentPriceId: existingPriceId,
-        newPriceId: priceId,
-        currentPeriodEnd: new Date(existingSub.current_period_end * 1000).toISOString()
-      });
-
       if (isUpgrade) {
         // For upgrades: Apply immediately with proration credit for unused time
-        console.log('Processing upgrade - applying immediately with proration credit');
-
         // If there's an existing schedule, release it first
         if (existingSub.schedule) {
           await stripe.subscriptionSchedules.release(existingSub.schedule as string);
-          console.log('Released existing schedule');
         }
 
         subscription = await stripe.subscriptions.update(existingSub.id, {
@@ -173,11 +155,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             interval,
           },
         });
-
-        console.log('Upgrade applied immediately with proration credit');
       } else {
         // For downgrades/lateral moves: Apply immediately but preserve renewal date and allocation
-        console.log('Processing downgrade/lateral move - applying immediately while preserving renewal date and allocation');
 
         // Calculate the old plan's allocation to preserve
         if (existingPlan === 'teams') {
@@ -193,21 +172,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           oldAllocation = oldAllocation * 12;
         }
 
-        console.log('Preserving allocation from old plan:', {
-          currentPlan: existingPlan,
-          currentInterval,
-          preservedAllocation: oldAllocation
-        });
-
         // If there's an existing schedule, release it first
         if (existingSub.schedule) {
           await stripe.subscriptionSchedules.release(existingSub.schedule as string);
-          console.log('Released existing schedule');
         }
 
         // Store the current renewal date before making changes
         const preservedRenewalDate = existingSub.current_period_end;
-        console.log('Preserving renewal date:', new Date(preservedRenewalDate * 1000).toISOString());
 
         // Update subscription immediately to the new plan
         // Use 'none' proration to avoid charging/crediting - just switch the plan
@@ -225,27 +196,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Preserve the billing cycle anchor to keep the same renewal date
           billing_cycle_anchor: 'unchanged',
         });
-
-        console.log('Downgrade applied immediately - renewal date preserved:', {
-          subscriptionId: subscription.id,
-          newPlan: planId,
-          newInterval: interval,
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString()
-        });
       }
-
-      console.log('Subscription updated - renewal date preserved:', {
-        subscriptionId: subscription.id,
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString()
-      });
     } else {
       // No existing subscription - create new one
-      console.log('Creating subscription with:', {
-        customer: stripeCustomerId,
-        priceId,
-        paymentMethod: defaultPaymentMethod
-      });
-
       subscription = await stripe.subscriptions.create({
         customer: stripeCustomerId,
         items: [{ price: priceId }],

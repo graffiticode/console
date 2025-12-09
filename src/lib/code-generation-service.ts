@@ -944,15 +944,7 @@ async function processGeneratedCode(content, lang = "0002", rid = null) {
     const lexicon = await getLanguageLexicon(lang);
 
     // Use parser.reformat with the lang identifier (without L prefix)
-    console.log(
-      "[1] processGeneratedCode()",
-      "processed=" + processed,
-    );
     processed = await parser.reformat(lang, processed, lexicon, {});
-    console.log(
-      "[2] processGeneratedCode()",
-      "processed=" + processed,
-    );
 
     if (rid) {
       ragLog(rid, "reformat.success", {
@@ -1086,8 +1078,6 @@ export async function generateCode({
           relevantExamples.map((ex, idx) => ex.id || `example-${idx}`)
         );
       }
-    } else {
-      console.log("RAG retrieval disabled by configuration");
     }
 
     // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
@@ -1165,16 +1155,13 @@ export async function generateCode({
             if (currentCodeSize < 4000) {
               // Use Haiku for property update prompts with code under 4KB
               modelToUse = CLAUDE_MODELS.HAIKU;
-              console.log(`[generateCode] ✅ Using Haiku model for property update (code size: ${currentCodeSize} bytes)`);
             }
           }
         }
       } catch (e) {
-        console.warn(`Failed to parse formatted prompt for model selection: ${e.message}`);
+        // Failed to parse formatted prompt for model selection
       }
     }
-
-    console.log(`[generateCode] Using model: ${modelToUse}`);
 
     // Start generation stage
     safeRAGAnalytics.startStage(requestId, "generation");
@@ -1390,16 +1377,6 @@ export async function generateCode({
           const inputCost = (finalUsage.prompt_tokens / 1000000) * modelPricing.input;
           const outputCost = (finalUsage.completion_tokens / 1000000) * modelPricing.output;
           totalTokenCost = inputCost + outputCost;
-
-          // Show cost savings when using Haiku
-          if (modelToUse === CLAUDE_MODELS.HAIKU) {
-            const sonnetPricing = TOKEN_PRICING[CLAUDE_MODELS.SONNET];
-            const sonnetCost = (finalUsage.prompt_tokens / 1000000) * sonnetPricing.input +
-                               (finalUsage.completion_tokens / 1000000) * sonnetPricing.output;
-            const savings = sonnetCost - totalTokenCost;
-            const savingsPercent = ((savings / sonnetCost) * 100).toFixed(0);
-            console.log(`[generateCode] 💰 Cost savings: ${savingsPercent}% less than Sonnet`);
-          }
         }
 
         // Define compile unit pricing (dollars per unit)
@@ -1520,10 +1497,6 @@ export async function generateCode({
             lastUpdated: now.toISOString()
           });
         }
-
-        console.log(
-          `[generateCode] Usage tracked: ${compileUnits} units, ${effectiveModelName}`
-        );
       } catch (error) {
         console.error("[generateCode] Failed to track usage:", error);
         // Don't throw - we still want to return the result even if usage tracking fails

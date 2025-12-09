@@ -2,7 +2,6 @@ import { getFirestore } from '../../../utils/db';
 
 const handler = async (req, res) => {
   const { name } = req.query;
-  console.log("GET /user name=" + name);
   try {
     const db = getFirestore();
     if (req.method === 'PUT') {
@@ -12,9 +11,6 @@ const handler = async (req, res) => {
       }, { merge: true });
     } else if (req.method === 'GET') {
       const doc = await db.collection('users').doc(name).get();
-      console.log("GET /user doc=" + JSON.stringify(doc, null, 2));
-      console.log("GET /user doc.exists=" + JSON.stringify(doc.exists, null, 2));
-      console.log("GET /user doc.data()=" + JSON.stringify(doc.data(), null, 2));
       if (!doc.exists) {
         return res.status(404).end();
       } else {

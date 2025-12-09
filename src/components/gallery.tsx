@@ -7,7 +7,7 @@ import {
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
-import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData } from '../utils/swr/fetchers';
+import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData, getItem } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'
@@ -165,6 +165,16 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     }
   );
 
+  // Load a single item directly when initialItemId is provided (e.g., from URL)
+  const { data: directItem, isLoading: isLoadingDirectItem } = useSWR(
+    user && initialItemId ? `item-${user.uid}-${initialItemId}` : null,
+    () => getItem({ user, id: initialItemId }),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+
   // Clear items and selected item when user changes to prevent stale state
   useEffect(() => {
     if (user?.uid) {
@@ -176,7 +186,22 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     }
   }, [user?.uid]);
 
+  // Handle directly loaded item (from URL initialItemId)
   useEffect(() => {
+    if (directItem && initialItemId) {
+      // Set this item as selected and load its content
+      setItems([directItem]);
+      setSelectedItemId(directItem.id);
+      setTaskId(directItem.taskId);
+      setEditorCode(directItem.code || "");
+      setEditorHelp(typeof directItem.help === "string" ? JSON.parse(directItem.help || "[]") : (directItem.help || []));
+    }
+  }, [directItem, initialItemId]);
+
+  useEffect(() => {
+    // Skip if we already loaded a direct item
+    if (directItem && initialItemId) return;
+
     if (loadedItems && loadedItems.length > 0) {
       setItems(loadedItems);
       // Priority: 1) initialItemId prop, 2) localStorage, 3) first item
@@ -199,11 +224,11 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         setEditorCode(loadedItems[0].code || "");
         setEditorHelp(typeof loadedItems[0].help === "string" ? JSON.parse(loadedItems[0].help || "[]") : (loadedItems[0].help || []));
       }
-    } else {
+    } else if (!initialItemId) {
       setItems([]);
       setSelectedItemId("");
     }
-  }, [loadedItems, initialItemId]);
+  }, [loadedItems, initialItemId, directItem]);
 
   const toggleItemsPanel = useCallback(() => {
     const newState = !isItemsPanelCollapsed;

@@ -87,8 +87,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               subscriptionId,
               timestamp: new Date(),
             });
-
-            console.log(`Resumed subscription ${subscriptionId} for user ${userId}`);
           }
 
           break;
@@ -154,7 +152,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Record trial usage if this is a trialing subscription and user hasn't used trial before
         if (subscription.status === 'trialing' && !userData?.trialUsedAt) {
           updateData.trialUsedAt = new Date().toISOString();
-          console.log(`Recording trial usage for user ${userId}`);
         }
 
         await db.collection('users').doc(userId).update(updateData);
@@ -237,7 +234,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // This happens when a downgraded plan renews for the first time
             const userData = userDoc.data();
             if (userData?.subscription?.preservedAllocation) {
-              console.log('Clearing preserved allocation on renewal for user:', userId);
               await db.collection('users').doc(userId).update({
                 'subscription.preservedAllocation': admin.firestore.FieldValue.delete(),
                 'subscription.preservedUntil': admin.firestore.FieldValue.delete(),
@@ -320,8 +316,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               status: 'completed',
               webhookProcessed: true,
             });
-
-            console.log(`Credited ${units} overage units to user ${userId} (${blocks} blocks)`);
           }
         }
 
@@ -388,7 +382,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        // Unhandled event type
     }
 
     // Log all webhook events for debugging
