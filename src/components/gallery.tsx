@@ -130,8 +130,6 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     return () => window.removeEventListener('resize', handleViewportChange);
   }, [currentViewport, editorPanelWidth, previewPanelHeight]);
 
-
-
   useEffect(() => {
     // Check if we were opened from editor (has opener and sessionStorage flag)
     if (typeof window !== 'undefined' && window.opener) {
@@ -157,7 +155,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   }, []);
   // Load items from the API only once on initialization
   const { data: loadedItems, mutate, isLoading: isLoadingItems } = useSWR(
-    user && lang && mark ? `items-${user.uid}-${lang}-${mark.id}` : null,
+    user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}` : null,
     () => loadItems({ user, lang, mark: mark.id }),
     {
       revalidateOnFocus: false,
