@@ -56,7 +56,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   const [ taskId, setTaskId ] = useState("");
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
 
-  // Save the current taskId to localStorage when it changes so it can be used in Compiles view
+  // Save the current taskId to localStorage when it changes so it can be used in Tasks view
   useEffect(() => {
     if (taskId && typeof window !== 'undefined') {
       localStorage.setItem('graffiticode:selected:taskId', taskId);

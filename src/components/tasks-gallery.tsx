@@ -36,7 +36,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function CompilesGallery({ lang }) {
+export default function TasksGallery({ lang }) {
   const router = useRouter();
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);

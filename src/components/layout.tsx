@@ -40,8 +40,7 @@ interface NavigationItem {
 const navigation: NavigationItem[] = [
   { name: 'Languages', href: '/languages', current: false },
   { name: 'Items', href: '/items', current: false },
-//  { name: 'Tasks', href: '/tasks', current: false },
-  { name: 'Compiles', href: '/compiles', current: false },
+  { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Specs', href: '/specs', current: false },
 //  { name: 'Explorer', href: '/explorer', current: false },
 ]

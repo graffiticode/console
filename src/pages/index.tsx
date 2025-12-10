@@ -90,7 +90,7 @@ export default function Compiles() {
         language service. Compiles are idemponent and thus yield the same output
         given the same input. This allows us to identify and cache the output of
         compiles by a hash for their task language and code and data. The&nbsp;
-        <Link href="/compiles"><b>Compiles</b></Link>
+        <Link href="/tasks"><b>Tasks</b></Link>
         &nbsp;tab shows the cached compiles performed through the
         <i> Graffiticode Console</i> and <i>API Gateway</i>.
       </p>
