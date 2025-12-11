@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
+import { mutate } from 'swr';
 import { UserCircleIcon, CameraIcon } from '@heroicons/react/24/outline';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { getTitle } from '../lib/utils';
@@ -122,6 +123,8 @@ export default function Profile() {
         if (!response.ok) {
           throw new Error('Failed to save profile image');
         }
+        // Update the SignIn component's cached user data
+        mutate(`user-profile-${user.uid}`);
       } catch (err) {
         console.error('Error saving profile image:', err);
         alert('Failed to save profile image');
@@ -194,6 +197,8 @@ export default function Profile() {
       if (!response.ok) {
         throw new Error('Failed to save name');
       }
+      // Update the SignIn component's cached user data
+      mutate(`user-profile-${user.uid}`);
     } catch (err) {
       console.error('Error saving name:', err);
     }

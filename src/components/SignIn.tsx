@@ -1,6 +1,7 @@
-import { useState, Fragment } from "react";
+import { useState, Fragment, useEffect } from "react";
 import { Menu, Transition } from "@headlessui/react";
 import Link from "next/link";
+import useSWR from "swr";
 import {
   ChevronDownIcon,
   CreditCardIcon,
@@ -21,9 +22,27 @@ interface Wallet {
   provider: any;
 }
 
+const fetchUserData = async ({ user }) => {
+  const token = await user.getToken();
+  const response = await fetch(`/api/user/${user.uid}`, {
+    headers: { 'Authorization': token },
+  });
+  if (response.ok) {
+    return response.json();
+  }
+  return null;
+};
+
 export default function SignInComponent({ label = "Sign in", className }: SignInComponentProps) {
   const { loading, user, signInWithEthereum, signOut } = useGraffiticodeAuth();
   const [showWalletDialog, setShowWalletDialog] = useState(false);
+
+  // Fetch user profile data from Firestore
+  const { data: userData } = useSWR(
+    user ? `user-profile-${user.uid}` : null,
+    () => fetchUserData({ user }),
+    { revalidateOnFocus: false }
+  );
 
   const handleSignInClick = () => {
     // Always show wallet selection dialog
@@ -42,12 +61,50 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
     handleSignIn(wallet);
   };
 
+  // Get display name for the user menu button
+  const getUserDisplayName = () => {
+    // Check Firestore profile data first
+    if (userData?.profileImageUrl) {
+      return (
+        <img
+          src={userData.profileImageUrl}
+          alt="Profile"
+          className="h-6 w-6 rounded-full object-cover"
+        />
+      );
+    }
+    // Fall back to Firebase Auth photoURL
+    if (user.photoURL) {
+      return (
+        <img
+          src={user.photoURL}
+          alt="Profile"
+          className="h-6 w-6 rounded-full object-cover"
+        />
+      );
+    }
+    // Check Firestore name
+    if (userData?.name) {
+      return userData.name;
+    }
+    // Fall back to Firebase Auth displayName
+    if (user.displayName) {
+      return user.displayName;
+    }
+    // Check Firestore email or Firebase Auth email
+    if (userData?.email || user.email) {
+      return userData?.email || user.email;
+    }
+    // Fall back to truncated UID
+    return `${user.uid.slice(0, 7)}...${user.uid.slice(33)}`;
+  };
+
   if (user) {
     return (
       <Menu as="div" className="relative inline-block text-left">
         <div>
           <Menu.Button className={`inline-flex justify-center items-center w-full ${className}`}>
-            {`${user.uid.slice(0, 7)}...${user.uid.slice(33)}`}
+            {getUserDisplayName()}
             <ChevronDownIcon className="ml-2 -mr-1 h-4 w-4" aria-hidden="true" />
           </Menu.Button>
         </div>
