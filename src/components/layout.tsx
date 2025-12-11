@@ -38,7 +38,6 @@ interface NavigationItem {
 }
 
 const navigation: NavigationItem[] = [
-  { name: 'Languages', href: '/languages', current: false },
   { name: 'Items', href: '/items', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Specs', href: '/specs', current: false },
@@ -100,8 +99,8 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                                 target={item.target}
                                 className={classNames(
                                   currentName === pathName
-                                    ? 'bg-gray-900 text-white'
-                                    : 'text-gray-300 hover:bg-gray-700 hover:text-white',
+                                    ? 'text-white'
+                                    : 'text-gray-300 hover:text-white',
                                   'px-3 py-2 rounded-none text-sm font-medium'
                                 )}
                                 aria-current={item.current ? 'page' : undefined}
@@ -125,11 +124,17 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                   </div>
                   <div className="hidden md:block">
                     <div className="text-sm font-medium ml-4 flex items-center md:ml-6 space-x-8">
+                      <Link
+                        href="/about"
+                        className="text-gray-300 hover:text-white"
+                      >
+                        About
+                      </Link>
                       <a
                         href="https://forum.graffiticode.org/"
                         target="graffiticode_community"
                         rel="opener"
-                        className="text-sky-300 hover:text-sky-400"
+                        className="text-gray-300 hover:text-white"
                       >
                         Community
                       </a>
@@ -163,7 +168,7 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                       as="a"
                       href={item.href}
                       className={classNames(
-                        item.current ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white',
+                        item.current ? 'text-white' : 'text-gray-300 hover:text-white',
                         'block px-3 py-2 rounded-none text-base font-medium'
                       )}
                       aria-current={item.current ? 'page' : undefined}
@@ -174,11 +179,17 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                 </div>
                 <div className="pt-4 pb-3 border-t border-gray-700">
                   <div className="flex items-center px-5">
+                    <Link
+                      href="/about"
+                      className="text-gray-300 hover:text-white text-sm mr-8"
+                    >
+                      About
+                    </Link>
                     <a
                       href="https://forum.graffiticode.org/"
                       target="graffiticode_community"
                       rel="opener"
-                      className="text-sky-300 hover:text-sky-400 text-sm mr-8"
+                      className="text-gray-300 hover:text-white text-sm mr-8"
                     >
                       Community
                     </a>
