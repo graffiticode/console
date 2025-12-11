@@ -16,7 +16,7 @@ export default function Editor({ language, setLanguage, mark }) {
   const itemId = Array.isArray(rawItemId) ? rawItemId[0] : rawItemId;
   const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
   const auth = useAuth();
-  const { user } = useGraffiticodeAuth();
+  const { user, loading: authLoading } = useGraffiticodeAuth();
   const [isCreating, setIsCreating] = useState(false);
   const [createdItemId, setCreatedItemId] = useState(null);
   const [error, setError] = useState(null);
@@ -157,8 +157,8 @@ export default function Editor({ language, setLanguage, mark }) {
     }
   };
 
-  // Show loading state while token sign-in is in progress or while we have a token and no user yet
-  if (isTokenSigningIn || (token && !user)) {
+  // Show loading state while router/auth is loading, token sign-in is in progress, or while we have a token and no user yet
+  if (!router.isReady || authLoading || isTokenSigningIn || (token && !user)) {
     return (
       <>
         <Head>
