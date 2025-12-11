@@ -411,19 +411,6 @@ export default function Profile() {
                     </div>
                   )}
 
-                  {userData?.updated && (
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Last Updated</dt>
-                      <dd className="mt-1 text-sm text-gray-900">
-                        {new Date(userData.updated).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
-                      </dd>
-                    </div>
-                  )}
-
                   {userData?.stripeCreated && (
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Billing Account Created</dt>

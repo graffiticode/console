@@ -91,10 +91,6 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
     if (user.displayName) {
       return user.displayName;
     }
-    // Check Firestore email or Firebase Auth email
-    if (userData?.email || user.email) {
-      return userData?.email || user.email;
-    }
     // Fall back to truncated UID
     return `${user.uid.slice(0, 7)}...${user.uid.slice(33)}`;
   };
