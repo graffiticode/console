@@ -157,8 +157,8 @@ export default function Editor({ language, setLanguage, mark }) {
     }
   };
 
-  // Show loading state while token sign-in is in progress
-  if (isTokenSigningIn) {
+  // Show loading state while token sign-in is in progress or while we have a token and no user yet
+  if (isTokenSigningIn || (token && !user)) {
     return (
       <>
         <Head>
