@@ -34,20 +34,20 @@ const languages: Language[] = [
   {id: 7,  name: 'L0147', desc: "Chart renderers", domains: ["hide"]},
   {id: 8,  name: 'L0150', desc: "Free shipping calculators", domains: ["hide"]},
   {id: 9,  name: 'L0151', desc: "Spreadsheets questions", domains: ["hide"]},
-  {id: 10, name: 'L0152', desc: "Interactive map questions", domains: ["graffiticode", "assessments"]},
+  {id: 10, name: 'L0152', desc: "Interactive map questions", domains: ["graffiticode", "learning"]},
   {id: 11, name: 'L0153', desc: "Area model questions", domains: ["hide"]},
   {id: 12, name: 'L0154', desc: "Magic square questions", domains: ["hide"]},
   {id: 13, name: 'L0155', desc: "Stoplight questions", domains: ["hide"]},
   {id: 14, name: 'L0156', desc: "Short text scorers", domains: ["hide"]},
   {id: 15, name: 'L0157', desc: "Geoboard manipulatives", domains: ["hide"]},
   {id: 16, name: 'L0158', desc: "Learnosity integrations", domains: ["hide"]},
-  {id: 17, name: 'L0159', desc: "Flashcard sets", domains: ["graffiticode", "assessments"]},
+  {id: 17, name: 'L0159', desc: "Flashcard sets", domains: ["graffiticode", "learning"]},
   {id: 18, name: 'L0160', desc: "Learnosity QTI Importer", domains: ["hide"]},
   {id: 19, name: 'L0161', desc: "Expression translators", domains: ["hide"]},
   {id: 20, name: 'L0162', desc: "Walking routes", domains: ["hide"]},
   {id: 21, name: 'L0163', desc: "Code editors", domains: ["hide"]},
   {id: 22, name: 'L0164', desc: "Code generators", domains: ["hide"]},
-  {id: 23, name: 'L0166', desc: "Spreadsheets", domains: ["graffiticode", "sheets", "assessments"]},
+  {id: 23, name: 'L0166', desc: "Spreadsheets", domains: ["graffiticode", "sheets", "learning"]},
 ];
 
 function classNames(...classes) {
