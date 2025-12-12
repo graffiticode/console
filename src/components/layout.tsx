@@ -54,7 +54,15 @@ export default function Layout({ children, pathName, language, setLanguage, mark
   const router = useRouter();
   const lang = language.name.slice(1);
   const queryDomain = router.query.domain;
-  const domain = (Array.isArray(queryDomain) ? queryDomain[0] : queryDomain) || getTitle();
+  const queryDomainStr = Array.isArray(queryDomain) ? queryDomain[0] : queryDomain;
+
+  // Store domain in sessionStorage when first seen from URL
+  if (queryDomainStr && typeof window !== 'undefined') {
+    sessionStorage.setItem('graffiticode:domain', queryDomainStr);
+  }
+
+  const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
+  const domain = queryDomainStr || storedDomain || getTitle();
   console.log('[Layout] domain:', domain);
   useEffect(() => {
     document.title = getTitle();

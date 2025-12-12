@@ -37,7 +37,9 @@ function LanguageList({ language, setLanguage }) {
   const { user } = useGraffiticodeAuth();
   const router = useRouter();
   const queryDomain = router.query.domain;
-  const domain = (Array.isArray(queryDomain) ? queryDomain[0] : queryDomain) || getTitle();
+  const queryDomainStr = Array.isArray(queryDomain) ? queryDomain[0] : queryDomain;
+  const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
+  const domain = queryDomainStr || storedDomain || getTitle();
   const languages = selectLanguages(domain);
   const { isValidating, isLoading, data } =
     useSWR(
