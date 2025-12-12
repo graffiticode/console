@@ -33,33 +33,33 @@ const languages: Language[] = [
   {id: 6,  name: 'L0146', desc: "SVG scrapers", domains: ["hide"]},
   {id: 7,  name: 'L0147', desc: "Chart renderers", domains: ["hide"]},
   {id: 8,  name: 'L0150', desc: "Free shipping calculators", domains: ["hide"]},
-  {id: 9,  name: 'L0151', desc: "Spreadsheet questions", domains: ["hide"]},
-  {id: 10,  name: 'L0152', desc: "Interactive map questions", domains: ["hide"]},
+  {id: 9,  name: 'L0151', desc: "Spreadsheets questions", domains: ["hide"]},
+  {id: 10, name: 'L0152', desc: "Interactive map questions", domains: ["graffiticode", "assessments"]},
   {id: 11, name: 'L0153', desc: "Area model questions", domains: ["hide"]},
   {id: 12, name: 'L0154', desc: "Magic square questions", domains: ["hide"]},
   {id: 13, name: 'L0155', desc: "Stoplight questions", domains: ["hide"]},
   {id: 14, name: 'L0156', desc: "Short text scorers", domains: ["hide"]},
   {id: 15, name: 'L0157', desc: "Geoboard manipulatives", domains: ["hide"]},
   {id: 16, name: 'L0158', desc: "Learnosity integrations", domains: ["hide"]},
-  {id: 17, name: 'L0159', desc: "Flashcard sets", domains: ["graffiticode"]},
+  {id: 17, name: 'L0159', desc: "Flashcard sets", domains: ["graffiticode", "assessments"]},
   {id: 18, name: 'L0160', desc: "Learnosity QTI Importer", domains: ["hide"]},
   {id: 19, name: 'L0161', desc: "Expression translators", domains: ["hide"]},
   {id: 20, name: 'L0162', desc: "Walking routes", domains: ["hide"]},
   {id: 21, name: 'L0163', desc: "Code editors", domains: ["hide"]},
   {id: 22, name: 'L0164', desc: "Code generators", domains: ["hide"]},
-  {id: 23, name: 'L0166', desc: "Spreadsheet questions", domains: ["graffiticode"]},
+  {id: 23, name: 'L0166', desc: "Spreadsheets", domains: ["graffiticode", "sheets", "assessments"]},
 ];
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export function selectLanguages() {
-  const domain = getTitle().toLowerCase();
+export function selectLanguages(domain: string) {
+  domain = domain.toLowerCase();
   return languages.filter(language =>
     domain === "graffiticode" && !language.domains.includes("hide") ||
       language.domains.length === 0 ||
-      language.domains.includes(domain.toLowerCase())
+      language.domains.includes(domain)
   );
 }
 
@@ -74,13 +74,13 @@ export default function LanguageSelector({ domain, language, setLanguage }: Lang
   const [query, setQuery] = useState('')
   const domainLanguages =
         languages.filter(language =>
-          !language.domains.includes("hide") ||
+          !language.domains.includes("hide") && (
             language.domains.length === 0 ||
-            language.domains.includes(domain.toLowerCase())
+              language.domains.includes(domain.toLowerCase())
+          )
         );
   // Normalize the query to ensure it has the leading "L" if it's just numbers
   const normalizedQuery = query && /^\d+$/.test(query) ? `L${query}` : query;
-
   // Check if query is a valid custom language format (e.g., "L0177" or just "0177")
   const isCustomLanguage = normalizedQuery && /^L\d+$/i.test(normalizedQuery) &&
     !domainLanguages.some(lang => lang.name.toLowerCase() === normalizedQuery.toLowerCase());

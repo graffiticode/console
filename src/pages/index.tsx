@@ -4,6 +4,7 @@ import useSWR from "swr";
 import { useState, useEffect, Fragment } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import Gallery from '../components/gallery';
 import Timeline from '../components/timeline';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
@@ -30,12 +31,14 @@ import { countTasks } from '../utils/swr/fetchers';
 
 const GREEN = "#2DC937";
 
-const languages = selectLanguages();
-
 import useLocalStorage from '../hooks/use-local-storage';
 
 function LanguageList({ language, setLanguage }) {
   const { user } = useGraffiticodeAuth();
+  const router = useRouter();
+  const queryDomain = router.query.domain;
+  const domain = (Array.isArray(queryDomain) ? queryDomain[0] : queryDomain) || getTitle();
+  const languages = selectLanguages(domain);
   const { isValidating, isLoading, data } =
     useSWR(
       user ? { user, langs: languages, mark: 1 } : null,

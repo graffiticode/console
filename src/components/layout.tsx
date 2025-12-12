@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { useState, useEffect, Fragment, useRef } from 'react';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import Gallery from '../components/gallery';
 import Timeline from '../components/timeline';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
@@ -50,7 +51,11 @@ function classNames(...classes) {
 export default function Layout({ children, pathName, language, setLanguage, mark, setMark }) {
   const [userId, setUserId] = useState();
   const { user } = useGraffiticodeAuth();
+  const router = useRouter();
   const lang = language.name.slice(1);
+  const queryDomain = router.query.domain;
+  const domain = (Array.isArray(queryDomain) ? queryDomain[0] : queryDomain) || getTitle();
+  console.log('[Layout] domain:', domain);
   useEffect(() => {
     document.title = getTitle();
   }, []);
@@ -112,7 +117,7 @@ export default function Layout({ children, pathName, language, setLanguage, mark
                       </div>
                     </div>
                     <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
-                      <LanguageSelector domain={getTitle()} language={language} setLanguage={setLanguage} />
+                      <LanguageSelector domain={domain} language={language} setLanguage={setLanguage} />
                     </div>
                     { (pathName === "items" || pathName === "tasks")
                       ? <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
