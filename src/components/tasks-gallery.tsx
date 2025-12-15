@@ -59,7 +59,7 @@ export default function TasksGallery({ lang }) {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:compiles:previewPanelHeight') : null;
     return saved ? parseFloat(saved) : 50;
   }); // Percentage height for mobile
-  const [ tab, setTab ] = useState("Data"); // State for the active tab
+  const [ tab, setTab ] = useState("Code"); // State for the active tab
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
