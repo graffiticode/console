@@ -132,7 +132,7 @@ export default function WalletSelectionDialog({
                   {loading ? (
                     <div className="text-sm text-gray-500">Detecting wallets...</div>
                   ) : wallets.length === 0 ? (
-                    <div className="text-sm text-gray-500">No wallets detected. Please install MetaMask or Coinbase Wallet.</div>
+                    <div className="text-sm text-gray-500">No wallet detected. Please install an Ethereum wallet such as MetaMask or Coinbase. These are free to install and free to use for Graffiticode authentication.</div>
                   ) : wallets.length === 1 ? (
                     <div className="space-y-4">
                       <div className="text-sm text-gray-600">

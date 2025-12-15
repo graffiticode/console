@@ -612,10 +612,16 @@ export async function getItems({ auth, lang, mark }) {
       // Get the sharedWith list for this item
       const sharedWith = sharedItemsData[doc.id]?.sharedWith || [];
 
+      // Skip items without a valid taskId
+      if (!taskId) {
+        console.log("getItems()", "Skipping item with null taskId", doc.id);
+        continue;
+      }
+
       const item = {
         id: doc.id,
         name: data.name,
-        taskId, // Include the potentially new taskId
+        taskId,
         lang: data.lang,
         mark: data.mark || 1, // Default to mark 1 if not set
         help: help || "[]",
