@@ -27,7 +27,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 import { EllipsisVerticalIcon } from '@heroicons/react/20/solid'
-import { countTasks } from '../utils/swr/fetchers';
+import { countItems } from '../utils/swr/fetchers';
 
 const GREEN = "#2DC937";
 
@@ -43,8 +43,8 @@ function LanguageList({ language, setLanguage }) {
   const languages = selectLanguages(domain);
   const { isValidating, isLoading, data } =
     useSWR(
-      user ? { user, langs: languages, mark: 1 } : null,
-      countTasks,
+      user ? { user, langs: languages } : null,
+      countItems,
     );
 
   useEffect(() => {
@@ -83,7 +83,7 @@ function LanguageList({ language, setLanguage }) {
             <div className="flex flex-1 items-center justify-between truncate rounded-none border-b border-r border-t border-gray-200 bg-white">
               <div className="flex-1 truncate px-4 py-2 text-sm">
                 {language.desc}
-                   <p className="text-gray-500">{data && data[language.name] || "0"} Tasks</p>
+                   <p className="text-gray-500">{data && data[language.name] || "0"} Items</p>
               </div>
               <div className="flex-shrink-0 pr-2">
                 <button

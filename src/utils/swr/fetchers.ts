@@ -127,6 +127,20 @@ export const countTasks = async ({ user, langs, mark }) => {
   return counts;
 };
 
+export const countItems = async ({ user, langs }) => {
+  if (!user) {
+    return {};
+  }
+  const groups = await Promise.all(langs.map(lang => {
+    return loadItems({user, lang: lang.name.slice(1), mark: null});
+  }));
+  const counts = {};
+  groups.forEach((group, index) => {
+    counts[langs[index].name] = group.length;
+  });
+  return counts;
+};
+
 export const loadCompiles = async ({ user, lang, type }) => {
   // console.log(
   //   "loadCompiles()",
