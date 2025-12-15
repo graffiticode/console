@@ -1628,7 +1628,7 @@ export const HelpPanel = ({
               >
                 {isLoading ? (
                   <>
-                    <span>Sending</span>
+                    <span>Updating</span>
                     <div className="flex items-center">
                       <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
                       <div className="w-1 h-1 bg-white rounded-full mx-0.5 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
@@ -1637,7 +1637,7 @@ export const HelpPanel = ({
                     <div className="text-white text-xs">{`${processingTime}s`}</div>
                   </>
                 ) : (
-                  'Send'
+                  'Update'
                 )}
               </button>
             </div>
@@ -2224,7 +2224,7 @@ export const HelpPanel = ({
             >
               {isLoading ? (
                 <>
-                  <span>Sending</span>
+                  <span>Updating</span>
                   <div className="flex items-center">
                     <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1s' }}></div>
                     <div className="w-1 h-1 bg-white rounded-full mx-0.5 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1s' }}></div>
@@ -2233,7 +2233,7 @@ export const HelpPanel = ({
                   <div className="text-white text-xs">{`${processingTime}s`}</div>
                 </>
               ) : (
-                'Send'
+                'Update'
               )}
             </button>
           </div>
