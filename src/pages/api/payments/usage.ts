@@ -246,6 +246,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Determine plan limits from Stripe subscription
     // Base units are monthly - multiply by 12 for annual plans
     const baseUnitAllocation = {
+      demo: 100,
       starter: 2000,
       pro: 100000,
       teams: 2000000,
@@ -269,8 +270,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Use the normal plan allocation (always monthly, even for annual plans)
       planUnits = baseUnitAllocation[currentPlan];
     } else {
-      // No plan selected
-      planUnits = 0;
+      // No plan selected - use demo tier allocation
+      planUnits = baseUnitAllocation.demo;
     }
 
     const overageUnits = userData?.subscription?.overageUnits || 0;

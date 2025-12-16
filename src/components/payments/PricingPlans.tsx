@@ -9,20 +9,33 @@ interface PricingPlansProps {
 
 const plans = [
   {
+    id: 'demo',
+    name: 'Demo',
+    description: 'Try Graffiticode for free',
+    monthlyPrice: 0,
+    annualPrice: 0,
+    monthlyUnits: 100,
+    features: [
+      '100 compile units per month',
+      'No credit card required',
+      'Upgrade anytime'
+    ],
+    cta: 'Current Plan',
+    isFree: true
+  },
+  {
     id: 'starter',
     name: 'Starter',
-    description: 'Perfect for getting started with Graffiticode',
+    description: 'Perfect for getting started',
     monthlyPrice: 10,
-    annualPrice: 100,  // $100/year (save ~17%)
+    annualPrice: 100,
     monthlyUnits: 2000,
     features: [
       '2,000 compile units per month',
       'Additional compiles at $0.005 each',
       'Cancel anytime'
     ],
-    freeTrialBadge: 'First month free',
-    cta: 'Get Started',
-    disabled: false
+    cta: 'Get Started'
   },
   {
     id: 'pro',
@@ -41,14 +54,14 @@ const plans = [
   {
     id: 'teams',
     name: 'Team',
-    description: 'For teams and high volume API calls',
+    description: 'For teams and high volume',
     monthlyPrice: 1000,
     annualPrice: 10000,
     monthlyUnits: 2000000,
     features: [
       '2,000,000 compile units per month',
       'Additional compiles at $0.0005 each',
-      'Up to 10 individual accounts included',
+      'Up to 10 accounts included',
       'Cancel anytime'
     ],
     cta: 'Go Team'
@@ -59,16 +72,15 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [highlightedPlan, setHighlightedPlan] = useState<string>('pro');
+  const [highlightedPlan, setHighlightedPlan] = useState<string>('starter');
   const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
-  const [currentUserPlan, setCurrentUserPlan] = useState<string>('starter');
+  const [currentUserPlan, setCurrentUserPlan] = useState<string>('demo');
   const [currentBillingInterval, setCurrentBillingInterval] = useState<'monthly' | 'annual'>('monthly');
   const [renewalDate, setRenewalDate] = useState<string | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const [pendingCancelPlan, setPendingCancelPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [hasUsedTrial, setHasUsedTrial] = useState(false);
 
   useEffect(() => {
     // Check user's subscription status and payment methods
@@ -87,11 +99,17 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
       const subscription = subscriptionResponse.data;
       setHasActiveSubscription(subscription.hasActiveSubscription || false);
       if (subscription.plan) {
-        setCurrentUserPlan(subscription.plan === 'teams' ? 'teams' : subscription.plan);
-        // If user has an active paid plan, highlight it
-        if (subscription.hasActiveSubscription && subscription.plan !== 'starter') {
-          setHighlightedPlan(subscription.plan === 'teams' ? 'teams' : subscription.plan);
+        setCurrentUserPlan(subscription.plan);
+        // If user has an active paid plan, highlight it; otherwise highlight starter as recommended
+        if (subscription.hasActiveSubscription && subscription.plan !== 'demo') {
+          setHighlightedPlan(subscription.plan);
+        } else {
+          setHighlightedPlan('starter');
         }
+      } else {
+        // No plan means demo
+        setCurrentUserPlan('demo');
+        setHighlightedPlan('starter');
       }
 
       // Set current billing interval
@@ -110,9 +128,6 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
       // Track if subscription is set to cancel at period end
       setCancelAtPeriodEnd(subscription.cancelAtPeriodEnd || false);
-
-      // Track if user has used their free trial
-      setHasUsedTrial(!!subscription.trialUsedAt);
 
       // Check payment methods - any payment method is sufficient for interval changes
       const methods = methodsResponse.data.paymentMethods || [];
@@ -160,30 +175,33 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
   };
 
   const handleSubscribe = async (planId: string) => {
-    // Handle downgrade to Starter plan (only if user has an active paid subscription)
-    if (planId === 'starter' && hasActiveSubscription && currentUserPlan !== 'starter') {
+    // Demo plan - do nothing if already on demo (no subscription)
+    if (planId === 'demo' && !hasActiveSubscription) {
+      return;
+    }
+
+    // Handle downgrade to Demo plan (cancel subscription)
+    if (planId === 'demo' && hasActiveSubscription) {
       setSelectedPlan(planId);
       setProcessing(true);
 
       try {
-        // Cancel the subscription immediately
         const response = await axios.post('/api/payments/cancel-subscription', {
           userId,
-          immediately: true // Cancel immediately instead of at period end
+          immediately: true
         });
 
         if (response.data.success) {
-          // Refresh the data to show the new plan
           await fetchUserData();
           setProcessing(false);
           setSelectedPlan(null);
           if (onSubscriptionChange) {
-            onSubscriptionChange(); // Trigger parent component refresh
+            onSubscriptionChange();
           }
         }
       } catch (error: any) {
         console.error('Error canceling subscription:', error);
-        alert('Failed to downgrade to Starter plan. Please try again.');
+        alert('Failed to cancel subscription. Please try again.');
         setProcessing(false);
         setSelectedPlan(null);
       }
@@ -196,14 +214,16 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
     // Check if this is an interval change on current plan (only for users with active subscription)
     const isChangingInterval = hasActiveSubscription && planId === currentUserPlan && billingInterval !== currentBillingInterval;
 
-    // Check if this is an upgrade (Pro -> Team or Monthly -> Annual)
+    // Check if this is an upgrade (Demo/Starter -> Pro/Teams, Pro -> Teams, or Monthly -> Annual)
     const isUpgrade =
+      (currentUserPlan === 'demo') ||
+      (currentUserPlan === 'starter' && (planId === 'pro' || planId === 'teams')) ||
       (currentUserPlan === 'pro' && planId === 'teams') ||
-      (currentBillingInterval === 'monthly' && billingInterval === 'annual');
+      (isChangingInterval && currentBillingInterval === 'monthly' && billingInterval === 'annual');
 
     try {
-      // For plan/interval changes, try quick subscribe first (only for existing subscribers)
-      if (hasActiveSubscription && (isChangingInterval || currentUserPlan !== 'starter')) {
+      // For plan/interval changes, try quick subscribe first (only for existing paid subscribers)
+      if (hasActiveSubscription && currentUserPlan !== 'demo' && (isChangingInterval || currentUserPlan !== 'starter')) {
         console.log('Attempting quick subscribe:', { isChangingInterval, isUpgrade, planId, interval: billingInterval });
 
         // Show confirmation for upgrades only
@@ -324,23 +344,27 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
       </div>
 
       {/* Pricing Cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {plans.map((plan) => {
           const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
-          // Only mark as current plan if user has an active subscription
-          const isCurrentPlan = hasActiveSubscription && plan.id === currentUserPlan;
+          const isFree = plan.isFree;
+          // Demo plan is current if user has no active subscription, paid plans need active subscription
+          const isCurrentPlan = isFree
+            ? !hasActiveSubscription && currentUserPlan === 'demo'
+            : hasActiveSubscription && plan.id === currentUserPlan;
           const isSameBillingInterval = billingInterval === currentBillingInterval;
-          const isChangingBilling = isCurrentPlan && !isSameBillingInterval;
+          const isChangingBilling = isCurrentPlan && !isSameBillingInterval && !isFree;
 
-          // Check if this plan selection would be an upgrade or downgrade (only relevant if user has active subscription)
-          const wouldBeUpgrade = hasActiveSubscription && (
+          // Check if this plan selection would be an upgrade or downgrade
+          const wouldBeUpgrade = !isFree && (
+            (currentUserPlan === 'demo') ||
+            (currentUserPlan === 'starter' && (plan.id === 'pro' || plan.id === 'teams')) ||
             (currentUserPlan === 'pro' && plan.id === 'teams') ||
             (isCurrentPlan && currentBillingInterval === 'monthly' && billingInterval === 'annual')
           );
 
-          const wouldBeDowngrade = hasActiveSubscription && (
-            (currentUserPlan === 'teams' && plan.id === 'pro') ||
-            (currentUserPlan === 'teams' && plan.id === 'starter') ||
+          const wouldBeDowngrade = !isFree && hasActiveSubscription && (
+            (currentUserPlan === 'teams' && (plan.id === 'pro' || plan.id === 'starter')) ||
             (currentUserPlan === 'pro' && plan.id === 'starter') ||
             (isCurrentPlan && currentBillingInterval === 'annual' && billingInterval === 'monthly')
           );
@@ -359,10 +383,12 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
                 }
               }}
             >
-              {plan.id === highlightedPlan && (
+              {plan.id === highlightedPlan && !(isFree && !isCurrentPlan) && (
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                   <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                    {!hasActiveSubscription
+                    {isFree && isCurrentPlan
+                      ? 'Current Plan'
+                      : !hasActiveSubscription
                       ? 'Select Plan'
                       : isChangingBilling
                       ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
@@ -381,14 +407,15 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
               </div>
 
               <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900">${price.toLocaleString()}</span>
-                <span className="text-gray-500 ml-1">
-                  /{billingInterval === 'monthly' ? 'mo' : 'yr'}
-                </span>
-                {plan.freeTrialBadge && !hasUsedTrial && (
-                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    {plan.freeTrialBadge}
-                  </span>
+                {isFree ? (
+                  <span className="text-4xl font-bold text-gray-900">Free</span>
+                ) : (
+                  <>
+                    <span className="text-4xl font-bold text-gray-900">${price.toLocaleString()}</span>
+                    <span className="text-gray-500 ml-1">
+                      /{billingInterval === 'monthly' ? 'mo' : 'yr'}
+                    </span>
+                  </>
                 )}
               </div>
 
@@ -403,17 +430,23 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
               <button
                 onClick={() => {
+                  // Demo plan can't be clicked when it's current
+                  if (isFree && isCurrentPlan) {
+                    return;
+                  }
                   // Handle current plan cancel flow
-                  if (isCurrentPlan && isSameBillingInterval && !cancelAtPeriodEnd) {
+                  if (isCurrentPlan && isSameBillingInterval && !cancelAtPeriodEnd && !isFree) {
                     handleCancelClick(plan.id);
                   } else {
                     handleSubscribe(plan.id);
                   }
                 }}
-                disabled={processing || cancelAtPeriodEnd}
+                disabled={processing || cancelAtPeriodEnd || (isFree && !hasActiveSubscription)}
                 className={`w-full py-2 px-4 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                   pendingCancelPlan === plan.id
                     ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
+                    : isFree && isCurrentPlan
+                    ? 'bg-gray-200 text-gray-600 cursor-default'
                     : plan.id === highlightedPlan
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500'
                     : 'bg-gray-50 text-gray-900 hover:bg-gray-100 focus:ring-gray-500'
@@ -423,21 +456,25 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
               >
                 {processing && selectedPlan === plan.id
                   ? 'Processing...'
+                  : isFree && isCurrentPlan
+                  ? 'Current Plan'
+                  : isFree && hasActiveSubscription
+                  ? 'Downgrade to Demo'
                   : cancelAtPeriodEnd && isCurrentPlan
                   ? 'Canceling at Period End'
-                  : !hasActiveSubscription
-                  ? plan.cta  // No subscription yet - show default CTA
+                  : isCurrentPlan && isSameBillingInterval && !isFree
+                  ? (pendingCancelPlan === plan.id ? 'Confirm Cancel' : 'Cancel Plan')
                   : isChangingBilling
                   ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
-                  : isCurrentPlan && isSameBillingInterval
-                  ? (pendingCancelPlan === plan.id ? 'Confirm Cancel' : 'Cancel Plan')
+                  : plan.id === 'starter' && currentUserPlan === 'demo'
+                  ? 'Upgrade to Starter'
                   : plan.id === 'starter' && (currentUserPlan === 'pro' || currentUserPlan === 'teams')
                   ? 'Downgrade to Starter'
+                  : plan.id === 'pro' && (currentUserPlan === 'demo' || currentUserPlan === 'starter')
+                  ? 'Upgrade to Pro'
                   : plan.id === 'pro' && currentUserPlan === 'teams'
                   ? 'Downgrade to Pro'
-                  : plan.id === 'pro' && currentUserPlan === 'starter'
-                  ? 'Upgrade to Pro'
-                  : plan.id === 'teams' && (currentUserPlan === 'starter' || currentUserPlan === 'pro')
+                  : plan.id === 'teams' && (currentUserPlan === 'demo' || currentUserPlan === 'starter' || currentUserPlan === 'pro')
                   ? 'Upgrade to Team'
                   : plan.cta}
               </button>

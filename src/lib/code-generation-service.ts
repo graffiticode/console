@@ -1336,7 +1336,7 @@ export async function generateCode({
         const userDoc = await db.doc(`users/${auth.uid}`).get();
         const userData = userDoc.data();
         const subscription = userData?.subscription || {};
-        const plan = subscription.plan || 'starter';
+        const plan = subscription.plan || 'demo';
 
         // Define token pricing per million tokens (in dollars) based on model actually used
         const TOKEN_PRICING = {
@@ -1381,6 +1381,7 @@ export async function generateCode({
 
         // Define compile unit pricing (dollars per unit)
         const UNIT_PRICING = {
+          demo: 0, // Demo tier doesn't charge but still tracks usage
           starter: 0, // Starter tier doesn't charge but still tracks usage
           pro: 0.001,  // $50/month for 50,000 units = $0.001 per unit
           max: 0.0005, // $500/month for 1,000,000 units = $0.0005 per unit
@@ -1412,11 +1413,12 @@ export async function generateCode({
 
           // Get plan allocation
           const planAllocations = {
+            demo: 100,
             starter: 2000,
             pro: 100000,
             teams: 2000000
           };
-          let allocatedUnits = planAllocations[plan] || 2000;
+          let allocatedUnits = planAllocations[plan] || 100;
 
           // Check for preserved allocation (from downgrade)
           const preservedUntil = subscription.preservedUntil;

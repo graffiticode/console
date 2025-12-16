@@ -36,16 +36,17 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
         const userDoc = await db.collection('users').doc(auth.uid).get();
         if (userDoc.exists) {
           const userData = userDoc.data();
-          const plan = userData?.subscription?.plan || 'starter';
+          const plan = userData?.subscription?.plan || 'demo';
           const overageUnits = userData?.subscription?.overageUnits || 0;
 
           // Get plan allocation
           const planAllocations = {
+            demo: 100,
             starter: 2000,
             pro: 100000,
             teams: 2000000
           };
-          let allocatedUnits = planAllocations[plan] || 2000;
+          let allocatedUnits = planAllocations[plan] || 100;
 
           // Check for preserved allocation (from downgrade)
           const preservedUntil = userData?.subscription?.preservedUntil;
