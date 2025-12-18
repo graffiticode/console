@@ -1,25 +1,15 @@
 import Head from 'next/head';
 import Image from 'next/image';
-import { useState, useEffect, Fragment, useRef } from 'react';
-import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
+import { useEffect } from 'react';
+import { Disclosure } from '@headlessui/react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import Gallery from '../components/gallery';
-import Timeline from '../components/timeline';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import LanguageSelector from '../components/language-selector';
 import MarkSelector from '../components/mark-selector';
-import useLocalStorage from '../hooks/use-local-storage';
 import {
-  CalendarIcon,
-  ChartBarIcon,
-  FolderIcon,
-  HomeIcon,
-  InboxIcon,
   Bars3Icon,
-  UsersIcon,
   XMarkIcon,
-  BellIcon,
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/SignIn'
 import { getTitle } from '../lib/utils';
@@ -41,7 +31,6 @@ const navigation: NavigationItem[] = [
   { name: 'Items', href: '/items', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Specs', href: '/specs', current: false },
-  { name: 'Integrations', href: '/integrations', current: false },
 ]
 
 function classNames(...classes) {
@@ -125,20 +114,23 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                     <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
                       <LanguageSelector domain={domain} language={language} setLanguage={setLanguage} />
                     </div>
-                    { pathName === "items"
-                      ? <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
-                          <MarkSelector mark={mark} setMark={setMark} />
-                        </div>
-                      : <div />
+                    { pathName === "items" &&
+                      <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
+                        <MarkSelector mark={mark} setMark={setMark} />
+                      </div>
                     }
                   </div>
                   <div className="hidden md:block">
                     <div className="text-sm font-medium ml-4 flex items-center md:ml-6 space-x-8">
                       <Link
-                        href="/about"
-                        className="text-gray-300 hover:text-white"
+                        href="/integrations"
+                        className={classNames(
+                          pathName === 'integrations'
+                            ? 'text-white'
+                            : 'text-gray-300 hover:text-white'
+                        )}
                       >
-                        About
+                        Integrations
                       </Link>
                       <div className="flex items-center gap-2 text-gray-400 hover:text-white">
                         <SignIn />
@@ -175,25 +167,19 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                       {item.name}
                     </Disclosure.Button>
                   ))}
+                  <Disclosure.Button
+                    as="a"
+                    href="/integrations"
+                    className="text-gray-300 hover:text-white block px-3 py-2 rounded-none text-base font-medium"
+                  >
+                    Integrations
+                  </Disclosure.Button>
                 </div>
                 <div className="pt-4 pb-3 border-t border-gray-700">
                   <div className="flex items-center px-5">
-                    <Link
-                      href="/about"
-                      className="text-gray-300 hover:text-white text-sm mr-8"
-                    >
-                      About
-                    </Link>
                     <div className="flex items-center gap-2 text-gray-400 hover:text-white">
                       <SignIn />
                     </div>
-                    <button
-                      type="button"
-                      className="ml-auto bg-gray-800 flex-shrink-0 p-1 rounded-none text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white"
-                    >
-                      <span className="sr-only">View notifications</span>
-                      <BellIcon className="h-6 w-6" aria-hidden="true" />
-                    </button>
                   </div>
                 </div>
               </Disclosure.Panel>
