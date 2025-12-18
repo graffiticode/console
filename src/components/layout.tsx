@@ -98,9 +98,9 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                                 target={item.target}
                                 className={classNames(
                                   currentName === pathName
-                                    ? 'text-white'
+                                    ? 'text-sky-300'
                                     : 'text-gray-300 hover:text-white',
-                                  'px-3 py-2 rounded-none text-sm font-medium'
+                                  'px-3 py-2 rounded-none text-sm tracking-wide font-medium'
                                 )}
                                 aria-current={item.current ? 'page' : undefined}
                               >
@@ -126,8 +126,9 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                         href="/integrations"
                         className={classNames(
                           pathName === 'integrations'
-                            ? 'text-white'
-                            : 'text-gray-300 hover:text-white'
+                            ? 'text-sky-300'
+                            : 'text-gray-300 hover:text-white',
+                          'text-sm tracking-wide font-medium'
                         )}
                       >
                         Integrations
