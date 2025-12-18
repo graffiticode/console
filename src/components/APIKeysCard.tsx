@@ -8,32 +8,30 @@ import NewAPIKeyDialog from "./NewAPIKeyDialog";
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-function APIKeyListItem({ user, apiKey, isProtected, isPending }) {
+function APIKeyListItem({ user, apiKey, isPending }) {
   const buildHandleDelete = (apiKey) => async () => {
     const { id } = apiKey;
     const token = await getIdToken(user);
     await client.apiKeys.remove({ token, id });
   };
-  const isDisabled = isProtected || isPending;
   return (
     <li className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
       <div className="flex flex-col">
         <span>{apiKey.id}</span>
         <small className="mb-2 text-sm text-neutral-500 dark:text-neutral-400 font-light italic">
           Created {moment(apiKey.createdAt.toDate()).format("MMMM Do YYYY, h:mm:ss a")}
-          {isProtected && " for Front integration"}
         </small>
       </div>
       <div className="relative group">
         <button
           type="button"
-          className={`inline-block rounded-none ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
-          onClick={isDisabled ? undefined : buildHandleDelete(apiKey)}
-          disabled={isDisabled}>
-          <TrashIcon className={`h-6 w-6 ${isDisabled ? 'text-gray-400' : 'text-blue-500'}`} />
+          className={`inline-block rounded-none ${isPending ? 'opacity-30 cursor-not-allowed' : ''}`}
+          onClick={isPending ? undefined : buildHandleDelete(apiKey)}
+          disabled={isPending}>
+          <TrashIcon className={`h-6 w-6 ${isPending ? 'text-gray-400' : 'text-blue-500'}`} />
         </button>
         <span className="absolute right-full top-1/2 -translate-y-1/2 mr-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-          {isProtected ? "Can't delete API key. It is used by an integration." : isPending ? "Verifying..." : "Delete API key"}
+          {isPending ? "Verifying..." : "Delete API key"}
         </span>
       </div>
     </li>
@@ -121,15 +119,16 @@ export default function APIKeysCard() {
       </button>
       </div>
       <ul className="list-disc space-y-2 m-1">
-        {apiKeys.map(apiKey => (
-          <APIKeyListItem
-            key={apiKey.id}
-            user={user}
-            apiKey={apiKey}
-            isProtected={protectedKeyIds.has(apiKey.id)}
-            isPending={!verifiedKeyIds.has(apiKey.id)}
-          />
-        ))}
+        {apiKeys
+          .filter(apiKey => !protectedKeyIds.has(apiKey.id))
+          .map(apiKey => (
+            <APIKeyListItem
+              key={apiKey.id}
+              user={user}
+              apiKey={apiKey}
+              isPending={!verifiedKeyIds.has(apiKey.id)}
+            />
+          ))}
       </ul>
       <NewAPIKeyDialog apiKey={newApiKey} />
     </div>

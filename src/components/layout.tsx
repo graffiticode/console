@@ -41,18 +41,17 @@ const navigation: NavigationItem[] = [
   { name: 'Items', href: '/items', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Specs', href: '/specs', current: false },
-//  { name: 'Explorer', href: '/explorer', current: false },
+  { name: 'Integrations', href: '/integrations', current: false },
 ]
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Layout({ children, pathName, language, setLanguage, mark, setMark }) {
-  const [userId, setUserId] = useState();
+export default function Layout({ children, language, setLanguage, mark, setMark }) {
   const { user } = useGraffiticodeAuth();
   const router = useRouter();
-  const lang = language.name.slice(1);
+  const pathName = router.pathname.slice(1);
   const queryDomain = router.query.domain;
   const queryDomainStr = Array.isArray(queryDomain) ? queryDomain[0] : queryDomain;
 
@@ -63,7 +62,6 @@ export default function Layout({ children, pathName, language, setLanguage, mark
 
   const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
   const domain = queryDomainStr || storedDomain || getTitle();
-  console.log('[Layout] domain:', domain);
   useEffect(() => {
     document.title = getTitle();
   }, []);

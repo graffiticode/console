@@ -80,18 +80,17 @@ export default function App({
         <WagmiProvider config={config}>
           <QueryClientProvider client={queryClient}>
             <GraffiticodeAuthProvider>
-              <AuthWrapper>
-                <Layout
-                  pathName={pathName}
-                  language={language}
+              <Layout
+                language={language}
                 setLanguage={setLanguage}
                 mark={mark}
                 setMark={setMark}
               >
-                <Component {...{...pageProps, language, setLanguage, mark}} />
+                <AuthWrapper>
+                  <Component {...{...pageProps, language, setLanguage, mark}} />
+                </AuthWrapper>
               </Layout>
-            </AuthWrapper>
-          </GraffiticodeAuthProvider>
+            </GraffiticodeAuthProvider>
           </QueryClientProvider>
         </WagmiProvider>
       </GraffiticodeFirebaseProvider>
