@@ -140,14 +140,6 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                       >
                         About
                       </Link>
-                      <a
-                        href="https://forum.graffiticode.org/"
-                        target="graffiticode_community"
-                        rel="opener"
-                        className="text-gray-300 hover:text-white"
-                      >
-                        Community
-                      </a>
                       <div className="flex items-center gap-2 text-gray-400 hover:text-white">
                         <SignIn />
                       </div>
@@ -192,14 +184,6 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                     >
                       About
                     </Link>
-                    <a
-                      href="https://forum.graffiticode.org/"
-                      target="graffiticode_community"
-                      rel="opener"
-                      className="text-gray-300 hover:text-white text-sm mr-8"
-                    >
-                      Community
-                    </a>
                     <div className="flex items-center gap-2 text-gray-400 hover:text-white">
                       <SignIn />
                     </div>
