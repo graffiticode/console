@@ -510,13 +510,22 @@ export const HelpPanel = ({
     const handleFormFocus = (event) => {
       if (event.detail) {
         const focusData = event.detail.focus;
+        const isTaskChange = event.detail.isTaskChange;
 
-        // Handle null focus (form loses focus, e.g. when clicking in text editor)
-        // Keep the property state intact so it can be sent when Enter is pressed
+        // Handle null focus
         if (!focusData) {
-          // Don't clear properties here - preserve them for when the user sends the message
-          // Only clear the focus tracking
-          // Note: We keep contextProperties and initialProperties intact
+          // If this is a task change, clear all focus-related state
+          if (isTaskChange) {
+            setFocusedElement(null);
+            setContextProperties({});
+            setInitialProperties({});
+            lastProcessedElementRef.current = null;
+            // Reset the properties panel height
+            if (setHeaderHeightRef.current) {
+              setHeaderHeightRef.current(null);
+            }
+          }
+          // Otherwise keep properties intact for when Enter is pressed
           return;
         }
 
