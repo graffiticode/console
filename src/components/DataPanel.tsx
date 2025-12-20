@@ -8,6 +8,7 @@ const isNullOrEmptyObject = (obj) => !obj || Object.keys(obj).length === 0;
 export const DataPanel = forwardRef(function DataPanel({
   id,
   user,
+  onDataChange,
 }: any, ref: any) {
   const [ data, setData ] = useState({});
 
@@ -19,8 +20,9 @@ export const DataPanel = forwardRef(function DataPanel({
   useEffect(() => {
     if (fetchedData) {
       setData(fetchedData);
+      onDataChange?.(fetchedData);
     }
-  }, [fetchedData]);
+  }, [fetchedData, onDataChange]);
 
   if (isLoading) {
     return (

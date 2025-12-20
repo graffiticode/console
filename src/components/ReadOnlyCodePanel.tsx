@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { getTask } from '../utils/swr/fetchers';
 
-export const ReadOnlyCodePanel = ({ id, user }: any) => {
+export const ReadOnlyCodePanel = ({ id, user, onCodeChange }: any) => {
   const [code, setCode] = useState("");
 
   const { data: taskData, error, isLoading } = useSWR(
@@ -13,8 +13,9 @@ export const ReadOnlyCodePanel = ({ id, user }: any) => {
   useEffect(() => {
     if (taskData?.code) {
       setCode(taskData.code);
+      onCodeChange?.(taskData.code);
     }
-  }, [taskData]);
+  }, [taskData, onCodeChange]);
 
   if (isLoading) {
     return (

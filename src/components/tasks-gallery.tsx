@@ -60,6 +60,8 @@ export default function TasksGallery({ lang }) {
     return saved ? parseFloat(saved) : 50;
   }); // Percentage height for mobile
   const [ tab, setTab ] = useState("Code"); // State for the active tab
+  const [ currentCode, setCurrentCode ] = useState("");
+  const [ currentData, setCurrentData ] = useState({});
   const { user } = useGraffiticodeAuth();
   const { data: accessToken } = useSWR(
     user && { user } || null,
@@ -192,6 +194,15 @@ export default function TasksGallery({ lang }) {
       localStorage.setItem('graffiticode:compiles:formPanelCollapsed', newState.toString());
     }
   }, [isFormPanelCollapsed]);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      const content = tab === "Code" ? currentCode : JSON.stringify(currentData, null, 2);
+      await navigator.clipboard.writeText(content);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  }, [tab, currentCode, currentData]);
 
   const handleSelectTask = (taskId) => {
   setSelectedTaskId(taskId);
@@ -347,7 +358,7 @@ export default function TasksGallery({ lang }) {
                   "border-b border-gray-200",
                   isDataPanelCollapsed && "hidden"
                 )}>
-                  <CompilerTabs tab={tab} setTab={setTab} />
+                  <CompilerTabs tab={tab} setTab={setTab} onCopy={handleCopy} />
                 </div>
                 <div
                   ref={dataRef}
@@ -362,11 +373,13 @@ export default function TasksGallery({ lang }) {
                       <DataPanel
                         id={selectedTaskId}
                         user={user}
+                        onDataChange={setCurrentData}
                       />
                     ) : (
                       <ReadOnlyCodePanel
                         id={selectedTaskId}
                         user={user}
+                        onCodeChange={setCurrentCode}
                       />
                     )}
                   </div>
