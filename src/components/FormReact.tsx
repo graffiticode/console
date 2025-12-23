@@ -17,7 +17,6 @@ function isNonNullNonEmptyObject(obj) {
 export const FormReact = ({
   lang,
   id,
-  setId,
   data,
   className,
   height,

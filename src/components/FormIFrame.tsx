@@ -107,6 +107,20 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
         return;
       }
 
+      // Handle data-updated messages from view.jsx
+      if (event.data.type === 'data-updated') {
+        const data = event.data.data;
+        if (data) {
+          setData && setData(data);
+          setIsLoading(false);
+          // Cache the data
+          if (id) {
+            cache[id] = JSON.stringify(data);
+          }
+        }
+        return;
+      }
+
       // Check if this is form data (has title, instructions, validation, interaction)
       let data = null;
 
@@ -242,7 +256,6 @@ export const FormIFrame = ({
   lang,
   id,
   setData,
-  setId,
   data,
   className,
   height,

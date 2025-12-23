@@ -503,7 +503,6 @@ export default function TasksGallery({ lang }) {
                   height="100%"
                   className="h-full w-full p-2"
                   setData={() => {}}
-                  setId={() => {}}
                   setNewTask={() => {}}
                 />
               </div>

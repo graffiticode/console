@@ -19,13 +19,12 @@ interface FormViewProps {
   lang: any;
   id: any;
   setData?: any;
-  setId?: any;
   setNewTask?: any;
   className?: any;
   height?: any;
 }
 
-export default function FormView({ lang, id, setData, setId, setNewTask, className, height }: FormViewProps) {
+export default function FormView({ lang, id, setData, setNewTask, className, height }: FormViewProps) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [dataId, setDataId] = useState();
@@ -55,7 +54,6 @@ export default function FormView({ lang, id, setData, setId, setNewTask, classNa
         id={id}
         data={{}}
         setData={setData}
-        setId={setId}
         className={className || "w-full h-full"}
         height={height || "100%"}
         user={user}

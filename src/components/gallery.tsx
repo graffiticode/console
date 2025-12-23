@@ -7,7 +7,7 @@ import {
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
-import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData, getItem } from '../utils/swr/fetchers';
+import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData, getItem, compile } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'
@@ -75,6 +75,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   const [ selectedItemId, setSelectedItemId ] = useState("");
   const [ editorCode, setEditorCode ] = useState("");
   const [ editorHelp, setEditorHelp ] = useState([]);
+  const [ formData, setFormData ] = useState({});
   const [ editorPanelWidth, setEditorPanelWidth ] = useState(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:editorPanelWidth') : null;
     return saved ? parseFloat(saved) : 50;
@@ -439,7 +440,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     if (isEditorMode.current && editorOrigin.current && window.opener && taskId) {
       console.log('Sending data-updated message for taskId:', taskId, 'selectedItemId:', selectedItemId);
       // Fetch the compiled data for this taskId
-      getData({ user, id: taskId }).then(compiledData => {
+      compile({ user, id: taskId, data: formData }).then(compiledData => {
         const message = {
           type: 'data-updated',
           itemId: selectedItemId,
@@ -451,7 +452,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         console.error('Failed to fetch compiled data:', err);
       });
     }
-  }, [taskId, selectedItemId, user]);
+  }, [taskId, selectedItemId, user, formData]);
 
   if (!user) {
     return (
@@ -730,8 +731,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
                 lang={lang}
                 height="100%"
                 className="h-full w-full p-2"
-                setData={() => {}}
-                setId={() => {}}
+                setData={setFormData}
                 setNewTask={() => {}}
               />
               </div>

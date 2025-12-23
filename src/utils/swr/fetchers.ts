@@ -11,11 +11,7 @@ const buildRequestClient = async ({ token }) => {
   return client;
 };
 
-export const compile = async ({ user, id, data }) => {
-  // console.log(
-  //   "compile()",
-  // );
-  data = data || {};
+export const compile = async ({ user, id, data = {} }) => {
   try {
     const token = await user.getToken();
     const index = Object.keys(data).length > 0 && 1 || 2; // Empty data so use full id.
