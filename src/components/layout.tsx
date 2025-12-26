@@ -111,17 +111,7 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                         }
                       </div>
                     </div>
-                    <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
-                      <LanguageSelector domain={domain} language={language} setLanguage={setLanguage} />
-                    </div>
-                    { pathName === "items" &&
-                      <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
-                        <MarkSelector mark={mark} setMark={setMark} />
-                      </div>
-                    }
-                  </div>
-                  <div className="hidden md:block">
-                    <div className="text-sm font-medium ml-4 flex items-center md:ml-6 space-x-8">
+                    <div className="hidden md:block ml-10">
                       <Link
                         href="/integrations"
                         className={classNames(
@@ -133,6 +123,18 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                       >
                         Integrations
                       </Link>
+                    </div>
+                    <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
+                      <LanguageSelector domain={domain} language={language} setLanguage={setLanguage} />
+                    </div>
+                    { pathName === "items" &&
+                      <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
+                        <MarkSelector mark={mark} setMark={setMark} />
+                      </div>
+                    }
+                  </div>
+                  <div className="hidden md:block">
+                    <div className="text-sm font-medium ml-4 flex items-center md:ml-6 space-x-8">
                       <div className="flex items-center gap-2 text-gray-400 hover:text-white">
                         <SignIn />
                       </div>
