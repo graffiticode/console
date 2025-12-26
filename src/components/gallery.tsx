@@ -164,6 +164,17 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     }
   );
 
+  // Listen for item-created messages from editor popup
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === 'item-created') {
+        mutate(); // Refresh items list
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [mutate]);
+
   // Load a single item directly when initialItemId is provided (e.g., from URL)
   const { data: directItem, isLoading: isLoadingDirectItem } = useSWR(
     user && initialItemId ? `item-${user.uid}-${initialItemId}` : null,
@@ -434,24 +445,27 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     }
   }, [taskId, editorCode, editorHelp, selectedItemId, user?.uid]);
 
-  // Send compiled data updates to editor when taskId changes
+  // Compile form data when taskId or formData changes
   useEffect(() => {
-    console.log('Data update effect - isEditorMode:', isEditorMode.current, 'editorOrigin:', editorOrigin.current, 'hasOpener:', !!window.opener, 'taskId:', taskId);
-    if (isEditorMode.current && editorOrigin.current && window.opener && taskId) {
-      console.log('Sending data-updated message for taskId:', taskId, 'selectedItemId:', selectedItemId);
-      // Fetch the compiled data for this taskId
-      compile({ user, id: taskId, data: formData }).then(compiledData => {
+    if (!user || !taskId || Object.keys(formData).length === 0) return;
+
+    compile({ user, id: taskId, data: formData }).then(compiledData => {
+      console.log(
+        "compile()",
+        "compiledData=" + JSON.stringify(compiledData, null, 2),
+      );
+      // Send to parent window if we have one
+      if (window.opener && editorOrigin.current) {
         const message = {
           type: 'data-updated',
           itemId: selectedItemId,
           data: compiledData
         };
-        console.log('Posting data-updated message:', message, 'to origin:', editorOrigin.current);
         window.opener.postMessage(message, editorOrigin.current);
-      }).catch(err => {
-        console.error('Failed to fetch compiled data:', err);
-      });
-    }
+      }
+    }).catch(err => {
+      console.error('Failed to compile form data:', err);
+    });
   }, [taskId, selectedItemId, user, formData]);
 
   if (!user) {
