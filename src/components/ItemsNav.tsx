@@ -96,7 +96,8 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
         mark,
         help,
         code,
-        isPublic: false // Don't copy public status
+        isPublic: false, // Don't copy public status
+        app: 'console'
       });
 
       if (newItem && newItem.id) {

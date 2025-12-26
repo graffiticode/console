@@ -55,6 +55,7 @@ const typeDefs = `
     created: String!
     updated: String
     sharedWith: [String]
+    app: String
   }
 
   type GeneratedCode {
@@ -76,7 +77,7 @@ const typeDefs = `
     compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
     task(id: String!): Task
-    items(lang: String!, mark: Int): [Item!]
+    items(lang: String!, mark: Int, app: String): [Item!]
     item(id: String!): Item
   }
 
@@ -90,7 +91,7 @@ const typeDefs = `
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
     generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String): GeneratedCode!
-    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
+    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean, app: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
   }
@@ -131,9 +132,9 @@ const resolvers = {
     },
     items: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, mark } = args;
+      const { lang, mark, app } = args;
       const { uid } = await client.verifyToken(token);
-      return await getItems({ auth: { uid, token }, lang, mark });
+      return await getItems({ auth: { uid, token }, lang, mark, app });
     },
     item: async (_, args, ctx) => {
       const { token } = ctx;
@@ -178,9 +179,9 @@ const resolvers = {
     },
     createItem: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, name, taskId, mark, help, code, isPublic } = args;
+      const { lang, name, taskId, mark, help, code, isPublic, app } = args;
       const { uid } = await client.verifyToken(token);
-      return await createItem({ auth: { uid, token }, lang, name, taskId, mark, help, code, isPublic });
+      return await createItem({ auth: { uid, token }, lang, name, taskId, mark, help, code, isPublic, app });
     },
     updateItem: async (_, args, ctx) => {
       const { token } = ctx;

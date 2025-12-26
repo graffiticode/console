@@ -157,7 +157,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   // Load items from the API only once on initialization
   const { data: loadedItems, mutate, isLoading: isLoadingItems } = useSWR(
     user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}` : null,
-    () => loadItems({ user, lang, mark: mark.id }),
+    () => loadItems({ user, lang, mark: mark.id, app: 'console' }),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
@@ -276,7 +276,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         mark: mark?.id || 1,
         help: "[]",
         code: "",
-        isPublic: false
+        isPublic: false,
+        app: 'console'
       });
       if (newItem) {
         setItems(prevItems => [newItem, ...prevItems]);

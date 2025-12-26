@@ -155,7 +155,7 @@ export async function getData({ authToken, id }) {
 export async function getTasks({ auth, lang, mark }) {
   try {
     // Get items from the items collection (primary source)
-    const items = await getItems({ auth, lang, mark });
+    const items = await getItems({ auth, lang, mark, app: 'console' });
 
     // Get taskIds from the taskIds collection (for backward compatibility)
     const taskIdsDocs = await db
@@ -426,6 +426,7 @@ export async function createItem({
   help,
   code,
   isPublic,
+  app,
 }) {
   try {
     // Generate a unique ID for the item
@@ -459,6 +460,7 @@ export async function createItem({
       help: generatedHelp,
       code: generatedCode,
       isPublic: isPublic || false,
+      app: app || 'console', // Default to 'console' if not provided
       created: timestamp,
       updated: timestamp,
     };
@@ -534,7 +536,7 @@ export async function updateItem({
   }
 }
 
-export async function getItems({ auth, lang, mark }) {
+export async function getItems({ auth, lang, mark, app }) {
   try {
     let query = db
       .collection(`users/${auth.uid}/items`)
@@ -543,6 +545,9 @@ export async function getItems({ auth, lang, mark }) {
     if (mark !== undefined && mark !== null) {
       query = query.where("mark", "==", mark);
     }
+    // Filter by app - default to 'console' if not specified
+    const appFilter = app || 'console';
+    query = query.where("app", "==", appFilter);
     const itemsSnapshot = await query.orderBy("created", "desc").get();
     const items = [];
 
@@ -631,6 +636,7 @@ export async function getItems({ auth, lang, mark }) {
         updated: data.updated ? String(data.updated) : String(data.created),
         sharedWith: sharedWith,
         sharedFrom: data.sharedFrom || null, // Include sharedFrom field if present
+        app: data.app || null,
       };
 
       items.push(item);

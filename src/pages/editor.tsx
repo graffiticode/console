@@ -106,7 +106,8 @@ export default function Editor({ language, setLanguage, mark }) {
         mark: 1,
         help: "[]",
         code: "",
-        isPublic: false
+        isPublic: false,
+        app: 'console'
       };
 
       const newItem = await createItem(createParams);
