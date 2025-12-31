@@ -5,7 +5,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "lang", "order": "ASCENDING" },
-        { "fieldPath": "mark", "order": "ASCENDING" },
+        { "fieldPath": "app", "order": "ASCENDING" },
         { "fieldPath": "created", "order": "DESCENDING" }
       ]
     },
@@ -14,6 +14,8 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "lang", "order": "ASCENDING" },
+        { "fieldPath": "mark", "order": "ASCENDING" },
+        { "fieldPath": "app", "order": "ASCENDING" },
         { "fieldPath": "created", "order": "DESCENDING" }
       ]
     },
@@ -83,13 +85,6 @@
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "daily",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "timestamp", "order": "ASCENDING" }
       ]
     },
     {
