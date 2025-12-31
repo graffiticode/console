@@ -50,7 +50,7 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-export default function Gallery({ lang, mark, hideItemsNav = false, itemId: initialItemId = null }) {
+export default function Gallery({ lang, mark, hideItemsNav = false, itemId: initialItemId = null, app = 'console' }) {
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
@@ -156,8 +156,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   }, []);
   // Load items from the API only once on initialization
   const { data: loadedItems, mutate, isLoading: isLoadingItems } = useSWR(
-    user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}` : null,
-    () => loadItems({ user, lang, mark: mark.id, app: 'console' }),
+    user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}-${app}` : null,
+    () => loadItems({ user, lang, mark: mark.id, app }),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
@@ -277,7 +277,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         help: "[]",
         code: "",
         isPublic: false,
-        app: 'console'
+        app
       });
       if (newItem) {
         setItems(prevItems => [newItem, ...prevItems]);

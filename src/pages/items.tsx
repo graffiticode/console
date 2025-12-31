@@ -16,6 +16,7 @@ import {
 import SignIn from '../components/SignIn'
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import Gallery from '../components/gallery';
 import useSwr from 'swr';
 import useLocalStorage from '../hooks/use-local-storage';
@@ -26,13 +27,17 @@ function classNames(...classes) {
 }
 
 export default function Tasks({ language, mark }) {
+  const router = useRouter();
+  const appParam = router.query.app;
+  const app = Array.isArray(appParam) ? appParam[0] : (appParam || 'console');
+
   useEffect(() => {
     document.title = getTitle();
   }, []);
   const lang = language.name.slice(1);
   return (
     <div className="max-w-full mx-auto py-0 sm:px-6 lg:px-8">
-      <Gallery lang={lang} mark={mark} />
+      <Gallery lang={lang} mark={mark} app={app} />
     </div>
   )
 }
