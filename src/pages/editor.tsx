@@ -101,7 +101,7 @@ export default function Editor({ language, setLanguage, mark }) {
       const createParams = {
         user,
         lang: String(lang).padStart(4, '0'),
-        name: "Editor Question",
+        name: "unnamed",
         taskId: "",
         mark: 1,
         help: "[]",
