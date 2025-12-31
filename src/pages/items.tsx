@@ -26,10 +26,20 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+const VALID_APPS = ['console', 'front'];
+
 export default function Tasks({ language, mark }) {
   const router = useRouter();
   const appParam = router.query.app;
   const app = Array.isArray(appParam) ? appParam[0] : (appParam || 'console');
+
+  // Validate app parameter - redirect if invalid
+  useEffect(() => {
+    if (appParam && !VALID_APPS.includes(app)) {
+      const { app: _, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    }
+  }, [appParam, app, router]);
 
   useEffect(() => {
     document.title = getTitle();
