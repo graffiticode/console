@@ -9,12 +9,17 @@ interface FrontIntegration {
   apiKeyToken?: string;
 }
 
+interface MCPIntegration {
+  apiKeyIds: string[];
+}
+
 function hashEmailAuth(authSecret: string, email: string): string {
   return createHash('sha256').update(authSecret + email).digest('hex');
 }
 
 interface IntegrationsSettings {
   front?: FrontIntegration;
+  mcp?: MCPIntegration;
   updatedAt?: string;
 }
 
@@ -38,27 +43,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const defaultSettings: IntegrationsSettings = {
         front: undefined,
+        mcp: undefined,
       };
 
       if (settingsDoc.exists) {
         const data = settingsDoc.data() as IntegrationsSettings;
-        // Mask auth secret, showing only last 4 chars
+        const responseData: any = { ...data };
+
+        // Mask auth secret for Front, showing only last 4 chars
         if (data?.front) {
           const secret = data.front.authSecret || '';
           const maskedSecret = secret.length > 4
             ? '••••••••' + secret.slice(-4)
             : secret.length > 0 ? '••••' : '';
-          return res.status(200).json({
-            ...data,
-            front: {
-              ...data.front,
-              authSecret: maskedSecret,
-              hasAuthSecret: !!data.front.authSecret,
-              apiKeyId: data.front.apiKeyId,
-            }
-          });
+          responseData.front = {
+            ...data.front,
+            authSecret: maskedSecret,
+            hasAuthSecret: !!data.front.authSecret,
+            apiKeyId: data.front.apiKeyId,
+          };
         }
-        return res.status(200).json(data);
+
+        // Include MCP settings as-is
+        if (data?.mcp) {
+          responseData.mcp = data.mcp;
+        }
+
+        return res.status(200).json(responseData);
       }
 
       return res.status(200).json(defaultSettings);
@@ -110,10 +121,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...(effectiveApiKeyToken ? { apiKeyToken: effectiveApiKeyToken } : {}),
       } : currentSettings.front;
 
-      const mergedSettings: IntegrationsSettings = {
-        front: newFront,
+      // Handle MCP settings
+      const newMcp = updates.mcp ? {
+        apiKeyIds: updates.mcp.apiKeyIds ?? currentSettings.mcp?.apiKeyIds ?? [],
+      } : currentSettings.mcp;
+
+      // Build merged settings, excluding undefined values (Firestore doesn't accept undefined)
+      const mergedSettings: Record<string, any> = {
         updatedAt: new Date().toISOString(),
       };
+      if (newFront) {
+        mergedSettings.front = newFront;
+      }
+      if (newMcp) {
+        mergedSettings.mcp = newMcp;
+      }
 
       await settingsRef.set(mergedSettings);
 
@@ -147,16 +169,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Return masked version
-      const responseSettings = { ...mergedSettings };
-      if (responseSettings.front) {
-        const secret = responseSettings.front.authSecret || '';
+      const responseSettings: any = { updatedAt: mergedSettings.updatedAt };
+      if (mergedSettings.front) {
+        const secret = mergedSettings.front.authSecret || '';
         responseSettings.front = {
-          ...responseSettings.front,
+          ...mergedSettings.front,
           authSecret: secret.length > 4
             ? '••••••••' + secret.slice(-4)
             : secret.length > 0 ? '••••' : '',
-          apiKeyToken: undefined, // Don't return the token
         };
+        delete responseSettings.front.apiKeyToken; // Don't return the token
+      }
+      // MCP settings are returned as-is
+      if (mergedSettings.mcp) {
+        responseSettings.mcp = mergedSettings.mcp;
       }
 
       return res.status(200).json({

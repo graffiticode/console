@@ -64,8 +64,13 @@ export default function APIKeysCard() {
         axios.get(`/api/integrations?userId=${user.uid}`)
           .then(response => {
             const protectedIds = new Set<string>();
+            // Front integration API key
             if (response.data?.front?.apiKeyId) {
               protectedIds.add(response.data.front.apiKeyId);
+            }
+            // MCP integration API keys
+            if (response.data?.mcp?.apiKeyIds) {
+              response.data.mcp.apiKeyIds.forEach((id: string) => protectedIds.add(id));
             }
             setProtectedKeyIds(protectedIds);
             // Mark all current keys as verified

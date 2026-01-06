@@ -26,7 +26,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-const VALID_APPS = ['console', 'front'];
+const VALID_APPS = ['console', 'front', 'mcp'];
 
 export default function Tasks({ language, mark }) {
   const router = useRouter();

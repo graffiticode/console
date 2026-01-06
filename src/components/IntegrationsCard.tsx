@@ -3,6 +3,7 @@ import { TrashIcon, PlusIcon, PencilIcon } from "@heroicons/react/24/outline";
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { client } from '../lib/auth';
 import axios from 'axios';
+import MCPIntegrationCard from './MCPIntegrationCard';
 
 interface FrontSettings {
   authSecret: string;
@@ -324,6 +325,9 @@ export default function IntegrationsCard() {
           </button>
         </div>
       </div>
+
+      {/* MCP Integration Section */}
+      <MCPIntegrationCard />
     </div>
   );
 }
