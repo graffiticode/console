@@ -9,17 +9,12 @@ interface FrontIntegration {
   apiKeyToken?: string;
 }
 
-interface MCPIntegration {
-  apiKeyIds: string[];
-}
-
 function hashEmailAuth(authSecret: string, email: string): string {
   return createHash('sha256').update(authSecret + email).digest('hex');
 }
 
 interface IntegrationsSettings {
   front?: FrontIntegration;
-  mcp?: MCPIntegration;
   updatedAt?: string;
 }
 
@@ -43,7 +38,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const defaultSettings: IntegrationsSettings = {
         front: undefined,
-        mcp: undefined,
       };
 
       if (settingsDoc.exists) {
@@ -62,11 +56,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             hasAuthSecret: !!data.front.authSecret,
             apiKeyId: data.front.apiKeyId,
           };
-        }
-
-        // Include MCP settings as-is
-        if (data?.mcp) {
-          responseData.mcp = data.mcp;
         }
 
         return res.status(200).json(responseData);
@@ -121,20 +110,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...(effectiveApiKeyToken ? { apiKeyToken: effectiveApiKeyToken } : {}),
       } : currentSettings.front;
 
-      // Handle MCP settings
-      const newMcp = updates.mcp ? {
-        apiKeyIds: updates.mcp.apiKeyIds ?? currentSettings.mcp?.apiKeyIds ?? [],
-      } : currentSettings.mcp;
-
       // Build merged settings, excluding undefined values (Firestore doesn't accept undefined)
       const mergedSettings: Record<string, any> = {
         updatedAt: new Date().toISOString(),
       };
       if (newFront) {
         mergedSettings.front = newFront;
-      }
-      if (newMcp) {
-        mergedSettings.mcp = newMcp;
       }
 
       await settingsRef.set(mergedSettings);
@@ -180,11 +161,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
         delete responseSettings.front.apiKeyToken; // Don't return the token
       }
-      // MCP settings are returned as-is
-      if (mergedSettings.mcp) {
-        responseSettings.mcp = mergedSettings.mcp;
-      }
-
       return res.status(200).json({
         success: true,
         settings: responseSettings,

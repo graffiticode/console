@@ -3,7 +3,7 @@ import { TrashIcon, PlusIcon, PencilIcon } from "@heroicons/react/24/outline";
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { client } from '../lib/auth';
 import axios from 'axios';
-import MCPIntegrationCard from './MCPIntegrationCard';
+import APIKeysCard from './APIKeysCard';
 
 interface FrontSettings {
   authSecret: string;
@@ -190,16 +190,22 @@ export default function IntegrationsCard() {
   }
 
   return (
-    <div className="overflow-hidden bg-white m-2">
+    <div className="overflow-hidden bg-white p-2">
       {error && (
         <div className="mb-4 rounded-lg bg-red-100 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* Front Integration Section */}
+      {/* API Keys Section */}
       <div className="border rounded-lg p-4 mb-4">
-        <h3 className="text-lg font-semibold mb-4">Front Integration</h3>
+        <h3 className="text-lg font-semibold mb-4">API Keys</h3>
+        <APIKeysCard />
+      </div>
+
+      {/* Front Section */}
+      <div className="border rounded-lg p-4 mb-4">
+        <h3 className="text-lg font-semibold mb-4">Front</h3>
 
         {/* Auth Secret */}
         <div className="mb-4">
@@ -312,7 +318,7 @@ export default function IntegrationsCard() {
             type="button"
             onClick={handleSave}
             disabled={saving || deleting}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
               <>
@@ -325,9 +331,6 @@ export default function IntegrationsCard() {
           </button>
         </div>
       </div>
-
-      {/* MCP Integration Section */}
-      <MCPIntegrationCard />
     </div>
   );
 }

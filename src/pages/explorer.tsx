@@ -30,7 +30,7 @@ const navigation = [
   { name: 'Items', href: '/items', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
   { name: 'Explorer', href: '/explorer', current: true },
-  { name: 'Settings', href: '/settings', current: false },
+  { name: 'Settings', href: '/integrations', current: false },
 ]
 
 function classNames(...classes) {

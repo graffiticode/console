@@ -1,4 +1,4 @@
-import { TrashIcon } from "@heroicons/react/24/outline";
+import { TrashIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { getIdToken } from "firebase/auth";
 import { collection, orderBy, query, where } from "firebase/firestore";
 import { useFirestore, useFirestoreCollectionData, useUser } from "reactfire";
@@ -28,7 +28,7 @@ function APIKeyListItem({ user, apiKey, isPending }) {
           className={`inline-block rounded-none ${isPending ? 'opacity-30 cursor-not-allowed' : ''}`}
           onClick={isPending ? undefined : buildHandleDelete(apiKey)}
           disabled={isPending}>
-          <TrashIcon className={`h-6 w-6 ${isPending ? 'text-gray-400' : 'text-blue-500'}`} />
+          <TrashIcon className={`h-6 w-6 ${isPending ? 'text-gray-400' : 'text-primary'}`} />
         </button>
         <span className="absolute right-full top-1/2 -translate-y-1/2 mr-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
           {isPending ? "Verifying..." : "Delete API key"}
@@ -67,10 +67,6 @@ export default function APIKeysCard() {
             // Front integration API key
             if (response.data?.front?.apiKeyId) {
               protectedIds.add(response.data.front.apiKeyId);
-            }
-            // MCP integration API keys
-            if (response.data?.mcp?.apiKeyIds) {
-              response.data.mcp.apiKeyIds.forEach((id: string) => protectedIds.add(id));
             }
             setProtectedKeyIds(protectedIds);
             // Mark all current keys as verified
@@ -114,16 +110,8 @@ export default function APIKeysCard() {
   }
 
   return (
-    <div className="overflow-hidden bg-white grid grid-col-1 m-2">
-      <div className="m-1">
-      <button
-        type="button"
-        className="inline-block rounded-none bg-gray-400 pt-2.5 text-xs font-medium uppercase leading-normal text-white px-6 pb-2"
-        onClick={handleCreate}>
-        Create API Key
-      </button>
-      </div>
-      <ul className="list-disc space-y-2 m-1">
+    <div className="overflow-hidden bg-white grid grid-col-1">
+      <ul className="list-disc space-y-2 mb-2">
         {apiKeys
           .filter(apiKey => !protectedKeyIds.has(apiKey.id))
           .map(apiKey => (
@@ -135,6 +123,15 @@ export default function APIKeysCard() {
             />
           ))}
       </ul>
+      <div>
+      <button
+        type="button"
+        className="inline-flex items-center px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
+        onClick={handleCreate}>
+        <PlusIcon className="h-4 w-4 mr-1" />
+        Create
+      </button>
+      </div>
       <NewAPIKeyDialog apiKey={newApiKey} />
     </div>
   )
