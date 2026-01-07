@@ -44,7 +44,7 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
       setShowReloadMessage(false);
       return;
     }
-    const timeout = setTimeout(() => setShowReloadMessage(true), 20000);
+    const timeout = setTimeout(() => setShowReloadMessage(true), 30000);
     return () => clearTimeout(timeout);
   }, [isLoading, id]);
 
@@ -217,10 +217,16 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
             <div className="text-center">
               <p className="text-gray-600 mb-2">Taking longer than expected.</p>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  setShowReloadMessage(false);
+                  setIsLoading(true);
+                  if (iframeRef.current) {
+                    iframeRef.current.src = iframeRef.current.src;
+                  }
+                }}
                 className="text-blue-600 hover:text-blue-800 underline"
               >
-                Reload page
+                Reload preview
               </button>
             </div>
           ) : (

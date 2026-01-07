@@ -41,9 +41,10 @@ export default function IntegrationsCard() {
   }, [user?.uid]);
 
   const fetchSettings = async () => {
+    if (!user?.uid) return;
     try {
       setLoading(true);
-      const response = await axios.get(`/api/integrations?userId=${user?.uid}`);
+      const response = await axios.get(`/api/integrations?userId=${user.uid}`);
       const data = response.data;
       setSettings(data);
       if (data.front) {
