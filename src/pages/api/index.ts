@@ -20,6 +20,7 @@ import {
   getItem,
   shareItem,
 } from "./resolvers";
+import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
 
 const typeDefs = `
@@ -72,6 +73,29 @@ const typeDefs = `
     output_tokens: Int
   }
 
+  type Language {
+    id: String!
+    name: String!
+    description: String!
+    category: String
+  }
+
+  type ReactComponent {
+    package: String!
+    component: String!
+    styleImport: String
+  }
+
+  type LanguageInfo {
+    id: String!
+    name: String!
+    description: String!
+    category: String
+    examples: [String!]
+    reactComponent: ReactComponent
+    specUrl: String!
+  }
+
   type Query {
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
@@ -79,6 +103,8 @@ const typeDefs = `
     task(id: String!): Task
     items(lang: String!, mark: Int, app: String): [Item!]
     item(id: String!): Item
+    languages(category: String, search: String): [Language!]!
+    language(id: String!): LanguageInfo
   }
 
   type ShareItemResult {
@@ -141,6 +167,14 @@ const resolvers = {
       const { id } = args;
       const { uid } = await client.verifyToken(token);
       return await getItem({ auth: { uid, token }, id });
+    },
+    languages: async (_, args) => {
+      const { category, search } = args;
+      return listLanguages({ category, search });
+    },
+    language: async (_, args) => {
+      const { id } = args;
+      return await getLanguageInfo(id);
     },
   },
   Mutation: {
