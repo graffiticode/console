@@ -81,10 +81,6 @@ export const HelpPanel = ({
   const [collapsedNestedObjects, setCollapsedNestedObjects] = useState<Record<string, boolean>>({});
   // Track which nested objects have been manually toggled by the user
   const [manuallyToggledNestedObjects, setManuallyToggledNestedObjects] = useState<Set<string>>(new Set());
-  // Track collapsed state for user messages
-  const [collapsedMessages, setCollapsedMessages] = useState<Record<number, boolean>>({});
-  // Track recently collapsed messages to prevent hover preview
-  const [recentlyCollapsed, setRecentlyCollapsed] = useState<Set<number>>(new Set());
 
   // Create a ref for the state to avoid circular dependencies
   const stateRef = useRef(null);
@@ -2307,44 +2303,14 @@ export const HelpPanel = ({
                   .reverse() // Display messages in reverse chronological order (newest first)
                   .map((message, index) => {
                     // Check if this message is pending (waiting for a response)
-                    // We use the same logic as in handleDeleteMessagePair for consistency
                     const isPending = isLoading &&
                                      (message.index === help.length - 1 ||
                                       help[message.index + 1]?.type !== 'bot');
 
-                    // Expand the first message (most recent) by default
-                    const isCollapsed = collapsedMessages[message.index] ?? (index !== 0);
-
                     return (
                       <div key={index} className="mb-2 w-full">
-                        <div
-                          className="relative group"
-                          onMouseEnter={() => {
-                            // Clear recently collapsed flag when mouse re-enters after a delay
-                            if (recentlyCollapsed.has(message.index)) {
-                              setTimeout(() => {
-                                setRecentlyCollapsed(prev => {
-                                  const newSet = new Set(prev);
-                                  newSet.delete(message.index);
-                                  return newSet;
-                                });
-                              }, 300);
-                            }
-                          }}
-                          onMouseLeave={() => {
-                            // Clear recently collapsed flag when mouse leaves
-                            if (recentlyCollapsed.has(message.index)) {
-                              setTimeout(() => {
-                                setRecentlyCollapsed(prev => {
-                                  const newSet = new Set(prev);
-                                  newSet.delete(message.index);
-                                  return newSet;
-                                });
-                              }, 100);
-                            }
-                          }}>
-                          {/* Delete button for each user message - highlighted for pending messages but only visible on hover */}
-                          {/* Don't show delete button for system messages */}
+                        <div className="relative group">
+                          {/* Delete button for each user message */}
                           {message.role !== 'system' && (
                             <button
                               className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10 ${isPending ? 'text-red-400 hover:text-red-600 bg-white rounded-full shadow-sm' : 'text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm'}`}
@@ -2359,238 +2325,95 @@ export const HelpPanel = ({
 
                           <div
                             className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${
-                              // Highlight both system notes and user messages if they have the current taskId
                               message.taskId && message.taskId === taskId ? 'border-2 border-blue-500' : ''
-                            }`}
-                          >
-                            {/* Hover preview - shown when hovering over collapsed header */}
-                            {isCollapsed && !recentlyCollapsed.has(message.index) && (
-                              <div className="absolute left-4 right-4 top-full mt-3 p-4 bg-white border-2 border-gray-400 rounded-lg shadow-2xl z-30 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 max-h-80 overflow-auto transform group-hover:translate-y-1">
-                                {/* Arrow pointing up to the parent */}
-                                <div className="absolute -top-2 left-8 w-4 h-4 bg-white border-l-2 border-t-2 border-gray-400 transform rotate-45"></div>
-                                <div className="text-sm prose prose-sm prose-blue max-w-none">
-                                  <ReactMarkdown
-                                    remarkPlugins={[remarkGfm]}
-                                    components={{
-                                      code({className, children, ...props}) {
-                                        const match = /language-(\w+)/.exec(className || '');
-                                        return match ? (
-                                          <SyntaxHighlighter
-                                            style={tomorrow}
-                                            language={match[1]}
-                                            PreTag="div"
-                                            {...props}
-                                          >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
-                                        ) : (
-                                          <code className={className} {...props}>
-                                            {children}
-                                          </code>
-                                        );
-                                      },
-                                      table({node, className, children, ...props}) {
-                                        return (
-                                          <div className="overflow-x-auto my-2 w-full">
-                                            <table className="table-auto border-collapse w-full text-xs" {...props}>
-                                              {children}
-                                            </table>
-                                          </div>
-                                        );
-                                      },
-                                      thead({node, children, ...props}) {
-                                        return (
-                                          <thead className="bg-blue-50" {...props}>
-                                            {children}
-                                          </thead>
-                                        );
-                                      },
-                                      tbody({node, children, ...props}) {
-                                        return (
-                                          <tbody className="divide-y divide-blue-100" {...props}>
-                                            {children}
-                                          </tbody>
-                                        );
-                                      },
-                                      tr({node, children, ...props}) {
-                                        return (
-                                          <tr className="hover:bg-blue-50" {...props}>
-                                            {children}
-                                          </tr>
-                                        );
-                                      },
-                                      th({node, children, ...props}) {
-                                        return (
-                                          <th className="px-2 py-1 text-left text-xs font-medium text-blue-600 uppercase tracking-wider border border-blue-200 whitespace-nowrap" {...props}>
-                                            {children}
-                                          </th>
-                                        );
-                                      },
-                                      td({node, children, ...props}) {
-                                        return (
-                                          <td className="px-2 py-1 text-xs text-blue-700 border border-blue-200" {...props}>
-                                            {children}
-                                          </td>
-                                        );
-                                      }
-                                    }}
-                                  >
-                                    {message.role === 'system' ? message.content : message.user}
-                                  </ReactMarkdown>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Collapsible header - only toggles expand/collapse */}
-                            <div
-                              className={`flex items-center justify-between p-3 cursor-pointer ${message.role === 'system' ? 'hover:bg-gray-200' : 'hover:bg-blue-200'} transition-colors`}
-                              onClick={() => {
-                                // Only handle expand/collapse, no task loading
-                                if (isCollapsed) {
-                                  // Clear recently collapsed flag for this message
-                                  setRecentlyCollapsed(prev => {
-                                    const newSet = new Set(prev);
-                                    newSet.delete(message.index);
-                                    return newSet;
-                                  });
-                                  // Collapse all messages first
-                                  const allCollapsed = {};
-                                  userMessages.forEach(msg => {
-                                    allCollapsed[msg.index] = true;
-                                  });
-                                  // Then expand only this one
-                                  setCollapsedMessages({
-                                    ...allCollapsed,
-                                    [message.index]: false
-                                  });
-                                } else {
-                                  // If collapsing, just collapse this one
-                                  setCollapsedMessages(prev => ({
-                                    ...prev,
-                                    [message.index]: true
-                                  }));
-                                  // Add to recently collapsed to prevent hover preview
-                                  setRecentlyCollapsed(prev => {
-                                    const newSet = new Set(prev);
-                                    newSet.add(message.index);
-                                    return newSet;
-                                  });
-                                }
-                              }}
-                              title={`Click to ${isCollapsed ? 'expand' : 'collapse'}`}
-                            >
-                              <div className="flex items-center space-x-2 flex-1 min-w-0">
-                                <svg
-                                  className={`w-4 h-4 text-gray-600 transform transition-transform flex-shrink-0 ${isCollapsed ? '' : 'rotate-90'}`}
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                                <div className="flex items-center flex-1 min-w-0">
-                                  {isCollapsed ? (
-                                    // Single line format when collapsed - show only timestamp
-                                    <div className="flex items-center min-w-0 flex-1">
-                                      <span className="text-sm text-gray-600">
-                                        {message.timestamp ?
-                                          new Date(message.timestamp).toLocaleString() :
-                                          'No timestamp'
-                                        }
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    // Expanded format - show timestamp if present
-                                    message.timestamp ? (
-                                      <div className="text-xs text-gray-500">
-                                        {new Date(message.timestamp).toLocaleString()}
-                                      </div>
-                                    ) : null
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Collapsible content - clicking loads the task if available */}
-                            {!isCollapsed && (
-                              <div
-                                className={`px-3 pb-3 pt-0 ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:bg-blue-50 transition-colors' : ''}`}
-                                onClick={() => {
-                                  // Load task when clicking on the body
-                                  if (message.taskId && onLoadTaskFromHelp) {
-                                    onLoadTaskFromHelp(message.taskId);
-                                  }
-                                }}
-                                title={message.taskId && onLoadTaskFromHelp ? 'Click to load task' : ''}
-                              >
-                                <div className="text-sm prose prose-sm prose-blue max-w-none">
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              code({className, children, ...props}) {
-                                const match = /language-(\w+)/.exec(className || '');
-                                return match ? (
-                                  <SyntaxHighlighter
-                                    style={tomorrow}
-                                    language={match[1]}
-                                    PreTag="div"
-                                    {...props}
-                                  >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
-                                ) : (
-                                  <code className={className} {...props}>
-                                    {children}
-                                  </code>
-                                );
-                              },
-                              table({node, className, children, ...props}) {
-                                return (
-                                  <div className="overflow-x-auto my-2 w-full">
-                                    <table className="table-auto border-collapse w-full text-xs" {...props}>
-                                      {children}
-                                    </table>
-                                  </div>
-                                );
-                              },
-                              thead({node, children, ...props}) {
-                                return (
-                                  <thead className="bg-blue-50" {...props}>
-                                    {children}
-                                  </thead>
-                                );
-                              },
-                              tbody({node, children, ...props}) {
-                                return (
-                                  <tbody className="divide-y divide-blue-100" {...props}>
-                                    {children}
-                                  </tbody>
-                                );
-                              },
-                              tr({node, children, ...props}) {
-                                return (
-                                  <tr className="hover:bg-blue-50" {...props}>
-                                    {children}
-                                  </tr>
-                                );
-                              },
-                              th({node, children, ...props}) {
-                                return (
-                                  <th className="px-2 py-1 text-left text-xs font-medium text-blue-600 uppercase tracking-wider border border-blue-200 whitespace-nowrap" {...props}>
-                                    {children}
-                                  </th>
-                                );
-                              },
-                              td({node, children, ...props}) {
-                                return (
-                                  <td className="px-2 py-1 text-xs text-blue-700 border border-blue-200" {...props}>
-                                    {children}
-                                  </td>
-                                );
+                            } ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:brightness-95 transition-all' : ''}`}
+                            onClick={() => {
+                              if (message.taskId && onLoadTaskFromHelp) {
+                                onLoadTaskFromHelp(message.taskId);
                               }
                             }}
+                            title={message.taskId && onLoadTaskFromHelp ? 'Click to load task' : ''}
                           >
-                            {message.role === 'system' ? message.content : message.user}
-                          </ReactMarkdown>
-                                </div>
+                            {/* Timestamp header */}
+                            {message.timestamp && (
+                              <div className="px-3 pt-2 pb-1">
+                                <span className="text-xs text-gray-500">
+                                  {new Date(message.timestamp).toLocaleString()}
+                                </span>
                               </div>
                             )}
+
+                            {/* Content */}
+                            <div className={`px-3 pb-3 ${message.timestamp ? 'pt-0' : 'pt-3'}`}>
+                              <div className="text-sm prose prose-sm prose-blue max-w-none">
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  components={{
+                                    code({className, children, ...props}) {
+                                      const match = /language-(\w+)/.exec(className || '');
+                                      return match ? (
+                                        <SyntaxHighlighter
+                                          style={tomorrow}
+                                          language={match[1]}
+                                          PreTag="div"
+                                          {...props}
+                                        >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
+                                      ) : (
+                                        <code className={className} {...props}>
+                                          {children}
+                                        </code>
+                                      );
+                                    },
+                                    table({node, className, children, ...props}) {
+                                      return (
+                                        <div className="overflow-x-auto my-2 w-full">
+                                          <table className="table-auto border-collapse w-full text-xs" {...props}>
+                                            {children}
+                                          </table>
+                                        </div>
+                                      );
+                                    },
+                                    thead({node, children, ...props}) {
+                                      return (
+                                        <thead className="bg-blue-50" {...props}>
+                                          {children}
+                                        </thead>
+                                      );
+                                    },
+                                    tbody({node, children, ...props}) {
+                                      return (
+                                        <tbody className="divide-y divide-blue-100" {...props}>
+                                          {children}
+                                        </tbody>
+                                      );
+                                    },
+                                    tr({node, children, ...props}) {
+                                      return (
+                                        <tr className="hover:bg-blue-50" {...props}>
+                                          {children}
+                                        </tr>
+                                      );
+                                    },
+                                    th({node, children, ...props}) {
+                                      return (
+                                        <th className="px-2 py-1 text-left text-xs font-medium text-blue-600 uppercase tracking-wider border border-blue-200 whitespace-nowrap" {...props}>
+                                          {children}
+                                        </th>
+                                      );
+                                    },
+                                    td({node, children, ...props}) {
+                                      return (
+                                        <td className="px-2 py-1 text-xs text-blue-700 border border-blue-200" {...props}>
+                                          {children}
+                                        </td>
+                                      );
+                                    }
+                                  }}
+                                >
+                                  {message.role === 'system' ? message.content : message.user}
+                                </ReactMarkdown>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
