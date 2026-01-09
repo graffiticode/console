@@ -341,19 +341,39 @@ export async function generateCode({
         } catch (error) {
           console.log(
             "generateCode()",
-            "Template not found on language server, falling back to service",
+            "Template not found on language server, using default template",
             error.message,
           );
           ragLog(rid, "template.error", {
             error: error.message,
             source: "language-server",
           });
-          // Cache empty result to avoid repeated failed fetches
-          templateCache.set(cacheKey, "");
+          // Use default template code
+          code = "{}..";
+          description = "Default template (no template.gc found)";
+          model = "default-template";
+          templateCache.set(cacheKey, code);
+          ragLog(rid, "template.loaded", {
+            source: "default",
+            lang: cacheKey,
+            codeLength: code.length,
+          });
         }
       }
+      // If template.gc returned empty, use default template
+      if (!code) {
+        code = "{}..";
+        description = "Default template (empty template.gc)";
+        model = "default-template";
+        templateCache.set(cacheKey, code);
+        ragLog(rid, "template.loaded", {
+          source: "default",
+          lang: cacheKey,
+          codeLength: code.length,
+        });
+      }
     }
-    // If no template was loaded, fall back to code generation service
+    // If no template was loaded (not a template request), fall back to code generation service
     if (!code) {
       const result = await codeGenerationService({
         auth,
