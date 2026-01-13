@@ -5,7 +5,7 @@ import { getAuth, connectAuthEmulator } from "firebase/auth";
 // The server-side scripts use 'graffiticode-app' as the project ID
 export const apiFirebaseConfig = {
   apiKey: "AIzaSyAoVuUNi8ElnS7cn6wc3D8XExML-URLw0I",
-  authDomain: "graffiticode.firebaseapp.com",
+  authDomain: "graffiticode.org",
   databaseURL: "https://graffiticode.firebaseio.com",
   projectId: "graffiticode",
   storageBucket: "graffiticode.appspot.com",
