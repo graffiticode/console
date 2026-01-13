@@ -45,6 +45,10 @@ export function GraffiticodeAuthProvider({ children }) {
       localStorage.removeItem('graffiticode:language');
     }
     await signOut(auth);
+    // Navigate to home to avoid stale Firestore listeners
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   }, [auth]);
 
   const value = {

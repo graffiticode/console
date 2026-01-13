@@ -9,7 +9,11 @@ import {
   ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import { useOAuth } from "../hooks/use-oauth";
+import { useAuth } from "reactfire";
+import { signInWithCustomToken } from "firebase/auth";
 import WalletSelectionDialog from "./WalletSelectionDialog";
+import AuthMethodDialog from "./AuthMethodDialog";
 
 interface SignInComponentProps {
   label?: string | React.ReactNode;
@@ -34,7 +38,12 @@ const fetchUserData = async ({ user }) => {
 
 export default function SignInComponent({ label = "Sign in", className }: SignInComponentProps) {
   const { loading, user, signInWithEthereum, signOut } = useGraffiticodeAuth();
+  const { signInWithGoogle } = useOAuth();
+  const auth = useAuth();
+  const [showAuthMethodDialog, setShowAuthMethodDialog] = useState(false);
   const [showWalletDialog, setShowWalletDialog] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
 
   // Fetch user profile data from Firestore
   const { data: userData } = useSWR(
@@ -44,8 +53,30 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
   );
 
   const handleSignInClick = () => {
-    // Always show wallet selection dialog
+    setGoogleError(null);
+    setShowAuthMethodDialog(true);
+  };
+
+  const handleSelectEthereum = () => {
+    setShowAuthMethodDialog(false);
     setShowWalletDialog(true);
+  };
+
+  const handleSelectGoogle = async () => {
+    try {
+      setGoogleLoading(true);
+      setGoogleError(null);
+      const { firebaseCustomToken } = await signInWithGoogle();
+      await signInWithCustomToken(auth, firebaseCustomToken);
+      setShowAuthMethodDialog(false);
+      // Navigate to home to avoid stale Firestore listeners on current page
+      window.location.href = '/';
+    } catch (err: any) {
+      console.error('Google sign-in error:', err);
+      setGoogleError(err.message || 'Failed to sign in with Google');
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   const handleSignIn = async (wallet: Wallet | null) => {
@@ -183,6 +214,15 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
         >
           {label}
         </button>
+
+        <AuthMethodDialog
+          isOpen={showAuthMethodDialog}
+          onClose={() => setShowAuthMethodDialog(false)}
+          onSelectEthereum={handleSelectEthereum}
+          onSelectGoogle={handleSelectGoogle}
+          googleLoading={googleLoading}
+          googleError={googleError}
+        />
 
         <WalletSelectionDialog
           isOpen={showWalletDialog}
