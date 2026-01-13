@@ -42,6 +42,13 @@ function isValidCallbackUrl(url: string): boolean {
   }
 }
 
+// Firebase config with authDomain pointing to Firebase Hosting
+// (required for signInWithRedirect to work - needs /__/auth/handler)
+const oauthFirebaseConfig = {
+  ...apiFirebaseConfig,
+  authDomain: "graffiticode.firebaseapp.com",
+};
+
 // Create a separate Firebase app instance for OAuth
 let oauthAuthInstance: ReturnType<typeof getAuth> | null = null;
 
@@ -50,7 +57,7 @@ const getOAuthAuth = () => {
 
   const appName = 'oauth-consent-helper';
   const existingApp = getApps().find(app => app.name === appName);
-  const app = existingApp || initializeApp(apiFirebaseConfig, appName);
+  const app = existingApp || initializeApp(oauthFirebaseConfig, appName);
   oauthAuthInstance = getAuth(app);
 
   if (isDevelopment) {
