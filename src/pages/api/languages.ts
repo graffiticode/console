@@ -33,6 +33,12 @@ const LANGUAGES: Language[] = [
     category: "general",
   },
   {
+    id: "0159",
+    name: "L0159",
+    description: "Flashcards, Match and Memory card games",
+    category: "data",
+  },
+  {
     id: "0166",
     name: "L0166",
     description: "Spreadsheets and tabular data with formulas",
