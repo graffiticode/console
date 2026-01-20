@@ -43,4 +43,5 @@ yarn-error.log*
 .firebase*
 firestore-debug.log
 firestore.indexes.json
-firestore.rules
+firestore.rulescloudrun-env-vars.txt
+cloudrun-env-vars.yaml

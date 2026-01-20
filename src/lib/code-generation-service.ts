@@ -1200,6 +1200,11 @@ export async function generateCode({
       }
     }
 
+    console.log(
+      "generateCode()",
+      "formattedPrompt=" + formattedPrompt,
+    );
+
     // Start generation stage
     safeRAGAnalytics.startStage(requestId, "generation");
     const generationStartTime = Date.now();
