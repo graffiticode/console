@@ -116,7 +116,7 @@ const typeDefs = `
   type Mutation {
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean): String!
-    generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String): GeneratedCode!
+    generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String, conversationSummary: ConversationSummaryInput): GeneratedCode!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean, app: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
@@ -126,6 +126,12 @@ const typeDefs = `
     model: String
     temperature: Float
     maxTokens: Int
+  }
+
+  input ConversationSummaryInput {
+    turnCount: Int!
+    previousRequests: [String!]!
+    previousOutputs: [String]
   }
 `;
 
@@ -182,10 +188,10 @@ const resolvers = {
       const { token } = ctx;
       const { uid } = await client.verifyToken(token);
       const auth = {uid, token};
-      const { prompt, language, options, currentCode } = args;
+      const { prompt, language, options, currentCode, conversationSummary } = args;
       try {
         // No authentication required for code generation
-        return await generateCode({ auth, prompt, language, options, currentCode });
+        return await generateCode({ auth, prompt, language, options, currentCode, conversationSummary });
       } catch (error) {
         console.error("Error in generateCode mutation:", error);
         throw error;

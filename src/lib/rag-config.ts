@@ -12,6 +12,12 @@ export interface RAGConfig {
   enableHybridSearch: boolean;
   enableUserFeedback: boolean;
 
+  // DSPy service settings
+  enableDSPyService: boolean;
+  dspyServiceUrl: string;
+  dspyTimeoutMs: number;
+  dspyFallbackToLegacy: boolean;
+
   // Fallback behavior
   fallbackToKeywordSearch: boolean;
   fallbackToNoExamples: boolean;
@@ -36,6 +42,12 @@ const defaultConfig: RAGConfig = {
   enableAnalytics: process.env.DISABLE_RAG_ANALYTICS !== 'true',
   enableHybridSearch: process.env.DISABLE_HYBRID_SEARCH !== 'true',
   enableUserFeedback: process.env.DISABLE_USER_FEEDBACK !== 'true',
+
+  // DSPy service settings - disabled by default until service is deployed
+  enableDSPyService: process.env.ENABLE_DSPY_SERVICE === 'true',
+  dspyServiceUrl: process.env.DSPY_SERVICE_URL || 'http://localhost:8080',
+  dspyTimeoutMs: parseInt(process.env.DSPY_TIMEOUT_MS || '5000', 10),
+  dspyFallbackToLegacy: process.env.DSPY_FALLBACK_TO_LEGACY !== 'false',
 
   // Fallback behavior - always enabled for resilience
   fallbackToKeywordSearch: true,

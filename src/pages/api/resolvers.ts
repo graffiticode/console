@@ -280,6 +280,7 @@ export async function generateCode({
   language,
   options,
   currentCode,
+  conversationSummary = null,
 }) {
   // TODO add support for calling the compiler to check generated code.
   const rid = generateRequestId();
@@ -386,6 +387,7 @@ export async function generateCode({
         },
         currentCode,
         rid,
+        conversationSummary,
       });
       code = result.code;
       model = result.model;

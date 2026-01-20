@@ -2,6 +2,41 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { generateCode } from "../utils/swr/fetchers";
 
 /**
+ * Build a conversation summary from chat history for DSPy service
+ */
+const buildConversationSummary = (chatHistory: any[]) => {
+  if (!chatHistory || chatHistory.length < 2) {
+    return null;
+  }
+
+  // Extract previous user requests from chat history
+  const previousRequests: string[] = [];
+  const previousOutputs: string[] = [];
+
+  // Get last 6 messages (3 exchanges)
+  const limitedHistory = chatHistory.slice(-6);
+
+  for (const item of limitedHistory) {
+    if (item.type === 'user') {
+      previousRequests.push(item.user);
+    } else if (item.type === 'bot' && item.help?.type === 'code') {
+      previousOutputs.push('[Generated code]');
+    } else if (item.type === 'bot') {
+      previousOutputs.push(item.user || '[Response]');
+    }
+  }
+
+  // Calculate turn count (each exchange is a turn)
+  const turnCount = Math.ceil(chatHistory.length / 2);
+
+  return {
+    turnCount,
+    previousRequests: previousRequests.slice(-3), // Last 3 requests
+    previousOutputs: previousOutputs.slice(-3), // Last 3 outputs
+  };
+};
+
+/**
  * Function to generate Graffiticode responses using the generateCode function
  */
 const generateBotResponse = async ({message, user, language, chatHistory = [], currentCode = ''}) => {
@@ -10,6 +45,9 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
 
     // Format chat history as context for the prompt
     let contextualPrompt = message;
+
+    // Build conversation summary for DSPy service
+    const conversationSummary = buildConversationSummary(chatHistory);
 
     // Only add chat history if there's a meaningful amount (at least 1 exchange)
     if (chatHistory.length >= 2) {
@@ -58,7 +96,8 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
         maxTokens: 2000
       },
       language,
-      currentCode
+      currentCode,
+      conversationSummary
     });
 
 

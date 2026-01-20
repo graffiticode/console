@@ -371,11 +371,12 @@ export const getItem = async ({ user, id }) => {
   return client.request(query, { id }).then(data => data.item);
 };
 
-export const generateCode = async ({ user, prompt, language, options, currentCode }) => {
+export const generateCode = async ({ user, prompt, language, options, currentCode, conversationSummary = null }) => {
   console.log(
     "fetchers/generateCode()",
     "language=" + language,
-    "currentCode length=" + (currentCode ? currentCode.length : 0)
+    "currentCode length=" + (currentCode ? currentCode.length : 0),
+    "conversationSummary=" + (conversationSummary ? JSON.stringify(conversationSummary) : "null")
   );
   if (!user) {
     return {};
@@ -387,8 +388,8 @@ export const generateCode = async ({ user, prompt, language, options, currentCod
     }
   });
   const query = gql`
-    mutation GenerateCode($prompt: String!, $language: String, $options: CodeGenerationOptions, $currentCode: String) {
-      generateCode(prompt: $prompt, language: $language, options: $options, currentCode: $currentCode) {
+    mutation GenerateCode($prompt: String!, $language: String, $options: CodeGenerationOptions, $currentCode: String, $conversationSummary: ConversationSummaryInput) {
+      generateCode(prompt: $prompt, language: $language, options: $options, currentCode: $currentCode, conversationSummary: $conversationSummary) {
         code
         taskId
         description
@@ -407,7 +408,8 @@ export const generateCode = async ({ user, prompt, language, options, currentCod
     prompt,
     language,
     options,
-    currentCode
+    currentCode,
+    conversationSummary
   };
 
   try {

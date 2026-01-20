@@ -25,6 +25,23 @@ import { generateCodeWithContinuation } from "./claude-stream-service";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
 import { getRAGConfig, withRAGFallback } from "./rag-config";
 import { parser } from "@graffiticode/parser";
+import {
+  compilePromptSpec,
+  compileRepairPromptSpec,
+  buildContextPack,
+  classifyCompilerError,
+  parseStructuredErrors,
+  isDSPyEnabled,
+  shouldFallbackToLegacy,
+  ConversationSummary,
+  RetrievedChunk,
+} from "./dspy-service";
+import {
+  renderPromptSpecToMessages,
+  convertLegacyPromptToRendered,
+  formatPromptSpecForLog,
+  RenderContext,
+} from "./prompt-renderer";
 
 // Global cache for language assets to avoid repeated fetches
 const languageAssetsCache = {
@@ -1006,6 +1023,7 @@ export async function generateCode({
   rid = null,
   userId = null,
   sessionId = null,
+  conversationSummary = null,
 }: {
   auth: any;
   prompt: string;
@@ -1015,6 +1033,7 @@ export async function generateCode({
   rid?: string | null;
   userId?: string | null;
   sessionId?: string | null;
+  conversationSummary?: ConversationSummary | null;
 }) {
   const accessToken = auth?.token;
 
@@ -1080,14 +1099,90 @@ export async function generateCode({
       }
     }
 
-    // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
-    const formattedPrompt = await createCodeGenerationPrompt(
-      prompt,
-      relevantExamples,
-      lang,
+    // Try DSPy service for prompt construction (with fallback to legacy)
+    let formattedPrompt: string;
+    let usedDSPy = false;
+    let promptSpecId: string | null = null;
+
+    // Convert retrieved examples to RetrievedChunk format
+    const retrievedChunks: RetrievedChunk[] = (relevantExamples || []).map((ex, idx) => ({
+      id: ex.id || `example-${idx}`,
+      prompt: ex.task || ex.description || "",
+      code: ex.code || "",
+      similarity: ex.similarity,
+      keywordScore: ex.keywordScore,
+      combinedScore: ex.combinedScore,
+      tags: ex.tags,
+    }));
+
+    // Build context pack for DSPy
+    const contextPack = buildContextPack({
+      latestAsk: prompt,
       currentCode,
-      rid,
-    );
+      conversationSummary,
+      retrievedChunks,
+      constraints: {
+        dialect: lang,
+        maxOutputTokens: options.maxTokens || 4096,
+      },
+      taskType: "codegen",
+    });
+
+    // Try DSPy service if enabled
+    if (isDSPyEnabled()) {
+      try {
+        const promptSpec = await compilePromptSpec(contextPack, requestId);
+
+        if (promptSpec) {
+          // Render PromptSpec to Claude message format
+          const renderContext: RenderContext = {
+            userRequest: prompt,
+            currentCode,
+            conversationSummary,
+            retrievedChunks,
+            dialect: lang,
+          };
+
+          const rendered = renderPromptSpecToMessages(promptSpec, renderContext);
+
+          // Convert to legacy format for compatibility with generateCodeWithContinuation
+          formattedPrompt = JSON.stringify({
+            system: rendered.systemPrompt,
+            messages: rendered.messages,
+          }, null, 2);
+
+          usedDSPy = true;
+          promptSpecId = promptSpec.specId;
+
+          if (requestId) {
+            ragLog(requestId, "dspy.prompt.rendered", {
+              specId: promptSpec.specId,
+              version: promptSpec.version,
+              messageCount: rendered.messages.length,
+            });
+          }
+        }
+      } catch (error: any) {
+        console.warn("DSPy prompt compilation failed, falling back to legacy:", error.message);
+        if (requestId) {
+          ragLog(requestId, "dspy.prompt.fallback", {
+            reason: error.message,
+          });
+        }
+      }
+    }
+
+    // Fall back to legacy prompt construction if DSPy didn't produce a result
+    if (!usedDSPy) {
+      // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
+      formattedPrompt = await createCodeGenerationPrompt(
+        prompt,
+        relevantExamples,
+        lang,
+        currentCode,
+        rid,
+      );
+    }
 
     // Check formatted prompt for property update pattern and adjust model if needed
     if (!options.model) {
@@ -1245,22 +1340,81 @@ export async function generateCode({
           verificationResult.errors ||
           verificationResult.status === "error"
         ) {
+          // Classify the error type
+          const errorType = classifyCompilerError(verificationResult);
+          const structuredErrors = parseStructuredErrors(verificationResult);
 
-          if (rid) {
-            ragLog(rid, "fix.attempt", {
+          if (requestId) {
+            ragLog(requestId, "fix.attempt", {
               attemptNumber: fixAttempts + 1,
               maxAttempts: MAX_FIX_ATTEMPTS,
+              errorType,
+              errorCount: structuredErrors.length,
               errorSummary: JSON.stringify(
                 verificationResult.errors || verificationResult.error,
               ).substring(0, 300),
             });
           }
 
-          // Create a prompt to fix the errors
-          const fixPrompt = createErrorFixPrompt(
-            generatedCode,
-            verificationResult,
-          );
+          let fixPrompt: string;
+          let usedDSPyRepair = false;
+
+          // For semantic errors, try DSPy repair flow if enabled
+          if (errorType === "semantic" && isDSPyEnabled()) {
+            try {
+              const repairContextPack = {
+                ...contextPack,
+                taskType: "repair" as const,
+                lastModelOutput: generatedCode,
+                structuredCompilerErrors: structuredErrors,
+              };
+
+              const repairSpec = await compileRepairPromptSpec(repairContextPack, requestId);
+
+              if (repairSpec) {
+                const renderContext: RenderContext = {
+                  userRequest: prompt,
+                  currentCode: generatedCode,
+                  conversationSummary,
+                  retrievedChunks,
+                  dialect: lang,
+                };
+
+                const rendered = renderPromptSpecToMessages(repairSpec, renderContext);
+
+                fixPrompt = JSON.stringify({
+                  system: rendered.systemPrompt,
+                  messages: rendered.messages,
+                }, null, 2);
+
+                usedDSPyRepair = true;
+
+                if (requestId) {
+                  ragLog(requestId, "dspy.repair.rendered", {
+                    specId: repairSpec.specId,
+                    errorType,
+                    errorCount: structuredErrors.length,
+                  });
+                }
+              }
+            } catch (error: any) {
+              console.warn("DSPy repair compilation failed, falling back to legacy:", error.message);
+              if (requestId) {
+                ragLog(requestId, "dspy.repair.fallback", {
+                  reason: error.message,
+                  errorType,
+                });
+              }
+            }
+          }
+
+          // Fall back to legacy fix prompt if DSPy repair didn't produce a result
+          if (!usedDSPyRepair) {
+            fixPrompt = createErrorFixPrompt(
+              generatedCode,
+              verificationResult,
+            );
+          }
 
           // Determine which model to use for fixes
           // If the initial generation used Sonnet or Haiku and failed, upgrade to Opus for better error fixing
@@ -1268,11 +1422,12 @@ export async function generateCode({
           if (fixAttempts === 0 && (fixModel === CLAUDE_MODELS.SONNET || fixModel === CLAUDE_MODELS.HAIKU)) {
             fixModel = CLAUDE_MODELS.OPUS;
             usedOpusForFix = true;
-            if (rid) {
-              ragLog(rid, "fix.model.upgrade", {
+            if (requestId) {
+              ragLog(requestId, "fix.model.upgrade", {
                 originalModel: options.model || CLAUDE_MODELS.DEFAULT,
                 upgradedModel: CLAUDE_MODELS.OPUS,
-                reason: "First fix attempt after initial generation failure"
+                reason: "First fix attempt after initial generation failure",
+                usedDSPyRepair,
               });
             }
           }
@@ -1288,7 +1443,7 @@ export async function generateCode({
               maxTokens: options.maxTokens || 4096,
               maxContinuations: 10
             },
-            onProgress: rid ? (message) => ragLog(rid, "fix.progress", { message }) : undefined
+            onProgress: requestId ? (message) => ragLog(requestId, "fix.progress", { message }) : undefined
           });
 
           if (fixResult.error) {
@@ -1297,7 +1452,7 @@ export async function generateCode({
           }
 
           // Update the generated code with the fixed version and process to fix escaping issues
-          generatedCode = await processGeneratedCode(fixResult.code, lang, rid);
+          generatedCode = await processGeneratedCode(fixResult.code, lang, requestId);
 
           // Add fix attempt usage to total
           finalUsage.prompt_tokens += fixResult.usage.inputTokens;
@@ -1522,7 +1677,10 @@ export async function generateCode({
       usedOpusForFix,  // Indicate if we had to upgrade to Opus for fixing
       streaming: true,
       chunks: streamResult.chunks,
-      requestId: requestId  // Include for feedback tracking
+      requestId: requestId,  // Include for feedback tracking
+      // DSPy telemetry
+      usedDSPy,
+      promptSpecId,
     };
 
     return result;
