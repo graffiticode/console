@@ -1625,6 +1625,11 @@ export async function generateCode({
       promptSpecId,
     };
 
+    console.log(
+      "generateCode()",
+      "result=" + JSON.stringify(result, null, 2),
+    );
+
     return result;
   } catch (error) {
     console.error(`Error generating code for ${lang}:`, error);
