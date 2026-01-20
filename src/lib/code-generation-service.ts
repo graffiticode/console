@@ -445,65 +445,6 @@ CRITICAL REMINDER: Put generated code between \`\`\` (triple backticks) to disti
 }
 
 /**
- * Generate examples section from retrieved training examples
- * @param {Array} examples - Array of training examples
- * @returns {string} - Formatted examples section for the system prompt
- */
-function generateExamplesSection(examples) {
-  if (!examples || examples.length === 0) return "";
-
-  let examplesText = `\n\n## RELEVANT EXAMPLES:\n\n`;
-
-  examples.forEach((example, i) => {
-    if (example.task && example.code) {
-      // Handle markdown-based examples (standardized format)
-      examplesText += `### Example ${i + 1}: ${example.task}\n`;
-      examplesText += "Prompt: " + example.task + "\n\n";
-      examplesText += "```\n";
-      examplesText += example.code;
-      examplesText += "\n```\n\n";
-    } else if (
-      example.messages &&
-      Array.isArray(example.messages) &&
-      example.messages.length > 0
-    ) {
-      // Handle dialog-based examples (legacy format)
-      examplesText += `### Example ${i + 1}: Dialog Interaction\n`;
-      examplesText += "Here's a relevant example of this type of task:\n\n";
-
-      example.messages.forEach((message) => {
-        const roleLabel = message.role === "user" ? "User" : "Assistant";
-        examplesText += `**${roleLabel}**: ${message.content}\n\n`;
-      });
-
-      // If we have code, also include it separately
-      if (
-        example.code &&
-        !example.messages.some((m) => m.content.includes(example.code))
-      ) {
-        examplesText += "```\n";
-        examplesText += example.code;
-        examplesText += "\n```\n";
-      }
-
-      // Add explanation if available
-      if (example.explanation) {
-        examplesText += `${example.explanation}\n\n`;
-      }
-    } else {
-      // Handle traditional examples (legacy format)
-      examplesText += `### Example ${i + 1}: ${example.description || "Graffiticode Example"}\n`;
-      examplesText += "```\n";
-      examplesText += example.code;
-      examplesText += "\n```\n";
-      examplesText += `${example.explanation || "An example of Graffiticode."}\n\n`;
-    }
-  });
-
-  return examplesText;
-}
-
-/**
  * Create a prompt for Claude that will generate high-quality code
  * @param {string} userPrompt - The user's original prompt
  * @param {Array} examples - Relevant examples to include
@@ -517,88 +458,88 @@ async function createCodeGenerationPrompt(
   lang = "0002",
   currentCode = null,
   rid = null,
+  conversationSummary = null,
 ) {
-  // Generate examples section from retrieved examples
-  const examplesSection = generateExamplesSection(examples);
-
-  // Get the dialect-specific system prompt
+  // Get the dialect-specific system prompt (matches dspy-service SYSTEM_INSTRUCTIONS_TEMPLATE)
   const dialectSystemPrompt = await getSystemPromptForDialect(lang);
 
-  // Combine dialect-specific system prompt with examples
-  const enhancedSystemPrompt = dialectSystemPrompt + examplesSection;
+  // Developer instructions (matches dspy-service DEVELOPER_INSTRUCTIONS_TEMPLATE)
+  const developerInstructions = `
+## APPROACH
+
+1. **Analyze the request** carefully to understand what the user wants
+2. **Review any existing code** to understand the current state
+3. **Plan minimal changes** that accomplish the goal without over-engineering
+4. **Generate valid Graffiticode** that compiles successfully
+5. **Preserve existing structure** unless explicitly asked to change it
+
+## GUIDELINES
+
+- Keep solutions simple and focused on the request
+- Don't add features beyond what was asked
+- Use meaningful variable names
+- Add comments only where logic isn't self-evident
+- Ensure all \`let\` statements end with \`..\`
+- Ensure the program ends with \`..\``;
+
+  // Build the system prompt with developer instructions
+  const systemPrompt = dialectSystemPrompt + "\n" + developerInstructions;
+
+  // Format retrieved examples for context
+  const retrievedContext = examples.length > 0
+    ? examples.map((ex, i) => {
+        if (ex.task && ex.code) {
+          return `Example ${i + 1}: ${ex.task}\n\`\`\`\n${ex.code}\n\`\`\``;
+        }
+        return "";
+      }).filter(Boolean).join("\n\n")
+    : "No similar examples found.";
+
+  // Format conversation summary
+  const conversationContext = conversationSummary
+    ? `Turn ${conversationSummary.turnCount || 1} of conversation.${
+        conversationSummary.previousRequests?.length
+          ? " Previously: " + conversationSummary.previousRequests.slice(-3).join("; ")
+          : ""
+      }`
+    : "First turn of conversation.";
+
+  // Build user message using USER_TEMPLATE format (matches dspy-service)
+  const userMessage = `<USER_REQUEST>
+${userPrompt}
+
+<CURRENT_CODE>
+${currentCode ? `\`\`\`\n${currentCode}\n\`\`\`` : "No existing code."}
+
+<CONVERSATION_SUMMARY>
+${conversationContext}
+
+<RETRIEVED_CONTEXT>
+${retrievedContext}
+
+<OUTPUT_FORMAT>
+Return ONLY Graffiticode between triple backticks. Must end with ".."`;
 
   if (rid) {
     ragLog(rid, "prompt.build", {
       dialect: `L${lang}`,
       examplesIncluded: examples.length,
       tokenEstimate: Math.ceil(
-        (enhancedSystemPrompt.length + userPrompt.length) / 4,
+        (systemPrompt.length + userMessage.length) / 4,
       ),
-      charCount: enhancedSystemPrompt.length + userPrompt.length,
+      charCount: systemPrompt.length + userMessage.length,
       hasCurrentCode: !!currentCode,
-      sectionsIncluded: ["system", "examples", "user"],
+      hasConversationSummary: !!conversationSummary,
+      sectionsIncluded: ["system", "developer", "user"],
     });
   }
 
   const promptData = {
-    system: enhancedSystemPrompt,
+    system: systemPrompt,
     messages: [
       {
         role: "user",
-        content:
-          "Create a data transformation pipeline that filters adult users and extracts their names.",
-      },
-      {
-        role: "assistant",
-        content: `
-| Transform data through a multi-step pipeline
-let users = [{ name: "Alice", age: 28 } { name: "Bob", age: 34 } { name: "Charlie", age: 19 }]..
-let isAdult = <user: ge (get "age" user) 21>..
-let getNames = <user: get "name" user>..
-map (getNames) (filter (isAdult) users)..
-`.trim(),
-      },
-      {
-        role: "user",
-        content:
-          "Create a function that handles different user roles using pattern matching with tags.",
-      },
-      {
-        role: "assistant",
-        content: `
-| Demonstrate pattern matching with tag values and records
-let getStatus = <user:
-  case get "role" user of
-    admin: "Has full access"
-    editor: "Can edit content"
-    viewer: "Read-only access"
-    _: "Unknown role"
-  end
->..
-getStatus { name: "Alice", role: admin }..
-`.trim(),
-      },
-      {
-        role: "user",
-        content:
-          "Show how to compose functions to create a data processing pipeline.",
-      },
-      {
-        role: "assistant",
-        content: `
-| Use higher-order functions to process data
-let compose = <f g x: f (g x)>..
-let double = <x: mul x 2>..
-let increment = <x: add x 1>..
-let doubleAndIncrement = compose (increment) (double)..
-map (doubleAndIncrement) [1 2 3 4]..
-`.trim(),
-      },
-      {
-        role: "user",
-        content: currentCode
-          ? `I have the following existing code:\n\n\`\`\`\n${currentCode}\n\`\`\`\n\nI need to: ${userPrompt}`
-          : userPrompt,
+        content: userMessage,
       },
     ],
   };
@@ -1181,6 +1122,7 @@ export async function generateCode({
         lang,
         currentCode,
         rid,
+        conversationSummary,
       );
     }
 
