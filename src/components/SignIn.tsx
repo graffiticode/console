@@ -6,6 +6,7 @@ import {
   ChevronDownIcon,
   CreditCardIcon,
   UserCircleIcon,
+  Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
@@ -178,6 +179,22 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
                       aria-hidden="true"
                     />
                     Payments & Billing
+                  </Link>
+                )}
+              </Menu.Item>
+              <Menu.Item>
+                {({ active }) => (
+                  <Link
+                    href="/settings"
+                    className={`${
+                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
+                    } group flex items-center px-4 py-2 text-sm`}
+                  >
+                    <Cog6ToothIcon
+                      className="mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"
+                      aria-hidden="true"
+                    />
+                    Settings
                   </Link>
                 )}
               </Menu.Item>
