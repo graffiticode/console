@@ -471,10 +471,13 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-100px)]">
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-100px)]">
         <SignIn
           label="Sign in to continue"
         />
+        <p className="mt-4 text-sm text-gray-600 text-center max-w-sm">
+          New here? Create a free account by signing in with an Ethereum wallet. No blockchain fees required.
+        </p>
       </div>
     );
   }

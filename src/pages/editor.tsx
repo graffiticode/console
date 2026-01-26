@@ -185,7 +185,9 @@ export default function Editor({ language, setLanguage, mark }) {
           <div className="max-w-md w-full">
             <h2 className="text-center text-2xl font-bold mb-4">Sign in to continue</h2>
             <p className="text-center text-gray-600 mb-8">
-              Graffiticode account required to create or edit questions
+              Graffiticode account required to create or edit questions.
+              <br />
+              New here? Create a free account by signing in with an Ethereum wallet. No blockchain fees required.
             </p>
             <div className="flex justify-center">
               <button

@@ -68,6 +68,12 @@ export default function AuthMethodDialog({
                   )}
 
                   {/* Ethereum Wallet Button */}
+                  <p className="text-sm text-gray-500 text-center">
+                    Sign-in with an Ethereum wallet.
+                    <br />
+                    No blockchain fees required.
+                  </p>
+
                   <button
                     type="button"
                     onClick={onSelectEthereum}
@@ -117,10 +123,10 @@ export default function AuthMethodDialog({
                   </button>
                 </div>
 
-                <p className="mt-4 text-xs text-gray-500 text-center">
+                <p className="mt-4 text-sm text-gray-500 text-center">
                   Google sign-in requires a linked Ethereum account.
                   <br />
-                  Link your Google account from the Integrations page.
+                  Link your Google account from the Settings page.
                 </p>
               </Dialog.Panel>
             </Transition.Child>
