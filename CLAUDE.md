@@ -16,6 +16,7 @@ npm run build        # Production build
 npm run lint         # Run ESLint
 npm run lint:fix     # Auto-fix ESLint errors
 npm run typecheck    # TypeScript type checking
+npm run gcp:build    # Deploy to Cloud Run (requires gcloud auth)
 ```
 
 Minimum bar: `npm run lint` and `npm run typecheck` must pass.
@@ -41,6 +42,11 @@ User prompt → RAG vector search → DSPy prompt compilation (optional) → Cla
 - DSPy service - prompt optimization (configurable via DSPY_SERVICE_URL)
 - Firebase/Firestore - auth and storage
 - Stripe - payments
+
+**Authentication:**
+- Primary: Ethereum wallet sign-in (via SIWE - Sign-In with Ethereum)
+- Secondary: Google OAuth (requires linked Ethereum account)
+- Auth hook: `useGraffiticodeAuth` in `src/hooks/use-graffiticode-auth.tsx`
 
 ## Code Style
 
