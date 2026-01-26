@@ -19,7 +19,9 @@
     "update-embeddings-refresh": "npx tsx scripts/update-embeddings.ts --refresh",
     "adjust-overage-credits": "npx tsx scripts/adjust-overage-credits.ts",
     "test:streaming": "npx tsx scripts/test-streaming.ts",
-    "gcp:build": "gcloud builds submit --config cloudbuild.yaml --project graffiticode-app --substitutions=_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')"
+    "gcp:build": "gcloud builds submit --config cloudbuild.yaml --project graffiticode-app --substitutions=_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')",
+    "gcp:logs": "gcloud run services logs read console --project graffiticode-app --region us-central1 --limit 100",
+    "gcp:logs:tail": "gcloud beta run services logs tail console --project graffiticode-app --region us-central1"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",

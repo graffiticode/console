@@ -17,6 +17,8 @@ npm run lint         # Run ESLint
 npm run lint:fix     # Auto-fix ESLint errors
 npm run typecheck    # TypeScript type checking
 npm run gcp:build    # Deploy to Cloud Run (requires gcloud auth)
+npm run gcp:logs     # Read recent Cloud Run logs
+npm run gcp:logs:tail # Stream Cloud Run logs
 ```
 
 Minimum bar: `npm run lint` and `npm run typecheck` must pass.
