@@ -1,18 +1,20 @@
 export function getTitle() {
-  const hostnameParts = typeof document === "undefined" && ["Graffiticode"] || document.location.hostname.split(/[.]/g);
-  const title = hostnameParts.length === 1 && hostnameParts[0] || hostnameParts[hostnameParts.length - 2];
-  switch (title) {
-  case "graffiticode":
-    return "Graffiticode";
-  case "graffiticode":
-    return "Graffiticode";
-  case "questioncompiler":
-    return "QuestionCompiler";
-  case "graffiticode":
-    return "Graffiticode";
-  case "hikingxxx":
-    return "HikingXXX";
-  default:
-    return "Graffiticode";
+  if (typeof document === "undefined") {
+    return "graffiticode";
   }
+
+  let hostname = document.location.hostname;
+
+  // Handle localhost as graffiticode (default)
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "graffiticode";
+  }
+
+  // Strip common prefixes
+  hostname = hostname.replace(/^(console|www)\./, '');
+
+  // Strip TLD suffixes
+  hostname = hostname.replace(/\.(com|org|net|io|dev|app|co)$/, '');
+
+  return hostname || "graffiticode";
 }
