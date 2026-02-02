@@ -42,6 +42,7 @@ import {
   formatPromptSpecForLog,
   RenderContext,
 } from "./prompt-renderer";
+import { checkCompileAllowed } from "./usage-service";
 
 // Global cache for language assets to avoid repeated fetches
 const languageAssetsCache = {
@@ -977,6 +978,17 @@ export async function generateCode({
   conversationSummary?: ConversationSummary | null;
 }) {
   const accessToken = auth?.token;
+
+  // Check usage limit before proceeding
+  if (auth?.uid) {
+    const { allowed, reason } = await checkCompileAllowed(auth.uid);
+    if (!allowed) {
+      return {
+        code: null,
+        errors: [{ message: reason || 'Usage limit reached' }]
+      };
+    }
+  }
 
   // Generate request ID if not provided
   const requestId = rid || generateRequestId();
