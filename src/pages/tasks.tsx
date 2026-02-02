@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import { useEffect } from 'react';
-import { getTitle } from '../lib/utils';
+import { getPageTitle } from '../lib/utils';
 import TasksGallery from '../components/tasks-gallery';
 
 function classNames(...classes) {
@@ -9,7 +9,7 @@ function classNames(...classes) {
 
 export default function Tasks({ language }) {
   useEffect(() => {
-    document.title = getTitle();
+    document.title = getPageTitle();
   }, []);
 
   const lang = language.name.slice(1);

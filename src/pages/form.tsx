@@ -24,7 +24,7 @@ import MarkSelector, { marks } from '../components/mark-selector';
 import useSwr from 'swr';
 import useLocalStorage from '../hooks/use-local-storage';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
-import { getTitle } from '../lib/utils';
+import { getPageTitle } from '../lib/utils';
 
 const parseQuery =
       query => ({
@@ -42,12 +42,7 @@ export default function Form() {
   return (
     <>
       <Head>
-        <title>{getTitle()}</title>
-        <link rel="icon" type="image/png" href="favicon.png" />
-        <meta
-          name="description"
-          content="A software studio"
-        />
+        <title>{getPageTitle()}</title>
       </Head>
       <div className="h-screen w-full overflow-hidden">
           <div className="h-full w-full">

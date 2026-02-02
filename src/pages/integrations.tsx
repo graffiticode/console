@@ -2,13 +2,13 @@ import { useEffect } from 'react';
 import IntegrationsCard from '../components/IntegrationsCard';
 import SignIn from '../components/SignIn';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
-import { getTitle } from '../lib/utils';
+import { getPageTitle } from '../lib/utils';
 
 export default function Integrations() {
   const { user } = useGraffiticodeAuth();
 
   useEffect(() => {
-    document.title = getTitle();
+    document.title = getPageTitle();
   }, []);
 
   if (!user) {

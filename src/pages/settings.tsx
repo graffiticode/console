@@ -4,7 +4,7 @@ import SignIn from '../components/SignIn';
 import APIKeysCard from '../components/APIKeysCard';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { useOAuth, OAuthLink } from '../hooks/use-oauth';
-import { getTitle } from '../lib/utils';
+import { getPageTitle } from '../lib/utils';
 
 function OAuthCard() {
   const { user } = useGraffiticodeAuth();
@@ -131,7 +131,7 @@ export default function Settings() {
   const { user } = useGraffiticodeAuth();
 
   useEffect(() => {
-    document.title = getTitle();
+    document.title = getPageTitle();
   }, []);
 
   if (!user) {

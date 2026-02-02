@@ -21,7 +21,7 @@ import {
   BellIcon,
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/SignIn'
-import { getTitle } from '../lib/utils';
+import { getTitle, getPageTitle } from '../lib/utils';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -48,7 +48,7 @@ function LanguageList({ language, setLanguage }) {
     );
 
   useEffect(() => {
-    document.title = getTitle();
+    document.title = getPageTitle();
   }, []);
 
   if (!user) {

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { getTitle } from '../lib/utils';
+import { getPageTitle } from '../lib/utils';
 import Link from 'next/link';
 import { getBaseUrlForApi } from "../lib/api";
 
@@ -7,7 +7,7 @@ export default function Spec({ language }) {
   const langId = language.name.slice(1);
   const src = `${getBaseUrlForApi()}/L${langId}/spec.html`;
   useEffect(() => {
-    document.title = getTitle();
+    document.title = getPageTitle();
   }, []);
   return (
     <iframe

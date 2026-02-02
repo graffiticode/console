@@ -1,10 +1,11 @@
 import Head from 'next/head';
 import Image from 'next/image';
 import { useState, useEffect, Fragment } from 'react';
+import logo from '@/images/logos/logo.png';
 import { Disclosure, Menu, Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import GraphQLIde from '../components/graphiql';
-import { getTitle } from '../lib/utils';
+import { getPageTitle } from '../lib/utils';
 
 import {
   CalendarIcon,
@@ -21,7 +22,7 @@ import SignIn from '../components/SignIn'
 
 export function Logo(props) {
   return (
-    <Image src='/logo.png' alt='Graffiticode logo' width='30' height='30' />
+    <Image src={logo} alt='Graffiticode logo' width={30} height={30} unoptimized />
   );
 }
 
@@ -40,7 +41,7 @@ function classNames(...classes) {
 export default function Compiles() {
   const [userId, setUserId] = useState();
   useEffect(() => {
-    document.title = getTitle();
+    document.title = getPageTitle();
   }, []);
   return (
     <div className="w-full h-screen">

@@ -5,7 +5,7 @@ import { useAuth } from 'reactfire';
 import { signInWithCustomToken } from 'firebase/auth';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { createItem } from '../utils/swr/fetchers';
-import { getTitle } from '../lib/utils';
+import { getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
 import Gallery from '../components/gallery';
 
@@ -160,8 +160,7 @@ export default function Editor({ language, setLanguage, mark }) {
     return (
       <>
         <Head>
-          <title>{getTitle()} - Signing In</title>
-          <link rel="icon" type="image/png" href="favicon.png" />
+          <title>{getPageTitle('Signing In')}</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
@@ -178,8 +177,7 @@ export default function Editor({ language, setLanguage, mark }) {
     return (
       <>
         <Head>
-          <title>{getTitle()} - Editor Integration</title>
-          <link rel="icon" type="image/png" href="favicon.png" />
+          <title>{getPageTitle('Editor')}</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center">
           <div className="max-w-md w-full">
@@ -208,8 +206,7 @@ export default function Editor({ language, setLanguage, mark }) {
     return (
       <>
         <Head>
-          <title>{getTitle()} - Editor</title>
-          <link rel="icon" type="image/png" href="favicon.png" />
+          <title>{getPageTitle('Editor')}</title>
         </Head>
         <Gallery
           lang={lang}
@@ -226,8 +223,7 @@ export default function Editor({ language, setLanguage, mark }) {
     return (
       <>
         <Head>
-          <title>{getTitle()} - Creating Item</title>
-          <link rel="icon" type="image/png" href="favicon.png" />
+          <title>{getPageTitle('Creating Item')}</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
@@ -244,8 +240,7 @@ export default function Editor({ language, setLanguage, mark }) {
     return (
       <>
         <Head>
-          <title>{getTitle()} - Error</title>
-          <link rel="icon" type="image/png" href="favicon.png" />
+          <title>{getPageTitle('Error')}</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
@@ -267,7 +262,7 @@ export default function Editor({ language, setLanguage, mark }) {
   return (
     <>
       <Head>
-        <title>{getTitle()} - Loading</title>
+        <title>{getPageTitle('Loading')}</title>
         <link rel="icon" type="image/png" href="favicon.png" />
       </Head>
       <div className="min-h-screen flex items-center justify-center">

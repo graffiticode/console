@@ -10,7 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
-import { getTitle } from '../lib/utils';
+import { getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
 import SubscriptionCard from '../components/payments/SubscriptionCard';
 import UsageMonitor from '../components/payments/UsageMonitor';
@@ -81,7 +81,7 @@ export default function Payments() {
   return (
     <>
       <Head>
-        <title>Payments - {getTitle()}</title>
+        <title>{getPageTitle('Payments')}</title>
       </Head>
 
       <div className="min-h-screen bg-gray-50">

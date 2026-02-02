@@ -20,6 +20,7 @@ import {
   getItem,
   shareItem,
 } from "./resolvers";
+import { checkCompileAllowed } from "../../lib/usage-service";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
 
@@ -60,12 +61,19 @@ const typeDefs = `
   }
 
   type GeneratedCode {
-    code: String!
+    code: String
     taskId: String
     description: String
     language: String
     model: String
     usage: UsageInfo
+    errors: [CodeError]
+  }
+
+  type CodeError {
+    message: String!
+    line: Int
+    column: Int
   }
 
   type UsageInfo {
@@ -96,7 +104,15 @@ const typeDefs = `
     specUrl: String!
   }
 
+  type CompileAllowedResponse {
+    allowed: Boolean!
+    reason: String
+    currentUsage: Int
+    totalAvailable: Int
+  }
+
   type Query {
+    checkCompileAllowed: CompileAllowedResponse!
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
@@ -137,6 +153,18 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
+    checkCompileAllowed: async (_, __, ctx) => {
+      const { token } = ctx;
+      if (!token) {
+        return { allowed: false, reason: 'Not authenticated' };
+      }
+      try {
+        const { uid } = await client.verifyToken(token);
+        return await checkCompileAllowed(uid);
+      } catch (error) {
+        return { allowed: false, reason: 'Authentication failed' };
+      }
+    },
     data: async (_, args, ctx) => {
       const { token } = ctx;
       const { id } = args;

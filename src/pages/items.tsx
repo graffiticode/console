@@ -20,7 +20,7 @@ import { useRouter } from 'next/router';
 import Gallery from '../components/gallery';
 import useSwr from 'swr';
 import useLocalStorage from '../hooks/use-local-storage';
-import { getTitle } from '../lib/utils';
+import { getPageTitle } from '../lib/utils';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -42,7 +42,7 @@ export default function Tasks({ language, mark }) {
   }, [appParam, app, router]);
 
   useEffect(() => {
-    document.title = getTitle();
+    document.title = getPageTitle();
   }, []);
   const lang = language.name.slice(1);
   return (

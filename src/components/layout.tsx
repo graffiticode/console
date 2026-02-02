@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Image from 'next/image';
 import { useEffect } from 'react';
+import logo from '@/images/logos/logo.png';
 import { Disclosure } from '@headlessui/react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -12,11 +13,11 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import SignIn from '../components/SignIn'
-import { getTitle } from '../lib/utils';
+import { getTitle, getPageTitle } from '../lib/utils';
 
 export function Logo(props) {
   return (
-    <Image src='/logo.png' alt='Graffiticode logo' width='30' height='30' />
+    <Image src={logo} alt='Graffiticode logo' width={30} height={30} unoptimized />
   );
 }
 
@@ -52,7 +53,7 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
   const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
   const domain = queryDomainStr || storedDomain || getTitle();
   useEffect(() => {
-    document.title = getTitle();
+    document.title = getPageTitle();
   }, []);
   return (
     <>
@@ -65,11 +66,7 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
         ```
       */}
       <Head>
-        <link rel="icon" type="image/png" href="favicon.png" />
-        <meta
-          name="description"
-          content="A software studio"
-        />
+        <title>{getPageTitle()}</title>
       </Head>
       <div className="min-h-full">
         <Disclosure as="nav" className="bg-gray-800 sticky top-0 z-50 shadow-lg">

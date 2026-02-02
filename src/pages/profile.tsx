@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { mutate } from 'swr';
 import { UserCircleIcon, CameraIcon } from '@heroicons/react/24/outline';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
-import { getTitle } from '../lib/utils';
+import { getTitle, getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
 
 interface UserData {
@@ -317,7 +317,7 @@ export default function Profile() {
   return (
     <>
       <Head>
-        <title>Profile - {getTitle()}</title>
+        <title>{getPageTitle('Profile')}</title>
       </Head>
 
       <div className="min-h-screen bg-gray-50">
