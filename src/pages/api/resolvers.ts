@@ -422,8 +422,15 @@ export async function generateCode({
 
       // Handle usage limit errors (returned as errors array)
       if ('errors' in result && result.errors) {
-        // Create error code as a comment (following template pattern)
-        const errorCode = `| Error: ${result.errors[0]?.message || 'Unknown error'}..`;
+        // Create error code as Graffiticode that compiles to the error object
+        // Elaborate the message to help the user resolve the issue
+        const elaboratedErrors = result.errors.map(err => ({
+          ...err,
+          message: err.message === 'Usage limit reached'
+            ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
+            : err.message
+        }));
+        const errorCode = JSON.stringify({ errors: elaboratedErrors }, null, 2) + "..";
 
         // Post task to get taskId (same as template/success flow)
         const taskData = await postTask({
@@ -440,7 +447,7 @@ export async function generateCode({
           description: "Error response",
           model: null,
           usage: null,
-          errors: result.errors,
+          errors: elaboratedErrors,
         };
       }
 
@@ -493,8 +500,9 @@ export async function generateCode({
       success: false,
     });
 
-    // Create error code and post task (following template pattern)
-    const errorCode = `| Error: ${error.message}..`;
+    // Create error code as Graffiticode that compiles to the error object
+    const errors = [{ message: error.message }];
+    const errorCode = JSON.stringify({ errors }, null, 2) + "..";
     const taskData = await postTask({
       auth,
       task: { lang: language, code: errorCode },
@@ -509,7 +517,7 @@ export async function generateCode({
       description: null,
       model: null,
       usage: null,
-      errors: [{ message: error.message }],
+      errors,
     };
   }
 }
