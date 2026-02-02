@@ -83,6 +83,7 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
       const usageDocRef = db.collection('usage').doc(auth.uid);
       const usageDoc = await usageDocRef.get();
 
+      let newTotal = units;
       if (usageDoc.exists) {
         const currentData = usageDoc.data();
         // Check if we need to reset monthly usage (new month)
@@ -98,10 +99,12 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
             lastReset: now.toISOString(),
             lastUpdated: now.toISOString()
           });
+          newTotal = units;
         } else {
           // Increment existing month total
+          newTotal = (currentData.currentMonthTotal || 0) + units;
           await usageDocRef.update({
-            currentMonthTotal: (currentData.currentMonthTotal || 0) + units,
+            currentMonthTotal: newTotal,
             lastUpdated: now.toISOString()
           });
         }
@@ -112,11 +115,38 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
           lastReset: now.toISOString(),
           lastUpdated: now.toISOString()
         });
+        newTotal = units;
       }
 
+      // Calculate if now over limit (after adding these new units)
+      const userDoc = await db.collection('users').doc(auth.uid).get();
+      const userData = userDoc.exists ? userDoc.data() : {};
+      const subscription = userData?.subscription || {};
+      const plan = subscription.plan || 'demo';
+      const overageUnits = subscription.overageUnits || 0;
+
+      const planAllocations = {
+        demo: 100,
+        starter: 2000,
+        pro: 100000,
+        teams: 2000000
+      };
+      let allocatedUnits = planAllocations[plan] || 100;
+
+      // Check for preserved allocation (from downgrade)
+      const preservedUntil = subscription.preservedUntil;
+      const preservedAllocation = subscription.preservedAllocation;
+      if (preservedUntil && preservedAllocation && new Date(preservedUntil) > now) {
+        allocatedUnits = preservedAllocation;
+      }
+
+      const totalAvailable = allocatedUnits + overageUnits;
+      const usageLimitReached = newTotal > totalAvailable;
+
+      return JSON.stringify({ success: true, usageLimitReached });
     }
 
-    return "ok";
+    return JSON.stringify({ success: true });
   } catch (x) {
     console.log("logCompile()", "ERROR", x);
   }
@@ -389,9 +419,36 @@ export async function generateCode({
         rid,
         conversationSummary,
       });
-      code = result.code;
-      model = result.model;
-      usage = result.usage;
+
+      // Handle usage limit errors (returned as errors array)
+      if ('errors' in result && result.errors) {
+        // Create error code as a comment (following template pattern)
+        const errorCode = `| Error: ${result.errors[0]?.message || 'Unknown error'}..`;
+
+        // Post task to get taskId (same as template/success flow)
+        const taskData = await postTask({
+          auth,
+          task: { lang: language, code: errorCode },
+          ephemeral: true,
+          isPublic: false,
+        });
+
+        return {
+          code: errorCode,
+          taskId: taskData?.id || null,
+          language,
+          description: "Error response",
+          model: null,
+          usage: null,
+          errors: result.errors,
+        };
+      }
+
+      // After error check, result is the success type
+      const successResult = result as { code: any; model: string; usage: any };
+      code = successResult.code;
+      model = successResult.model;
+      usage = successResult.usage;
     }
 
     // Post the task to get a task ID
@@ -425,6 +482,7 @@ export async function generateCode({
       description: description,
       model: model,
       usage: usage,
+      errors: null,
     };
   } catch (error) {
     console.error("generateCode()", "ERROR", error);
@@ -435,7 +493,24 @@ export async function generateCode({
       success: false,
     });
 
-    throw new Error(`Failed to generate code: ${error.message}`);
+    // Create error code and post task (following template pattern)
+    const errorCode = `| Error: ${error.message}..`;
+    const taskData = await postTask({
+      auth,
+      task: { lang: language, code: errorCode },
+      ephemeral: true,
+      isPublic: false,
+    });
+
+    return {
+      code: errorCode,
+      taskId: taskData?.id || null,
+      language,
+      description: null,
+      model: null,
+      usage: null,
+      errors: [{ message: error.message }],
+    };
   }
 }
 
