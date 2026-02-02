@@ -421,6 +421,7 @@ export async function generateCode({
       });
 
       // Handle usage limit errors (returned as errors array)
+      console.log("generateCode() result:", { hasErrors: 'errors' in result, errors: 'errors' in result ? result.errors : null });
       if ('errors' in result && result.errors) {
         // Create error code as Graffiticode that compiles to the error object
         // Elaborate the message to help the user resolve the issue

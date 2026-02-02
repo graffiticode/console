@@ -981,8 +981,10 @@ export async function generateCode({
 
   // Check usage limit before proceeding
   if (auth?.uid) {
-    const { allowed, reason } = await checkCompileAllowed(auth.uid);
+    const { allowed, reason, currentUsage, totalAvailable } = await checkCompileAllowed(auth.uid);
+    console.log("generateCode() usage check:", { uid: auth.uid, allowed, reason, currentUsage, totalAvailable });
     if (!allowed) {
+      console.log("generateCode() returning usage limit error");
       return {
         code: null,
         errors: [{ message: reason || 'Usage limit reached' }]
