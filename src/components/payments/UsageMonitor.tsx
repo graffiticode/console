@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Switch } from '@headlessui/react';
 import { BoltIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
@@ -413,7 +414,10 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
               <div className="pt-4">
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <p className="text-sm text-gray-600">
-                    Overage purchases are not available for your plan.
+                    Overage purchases are not available for your plan.{' '}
+                    <Link href="/payments" className="text-blue-600 hover:text-blue-800 font-medium">
+                      Upgrade to get more compiles.
+                    </Link>
                   </p>
                 </div>
               </div>

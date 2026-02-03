@@ -4,7 +4,6 @@ import Head from 'next/head';
 import { Tab } from '@headlessui/react';
 import {
   CreditCardIcon,
-  ChartBarIcon,
   DocumentTextIcon,
   CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
@@ -13,7 +12,6 @@ import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
 import SubscriptionCard from '../components/payments/SubscriptionCard';
-import UsageMonitor from '../components/payments/UsageMonitor';
 import PricingPlans from '../components/payments/PricingPlans';
 import BillingHistory from '../components/payments/BillingHistory';
 import PaymentMethods from '../components/payments/PaymentMethods';
@@ -24,7 +22,6 @@ function classNames(...classes: string[]) {
 
 const tabs = [
   { name: 'Subscription', icon: CurrencyDollarIcon },
-  { name: 'Usage', icon: ChartBarIcon },
   { name: 'Billing History', icon: DocumentTextIcon },
   { name: 'Payment Methods', icon: CreditCardIcon },
 ];
@@ -124,10 +121,6 @@ export default function Payments() {
                     <PricingPlans userId={user.uid} onSubscriptionChange={refreshSubscription} />
                   </div>
                 </div>
-              </Tab.Panel>
-
-              <Tab.Panel className="rounded-xl bg-white p-6 shadow">
-                <UsageMonitor userId={user.uid} />
               </Tab.Panel>
 
               <Tab.Panel className="rounded-xl bg-white p-6 shadow">
