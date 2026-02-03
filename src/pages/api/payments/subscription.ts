@@ -34,16 +34,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const db = getFirestore();
     const userDoc = await db.collection('users').doc(userId).get();
 
-    // For new users without a document, return starter tier
+    // For new users without a document, return demo tier
     if (!userDoc.exists) {
+      const now = new Date();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
       return res.status(200).json({
-        plan: 'starter',
-        interval: null,
+        plan: 'demo',
+        interval: 'monthly',
         status: 'active',
-        currentBillingPeriod: null,
+        currentBillingPeriod: {
+          start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+          end: endOfMonth.toISOString(),
+        },
         cancelAtPeriodEnd: false,
-        nextBillingDate: null,
-        units: 1000, // Starter tier units
+        nextBillingDate: endOfMonth.toISOString(),
+        units: 100, // Demo tier units
         overageUnits: 0,
         overageRate: null,
         hasActiveSubscription: false,
@@ -54,19 +60,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const userData = userDoc.data();
     let stripeCustomerId = userData?.stripeCustomerId;
 
-    // If Stripe is not configured or no Stripe customer, return starter tier
+    // If Stripe is not configured or no Stripe customer, return demo/starter tier
     if (!stripe || !stripeCustomerId) {
       const preservedRenewalDate = userData?.subscription?.renewalDate || null;
+      const plan = userData?.subscription?.plan || 'demo';
+
+      // For demo/free users, calculate end of current month as renewal date
+      const now = new Date();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1); // First day of next month = renewal
+      const renewalDate = preservedRenewalDate || endOfMonth.toISOString();
+
+      // Demo gets 100 units, Starter gets 2000
+      const units = plan === 'demo' ? 100 : 2000;
 
       return res.status(200).json({
-        plan: userData?.subscription?.plan || 'starter',
-        interval: null,
+        plan,
+        interval: 'monthly',
         status: 'active',
-        currentBillingPeriod: null,
+        currentBillingPeriod: {
+          start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+          end: endOfMonth.toISOString(),
+        },
         cancelAtPeriodEnd: false,
-        nextBillingDate: preservedRenewalDate,
-        units: 2000, // Starter tier units
-        overageUnits: 0,
+        nextBillingDate: renewalDate,
+        units,
+        overageUnits: userData?.subscription?.overageUnits || 0,
         overageRate: null,
         hasActiveSubscription: false,
         trialUsedAt: userData?.trialUsedAt || null,
@@ -78,18 +96,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await stripe.customers.retrieve(stripeCustomerId);
     } catch (error: any) {
       if (error.code === 'resource_missing') {
-        // Customer doesn't exist in current mode, treat as starter tier
+        // Customer doesn't exist in current mode, treat as demo tier
         const preservedRenewalDate = userData?.subscription?.renewalDate || null;
+        const plan = userData?.subscription?.plan || 'demo';
+        const now = new Date();
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const renewalDate = preservedRenewalDate || endOfMonth.toISOString();
+        const units = plan === 'demo' ? 100 : 2000;
 
         return res.status(200).json({
-          plan: userData?.subscription?.plan || 'starter',
-          interval: null,
+          plan,
+          interval: 'monthly',
           status: 'active',
-          currentBillingPeriod: null,
+          currentBillingPeriod: {
+            start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+            end: endOfMonth.toISOString(),
+          },
           cancelAtPeriodEnd: false,
-          nextBillingDate: preservedRenewalDate,
-          units: 2000, // Starter tier units
-          overageUnits: 0,
+          nextBillingDate: renewalDate,
+          units,
+          overageUnits: userData?.subscription?.overageUnits || 0,
           overageRate: null,
           hasActiveSubscription: false,
           trialUsedAt: userData?.trialUsedAt || null,
@@ -115,7 +141,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subscriptions.data.push(...trialingSubscriptions.data);
     }
 
-    // If no active subscription, return starter tier with preserved renewal date if available
+    // If no active subscription, return demo/starter tier with preserved renewal date if available
     if (!subscriptions.data.length) {
       // Check if there's a preserved renewal date from a previous subscription
       const preservedRenewalDate = userData?.subscription?.renewalDate || null;
@@ -125,15 +151,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const preservedAllocation = userData?.subscription?.preservedAllocation;
       const hasPreservedAllocation = preservedUntil && preservedAllocation && new Date(preservedUntil) > new Date();
 
+      const plan = userData?.subscription?.plan || 'demo';
+
+      // For demo/free users, calculate end of current month as renewal date
+      const now = new Date();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const renewalDate = preservedRenewalDate || endOfMonth.toISOString();
+
+      // Demo gets 100 units, Starter gets 2000
+      const defaultUnits = plan === 'demo' ? 100 : 2000;
+
       return res.status(200).json({
-        plan: userData?.subscription?.plan || 'starter',
-        interval: null,
+        plan,
+        interval: 'monthly',
         status: 'active',
-        currentBillingPeriod: null,
+        currentBillingPeriod: {
+          start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+          end: endOfMonth.toISOString(),
+        },
         cancelAtPeriodEnd: false,
-        nextBillingDate: preservedRenewalDate, // Use preserved renewal date if available
-        units: hasPreservedAllocation ? preservedAllocation : 2000, // Use preserved allocation or Starter tier units
-        overageUnits: 0,
+        nextBillingDate: renewalDate,
+        units: hasPreservedAllocation ? preservedAllocation : defaultUnits,
+        overageUnits: userData?.subscription?.overageUnits || 0,
         overageRate: null,
         isUsingPreservedAllocation: hasPreservedAllocation,
         preservedUntil: hasPreservedAllocation ? preservedUntil : null,

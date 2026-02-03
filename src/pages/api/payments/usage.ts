@@ -127,8 +127,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         lastDayOfPeriod = new Date(currentYear, currentMonth + 1, 0);
       }
     } else {
-      // No Stripe customer - starter users don't have billing periods normally
-      // But check if there's a preserved renewal date from a downgrade
+      // No Stripe customer - Demo/Free users use calendar month
+      // Check if there's a preserved renewal date from a downgrade
       const preservedRenewalDate = userData?.subscription?.renewalDate;
       const preservedUntil = userData?.subscription?.preservedUntil;
 
@@ -141,10 +141,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         firstDayOfPeriod = new Date(lastDayOfPeriod);
         firstDayOfPeriod.setMonth(firstDayOfPeriod.getMonth() - 1);
       } else {
-        // No preserved dates - use account creation date as the start
-        const accountCreated = userData?.created ? new Date(userData.created) : now;
-        firstDayOfPeriod = accountCreated;
-        lastDayOfPeriod = new Date('2099-12-31'); // Far future date (no reset for starter users)
+        // Demo/Free users: use calendar month (1st to end of month)
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        firstDayOfPeriod = new Date(currentYear, currentMonth, 1);
+        lastDayOfPeriod = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
       }
     }
 
@@ -170,13 +171,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log('Monthly usage needs reset - using 0 for stored total');
         totalUsage = 0;
       } else {
-        // For starter users (no Stripe customer), use lifetime total
-        // For paid users, use current period total
-        if (!stripeCustomerId) {
-          totalUsage = data?.lifetimeTotal || data?.currentMonthTotal || 0;
-        } else {
-          totalUsage = data?.currentMonthTotal || 0;
-        }
+        // Use current month total for all users (Demo, Starter, and Paid)
+        totalUsage = data?.currentMonthTotal || 0;
       }
       lastUpdate = data?.lastUpdate || null;
 

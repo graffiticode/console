@@ -4,7 +4,7 @@ import axios from 'axios';
 
 interface SubscriptionData {
   status: 'active' | 'canceled' | 'past_due' | 'trialing' | 'none';
-  plan: 'starter' | 'pro' | 'teams';
+  plan: 'demo' | 'starter' | 'pro' | 'teams';
   interval: 'monthly' | 'annual' | null;
   currentPeriodEnd?: string;
   cancelAtPeriodEnd?: boolean;
@@ -21,6 +21,7 @@ interface SubscriptionCardProps {
 }
 
 const planDetails = {
+  demo: { name: 'Demo', monthlyUnits: 100, price: { monthly: 0, annual: 0 } },
   starter: { name: 'Starter', monthlyUnits: 2000, price: { monthly: 10, annual: 100 } },
   pro: { name: 'Pro', monthlyUnits: 100000, price: { monthly: 100, annual: 1000 } },
   teams: { name: 'Team', monthlyUnits: 2000000, price: { monthly: 1000, annual: 10000 } },
@@ -41,11 +42,11 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
       setSubscription(response.data);
     } catch (error) {
       console.error('Error fetching subscription:', error);
-      // Default to starter tier if no subscription found
+      // Default to demo tier if no subscription found
       setSubscription({
         status: 'none',
-        plan: 'starter',
-        interval: null
+        plan: 'demo',
+        interval: 'monthly'
       });
     } finally {
       setLoading(false);
@@ -97,7 +98,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
     return <div>Error loading subscription data</div>;
   }
 
-  const plan = planDetails[subscription.plan] || planDetails.starter;
+  const plan = planDetails[subscription.plan] || planDetails.demo;
   const currentPrice = subscription.interval && plan.price && typeof plan.price === 'object'
     ? plan.price[subscription.interval]
     : plan.price && typeof plan.price === 'number' ? plan.price : 0;
@@ -118,7 +119,8 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
     : 'text-gray-600 bg-gray-100';
 
   const getStatusLabel = () => {
-    if (subscription.status === 'none') return 'Starter Tier';
+    if (subscription.status === 'none') return 'Free Tier';
+    if (subscription.plan === 'demo') return 'Free Tier';
     if (subscription.status === 'active' || subscription.status === 'trialing') return 'Active';
     if (subscription.status === 'past_due') return 'Past Due';
     if (subscription.status === 'canceled') return 'Canceled';
@@ -152,13 +154,19 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
           <div>
             <dt className="text-sm font-medium text-gray-500">Billing</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              ${currentPrice}
-              <span className="text-sm text-gray-500 ml-1">
-                / {subscription.interval === 'annual' ? 'year' : 'month'}
-              </span>
+              {currentPrice === 0 ? (
+                'Free'
+              ) : (
+                <>
+                  ${currentPrice}
+                  <span className="text-sm text-gray-500 ml-1">
+                    / {subscription.interval === 'annual' ? 'year' : 'month'}
+                  </span>
+                </>
+              )}
             </dd>
             <dd className="mt-1 text-sm text-gray-600">
-              {subscription.interval ? `Billed ${subscription.interval === 'monthly' ? 'monthly' : 'annually'}` : 'Billed monthly'}
+              {currentPrice === 0 ? 'No payment required' : subscription.interval ? `Billed ${subscription.interval === 'monthly' ? 'monthly' : 'annually'}` : 'Billed monthly'}
             </dd>
           </div>
 
@@ -179,6 +187,8 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
               <dd className="mt-1 text-sm text-gray-600">
                 {subscription.cancelAtPeriodEnd
                   ? 'Subscription ends'
+                  : subscription.plan === 'demo'
+                  ? 'Usage resets'
                   : subscription.status === 'trialing'
                   ? 'First payment due'
                   : 'Next payment due'}

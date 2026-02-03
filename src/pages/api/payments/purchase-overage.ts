@@ -50,10 +50,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // For new users without a document, return starter plan info
       const userData = userDoc.exists ? userDoc.data() : null;
       const subscriptionData = userData?.subscription || {};
-      const currentPlan = subscriptionData.plan || 'starter';
+      const currentPlan = subscriptionData.plan || 'demo';
       const currentOverage = subscriptionData.overageUnits || 0;
 
-      // Starter plan now supports overage purchases
+      // Demo users cannot purchase overage units
+      if (currentPlan === 'demo') {
+        return res.status(200).json({
+          plan: currentPlan,
+          overageAvailable: false,
+          currentOverageBalance: currentOverage,
+          message: 'Please upgrade to a paid plan to purchase additional units'
+        });
+      }
 
       const pricing = OVERAGE_PRICING[currentPlan];
 
@@ -114,7 +122,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get user's current plan
     const subscriptionData = userData?.subscription || {};
-    const currentPlan = subscriptionData.plan || 'starter';
+    const currentPlan = subscriptionData.plan || 'demo';
+
+    // Demo users cannot purchase overage units
+    if (currentPlan === 'demo') {
+      return res.status(400).json({ error: 'Please upgrade to a paid plan to purchase additional units' });
+    }
 
     // Validate purchase amount
     const pricing = OVERAGE_PRICING[currentPlan];

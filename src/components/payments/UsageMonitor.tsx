@@ -309,47 +309,51 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
             </h3>
 
             <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Auto-recharge</p>
-                <p className="text-sm text-gray-500">
-                  Automatically purchase overage blocks when you run out of compile units
-                </p>
-              </div>
-              <Switch
-                checked={billing.autoRecharge}
-                onChange={handleAutoRechargeToggle}
-                className={`${
-                  billing.autoRecharge ? 'bg-indigo-600' : 'bg-gray-200'
-                } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2`}
-              >
-                <span
-                  className={`${
-                    billing.autoRecharge ? 'translate-x-6' : 'translate-x-1'
-                  } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
-                />
-              </Switch>
-            </div>
+            {pricing.overageAvailable && (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Auto-recharge</p>
+                    <p className="text-sm text-gray-500">
+                      Automatically purchase overage blocks when you run out of compile units
+                    </p>
+                  </div>
+                  <Switch
+                    checked={billing.autoRecharge}
+                    onChange={handleAutoRechargeToggle}
+                    className={`${
+                      billing.autoRecharge ? 'bg-indigo-600' : 'bg-gray-200'
+                    } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2`}
+                  >
+                    <span
+                      className={`${
+                        billing.autoRecharge ? 'translate-x-6' : 'translate-x-1'
+                      } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                    />
+                  </Switch>
+                </div>
 
-            {billing.autoRecharge && pricing && pricing.blockSize && (
-              <div className="ml-4 pb-4 border-b">
-                <label className="text-sm font-medium text-gray-700">
-                  Monthly limit
-                </label>
-                <select
-                  value={billing.autoRechargeLimit}
-                  onChange={(e) => handleLimitChange(Number(e.target.value))}
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                >
-                  <option value={1}>1 block ({pricing.blockSize.toLocaleString()} units)</option>
-                  <option value={3}>3 blocks ({(3 * pricing.blockSize).toLocaleString()} units)</option>
-                  <option value={5}>5 blocks ({(5 * pricing.blockSize).toLocaleString()} units)</option>
-                  <option value={10}>10 blocks ({(10 * pricing.blockSize).toLocaleString()} units)</option>
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  {billing.overageBlocksUsedThisPeriod} of {billing.autoRechargeLimit} blocks used this month
-                </p>
-              </div>
+                {billing.autoRecharge && pricing.blockSize && (
+                  <div className="ml-4 pb-4 border-b">
+                    <label className="text-sm font-medium text-gray-700">
+                      Monthly limit
+                    </label>
+                    <select
+                      value={billing.autoRechargeLimit}
+                      onChange={(e) => handleLimitChange(Number(e.target.value))}
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                    >
+                      <option value={1}>1 block ({pricing.blockSize.toLocaleString()} units)</option>
+                      <option value={3}>3 blocks ({(3 * pricing.blockSize).toLocaleString()} units)</option>
+                      <option value={5}>5 blocks ({(5 * pricing.blockSize).toLocaleString()} units)</option>
+                      <option value={10}>10 blocks ({(10 * pricing.blockSize).toLocaleString()} units)</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {billing.overageBlocksUsedThisPeriod} of {billing.autoRechargeLimit} blocks used this month
+                    </p>
+                  </div>
+                )}
+              </>
             )}
 
             {pricing && pricing.overageAvailable && (
