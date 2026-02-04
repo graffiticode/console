@@ -58,20 +58,20 @@ function OAuthCard() {
   };
 
   return (
-    <div className="border rounded-lg p-4">
+    <div className="border rounded-none p-4">
       <h3 className="text-lg font-semibold mb-4">OAuth</h3>
       <p className="text-sm text-gray-600 mb-4">
         Link your Google account to enable sign-in with Google.
       </p>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-100 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-none bg-red-100 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
       {oauthLinks.length > 0 && (
-        <ul className="border border-gray-300 rounded mb-4 divide-y">
+        <ul className="border border-gray-300 rounded-none mb-4 divide-y">
           {oauthLinks.map((link) => (
             <li key={link.provider} className="flex items-center justify-between px-3 py-3">
               <div className="flex items-center gap-3">
@@ -90,14 +90,19 @@ function OAuthCard() {
                   )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleUnlinkGoogle}
-                disabled={oauthLoading}
-                className="text-red-500 hover:text-red-700 disabled:opacity-50"
-              >
-                <TrashIcon className="h-5 w-5" />
-              </button>
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handleUnlinkGoogle}
+                  disabled={oauthLoading}
+                  className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                >
+                  <TrashIcon className="h-5 w-5" />
+                </button>
+                <span className="absolute right-full top-1/2 -translate-y-1/2 mr-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                  Unlink Google account
+                </span>
+              </div>
             </li>
           ))}
         </ul>
@@ -108,7 +113,7 @@ function OAuthCard() {
           type="button"
           onClick={handleLinkGoogle}
           disabled={oauthLoading}
-          className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-300 rounded-none text-sm text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {oauthLoading ? (
             <>
@@ -153,7 +158,7 @@ export default function Settings() {
             <span className="mx-5 text-xl font-bold">Settings</span>
           </aside>
           <div className="lg:col-span-9 p-4 space-y-4">
-            <div className="border rounded-lg p-4">
+            <div className="border rounded-none p-4">
               <h3 className="text-lg font-semibold mb-4">API Keys</h3>
               <APIKeysCard />
             </div>

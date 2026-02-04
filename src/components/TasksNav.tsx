@@ -198,7 +198,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                   {!item.children ? (
                     <div
                       className={classNames(
-                        item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                        item.current ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200',
                         "flex flex-row justify-between pr-2"
                       )}
                     >
@@ -208,10 +208,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                           items.forEach(item => item.current = false);
                           item.current = true;
                         }}
-                        className={classNames(
-                          item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                          'block rounded-none py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left'
-                        )}
+                        className="block rounded-none py-0 pr-2 pl-10 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left"
                         title={item.name}
                       >
                         {item.name}
@@ -222,7 +219,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                       {({ open }) => (
                         <>
                           <div className={classNames(
-                                 item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                 item.current ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200',
                                  "flex flex-row justify-between pr-2"
                                )}
                           >
@@ -232,10 +229,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                                 items.forEach(item => item.current = false);
                                 item.current = true;
                               }}
-                              className={classNames(
-                                item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                                'flex items-center w-full text-xs text-left rounded-none px-2 gap-x-3 leading-6 font-bold text-gray-700'
-                              )}
+                              className="flex items-center w-full text-xs text-left rounded-none px-2 gap-x-3 leading-6 font-bold text-gray-700"
                               title={item.name}
                             >
                               <ChevronRightIcon
@@ -252,7 +246,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                             {item.children.map((subItem) => (
                               <li key={subItem.id}>
                                 <div className={classNames(
-                                       item.current ? 'bg-gray-50' : 'hover:bg-gray-50',
+                                       item.current ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200',
                                        "flex flex-row justify-between"
                                      )}
                                 >
@@ -263,10 +257,7 @@ export default function TasksNav({ user, setId, tasks, currentId }) {
                                       item.children.forEach(subItem => subItem.current = false);
                                       subItem.current = true;
                                     }}
-                                    className={classNames(
-                                      subItem.current ? 'bg-gray-50' : 'hover:bg-gray-50',
-                                      'font-normal block rounded-none py-0 pr-2 pl-8 text-xs leading-6 text-gray-700 truncate max-w-[150px] text-left'
-                                    )}
+                                    className="font-normal block rounded-none py-0 pr-2 pl-8 text-xs leading-6 text-gray-700 truncate max-w-[150px] text-left"
                                     title={subItem.name}
                                   >
                                     {subItem.name}

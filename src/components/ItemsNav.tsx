@@ -272,17 +272,17 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
   const [ showId, setShowId ] = useState("");
 
   return (
-    <div className="w-full flex flex-col gap-y-1 bg-white pt-1">
+    <div className="w-full flex flex-col gap-y-1 bg-gray-100 pt-1 pr-2">
       <nav className="flex flex-1 flex-col">
         {items.length === 0 ? (
           <p className="text-xs text-gray-500 text-left pl-4 py-0 leading-6">No items found</p>
         ) : (
-          <ul role="list" className="space-y-1 font-mono pr-1">
+          <ul role="list" className="space-y-1 font-mono">
             {items.map((item) => (
               <li key={item.id}>
                 <div
                   className={classNames(
-                    item.id === selectedItemId ? 'bg-gray-100' : 'hover:bg-gray-100',
+                    item.id === selectedItemId ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200',
                     'flex flex-row justify-between pr-2'
                   )}
                   onMouseOver={() => {
@@ -293,10 +293,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                 >
                   <button
                     onClick={() => onSelectItem(item.id)}
-                    className={classNames(
-                      item.id === selectedItemId ? 'bg-gray-100' : 'hover:bg-gray-100',
-                      'flex items-center rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left'
-                    )}
+                    className="flex items-center rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left"
                     title={item.name}
                   >
                     <span className="truncate">{item.name}</span>

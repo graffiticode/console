@@ -25,14 +25,14 @@ export default function NewAPIKeyDialog({ apiKey }) {
         <span className="font-semibold">ID</span>
         <span className="flex-1 text-slate-500 text-ellipsis overflow-hidden ml-2">{apiKey?.id}</span>
         <button className="" onClick={() => copyToClipboard(apiKey?.id)}>
-          <ClipboardIcon className="h-6 w-6 text-blue-500" />
+          <ClipboardIcon className="h-6 w-6 text-gray-500" />
         </button>
       </div>
       <div className="flex items-center text-gray-800 border border-gray-800 bg-white font-mono text-sm py-3 px-4 mb-1 rounded">
         <span className="font-semibold">Secret</span>
         <span className="flex-1 text-slate-500 text-ellipsis overflow-hidden ml-2">{apiKey?.token}</span>
         <button onClick={() => copyToClipboard(apiKey?.token)}>
-          <ClipboardIcon className="h-6 w-6 text-blue-500" />
+          <ClipboardIcon className="h-6 w-6 text-gray-500" />
         </button>
       </div>
       {state.error && <p className="text-danger">Unable to copy value: {state.error.message}</p>}

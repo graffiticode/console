@@ -274,13 +274,13 @@ export default function TasksGallery({ lang }) {
                   <div className="text-sm text-gray-500">No tasks found</div>
                 </div>
               ) : (
-                <nav className="flex flex-1 flex-col p-2">
-                  <ul role="list" className="space-y-1 font-mono pr-1">
+                <nav className="flex flex-1 flex-col bg-gray-100 pt-1 pr-2">
+                  <ul role="list" className="space-y-1 font-mono">
                     {taskIds.map((task) => (
                       <li key={task.id} ref={el => { taskItemsRef.current[task.id] = el; }}>
                         <div
                           className={classNames(
-                            task.current ? 'bg-gray-100' : 'hover:bg-gray-100',
+                            task.current ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200',
                             "flex flex-row justify-between pr-2"
                           )}
                           onMouseOver={() => {
@@ -291,10 +291,7 @@ export default function TasksGallery({ lang }) {
                         >
                           <button
                             onClick={() => handleSelectTask(task.id)}
-                            className={classNames(
-                              task.current ? 'bg-gray-100' : 'hover:bg-gray-100',
-                              'block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 w-full text-left truncate'
-                            )}
+                            className="block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 w-full text-left truncate"
                           >
                             {elideCompoundId(task.id)}
                           </button>
@@ -371,7 +368,7 @@ export default function TasksGallery({ lang }) {
                   )}
                   style={{ height: 'calc(100% - 84px)' }}
                 >
-                  <div className="h-full overflow-auto p-2">
+                  <div className="h-full overflow-auto">
                     {tab === "Data" ? (
                       <DataPanel
                         id={selectedTaskId}
@@ -504,7 +501,7 @@ export default function TasksGallery({ lang }) {
                   id={selectedTaskId}
                   lang={lang}
                   height="100%"
-                  className="h-full w-full p-2"
+                  className="h-full w-full"
                   setData={() => {}}
                   setNewTask={() => {}}
                 />

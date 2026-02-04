@@ -53,7 +53,7 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
     return (
       <div className="animate-pulse space-y-4">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-20 bg-gray-200 rounded-lg"></div>
+          <div key={i} className="h-20 bg-gray-200 rounded-none"></div>
         ))}
       </div>
     );
@@ -75,7 +75,7 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
                 onClick={() => setFilter(tab as any)}
                 className={`${
                   filter === tab
-                    ? 'border-indigo-500 text-indigo-600'
+                    ? 'border-gray-500 text-gray-700'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm capitalize`}
               >
@@ -92,7 +92,7 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
           <p className="text-gray-500">No billing history to display.</p>
         </div>
       ) : (
-        <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+        <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-none">
           <table className="min-w-full divide-y divide-gray-300">
             <thead className="bg-gray-50">
               <tr>
@@ -128,8 +128,8 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       invoice.type === 'subscription'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-purple-100 text-purple-800'
+                        ? 'bg-gray-100 text-gray-800'
+                        : 'bg-gray-200 text-gray-700'
                     }`}>
                       {invoice.type}
                     </span>
@@ -155,7 +155,7 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
                       onClick={() => handleDownloadInvoice(invoice.id, invoice.invoicePdf)}
                       className={`inline-flex items-center ${
                         invoice.invoicePdf
-                          ? 'text-indigo-600 hover:text-indigo-900'
+                          ? 'text-gray-600 hover:text-gray-900'
                           : 'text-gray-400 cursor-not-allowed'
                       }`}
                       disabled={!invoice.invoicePdf}
@@ -174,7 +174,7 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
 
       {/* Summary */}
       <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-white overflow-hidden shadow rounded-none">
           <div className="px-4 py-5 sm:p-6">
             <dt className="text-sm font-medium text-gray-500 truncate">
               Total Spent (This Month)
@@ -194,7 +194,7 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
           </div>
         </div>
 
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-white overflow-hidden shadow rounded-none">
           <div className="px-4 py-5 sm:p-6">
             <dt className="text-sm font-medium text-gray-500 truncate">
               Overage Charges (This Month)
@@ -215,7 +215,7 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
           </div>
         </div>
 
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-white overflow-hidden shadow rounded-none">
           <div className="px-4 py-5 sm:p-6">
             <dt className="text-sm font-medium text-gray-500 truncate">
               Total All Time

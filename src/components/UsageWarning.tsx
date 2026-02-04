@@ -117,11 +117,11 @@ export default function UsageWarning({ userId }: UsageWarningProps) {
                 leaveFrom="opacity-100 translate-y-0 sm:scale-100"
                 leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
               >
-                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-sm sm:p-6">
+                <Dialog.Panel className="relative transform overflow-hidden rounded-none bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-sm sm:p-6">
                   <div className="absolute right-0 top-0 pr-4 pt-4">
                     <button
                       type="button"
-                      className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
+                      className="rounded-none bg-white text-gray-400 hover:text-gray-500 focus:outline-none"
                       onClick={() => setShowPopup(false)}
                     >
                       <span className="sr-only">Close</span>
@@ -155,9 +155,9 @@ export default function UsageWarning({ userId }: UsageWarningProps) {
                         </div>
 
                         {/* Progress Bar */}
-                        <div className={`w-full ${styles.barBgColor} rounded-full h-8 relative overflow-hidden`}>
+                        <div className={`w-full ${styles.barBgColor} rounded-none h-8 relative overflow-hidden`}>
                           <div
-                            className={`${styles.barColor} h-8 rounded-full transition-all duration-300 flex items-center justify-center`}
+                            className={`${styles.barColor} h-8 rounded-none transition-all duration-300 flex items-center justify-center`}
                             style={{ width: `${displayPercentage}%` }}
                           >
                             {displayPercentage > 20 && (
@@ -191,14 +191,14 @@ export default function UsageWarning({ userId }: UsageWarningProps) {
                       <div className="mt-6 space-y-2">
                         <Link
                           href="/payments"
-                          className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                          className="inline-flex w-full justify-center rounded-none bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600"
                           onClick={() => setShowPopup(false)}
                         >
                           {isOverLimit ? 'Upgrade Plan' : 'Manage Subscription'}
                         </Link>
                         <button
                           type="button"
-                          className="inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                          className="inline-flex w-full justify-center rounded-none bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                           onClick={() => setShowPopup(false)}
                         >
                           Close

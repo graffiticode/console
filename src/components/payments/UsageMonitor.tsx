@@ -134,8 +134,8 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-32 bg-gray-200 rounded-lg"></div>
-        <div className="h-48 bg-gray-200 rounded-lg"></div>
+        <div className="h-32 bg-gray-200 rounded-none"></div>
+        <div className="h-48 bg-gray-200 rounded-none"></div>
       </div>
     );
   }
@@ -168,7 +168,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
   // Show alert when no plan is selected
   if (usage.allocatedUnits === 0) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-none p-4">
         <div className="flex items-center">
           <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600 mr-2" />
           <p className="text-sm text-yellow-800">No plan selected</p>
@@ -180,7 +180,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
   return (
     <div className="space-y-6">
       {/* Usage Overview */}
-      <div className="bg-white overflow-hidden shadow rounded-lg">
+      <div className="bg-white overflow-hidden shadow rounded-none">
         <div className="px-4 py-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg leading-6 font-medium text-gray-900">
@@ -202,14 +202,14 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
             <div className="w-full bg-gray-200 h-8 relative overflow-hidden">
               {/* Compiles bar (first segment) */}
               <div
-                className="h-8 bg-blue-500 absolute left-0 top-0 transition-all duration-300"
+                className="h-8 bg-gray-400 absolute left-0 top-0 transition-all duration-300"
                 style={{ width: `${Math.min(compilePercentage, 100)}%` }}
                 title={`Compiles: ${usage.compileUnits.toLocaleString()} units (${compilePercentage.toFixed(1)}%)`}
               />
               {/* Code generation bar (second segment) */}
               <div
                 className={`h-8 absolute top-0 transition-all duration-300 ${
-                  isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-purple-500'
+                  isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-gray-600'
                 }`}
                 style={{
                   left: `${Math.min(compilePercentage, 100)}%`,
@@ -231,11 +231,11 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
             </div>
             <div className="mt-2 flex items-center gap-4 text-xs text-gray-600">
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-blue-500"></div>
+                <div className="w-3 h-3 bg-gray-400"></div>
                 <span>Compiles: {usage.compileUnits.toLocaleString()} ({compilePercentage.toFixed(1)}%)</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className={`w-3 h-3 ${isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-purple-500'}`}></div>
+                <div className={`w-3 h-3 ${isAtLimit ? 'bg-red-600' : isNearLimit ? 'bg-yellow-500' : 'bg-gray-600'}`}></div>
                 <span>Code Gen: {usage.codeGenerationUnits.toLocaleString()} ({codeGenPercentage.toFixed(1)}%)</span>
               </div>
               {otherUsage > 0 && (
@@ -303,7 +303,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
       {/* Overage Settings - Show for all plans */}
       {pricing && (
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-white overflow-hidden shadow rounded-none">
           <div className="px-4 py-5 sm:p-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
               Overage Settings
@@ -323,8 +323,8 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                     checked={billing.autoRecharge}
                     onChange={handleAutoRechargeToggle}
                     className={`${
-                      billing.autoRecharge ? 'bg-indigo-600' : 'bg-gray-200'
-                    } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2`}
+                      billing.autoRecharge ? 'bg-gray-600' : 'bg-gray-200'
+                    } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                   >
                     <span
                       className={`${
@@ -342,7 +342,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                     <select
                       value={billing.autoRechargeLimit}
                       onChange={(e) => handleLimitChange(Number(e.target.value))}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-none"
                     >
                       <option value={1}>1 block ({pricing.blockSize.toLocaleString()} units)</option>
                       <option value={3}>3 blocks ({(3 * pricing.blockSize).toLocaleString()} units)</option>
@@ -369,7 +369,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                     <select
                       value={selectedBlocks}
                       onChange={(e) => setSelectedBlocks(Number(e.target.value))}
-                      className="block w-40 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                      className="block w-40 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-none"
                     >
                       {pricing.suggestedBlocks?.map(blocks => (
                         <option key={blocks} value={blocks}>
@@ -394,7 +394,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                     <button
                       onClick={handlePurchaseOverage}
                       disabled={purchasing}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-none shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50"
                     >
                       <BoltIcon className="w-4 h-4 mr-2" />
                       {purchasing ? 'Processing...' : 'Purchase'}
@@ -412,10 +412,10 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
             {pricing && !pricing.overageAvailable && (
               <div className="pt-4">
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-none p-4">
                   <p className="text-sm text-gray-600">
                     Overage purchases are not available for your plan.{' '}
-                    <Link href="/payments" className="text-blue-600 hover:text-blue-800 font-medium">
+                    <Link href="/payments" className="text-gray-600 hover:text-gray-800 font-medium">
                       Upgrade to get more compiles.
                     </Link>
                   </p>

@@ -45,7 +45,7 @@ export default function AuthMethodDialog({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-none bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <Dialog.Title
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900 flex justify-between items-center"
@@ -62,7 +62,7 @@ export default function AuthMethodDialog({
 
                 <div className="mt-4 space-y-3">
                   {googleError && (
-                    <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+                    <div className="rounded-none bg-red-50 p-3 text-sm text-red-700">
                       {googleError}
                     </div>
                   )}
@@ -78,7 +78,7 @@ export default function AuthMethodDialog({
                     type="button"
                     onClick={onSelectEthereum}
                     disabled={googleLoading}
-                    className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="w-full flex items-center justify-center gap-3 rounded-none border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M12 2L4 12L12 16L20 12L12 2Z" fill="#627EEA" />
@@ -102,7 +102,7 @@ export default function AuthMethodDialog({
                     type="button"
                     onClick={onSelectGoogle}
                     disabled={googleLoading}
-                    className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="w-full flex items-center justify-center gap-3 rounded-none border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {googleLoading ? (
                       <>

@@ -141,7 +141,7 @@ export default function UserSearchCombobox({
                   className={({ active }) =>
                     classNames(
                       'relative cursor-default select-none py-2 pl-8 pr-4',
-                      active ? 'bg-gray-600 text-white' : 'text-gray-900'
+                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-900'
                     )
                   }
                 >
@@ -152,7 +152,7 @@ export default function UserSearchCombobox({
                         {user.id}
                       </span>
                       {user.email && (
-                        <span className={classNames('block truncate text-xs', active ? 'text-gray-200' : 'text-gray-500')}>
+                        <span className={classNames('block truncate text-xs', 'text-gray-500')}>
                           {user.email}
                         </span>
                       )}
@@ -161,7 +161,7 @@ export default function UserSearchCombobox({
                       <span
                         className={classNames(
                           'absolute inset-y-0 left-0 flex items-center pl-1.5',
-                          active ? 'text-white' : 'text-gray-600'
+                          'text-gray-600'
                         )}
                       >
                         <CheckIcon className="h-5 w-5" aria-hidden="true" />

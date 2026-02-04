@@ -125,7 +125,7 @@ export default function LanguageSelector({ domain, language, setLanguage }: Lang
                 className={({ active }) =>
                   classNames(
                     'relative cursor-default select-none py-2 pl-8 pr-4',
-                    active ? 'bg-gray-600 text-white' : 'text-gray-900'
+                    active ? 'bg-gray-100 text-gray-900' : 'text-gray-900'
                   )
                 }
               >
@@ -138,7 +138,7 @@ export default function LanguageSelector({ domain, language, setLanguage }: Lang
                       <span
                         className={classNames(
                           'absolute inset-y-0 left-0 flex items-center pl-1.5',
-                          active ? 'text-white' : 'text-gray-600'
+                          'text-gray-600'
                         )}
                       >
                         <CheckIcon className="h-5 w-5" aria-hidden="true" />
@@ -155,7 +155,7 @@ export default function LanguageSelector({ domain, language, setLanguage }: Lang
                 className={({ active }) =>
                   classNames(
                     'relative cursor-default select-none py-2 pl-8 pr-4',
-                    active ? 'bg-gray-600 text-white' : 'text-gray-900'
+                    active ? 'bg-gray-100 text-gray-900' : 'text-gray-900'
                   )
                 }
               >
@@ -167,7 +167,7 @@ export default function LanguageSelector({ domain, language, setLanguage }: Lang
                       <span
                         className={classNames(
                           'absolute inset-y-0 left-0 flex items-center pl-1.5',
-                          active ? 'text-white' : 'text-gray-600'
+                          'text-gray-600'
                         )}
                       >
                         <CheckIcon className="h-5 w-5" aria-hidden="true" />

@@ -1401,7 +1401,7 @@ export const HelpPanel = ({
         // For initial property load, use a MutationObserver to detect when the property editor is actually rendered
         const observer = new MutationObserver((mutations) => {
           // Check if the property editor div was added
-          const propertyEditorExists = headerRef.current?.querySelector('.bg-gray-50.rounded-lg.border-gray-200');
+          const propertyEditorExists = headerRef.current?.querySelector('.bg-gray-50.rounded-none.border-gray-200');
           if (propertyEditorExists) {
             // Property editor is now in the DOM, measure it
             requestAnimationFrame(() => {
@@ -1561,12 +1561,12 @@ export const HelpPanel = ({
         className={`fixed inset-0 pointer-events-none z-50 transition-opacity duration-200 ${isDragActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         style={{ display: isDragActive ? 'block' : 'none' }}
       >
-        <div className="absolute inset-0 bg-blue-50 bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-xl text-center transform transition-transform duration-200 scale-100">
-            <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="absolute inset-0 bg-gray-50 bg-opacity-40 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-none shadow-xl text-center transform transition-transform duration-200 scale-100">
+            <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <p className="mt-4 text-lg font-semibold text-blue-700">Drop text file here</p>
+            <p className="mt-4 text-lg font-semibold text-gray-700">Drop text file here</p>
           </div>
         </div>
       </div>
@@ -1585,9 +1585,9 @@ export const HelpPanel = ({
           <div className="font-light text-gray-500 flex items-center flex-wrap">
             <span className="font-medium">CSV</span>
             <span className="mx-1">for tables,</span>
-            <span className="font-medium py-0.5 px-1 rounded-sm bg-[#f8f8f8] font-mono">```</span>
+            <span className="font-medium py-0.5 px-1 rounded-none bg-[#f8f8f8] font-mono">```</span>
             <span className="mx-1">for code. Drag & drop to</span>
-            <span title="Drag & drop to upload file" className="text-blue-500 inline-flex items-center">
+            <span title="Drag & drop to upload file" className="text-gray-500 inline-flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
@@ -1595,7 +1595,7 @@ export const HelpPanel = ({
             <span className="ml-1">file.</span>
           </div>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="rounded-none border border-gray-200 bg-white shadow-sm">
           <div className="p-1 pb-0">
             <TextEditor
               key={help.length === 0 ? 'empty' : 'has-content'}
@@ -1609,7 +1609,7 @@ export const HelpPanel = ({
 
         {/* Property Editor */}
         {Object.keys(contextProperties).length > 0 && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="mt-3 p-3 bg-gray-50 rounded-none border border-gray-200">
             <div className="flex justify-between items-center mb-2">
               <div className="text-xs font-semibold text-gray-600">
                 {focusedElement?.type && focusedElement?.name ?
@@ -1629,7 +1629,7 @@ export const HelpPanel = ({
                   sendCombinedMessage();
                 }}
                 disabled={isLoading || !hasChangesToSend}
-                className="px-4 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 flex-shrink-0"
+                className="px-4 py-1.5 text-xs bg-gray-600 text-white rounded-none hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 flex-shrink-0"
               >
                 {isLoading ? (
                   <>
@@ -1698,7 +1698,7 @@ export const HelpPanel = ({
                     <div key={groupName} className="space-y-2">
                       {showGroupHeader && (
                         <div
-                          className="flex items-center justify-between mt-2 mb-1 cursor-pointer hover:bg-gray-100 -mx-2 px-2 py-1 rounded"
+                          className="flex items-center justify-between mt-2 mb-1 cursor-pointer hover:bg-gray-100 -mx-2 px-2 py-1 rounded-none"
                           onClick={() => {
                             // Mark this group as manually toggled
                             setManuallyToggledGroups(prev => new Set(prev).add(groupName));
@@ -1782,7 +1782,7 @@ export const HelpPanel = ({
                                       });
                                     }}
                                     disabled={nestedProp.readonly}
-                                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
                                   >
                                     <option value=""></option>
                                     {nestedProp.enum.map(option => (
@@ -1821,7 +1821,7 @@ export const HelpPanel = ({
                                       }));
                                     }}
                                     disabled={nestedProp.readonly}
-                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                                    className="h-4 w-4 text-gray-600 border-gray-300 rounded-none focus:ring-gray-500 disabled:opacity-50"
                                   />
                                 ) : nestedProp.type === 'number' ? (
                                   <input
@@ -1856,7 +1856,7 @@ export const HelpPanel = ({
                                     }}
                                     disabled={nestedProp.readonly}
                                     placeholder={nestedProp.placeholder}
-                                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
                                   />
                                 ) : (
                                   <input
@@ -1892,7 +1892,7 @@ export const HelpPanel = ({
                                     }}
                                     disabled={nestedProp.readonly}
                                     placeholder={nestedProp.placeholder}
-                                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
                                   />
                                 )}
                               </div>
@@ -1970,7 +1970,7 @@ export const HelpPanel = ({
                                           }));
                                         }}
                                         disabled={nestedProp.readonly}
-                                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
                                       >
                                         <option value=""></option>
                                         {nestedProp.enum.map(option => (
@@ -2009,7 +2009,7 @@ export const HelpPanel = ({
                                           }));
                                         }}
                                         disabled={nestedProp.readonly}
-                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                                        className="h-4 w-4 text-gray-600 border-gray-300 rounded-none focus:ring-gray-500 disabled:opacity-50"
                                       />
                                     ) : nestedProp.type === 'number' ? (
                                       <input
@@ -2044,7 +2044,7 @@ export const HelpPanel = ({
                                         }}
                                         disabled={nestedProp.readonly}
                                         placeholder={nestedProp.placeholder}
-                                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
                                       />
                                     ) : (
                                       <input
@@ -2077,7 +2077,7 @@ export const HelpPanel = ({
                                         }}
                                         disabled={nestedProp.readonly}
                                         placeholder={nestedProp.placeholder}
-                                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
                                       />
                                     )}
                                   </div>
@@ -2106,7 +2106,7 @@ export const HelpPanel = ({
                                     [key]: { ...propDef, value: e.target.value }
                                   }))}
                                   disabled={propDef.readonly}
-                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
                                 >
                                   <option value=""></option>
                                   {propDef.enum.map(option => (
@@ -2125,7 +2125,7 @@ export const HelpPanel = ({
                                     [key]: { ...propDef, value: e.target.checked }
                                   }))}
                                   disabled={propDef.readonly}
-                                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+                                  className="h-4 w-4 text-blue-600 border-gray-300 rounded-none focus:ring-gray-500 disabled:opacity-50"
                                 />
                               ) : propDef.type === 'number' || propDef.type === 'integer' ? (
                                 // Number input
@@ -2142,7 +2142,7 @@ export const HelpPanel = ({
                                   }))}
                                   disabled={propDef.readonly}
                                   placeholder={propDef.placeholder}
-                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
                                 />
                               ) : propDef.type === 'array' ? (
                                 // Array input - show as JSON for now
@@ -2161,7 +2161,7 @@ export const HelpPanel = ({
                                   }}
                                   disabled={propDef.readonly}
                                   placeholder={propDef.placeholder || '[]'}
-                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 font-mono"
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100 font-mono"
                                   rows={2}
                                 />
                               ) : propDef.type === 'object' ? (
@@ -2181,7 +2181,7 @@ export const HelpPanel = ({
                                   }}
                                   disabled={propDef.readonly}
                                   placeholder={propDef.placeholder || '{}'}
-                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 font-mono"
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100 font-mono"
                                   rows={2}
                                 />
                               ) : (
@@ -2197,7 +2197,7 @@ export const HelpPanel = ({
                                   disabled={propDef.readonly}
                                   placeholder={propDef.placeholder}
                                   pattern={propDef.pattern}
-                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-none focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
                                 />
                               )}
                         </div>
@@ -2225,7 +2225,7 @@ export const HelpPanel = ({
                 sendCombinedMessage();
               }}
               disabled={isLoading}
-              className="px-4 py-1.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 flex-shrink-0"
+              className="px-4 py-1.5 text-xs bg-gray-600 text-white rounded-none hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 flex-shrink-0"
             >
               {isLoading ? (
                 <>
@@ -2246,7 +2246,7 @@ export const HelpPanel = ({
 
         {/* File Upload Notification */}
         {uploadNotification && (
-          <div className={`absolute left-1/2 transform -translate-x-1/2 top-24 px-4 py-2 rounded-md shadow-md z-50 flex items-center text-sm ${
+          <div className={`absolute left-1/2 transform -translate-x-1/2 top-24 px-4 py-2 rounded-none shadow-md z-50 flex items-center text-sm ${
             uploadNotification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
           }`}>
             <div className="mr-2">
@@ -2324,8 +2324,8 @@ export const HelpPanel = ({
                           )}
 
                           <div
-                            className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-blue-100'} rounded-lg overflow-hidden ${isPending ? 'border-2 border-blue-300' : ''} ${
-                              message.taskId && message.taskId === taskId ? 'border-2 border-blue-500' : ''
+                            className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-gray-200'} rounded-none overflow-hidden ${isPending ? 'border-2 border-gray-300' : ''} ${
+                              message.taskId && message.taskId === taskId ? 'border-2 border-gray-500' : ''
                             } ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:brightness-95 transition-all' : ''}`}
                             onClick={() => {
                               if (message.taskId && onLoadTaskFromHelp) {
@@ -2375,35 +2375,35 @@ export const HelpPanel = ({
                                     },
                                     thead({node, children, ...props}) {
                                       return (
-                                        <thead className="bg-blue-50" {...props}>
+                                        <thead className="bg-gray-50" {...props}>
                                           {children}
                                         </thead>
                                       );
                                     },
                                     tbody({node, children, ...props}) {
                                       return (
-                                        <tbody className="divide-y divide-blue-100" {...props}>
+                                        <tbody className="divide-y divide-gray-100" {...props}>
                                           {children}
                                         </tbody>
                                       );
                                     },
                                     tr({node, children, ...props}) {
                                       return (
-                                        <tr className="hover:bg-blue-50" {...props}>
+                                        <tr className="hover:bg-gray-50" {...props}>
                                           {children}
                                         </tr>
                                       );
                                     },
                                     th({node, children, ...props}) {
                                       return (
-                                        <th className="px-2 py-1 text-left text-xs font-medium text-blue-600 uppercase tracking-wider border border-blue-200 whitespace-nowrap" {...props}>
+                                        <th className="px-2 py-1 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border border-gray-200 whitespace-nowrap" {...props}>
                                           {children}
                                         </th>
                                       );
                                     },
                                     td({node, children, ...props}) {
                                       return (
-                                        <td className="px-2 py-1 text-xs text-blue-700 border border-blue-200" {...props}>
+                                        <td className="px-2 py-1 text-xs text-gray-700 border border-gray-200" {...props}>
                                           {children}
                                         </td>
                                       );

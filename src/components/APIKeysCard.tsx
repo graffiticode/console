@@ -28,7 +28,7 @@ function APIKeyListItem({ user, apiKey, isPending }) {
           className={`inline-block rounded-none ${isPending ? 'opacity-30 cursor-not-allowed' : ''}`}
           onClick={isPending ? undefined : buildHandleDelete(apiKey)}
           disabled={isPending}>
-          <TrashIcon className={`h-6 w-6 ${isPending ? 'text-gray-400' : 'text-primary'}`} />
+          <TrashIcon className={`h-5 w-5 ${isPending ? 'text-gray-400' : 'text-red-500 hover:text-red-700'}`} />
         </button>
         <span className="absolute right-full top-1/2 -translate-y-1/2 mr-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
           {isPending ? "Verifying..." : "Delete API key"}
@@ -102,7 +102,7 @@ export default function APIKeysCard() {
   } else if (status === "error") {
     return <div>
       <h1>Error</h1>
-      <span className="mb-4 rounded-lg bg-danger-100 px-6 py-5 text-base text-danger-700"
+      <span className="mb-4 rounded-none bg-danger-100 px-6 py-5 text-base text-danger-700"
         role="alert">
         Opps! Something went wrong.
       </span>
@@ -110,7 +110,7 @@ export default function APIKeysCard() {
   }
 
   return (
-    <div className="overflow-hidden bg-white grid grid-col-1">
+    <div className="overflow-hidden grid grid-col-1">
       <ul className="list-disc space-y-2 mb-2">
         {apiKeys
           .filter(apiKey => !protectedKeyIds.has(apiKey.id))
@@ -126,7 +126,7 @@ export default function APIKeysCard() {
       <div>
       <button
         type="button"
-        className="inline-flex items-center px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
+        className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-300 rounded-none text-sm text-gray-700 hover:bg-gray-200"
         onClick={handleCreate}>
         <PlusIcon className="h-4 w-4 mr-1" />
         Create

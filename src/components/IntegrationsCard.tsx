@@ -182,7 +182,7 @@ export default function IntegrationsCard() {
   if (error && !settings) {
     return (
       <div className="p-4">
-        <span className="rounded-lg bg-red-100 px-4 py-3 text-base text-red-700" role="alert">
+        <span className="rounded-none bg-red-100 px-4 py-3 text-base text-red-700" role="alert">
           {error}
         </span>
       </div>
@@ -192,13 +192,13 @@ export default function IntegrationsCard() {
   return (
     <div className="overflow-hidden bg-white p-2">
       {error && (
-        <div className="mb-4 rounded-lg bg-red-100 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-none bg-red-100 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
       {/* Front Section */}
-      <div className="border rounded-lg p-4">
+      <div className="border rounded-none p-4">
         <h3 className="text-lg font-semibold mb-4">Front</h3>
 
         {/* Auth Secret */}
@@ -208,7 +208,7 @@ export default function IntegrationsCard() {
           </label>
           {!isEditingSecret && settings.front?.hasAuthSecret ? (
             <div className="flex items-center gap-2">
-              <span className="font-mono text-gray-600 bg-gray-100 px-3 py-2 rounded flex-1">
+              <span className="font-mono text-gray-600 bg-gray-100 px-3 py-2 rounded-none flex-1">
                 {authSecret}
               </span>
               <button
@@ -217,7 +217,7 @@ export default function IntegrationsCard() {
                   setAuthSecret('');
                   setIsEditingSecret(true);
                 }}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50"
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-none text-sm text-gray-700 hover:bg-gray-50"
               >
                 <PencilIcon className="h-4 w-4 mr-1" />
                 Edit
@@ -229,7 +229,7 @@ export default function IntegrationsCard() {
               value={authSecret}
               onChange={(e) => setAuthSecret(e.target.value)}
               placeholder="Enter auth secret"
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-none focus:ring-gray-500 focus:border-gray-500"
             />
           )}
         </div>
@@ -266,13 +266,13 @@ export default function IntegrationsCard() {
               onChange={(e) => setNewEmail(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="user@example.com"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-none focus:ring-gray-500 focus:border-gray-500"
             />
             <button
               type="button"
               onClick={handleAddEmail}
               disabled={!newEmail.trim()}
-              className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-300 rounded-none text-sm text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <PlusIcon className="h-4 w-4 mr-1" />
               Add
@@ -287,7 +287,7 @@ export default function IntegrationsCard() {
               type="button"
               onClick={handleDeleteClick}
               disabled={deleting || saving}
-              className={`inline-flex items-center px-4 py-2 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`inline-flex items-center px-4 py-2 text-white rounded-none disabled:opacity-50 disabled:cursor-not-allowed ${
                 confirmDelete ? 'bg-red-700 hover:bg-red-800' : 'bg-red-600 hover:bg-red-700'
               }`}
             >
@@ -312,7 +312,7 @@ export default function IntegrationsCard() {
             type="button"
             onClick={handleSave}
             disabled={saving || deleting}
-            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-none hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
               <>

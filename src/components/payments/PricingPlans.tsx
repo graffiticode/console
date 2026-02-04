@@ -305,7 +305,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-600"></div>
       </div>
     );
   }
@@ -314,14 +314,14 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
     <div className="space-y-8">
       {/* Billing Toggle */}
       <div className="flex justify-center">
-        <div className="relative flex bg-gray-100 rounded-lg p-0.5">
+        <div className="relative flex bg-gray-100 rounded-none p-0.5">
           <button
             type="button"
             className={`${
               billingInterval === 'monthly'
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500'
-            } relative rounded-md py-2 px-6 text-sm font-medium whitespace-nowrap focus:outline-none focus:z-10 transition-all`}
+            } relative rounded-none py-2 px-6 text-sm font-medium whitespace-nowrap focus:outline-none focus:z-10 transition-all`}
             onClick={() => setBillingInterval('monthly')}
           >
             Monthly billing
@@ -332,7 +332,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
               billingInterval === 'annual'
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500'
-            } relative rounded-md py-2 px-6 text-sm font-medium whitespace-nowrap focus:outline-none focus:z-10 transition-all ml-0.5`}
+            } relative rounded-none py-2 px-6 text-sm font-medium whitespace-nowrap focus:outline-none focus:z-10 transition-all ml-0.5`}
             onClick={() => setBillingInterval('annual')}
           >
             Annual billing
@@ -372,8 +372,8 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
           return (
             <div
               key={plan.id}
-              className={`relative rounded-lg shadow-md bg-white p-6 ${
-                plan.id === highlightedPlan ? 'ring-2 ring-indigo-500' : ''
+              className={`relative rounded-none shadow-md bg-white p-6 ${
+                plan.id === highlightedPlan ? 'ring-2 ring-gray-500' : ''
               } cursor-pointer`}
               onClick={() => {
                 setHighlightedPlan(plan.id);
@@ -385,7 +385,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
             >
               {plan.id === highlightedPlan && !(isFree && !isCurrentPlan) && (
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                  <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                  <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                     {isFree && isCurrentPlan
                       ? 'Current Plan'
                       : !hasActiveSubscription
@@ -442,13 +442,13 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
                   }
                 }}
                 disabled={processing || cancelAtPeriodEnd || (isFree && !hasActiveSubscription)}
-                className={`w-full py-2 px-4 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                className={`w-full py-2 px-4 rounded-none text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                   pendingCancelPlan === plan.id
                     ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
                     : isFree && isCurrentPlan
                     ? 'bg-gray-200 text-gray-600 cursor-default'
                     : plan.id === highlightedPlan
-                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500'
+                    ? 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500'
                     : 'bg-gray-50 text-gray-900 hover:bg-gray-100 focus:ring-gray-500'
                 } ${
                   (processing || cancelAtPeriodEnd) ? 'opacity-50 cursor-not-allowed' : ''

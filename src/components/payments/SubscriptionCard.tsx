@@ -89,7 +89,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
   if (loading) {
     return (
       <div className="animate-pulse">
-        <div className="h-32 bg-gray-200 rounded-lg"></div>
+        <div className="h-32 bg-gray-200 rounded-none"></div>
       </div>
     );
   }
@@ -128,7 +128,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
   };
 
   return (
-    <div className="bg-white overflow-hidden shadow rounded-lg">
+    <div className="bg-white overflow-hidden shadow rounded-none">
       <div className="px-4 py-5 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg leading-6 font-medium text-gray-900">
@@ -200,14 +200,14 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
         </div>
 
         {subscription.cancelAtPeriodEnd && (
-          <div className="mt-6 p-4 bg-yellow-50 rounded-md">
+          <div className="mt-6 p-4 bg-yellow-50 rounded-none">
             <p className="text-sm text-yellow-800">
               Your subscription will be cancelled at the end of the current billing period.
             </p>
             <button
               onClick={handleResumeSubscription}
               disabled={cancelling}
-              className="mt-2 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="mt-2 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-none text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
             >
               {cancelling ? 'Processing...' : 'Resume Subscription'}
             </button>
@@ -215,7 +215,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
         )}
 
         {subscription.status === 'past_due' && (
-          <div className="mt-6 p-4 bg-red-50 rounded-md">
+          <div className="mt-6 p-4 bg-red-50 rounded-none">
             <p className="text-sm text-red-800">
               Your subscription is past due. Please update your payment method to continue using the service.
             </p>

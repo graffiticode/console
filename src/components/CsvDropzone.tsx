@@ -196,12 +196,12 @@ export const CsvDropzone: React.FC<CsvDropzoneProps> = ({
       onClick={() => setShowUploadModal(false)}
     >
       <div
-        className="bg-white rounded-md p-4 shadow-xl w-[400px] max-w-[90vw]"
+        className="bg-white rounded-none p-4 shadow-xl w-[400px] max-w-[90vw]"
         style={{
           position: 'relative',
           zIndex: 2147483647,
           backgroundColor: 'white',
-          borderRadius: '0.375rem',
+          borderRadius: '0',
           padding: '1rem',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
         }}
@@ -221,29 +221,29 @@ export const CsvDropzone: React.FC<CsvDropzoneProps> = ({
 
         <div
           {...getRootProps()}
-          className={`border border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
-            isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+          className={`border border-dashed rounded-none p-6 text-center cursor-pointer transition-colors ${
+            isDragActive ? 'border-gray-400 bg-gray-50' : 'border-gray-300 hover:border-gray-400'
           }`}
           style={{
             border: '1px dashed',
-            borderColor: isDragActive ? '#3b82f6' : '#d1d5db',
-            borderRadius: '0.375rem',
+            borderColor: isDragActive ? '#9ca3af' : '#d1d5db',
+            borderRadius: '0',
             padding: '1.5rem',
             textAlign: 'center',
             cursor: 'pointer',
-            backgroundColor: isDragActive ? '#eff6ff' : 'transparent'
+            backgroundColor: isDragActive ? '#f9fafb' : 'transparent'
           }}
         >
           <input {...getInputProps()} />
           {isDragActive ? (
-            <p className="text-blue-500 text-sm">Drop the text file here...</p>
+            <p className="text-gray-600 text-sm">Drop the text file here...</p>
           ) : (
             <div>
               <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               <p className="mt-2 text-sm text-gray-600">
-                Drag & drop a text file here, or <span className="text-blue-500 font-medium">click to select</span>
+                Drag & drop a text file here, or <span className="text-gray-700 font-medium">click to select</span>
               </p>
               <p className="mt-1 text-xs text-gray-500">
                 Text files (.txt, .csv, .json, .py, .js, .md, .gc, etc.)
@@ -255,14 +255,14 @@ export const CsvDropzone: React.FC<CsvDropzoneProps> = ({
         <div className="flex justify-end mt-3">
           <button
             onClick={() => setShowUploadModal(false)}
-            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-none hover:bg-gray-200 transition-colors"
             style={{
               padding: '0.375rem 0.75rem',
               fontSize: '0.75rem',
               fontWeight: '500',
               color: '#374151',
               backgroundColor: '#f3f4f6',
-              borderRadius: '0.25rem',
+              borderRadius: '0',
               transition: 'background-color 0.2s'
             }}
           >

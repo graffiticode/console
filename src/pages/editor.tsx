@@ -190,7 +190,7 @@ export default function Editor({ language, setLanguage, mark }) {
             <div className="flex justify-center">
               <button
                 onClick={() => window.open('https://graffiticode.com', '_blank')}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="px-6 py-3 bg-gray-600 text-white rounded-none hover:bg-gray-700 transition-colors font-medium"
               >
                 Open Graffiticode to Sign In
               </button>
@@ -248,7 +248,7 @@ export default function Editor({ language, setLanguage, mark }) {
             <p className="text-gray-600 mb-4">{error}</p>
             <button
               onClick={handleCreateNewItem}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-4 py-2 bg-gray-600 text-white rounded-none hover:bg-gray-700"
             >
               Try Again
             </button>

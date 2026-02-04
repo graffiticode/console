@@ -93,7 +93,7 @@ function AddPaymentMethodForm({ userId, onSuccess, onCancel }: { userId: string;
           id="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          className="mt-1 block w-full border border-gray-300 rounded-none shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm"
           placeholder="John Doe"
         />
       </div>
@@ -106,11 +106,11 @@ function AddPaymentMethodForm({ userId, onSuccess, onCancel }: { userId: string;
           id="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          className="mt-1 block w-full border border-gray-300 rounded-none shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm"
           placeholder="john@example.com"
         />
       </div>
-      <div className="p-4 border border-gray-300 rounded-md">
+      <div className="p-4 border border-gray-300 rounded-none">
         <CardElement
           options={{
             style: {
@@ -135,14 +135,14 @@ function AddPaymentMethodForm({ userId, onSuccess, onCancel }: { userId: string;
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          className="px-4 py-2 border border-gray-300 rounded-none shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!stripe || processing}
-          className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+          className="px-4 py-2 border border-transparent rounded-none shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50"
         >
           {processing ? 'Processing...' : 'Add Payment Method'}
         </button>
@@ -227,7 +227,7 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
     return (
       <div className="animate-pulse space-y-4">
         {[...Array(2)].map((_, i) => (
-          <div key={i} className="h-24 bg-gray-200 rounded-lg"></div>
+          <div key={i} className="h-24 bg-gray-200 rounded-none"></div>
         ))}
       </div>
     );
@@ -248,7 +248,7 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
         {!showAddForm && (
           <button
             onClick={handleAddPaymentMethod}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-none shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
           >
             <PlusIcon className="h-4 w-4 mr-2" />
             Add Payment Method
@@ -258,7 +258,7 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
 
       {/* Add Payment Method Form */}
       {showAddForm && (
-        <div className="bg-gray-50 rounded-lg p-6">
+        <div className="bg-gray-50 rounded-none p-6">
           <h4 className="text-sm font-medium text-gray-900 mb-4">Add New Payment Method</h4>
           <Elements stripe={stripePromise}>
             <AddPaymentMethodForm
@@ -277,7 +277,7 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
 
       {/* Payment Methods List */}
       {!Array.isArray(paymentMethods) || paymentMethods.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
+        <div className="text-center py-12 bg-white rounded-none border-2 border-dashed border-gray-300">
           <CreditCardIcon className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No payment methods</h3>
           <p className="mt-1 text-sm text-gray-500">Get started by adding a payment method.</p>
@@ -291,8 +291,8 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
             return (
               <div
                 key={method.id}
-                className={`bg-white shadow rounded-lg p-6 ${
-                  method.isDefault ? 'ring-2 ring-indigo-500' : ''
+                className={`bg-white shadow rounded-none p-6 ${
+                  method.isDefault ? 'ring-2 ring-gray-500' : ''
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -316,7 +316,7 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
                     {!method.isDefault && (
                       <button
                         onClick={() => handleSetDefault(method.id)}
-                        className="text-sm text-indigo-600 hover:text-indigo-500"
+                        className="text-sm text-gray-600 hover:text-gray-500"
                       >
                         Set as default
                       </button>
@@ -349,10 +349,10 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
       )}
 
       {/* Security Notice */}
-      <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
+      <div className="bg-gray-50 border-l-4 border-gray-400 p-4">
         <div className="flex">
           <div className="ml-3">
-            <p className="text-sm text-blue-700">
+            <p className="text-sm text-gray-700">
               Your payment information is securely stored with Stripe. We never store your full card details on our servers.
             </p>
           </div>

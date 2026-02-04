@@ -224,7 +224,7 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
                     iframeRef.current.src = iframeRef.current.src;
                   }
                 }}
-                className="text-blue-600 hover:text-blue-800 underline"
+                className="text-gray-600 hover:text-gray-800 underline"
               >
                 Reload preview
               </button>

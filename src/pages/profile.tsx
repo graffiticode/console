@@ -330,7 +330,7 @@ export default function Profile() {
           </div>
 
           {loadingData ? (
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="bg-white shadow rounded-none p-6">
               <div className="animate-pulse">
                 <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
                 <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
@@ -338,12 +338,12 @@ export default function Profile() {
               </div>
             </div>
           ) : error ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <div className="bg-red-50 border border-red-200 rounded-none p-6">
               <p className="text-red-800">{error}</p>
             </div>
           ) : (
             <>
-            <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="bg-white shadow rounded-none overflow-hidden">
               <div className="px-6 py-5 border-b border-gray-200 bg-gray-50">
                 <div className="flex items-center">
                   <div className="relative">
@@ -431,7 +431,7 @@ export default function Profile() {
             </div>
 
             {/* Notification Settings */}
-            <div className="mt-8 bg-white shadow rounded-lg overflow-hidden">
+            <div className="mt-8 bg-white shadow rounded-none overflow-hidden">
               <div className="px-6 py-5 border-b border-gray-200">
                 <h3 className="text-lg font-medium text-gray-900">Notification Settings</h3>
                 <p className="mt-1 text-sm text-gray-500">
@@ -451,7 +451,7 @@ export default function Profile() {
                         type="checkbox"
                         checked={notifyByEmail}
                         onChange={(e) => handleNotifyByEmailChange(e.target.checked)}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded-none"
                       />
                       <span className="ml-2 text-sm text-gray-600">Enabled</span>
                     </label>
@@ -463,7 +463,7 @@ export default function Profile() {
                     onChange={(e) => setNotificationEmail(e.target.value)}
                     onBlur={(e) => saveNotificationEmail(e.target.value)}
                     placeholder="email@example.com"
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className="mt-1 block w-full border border-gray-300 rounded-none shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm"
                   />
                 </div>
 
@@ -478,7 +478,7 @@ export default function Profile() {
                         type="checkbox"
                         checked={notifyByPhone}
                         onChange={(e) => handleNotifyByPhoneChange(e.target.checked)}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded-none"
                       />
                       <span className="ml-2 text-sm text-gray-600">Enabled</span>
                     </label>
@@ -490,7 +490,7 @@ export default function Profile() {
                     onChange={handlePhoneChange}
                     onBlur={(e) => saveNotificationPhone(e.target.value)}
                     placeholder="+1 (555) 123-4567"
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className="mt-1 block w-full border border-gray-300 rounded-none shadow-sm py-2 px-3 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm"
                   />
                 </div>
               </div>

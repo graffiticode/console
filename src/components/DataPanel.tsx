@@ -34,8 +34,8 @@ export const DataPanel = forwardRef(function DataPanel({
 
   return (
     isNullOrEmptyObject(data) &&
-      <div /> ||
-      <div ref={ref}>
+      <div className="h-full bg-white" /> ||
+      <div ref={ref} className="h-full bg-white p-4">
         <Form
           state={{
             apply: () => {},
