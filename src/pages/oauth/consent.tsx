@@ -76,6 +76,7 @@ export default function OAuthConsent() {
   const { callback_url, state, app_name } = router.query;
 
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -121,6 +122,10 @@ export default function OAuthConsent() {
 
       // Clean up helper auth session
       await cleanupOAuthSession(oauthAuth);
+
+      // Show success state before redirect (page may stay open after protocol handler)
+      setLoading(false);
+      setSuccess(true);
 
       // Redirect back to callback URL with the Google ID token
       const redirectUrl = new URL(callbackUrl);
@@ -174,6 +179,18 @@ export default function OAuthConsent() {
               <div className="text-center">
                 <div className="rounded-md bg-red-50 p-4">
                   <p className="text-sm text-red-700">{validationError}</p>
+                </div>
+              </div>
+            ) : success ? (
+              <div className="text-center">
+                <div className="rounded-md bg-green-50 p-4">
+                  <div className="flex justify-center mb-2">
+                    <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-green-700 font-medium">Sign-in successful!</p>
+                  <p className="text-xs text-green-600 mt-1">You can close this window.</p>
                 </div>
               </div>
             ) : (
