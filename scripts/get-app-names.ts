@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 
 import admin from 'firebase-admin';
-import fs from 'fs';
 
 // Force connection to production Firestore (bypass emulator)
 delete process.env.FIRESTORE_EMULATOR_HOST;
 delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
 
-// Use local key file if available
-const localKeyPath = "/Users/jeffdyer/graffiticode-app-key.json";
-if (fs.existsSync(localKeyPath)) {
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = localKeyPath;
+// Use GRAFFITICODE_APP_CREDENTIALS for the graffiticode-app project
+if (process.env.GRAFFITICODE_APP_CREDENTIALS) {
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GRAFFITICODE_APP_CREDENTIALS;
+} else {
+  console.error('Error: GRAFFITICODE_APP_CREDENTIALS environment variable not set');
+  console.error('Set it to the path of your graffiticode-app service account key');
+  process.exit(1);
 }
 
 admin.initializeApp({

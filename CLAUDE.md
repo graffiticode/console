@@ -58,6 +58,25 @@ User prompt → RAG vector search → DSPy prompt compilation (optional) → Cla
 - 2-space indentation
 - Functional components with hooks
 
+## Scripts
+
+Admin scripts in `scripts/` require Firebase service account credentials. Two separate projects are used:
+
+```bash
+# Add to ~/.zshrc
+export GRAFFITICODE_CREDENTIALS=~/graffiticode-key.json        # graffiticode project
+export GRAFFITICODE_APP_CREDENTIALS=~/graffiticode-app-key.json # graffiticode-app project
+```
+
+**graffiticode project** (API data):
+- `npx tsx scripts/clear-compile.ts <taskId>` - Delete a compile record
+
+**graffiticode-app project** (console data):
+- `npx tsx scripts/adjust-overage-credits.ts <userId> <adjustment> [reason]` - Adjust user credits
+- `npx tsx scripts/get-app-names.ts` - List app names from items
+- `npx tsx scripts/update-embeddings.ts` - Update training example embeddings
+- `npx tsx scripts/download-training-examples.ts` - Download training examples to markdown
+
 ## Local Development
 
 1. Configure `.env.local` with API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, Firebase config, etc.)
