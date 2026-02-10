@@ -18,6 +18,8 @@ const plans = [
     features: [
       '100 compile units per month',
       'No credit card required',
+      'Community support',
+      'Email support',
       'Upgrade anytime'
     ],
     cta: 'Current Plan',
@@ -33,6 +35,8 @@ const plans = [
     features: [
       '2,000 compile units per month',
       'Additional compiles at $0.005 each',
+      'Community support',
+      'Email support',
       'Cancel anytime'
     ],
     cta: 'Get Started'
@@ -47,6 +51,8 @@ const plans = [
     features: [
       '100,000 compile units per month',
       'Additional compiles at $0.001 each',
+      'Community support',
+      'Email support',
       'Cancel anytime'
     ],
     cta: 'Go Pro'
@@ -62,6 +68,8 @@ const plans = [
       '2,000,000 compile units per month',
       'Additional compiles at $0.0005 each',
       'Up to 10 accounts included',
+      'Priority email support',
+      'Language development services',
       'Cancel anytime'
     ],
     cta: 'Go Team'
