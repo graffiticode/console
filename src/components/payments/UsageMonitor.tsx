@@ -415,7 +415,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                 <div className="bg-gray-50 border border-gray-200 rounded-none p-4">
                   <p className="text-sm text-gray-600">
                     Overage purchases are not available for your plan.{' '}
-                    <Link href="/payments" className="text-gray-600 hover:text-gray-800 font-medium">
+                    <Link href="/billing" className="text-gray-600 hover:text-gray-800 font-medium">
                       Upgrade to get more compiles.
                     </Link>
                   </p>

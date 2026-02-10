@@ -77,8 +77,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         customer: stripeCustomerId,
         mode: 'setup',
         payment_method_types: ['card'],
-        success_url: `${process.env.NEXT_PUBLIC_URL}/payments?resumed=true`,
-        cancel_url: `${process.env.NEXT_PUBLIC_URL}/payments?canceled=true`,
+        success_url: `${process.env.NEXT_PUBLIC_URL}/billing?resumed=true`,
+        cancel_url: `${process.env.NEXT_PUBLIC_URL}/billing?canceled=true`,
         metadata: {
           userId,
           action: 'resume_subscription',

@@ -155,8 +155,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_URL}/payments?session_id={CHECKOUT_SESSION_ID}&success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_URL}/payments?canceled=true`,
+      success_url: `${process.env.NEXT_PUBLIC_URL}/billing?session_id={CHECKOUT_SESSION_ID}&success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_URL}/billing?canceled=true`,
       // Allow modifying quantities, promo codes, etc
       allow_promotion_codes: true,
       billing_address_collection: 'auto',

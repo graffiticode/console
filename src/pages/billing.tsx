@@ -26,7 +26,7 @@ const tabs = [
   { name: 'Payment Methods', icon: CreditCardIcon },
 ];
 
-export default function Payments() {
+export default function Billing() {
   const router = useRouter();
   const { user, loading } = useGraffiticodeAuth();
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -49,7 +49,7 @@ export default function Payments() {
         })
         .finally(() => {
           // Clear the query param
-          router.replace('/payments', undefined, { shallow: true });
+          router.replace('/billing', undefined, { shallow: true });
         });
     }
   }, [router.query.resumed, user]);
@@ -78,7 +78,7 @@ export default function Payments() {
   return (
     <>
       <Head>
-        <title>{getPageTitle('Payments')}</title>
+        <title>{getPageTitle('Billing')}</title>
       </Head>
 
       <div className="min-h-screen bg-gray-50">

@@ -186,7 +186,7 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
               <Menu.Item>
                 {({ active }) => (
                   <Link
-                    href="/payments"
+                    href="/billing"
                     className={`${
                       active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
                     } group flex items-center px-4 py-2 text-sm`}
