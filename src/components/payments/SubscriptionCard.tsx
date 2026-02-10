@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
+import { planDetails } from '@/utils/plans';
 
 interface SubscriptionData {
   status: 'active' | 'canceled' | 'past_due' | 'trialing' | 'none';
@@ -19,13 +20,6 @@ interface SubscriptionData {
 interface SubscriptionCardProps {
   userId: string;
 }
-
-const planDetails = {
-  demo: { name: 'Demo', monthlyUnits: 100, price: { monthly: 0, annual: 0 } },
-  starter: { name: 'Starter', monthlyUnits: 2000, price: { monthly: 10, annual: 100 } },
-  pro: { name: 'Pro', monthlyUnits: 100000, price: { monthly: 100, annual: 1000 } },
-  teams: { name: 'Team', monthlyUnits: 2000000, price: { monthly: 1000, annual: 10000 } },
-};
 
 export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);

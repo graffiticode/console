@@ -1,145 +1,69 @@
 import { useState, useEffect } from 'react';
-import { CheckIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
+import { plans, PlanId, BillingInterval, isUpgrade } from '@/utils/plans';
+import PlanCard from './PlanCard';
 
 interface PricingPlansProps {
   userId: string;
   onSubscriptionChange?: () => void;
 }
 
-const plans = [
-  {
-    id: 'demo',
-    name: 'Demo',
-    description: 'Try Graffiticode for free',
-    monthlyPrice: 0,
-    annualPrice: 0,
-    monthlyUnits: 100,
-    features: [
-      '100 compile units per month',
-      'No credit card required',
-      'Community support',
-      'Email support',
-      'Upgrade anytime'
-    ],
-    cta: 'Current Plan',
-    isFree: true
-  },
-  {
-    id: 'starter',
-    name: 'Starter',
-    description: 'Perfect for getting started',
-    monthlyPrice: 10,
-    annualPrice: 100,
-    monthlyUnits: 2000,
-    features: [
-      '2,000 compile units per month',
-      'Additional compiles at $0.005 each',
-      'Community support',
-      'Email support',
-      'Cancel anytime'
-    ],
-    cta: 'Get Started'
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    description: 'Great for serious creators',
-    monthlyPrice: 100,
-    annualPrice: 1000,
-    monthlyUnits: 100000,
-    features: [
-      '100,000 compile units per month',
-      'Additional compiles at $0.001 each',
-      'Community support',
-      'Email support',
-      'Cancel anytime'
-    ],
-    cta: 'Go Pro'
-  },
-  {
-    id: 'teams',
-    name: 'Team',
-    description: 'For teams and high volume',
-    monthlyPrice: 1000,
-    annualPrice: 10000,
-    monthlyUnits: 2000000,
-    features: [
-      '2,000,000 compile units per month',
-      'Additional compiles at $0.0005 each',
-      'Up to 10 accounts included',
-      'Priority email support',
-      'Language development services',
-      'Cancel anytime'
-    ],
-    cta: 'Go Team'
-  }
-];
+interface SubscriptionState {
+  hasActiveSubscription: boolean;
+  currentUserPlan: PlanId;
+  currentBillingInterval: BillingInterval;
+  renewalDate: string | null;
+  cancelAtPeriodEnd: boolean;
+  hasPaymentMethod: boolean;
+}
+
+const defaultSubState: SubscriptionState = {
+  hasActiveSubscription: false,
+  currentUserPlan: 'demo',
+  currentBillingInterval: 'monthly',
+  renewalDate: null,
+  cancelAtPeriodEnd: false,
+  hasPaymentMethod: false,
+};
 
 export default function PricingPlans({ userId, onSubscriptionChange }: PricingPlansProps) {
-  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [highlightedPlan, setHighlightedPlan] = useState<string>('starter');
-  const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
-  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
-  const [currentUserPlan, setCurrentUserPlan] = useState<string>('demo');
-  const [currentBillingInterval, setCurrentBillingInterval] = useState<'monthly' | 'annual'>('monthly');
-  const [renewalDate, setRenewalDate] = useState<string | null>(null);
-  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const [pendingCancelPlan, setPendingCancelPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sub, setSub] = useState<SubscriptionState>(defaultSubState);
 
   useEffect(() => {
-    // Check user's subscription status and payment methods
     fetchUserData();
   }, [userId]);
 
   const fetchUserData = async () => {
     try {
-      // Check current subscription
       const [subscriptionResponse, methodsResponse] = await Promise.all([
         axios.get(`/api/payments/subscription?userId=${userId}`),
         axios.get(`/api/payments/methods?userId=${userId}`)
       ]);
 
-      // Set current plan and subscription status
       const subscription = subscriptionResponse.data;
-      setHasActiveSubscription(subscription.hasActiveSubscription || false);
-      if (subscription.plan) {
-        setCurrentUserPlan(subscription.plan);
-        // If user has an active paid plan, highlight it; otherwise highlight starter as recommended
-        if (subscription.hasActiveSubscription && subscription.plan !== 'demo') {
-          setHighlightedPlan(subscription.plan);
-        } else {
-          setHighlightedPlan('starter');
-        }
-      } else {
-        // No plan means demo
-        setCurrentUserPlan('demo');
-        setHighlightedPlan('starter');
-      }
-
-      // Set current billing interval
-      // If there's a scheduled interval change, that becomes the "current" selection
-      const effectiveInterval = subscription.scheduledInterval || subscription.interval;
-
-      if (effectiveInterval) {
-        setCurrentBillingInterval(effectiveInterval);
-        setBillingInterval(effectiveInterval);
-      }
-
-      // Set renewal date
-      if (subscription.currentBillingPeriod?.end) {
-        setRenewalDate(subscription.currentBillingPeriod.end);
-      }
-
-      // Track if subscription is set to cancel at period end
-      setCancelAtPeriodEnd(subscription.cancelAtPeriodEnd || false);
-
-      // Check payment methods - any payment method is sufficient for interval changes
+      const plan: PlanId = subscription.plan || 'demo';
+      const effectiveInterval: BillingInterval = subscription.scheduledInterval || subscription.interval || 'monthly';
       const methods = methodsResponse.data.paymentMethods || [];
-      setHasPaymentMethod(methods.length > 0);
+
+      setSub({
+        hasActiveSubscription: subscription.hasActiveSubscription || false,
+        currentUserPlan: plan,
+        currentBillingInterval: effectiveInterval,
+        renewalDate: subscription.currentBillingPeriod?.end || null,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd || false,
+        hasPaymentMethod: methods.length > 0,
+      });
+
+      setBillingInterval(effectiveInterval);
+      setHighlightedPlan(
+        subscription.hasActiveSubscription && plan !== 'demo' ? plan : 'starter'
+      );
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
@@ -148,28 +72,24 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
   };
 
   const handleCancelClick = async (planId: string) => {
-    // First click - show confirmation
     if (pendingCancelPlan !== planId) {
       setPendingCancelPlan(planId);
       return;
     }
 
-    // Second click - confirm cancellation
     setProcessing(true);
     setSelectedPlan(planId);
 
     try {
       const response = await axios.post('/api/payments/cancel-subscription', {
         userId,
-        immediately: false // Cancel at end of billing period
+        immediately: false
       });
 
       if (response.data.success) {
         setPendingCancelPlan(null);
         await fetchUserData();
-        if (onSubscriptionChange) {
-          onSubscriptionChange();
-        }
+        onSubscriptionChange?.();
       }
     } catch (error: any) {
       console.error('Error canceling subscription:', error);
@@ -182,102 +102,104 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
     }
   };
 
-  const handleSubscribe = async (planId: string) => {
-    // Demo plan - do nothing if already on demo (no subscription)
-    if (planId === 'demo' && !hasActiveSubscription) {
-      return;
+  const cancelToDemo = async () => {
+    setProcessing(true);
+    setSelectedPlan('demo');
+    try {
+      const response = await axios.post('/api/payments/cancel-subscription', {
+        userId,
+        immediately: true
+      });
+      if (response.data.success) {
+        await fetchUserData();
+        onSubscriptionChange?.();
+      }
+    } catch (error: any) {
+      console.error('Error canceling subscription:', error);
+      alert('Failed to cancel subscription. Please try again.');
+    } finally {
+      setProcessing(false);
+      setSelectedPlan(null);
     }
+  };
 
-    // Handle downgrade to Demo plan (cancel subscription)
-    if (planId === 'demo' && hasActiveSubscription) {
-      setSelectedPlan(planId);
-      setProcessing(true);
-
-      try {
-        const response = await axios.post('/api/payments/cancel-subscription', {
-          userId,
-          immediately: true
-        });
-
-        if (response.data.success) {
-          await fetchUserData();
-          setProcessing(false);
-          setSelectedPlan(null);
-          if (onSubscriptionChange) {
-            onSubscriptionChange();
-          }
-        }
-      } catch (error: any) {
-        console.error('Error canceling subscription:', error);
-        alert('Failed to cancel subscription. Please try again.');
+  const quickSubscribe = async (planId: string, wouldBeUpgrade: boolean) => {
+    if (wouldBeUpgrade) {
+      const upgradeType = sub.currentUserPlan === 'pro' && planId === 'teams'
+        ? 'Team plan'
+        : 'annual billing';
+      if (!confirm(`Upgrade to ${upgradeType}? You'll receive credit for the unused portion of your current plan and be charged immediately.`)) {
         setProcessing(false);
         setSelectedPlan(null);
+        return true; // handled
       }
+    }
+
+    try {
+      const quickResponse = await axios.post('/api/payments/quick-subscribe', {
+        userId,
+        planId,
+        interval: billingInterval
+      });
+
+      if (quickResponse.data.success) {
+        await fetchUserData();
+        setProcessing(false);
+        setSelectedPlan(null);
+        onSubscriptionChange?.();
+        return true;
+      }
+      // requiresAction — fall through
+      return false;
+    } catch (quickError: any) {
+      if (quickError.response?.data?.requiresCheckout) {
+        console.log('Quick subscribe not available, using checkout...');
+        return false;
+      }
+      throw quickError;
+    }
+  };
+
+  const handleError = (error: any) => {
+    console.error('Error creating subscription:', error);
+    console.error('Error details:', error.response?.data);
+
+    if (error.response?.data?.requiresPaymentMethod) {
+      alert(error.response.data.message || 'To change your plan or billing interval, please add a payment method in the Payment Methods tab first.');
+    } else if (error.response?.data?.error) {
+      alert(error.response.data.error + (error.response.data.details ? '\n\n' + error.response.data.details : ''));
+    } else if (error.response?.data?.message) {
+      alert(error.response.data.message);
+    } else {
+      alert('Failed to process your request. Please try again.');
+    }
+
+    setProcessing(false);
+    setSelectedPlan(null);
+  };
+
+  const handleSubscribe = async (planId: string) => {
+    if (planId === 'demo' && !sub.hasActiveSubscription) return;
+    if (planId === 'demo' && sub.hasActiveSubscription) {
+      await cancelToDemo();
       return;
     }
 
     setSelectedPlan(planId);
     setProcessing(true);
 
-    // Check if this is an interval change on current plan (only for users with active subscription)
-    const isChangingInterval = hasActiveSubscription && planId === currentUserPlan && billingInterval !== currentBillingInterval;
-
-    // Check if this is an upgrade (Demo/Starter -> Pro/Teams, Pro -> Teams, or Monthly -> Annual)
-    const isUpgrade =
-      (currentUserPlan === 'demo') ||
-      (currentUserPlan === 'starter' && (planId === 'pro' || planId === 'teams')) ||
-      (currentUserPlan === 'pro' && planId === 'teams') ||
-      (isChangingInterval && currentBillingInterval === 'monthly' && billingInterval === 'annual');
+    const isChangingInterval = sub.hasActiveSubscription && planId === sub.currentUserPlan && billingInterval !== sub.currentBillingInterval;
+    const wouldBeUpgrade = sub.currentUserPlan === 'demo' ||
+      isUpgrade(sub.currentUserPlan, planId as PlanId) ||
+      (isChangingInterval && sub.currentBillingInterval === 'monthly' && billingInterval === 'annual');
 
     try {
-      // For plan/interval changes, try quick subscribe first (only for existing paid subscribers)
-      if (hasActiveSubscription && currentUserPlan !== 'demo' && (isChangingInterval || currentUserPlan !== 'starter')) {
-        console.log('Attempting quick subscribe:', { isChangingInterval, isUpgrade, planId, interval: billingInterval });
-
-        // Show confirmation for upgrades only
-        if (isUpgrade) {
-          const upgradeType = currentUserPlan === 'pro' && planId === 'teams'
-            ? 'Team plan'
-            : 'annual billing';
-
-          if (!confirm(`Upgrade to ${upgradeType}? You'll receive credit for the unused portion of your current plan and be charged immediately.`)) {
-            setProcessing(false);
-            setSelectedPlan(null);
-            return;
-          }
-        }
-
-        try {
-          const quickResponse = await axios.post('/api/payments/quick-subscribe', {
-            userId,
-            planId,
-            interval: billingInterval
-          });
-
-          if (quickResponse.data.success) {
-            // Refresh the data to show the new plan
-            await fetchUserData();
-            setProcessing(false);
-            setSelectedPlan(null);
-            if (onSubscriptionChange) {
-              onSubscriptionChange(); // Trigger parent component refresh
-            }
-            return;
-          } else if (quickResponse.data.requiresAction) {
-            // Handle 3D Secure or other authentication
-            // Fall through to regular checkout
-          }
-        } catch (quickError: any) {
-          if (quickError.response?.data?.requiresCheckout) {
-            // Fall through to regular checkout
-            console.log('Quick subscribe not available, using checkout...');
-          } else {
-            throw quickError;
-          }
-        }
+      if (sub.hasActiveSubscription && sub.currentUserPlan !== 'demo' && (isChangingInterval || sub.currentUserPlan !== 'starter')) {
+        console.log('Attempting quick subscribe:', { isChangingInterval, wouldBeUpgrade, planId, interval: billingInterval });
+        const handled = await quickSubscribe(planId, wouldBeUpgrade);
+        if (handled) return;
       }
 
-      // Fall back to regular Stripe Checkout for NEW subscriptions
       console.log('Falling back to Stripe Checkout:', { userId, planId, interval: billingInterval });
       const response = await axios.post('/api/payments/create-checkout-session', {
         userId,
@@ -285,28 +207,11 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
         interval: billingInterval
       });
 
-      // Redirect to Stripe Checkout
       if (response.data.checkoutUrl) {
         window.location.href = response.data.checkoutUrl;
       }
     } catch (error: any) {
-      console.error('Error creating subscription:', error);
-      console.error('Error details:', error.response?.data);
-
-      // Handle specific error cases
-      if (error.response?.data?.requiresPaymentMethod) {
-        alert(error.response.data.message || 'To change your plan or billing interval, please add a payment method in the Payment Methods tab first.');
-      } else if (error.response?.data?.error) {
-        // Show the specific error from the API
-        alert(error.response.data.error + (error.response.data.details ? '\n\n' + error.response.data.details : ''));
-      } else if (error.response?.data?.message) {
-        alert(error.response.data.message);
-      } else {
-        alert('Failed to process your request. Please try again.');
-      }
-
-      setProcessing(false);
-      setSelectedPlan(null);
+      handleError(error);
     }
   };
 
@@ -353,172 +258,26 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
       {/* Pricing Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {plans.map((plan) => {
-          const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
-          const isFree = plan.isFree;
-          // Demo plan is current if user has no active subscription, paid plans need active subscription
-          const isCurrentPlan = isFree
-            ? !hasActiveSubscription && currentUserPlan === 'demo'
-            : hasActiveSubscription && plan.id === currentUserPlan;
-          const isSameBillingInterval = billingInterval === currentBillingInterval;
-          const isChangingBilling = isCurrentPlan && !isSameBillingInterval && !isFree;
-
-          // Check if this plan selection would be an upgrade or downgrade
-          const wouldBeUpgrade = !isFree && (
-            (currentUserPlan === 'demo') ||
-            (currentUserPlan === 'starter' && (plan.id === 'pro' || plan.id === 'teams')) ||
-            (currentUserPlan === 'pro' && plan.id === 'teams') ||
-            (isCurrentPlan && currentBillingInterval === 'monthly' && billingInterval === 'annual')
-          );
-
-          const wouldBeDowngrade = !isFree && hasActiveSubscription && (
-            (currentUserPlan === 'teams' && (plan.id === 'pro' || plan.id === 'starter')) ||
-            (currentUserPlan === 'pro' && plan.id === 'starter') ||
-            (isCurrentPlan && currentBillingInterval === 'annual' && billingInterval === 'monthly')
-          );
-
-          return (
-            <div
-              key={plan.id}
-              className={`relative rounded-none shadow-md bg-white p-6 ${
-                plan.id === highlightedPlan ? 'ring-2 ring-gray-500' : ''
-              } cursor-pointer`}
-              onClick={() => {
-                setHighlightedPlan(plan.id);
-                // Reset cancel confirmation if clicking on a different plan
-                if (pendingCancelPlan && pendingCancelPlan !== plan.id) {
-                  setPendingCancelPlan(null);
-                }
-              }}
-            >
-              {plan.id === highlightedPlan && !(isFree && !isCurrentPlan) && (
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                  <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                    {isFree && isCurrentPlan
-                      ? 'Current Plan'
-                      : !hasActiveSubscription
-                      ? 'Select Plan'
-                      : isChangingBilling
-                      ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
-                      : isCurrentPlan
-                      ? 'Current Plan'
-                      : wouldBeDowngrade
-                      ? 'Downgrade'
-                      : 'Upgrade Now'}
-                  </span>
-                </div>
-              )}
-
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
-                <p className="mt-1 text-sm text-gray-500">{plan.description}</p>
-              </div>
-
-              <div className="mb-6">
-                {isFree ? (
-                  <span className="text-4xl font-bold text-gray-900">Free</span>
-                ) : (
-                  <>
-                    <span className="text-4xl font-bold text-gray-900">${price.toLocaleString()}</span>
-                    <span className="text-gray-500 ml-1">
-                      /{billingInterval === 'monthly' ? 'mo' : 'yr'}
-                    </span>
-                  </>
-                )}
-              </div>
-
-              <ul className="space-y-3 mb-6">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start">
-                    <CheckIcon className="flex-shrink-0 h-5 w-5 text-green-500" />
-                    <span className="ml-2 text-sm text-gray-700">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                onClick={() => {
-                  // Demo plan can't be clicked when it's current
-                  if (isFree && isCurrentPlan) {
-                    return;
-                  }
-                  // Handle current plan cancel flow
-                  if (isCurrentPlan && isSameBillingInterval && !cancelAtPeriodEnd && !isFree) {
-                    handleCancelClick(plan.id);
-                  } else {
-                    handleSubscribe(plan.id);
-                  }
-                }}
-                disabled={processing || cancelAtPeriodEnd || (isFree && !hasActiveSubscription)}
-                className={`w-full py-2 px-4 rounded-none text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                  pendingCancelPlan === plan.id
-                    ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
-                    : isFree && isCurrentPlan
-                    ? 'bg-gray-200 text-gray-600 cursor-default'
-                    : plan.id === highlightedPlan
-                    ? 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500'
-                    : 'bg-gray-50 text-gray-900 hover:bg-gray-100 focus:ring-gray-500'
-                } ${
-                  (processing || cancelAtPeriodEnd) ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                {processing && selectedPlan === plan.id
-                  ? 'Processing...'
-                  : isFree && isCurrentPlan
-                  ? 'Current Plan'
-                  : isFree && hasActiveSubscription
-                  ? 'Downgrade to Demo'
-                  : cancelAtPeriodEnd && isCurrentPlan
-                  ? 'Canceling at Period End'
-                  : isCurrentPlan && isSameBillingInterval && !isFree
-                  ? (pendingCancelPlan === plan.id ? 'Confirm Cancel' : 'Cancel Plan')
-                  : isChangingBilling
-                  ? `Change to ${billingInterval === 'annual' ? 'Annual' : 'Monthly'}`
-                  : plan.id === 'starter' && currentUserPlan === 'demo'
-                  ? 'Upgrade to Starter'
-                  : plan.id === 'starter' && (currentUserPlan === 'pro' || currentUserPlan === 'teams')
-                  ? 'Downgrade to Starter'
-                  : plan.id === 'pro' && (currentUserPlan === 'demo' || currentUserPlan === 'starter')
-                  ? 'Upgrade to Pro'
-                  : plan.id === 'pro' && currentUserPlan === 'teams'
-                  ? 'Downgrade to Pro'
-                  : plan.id === 'teams' && (currentUserPlan === 'demo' || currentUserPlan === 'starter' || currentUserPlan === 'pro')
-                  ? 'Upgrade to Team'
-                  : plan.cta}
-              </button>
-
-              {isChangingBilling && !wouldBeUpgrade && !wouldBeDowngrade && (
-                <p className="mt-2 text-xs text-gray-500 text-center">
-                  Billing change applies immediately current credits retained
-                </p>
-              )}
-
-              {wouldBeUpgrade && (
-                <p className="mt-2 text-xs text-green-600 text-center font-medium">
-                  Upgrade applies immediately with credit for unused time
-                </p>
-              )}
-
-              {wouldBeDowngrade && (
-                <p className="mt-2 text-xs text-gray-500 text-center">
-                  Downgrades apply immediately current credits retained
-                </p>
-              )}
-
-              {pendingCancelPlan === plan.id && (
-                <p className="mt-2 text-xs text-red-600 text-center font-medium">
-                  Click again to confirm. Cancels at end of billing period. Overage credits remain.
-                </p>
-              )}
-
-              {cancelAtPeriodEnd && isCurrentPlan && renewalDate && (
-                <p className="mt-2 text-xs text-gray-500 text-center">
-                  Ends {new Date(renewalDate).toLocaleDateString()}. Overage credits remain until used.
-                </p>
-              )}
-            </div>
-          );
-        })}
+        {plans.map((plan) => (
+          <PlanCard
+            key={plan.id}
+            plan={plan}
+            billingInterval={billingInterval}
+            currentUserPlan={sub.currentUserPlan}
+            currentBillingInterval={sub.currentBillingInterval}
+            hasActiveSubscription={sub.hasActiveSubscription}
+            cancelAtPeriodEnd={sub.cancelAtPeriodEnd}
+            renewalDate={sub.renewalDate}
+            highlightedPlan={highlightedPlan}
+            pendingCancelPlan={pendingCancelPlan}
+            processing={processing}
+            selectedPlan={selectedPlan}
+            onHighlight={setHighlightedPlan}
+            onResetPendingCancel={() => setPendingCancelPlan(null)}
+            onCancelClick={handleCancelClick}
+            onSubscribe={handleSubscribe}
+          />
+        ))}
       </div>
     </div>
   );
