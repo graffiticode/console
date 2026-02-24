@@ -97,6 +97,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   // Detect if we're in editor mode
   const isEditorMode = useRef(false);
   const editorOrigin = useRef(null);
+  const openerWindowRef = useRef(null);
 
   // Track current viewport type to detect changes
   const [ currentViewport, setCurrentViewport ] = useState(() =>
@@ -132,14 +133,17 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   }, [currentViewport, editorPanelWidth, previewPanelHeight]);
 
   useEffect(() => {
+    console.log('[Gallery] Checking editor mode: window.opener=', !!window.opener);
     // Check if we were opened from editor (has opener and sessionStorage flag)
     if (typeof window !== 'undefined' && window.opener) {
       const editorData = sessionStorage.getItem('graffiticode:editor');
+      console.log('[Gallery] sessionStorage editor data:', editorData);
       if (editorData) {
         try {
           const data = JSON.parse(editorData);
           isEditorMode.current = true;
           editorOrigin.current = data.origin;
+          console.log('[Gallery] Editor mode from sessionStorage, origin:', data.origin);
         } catch (e) {
           console.error('Failed to parse editor data:', e);
         }
@@ -150,10 +154,33 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
       if (urlParams.get('editorMode') === 'true' && urlParams.get('editorOrigin')) {
         isEditorMode.current = true;
         editorOrigin.current = urlParams.get('editorOrigin');
-        console.log('Editor mode enabled via URL parameters, origin:', editorOrigin.current);
+        console.log('[Gallery] Editor mode from URL params, origin:', editorOrigin.current);
       }
+    } else {
+      console.log('[Gallery] No window.opener - not in editor mode');
     }
   }, []);
+
+  // Listen for establish-communication from the opener window (e.g. Learnosity custom layout)
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === 'establish-communication' && event.source) {
+        console.log('[Gallery] Received establish-communication from', event.origin);
+        openerWindowRef.current = event.source;
+        editorOrigin.current = event.origin;
+        isEditorMode.current = true;
+        // Send acknowledgment
+        try {
+          (event.source as Window).postMessage({ type: 'graffiticode-ready' }, event.origin);
+        } catch (e) {
+          console.warn('[Gallery] Failed to send graffiticode-ready:', e);
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   // Load items from the API only once on initialization
   const { data: loadedItems, mutate, isLoading: isLoadingItems } = useSWR(
     user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}-${app}` : null,
@@ -448,21 +475,33 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
 
   // Compile form data when taskId or formData changes
   useEffect(() => {
-    if (!user || !taskId || Object.keys(formData).length === 0) return;
+    if (!user || !taskId || Object.keys(formData).length === 0) {
+      console.log('[Gallery] Compile skipped: user=', !!user, 'taskId=', taskId, 'formData keys=', Object.keys(formData).length);
+      return;
+    }
 
     compile({ user, id: taskId, data: formData }).then(compiledData => {
       console.log(
         "compile()",
         "compiledData=" + JSON.stringify(compiledData, null, 2),
       );
-      // Send to parent window if we have one
-      if (window.opener && editorOrigin.current) {
+      // Send to opener window if we have one
+      const targetWindow = openerWindowRef.current || window.opener;
+      console.log('[Gallery] data-updated: targetWindow=', !!targetWindow, 'editorOrigin=', editorOrigin.current);
+      if (targetWindow && editorOrigin.current) {
         const message = {
           type: 'data-updated',
           itemId: selectedItemId,
           data: compiledData
         };
-        window.opener.postMessage(message, editorOrigin.current);
+        try {
+          targetWindow.postMessage(message, editorOrigin.current);
+          console.log('[Gallery] data-updated postMessage sent to', editorOrigin.current);
+        } catch (e) {
+          console.error('[Gallery] data-updated postMessage failed:', e);
+        }
+      } else {
+        console.warn('[Gallery] Cannot send data-updated: targetWindow=', !!targetWindow, 'editorOrigin=', editorOrigin.current);
       }
     }).catch(err => {
       console.error('Failed to compile form data:', err);

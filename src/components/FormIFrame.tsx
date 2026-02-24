@@ -121,6 +121,16 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
         return;
       }
 
+      // Skip known non-form message types (e.g. from external integrations)
+      if (event.data.type === 'establish-communication' ||
+          event.data.type === 'item-created' ||
+          event.data.type === 'item-updated' ||
+          event.data.type === 'learnosity-ready' ||
+          event.data.type === 'graffiticode-ready' ||
+          event.data.type === 'onload') {
+        return;
+      }
+
       // Check if this is form data (has title, instructions, validation, interaction)
       let data = null;
 

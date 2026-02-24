@@ -23,6 +23,8 @@ export default function Editor({ language, setLanguage, mark }) {
   const [isTokenSigningIn, setIsTokenSigningIn] = useState(false);
   const creationStarted = useRef(false);
   const tokenSignInAttempted = useRef(false);
+  const openerWindowRef = useRef(null);
+  const pendingItemCreatedRef = useRef(null);
 
   // Handle token-based sign-in from URL parameter
   useEffect(() => {
@@ -51,6 +53,34 @@ export default function Editor({ language, setLanguage, mark }) {
       setIsTokenSigningIn(false);
     }
   }, [user, isTokenSigningIn]);
+
+  // Listen for establish-communication from the opener window (e.g. Learnosity custom layout)
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === 'establish-communication' && event.source) {
+        console.log('[Editor] Received establish-communication from', event.origin);
+        openerWindowRef.current = event.source;
+        // Send acknowledgment
+        try {
+          (event.source as Window).postMessage({ type: 'graffiticode-ready' }, event.origin);
+        } catch (e) {
+          console.warn('[Editor] Failed to send graffiticode-ready:', e);
+        }
+        // Send any pending item-created message
+        if (pendingItemCreatedRef.current) {
+          try {
+            (event.source as Window).postMessage(pendingItemCreatedRef.current, event.origin);
+            console.log('[Editor] Sent pending item-created to', event.origin);
+          } catch (e) {
+            console.error('[Editor] Failed to send pending item-created:', e);
+          }
+          pendingItemCreatedRef.current = null;
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   useEffect(() => {
     if (!lang || mode !== 'editor' || !origin) {
@@ -116,14 +146,27 @@ export default function Editor({ language, setLanguage, mark }) {
         setCreatedItemId(newItem.id);
         setIsCreating(false);
 
-        // Send message back to parent window
-        if (window.opener && origin) {
-          const message = {
-            type: 'item-created',
-            itemId: newItem.id,
-            lang: lang
-          };
-          window.opener.postMessage(message, String(origin));
+        // Send message back to opener window
+        const targetWindow = openerWindowRef.current || window.opener;
+        const message = {
+          type: 'item-created',
+          itemId: newItem.id,
+          lang: lang
+        };
+        console.log('[Editor] item-created: targetWindow=', !!targetWindow, 'origin=', origin);
+        if (targetWindow && origin) {
+          try {
+            targetWindow.postMessage(message, String(origin));
+            console.log('[Editor] item-created postMessage sent to', String(origin));
+          } catch (e) {
+            console.error('[Editor] item-created postMessage failed:', e);
+          }
+        } else if (origin) {
+          // Queue for when establish-communication arrives
+          pendingItemCreatedRef.current = message;
+          console.log('[Editor] Queued item-created for establish-communication');
+        } else {
+          console.warn('[Editor] Cannot send item-created: no targetWindow or origin');
         }
 
         // Store the selected item ID in localStorage so it will be selected in the items view

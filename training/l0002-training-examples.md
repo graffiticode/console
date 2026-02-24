@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-10-09T23:58:15.326Z*
+*Downloaded on 2026-02-24T22:41:06.142Z*
 
 ## Language L0002
 
@@ -39,7 +39,7 @@ hello 'world'
 #### Code
 
 ```
-case 42 of
+print case 42 of
   42: "Found forty-two"
   _: "Something else"
 end..
@@ -65,8 +65,8 @@ In simple terms, this generated code allows you to easily access the first item 
 ```
 let first = <list: hd list>..
 let fruits = ["apple" "banana" "orange" "grape"]..
-let firstFruit = first fruits..
-firstFruit..
+let first-fruit = first fruits..
+print first-fruit..
 ```
 
 ---
@@ -86,8 +86,8 @@ firstFruit..
 
 ```
 let obj = {x: 42}..
-let xValue = get "x" obj..
-xValue..
+let x-value = get "x" obj..
+print x-value..
 ```
 
 ---
@@ -110,7 +110,7 @@ This generated code creates a list of the first 100 whole numbers (from 1 to 100
 ```
 let numbers = range 1 101 1..
 let sum = reduce (<x y: add x y>) 0 numbers..
-sum..
+print sum..
 ```
 
 ---
@@ -139,7 +139,7 @@ let fizzbuzz = <n:
 >..
 let numbers = range 1 101 1..
 let results = map (fizzbuzz) numbers..
-results..
+print results..
 ```
 
 ---
@@ -158,9 +158,9 @@ results..
 #### Code
 
 ```
-let myRecord = { foo: 10 }..
-let updatedRecord = set "bar" 20 myRecord..
-updatedRecord..
+let my-record = { foo: 10 }..
+let updated-record = set "bar" 20 my-record..
+print updated-record..
 ```
 
 ---
@@ -202,6 +202,36 @@ x..
 ---
 
 ### Example 10
+
+#### Prompt
+"create a function that prints the names of the first 10 integers in french and calls it with one of the integers"
+
+#### Chat Transcript
+
+**User**: create a function that prints the names of the first 10 integers in french and calls it with one of the integers
+
+#### Code
+
+```
+let fn = <n: case n of
+  1: "un"
+  2: "deux"
+  3: "trois"
+  4: "quatre"
+  5: "cinq"
+  6: "six"
+  7: "sept"
+  8: "huit"
+  9: "neuf"
+  10: "dix"
+  _: "unknown"
+end>..
+fn 10..
+```
+
+---
+
+### Example 11
 
 #### Prompt
 "write a program that translates integers from 1 to 10 to their french names
@@ -276,12 +306,12 @@ let frenchTens = <n:
 >..
 let numbers = range 10 110 10..
 let frenchNumbers = map (frenchTens) numbers..
-frenchNumbers..
+print frenchNumbers..
 ```
 
 ---
 
-### Example 11
+### Example 12
 
 #### Prompt
 "define a function and call it"
@@ -293,13 +323,13 @@ frenchNumbers..
 #### Code
 
 ```
-let myFunction = <x: mul x 2>..
-myFunction 42..
+let my-function = <x: mul x 2>..
+print my-function 42..
 ```
 
 ---
 
-### Example 12
+### Example 13
 
 #### Prompt
 "use parenthesis to call a higher order function"
@@ -312,12 +342,12 @@ myFunction 42..
 
 ```
 let double = <x: mul 2 x>..
-map (double) [1 2 3]..
+print map (double) [1 2 3 4]..
 ```
 
 ---
 
-### Example 13
+### Example 14
 
 #### Prompt
 "write a program with a simple conditional expression"
@@ -329,12 +359,12 @@ map (double) [1 2 3]..
 #### Code
 
 ```
-if gt 5 3 then "five is greater" else "three is greater"..
+print if gt 5 3 then "five is greater" else "three is greater"..
 ```
 
 ---
 
-### Example 14
+### Example 15
 
 #### Prompt
 "get the tail of a list of integers"
@@ -355,7 +385,7 @@ print tail..
 ```
 let numbers = [6 8 2 9 3]..
 let tail = tl numbers..
- tail..
+print tail..
 ```
 
 

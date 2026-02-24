@@ -67,6 +67,10 @@ const languages: Language[] = [
     "embedsheets",
     "graffiticode",
   ]},
+  {id: 24, name: 'L0169', desc: "Concept web assessments", domains: [
+    "appliedscoring",
+    "graffiticode",
+  ]},
 ];
 
 function classNames(...classes) {
