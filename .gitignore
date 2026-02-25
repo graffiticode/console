@@ -46,3 +46,6 @@ firestore-debug.log
 firestore.indexes.json
 firestore.rulescloudrun-env-vars.txt
 cloudrun-env-vars.yaml
+
+# generated reports
+rag-analytics-report*.html
