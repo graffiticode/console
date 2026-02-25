@@ -229,7 +229,7 @@ export class RAGAnalyticsService {
       requestId,
       userId,
       sessionId,
-      timestamp: FieldValue.serverTimestamp() as any,
+      timestamp: admin.firestore.Timestamp.now(),
       query: {
         text: query,
         length: query.length,
