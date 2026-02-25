@@ -52,10 +52,10 @@ const languageAssetsCache = {
 
 // Define available Claude models with best practices
 export const CLAUDE_MODELS = {
-  OPUS: "claude-opus-4-20250514",
-  SONNET: "claude-sonnet-4-20250514",
-  HAIKU: "claude-3-5-haiku-20241022",
-  DEFAULT: "claude-sonnet-4-20250514",  // Sonnet is now the default
+  OPUS: "claude-opus-4-6",
+  SONNET: "claude-sonnet-4-6",
+  HAIKU: "claude-haiku-4-5-20251001",
+  DEFAULT: "claude-sonnet-4-6",
 };
 
 /**

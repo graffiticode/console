@@ -47,14 +47,25 @@ function parseArgs(argv: string[]): { period: string; output: string; language?:
   return { period, output, language };
 }
 
+interface RetrievalDoc {
+  similarity: number;
+  keywordScore?: number;
+  combinedScore?: number;
+  embeddingText?: string;
+  prompt?: string;
+  codeSnippet?: string;
+  position?: number;
+  wasUsedInPrompt?: boolean;
+}
+
 interface AnalyticsDoc {
   requestId: string;
   timestamp: FirebaseFirestore.Timestamp;
-  query?: { text?: string; language?: string };
-  retrieval?: { documents?: Array<{ similarity: number }>; retrievalLatencyMs?: number };
+  query?: { text?: string; language?: string; embeddingText?: string };
+  retrieval?: { documents?: RetrievalDoc[]; retrievalLatencyMs?: number };
   generation?: { success?: boolean; latencyMs?: number; model?: string };
   compilation?: { success?: boolean; errorMessage?: string; retryCount?: number };
-  response?: { success?: boolean };
+  response?: { success?: boolean; code?: string };
   feedback?: { score?: number };
   performance?: { totalLatencyMs?: number; stages?: Array<{ stage: string; startTime?: number; endTime?: number; durationMs?: number }> };
   errors?: Array<{ stage: string; message: string }>;
@@ -232,8 +243,8 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
   // Sort docs by timestamp descending for detail table
   const sorted = [...docs].sort((a, b) => (getTimestampMs(b) || 0) - (getTimestampMs(a) || 0));
 
-  // Detail table rows
-  const detailRows = sorted.map(d => {
+  // Detail table rows with expandable panels
+  const detailRows = sorted.map((d, i) => {
     const ts = formatTimestamp(d);
     const lang = getLanguage(d);
     const query = escapeHtml((d.query?.text || '—').substring(0, 60));
@@ -246,7 +257,33 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
       ? (d.compilation.success ? 'Pass' : `Fail${d.compilation.retryCount ? ` (${d.compilation.retryCount} retries)` : ''}`)
       : '—';
     const successClass = d.response?.success ? 'success' : 'failure';
-    return `<tr class="${successClass}"><td class="ts">${ts}</td><td>${lang}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${compilation}</td></tr>`;
+
+    // Build expandable detail content
+    const fullQuery = escapeHtml(d.query?.text || '—');
+    const responseCode = escapeHtml(d.response?.code || '—');
+    const embeddingText = escapeHtml(d.query?.embeddingText || '—');
+
+    // Top match from retrieval
+    const topMatch = d.retrieval?.documents?.length
+      ? [...d.retrieval.documents].sort((a, b) => b.similarity - a.similarity)[0]
+      : null;
+    const matchEmbeddingText = topMatch ? escapeHtml(topMatch.embeddingText || '—') : '—';
+    const matchPrompt = topMatch ? escapeHtml(topMatch.prompt || '—') : '—';
+    const matchCode = topMatch ? escapeHtml(topMatch.codeSnippet || '—') : '—';
+    const matchSim = topMatch ? topMatch.similarity.toFixed(4) : '—';
+
+    const summaryRow = `<tr class="${successClass} clickable" onclick="toggle(${i})"><td class="ts">${ts}</td><td>${lang}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${compilation}</td></tr>`;
+    const detailRow = `<tr class="detail-row" id="detail-${i}"><td colspan="7"><div class="detail-panel">
+<div class="detail-section"><div class="detail-label">Prompt</div><pre class="detail-pre">${fullQuery}</pre></div>
+<div class="detail-section"><div class="detail-label">Generated Code</div><pre class="detail-pre">${responseCode}</pre></div>
+<div class="detail-section"><div class="detail-label">Embedding Text (query)</div><pre class="detail-pre">${embeddingText}</pre></div>
+<div class="detail-section"><div class="detail-label">Top Match (similarity: ${matchSim})</div>
+<div class="detail-sublabel">Prompt</div><pre class="detail-pre">${matchPrompt}</pre>
+<div class="detail-sublabel">Embedding Text</div><pre class="detail-pre">${matchEmbeddingText}</pre>
+<div class="detail-sublabel">Code Snippet</div><pre class="detail-pre">${matchCode}</pre>
+</div>
+</div></td></tr>`;
+    return summaryRow + '\n' + detailRow;
   }).join('\n');
 
   return `<!DOCTYPE html>
@@ -275,7 +312,21 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
   td.ts { font-family: monospace; font-size: 0.8rem; white-space: nowrap; }
   .empty { color: #94a3b8; text-align: center; padding: 32px; }
   .chart-container { overflow-x: auto; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: #f1f5f9; }
+  tr.detail-row { display: none; }
+  tr.detail-row.open { display: table-row; }
+  .detail-panel { padding: 12px 4px; }
+  .detail-section { margin-bottom: 12px; }
+  .detail-label { font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; margin-bottom: 4px; }
+  .detail-sublabel { font-weight: 600; font-size: 0.7rem; color: #64748b; margin: 8px 0 2px 8px; }
+  .detail-pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; margin-left: 8px; }
 </style>
+<script>
+function toggle(i) {
+  document.getElementById('detail-' + i).classList.toggle('open');
+}
+</script>
 </head>
 <body>
 <h1>RAG Analytics Report</h1>
