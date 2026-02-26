@@ -367,9 +367,7 @@ export async function vectorSearch({
       // Cosine distance of exactly 0 (similarity 1.0) for different texts is impossible
       // with real embeddings — it indicates a zero/degenerate vector in the index.
       const distance = doc.get("_distance");
-      console.log(`vectorSearch distance docId=${doc.id} distance=${distance} type=${typeof distance}`);
       if (distance == null || distance === 0) {
-        console.log(`vectorSearch SKIP degenerate docId=${doc.id} distance=${distance}`);
         return;
       }
       const similarity = 1 - distance; // For cosine distance
