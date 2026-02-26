@@ -356,12 +356,27 @@ export async function vectorSearch({
           })
           .get();
 
-    // Extract documents and add similarity scores
+    // Extract documents and add similarity scores, skipping degenerate results
     const documents = [];
     results.forEach((doc) => {
       const data = doc.data();
-      // Firebase returns distance, convert to similarity score
-      const distance = doc.get("__distance__") || 0;
+      // Firebase returns distance, convert to similarity score.
+      // Cosine distance of exactly 0 (similarity 1.0) for different texts is impossible
+      // with real embeddings — it indicates a zero/degenerate vector in the index.
+      const distance = doc.get("__distance__");
+      if (rid) {
+        ragLog(rid, "vectorSearch.docDistance", {
+          docId: doc.id,
+          distance,
+          distanceType: typeof distance,
+        });
+      }
+      if (distance == null || distance === 0) {
+        if (rid) {
+          ragLog(rid, "vectorSearch.skipDegenerateDistance", { docId: doc.id, distance });
+        }
+        return;
+      }
       const similarity = 1 - distance; // For cosine distance
 
       documents.push({

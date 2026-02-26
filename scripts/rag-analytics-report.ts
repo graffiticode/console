@@ -272,8 +272,47 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     const matchCode = topMatch ? escapeHtml(topMatch.codeSnippet || '—') : '—';
     const matchSim = topMatch ? topMatch.similarity.toFixed(4) : '—';
 
+    // Build markdown for clipboard
+    const rawQuery = d.query?.text || '—';
+    const rawCode = d.response?.code || '—';
+    const rawEmbedding = d.query?.embeddingText || '—';
+    const rawMatchPrompt = topMatch?.prompt || '—';
+    const rawMatchEmbedding = topMatch?.embeddingText || '—';
+    const rawMatchCode = topMatch?.codeSnippet || '—';
+    const md = [
+      `## RAG Request ${d.requestId}`,
+      '',
+      `- **Timestamp:** ${ts}`,
+      `- **Language:** ${lang}`,
+      `- **Success:** ${success}`,
+      `- **Latency:** ${latency}`,
+      `- **Compilation:** ${compilation}`,
+      '',
+      `### Prompt`,
+      '```', rawQuery, '```',
+      '',
+      `### Generated Code`,
+      '```', rawCode, '```',
+      '',
+      `### Embedding Text (query)`,
+      '```', rawEmbedding, '```',
+      '',
+      `### Top Match (similarity: ${matchSim})`,
+      '',
+      `**Prompt:**`,
+      '```', rawMatchPrompt, '```',
+      '',
+      `**Embedding Text:**`,
+      '```', rawMatchEmbedding, '```',
+      '',
+      `**Code Snippet:**`,
+      '```', rawMatchCode, '```',
+    ].join('\n');
+    const mdAttr = escapeHtml(md);
+
     const summaryRow = `<tr class="${successClass} clickable" onclick="toggle(${i})"><td class="ts">${ts}</td><td>${lang}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${compilation}</td></tr>`;
     const detailRow = `<tr class="detail-row" id="detail-${i}"><td colspan="7"><div class="detail-panel">
+<div class="detail-actions"><button class="copy-btn" onclick="copyMd(this)" data-md="${mdAttr}">Copy as Markdown</button></div>
 <div class="detail-section"><div class="detail-label">Prompt</div><pre class="detail-pre">${fullQuery}</pre></div>
 <div class="detail-section"><div class="detail-label">Generated Code</div><pre class="detail-pre">${responseCode}</pre></div>
 <div class="detail-section"><div class="detail-label">Embedding Text (query)</div><pre class="detail-pre">${embeddingText}</pre></div>
@@ -321,10 +360,22 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
   .detail-label { font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; margin-bottom: 4px; }
   .detail-sublabel { font-weight: 600; font-size: 0.7rem; color: #64748b; margin: 8px 0 2px 8px; }
   .detail-pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; margin-left: 8px; }
+  .detail-actions { margin-bottom: 12px; }
+  .copy-btn { background: #3b82f6; color: #fff; border: none; border-radius: 4px; padding: 6px 12px; font-size: 0.8rem; cursor: pointer; }
+  .copy-btn:hover { background: #2563eb; }
+  .copy-btn.copied { background: #22c55e; }
 </style>
 <script>
 function toggle(i) {
   document.getElementById('detail-' + i).classList.toggle('open');
+}
+function copyMd(btn) {
+  var md = btn.getAttribute('data-md');
+  navigator.clipboard.writeText(md).then(function() {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() { btn.textContent = 'Copy as Markdown'; btn.classList.remove('copied'); }, 2000);
+  });
 }
 </script>
 </head>
