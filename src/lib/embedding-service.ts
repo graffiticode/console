@@ -355,7 +355,7 @@ export async function vectorSearch({
             queryVector: vectorQuery,
             limit: limit,
             distanceMeasure: "COSINE",
-            distanceResultField: "__distance__",
+            distanceResultField: "_distance",
           })
           .get();
 
@@ -366,7 +366,7 @@ export async function vectorSearch({
       // Firebase returns distance, convert to similarity score.
       // Cosine distance of exactly 0 (similarity 1.0) for different texts is impossible
       // with real embeddings — it indicates a zero/degenerate vector in the index.
-      const distance = doc.get("__distance__");
+      const distance = doc.get("_distance");
       console.log(`vectorSearch distance docId=${doc.id} distance=${distance} type=${typeof distance}`);
       if (distance == null || distance === 0) {
         console.log(`vectorSearch SKIP degenerate docId=${doc.id} distance=${distance}`);
