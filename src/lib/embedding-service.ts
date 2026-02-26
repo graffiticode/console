@@ -352,7 +352,8 @@ export async function vectorSearch({
     const results = await searchQuery
           .findNearest("embedding", vectorQuery, {
             limit: limit,
-            distanceMeasure: "COSINE", // or 'EUCLIDEAN', 'DOT_PRODUCT'
+            distanceMeasure: "COSINE",
+            distanceResultField: "__distance__",
           })
           .get();
 
