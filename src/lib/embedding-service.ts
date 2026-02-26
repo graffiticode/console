@@ -350,7 +350,9 @@ export async function vectorSearch({
     // Perform vector similarity search
     // Note: Firebase requires a specific index for vector search
     const results = await searchQuery
-          .findNearest("embedding", vectorQuery, {
+          .findNearest({
+            vectorField: "embedding",
+            queryVector: vectorQuery,
             limit: limit,
             distanceMeasure: "COSINE",
             distanceResultField: "__distance__",
