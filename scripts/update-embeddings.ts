@@ -280,7 +280,10 @@ function extractExpectedValues(code: string): string[] {
  * and feature tags add noise without helping differentiation.
  */
 function createVectorText(example: TrainingExample): string {
-  return example.prompt;
+  if (example.prompt) return example.prompt;
+  // Fall back to first user message from chat transcript
+  const userMsg = example.messages?.find(m => m.role === 'user');
+  return userMsg?.content || '';
 }
 
 /**
@@ -298,10 +301,14 @@ function parseMarkdownFile(filePath: string, langCode: string): TrainingExample[
     
     // Extract prompt
     let prompt = '';
-    const promptSection = section.match(/#### Prompt\s*\n([^#]*?)(?=####|$)/);
+    const promptSection = section.match(/#### Prompt\s*\n([\s\S]*?)(?=####|$)/);
     if (promptSection) {
-      const promptMatch = promptSection[1].match(/"([^"]+)"/);
-      prompt = promptMatch ? promptMatch[1] : promptSection[1].trim();
+      let raw = promptSection[1].trim();
+      // Strip surrounding quotes if present
+      if (raw.startsWith('"') && raw.endsWith('"')) {
+        raw = raw.slice(1, -1);
+      }
+      prompt = raw;
     }
     
     // Extract chat transcript
