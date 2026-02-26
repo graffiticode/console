@@ -275,19 +275,12 @@ function extractExpectedValues(code: string): string[] {
 }
 
 /**
- * Create the vector text for embedding
+ * Create the vector text for embedding.
+ * Uses plain prompt text only — lang is filtered at query time,
+ * and feature tags add noise without helping differentiation.
  */
 function createVectorText(example: TrainingExample): string {
-  // Build the vector text following the recommended format
-  // The Prompt already contains the user request, so we don't need to duplicate it
-  let vectorText = `L${example.lang}. `;
-  vectorText += `Prompt: ${example.prompt}. `;
-  
-  if (example.tags.length > 0) {
-    vectorText += `Features: ${example.tags.join(', ')}.`;
-  }
-  
-  return vectorText;
+  return example.prompt;
 }
 
 /**

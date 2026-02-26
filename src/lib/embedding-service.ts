@@ -233,32 +233,22 @@ export function createEmbeddingText(example) {
     return userTexts.filter(Boolean).join("\n");
   }
 
-  // Language marker
-  const lang = example.lang || example.language || "";
-
-  // Prompt/task fields
+  // Prompt/task fields + dialog context only.
+  // Language prefix and feature tags are omitted — lang is filtered at query
+  // time, and feature tags are mostly identical across examples (noise).
   const prompt = example.prompt || example.task || "";
   const userTurns = extractUserTurns(example);
 
-  // Code features (do not include raw code in the vector text)
-  const code = example.code || example.src || "";
-  const tags = extractFeatureTags(code);
-
-  // Compose vector text per recommendations
   const parts = [];
-  if (lang) parts.push(`L${lang}`);
-  if (prompt) parts.push(`Prompt: ${prompt}`);
-  if (userTurns) parts.push(`User: ${userTurns}`);
-  if (tags.length) parts.push(`Features: ${tags.join(", ")}`);
+  if (prompt) parts.push(prompt);
+  if (userTurns && userTurns !== prompt) parts.push(userTurns);
 
-  // If nothing useful, fall back to description or empty string
   if (parts.length === 0) {
     if (example.description) return example.description;
-    // As a last resort, avoid embedding raw code; return empty string
     return "";
   }
 
-  return parts.join(". ");
+  return parts.join("\n");
 }
 
 /**
@@ -330,10 +320,8 @@ export async function vectorSearch({
       return [];
     }
 
-    // Format query text to match document embedding format:
-    // Documents are stored as "L{lang}. Prompt: {text}. Features: ..."
-    const queryText = lang ? `L${lang}. Prompt: ${query}.` : query;
-    const queryEmbedding = await generateEmbedding(queryText, { rid });
+    // Embed query as-is — documents are also stored as plain prompt text
+    const queryEmbedding = await generateEmbedding(query, { rid });
 
     // Convert to VectorValue if available, otherwise use array directly
     const vectorQuery = VectorValue
