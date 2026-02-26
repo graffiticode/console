@@ -150,11 +150,26 @@ function parseMarkdownExamples(markdownContent) {
   }
 }
 
+function extractSearchQuery(prompt: string): string {
+  const marker = "Now, please address this new request:\n";
+  const idx = prompt.lastIndexOf(marker);
+  if (idx !== -1) {
+    const latest = prompt.substring(idx + marker.length).trim();
+    if (latest.length > 0) return latest;
+  }
+  return prompt;
+}
+
 async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
+  // Extract just the latest user request for retrieval so conversation
+  // context doesn't dilute the embedding similarity.
+  const searchQuery = extractSearchQuery(prompt);
+
   try {
     if (rid) {
       ragLog(rid, "retrieval.start", {
-        query: prompt.substring(0, 100),
+        query: searchQuery.substring(0, 100),
+        fullPromptLength: prompt.length,
         lang,
         k: limit,
         mode: "hybrid",
@@ -168,7 +183,7 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
       // Use hybrid search for better results
       const results = await hybridSearch({
         collection: "training_examples",
-        query: prompt,
+        query: searchQuery,
         limit: limit,
         lang: lang,
         db: db,
