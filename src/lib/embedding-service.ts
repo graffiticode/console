@@ -330,8 +330,10 @@ export async function vectorSearch({
       return [];
     }
 
-    // Generate embedding for the query
-    const queryEmbedding = await generateEmbedding(query, { rid });
+    // Format query text to match document embedding format:
+    // Documents are stored as "L{lang}. Prompt: {text}. Features: ..."
+    const queryText = lang ? `L${lang}. Prompt: ${query}.` : query;
+    const queryEmbedding = await generateEmbedding(queryText, { rid });
 
     // Convert to VectorValue if available, otherwise use array directly
     const vectorQuery = VectorValue
