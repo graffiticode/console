@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2025-12-02T21:29:19.137Z*
+*Downloaded on 2026-02-27T00:20:30.090Z*
 
 ## Language L0166
 
@@ -134,29 +134,11 @@ columns [
 ### Example 5
 
 #### Prompt
-"make a simple income statement assessment
-
-Use these changed properties to update the code for column B:
-```json
-{
-    "format": "($#,##0)"
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated."
+"make a simple income statement assessment"
 
 #### Chat Transcript
 
 **User**: make a simple income statement assessment
-
-**User**: Use these changed properties to update the code for column B:
-```json
-{
-    "format": "($#,##0)"
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
 
 #### Code
 
@@ -797,6 +779,72 @@ columns [
 ### Example 19
 
 #### Prompt
+"create a simple home budget assessment"
+
+#### Chat Transcript
+
+**User**: create a simple home budget assessment
+
+#### Code
+
+```
+title "Home Budget Assessment" columns [
+  column A width 150 align "left" {}
+  column B width 100 format "($#,##0)" {}
+  column C width 250 align "left" {}
+] cells [
+  cell A1 text "CATEGORY" font-weight "bold" {}
+  cell B1 text "AMOUNT" font-weight "bold" {}
+  cell C1 text "DETAILS" font-weight "bold" {}
+  cell A2 text "Income" {}
+  cell B2 text "5000" {}
+  cell C2 text "Total monthly income" {}
+  cell A3 text "Rent" {}
+  cell B3 text "" assess [
+    method "formula"
+    expected "=B2*0.35"
+  ] {}
+  cell C3 text "35% of your total income" {}
+  cell A4 text "Utilities" {}
+  cell B4 text "200" {}
+  cell C4 text "Fixed expense" {}
+  cell A5 text "Food" {}
+  cell B5 text "" assess [
+    method "formula"
+    expected "=B2*0.15"
+  ] {}
+  cell C5 text "15% of your total income" {}
+  cell A6 text "Transportation" {}
+  cell B6 text "" assess [
+    method "formula"
+    expected "=B2*0.10"
+  ] {}
+  cell C6 text "10% of your total income" {}
+  cell A7 text "Entertainment" {}
+  cell B7 text "150" {}
+  cell C7 text "Fixed expense" {}
+  cell A8 text "Savings" {}
+  cell B8 text "" assess [
+    method "formula"
+    expected "=B2*0.20"
+  ] {}
+  cell C8 text "20% of your total income" {}
+  cell A9 text "Miscellaneous" {}
+  cell B9 text "" assess [
+    method "formula"
+    expected "=B2-SUM(B3:B8)"
+  ] {}
+  cell C9 text "Remaining income after all other expenses" {}
+] {
+  v: "0.0.1"
+}..
+```
+
+---
+
+### Example 20
+
+#### Prompt
 "align column a and b to the right"
 
 #### Chat Transcript
@@ -821,7 +869,7 @@ columns [
 
 ---
 
-### Example 20
+### Example 21
 
 #### Prompt
 "make a single cell table"
@@ -850,7 +898,7 @@ cells [
 
 ---
 
-### Example 21
+### Example 22
 
 #### Prompt
 "Update the code for column A using these property values:
@@ -885,7 +933,7 @@ columns [
 
 ---
 
-### Example 22
+### Example 23
 
 #### Prompt
 "column a align center
@@ -924,7 +972,7 @@ columns [
 
 ---
 
-### Example 23
+### Example 24
 
 #### Prompt
 "add metadata to cell A1 that sets x=10"
@@ -940,13 +988,13 @@ columns [
   column A width 100 align "center" {}
   column B width 100 align "center" {}
 ] cells [
-  cell A1 {
+  cell A1 text "100" {
     x: 10
   }
   {}
   cell B1 {}
-  cell A2 {}
-  cell B2 {}
+  cell A2 text "200" {}
+  cell B2 text "=average(a1:a2)" {}
 ] {
   v: "0.0.1"
 }..
@@ -954,7 +1002,7 @@ columns [
 
 ---
 
-### Example 24
+### Example 25
 
 #### Prompt
 "left align column A"
@@ -981,7 +1029,7 @@ columns [
 
 ---
 
-### Example 25
+### Example 26
 
 #### Prompt
 "remove alignment on column b"
@@ -1008,7 +1056,7 @@ columns [
 
 ---
 
-### Example 26
+### Example 27
 
 #### Prompt
 "make column C width 250"
@@ -1037,7 +1085,7 @@ columns [
 
 ---
 
-### Example 27
+### Example 28
 
 #### Prompt
 "make a spreadsheet that allows me to track my stocks. see the sheet with a few dummy examples
@@ -1149,149 +1197,6 @@ cells [
   cell F8 text "=SUM(F2:F6)" {fontWeight: "bold", format: "$#,##0.00"}
 ]
 {
-  v: "0.0.1"
-}..
-```
-
----
-
-### Example 28
-
-#### Prompt
-"Make a home budget assessment using the following data:
-
-| CATEGORY | AMOUNT | DETAILS |
-| --- | --- | --- |
-| Income | 4000 | Total monthly income |
-| Rent |  | 35% of your total income |
-| Utilities | 200 | Fixed expense |
-| Food |  | 15% of your total income |
-| Transportation |  | 10% of your total income |
-| Entertainment | 150 | Fixed expense |
-| Savings |  | 20% of your total income |
-| Miscellaneous |  | Remaining income after all other expenses |
-
-Use these changed properties to update the code for column A:
-```json
-{
-    "align": "left"
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
-
-Use these changed properties to update the code for column C:
-```json
-{
-    "align": "left"
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
-
-Use these changed properties to update the code for column B:
-```json
-{
-    "format": "($#,##0)"
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated."
-
-#### Chat Transcript
-
-**User**: Make a home budget assessment using the following data:
-
-| CATEGORY | AMOUNT | DETAILS |
-| --- | --- | --- |
-| Income | 4000 | Total monthly income |
-| Rent |  | 35% of your total income |
-| Utilities | 200 | Fixed expense |
-| Food |  | 15% of your total income |
-| Transportation |  | 10% of your total income |
-| Entertainment | 150 | Fixed expense |
-| Savings |  | 20% of your total income |
-| Miscellaneous |  | Remaining income after all other expenses |
-
-**User**: Use these changed properties to update the code for column A:
-```json
-{
-    "align": "left"
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
-
-**User**: Use these changed properties to update the code for column C:
-```json
-{
-    "align": "left"
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
-
-**User**: Use these changed properties to update the code for column B:
-```json
-{
-    "format": "($#,##0)"
-}
-```
-
-Note: Only the properties shown above have changed and need to be updated.
-
-#### Code
-
-```
-title "Home Budget Assessment" columns [
-  column A width 150 align "left" {}
-  column B width 100 format "($#,##0)" {}
-  column C width 250 align "left" {}
-] cells [
-  cell A1 text "CATEGORY" font-weight "bold" {}
-  cell B1 text "AMOUNT" font-weight "bold" {}
-  cell C1 text "DETAILS" font-weight "bold" {}
-  cell A2 text "Income" {}
-  cell B2 text "4000" {}
-  cell C2 text "Total monthly income" {}
-  cell A3 text "Rent" {}
-  cell B3 text "" assess [
-    method "value"
-    expected "1400"
-  ] {}
-  cell C3 text "35% of your total income" {}
-  cell A4 text "Utilities" {}
-  cell B4 text "200" {}
-  cell C4 text "Fixed expense" {}
-  cell A5 text "Food" {}
-  cell B5 text "" assess [
-    method "value"
-    expected "600"
-  ] {}
-  cell C5 text "15% of your total income" {}
-  cell A6 text "Transportation" {}
-  cell B6 text "" assess [
-    method "value"
-    expected "400"
-  ] {}
-  cell C6 text "10% of your total income" {}
-  cell A7 text "Entertainment" {}
-  cell B7 text "150" {}
-  cell C7 text "Fixed expense" {}
-  cell A8 text "Savings" {}
-  cell B8 text "" assess [
-    method "value"
-    expected "800"
-  ] {}
-  cell C8 text "20% of your total income" {}
-  cell A9 text "Miscellaneous" {}
-  cell B9 text "" assess [
-    method "value"
-    expected "450"
-  ] {}
-  cell C9 text "Remaining income after all other expenses" {}
-] {
-  hideMenu: true
   v: "0.0.1"
 }..
 ```

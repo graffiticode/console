@@ -533,6 +533,8 @@ ${conversationContext}
 <RETRIEVED_CONTEXT>
 ${retrievedContext}
 
+When a retrieved example closely matches the user's request, follow its coding patterns and techniques. If there is existing current code, apply the example's patterns to the current code rather than replacing it.
+
 <OUTPUT_FORMAT>
 Return ONLY Graffiticode between triple backticks. Must end with ".."`;
 
