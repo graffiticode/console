@@ -81,6 +81,29 @@ When report failures shift from "wrong example retrieved" to "right example retr
 ### Overall tipping point
 ~80-100 curated examples with good structural coverage, RAG report consistently showing top similarity > 0.7 for most requests. At that point, diminishing returns from more examples — DSPy becomes worth the investment.
 
+## Reliability Strategy: Reducing the Error Surface
+
+The core strategy: **reduce the surface area of what Claude can get wrong on each turn.** Each layer makes the system more deterministic without losing flexibility.
+
+### What we have
+- Compilation verification with retry (Claude fixes its own syntax errors)
+- RAG for structural pattern matching
+- Prompt instruction to follow matched examples
+
+### What would close the remaining gaps
+
+1. **Structured error feedback** — Feed back specific compiler errors (line, expected token) rather than just "it failed." `parseStructuredErrors()` in dspy-service.ts already supports this. More precise error context = faster convergence.
+
+2. **Output validation beyond compilation** — Code can compile but be wrong. Validate that generated code preserves existing cells/columns when the user only asked to change one thing. Diff-based check: "user asked to format column B, but columns A and C changed too" — reject and retry.
+
+3. **Constrained generation** — Instead of free-form generation, give Claude the current AST and ask it to modify specific nodes. Eliminates the "regenerate everything" failure mode. Property update detection (`isPropertyUpdate`) already moves in this direction.
+
+4. **Change guardrails** — In multi-turn conversations, diff output against current code. If the user said "format column B" but the diff shows 15 cells changed, flag or auto-reject.
+
+5. **Template-first generation** — For high-similarity matches (> 0.9), give Claude the matched example's code as a starting point and ask it to adapt. Flips the problem from "generate correct code" to "make minimal edits" — which LLMs are better at.
+
+6. **Progressive complexity** — Start users with a template (already implemented via `"Create a minimal starting template"`). Each turn makes one change. Naturally constrains generation scope and makes errors easier to catch and fix.
+
 ## Key Principles
 
 1. **Clean data in, clean embeddings out** — single-turn curated prompts produce better matches
