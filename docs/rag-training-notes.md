@@ -48,6 +48,39 @@ The second sentence prevents matched examples from overriding current code in mu
 
 Current approach: static prompt template + curated RAG examples. DSPy adds value as the next layer when there's a scoring metric and enough traffic to optimize against.
 
+## When to Move from RAG to DSPy
+
+### RAG phase (current)
+- Adding/curating training examples still improves output quality
+- Still discovering prompt patterns that users commonly ask for
+- Similarity scores are the main bottleneck (fixable with better examples)
+
+### DSPy tipping point
+- Good coverage of common prompts (50+ curated examples per language) but quality plateaus
+- Same retrieval results produce inconsistent outputs — the problem shifts from *what* Claude sees to *how* it's instructed
+- Enough analytics data to define a scoring metric (compile rate, user feedback, edit rate)
+- Need per-request-type prompt tuning too complex to hand-code
+
+### Practical signal
+When report failures shift from "wrong example retrieved" to "right example retrieved, wrong output anyway."
+
+## Training Example Coverage Targets
+
+### Structural examples (priority)
+- Target: ~50-80 curated examples to cover the L0166 feature surface
+- Cover: format, assess, columns, formulas, borders, alignment, font-weight, width, etc.
+- Each structural request ("add a format", "make column B right-aligned") should have a close match
+
+### Subject matter examples (lower priority)
+- Target: ~20-30 domain templates (budgets, grade books, inventories, income statements, etc.)
+- Same format as structural examples — a prompt and expected code
+- Purpose: show Claude what a *good* instance of a domain looks like in L0166
+- Lower priority because content authors are in the loop prompting for corrections — Claude already knows what a budget looks like, it just needs to know how to express it in L0166
+- Only becomes important if users consistently need many turns to get reasonable content for common domains
+
+### Overall tipping point
+~80-100 curated examples with good structural coverage, RAG report consistently showing top similarity > 0.7 for most requests. At that point, diminishing returns from more examples — DSPy becomes worth the investment.
+
 ## Key Principles
 
 1. **Clean data in, clean embeddings out** — single-turn curated prompts produce better matches
