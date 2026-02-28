@@ -352,7 +352,7 @@ export class RAGAnalyticsService {
       features: doc.features,
       embeddingText: doc.embeddingText,  // Text used for embedding
       prompt: doc.prompt,                 // Original prompt/task from the document
-      codeSnippet: doc.code ? doc.code.substring(0, 200) : undefined, // First 200 chars of code
+      codeSnippet: doc.code || undefined,
     }));
 
     record.retrieval = {
@@ -396,7 +396,7 @@ export class RAGAnalyticsService {
 
     record.generation = metrics;
     record.response = {
-      code: generatedCode.substring(0, 1000), // Store first 1000 chars
+      code: generatedCode,
       length: generatedCode.length,
       success: metrics.success,
     };

@@ -94,10 +94,14 @@ function getTimestampMs(d: AnalyticsDoc): number | null {
   return null;
 }
 
-function formatTimestamp(d: AnalyticsDoc): string {
+function formatTimestamp(d: AnalyticsDoc, period?: string): string {
   const ms = getTimestampMs(d);
   if (ms == null) return '—';
-  return new Date(ms).toISOString();
+  const date = new Date(ms);
+  if (period === 'hour' || period === 'day') {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+  return date.toISOString();
 }
 
 async function fetchDocs(period: string, language?: string): Promise<AnalyticsDoc[]> {
@@ -132,8 +136,11 @@ function computeMetrics(docs: AnalyticsDoc[]) {
   const latencies = docs.map(d => d.performance?.totalLatencyMs).filter((v): v is number => v != null);
   const avgLatency = latencies.length > 0 ? latencies.reduce((a, b) => a + b, 0) / latencies.length : 0;
 
-  const similarities = docs.flatMap(d => d.retrieval?.documents?.map(doc => doc.similarity) || []);
-  const avgSimilarity = similarities.length > 0 ? similarities.reduce((a, b) => a + b, 0) / similarities.length : 0;
+  const topSimilarities = docs.map(d => {
+    const sims = d.retrieval?.documents?.map(doc => doc.similarity) || [];
+    return sims.length > 0 ? Math.max(...sims) : null;
+  }).filter((v): v is number => v != null);
+  const avgTopSimilarity = topSimilarities.length > 0 ? topSimilarities.reduce((a, b) => a + b, 0) / topSimilarities.length : 0;
 
   const feedbacks = docs.map(d => d.feedback?.score).filter((v): v is number => v != null);
   const avgFeedback = feedbacks.length > 0 ? feedbacks.reduce((a, b) => a + b, 0) / feedbacks.length : 0;
@@ -149,20 +156,6 @@ function computeMetrics(docs: AnalyticsDoc[]) {
   const errorBreakdown = Array.from(errorCounts.entries())
     .map(([error, count]) => ({ error, count }))
     .sort((a, b) => b.count - a.count);
-
-  // Requests over time
-  const bucketMs = 300000; // 5 min buckets
-  const timeBuckets = new Map<number, number>();
-  docs.forEach(d => {
-    const ms = getTimestampMs(d);
-    if (ms != null) {
-      const bucket = Math.floor(ms / bucketMs) * bucketMs;
-      timeBuckets.set(bucket, (timeBuckets.get(bucket) || 0) + 1);
-    }
-  });
-  const timeSeries = Array.from(timeBuckets.entries())
-    .map(([time, count]) => ({ time, count }))
-    .sort((a, b) => a.time - b.time);
 
   // Per-language breakdown
   const langMap = new Map<string, { total: number; successful: number; totalLatency: number; latencyCount: number }>();
@@ -186,7 +179,7 @@ function computeMetrics(docs: AnalyticsDoc[]) {
     }))
     .sort((a, b) => b.total - a.total);
 
-  return { total, successful, successRate, avgLatency, avgSimilarity, avgFeedback, feedbackCount: feedbacks.length, errorBreakdown, timeSeries, languageBreakdown };
+  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, errorBreakdown, languageBreakdown };
 }
 
 function escapeHtml(str: string): string {
@@ -196,39 +189,6 @@ function escapeHtml(str: string): string {
 function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMetrics>, period: string, language?: string): string {
   const now = new Date().toISOString();
   const langLabel = language ? ` | Language: ${language}` : '';
-
-  // SVG bar chart for time series
-  const maxCount = Math.max(...metrics.timeSeries.map(t => t.count), 1);
-  const n = metrics.timeSeries.length;
-  const barWidth = n > 0 ? Math.max(8, Math.floor(700 / n) - 2) : 20;
-  const chartPadLeft = 30;
-  const chartPadBottom = 40;
-  const chartWidth = Math.max(720, n * (barWidth + 2) + chartPadLeft + 10);
-  const chartHeight = 200;
-  const barAreaHeight = chartHeight - chartPadBottom - 20;
-  const baselineY = chartHeight - chartPadBottom;
-
-  const bars = metrics.timeSeries.map((t, i) => {
-    const h = (t.count / maxCount) * barAreaHeight;
-    const x = chartPadLeft + i * (barWidth + 2);
-    const y = baselineY - h;
-    const d = new Date(t.time);
-    const label = d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return `<rect x="${x}" y="${y}" width="${barWidth}" height="${h}" fill="#3b82f6" rx="2"><title>${label}: ${t.count}</title></rect>`;
-  }).join('\n');
-
-  // Time tick labels — pick ~8-12 evenly spaced ticks
-  const tickCount = Math.min(n, Math.max(4, Math.floor(chartWidth / 100)));
-  const tickStep = n > 1 ? (n - 1) / (tickCount - 1) : 0;
-  const ticks = Array.from({ length: tickCount }, (_, i) => {
-    const idx = Math.round(i * tickStep);
-    const t = metrics.timeSeries[idx];
-    if (!t) return '';
-    const x = chartPadLeft + idx * (barWidth + 2) + barWidth / 2;
-    const d = new Date(t.time);
-    const label = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    return `<line x1="${x}" y1="${baselineY}" x2="${x}" y2="${baselineY + 4}" stroke="#94a3b8" stroke-width="1"/><text x="${x}" y="${baselineY + 16}" text-anchor="middle" font-size="10" fill="#64748b">${label}</text>`;
-  }).join('\n');
 
   // Error table rows
   const errorRows = metrics.errorBreakdown.map(e =>
@@ -245,7 +205,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
 
   // Detail table rows with expandable panels
   const detailRows = sorted.map((d, i) => {
-    const ts = formatTimestamp(d);
+    const ts = formatTimestamp(d, period);
     const lang = getLanguage(d);
     const query = escapeHtml((d.query?.text || '—').substring(0, 60));
     const success = d.response?.success ? 'Yes' : 'No';
@@ -253,9 +213,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     const topSim = d.retrieval?.documents?.length
       ? Math.max(...d.retrieval.documents.map(doc => doc.similarity)).toFixed(3)
       : '—';
-    const compilation = d.compilation
-      ? (d.compilation.success ? 'Pass' : `Fail${d.compilation.retryCount ? ` (${d.compilation.retryCount} retries)` : ''}`)
-      : '—';
+    const retries = d.compilation?.retryCount ? `${d.compilation.retryCount}` : '0';
     const successClass = d.response?.success ? 'success' : 'failure';
 
     // Build expandable detail content
@@ -267,9 +225,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     const topMatch = d.retrieval?.documents?.length
       ? [...d.retrieval.documents].sort((a, b) => b.similarity - a.similarity)[0]
       : null;
-    const matchEmbeddingText = topMatch ? escapeHtml(topMatch.embeddingText || '—') : '—';
     const matchPrompt = topMatch ? escapeHtml(topMatch.prompt || '—') : '—';
-    const matchCode = topMatch ? escapeHtml(topMatch.codeSnippet || '—') : '—';
     const matchSim = topMatch ? topMatch.similarity.toFixed(4) : '—';
 
     // Build markdown for clipboard
@@ -277,8 +233,6 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     const rawCode = d.response?.code || '—';
     const rawEmbedding = d.query?.embeddingText || '—';
     const rawMatchPrompt = topMatch?.prompt || '—';
-    const rawMatchEmbedding = topMatch?.embeddingText || '—';
-    const rawMatchCode = topMatch?.codeSnippet || '—';
     const md = [
       `## RAG Request ${d.requestId}`,
       '',
@@ -286,41 +240,31 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
       `- **Language:** ${lang}`,
       `- **Success:** ${success}`,
       `- **Latency:** ${latency}`,
-      `- **Compilation:** ${compilation}`,
+      `- **Retries:** ${retries}`,
       '',
-      `### Prompt`,
+      `### User Prompt`,
       '```', rawQuery, '```',
       '',
-      `### Generated Code`,
-      '```', rawCode, '```',
-      '',
-      `### Embedding Text (query)`,
-      '```', rawEmbedding, '```',
-      '',
+      ...(rawEmbedding !== rawQuery ? [`### Search Query`, '```', rawEmbedding, '```', ''] : []),
       `### Top Match (similarity: ${matchSim})`,
       '',
       `**Prompt:**`,
       '```', rawMatchPrompt, '```',
       '',
-      `**Embedding Text:**`,
-      '```', rawMatchEmbedding, '```',
-      '',
-      `**Code Snippet:**`,
-      '```', rawMatchCode, '```',
+      `### Generated Code`,
+      '```', rawCode, '```',
     ].join('\n');
     const mdAttr = escapeHtml(md);
 
-    const summaryRow = `<tr class="${successClass} clickable" onclick="toggle(${i})"><td class="ts">${ts}</td><td>${lang}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${compilation}</td></tr>`;
+    const summaryRow = `<tr class="${successClass} clickable" onclick="toggle(${i})"><td class="ts">${ts}</td><td>${lang}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${retries}</td></tr>`;
     const detailRow = `<tr class="detail-row" id="detail-${i}"><td colspan="7"><div class="detail-panel">
-<div class="detail-actions"><button class="copy-btn" onclick="copyMd(this)" data-md="${mdAttr}">Copy as Markdown</button></div>
-<div class="detail-section"><div class="detail-label">Prompt</div><pre class="detail-pre">${fullQuery}</pre></div>
-<div class="detail-section"><div class="detail-label">Generated Code</div><pre class="detail-pre">${responseCode}</pre></div>
-<div class="detail-section"><div class="detail-label">Embedding Text (query)</div><pre class="detail-pre">${embeddingText}</pre></div>
+<div class="detail-actions"><button class="copy-btn" onclick="copyMd(this)" data-md="${mdAttr}">Copy</button></div>
+<div class="detail-section"><div class="detail-label">User Prompt</div><pre class="detail-pre">${fullQuery}</pre></div>
+${embeddingText !== fullQuery ? `<div class="detail-section"><div class="detail-label">Search Query</div><pre class="detail-pre">${embeddingText}</pre></div>` : ''}
 <div class="detail-section"><div class="detail-label">Top Match (similarity: ${matchSim})</div>
 <div class="detail-sublabel">Prompt</div><pre class="detail-pre">${matchPrompt}</pre>
-<div class="detail-sublabel">Embedding Text</div><pre class="detail-pre">${matchEmbeddingText}</pre>
-<div class="detail-sublabel">Code Snippet</div><pre class="detail-pre">${matchCode}</pre>
 </div>
+<div class="detail-section"><div class="detail-label">Generated Code</div><pre class="detail-pre">${responseCode}</pre></div>
 </div></td></tr>`;
     return summaryRow + '\n' + detailRow;
   }).join('\n');
@@ -342,7 +286,6 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
   .card .value { font-size: 1.5rem; font-weight: 600; margin-top: 4px; }
   .section { margin-bottom: 32px; }
   .section h2 { font-size: 1.1rem; margin-bottom: 12px; }
-  svg { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
   table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.85rem; }
   th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
   th { background: #f1f5f9; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
@@ -350,9 +293,9 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
   tr.success td { }
   td.ts { font-family: monospace; font-size: 0.8rem; white-space: nowrap; }
   .empty { color: #94a3b8; text-align: center; padding: 32px; }
-  .chart-container { overflow-x: auto; }
   tr.clickable { cursor: pointer; }
   tr.clickable:hover td { background: #f1f5f9; }
+  tr.clickable.active td { font-weight: 600; background: #f1f5f9; }
   tr.detail-row { display: none; }
   tr.detail-row.open { display: table-row; }
   .detail-panel { padding: 12px 4px; }
@@ -360,21 +303,29 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
   .detail-label { font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; margin-bottom: 4px; }
   .detail-sublabel { font-weight: 600; font-size: 0.7rem; color: #64748b; margin: 8px 0 2px 8px; }
   .detail-pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; margin-left: 8px; }
-  .detail-actions { margin-bottom: 12px; }
+  .detail-actions { margin-bottom: 12px; text-align: right; }
   .copy-btn { background: #3b82f6; color: #fff; border: none; border-radius: 4px; padding: 6px 12px; font-size: 0.8rem; cursor: pointer; }
   .copy-btn:hover { background: #2563eb; }
   .copy-btn.copied { background: #22c55e; }
 </style>
 <script>
 function toggle(i) {
-  document.getElementById('detail-' + i).classList.toggle('open');
+  var prev = document.querySelector('tr.detail-row.open');
+  var prevSummary = document.querySelector('tr.clickable.active');
+  if (prev && prev.id !== 'detail-' + i) {
+    prev.classList.remove('open');
+    if (prevSummary) prevSummary.classList.remove('active');
+  }
+  var row = document.getElementById('detail-' + i);
+  row.classList.toggle('open');
+  row.previousElementSibling.classList.toggle('active');
 }
 function copyMd(btn) {
   var md = btn.getAttribute('data-md');
   navigator.clipboard.writeText(md).then(function() {
     btn.textContent = 'Copied!';
     btn.classList.add('copied');
-    setTimeout(function() { btn.textContent = 'Copy as Markdown'; btn.classList.remove('copied'); }, 2000);
+    setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
   });
 }
 </script>
@@ -387,30 +338,18 @@ function copyMd(btn) {
   <div class="card"><div class="label">Total Requests</div><div class="value">${metrics.total}</div></div>
   <div class="card"><div class="label">Success Rate</div><div class="value">${(metrics.successRate * 100).toFixed(1)}%</div></div>
   <div class="card"><div class="label">Avg Latency</div><div class="value">${Math.round(metrics.avgLatency)}ms</div></div>
-  <div class="card"><div class="label">Avg Similarity</div><div class="value">${metrics.avgSimilarity.toFixed(3)}</div></div>
+  <div class="card"><div class="label">Avg Top Similarity</div><div class="value">${metrics.avgTopSimilarity.toFixed(3)}</div></div>
   <div class="card"><div class="label">Feedback Score</div><div class="value">${metrics.feedbackCount > 0 ? metrics.avgFeedback.toFixed(1) : '—'}</div></div>
 </div>
 
-<div class="section">
-  <h2>Requests Over Time</h2>
-  ${metrics.timeSeries.length > 0 ? `
-  <div class="chart-container">
-  <svg width="${chartWidth}" height="${chartHeight}" viewBox="0 0 ${chartWidth} ${chartHeight}">
-    <line x1="${chartPadLeft - 2}" y1="${baselineY}" x2="${chartWidth}" y2="${baselineY}" stroke="#e2e8f0" stroke-width="1"/>
-    ${bars}
-    ${ticks}
-  </svg>
-  </div>` : '<p class="empty">No time series data</p>'}
-</div>
-
-<div class="section">
+${!language ? `<div class="section">
   <h2>By Language</h2>
   ${metrics.languageBreakdown.length > 0 ? `
   <table>
     <thead><tr><th>Language</th><th>Requests</th><th>Success Rate</th><th>Avg Latency</th></tr></thead>
     <tbody>${langRows}</tbody>
   </table>` : '<p class="empty">No language data</p>'}
-</div>
+</div>` : ''}
 
 <div class="section">
   <h2>Error Breakdown</h2>
@@ -426,7 +365,7 @@ function copyMd(btn) {
   ${docs.length > 0 ? `
   <div style="overflow-x:auto">
   <table>
-    <thead><tr><th>Timestamp</th><th>Language</th><th>Query</th><th>Success</th><th>Latency</th><th>Top Similarity</th><th>Compilation</th></tr></thead>
+    <thead><tr><th>Timestamp</th><th>Language</th><th>Query</th><th>Success</th><th>Latency</th><th>Top Similarity</th><th>Retries</th></tr></thead>
     <tbody>${detailRows}</tbody>
   </table>
   </div>` : '<p class="empty">No requests in this period</p>'}
