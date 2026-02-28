@@ -76,26 +76,12 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
       if (result.data.success) {
         const units = result.data.units || (selectedBlocks * (pricing?.blockSize || 1000));
-
-        // Immediately update local state with the new overage balance
-        setUsage(prev => prev ? {
-          ...prev,
-          overageUnits: result.data.newOverageBalance
-        } : null);
-
-        // Also update pricing to reflect new balance
-        setPricing(prev => prev ? {
-          ...prev,
-          currentOverageBalance: result.data.newOverageBalance
-        } : null);
-
         alert(`Successfully purchased ${units.toLocaleString()} additional compile units!`);
 
-        // Fetch fresh data in the background (in case webhook already processed)
-        // This ensures we get the absolute latest data without delay
+        // Refresh after webhook has processed the payment
         setTimeout(() => {
           fetchUsageData();
-        }, 2000);
+        }, 3000);
       }
     } catch (error) {
       console.error('Error purchasing overage:', error);
