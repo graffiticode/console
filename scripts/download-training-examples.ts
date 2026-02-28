@@ -33,9 +33,9 @@ const languageFilter = args.includes("--lang")
   ? args[args.indexOf("--lang") + 1]
   : null;
 
-const markValue = args.includes("--mark")
-  ? parseInt(args[args.indexOf("--mark") + 1])
-  : 4; // Default to mark 4 for high quality examples
+const markValues: number[] = args.includes("--mark")
+  ? args[args.indexOf("--mark") + 1].split(",").map(v => parseInt(v.trim()))
+  : [4]; // Default to mark 4 for high quality examples
 
 // Default user ID
 const defaultUserId = "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1";
@@ -57,7 +57,7 @@ Usage: npm run download-training-examples -- [options]
 Options:
   --limit <number>       Maximum number of items to download (default: 10000)
   --lang <language>      Filter by language code (e.g., "0159")
-  --mark <mark>          Filter by mark value (default: 4)
+  --mark <marks>         Filter by mark value(s), comma-separated (default: 4)
   --user <userId>        User ID to fetch items from (default: predefined ID)
   --append               Append to existing file instead of overwriting (default: overwrite)
   --help                 Show this help message
@@ -66,7 +66,7 @@ Examples:
   npm run download-training-examples                    # Download L0002 mark=4 examples (default)
   npm run download-training-examples -- --lang 0159     # Download L0159 mark=4 examples
   npm run download-training-examples -- --mark 5        # Download L0002 mark=5 examples
-  npm run download-training-examples -- --mark 1        # Download L0002 mark=1 examples
+  npm run download-training-examples -- --mark 3,4      # Download L0002 mark=3 and mark=4 examples
   npm run download-training-examples -- --append        # Append to existing L0002 file
 `);
   process.exit(0);
@@ -165,20 +165,22 @@ function convertToMarkdownFormat(trainingExamples: any[]): string {
 }
 
 // Fetch items from Firestore
-async function fetchItemsFromFirestore(lang: string | null, mark: number, limit: number) {
+async function fetchItemsFromFirestore(lang: string | null, marks: number[], limit: number) {
   const db = admin.firestore();
   const collectionPath = `users/${userId}/items`;
-  
+
   console.log(`Fetching from: ${collectionPath}`);
-  console.log(`Filters: lang=${lang || "all"}, mark=${mark}, limit=${limit}`);
-  
+  console.log(`Filters: lang=${lang || "all"}, mark=${marks.join(",")}, limit=${limit}`);
+
   let query: any = db.collection("users").doc(userId).collection("items");
-  
+
   if (lang) {
     query = query.where("lang", "==", lang);
   }
-  if (mark !== undefined && mark !== null) {
-    query = query.where("mark", "==", mark);
+  if (marks.length === 1) {
+    query = query.where("mark", "==", marks[0]);
+  } else if (marks.length > 1) {
+    query = query.where("mark", "in", marks);
   }
   if (limit) {
     query = query.limit(limit);
@@ -346,7 +348,7 @@ async function main() {
     for (const lang of languagesToProcess) {
       console.log(`\nProcessing language L${lang}...`);
       
-      const items = await fetchItemsFromFirestore(lang, markValue, limit);
+      const items = await fetchItemsFromFirestore(lang, markValues, limit);
       const examples = processItems(items);
       
       console.log(`Processed ${examples.length} training examples for L${lang}`);
