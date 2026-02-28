@@ -18,6 +18,7 @@ interface BillingSettings {
   autoRecharge: boolean;
   autoRechargeLimit: number;
   overageBlocksUsedThisPeriod: number;
+  autoRechargeDisabledReason?: string;
 }
 
 interface PricingInfo {
@@ -111,7 +112,11 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
         autoRecharge: enabled,
         autoRechargeLimit: billing?.autoRechargeLimit || 1
       });
-      setBilling(prev => prev ? { ...prev, autoRecharge: enabled } : null);
+      setBilling(prev => prev ? {
+        ...prev,
+        autoRecharge: enabled,
+        autoRechargeDisabledReason: enabled ? undefined : prev.autoRechargeDisabledReason,
+      } : null);
     } catch (error) {
       console.error('Error updating auto-recharge:', error);
       alert('Failed to update auto-recharge settings.');
@@ -312,6 +317,19 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
             <div className="space-y-4">
             {pricing.overageAvailable && (
               <>
+                {billing.autoRechargeDisabledReason && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-none p-3">
+                    <div className="flex items-center">
+                      <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0" />
+                      <p className="text-sm text-yellow-800">
+                        {billing.autoRechargeDisabledReason === 'no_payment_method'
+                          ? 'Auto-recharge was disabled because no payment method is on file.'
+                          : 'Auto-recharge was disabled because a payment failed. Please check your payment method and re-enable.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900">Auto-recharge</p>

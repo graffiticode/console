@@ -1,38 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
+import { OVERAGE_PRICING } from '../../../lib/overage-pricing';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2022-08-01',
 });
-
-// Overage pricing based on plan's compile unit price
-const OVERAGE_PRICING = {
-  starter: {
-    pricePerUnit: 0.005,     // $0.005 per unit = $5 per 1000 units
-    blockSize: 1000,         // Purchase in blocks of 1,000
-    minBlocks: 1,            // Minimum 1 block (1,000 units)
-    description: '$5 per 1,000 units'
-  },
-  pro: {
-    pricePerUnit: 0.001,    // $0.001 per unit = $1 per 1000 units
-    blockSize: 10000,        // Purchase in blocks of 10,000
-    minBlocks: 1,            // Minimum 1 block (10,000 units)
-    description: '$10 per 10,000 units'
-  },
-  max: {
-    pricePerUnit: 0.0005,    // $0.0005 per unit = $0.50 per 1000 units
-    blockSize: 20000,        // Purchase in blocks of 20,000
-    minBlocks: 1,            // Minimum 1 block (20,000 units)
-    description: '$10 per 20,000 units'
-  },
-  teams: {
-    pricePerUnit: 0.0005,    // $0.0005 per unit = $0.50 per 1000 units
-    blockSize: 20000,        // Purchase in blocks of 20,000
-    minBlocks: 1,            // Minimum 1 block (20,000 units)
-    description: '$10 per 20,000 units'
-  },
-};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Handle GET request to fetch pricing info

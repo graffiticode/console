@@ -38,10 +38,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .doc('billing')
         .get();
 
-      const defaultSettings = {
+      const defaultSettings: Record<string, any> = {
         autoRecharge: false,
         autoRechargeLimit: 1,
         overageBlocksUsedThisPeriod: 0,
+        autoRechargeDisabledReason: null,
         // Extended settings for future use
         extended: {
           autoRecharge: {
@@ -65,6 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           autoRecharge: data?.autoRecharge || false,
           autoRechargeLimit: data?.autoRechargeLimit || 1,
           overageBlocksUsedThisPeriod: data?.overageBlocksUsedThisPeriod || 0,
+          autoRechargeDisabledReason: data?.autoRechargeDisabledReason || null,
           extended: data?.extended || defaultSettings.extended,
         };
       }
@@ -76,12 +78,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Handle simple format from UsageMonitor component
       if ('autoRecharge' in updates && typeof updates.autoRecharge === 'boolean') {
-        // Simple format update
-        const simpleUpdate = {
+        // Simple format update — clear failure reason when re-enabling
+        const simpleUpdate: Record<string, any> = {
           autoRecharge: updates.autoRecharge,
           autoRechargeLimit: updates.autoRechargeLimit || 1,
           overageBlocksUsedThisPeriod: updates.overageBlocksUsedThisPeriod || 0,
         };
+        if (updates.autoRecharge) {
+          simpleUpdate.autoRechargeDisabledReason = null;
+          simpleUpdate.autoRechargeDisabledAt = null;
+        }
 
         // Save the updated settings
         const settingsRef = db
