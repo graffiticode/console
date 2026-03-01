@@ -1295,12 +1295,17 @@ export async function generateCode({
       total_tokens: streamResult.usage.inputTokens + streamResult.usage.outputTokens
     };
 
+    // Estimate compile units from initial generation.
+    // Skip fix attempts if already expensive (>50 units).
+    const MAX_UNITS_FOR_FIXES = 50;
+    const estimatedUnits = Math.ceil(finalUsage.total_tokens / 1000);
+
     // Verify the code if an access token is provided
     if (accessToken) {
       safeRAGAnalytics.startStage(requestId, "compilation");
 
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
-      while (fixAttempts < MAX_FIX_ATTEMPTS) {
+      while (fixAttempts < MAX_FIX_ATTEMPTS && estimatedUnits <= MAX_UNITS_FOR_FIXES) {
         verificationResult = await verifyCode(generatedCode, accessToken, requestId);
 
         // If compilation was successful, break the loop
@@ -1399,21 +1404,9 @@ export async function generateCode({
             );
           }
 
-          // Determine which model to use for fixes
-          // If the initial generation used Sonnet or Haiku and failed, upgrade to Opus for better error fixing
+          // Use the same model for fixes — no Opus upgrade.
+          // Sonnet handles error correction well and keeps costs predictable.
           let fixModel = options.model || CLAUDE_MODELS.DEFAULT;
-          if (fixAttempts === 0 && (fixModel === CLAUDE_MODELS.SONNET || fixModel === CLAUDE_MODELS.HAIKU)) {
-            fixModel = CLAUDE_MODELS.OPUS;
-            usedOpusForFix = true;
-            if (requestId) {
-              ragLog(requestId, "fix.model.upgrade", {
-                originalModel: options.model || CLAUDE_MODELS.DEFAULT,
-                upgradedModel: CLAUDE_MODELS.OPUS,
-                reason: "First fix attempt after initial generation failure",
-                usedDSPyRepair,
-              });
-            }
-          }
 
           // Use streaming service to fix the code
           const fixResult = await generateCodeWithContinuation({
