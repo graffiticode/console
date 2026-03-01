@@ -1636,8 +1636,9 @@ export async function generateCode({
       }
     }
 
-    // Complete analytics tracking
-    await safeRAGAnalytics.completeRequest(requestId, true);
+    // Complete analytics tracking — mark as failed if compilation had errors
+    const compilationSucceeded = !verificationResult?.error && verificationResult?.status !== 'error';
+    await safeRAGAnalytics.completeRequest(requestId, compilationSucceeded);
 
     // Return formatted response with the language name
     const result = {
