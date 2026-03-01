@@ -181,9 +181,9 @@ export async function checkCompileAllowed(uid: string): Promise<CompileAllowedRe
   try {
     const db = getFirestore();
 
-    // Get current usage
+    // Get current usage from stored total
     const usageDoc = await db.collection('usage').doc(uid).get();
-    const currentUsage = usageDoc.exists ? (usageDoc.data()?.currentMonthTotal || 0) : 0;
+    let currentUsage = usageDoc.exists ? (usageDoc.data()?.currentMonthTotal || 0) : 0;
 
     // Get subscription and calculate available units
     const userDoc = await db.doc(`users/${uid}`).get();
@@ -199,6 +199,28 @@ export async function checkCompileAllowed(uid: string): Promise<CompileAllowedRe
     const preservedAllocation = subscription.preservedAllocation;
     if (preservedUntil && preservedAllocation && new Date(preservedUntil) > now) {
       allocatedUnits = preservedAllocation;
+    }
+
+    // Cross-check stored total against actual usage records for the current month
+    // The stored total can get out of sync (e.g. after calendar month reset vs billing period)
+    try {
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const usageRecords = await db.collection('usage')
+        .where('userId', '==', uid)
+        .where('createdAt', '>=', firstOfMonth)
+        .get();
+      let calculatedTotal = 0;
+      usageRecords.docs.forEach(doc => {
+        calculatedTotal += doc.data().units || 0;
+      });
+      if (calculatedTotal > currentUsage) {
+        console.log(`checkCompileAllowed: using calculated total (${calculatedTotal}) instead of stored (${currentUsage})`);
+        currentUsage = calculatedTotal;
+        // Fix the stored total
+        await db.collection('usage').doc(uid).update({ currentMonthTotal: calculatedTotal });
+      }
+    } catch (err) {
+      console.error('checkCompileAllowed: error calculating actual usage', err);
     }
 
     const totalAvailable = allocatedUnits + overageUnits;
