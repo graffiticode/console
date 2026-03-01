@@ -328,7 +328,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                     onChange={handleAutoRechargeToggle}
                     className={`${
                       billing.autoRecharge ? 'bg-green-600' : 'bg-gray-200'
-                    } relative inline-flex h-6 w-11 items-center rounded-none transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                    } relative inline-flex h-6 w-11 items-center rounded-none transition-colors focus:outline-none`}
                   >
                     <span
                       className={`${
