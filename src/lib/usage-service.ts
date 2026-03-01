@@ -201,13 +201,19 @@ export async function checkCompileAllowed(uid: string): Promise<CompileAllowedRe
       allocatedUnits = preservedAllocation;
     }
 
-    // Cross-check stored total against actual usage records for the current month
+    // Cross-check stored total against actual usage records for the billing period
     // The stored total can get out of sync (e.g. after calendar month reset vs billing period)
     try {
-      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      // Use billing period start from Stripe subscription, fall back to first of month
+      let periodStart: Date;
+      if (subscription.currentPeriodStart) {
+        periodStart = new Date(subscription.currentPeriodStart);
+      } else {
+        periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
       const usageRecords = await db.collection('usage')
         .where('userId', '==', uid)
-        .where('createdAt', '>=', firstOfMonth)
+        .where('createdAt', '>=', periodStart)
         .get();
       let calculatedTotal = 0;
       usageRecords.docs.forEach(doc => {
