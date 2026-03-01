@@ -65,17 +65,7 @@ async function chargeStripeAsync(uid: string, customerId: string, plan: string, 
 
     if (paymentIntent.status === 'succeeded') {
       console.log('Auto-recharge: payment succeeded for user', uid, units, 'units');
-      // Update overage_purchases record status
-      const purchaseQuery = await db.collection('overage_purchases')
-        .where('userId', '==', uid)
-        .where('status', '==', 'pending_payment')
-        .where('autoRecharge', '==', true)
-        .orderBy('timestamp', 'desc')
-        .limit(1)
-        .get();
-      if (!purchaseQuery.empty) {
-        await purchaseQuery.docs[0].ref.update({ status: 'succeeded' });
-      }
+      // Note: overage_purchases status is updated by the Stripe webhook (payment_intent.succeeded)
     } else {
       console.error('Auto-recharge: payment status', paymentIntent.status, 'for user', uid);
       await db.collection('users').doc(uid).collection('settings').doc('billing').update({
