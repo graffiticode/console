@@ -104,6 +104,25 @@ function formatTimestamp(d: AnalyticsDoc, period?: string): string {
   return date.toISOString();
 }
 
+async function fetchCompileUnits(requestIds: string[]): Promise<Map<string, number>> {
+  const units = new Map<string, number>();
+  if (requestIds.length === 0) return units;
+
+  // Query usage collection for matching taskIds
+  const snapshot = await db.collection('usage')
+    .where('type', '==', 'ai_generation')
+    .get();
+
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    if (data.taskId && requestIds.includes(data.taskId)) {
+      units.set(data.taskId, data.units || 0);
+    }
+  });
+
+  return units;
+}
+
 async function fetchDocs(period: string, language?: string): Promise<AnalyticsDoc[]> {
   const snapshot = await db.collection('rag_analytics').get();
 
@@ -128,7 +147,7 @@ async function fetchDocs(period: string, language?: string): Promise<AnalyticsDo
   return docs;
 }
 
-function computeMetrics(docs: AnalyticsDoc[]) {
+function computeMetrics(docs: AnalyticsDoc[], compileUnits?: Map<string, number>) {
   const total = docs.length;
   const successful = docs.filter(d => d.response?.success || d.metadata?.success).length;
   const successRate = total > 0 ? successful / total : 0;
@@ -179,14 +198,22 @@ function computeMetrics(docs: AnalyticsDoc[]) {
     }))
     .sort((a, b) => b.total - a.total);
 
-  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, errorBreakdown, languageBreakdown };
+  // Total compile units
+  let totalCompileUnits = 0;
+  if (compileUnits) {
+    docs.forEach(d => {
+      totalCompileUnits += compileUnits.get(d.requestId) || 0;
+    });
+  }
+
+  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, errorBreakdown, languageBreakdown, totalCompileUnits };
 }
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMetrics>, period: string, language?: string): string {
+function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMetrics>, period: string, language?: string, compileUnits?: Map<string, number>): string {
   const now = new Date().toISOString();
   const langLabel = language ? ` | Language: ${language}` : '';
 
@@ -214,6 +241,8 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
       ? Math.max(...d.retrieval.documents.map(doc => doc.similarity)).toFixed(3)
       : '—';
     const retries = d.compilation?.retryCount ? `${d.compilation.retryCount}` : '0';
+    const units = compileUnits?.get(d.requestId);
+    const unitsStr = units != null ? units.toLocaleString() : '—';
     const successClass = d.response?.success ? 'success' : 'failure';
 
     // Build expandable detail content
@@ -240,6 +269,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
       `- **Language:** ${lang}`,
       `- **Success:** ${success}`,
       `- **Latency:** ${latency}`,
+      `- **Compile Units:** ${unitsStr}`,
       `- **Retries:** ${retries}`,
       '',
       `### User Prompt`,
@@ -256,8 +286,8 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     ].join('\n');
     const mdAttr = escapeHtml(md);
 
-    const summaryRow = `<tr class="${successClass} clickable" onclick="toggle(${i})"><td class="ts">${ts}</td><td>${lang}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${retries}</td></tr>`;
-    const detailRow = `<tr class="detail-row" id="detail-${i}"><td colspan="7"><div class="detail-panel">
+    const summaryRow = `<tr class="${successClass} clickable" onclick="toggle(${i})"><td class="ts">${ts}</td><td>${lang}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${unitsStr}</td><td>${retries}</td></tr>`;
+    const detailRow = `<tr class="detail-row" id="detail-${i}"><td colspan="8"><div class="detail-panel">
 <div class="detail-actions"><button class="copy-btn" onclick="copyMd(this)" data-md="${mdAttr}">Copy</button></div>
 <div class="detail-section"><div class="detail-label">User Prompt</div><pre class="detail-pre">${fullQuery}</pre></div>
 ${embeddingText !== fullQuery ? `<div class="detail-section"><div class="detail-label">Search Query</div><pre class="detail-pre">${embeddingText}</pre></div>` : ''}
@@ -339,6 +369,7 @@ function copyMd(btn) {
   <div class="card"><div class="label">Success Rate</div><div class="value">${(metrics.successRate * 100).toFixed(1)}%</div></div>
   <div class="card"><div class="label">Avg Latency</div><div class="value">${Math.round(metrics.avgLatency)}ms</div></div>
   <div class="card"><div class="label">Avg Top Similarity</div><div class="value">${metrics.avgTopSimilarity.toFixed(3)}</div></div>
+  <div class="card"><div class="label">Compile Units</div><div class="value">${metrics.totalCompileUnits > 0 ? metrics.totalCompileUnits.toLocaleString() : '—'}</div></div>
   <div class="card"><div class="label">Feedback Score</div><div class="value">${metrics.feedbackCount > 0 ? metrics.avgFeedback.toFixed(1) : '—'}</div></div>
 </div>
 
@@ -365,7 +396,7 @@ ${!language ? `<div class="section">
   ${docs.length > 0 ? `
   <div style="overflow-x:auto">
   <table>
-    <thead><tr><th>Timestamp</th><th>Language</th><th>Query</th><th>Success</th><th>Latency</th><th>Top Similarity</th><th>Retries</th></tr></thead>
+    <thead><tr><th>Timestamp</th><th>Language</th><th>Query</th><th>Success</th><th>Latency</th><th>Top Similarity</th><th>Units</th><th>Retries</th></tr></thead>
     <tbody>${detailRows}</tbody>
   </table>
   </div>` : '<p class="empty">No requests in this period</p>'}
@@ -382,8 +413,9 @@ async function main() {
   const docs = await fetchDocs(period, language);
   console.log(`Found ${docs.length} records`);
 
-  const metrics = computeMetrics(docs);
-  const html = generateHtml(docs, metrics, period, language);
+  const compileUnits = await fetchCompileUnits(docs.map(d => d.requestId));
+  const metrics = computeMetrics(docs, compileUnits);
+  const html = generateHtml(docs, metrics, period, language, compileUnits);
 
   writeFileSync(output, html, 'utf-8');
   console.log(`Report written to ${output}`);
