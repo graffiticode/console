@@ -1288,7 +1288,6 @@ export async function generateCode({
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
-    let usedOpusForFix = false;  // Track if we upgraded to Opus for fixing
     let finalUsage = {
       prompt_tokens: streamResult.usage.inputTokens,
       completion_tokens: streamResult.usage.outputTokens,
@@ -1469,71 +1468,12 @@ export async function generateCode({
         const subscription = userData?.subscription || {};
         const plan = subscription.plan || 'demo';
 
-        // Define token pricing per million tokens (in dollars) based on model actually used
-        const TOKEN_PRICING = {
-          [CLAUDE_MODELS.OPUS]: { input: 15, output: 75 },
-          [CLAUDE_MODELS.SONNET]: { input: 3, output: 15 },
-          [CLAUDE_MODELS.HAIKU]: { input: 0.25, output: 1.25 },
-          [CLAUDE_MODELS.DEFAULT]: { input: 3, output: 15 }, // Default to Sonnet pricing
-        };
-
-        // Calculate weighted cost if multiple models were used
-        let totalTokenCost = 0;
-        let effectiveModelName = modelToUse;
-
-        if (usedOpusForFix && fixAttempts > 0) {
-          // If Opus was used for fixes, calculate a weighted average cost
-          // Approximate: initial generation used original model, fixes used Opus
-          // Since we don't track tokens per attempt, we'll use a conservative estimate:
-          // - Initial generation: ~70% of tokens (with original model)
-          // - Fix attempts: ~30% of tokens (with Opus)
-          const initialRatio = 0.7;
-          const fixRatio = 0.3;
-
-          const initialModelPricing = TOKEN_PRICING[modelToUse] || TOKEN_PRICING[CLAUDE_MODELS.DEFAULT];
-          const opusPricing = TOKEN_PRICING[CLAUDE_MODELS.OPUS];
-
-          const initialInputCost = (finalUsage.prompt_tokens * initialRatio / 1000000) * initialModelPricing.input;
-          const initialOutputCost = (finalUsage.completion_tokens * initialRatio / 1000000) * initialModelPricing.output;
-
-          const fixInputCost = (finalUsage.prompt_tokens * fixRatio / 1000000) * opusPricing.input;
-          const fixOutputCost = (finalUsage.completion_tokens * fixRatio / 1000000) * opusPricing.output;
-
-          totalTokenCost = initialInputCost + initialOutputCost + fixInputCost + fixOutputCost;
-          effectiveModelName = `${modelToUse}+Opus(fix)`;
-
-        } else {
-          // Single model was used throughout
-          const modelPricing = TOKEN_PRICING[modelToUse] || TOKEN_PRICING[CLAUDE_MODELS.DEFAULT];
-          const inputCost = (finalUsage.prompt_tokens / 1000000) * modelPricing.input;
-          const outputCost = (finalUsage.completion_tokens / 1000000) * modelPricing.output;
-          totalTokenCost = inputCost + outputCost;
-        }
-
-        // Define compile unit pricing (dollars per unit)
-        const UNIT_PRICING = {
-          demo: 0, // Demo tier doesn't charge but still tracks usage
-          starter: 0, // Starter tier doesn't charge but still tracks usage
-          pro: 0.001,  // $50/month for 50,000 units = $0.001 per unit
-          max: 0.0005, // $500/month for 1,000,000 units = $0.0005 per unit
-          teams: 0.0005, // Same as max
-        };
-
-        const unitPrice = UNIT_PRICING[plan] || UNIT_PRICING.pro; // Default to pro pricing if unknown
-
-        // Convert to compile units
-        // Formula: (price_per_token * token_count) / price_per_compile
-        let compileUnits = 0;
-        if (unitPrice > 0) {
-          // For paid plans, calculate units based on cost
-          compileUnits = Math.ceil(totalTokenCost / unitPrice);
-        } else {
-          // For starter plan, use a simple token-to-unit conversion (1000 tokens = 1 unit)
-          compileUnits = Math.ceil(finalUsage.total_tokens / 1000);
-        }
-
-        // Ensure at least 1 unit is charged for any generation
-        compileUnits = Math.max(1, compileUnits);
+        // Fixed ratio: 100 tokens = 1 compile unit, capped at 10 units per call
+        const TOKENS_PER_UNIT = 100;
+        const MAX_UNITS_PER_CALL = 10;
+        const totalTokenCost = 0; // kept for usage record
+        const rawUnits = Math.max(1, Math.ceil(finalUsage.total_tokens / TOKENS_PER_UNIT));
+        let compileUnits = Math.min(rawUnits, MAX_UNITS_PER_CALL);
 
         const now = new Date();
 
@@ -1578,8 +1518,7 @@ export async function generateCode({
           timestamp: now.toISOString(),
           lang: lang,
           type: 'ai_generation',
-          model: effectiveModelName,
-          baseModel: modelToUse,
+          model: modelToUse,
           tokens: {
             input: finalUsage.prompt_tokens,
             output: finalUsage.completion_tokens,
@@ -1587,12 +1526,10 @@ export async function generateCode({
           },
           cost: {
             total: totalTokenCost,
-            breakdown: usedOpusForFix ? 'mixed_model' : 'single_model',
           },
           plan: plan,
-          unitPrice: unitPrice,
+          tokensPerUnit: TOKENS_PER_UNIT,
           fixAttempts: fixAttempts,
-          usedOpusForFix: usedOpusForFix,
           wasOverLimit: wasOverLimit
         });
 
@@ -1651,7 +1588,6 @@ export async function generateCode({
       },
       verification: verificationResult,
       fixAttempts,
-      usedOpusForFix,  // Indicate if we had to upgrade to Opus for fixing
       streaming: true,
       chunks: streamResult.chunks,
       requestId: requestId,  // Include for feedback tracking

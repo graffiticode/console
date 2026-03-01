@@ -104,9 +104,15 @@ function formatTimestamp(d: AnalyticsDoc, period?: string): string {
   return date.toISOString();
 }
 
-async function fetchCompileUnits(requestIds: string[]): Promise<Map<string, number>> {
-  const units = new Map<string, number>();
-  if (requestIds.length === 0) return units;
+interface UsageInfo {
+  units: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+async function fetchUsageInfo(requestIds: string[]): Promise<Map<string, UsageInfo>> {
+  const info = new Map<string, UsageInfo>();
+  if (requestIds.length === 0) return info;
 
   // Query usage collection for matching taskIds
   const snapshot = await db.collection('usage')
@@ -116,11 +122,15 @@ async function fetchCompileUnits(requestIds: string[]): Promise<Map<string, numb
   snapshot.forEach(doc => {
     const data = doc.data();
     if (data.taskId && requestIds.includes(data.taskId)) {
-      units.set(data.taskId, data.units || 0);
+      info.set(data.taskId, {
+        units: data.units || 0,
+        inputTokens: data.tokens?.input || 0,
+        outputTokens: data.tokens?.output || 0,
+      });
     }
   });
 
-  return units;
+  return info;
 }
 
 async function fetchDocs(period: string, language?: string): Promise<AnalyticsDoc[]> {
@@ -147,7 +157,7 @@ async function fetchDocs(period: string, language?: string): Promise<AnalyticsDo
   return docs;
 }
 
-function computeMetrics(docs: AnalyticsDoc[], compileUnits?: Map<string, number>) {
+function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>) {
   const total = docs.length;
   const successful = docs.filter(d => d.response?.success || d.metadata?.success).length;
   const successRate = total > 0 ? successful / total : 0;
@@ -198,22 +208,29 @@ function computeMetrics(docs: AnalyticsDoc[], compileUnits?: Map<string, number>
     }))
     .sort((a, b) => b.total - a.total);
 
-  // Total compile units
+  // Total compile units and tokens
   let totalCompileUnits = 0;
-  if (compileUnits) {
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  if (usageInfo) {
     docs.forEach(d => {
-      totalCompileUnits += compileUnits.get(d.requestId) || 0;
+      const info = usageInfo.get(d.requestId);
+      if (info) {
+        totalCompileUnits += info.units;
+        totalInputTokens += info.inputTokens;
+        totalOutputTokens += info.outputTokens;
+      }
     });
   }
 
-  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, errorBreakdown, languageBreakdown, totalCompileUnits };
+  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, errorBreakdown, languageBreakdown, totalCompileUnits, totalInputTokens, totalOutputTokens };
 }
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMetrics>, period: string, language?: string, compileUnits?: Map<string, number>): string {
+function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMetrics>, period: string, language?: string, usageInfo?: Map<string, UsageInfo>): string {
   const now = new Date().toISOString();
   const langLabel = language ? ` | Language: ${language}` : '';
 
@@ -241,8 +258,10 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
       ? Math.max(...d.retrieval.documents.map(doc => doc.similarity)).toFixed(3)
       : '—';
     const retries = d.compilation?.retryCount ? `${d.compilation.retryCount}` : '0';
-    const units = compileUnits?.get(d.requestId);
-    const unitsStr = units != null ? units.toLocaleString() : '—';
+    const info = usageInfo?.get(d.requestId);
+    const unitsStr = info != null ? info.units.toLocaleString() : '—';
+    const inputTokensStr = info?.inputTokens ? info.inputTokens.toLocaleString() : '—';
+    const outputTokensStr = info?.outputTokens ? info.outputTokens.toLocaleString() : '—';
     const successClass = d.response?.success ? 'success' : 'failure';
 
     // Build expandable detail content
@@ -270,6 +289,8 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
       `- **Success:** ${success}`,
       `- **Latency:** ${latency}`,
       `- **Compile Units:** ${unitsStr}`,
+      `- **Input Tokens:** ${inputTokensStr}`,
+      `- **Output Tokens:** ${outputTokensStr}`,
       `- **Retries:** ${retries}`,
       '',
       `### User Prompt`,
@@ -286,8 +307,8 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     ].join('\n');
     const mdAttr = escapeHtml(md);
 
-    const summaryRow = `<tr class="${successClass} clickable" onclick="toggle(${i})"><td class="ts">${ts}</td><td>${lang}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${unitsStr}</td><td>${retries}</td></tr>`;
-    const detailRow = `<tr class="detail-row" id="detail-${i}"><td colspan="8"><div class="detail-panel">
+    const summaryRow = `<tr class="${successClass} clickable" onclick="toggle(${i})"><td class="ts">${ts}</td><td>${lang}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${unitsStr}</td><td>${inputTokensStr}</td><td>${outputTokensStr}</td><td>${retries}</td></tr>`;
+    const detailRow = `<tr class="detail-row" id="detail-${i}"><td colspan="10"><div class="detail-panel">
 <div class="detail-actions"><button class="copy-btn" onclick="copyMd(this)" data-md="${mdAttr}">Copy</button></div>
 <div class="detail-section"><div class="detail-label">User Prompt</div><pre class="detail-pre">${fullQuery}</pre></div>
 ${embeddingText !== fullQuery ? `<div class="detail-section"><div class="detail-label">Search Query</div><pre class="detail-pre">${embeddingText}</pre></div>` : ''}
@@ -370,6 +391,8 @@ function copyMd(btn) {
   <div class="card"><div class="label">Avg Latency</div><div class="value">${Math.round(metrics.avgLatency)}ms</div></div>
   <div class="card"><div class="label">Avg Top Similarity</div><div class="value">${metrics.avgTopSimilarity.toFixed(3)}</div></div>
   <div class="card"><div class="label">Compile Units</div><div class="value">${metrics.totalCompileUnits > 0 ? metrics.totalCompileUnits.toLocaleString() : '—'}</div></div>
+  <div class="card"><div class="label">Input Tokens</div><div class="value">${metrics.totalInputTokens > 0 ? metrics.totalInputTokens.toLocaleString() : '—'}</div></div>
+  <div class="card"><div class="label">Output Tokens</div><div class="value">${metrics.totalOutputTokens > 0 ? metrics.totalOutputTokens.toLocaleString() : '—'}</div></div>
   <div class="card"><div class="label">Feedback Score</div><div class="value">${metrics.feedbackCount > 0 ? metrics.avgFeedback.toFixed(1) : '—'}</div></div>
 </div>
 
@@ -396,7 +419,7 @@ ${!language ? `<div class="section">
   ${docs.length > 0 ? `
   <div style="overflow-x:auto">
   <table>
-    <thead><tr><th>Timestamp</th><th>Language</th><th>Query</th><th>Success</th><th>Latency</th><th>Top Similarity</th><th>Units</th><th>Retries</th></tr></thead>
+    <thead><tr><th>Timestamp</th><th>Language</th><th>Query</th><th>Success</th><th>Latency</th><th>Top Similarity</th><th>Units</th><th>In Tokens</th><th>Out Tokens</th><th>Retries</th></tr></thead>
     <tbody>${detailRows}</tbody>
   </table>
   </div>` : '<p class="empty">No requests in this period</p>'}
@@ -413,9 +436,9 @@ async function main() {
   const docs = await fetchDocs(period, language);
   console.log(`Found ${docs.length} records`);
 
-  const compileUnits = await fetchCompileUnits(docs.map(d => d.requestId));
-  const metrics = computeMetrics(docs, compileUnits);
-  const html = generateHtml(docs, metrics, period, language, compileUnits);
+  const usageInfo = await fetchUsageInfo(docs.map(d => d.requestId));
+  const metrics = computeMetrics(docs, usageInfo);
+  const html = generateHtml(docs, metrics, period, language, usageInfo);
 
   writeFileSync(output, html, 'utf-8');
   console.log(`Report written to ${output}`);
