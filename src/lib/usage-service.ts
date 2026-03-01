@@ -65,6 +65,17 @@ async function chargeStripeAsync(uid: string, customerId: string, plan: string, 
 
     if (paymentIntent.status === 'succeeded') {
       console.log('Auto-recharge: payment succeeded for user', uid, units, 'units');
+      // Update overage_purchases record status
+      const purchaseQuery = await db.collection('overage_purchases')
+        .where('userId', '==', uid)
+        .where('status', '==', 'pending_payment')
+        .where('autoRecharge', '==', true)
+        .orderBy('timestamp', 'desc')
+        .limit(1)
+        .get();
+      if (!purchaseQuery.empty) {
+        await purchaseQuery.docs[0].ref.update({ status: 'succeeded' });
+      }
     } else {
       console.error('Auto-recharge: payment status', paymentIntent.status, 'for user', uid);
       await db.collection('users').doc(uid).collection('settings').doc('billing').update({
@@ -98,8 +109,16 @@ async function tryAutoRecharge(uid: string): Promise<boolean> {
     const settings = settingsDoc.data();
     if (!settings?.autoRecharge) return false;
 
-    // Check monthly block limit
-    const blocksUsed = settings.overageBlocksUsedThisPeriod || 0;
+    // Check monthly block limit — reset counter if last recharge was in a previous month
+    let blocksUsed = settings.overageBlocksUsedThisPeriod || 0;
+    const lastRechargeAt = settings.lastAutoRechargeAt ? new Date(settings.lastAutoRechargeAt) : null;
+    const now = new Date();
+    if (lastRechargeAt && (lastRechargeAt.getMonth() !== now.getMonth() || lastRechargeAt.getFullYear() !== now.getFullYear())) {
+      blocksUsed = 0;
+      await db.collection('users').doc(uid).collection('settings').doc('billing').update({
+        overageBlocksUsedThisPeriod: 0,
+      });
+    }
     const limit = settings.autoRechargeLimit || 1;
     if (blocksUsed >= limit) return false;
 
