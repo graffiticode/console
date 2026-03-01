@@ -37,6 +37,7 @@ const typeDefs = `
     src: String!
     lang: String!
     code: String!
+    source: String
     help: String!
     taskId: String!
     isPublic: Boolean

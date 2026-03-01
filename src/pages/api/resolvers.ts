@@ -2,7 +2,8 @@ import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
 import { getFirestore } from "../../utils/db";
-import { getApiTask, getBaseUrlForApi, getLanguageAsset } from "../../lib/api";
+import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } from "../../lib/api";
+import { unparse } from "../../lib/unparse";
 import { generateCode as codeGenerationService } from "../../lib/code-generation-service";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import fs from "fs";
@@ -543,7 +544,6 @@ export async function createItem({
       name = "unnamed";
     }
     // If no taskId provided, create a minimal template task
-    let generatedCode = code || "";
     let generatedHelp = help || "[]";
     if (!taskId) {
       const result = await generateCode({
@@ -554,7 +554,19 @@ export async function createItem({
         currentCode: null,
       });
       taskId = result.taskId;
-      generatedCode = result.code || generatedCode;
+      if (!taskId) {
+        // Fallback: post a minimal task directly
+        const fallbackData = await postTask({
+          auth,
+          task: { lang, code: "{}.." },
+          ephemeral: true,
+          isPublic: false,
+        });
+        taskId = fallbackData?.id;
+      }
+      if (!taskId) {
+        throw new Error("Failed to generate template task");
+      }
     }
     const timestamp = Date.now();
     const item = {
@@ -564,7 +576,7 @@ export async function createItem({
       lang,
       mark: mark || 1, // Default to mark 1 if not provided
       help: generatedHelp,
-      code: generatedCode,
+      code: "", // AST cache - empty until first getTask
       isPublic: isPublic || false,
       app: app || 'console', // Default to 'console' if not provided
       created: timestamp,
@@ -614,16 +626,33 @@ export async function updateItem({
     const itemData = itemDoc.data();
     const updates: any = {};
     if (name !== undefined) updates.name = name;
-    if (taskId !== undefined) updates.taskId = taskId;
+    if (taskId !== undefined) {
+      updates.taskId = taskId;
+      // Clear AST cache when taskId changes
+      if (taskId !== itemData.taskId) {
+        updates.code = "";
+      }
+    }
     if (mark !== undefined) updates.mark = mark;
     if (help !== undefined) updates.help = help;
     if (code !== undefined) updates.code = code;
     if (isPublic !== undefined) {
       updates.isPublic = isPublic;
       if (isPublic) {
-        const lang = itemData.lang;
-        const itemCode = code !== undefined ? code : itemData.code;
-        await makeApiTaskPublic({ auth, lang, code: itemCode });
+        // Fetch source from API task for making public
+        const itemTaskId = taskId || itemData.taskId;
+        if (itemTaskId) {
+          try {
+            const apiTask = await getApiTask({ id: itemTaskId, auth });
+            const taskData = apiTask[0] || apiTask;
+            const ast = taskData.code;
+            const lexicon = await getLanguageLexicon(taskData.lang);
+            const source = unparse(ast, lexicon || {});
+            await makeApiTaskPublic({ auth, lang: itemData.lang, code: source });
+          } catch (err) {
+            console.error("updateItem: failed to fetch source for makeApiTaskPublic", err);
+          }
+        }
       }
     }
     updates.updated = Date.now();
@@ -756,16 +785,18 @@ export async function getItems({ auth, lang, mark, app }) {
 
 export async function getTask({ auth, id }) {
   try {
-    // Get the task code from the API
     const apiTask = await getApiTask({ id, auth });
     const taskData = apiTask[0] || apiTask;
-
-    // Return the AST (object code) directly as a JSON string
-    return {
-      id: id,
-      lang: taskData.lang,
-      code: JSON.stringify(taskData.code, null, 2),
-    };
+    const ast = taskData.code;
+    const astStr = JSON.stringify(ast, null, 2);
+    let source = "";
+    try {
+      const lexicon = await getLanguageLexicon(taskData.lang);
+      source = unparse(ast, lexicon || {});
+    } catch (err) {
+      console.error("getTask: failed to unparse", err);
+    }
+    return { id, lang: taskData.lang, code: astStr, source };
   } catch (error) {
     console.error("getTask()", "ERROR", error);
     throw new Error(`Failed to get task: ${error.message}`);

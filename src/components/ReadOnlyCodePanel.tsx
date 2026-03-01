@@ -1,44 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { getTask } from '../utils/swr/fetchers';
-import { unparse } from '../lib/unparse';
-import { getLanguageLexicon } from '../lib/api';
 
 type CodeTab = 'source' | 'ast';
 
 export const ReadOnlyCodePanel = ({ id, user, onCodeChange }: any) => {
-  const [ast, setAst] = useState("");
-  const [source, setSource] = useState("");
   const [activeTab, setActiveTab] = useState<CodeTab>('source');
-  const [lexicon, setLexicon] = useState<any>(null);
 
   const { data: taskData, isLoading } = useSWR(
     user && id ? [`getTask-${id}`, { user, id }] : null,
     ([_, params]) => getTask(params)
   );
 
-  // Fetch lexicon when lang changes
+  // Notify parent when source changes
   useEffect(() => {
-    if (taskData?.lang) {
-      getLanguageLexicon(taskData.lang).then(setLexicon);
+    if (taskData?.source) {
+      onCodeChange?.(taskData.source);
+    } else if (taskData?.code) {
+      onCodeChange?.(taskData.code);
     }
-  }, [taskData?.lang]);
-
-  // Update source and AST when taskData or lexicon changes
-  useEffect(() => {
-    if (taskData?.code) {
-      setAst(taskData.code);
-      try {
-        const astObj = JSON.parse(taskData.code);
-        const sourceCode = unparse(astObj, lexicon || {});
-        setSource(sourceCode || "");
-        onCodeChange?.(sourceCode || taskData.code);
-      } catch {
-        setSource("");
-        onCodeChange?.(taskData.code);
-      }
-    }
-  }, [taskData, lexicon, onCodeChange]);
+  }, [taskData, onCodeChange]);
 
   if (isLoading) {
     return (
@@ -48,7 +29,7 @@ export const ReadOnlyCodePanel = ({ id, user, onCodeChange }: any) => {
     );
   }
 
-  const displayCode = activeTab === 'source' ? source : ast;
+  const displayCode = activeTab === 'source' ? (taskData?.source || "") : (taskData?.code || "");
 
   return (
     <div className="h-full flex flex-col">

@@ -7,7 +7,7 @@ import {
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
 import SignIn from "./SignIn";
-import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData, getItem, compile } from '../utils/swr/fetchers';
+import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'
@@ -181,6 +181,21 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  // Load source code for an item via its taskId
+  const loadItemSource = useCallback(async (itemId: string, itemTaskId: string, cachedAst: string) => {
+    if (!itemTaskId || !user) {
+      setEditorCode("");
+      return;
+    }
+    // Cache miss — fetch from API
+    const taskData = await getTask({ user, id: itemTaskId });
+    setEditorCode(taskData?.source || "");
+    // Write AST to cache
+    if (taskData?.code && itemId) {
+      updateItem({ user, id: itemId, taskId: itemTaskId, help: undefined, name: undefined, mark: undefined, isPublic: undefined });
+    }
+  }, [user]);
+
   // Load items from the API only once on initialization
   const { data: loadedItems, mutate, isLoading: isLoadingItems } = useSWR(
     user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}-${app}` : null,
@@ -226,12 +241,11 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   // Handle directly loaded item (from URL initialItemId)
   useEffect(() => {
     if (directItem && initialItemId) {
-      // Set this item as selected and load its content
       setItems([directItem]);
       setSelectedItemId(directItem.id);
       setTaskId(directItem.taskId);
-      setEditorCode(directItem.code || "");
       setEditorHelp(typeof directItem.help === "string" ? JSON.parse(directItem.help || "[]") : (directItem.help || []));
+      loadItemSource(directItem.id, directItem.taskId, directItem.code);
     }
   }, [directItem, initialItemId]);
 
@@ -249,8 +263,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         if (matchingItem) {
           setSelectedItemId(matchingItem.id);
           setTaskId(matchingItem.taskId);
-          setEditorCode(matchingItem.code || "");
           setEditorHelp(typeof matchingItem.help === "string" ? JSON.parse(matchingItem.help || "[]") : (matchingItem.help || []));
+          loadItemSource(matchingItem.id, matchingItem.taskId, matchingItem.code);
           return;
         }
       }
@@ -258,8 +272,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
       if (loadedItems[0]) {
         setSelectedItemId(loadedItems[0].id);
         setTaskId(loadedItems[0].taskId);
-        setEditorCode(loadedItems[0].code || "");
         setEditorHelp(typeof loadedItems[0].help === "string" ? JSON.parse(loadedItems[0].help || "[]") : (loadedItems[0].help || []));
+        loadItemSource(loadedItems[0].id, loadedItems[0].taskId, loadedItems[0].code);
       }
     } else if (!initialItemId) {
       setItems([]);
@@ -310,8 +324,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         setItems(prevItems => [newItem, ...prevItems]);
         setSelectedItemId(newItem.id);
         setTaskId(newItem.taskId);
-        setEditorCode(newItem.code || "");
         setEditorHelp(typeof newItem.help === "string" ? JSON.parse(newItem.help || "[]") : (newItem.help || []));
+        loadItemSource(newItem.id, newItem.taskId, newItem.code);
         if (typeof window !== 'undefined') {
           localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
         }
@@ -323,7 +337,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     }
   };
 
-  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, code, help, isPublic }) => {
+  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, help, isPublic }) => {
     // Prevent updates with stale item IDs - check both items array and ensure we have a valid user
     const currentItem = items.find(item => item.id === itemId);
     if (!itemId || !currentItem || !user?.uid) {
@@ -342,19 +356,15 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
 
     // Then update backend
     try {
-      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, code, help, isPublic });
+      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, help, isPublic });
 
       // If mark changed and this is the selected item, we need to reload the task data
       if (isMarkChanging && selectedItemId === itemId && result && result.taskId) {
-        // Update the taskId which will trigger the editor to reload
         setTaskId(result.taskId);
-        // Update editor content with the new task's code and help
-        if (result.code !== undefined) {
-          setEditorCode(result.code);
-        }
         if (result.help !== undefined) {
           setEditorHelp(typeof result.help === "string" ? JSON.parse(result.help || "[]") : (result.help || []));
         }
+        loadItemSource(itemId, result.taskId, result.code);
       }
 
       // Update local state after successful backend update
@@ -381,8 +391,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         if (remainingItems.length > 0) {
           setSelectedItemId(remainingItems[0].id);
           setTaskId(remainingItems[0].taskId);
-          setEditorCode(remainingItems[0].code || "");
           setEditorHelp(typeof remainingItems[0].help === "string" ? JSON.parse(remainingItems[0].help || "[]") : (remainingItems[0].help || []));
+          loadItemSource(remainingItems[0].id, remainingItems[0].taskId, remainingItems[0].code);
         } else {
           setSelectedItemId("");
           setTaskId("");
@@ -402,8 +412,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     if (item) {
       setSelectedItemId(item.id);
       setTaskId(item.taskId);
-      setEditorCode(item.code || "");
       setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
+      loadItemSource(item.id, item.taskId, item.code);
       if (typeof window !== 'undefined') {
         localStorage.setItem(`graffiticode:selected:itemId`, item.id);
       }
@@ -415,22 +425,12 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     if (!taskIdToLoad || !user) return;
 
     try {
-      // Import getTask from fetchers
-      const { getTask } = await import('../utils/swr/fetchers');
-
-      // Load the task data
       const taskData = await getTask({ user, id: taskIdToLoad });
 
       if (taskData) {
-        // Update the taskId which updates the preview
         setTaskId(taskIdToLoad);
+        setEditorCode(taskData.source || "");
 
-        // Update the code and help panels
-        if (taskData.code !== undefined) {
-          setEditorCode(taskData.code);
-        }
-
-        // Parse help if it's a string
         if (taskData.help !== undefined) {
           const helpData = typeof taskData.help === "string" ?
             JSON.parse(taskData.help || "[]") :
@@ -453,7 +453,6 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         // Check if any values have changed
         const hasChanges =
           (taskId && selectedItem.taskId !== taskId) ||
-          (editorCode !== undefined && selectedItem.code !== editorCode) ||
           (editorHelp !== undefined && JSON.stringify(selectedItem.help) !== JSON.stringify(editorHelp));
         if (hasChanges) {
           handleUpdateItem({
@@ -461,7 +460,6 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
             name: selectedItem.name,
             taskId: taskId || selectedItem.taskId,
             mark: selectedItem.mark,
-            code: editorCode,
             help: JSON.stringify(editorHelp),
             isPublic: selectedItem.isPublic
           });
@@ -471,7 +469,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         setSelectedItemId(null);
       }
     }
-  }, [taskId, editorCode, editorHelp, selectedItemId, user?.uid]);
+  }, [taskId, editorHelp, selectedItemId, user?.uid]);
 
   // Compile form data when taskId or formData changes
   useEffect(() => {
