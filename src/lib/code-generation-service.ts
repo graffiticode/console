@@ -192,8 +192,13 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
       });
 
       if (results && results.length > 0) {
+        // Filter out low-quality matches — with a specific DSL, bad examples
+        // are worse than no examples since the prompt already has detailed instructions.
+        const MIN_COMBINED_SCORE = 0.65;
+        const filteredResults = results.filter(doc => (doc.combinedScore || doc.similarity || 0) >= MIN_COMBINED_SCORE);
+
         // Transform the results to match the expected format
-        const transformedResults = results.map(doc => {
+        const transformedResults = filteredResults.map(doc => {
           // The new format has these fields: lang, prompt, code, messages, tags, etc.
           return {
             task: doc.prompt || doc.task,
