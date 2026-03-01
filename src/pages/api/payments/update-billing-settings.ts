@@ -22,11 +22,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .collection('settings')
       .doc('billing');
 
-    const updates = {
+    const updates: Record<string, any> = {
       autoRecharge: autoRecharge || false,
       autoRechargeLimit: autoRechargeLimit || 1,
       updatedAt: new Date().toISOString(),
     };
+
+    // Clear disabled reason when re-enabling auto-recharge
+    if (autoRecharge) {
+      updates.autoRechargeDisabledReason = null;
+      updates.autoRechargeDisabledAt = null;
+    }
 
     const currentDoc = await settingsRef.get();
 
