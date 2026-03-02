@@ -20,7 +20,7 @@
     "adjust-overage-credits": "npx tsx scripts/adjust-overage-credits.ts",
     "test:streaming": "npx tsx scripts/test-streaming.ts",
     "gcp:build": "gcloud builds submit --config cloudbuild.yaml --project graffiticode-app --substitutions=_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')",
-    "gcp:logs": "gcloud run services logs read console --project graffiticode-app --region us-central1 --limit 100",
+    "gcp:logs": "gcloud logging read 'resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"console\"' --project graffiticode-app --limit 100 --format='table(timestamp,severity,httpRequest.status,httpRequest.requestMethod,httpRequest.requestUrl,httpRequest.latency,textPayload)'",
     "gcp:logs:tail": "gcloud beta run services logs tail console --project graffiticode-app --region us-central1"
   },
   "dependencies": {

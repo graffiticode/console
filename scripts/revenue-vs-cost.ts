@@ -2,7 +2,6 @@
 
 import admin from 'firebase-admin';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
-import { execSync } from 'child_process';
 import { resolve } from 'path';
 
 // Load .env.local
@@ -72,7 +71,7 @@ function parseArgs(argv: string[]): { period: string; output: string; lang?: str
 function getPeriodStart(period: string): Date | null {
   if (period === 'all') return null;
   const today = new Date(new Date().toISOString().split('T')[0] + 'T00:00:00Z');
-  if (period === 'day') return new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000);
+  if (period === 'day') return today;
   if (period === 'week') return new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   if (period === 'month') return new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
   return null;
@@ -117,12 +116,10 @@ const PLAN_PRICE_PER_UNIT: Record<string, number> = {
   demo: 0, starter: 10 / 2000, pro: 100 / 100000, teams: 1000 / 2000000,
 };
 
-// Actual daily data loaded from data/ files (populated by fetch-daily-costs.ts / fetch-daily-usage.ts)
+// Actual daily data loaded from data/daily-usage/ files (populated by fetch-daily-usage.ts)
 interface ActualDailyData {
   date: string;
-  cost: number; // USD (total across all keys, from cost API)
-  costByModel: Record<string, number>; // USD per model (from cost API)
-  estimatedCost: number; // USD computed from usage tokens × pricing (our key only)
+  estimatedCost: number; // USD computed from usage tokens × pricing
   usage: {
     uncached_input_tokens: number;
     cached_input_tokens: number;
@@ -136,92 +133,51 @@ function ensureYesterdayData(): void {
   const yesterday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1));
   const dateStr = yesterday.toISOString().split('T')[0];
 
-  const costsDir = resolve(process.cwd(), 'data', 'daily-costs');
   const usageDir = resolve(process.cwd(), 'data', 'daily-usage');
-  const costsFile = resolve(costsDir, `costs-${dateStr}.json`);
   const usageFile = resolve(usageDir, `usage-${dateStr}.json`);
 
-  if (!existsSync(costsFile)) {
-    console.log(`  Missing costs for ${dateStr}, fetching...`);
-    try {
-      execSync('npx tsx scripts/fetch-daily-costs.ts', { stdio: 'inherit' });
-    } catch (e) {
-      console.error(`  Failed to fetch costs for ${dateStr}`);
-    }
-  }
   if (!existsSync(usageFile)) {
-    console.log(`  Missing usage for ${dateStr}, fetching...`);
-    try {
-      execSync('npx tsx scripts/fetch-daily-usage.ts', { stdio: 'inherit' });
-    } catch (e) {
-      console.error(`  Failed to fetch usage for ${dateStr}`);
-    }
+    console.log(`  Missing usage for ${dateStr}, fetch with: npx tsx scripts/fetch-daily-usage.ts`);
   }
 }
 
 function loadDailyData(startDate: string | null, endDate: string): ActualDailyData[] {
-  const costsDir = resolve(process.cwd(), 'data', 'daily-costs');
   const usageDir = resolve(process.cwd(), 'data', 'daily-usage');
   const results: ActualDailyData[] = [];
 
-  // Read all available cost files
-  const costFiles = existsSync(costsDir)
-    ? readdirSync(costsDir).filter(f => f.startsWith('costs-') && f.endsWith('.json'))
-    : [];
   const usageFiles = existsSync(usageDir)
     ? readdirSync(usageDir).filter(f => f.startsWith('usage-') && f.endsWith('.json'))
     : [];
 
-  // Build a set of dates from cost files
-  const dateSet = new Set<string>();
-  for (const f of costFiles) {
-    const date = f.replace('costs-', '').replace('.json', '');
-    if (startDate && date < startDate) continue;
-    if (date > endDate) continue;
-    dateSet.add(date);
-  }
-  for (const f of usageFiles) {
-    const date = f.replace('usage-', '').replace('.json', '');
-    if (startDate && date < startDate) continue;
-    if (date > endDate) continue;
-    dateSet.add(date);
-  }
+  const dates = usageFiles
+    .map(f => f.replace('usage-', '').replace('.json', ''))
+    .filter(date => (!startDate || date >= startDate) && date <= endDate)
+    .sort();
 
-  for (const date of [...dateSet].sort()) {
-    const entry: ActualDailyData = { date, cost: 0, costByModel: {}, estimatedCost: 0, usage: null, usageByModel: {} };
-
-    const costFile = resolve(costsDir, `costs-${date}.json`);
-    if (existsSync(costFile)) {
-      try {
-        const data = JSON.parse(readFileSync(costFile, 'utf-8'));
-        entry.cost = data.total_cost_usd || 0;
-        entry.costByModel = data.by_model || {};
-      } catch {}
-    }
+  for (const date of dates) {
+    const entry: ActualDailyData = { date, estimatedCost: 0, usage: null, usageByModel: {} };
 
     const usageFile = resolve(usageDir, `usage-${date}.json`);
-    if (existsSync(usageFile)) {
-      try {
-        const data = JSON.parse(readFileSync(usageFile, 'utf-8'));
-        if (data.totals) {
-          entry.usage = {
-            uncached_input_tokens: data.totals.uncached_input_tokens || 0,
-            cached_input_tokens: data.totals.cached_input_tokens || 0,
-            output_tokens: data.totals.output_tokens || 0,
+    try {
+      const data = JSON.parse(readFileSync(usageFile, 'utf-8'));
+      if (data.totals) {
+        entry.usage = {
+          uncached_input_tokens: data.totals.uncached_input_tokens || 0,
+          cached_input_tokens: data.totals.cached_input_tokens || 0,
+          output_tokens: data.totals.output_tokens || 0,
+        };
+      }
+      if (data.by_model) {
+        for (const [model, stats] of Object.entries(data.by_model as Record<string, any>)) {
+          entry.usageByModel[model] = {
+            input: stats.input || 0,
+            cached_input: stats.cached_input || 0,
+            output: stats.output || 0,
           };
+          entry.estimatedCost += getModelCost(model, stats.input || 0, stats.output || 0);
         }
-        if (data.by_model) {
-          for (const [model, stats] of Object.entries(data.by_model as Record<string, any>)) {
-            entry.usageByModel[model] = {
-              input: stats.input || 0,
-              cached_input: stats.cached_input || 0,
-              output: stats.output || 0,
-            };
-            entry.estimatedCost += getModelCost(model, stats.input || 0, stats.output || 0);
-          }
-        }
-      } catch {}
-    }
+      }
+    } catch {}
 
     results.push(entry);
   }
@@ -503,13 +459,12 @@ async function main() {
   // Fetch usage records (filter by type, then by date/lang in code to avoid composite index)
   const snapshot = await db.collection('usage')
     .where('type', 'in', ['ai_generation', 'compile']).get();
-  const todayStart = new Date(new Date().toISOString().split('T')[0]).getTime();
   const records: UsageRecord[] = [];
   snapshot.forEach(doc => {
     const data = doc.data() as UsageRecord;
     if (lang && data.lang !== lang && data.lang !== `L${lang}`) return;
     const ms = getTimestampMs(data);
-    if (!ms || ms >= todayStart) return; // exclude today
+    if (!ms) return;
     if (periodStart && ms < periodStart.getTime()) return;
     records.push(data);
   });
@@ -559,7 +514,7 @@ async function main() {
 
   const startDateStr = periodStart ? periodStart.toISOString().split('T')[0] : null;
   const today = new Date().toISOString().split('T')[0];
-  const endDateStr = new Date(new Date(today).getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const endDateStr = today;
   const dailyData = loadDailyData(startDateStr, endDateStr);
   console.log(`  Loaded ${dailyData.length} days of actual data`);
 
@@ -598,7 +553,6 @@ async function main() {
     const ms = getTimestampMs(r);
     if (!ms) continue;
     const date = new Date(ms).toISOString().split('T')[0];
-    if (date >= today) continue;
     if (!dailyMap[date]) dailyMap[date] = emptyBucket(date);
     const plan = r.plan || 'demo';
     dailyMap[date].projectedRevenue += (r.units || 0) * (PLAN_PRICE_PER_UNIT[plan] || 0);
@@ -608,7 +562,6 @@ async function main() {
     const ms = getTimestampMs(r);
     if (!ms) continue;
     const date = new Date(ms).toISOString().split('T')[0];
-    if (date >= today) continue;
     if (!dailyMap[date]) dailyMap[date] = emptyBucket(date);
     dailyMap[date].projectedCost += getModelCost(r.model || 'unknown', r.tokens?.input || 0, r.tokens?.output || 0);
   }

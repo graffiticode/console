@@ -1427,7 +1427,16 @@ export async function generateCode({
           }
 
           // Update the generated code with the fixed version and process to fix escaping issues
-          generatedCode = await processGeneratedCode(fixResult.code, lang, requestId);
+          // Only accept the fix if it contains a code block; otherwise keep the original
+          const hasCodeBlock = /```[\s\S]*```/.test(fixResult.code);
+          if (hasCodeBlock) {
+            generatedCode = await processGeneratedCode(fixResult.code, lang, requestId);
+          } else {
+            if (requestId) {
+              ragLog(requestId, "fix.skipped", { reason: "no code block in fix response" });
+            }
+            break;
+          }
 
           // Add fix attempt usage to total
           finalUsage.prompt_tokens += fixResult.usage.inputTokens;
