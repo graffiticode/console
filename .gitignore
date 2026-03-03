@@ -51,3 +51,4 @@ cloudrun-env-vars.yaml
 rag-analytics-report*.html
 /data
 revenue-vs-cost.html
+user-report.html
