@@ -3,7 +3,7 @@ import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
 import { getFirestore } from "../../utils/db";
 import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } from "../../lib/api";
-import { unparse } from "../../lib/unparse";
+import { unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService } from "../../lib/code-generation-service";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import fs from "fs";
