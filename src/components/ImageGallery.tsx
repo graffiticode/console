@@ -136,7 +136,7 @@ export function ImageGallery() {
               <img
                 src={img.downloadURL}
                 alt={fileNameWithoutExt(img.name)}
-                className="w-[120px] h-[120px] object-contain"
+                className="w-[100px] h-[100px] object-contain"
               />
               <span className="text-xs text-gray-500 mt-1 truncate w-full text-center">
                 {copiedUrl === img.downloadURL ? 'Copied!' : fileNameWithoutExt(img.name)}
