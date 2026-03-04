@@ -15,7 +15,7 @@ export function ImageGallery() {
   const firebaseApp = useFirebaseApp();
   const { user } = useGraffiticodeAuth();
   const [images, setImages] = useState<ImageInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -23,7 +23,10 @@ export function ImageGallery() {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const loadImages = useCallback(async () => {
-    if (!user?.uid) return;
+    if (!user?.uid) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
