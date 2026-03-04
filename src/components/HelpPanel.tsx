@@ -2386,7 +2386,7 @@ export const HelpPanel = ({
                                       const displayName = alt && alt !== 'uploaded image'
                                         ? alt.replace(/\.[^.]+$/, '') : null;
                                       return (
-                                        <span className="block mt-2 mb-1">
+                                        <span className="block mt-2">
                                           <img
                                             src={src}
                                             alt={alt || 'uploaded image'}
@@ -2396,7 +2396,7 @@ export const HelpPanel = ({
                                             {...props}
                                           />
                                           {displayName && (
-                                            <span className="block text-xs text-gray-500 leading-tight">{displayName}</span>
+                                            <span className="block text-xs text-gray-500 -mt-0.5 leading-tight">{displayName}</span>
                                           )}
                                         </span>
                                       );
