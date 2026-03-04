@@ -2412,14 +2412,26 @@ export const HelpPanel = ({
                             }}
                             title={message.taskId && onLoadTaskFromHelp ? 'Click to load task' : ''}
                           >
-                            {/* Timestamp header */}
-                            {message.timestamp && (
-                              <div className="px-3 pt-2 pb-1">
-                                <span className="text-xs text-gray-500">
-                                  {new Date(message.timestamp).toLocaleString()}
-                                </span>
-                              </div>
-                            )}
+                            {/* Image name + Timestamp header */}
+                            {(() => {
+                              const messageText = message.role === 'system' ? message.content : message.user;
+                              const imageMatch = messageText?.match(/!\[([^\]]+)\]\([^)]+\)/);
+                              const imageName = imageMatch?.[1] && imageMatch[1] !== 'uploaded image'
+                                ? imageMatch[1].replace(/\.[^.]+$/, '') : null;
+                              const hasHeader = imageName || message.timestamp;
+                              return hasHeader ? (
+                                <div className="px-3 pt-2 pb-1 flex items-center gap-2">
+                                  {imageName && (
+                                    <span className="text-xs text-gray-500">{imageName}</span>
+                                  )}
+                                  {message.timestamp && (
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(message.timestamp).toLocaleString()}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : null;
+                            })()}
 
                             {/* Content */}
                             <div className={`px-3 pb-3 ${message.timestamp ? 'pt-0' : 'pt-3'}`}>
@@ -2429,19 +2441,14 @@ export const HelpPanel = ({
                                   components={{
                                     img({ src, alt, ...props }) {
                                       return (
-                                        <span className="block my-2">
-                                          {alt && alt !== 'uploaded image' && (
-                                            <span className="block text-xs text-gray-500 mb-1">{alt}</span>
-                                          )}
-                                          <img
-                                            src={src}
-                                            alt={alt || 'uploaded image'}
-                                            className="max-w-full h-auto rounded"
-                                            style={{ maxHeight: '300px', objectFit: 'contain' as const }}
-                                            loading="lazy"
-                                            {...props}
-                                          />
-                                        </span>
+                                        <img
+                                          src={src}
+                                          alt={alt || 'uploaded image'}
+                                          className="max-w-full h-auto rounded my-2"
+                                          style={{ maxHeight: '300px', objectFit: 'contain' as const }}
+                                          loading="lazy"
+                                          {...props}
+                                        />
                                       );
                                     },
                                     code({className, children, ...props}) {
