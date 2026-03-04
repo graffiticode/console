@@ -22,7 +22,7 @@ import { useDropzone } from 'react-dropzone';
 import { createPortal } from 'react-dom';
 import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
-import { validateImageFile, uploadImage } from '../lib/image-upload';
+import { validateImageFile, uploadImageDeduped, listUserImages } from '../lib/image-upload';
 import { getLanguageAsset } from "../lib/api";
 import useLocalStorage from '../hooks/use-local-storage';
 import {
@@ -784,10 +784,12 @@ export const HelpPanel = ({
     setImageUploadProgress(0);
     try {
       const storage = getStorage(firebaseApp);
-      const { promise } = uploadImage(storage, user.uid, file, (percent) => {
-        setImageUploadProgress(percent);
-      });
-      const { downloadURL, fileName } = await promise;
+      const existingImages = await listUserImages(storage, user.uid);
+      const { downloadURL, fileName, skipped } = await uploadImageDeduped(
+        storage, user.uid, file, existingImages, (percent) => {
+          setImageUploadProgress(percent);
+        },
+      );
       setImageUploadProgress(null);
 
       // Insert markdown image reference into the editor
