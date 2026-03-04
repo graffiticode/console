@@ -2429,14 +2429,19 @@ export const HelpPanel = ({
                                   components={{
                                     img({ src, alt, ...props }) {
                                       return (
-                                        <img
-                                          src={src}
-                                          alt={alt || 'uploaded image'}
-                                          className="max-w-full h-auto rounded my-2"
-                                          style={{ maxHeight: '300px', objectFit: 'contain' as const }}
-                                          loading="lazy"
-                                          {...props}
-                                        />
+                                        <span className="block my-2">
+                                          {alt && alt !== 'uploaded image' && (
+                                            <span className="block text-xs text-gray-500 mb-1">{alt}</span>
+                                          )}
+                                          <img
+                                            src={src}
+                                            alt={alt || 'uploaded image'}
+                                            className="max-w-full h-auto rounded"
+                                            style={{ maxHeight: '300px', objectFit: 'contain' as const }}
+                                            loading="lazy"
+                                            {...props}
+                                          />
+                                        </span>
                                       );
                                     },
                                     code({className, children, ...props}) {
