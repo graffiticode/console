@@ -783,7 +783,7 @@ export const HelpPanel = ({
 
     setImageUploadProgress(0);
     try {
-      const storage = getStorage(firebaseApp);
+      const storage = getStorage(firebaseApp, 'gs://graffiticode-app.appspot.com');
       const existingImages = await listUserImages(storage, user.uid);
       const { downloadURL, fileName, skipped } = await uploadImageDeduped(
         storage, user.uid, file, existingImages, (percent) => {
