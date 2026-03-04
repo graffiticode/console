@@ -20,6 +20,9 @@ import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/prism';
 import tomorrow from 'react-syntax-highlighter/dist/cjs/styles/prism/tomorrow';
 import { useDropzone } from 'react-dropzone';
 import { createPortal } from 'react-dom';
+import { getStorage } from 'firebase/storage';
+import { useFirebaseApp } from 'reactfire';
+import { validateImageFile, uploadImage } from '../lib/image-upload';
 import { getLanguageAsset } from "../lib/api";
 import useLocalStorage from '../hooks/use-local-storage';
 import {
@@ -58,7 +61,9 @@ export const HelpPanel = ({
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
   const { user } = useGraffiticodeAuth();
+  const firebaseApp = useFirebaseApp();
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null);
 
   // Resizable panel state
   const isResizing = useRef(false);
@@ -762,11 +767,64 @@ export const HelpPanel = ({
     }
   }));
 
+  // Handle image file drop - upload to Firebase Storage
+  const handleImageDrop = useCallback(async (file: File) => {
+    const error = validateImageFile(file);
+    if (error) {
+      setUploadNotification({ type: 'error', message: error, fileName: file.name });
+      setTimeout(() => setUploadNotification(null), 3000);
+      return;
+    }
+    if (!user?.uid) {
+      setUploadNotification({ type: 'error', message: 'Sign in to upload images', fileName: file.name });
+      setTimeout(() => setUploadNotification(null), 3000);
+      return;
+    }
+
+    setImageUploadProgress(0);
+    try {
+      const storage = getStorage(firebaseApp);
+      const { promise } = uploadImage(storage, user.uid, file, (percent) => {
+        setImageUploadProgress(percent);
+      });
+      const { downloadURL, fileName } = await promise;
+      setImageUploadProgress(null);
+
+      // Insert markdown image reference into the editor
+      const markdown = `![${fileName}](${downloadURL})`;
+      const editorElement: HTMLElement | null =
+        document.querySelector("[contenteditable=true]") ||
+        document.querySelector(".ProseMirror") ||
+        document.querySelector("[role='textbox']");
+      if (editorElement) {
+        editorElement.focus();
+        document.execCommand('insertText', false, markdown);
+      }
+
+      setUploadNotification({ type: 'success', message: `Image "${fileName}" uploaded`, fileName });
+      setTimeout(() => setUploadNotification(null), 3000);
+    } catch (err: any) {
+      setImageUploadProgress(null);
+      setUploadNotification({
+        type: 'error',
+        message: `Upload failed: ${err.message || 'unknown error'}`,
+        fileName: file.name,
+      });
+      setTimeout(() => setUploadNotification(null), 3000);
+    }
+  }, [firebaseApp, user]);
+
   // Handle file drop functionality for the entire panel
   const onDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles.length === 0) return;
 
     const file = acceptedFiles[0];
+
+    // Route image files to image upload handler
+    if (file.type.startsWith('image/')) {
+      handleImageDrop(file);
+      return;
+    }
 
     // Read the file contents
     const reader = new FileReader();
@@ -896,7 +954,7 @@ export const HelpPanel = ({
 
     // Read the file as text
     reader.readAsText(file);
-  }, [state]);
+  }, [state, handleImageDrop]);
 
   // ChatBot integration
   const { handleSendMessage, cancelGeneration, isLoading } = ChatBot({
@@ -914,6 +972,10 @@ export const HelpPanel = ({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/gif': ['.gif'],
+      'image/webp': ['.webp'],
       'text/*': ['.txt', '.csv', '.json', '.xml', '.md', '.log', '.conf', '.cfg', '.ini', '.yaml', '.yml', '.toml', '.gc'],
       'application/json': ['.json'],
       'application/xml': ['.xml'],
@@ -2244,6 +2306,22 @@ export const HelpPanel = ({
           </div>
         )}
 
+        {/* Image Upload Progress */}
+        {imageUploadProgress !== null && (
+          <div className="absolute left-1/2 transform -translate-x-1/2 top-24 px-4 py-2 rounded-none shadow-md z-50 bg-blue-50 border border-blue-200 text-sm text-blue-800">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Uploading image... {Math.round(imageUploadProgress)}%
+            </div>
+            <div className="w-48 bg-blue-200 rounded-full h-1.5">
+              <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${imageUploadProgress}%` }} />
+            </div>
+          </div>
+        )}
+
         {/* File Upload Notification */}
         {uploadNotification && (
           <div className={`absolute left-1/2 transform -translate-x-1/2 top-24 px-4 py-2 rounded-none shadow-md z-50 flex items-center text-sm ${
@@ -2349,6 +2427,18 @@ export const HelpPanel = ({
                                 <ReactMarkdown
                                   remarkPlugins={[remarkGfm]}
                                   components={{
+                                    img({ src, alt, ...props }) {
+                                      return (
+                                        <img
+                                          src={src}
+                                          alt={alt || 'uploaded image'}
+                                          className="max-w-full h-auto rounded my-2"
+                                          style={{ maxHeight: '300px', objectFit: 'contain' as const }}
+                                          loading="lazy"
+                                          {...props}
+                                        />
+                                      );
+                                    },
                                     code({className, children, ...props}) {
                                       const match = /language-(\w+)/.exec(className || '');
                                       return match ? (

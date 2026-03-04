@@ -19,6 +19,11 @@ const nextConfig = {
         hostname: 'cdn.acx.ac',
         pathname: '**',
       },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        pathname: '**',
+      },
     ],
   },
   // Make environment variables available to the client
