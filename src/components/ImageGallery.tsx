@@ -2,13 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
-import { listUserImages, validateImageFile, uploadImage } from '../lib/image-upload';
-
-interface ImageItem {
-  name: string;
-  downloadURL: string;
-  timeCreated: string;
-}
+import { listUserImages, validateImageFile, uploadImageDeduped } from '../lib/image-upload';
+import type { ImageInfo } from '../lib/image-upload';
 
 function fileNameWithoutExt(name: string): string {
   // Strip UUID prefix (uuid_name.ext -> name)
@@ -19,7 +14,7 @@ function fileNameWithoutExt(name: string): string {
 export function ImageGallery() {
   const firebaseApp = useFirebaseApp();
   const { user } = useGraffiticodeAuth();
-  const [images, setImages] = useState<ImageItem[]>([]);
+  const [images, setImages] = useState<ImageInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
@@ -47,7 +42,7 @@ export function ImageGallery() {
     loadImages();
   }, [loadImages]);
 
-  const handleCopy = async (img: ImageItem) => {
+  const handleCopy = async (img: ImageInfo) => {
     const label = fileNameWithoutExt(img.name);
     const markdown = `![${label}](${img.downloadURL})`;
     await navigator.clipboard.writeText(markdown);
@@ -66,19 +61,23 @@ export function ImageGallery() {
     setUploadError(null);
     setUploadProgress(0);
     const storage = getStorage(firebaseApp);
-    const { promise } = uploadImage(storage, user.uid, file, (percent) => {
-      setUploadProgress(percent);
-    });
     try {
-      await promise;
+      const result = await uploadImageDeduped(storage, user.uid, file, images, (percent) => {
+        setUploadProgress(percent);
+      });
       setUploadProgress(null);
-      loadImages();
+      if (result.skipped) {
+        setUploadError('Image already exists');
+        setTimeout(() => setUploadError(null), 2000);
+      } else {
+        loadImages();
+      }
     } catch (err) {
       setUploadError('Upload failed');
       setUploadProgress(null);
       console.error(err);
     }
-  }, [firebaseApp, user?.uid, loadImages]);
+  }, [firebaseApp, user?.uid, images, loadImages]);
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -137,7 +136,7 @@ export function ImageGallery() {
               <img
                 src={img.downloadURL}
                 alt={fileNameWithoutExt(img.name)}
-                className="max-h-[150px] object-contain"
+                className="w-[120px] h-[120px] object-contain"
               />
               <span className="text-xs text-gray-500 mt-1 truncate w-full text-center">
                 {copiedUrl === img.downloadURL ? 'Copied!' : fileNameWithoutExt(img.name)}
