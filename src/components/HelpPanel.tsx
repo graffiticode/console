@@ -814,147 +814,103 @@ export const HelpPanel = ({
     }
   }, [firebaseApp, user]);
 
+  // Insert text content into the editor
+  const insertTextIntoEditor = useCallback((content: string) => {
+    let updateSuccess = false;
+    try {
+      const editorElement: HTMLElement =
+        document.querySelector("[contenteditable=true]") ||
+        document.querySelector(".ProseMirror") ||
+        document.querySelector("[role='textbox']");
+      if (editorElement) {
+        editorElement.focus();
+        try {
+          document.execCommand('selectAll', false, null);
+          document.execCommand('delete', false, null);
+          document.execCommand('insertText', false, content);
+          updateSuccess = true;
+        } catch {
+          try {
+            editorElement.innerHTML = '';
+            editorElement.innerHTML = content.replace(/\n/g, '<br>');
+            updateSuccess = true;
+          } catch {}
+        }
+      }
+    } catch {}
+
+    if (!updateSuccess && state && typeof state.apply === 'function') {
+      try {
+        state.apply({ type: 'csv-upload', args: { content } });
+        updateSuccess = true;
+      } catch {}
+    }
+    return updateSuccess;
+  }, [state]);
+
   // Handle file drop functionality for the entire panel
   const onDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles.length === 0) return;
 
-    const file = acceptedFiles[0];
+    const imageFiles = acceptedFiles.filter(f => f.type.startsWith('image/'));
+    const textFiles = acceptedFiles.filter(f => !f.type.startsWith('image/'));
 
-    // Route image files to image upload handler
-    if (file.type.startsWith('image/')) {
-      handleImageDrop(file);
-      return;
-    }
+    // Upload all images in parallel
+    imageFiles.forEach(file => handleImageDrop(file));
 
-    // Read the file contents
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const fileContent = e.target.result as string;
-      let updateSuccess = false;
+    // Concatenate and load text files into editor
+    if (textFiles.length > 0) {
+      const readPromises = textFiles.map(file =>
+        new Promise<{ name: string; content: string }>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve({ name: file.name, content: e.target.result as string });
+          reader.onerror = () => reject(new Error(`Error reading ${file.name}`));
+          reader.readAsText(file);
+        })
+      );
 
-      // Wait a moment to ensure the editor is accessible
-      setTimeout(() => {
-        // Try direct DOM manipulation first - most reliable method
-        try {
-          // Try to find the editor in multiple ways
-          const editorElement: HTMLElement =
-            document.querySelector("[contenteditable=true]") ||
-            document.querySelector(".ProseMirror") ||
-            document.querySelector("[role='textbox']");
+      Promise.all(readPromises).then(results => {
+        setTimeout(() => {
+          const combined = results.map(r => r.content).join('\n\n');
+          const names = results.map(r => r.name).join(', ');
+          const success = insertTextIntoEditor(combined);
+          setShowUploadModal(false);
 
-          if (editorElement) {
-            // Focus and clear the editor
-            editorElement.focus();
-
-            // Try multiple approaches to insert text
-            try {
-              // Modern approach
-              document.execCommand('selectAll', false, null);
-              document.execCommand('delete', false, null);
-              document.execCommand('insertText', false, fileContent);
-              updateSuccess = true;
-            } catch (insertErr) {
-              console.error("execCommand insertion failed:", insertErr);
-
-              // Try direct innerHTML approach
-              try {
-                editorElement.innerHTML = '';
-                editorElement.innerHTML = fileContent.replace(/\n/g, '<br>');
-                updateSuccess = true;
-              } catch (innerErr) {
-                console.error("innerHTML insertion failed:", innerErr);
-              }
-            }
-          } else {
-            console.error("Could not find editor element");
-          }
-        } catch (err) {
-          console.error("DOM manipulation failed:", err);
-        }
-
-        // Try state update as a fallback
-        if (!updateSuccess && state && typeof state.apply === 'function') {
-          try {
-            state.apply({
-              type: 'csv-upload',
-              args: {
-                content: fileContent
-              }
+          if (success) {
+            setUploadNotification({
+              type: 'success',
+              message: results.length === 1
+                ? `File "${names}" loaded into editor`
+                : `${results.length} files loaded into editor`,
+              fileName: names,
             });
-            updateSuccess = true;
-          } catch (err) {
-            console.error("State update failed:", err);
-          }
-        }
-
-        // Show appropriate notification
-        if (updateSuccess) {
-          setUploadNotification({
-            type: 'success',
-            message: `File "${file.name}" loaded into editor`,
-            fileName: file.name
-          });
-        } else {
-          // Last resort: copy to clipboard
-          try {
-            // First try the modern clipboard API
-            navigator.clipboard.writeText(fileContent)
+          } else {
+            navigator.clipboard.writeText(combined)
               .then(() => {
                 setUploadNotification({
                   type: 'warning',
-                  message: `File content copied to clipboard. Press Ctrl+V or Cmd+V to paste.`,
-                  fileName: file.name
+                  message: 'File content copied to clipboard. Press Ctrl+V or Cmd+V to paste.',
+                  fileName: names,
                 });
               })
-              .catch((clipErr) => {
-                console.error("Clipboard API failed:", clipErr);
-                // Fallback: show error notification
+              .catch(() => {
                 setUploadNotification({
                   type: 'error',
-                  message: `Could not process file. Please try copying and pasting manually.`,
-                  fileName: file.name
+                  message: 'Could not process files',
+                  fileName: names,
                 });
               });
-          } catch (clipErr) {
-            console.error("Clipboard operation failed:", clipErr);
-            setUploadNotification({
-              type: 'error',
-              message: `Could not process file`,
-              fileName: file.name
-            });
           }
-        }
-
-        // Close the modal if it's open
+          setTimeout(() => setUploadNotification(null), 3000);
+        }, 100);
+      }).catch((error) => {
+        console.error("Error reading files:", error);
+        setUploadNotification({ type: 'error', message: 'Error reading files', fileName: '' });
         setShowUploadModal(false);
-
-        // Clear notification after 3 seconds
-        setTimeout(() => {
-          setUploadNotification(null);
-        }, 3000);
-      }, 100); // Small delay to ensure DOM is ready
-    };
-
-    reader.onerror = (error) => {
-      console.error("Error reading file:", error);
-      setUploadNotification({
-        type: 'error',
-        message: 'Error reading file',
-        fileName: file.name
+        setTimeout(() => setUploadNotification(null), 3000);
       });
-
-      // Close the modal
-      setShowUploadModal(false);
-
-      // Clear notification after 3 seconds
-      setTimeout(() => {
-        setUploadNotification(null);
-      }, 3000);
-    };
-
-    // Read the file as text
-    reader.readAsText(file);
-  }, [state, handleImageDrop]);
+    }
+  }, [handleImageDrop, insertTextIntoEditor]);
 
   // ChatBot integration
   const { handleSendMessage, cancelGeneration, isLoading } = ChatBot({
@@ -998,7 +954,6 @@ export const HelpPanel = ({
       'application/x-sh': ['.sh', '.bash'],
       'text/x-sql': ['.sql']
     },
-    maxFiles: 1,
     noClick: true, // Don't open file dialog on click, only accept drops
     noKeyboard: true // Disable keyboard interaction
   });
@@ -2412,26 +2367,14 @@ export const HelpPanel = ({
                             }}
                             title={message.taskId && onLoadTaskFromHelp ? 'Click to load task' : ''}
                           >
-                            {/* Image name + Timestamp header */}
-                            {(() => {
-                              const messageText = message.role === 'system' ? message.content : message.user;
-                              const imageMatch = messageText?.match(/!\[([^\]]+)\]\([^)]+\)/);
-                              const imageName = imageMatch?.[1] && imageMatch[1] !== 'uploaded image'
-                                ? imageMatch[1].replace(/\.[^.]+$/, '') : null;
-                              const hasHeader = imageName || message.timestamp;
-                              return hasHeader ? (
-                                <div className="px-3 pt-2 pb-1 flex items-center gap-2">
-                                  {imageName && (
-                                    <span className="text-xs text-gray-500">{imageName}</span>
-                                  )}
-                                  {message.timestamp && (
-                                    <span className="text-xs text-gray-500">
-                                      {new Date(message.timestamp).toLocaleString()}
-                                    </span>
-                                  )}
-                                </div>
-                              ) : null;
-                            })()}
+                            {/* Timestamp header */}
+                            {message.timestamp && (
+                              <div className="px-3 pt-2 pb-1">
+                                <span className="text-xs text-gray-500">
+                                  {new Date(message.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                            )}
 
                             {/* Content */}
                             <div className={`px-3 pb-3 ${message.timestamp ? 'pt-0' : 'pt-3'}`}>
@@ -2440,15 +2383,22 @@ export const HelpPanel = ({
                                   remarkPlugins={[remarkGfm]}
                                   components={{
                                     img({ src, alt, ...props }) {
+                                      const displayName = alt && alt !== 'uploaded image'
+                                        ? alt.replace(/\.[^.]+$/, '') : null;
                                       return (
-                                        <img
-                                          src={src}
-                                          alt={alt || 'uploaded image'}
-                                          className="max-w-full h-auto rounded my-2"
-                                          style={{ maxHeight: '300px', objectFit: 'contain' as const }}
-                                          loading="lazy"
-                                          {...props}
-                                        />
+                                        <span className="block my-2">
+                                          <img
+                                            src={src}
+                                            alt={alt || 'uploaded image'}
+                                            className="max-w-full h-auto rounded"
+                                            style={{ maxHeight: '300px', objectFit: 'contain' as const }}
+                                            loading="lazy"
+                                            {...props}
+                                          />
+                                          {displayName && (
+                                            <span className="block text-xs text-gray-500 mt-1">{displayName}</span>
+                                          )}
+                                        </span>
                                       );
                                     },
                                     code({className, children, ...props}) {
