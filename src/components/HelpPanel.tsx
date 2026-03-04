@@ -22,7 +22,7 @@ import { useDropzone } from 'react-dropzone';
 import { createPortal } from 'react-dom';
 import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
-import { validateImageFile, uploadImageDeduped, listUserImages } from '../lib/image-upload';
+import { validateImageFile, uploadImage } from '../lib/image-upload';
 import { getLanguageAsset } from "../lib/api";
 import useLocalStorage from '../hooks/use-local-storage';
 import {
@@ -784,12 +784,10 @@ export const HelpPanel = ({
     setImageUploadProgress(0);
     try {
       const storage = getStorage(firebaseApp, 'gs://graffiticode-app.appspot.com');
-      const existingImages = await listUserImages(storage, user.uid);
-      const { downloadURL, fileName, skipped } = await uploadImageDeduped(
-        storage, user.uid, file, existingImages, (percent) => {
-          setImageUploadProgress(percent);
-        },
-      );
+      const { promise } = uploadImage(storage, user.uid, file, (percent) => {
+        setImageUploadProgress(percent);
+      });
+      const { downloadURL, fileName } = await promise;
       setImageUploadProgress(null);
 
       // Insert markdown image reference into the editor
