@@ -57,12 +57,15 @@ export async function listUserImages(
     }),
   );
   items.sort((a, b) => new Date(b.timeCreated).getTime() - new Date(a.timeCreated).getTime());
-  // Deduplicate by (displayName, hash) — keep newest (first after sort)
+  // Deduplicate by displayName — keep newest (first after sort)
   const seen = new Set<string>();
   return items.filter((item) => {
-    const key = `${displayName(item.name)}|${item.hash || item.downloadURL}`;
+    const dn = displayName(item.name);
+    const key = item.hash ? `${dn}|${item.hash}` : dn;
     if (seen.has(key)) return false;
     seen.add(key);
+    // Also mark the plain name as seen so hashless dupes are filtered
+    if (item.hash) seen.add(dn);
     return true;
   });
 }
@@ -114,23 +117,25 @@ export async function uploadImageDeduped(
   const baseName = file.name.replace(/\.[^.]+$/, '');
   const ext = file.name.split('.').pop() || 'png';
 
-  // Check for exact duplicate (same display name and hash)
-  const exactDup = existingImages.find(
-    (img) => displayName(img.name) === baseName && img.hash === hash,
-  );
-  if (exactDup) {
-    return { downloadURL: exactDup.downloadURL, fileName: file.name, skipped: true };
-  }
-
-  // Check if same name exists with different hash — add suffix
+  // Find images with the same base display name
   const sameNameImages = existingImages.filter(
     (img) => {
       const dn = displayName(img.name);
       return dn === baseName || /^.+\(\d+\)$/.test(dn) && dn.replace(/\(\d+\)$/, '').trim() === baseName;
     },
   );
+
+  // Skip if exact duplicate: same name and (matching hash OR no hash on existing image)
+  const exactDup = sameNameImages.find(
+    (img) => displayName(img.name) === baseName && (!img.hash || img.hash === hash),
+  );
+  if (exactDup) {
+    return { downloadURL: exactDup.downloadURL, fileName: file.name, skipped: true };
+  }
+
+  // Same name but different hash — add suffix
   let finalName = file.name;
-  if (sameNameImages.length > 0 && !sameNameImages.some((img) => img.hash === hash)) {
+  if (sameNameImages.length > 0) {
     finalName = `${baseName}(${sameNameImages.length}).${ext}`;
   }
 
