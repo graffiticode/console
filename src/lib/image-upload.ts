@@ -1,4 +1,4 @@
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata } from 'firebase/storage';
 import type { FirebaseStorage, UploadTask } from 'firebase/storage';
 
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
@@ -16,6 +16,29 @@ export function validateImageFile(file: File): string | null {
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+export async function listUserImages(
+  storage: FirebaseStorage,
+  userId: string,
+): Promise<{ name: string; downloadURL: string; timeCreated: string }[]> {
+  const folderRef = ref(storage, `uploads/${userId}/`);
+  const result = await listAll(folderRef);
+  const items = await Promise.all(
+    result.items.map(async (itemRef) => {
+      const [downloadURL, metadata] = await Promise.all([
+        getDownloadURL(itemRef),
+        getMetadata(itemRef),
+      ]);
+      return {
+        name: itemRef.name,
+        downloadURL,
+        timeCreated: metadata.timeCreated,
+      };
+    }),
+  );
+  items.sort((a, b) => new Date(b.timeCreated).getTime() - new Date(a.timeCreated).getTime());
+  return items;
 }
 
 export function uploadImage(

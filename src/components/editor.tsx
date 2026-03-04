@@ -9,6 +9,7 @@ import { postTask, getData } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
+import { ImageGallery } from "./ImageGallery";
 import { isNonNullNonEmptyObject } from "../utils";
 import useLocalStorage from '../hooks/use-local-storage';
 
@@ -227,6 +228,8 @@ export default function Editor({
                     taskId={taskId}
                   />
                 );
+              } else if (tab === "Images") {
+                return <ImageGallery />;
               } else {
                 return (
                   <CodePanel
