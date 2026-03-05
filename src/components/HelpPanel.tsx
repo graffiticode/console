@@ -1525,6 +1525,91 @@ export const HelpPanel = ({
     };
   }, [isLoading]);
 
+  // Stable remarkPlugins array to prevent re-renders
+  const remarkPlugins = useMemo(() => [remarkGfm], []);
+
+  // Stable ReactMarkdown components to prevent image remounting on re-render
+  const markdownComponents = useMemo(() => ({
+    img({ src, alt, ...props }) {
+      const displayName = alt && alt !== 'uploaded image'
+        ? alt.replace(/\.[^.]+$/, '') : null;
+      return (
+        <span className="block mt-2">
+          <img
+            src={src}
+            alt={alt || 'uploaded image'}
+            className="max-w-full h-auto rounded"
+            style={{ maxHeight: '300px', objectFit: 'contain' as const }}
+            loading="lazy"
+            {...props}
+          />
+          {displayName && (
+            <span className="block text-xs text-gray-500 -mt-0.5 leading-tight">{displayName}</span>
+          )}
+        </span>
+      );
+    },
+    code({className, children, ...props}) {
+      const match = /language-(\w+)/.exec(className || '');
+      return match ? (
+        <SyntaxHighlighter
+          style={tomorrow}
+          language={match[1]}
+          PreTag="div"
+          {...props}
+        >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
+      ) : (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
+    },
+    table({node, className, children, ...props}) {
+      return (
+        <div className="overflow-x-auto my-2 w-full">
+          <table className="table-auto border-collapse w-full text-xs" {...props}>
+            {children}
+          </table>
+        </div>
+      );
+    },
+    thead({node, children, ...props}) {
+      return (
+        <thead className="bg-gray-50" {...props}>
+          {children}
+        </thead>
+      );
+    },
+    tbody({node, children, ...props}) {
+      return (
+        <tbody className="divide-y divide-gray-100" {...props}>
+          {children}
+        </tbody>
+      );
+    },
+    tr({node, children, ...props}) {
+      return (
+        <tr className="hover:bg-gray-50" {...props}>
+          {children}
+        </tr>
+      );
+    },
+    th({node, children, ...props}) {
+      return (
+        <th className="px-2 py-1 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border border-gray-200 whitespace-nowrap" {...props}>
+          {children}
+        </th>
+      );
+    },
+    td({node, children, ...props}) {
+      return (
+        <td className="px-2 py-1 text-xs text-gray-700 border border-gray-200" {...props}>
+          {children}
+        </td>
+      );
+    }
+  }), []);
+
   // Function to prepare messages for display
   const prepareMessagesForDisplay = () => {
     // Find all user and system messages in chronological order (oldest to newest)
@@ -2388,87 +2473,8 @@ export const HelpPanel = ({
                             <div className={`px-3 pb-3 ${message.timestamp ? 'pt-0' : 'pt-3'}`}>
                               <div className="text-sm prose prose-sm prose-blue max-w-none">
                                 <ReactMarkdown
-                                  remarkPlugins={[remarkGfm]}
-                                  components={{
-                                    img({ src, alt, ...props }) {
-                                      const displayName = alt && alt !== 'uploaded image'
-                                        ? alt.replace(/\.[^.]+$/, '') : null;
-                                      return (
-                                        <span className="block mt-2">
-                                          <img
-                                            src={src}
-                                            alt={alt || 'uploaded image'}
-                                            className="max-w-full h-auto rounded"
-                                            style={{ maxHeight: '300px', objectFit: 'contain' as const }}
-                                            loading="lazy"
-                                            {...props}
-                                          />
-                                          {displayName && (
-                                            <span className="block text-xs text-gray-500 -mt-0.5 leading-tight">{displayName}</span>
-                                          )}
-                                        </span>
-                                      );
-                                    },
-                                    code({className, children, ...props}) {
-                                      const match = /language-(\w+)/.exec(className || '');
-                                      return match ? (
-                                        <SyntaxHighlighter
-                                          style={tomorrow}
-                                          language={match[1]}
-                                          PreTag="div"
-                                          {...props}
-                                        >{String(children).replace(/\n$/, '')}</SyntaxHighlighter>
-                                      ) : (
-                                        <code className={className} {...props}>
-                                          {children}
-                                        </code>
-                                      );
-                                    },
-                                    table({node, className, children, ...props}) {
-                                      return (
-                                        <div className="overflow-x-auto my-2 w-full">
-                                          <table className="table-auto border-collapse w-full text-xs" {...props}>
-                                            {children}
-                                          </table>
-                                        </div>
-                                      );
-                                    },
-                                    thead({node, children, ...props}) {
-                                      return (
-                                        <thead className="bg-gray-50" {...props}>
-                                          {children}
-                                        </thead>
-                                      );
-                                    },
-                                    tbody({node, children, ...props}) {
-                                      return (
-                                        <tbody className="divide-y divide-gray-100" {...props}>
-                                          {children}
-                                        </tbody>
-                                      );
-                                    },
-                                    tr({node, children, ...props}) {
-                                      return (
-                                        <tr className="hover:bg-gray-50" {...props}>
-                                          {children}
-                                        </tr>
-                                      );
-                                    },
-                                    th({node, children, ...props}) {
-                                      return (
-                                        <th className="px-2 py-1 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border border-gray-200 whitespace-nowrap" {...props}>
-                                          {children}
-                                        </th>
-                                      );
-                                    },
-                                    td({node, children, ...props}) {
-                                      return (
-                                        <td className="px-2 py-1 text-xs text-gray-700 border border-gray-200" {...props}>
-                                          {children}
-                                        </td>
-                                      );
-                                    }
-                                  }}
+                                  remarkPlugins={remarkPlugins}
+                                  components={markdownComponents}
                                 >
                                   {message.role === 'system' ? message.content : message.user}
                                 </ReactMarkdown>
