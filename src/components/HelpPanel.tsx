@@ -783,7 +783,7 @@ export const HelpPanel = ({
 
     setImageUploadProgress(0);
     try {
-      const storage = getStorage(firebaseApp, 'gs://graffiticode-app.firebasestorage.app');
+      const storage = getStorage(firebaseApp);
       const { promise } = uploadImage(storage, user.uid, file, (percent) => {
         setImageUploadProgress(percent);
       });

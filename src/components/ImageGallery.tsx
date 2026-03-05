@@ -30,7 +30,7 @@ export function ImageGallery() {
     try {
       setLoading(true);
       setError(null);
-      const storage = getStorage(firebaseApp, 'gs://graffiticode-app.firebasestorage.app');
+      const storage = getStorage(firebaseApp);
       const result = await listUserImages(storage, user.uid);
       setImages(result);
     } catch (err) {
@@ -63,7 +63,7 @@ export function ImageGallery() {
     }
     setUploadError(null);
     setUploadProgress(0);
-    const storage = getStorage(firebaseApp, 'gs://graffiticode-app.firebasestorage.app');
+    const storage = getStorage(firebaseApp);
     try {
       const result = await uploadImageDeduped(storage, user.uid, file, images, (percent) => {
         setUploadProgress(percent);
