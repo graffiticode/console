@@ -129,7 +129,7 @@ export function ImageGallery() {
           No images uploaded yet. Drag images here to upload.
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="flex flex-wrap gap-3">
           {images.map((img) => (
             <button
               key={img.downloadURL}
