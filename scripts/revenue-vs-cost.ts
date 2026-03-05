@@ -51,30 +51,42 @@ function getModelCost(model: string, inputTokens: number, outputTokens: number):
   return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
 }
 
-function parseArgs(argv: string[]): { period: string; output: string; lang?: string } {
+function parseArgs(argv: string[]): { period: string; output: string; lang?: string; from?: string; to?: string } {
   const args = argv.slice(2);
   let period = 'all';
   let output = 'revenue-vs-cost.html';
   let lang: string | undefined;
+  let from: string | undefined;
+  let to: string | undefined;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--period' && args[i + 1]) { period = args[i + 1]; i++; }
     else if (args[i] === '--output' && args[i + 1]) { output = args[i + 1]; i++; }
     else if (args[i] === '--lang' && args[i + 1]) { lang = args[i + 1]; i++; }
+    else if (args[i] === '--from' && args[i + 1]) { from = args[i + 1]; i++; }
+    else if (args[i] === '--to' && args[i + 1]) { to = args[i + 1]; i++; }
   }
-  if (!['all', 'month', 'week', 'day'].includes(period)) {
-    console.error('Error: --period must be "all", "month", "week", or "day"');
+  if (from) {
+    period = 'custom';
+  } else if (!['all', 'month', 'week', 'day'].includes(period)) {
+    console.error('Error: --period must be "all", "month", "week", or "day", or use --from/--to YYYY-MM-DD');
     process.exit(1);
   }
-  return { period, output, lang };
+  return { period, output, lang, from, to };
 }
 
-function getPeriodStart(period: string): Date | null {
+function getPeriodStart(period: string, from?: string): Date | null {
   if (period === 'all') return null;
+  if (period === 'custom' && from) return new Date(from + 'T00:00:00Z');
   const today = new Date(new Date().toISOString().split('T')[0] + 'T00:00:00Z');
   if (period === 'day') return today;
   if (period === 'week') return new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   if (period === 'month') return new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
   return null;
+}
+
+function getPeriodEnd(to?: string): string {
+  if (to) return new Date(new Date(to + 'T00:00:00Z').getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  return new Date().toISOString().split('T')[0];
 }
 
 function getTimestampMs(r: UsageRecord): number | null {
@@ -451,10 +463,11 @@ if (document.getElementById('tokenChart')) {
 }
 
 async function main() {
-  const { period, output, lang } = parseArgs(process.argv);
-  const periodStart = getPeriodStart(period);
+  const { period, output, lang, from, to } = parseArgs(process.argv);
+  const periodStart = getPeriodStart(period, from);
+  const periodEnd = getPeriodEnd(to);
 
-  console.log(`Fetching data (period: ${period})...`);
+  console.log(`Fetching data (period: ${period}${from ? `, from: ${from}` : ''}${to ? `, to: ${to}` : ''})...`);
 
   // Fetch usage records (filter by type, then by date/lang in code to avoid composite index)
   const snapshot = await db.collection('usage')
@@ -466,6 +479,10 @@ async function main() {
     const ms = getTimestampMs(data);
     if (!ms) return;
     if (periodStart && ms < periodStart.getTime()) return;
+    if (to) {
+      const endMs = new Date(periodEnd + 'T00:00:00Z').getTime();
+      if (ms >= endMs) return;
+    }
     records.push(data);
   });
 
@@ -513,8 +530,7 @@ async function main() {
   ensureYesterdayData();
 
   const startDateStr = periodStart ? periodStart.toISOString().split('T')[0] : null;
-  const today = new Date().toISOString().split('T')[0];
-  const endDateStr = today;
+  const endDateStr = periodEnd;
   const dailyData = loadDailyData(startDateStr, endDateStr);
   console.log(`  Loaded ${dailyData.length} days of actual data`);
 

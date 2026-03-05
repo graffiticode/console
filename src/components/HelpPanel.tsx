@@ -1013,8 +1013,9 @@ export const HelpPanel = ({
             if (botResponse.taskId) {
               newHelp[i].taskId = botResponse.taskId;
             }
-            // Use the bot response timestamp if available, otherwise keep the existing one
-            if (botResponse.timestamp) {
+            // Only set timestamp if the user message doesn't already have one
+            // (changing timestamp changes the React key, causing image flash)
+            if (botResponse.timestamp && !newHelp[i].timestamp) {
               newHelp[i].timestamp = botResponse.timestamp;
             }
             break;
@@ -1544,7 +1545,7 @@ export const HelpPanel = ({
             {...props}
           />
           {displayName && (
-            <span className="block text-xs text-gray-500 leading-tight" style={{ marginTop: '2px' }}>{displayName}</span>
+            <span className="block text-xs text-gray-500 leading-tight">{displayName}</span>
           )}
         </span>
       );
