@@ -597,7 +597,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
                 if (!isDragging) return;
 
                 const delta = moveEvent.clientX - startX;
-                const newWidth = Math.max(120, Math.min(400, startWidth + delta));
+                const newWidth = Math.max(120, Math.min(450, startWidth + delta));
 
                 setAssetsPanelWidth(newWidth);
 
