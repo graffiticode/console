@@ -2472,7 +2472,7 @@ export const HelpPanel = ({
 
                             {/* Content */}
                             <div className={`px-3 pb-3 ${message.timestamp ? 'pt-0' : 'pt-3'}`}>
-                              <div className="text-sm prose prose-sm prose-blue max-w-none">
+                              <div className="text-sm prose prose-sm prose-blue max-w-none prose-img:mb-0">
                                 <ReactMarkdown
                                   remarkPlugins={remarkPlugins}
                                   components={markdownComponents}
