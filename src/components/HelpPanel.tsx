@@ -1545,7 +1545,7 @@ export const HelpPanel = ({
             {...props}
           />
           {displayName && (
-            <span className="block text-xs text-gray-500 leading-tight">{displayName}</span>
+            <span className="block text-xs text-gray-500 leading-tight mt-1">{displayName}</span>
           )}
         </span>
       );
