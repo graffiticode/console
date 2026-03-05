@@ -18,7 +18,7 @@ const buildConversationSummary = (chatHistory: any[]) => {
 
   for (const item of limitedHistory) {
     if (item.type === 'user') {
-      previousRequests.push(item.user);
+      previousRequests.push(stripImageMarkdown(item.user));
     } else if (item.type === 'bot' && item.help?.type === 'code') {
       previousOutputs.push('[Generated code]');
     } else if (item.type === 'bot') {
@@ -36,6 +36,10 @@ const buildConversationSummary = (chatHistory: any[]) => {
   };
 };
 
+/** Strip image markdown references from text so they don't influence code generation */
+const stripImageMarkdown = (text: string): string =>
+  text.replace(/!\[[^\]]*\]\([^)]+\)\n?/g, '').trim();
+
 /**
  * Function to generate Graffiticode responses using the generateCode function
  */
@@ -43,8 +47,8 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
   try {
     // Use our fetcher function directly
 
-    // Format chat history as context for the prompt
-    let contextualPrompt = message;
+    // Format chat history as context for the prompt (strip image references)
+    let contextualPrompt = stripImageMarkdown(message);
 
     // Build conversation summary for DSPy service
     const conversationSummary = buildConversationSummary(chatHistory);
@@ -60,7 +64,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       for (let i = 0; i < limitedHistory.length; i++) {
         const item = limitedHistory[i];
         if (item.type === 'user') {
-          conversationContext += `User: ${item.user}\n`;
+          conversationContext += `User: ${stripImageMarkdown(item.user)}\n`;
         } else if (item.type === 'bot') {
           // For bot responses, include either the text (if a description) or a summary (if code)
           if (item.help && item.help.type === 'code') {

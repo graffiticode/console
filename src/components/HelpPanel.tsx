@@ -790,7 +790,26 @@ export const HelpPanel = ({
       const { downloadURL, fileName } = await promise;
       setImageUploadProgress(null);
 
-      setUploadNotification({ type: 'success', message: `Image "${fileName}" uploaded. Use Images tab to reference.`, fileName });
+      // Insert image markdown into the text editor
+      const label = fileName.replace(/\.[^.]+$/, '');
+      const markdown = `![${label}](${downloadURL})`;
+      const editorElement = document.querySelector("[contenteditable=true]") as HTMLElement;
+      if (editorElement) {
+        editorElement.focus();
+        // Move cursor to end
+        const sel = window.getSelection();
+        sel?.selectAllChildren(editorElement);
+        sel?.collapseToEnd();
+        // Add newline if editor already has content
+        const existing = editorElement.innerText?.trim();
+        if (existing) {
+          document.execCommand('insertText', false, '\n' + markdown);
+        } else {
+          document.execCommand('insertText', false, markdown);
+        }
+      }
+
+      setUploadNotification({ type: 'success', message: `Image "${fileName}" uploaded`, fileName });
       setTimeout(() => setUploadNotification(null), 3000);
     } catch (err: any) {
       setImageUploadProgress(null);
@@ -2330,7 +2349,7 @@ export const HelpPanel = ({
                                       help[message.index + 1]?.type !== 'bot');
 
                     return (
-                      <div key={index} className="mb-2 w-full">
+                      <div key={message.timestamp || message.index} className="mb-2 w-full">
                         <div className="relative group">
                           {/* Delete button for each user message */}
                           {message.role !== 'system' && (
