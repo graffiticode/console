@@ -200,52 +200,45 @@ export default function Editor({
             height: height === "100%" ? undefined : (height || "calc(100vh - 120px)") // Use flexbox when 100%
           }}
         >
-          {
-            (() => {
-              if (tab === "Data") {
-                return (
-                  <DataPanel
-                    ref={dataPanelRef}
-                    id={taskId}
-                    user={user}
-                  />
-                );
-              } else if (tab === "Make") {
-                return (
-                  <HelpPanel
-                    help={help}
-                    setHelp={setHelp}
-                    language={lang}
-                    code={code}
-                    setCode={(newCode) => {
-                      if (isCodeNew(newCode)) {
-                        setIsUserEdit(true);
-                        setCode(newCode);
-                      }
-                    }}
-                    setTaskId={setTaskId}
-                    onLoadTaskFromHelp={onLoadTaskFromHelp}
-                    taskId={taskId}
-                  />
-                );
-              } else if (tab === "Images") {
-                return <ImageGallery />;
-              } else {
-                return (
-                  <CodePanel
-                    code={code}
-                    setCode={(newCode) => {
-                      if (isCodeNew(newCode)) {
-                        setIsUserEdit(true);
-                        setCode(newCode);
-                      }
-                    }}
-                    compiledData={data}
-                  />
-                );
-              }
-            })()
-          }
+          <div style={{ display: tab === "Make" ? undefined : "none" }}>
+            <HelpPanel
+              help={help}
+              setHelp={setHelp}
+              language={lang}
+              code={code}
+              setCode={(newCode) => {
+                if (isCodeNew(newCode)) {
+                  setIsUserEdit(true);
+                  setCode(newCode);
+                }
+              }}
+              setTaskId={setTaskId}
+              onLoadTaskFromHelp={onLoadTaskFromHelp}
+              taskId={taskId}
+            />
+          </div>
+          {tab === "Data" && (
+            <DataPanel
+              ref={dataPanelRef}
+              id={taskId}
+              user={user}
+            />
+          )}
+          <div style={{ display: tab === "Images" ? undefined : "none" }}>
+            <ImageGallery />
+          </div>
+          {tab === "Code" && (
+            <CodePanel
+              code={code}
+              setCode={(newCode) => {
+                if (isCodeNew(newCode)) {
+                  setIsUserEdit(true);
+                  setCode(newCode);
+                }
+              }}
+              compiledData={data}
+            />
+          )}
         </div>
       </div>
     </div>
