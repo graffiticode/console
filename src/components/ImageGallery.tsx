@@ -134,6 +134,14 @@ export function ImageGallery() {
             <button
               key={img.downloadURL}
               onClick={() => handleCopy(img)}
+              draggable
+              onDragStart={(e) => {
+                const label = fileNameWithoutExt(img.name);
+                const markdown = `![${label}](${img.downloadURL})`;
+                e.dataTransfer.setData('text/plain', markdown);
+                e.dataTransfer.setData('application/x-gc-image', img.downloadURL);
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
               className="group relative flex flex-col items-center p-2 rounded hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200"
             >
               <img

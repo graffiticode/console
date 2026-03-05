@@ -1662,8 +1662,29 @@ export const HelpPanel = ({
     return Object.keys(changedValues).length > 0;
   }, [contextProperties, initialProperties]);
 
+  // Handle image markdown dropped from Assets panel
+  const handleAssetDrop = useCallback((e: React.DragEvent) => {
+    const gcImage = e.dataTransfer.types.includes('application/x-gc-image');
+    if (gcImage) {
+      e.preventDefault();
+      e.stopPropagation();
+      const markdown = e.dataTransfer.getData('text/plain');
+      if (markdown) {
+        insertTextIntoEditor(markdown);
+      }
+    }
+  }, [insertTextIntoEditor]);
+
   return (
-    <div {...getRootProps()} ref={containerRef} className="flex flex-col h-[calc(100vh-120px)]">
+    <div {...getRootProps()} ref={containerRef} className="flex flex-col h-[calc(100vh-120px)]"
+      onDrop={handleAssetDrop}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('application/x-gc-image')) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+    >
 
       <input {...getInputProps()} />
 

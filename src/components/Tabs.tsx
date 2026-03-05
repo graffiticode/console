@@ -8,7 +8,6 @@ const tabs = [
   { name: 'Make', current: false },
   { name: 'Code', current: true },
   { name: 'Data', current: false },
-  { name: 'Images', current: false },
 ];
 
 export function Tabs({ tab: tabName, setTab, onCopy, showCopyButton }) {

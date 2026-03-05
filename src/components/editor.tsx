@@ -9,7 +9,6 @@ import { postTask, getData } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
-import { ImageGallery } from "./ImageGallery";
 import { isNonNullNonEmptyObject } from "../utils";
 import useLocalStorage from '../hooks/use-local-storage';
 
@@ -224,9 +223,6 @@ export default function Editor({
               user={user}
             />
           )}
-          <div style={{ display: tab === "Images" ? undefined : "none" }}>
-            <ImageGallery />
-          </div>
           {tab === "Code" && (
             <CodePanel
               code={code}

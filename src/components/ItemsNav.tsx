@@ -268,7 +268,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
   )
 }
 
-export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh }) {
+export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh, panelWidth = 210 }) {
   const [ showId, setShowId ] = useState("");
 
   return (
@@ -293,7 +293,8 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                 >
                   <button
                     onClick={() => onSelectItem(item.id)}
-                    className="flex items-center rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate max-w-[170px] text-left"
+                    className="flex items-center rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate text-left"
+                    style={{ maxWidth: panelWidth - 40 }}
                     title={item.name}
                   >
                     <span className="truncate">{item.name}</span>

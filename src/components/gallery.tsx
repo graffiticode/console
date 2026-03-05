@@ -6,6 +6,7 @@ import {
   ChevronDoubleLeftIcon,
 } from '@heroicons/react/24/outline'
 import Editor from './editor';
+import { ImageGallery } from './ImageGallery';
 import SignIn from "./SignIn";
 import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
@@ -71,6 +72,17 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   const [ isFormPanelCollapsed, setIsFormPanelCollapsed ] = useState(
     typeof window !== 'undefined' && localStorage.getItem('graffiticode:formPanelCollapsed') === 'true'
   );
+  const [ isAssetsPanelCollapsed, setIsAssetsPanelCollapsed ] = useState(
+    typeof window !== 'undefined' && localStorage.getItem('graffiticode:assetsPanelCollapsed') === 'true'
+  );
+  const [ assetsPanelWidth, setAssetsPanelWidth ] = useState(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:assetsPanelWidth') : null;
+    return saved ? parseInt(saved) : 210;
+  });
+  const [ itemsPanelWidth, setItemsPanelWidth ] = useState(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:itemsPanelWidth') : null;
+    return saved ? parseInt(saved) : 210;
+  });
   const [ items, setItems ] = useState([]);
   const [ selectedItemId, setSelectedItemId ] = useState("");
   const [ editorCode, setEditorCode ] = useState("");
@@ -305,6 +317,14 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     }
   }, [isFormPanelCollapsed]);
 
+  const toggleAssetsPanel = useCallback(() => {
+    const newState = !isAssetsPanelCollapsed;
+    setIsAssetsPanelCollapsed(newState);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('graffiticode:assetsPanelCollapsed', newState.toString());
+    }
+  }, [isAssetsPanelCollapsed]);
+
   const handleCreateItem = async () => {
     if (isCreatingItem) return;
     setIsCreatingItem(true);
@@ -523,14 +543,108 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     <div className="flex h-[calc(100vh-64px)] w-full">
       {/* Main content area */}
       <div className="flex grow w-full overflow-hidden">
+        {/* Assets panel */}
+        <div
+          className={classNames(
+            "flex-none border border-gray-200 border-r-0 rounded-none",
+            isAssetsPanelCollapsed ? "h-10" : "h-[calc(100vh-90px)]"
+          )}
+          style={{ width: isAssetsPanelCollapsed ? 40 : assetsPanelWidth }}
+        >
+          <div className="flex justify-between items-center p-2 border-b border-gray-200">
+            <span className={classNames(
+              "text-sm font-medium text-gray-700",
+              isAssetsPanelCollapsed && "hidden"
+            )}>Assets</span>
+            <button
+              className="text-gray-400 hover:text-gray-500 focus:outline-none"
+              title={isAssetsPanelCollapsed ? "Expand assets panel" : "Collapse assets panel"}
+              onClick={toggleAssetsPanel}>
+              {isAssetsPanelCollapsed ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+              )}
+            </button>
+          </div>
+          <div className={classNames(
+            isAssetsPanelCollapsed && "hidden",
+            "h-[calc(100%-42px)] overflow-auto"
+          )}>
+            <ImageGallery />
+          </div>
+        </div>
+        {/* Resize bar for Assets panel */}
+        {!isAssetsPanelCollapsed ? (
+          <div
+            className="flex-none w-1 bg-gray-300 hover:bg-gray-400 cursor-col-resize transition-colors relative mx-px"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              let isDragging = false;
+              let holdTimeout = null;
+
+              const target = e.currentTarget;
+              target.setPointerCapture(e.pointerId);
+
+              const startX = e.clientX;
+              const startWidth = assetsPanelWidth;
+
+              const handlePointerMove = (moveEvent) => {
+                if (!isDragging) return;
+
+                const delta = moveEvent.clientX - startX;
+                const newWidth = Math.max(120, Math.min(400, startWidth + delta));
+
+                setAssetsPanelWidth(newWidth);
+
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('graffiticode:assetsPanelWidth', newWidth.toString());
+                }
+              };
+
+              const handlePointerUp = () => {
+                if (holdTimeout) {
+                  clearTimeout(holdTimeout);
+                  holdTimeout = null;
+                }
+                isDragging = false;
+                target.releasePointerCapture(e.pointerId);
+                target.removeEventListener('pointermove', handlePointerMove);
+                target.removeEventListener('pointerup', handlePointerUp);
+                target.removeEventListener('pointercancel', handlePointerUp);
+              };
+
+              target.addEventListener('pointermove', handlePointerMove);
+              target.addEventListener('pointerup', handlePointerUp);
+              target.addEventListener('pointercancel', handlePointerUp);
+
+              holdTimeout = setTimeout(() => {
+                isDragging = true;
+              }, 200);
+            }}
+            title="Drag to resize horizontally"
+          >
+            <div className="absolute inset-y-0 -left-1 -right-1 flex items-center justify-center">
+              <div className="h-16 w-1 bg-gray-400 rounded-full opacity-50"></div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-none w-1 mx-px" />
+        )}
         {/* ItemsNav panel with collapse functionality */}
         {!hideItemsNav && (
         <>
-        <div className={classNames(
-          "flex-none transition-all duration-300 border border-gray-200 rounded-none mr-1",
-          isItemsPanelCollapsed ? "w-10" : "w-[210px]",
-          isItemsPanelCollapsed ? "h-10" : "h-[calc(100vh-90px)]"
-        )}>
+        <div
+          className={classNames(
+            "flex-none border border-gray-200 border-r-0 rounded-none",
+            isItemsPanelCollapsed ? "h-10" : "h-[calc(100vh-90px)]"
+          )}
+          style={{ width: isItemsPanelCollapsed ? 40 : itemsPanelWidth }}
+        >
           <div className="flex justify-between items-center p-2 border-b border-gray-200">
             <span className={classNames(
               "text-sm font-medium text-gray-700",
@@ -576,13 +690,69 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
                   onSelectItem={handleSelectItem}
                   onUpdateItem={handleUpdateItem}
                   onRefresh={() => mutate()}
+                  panelWidth={itemsPanelWidth}
                 />
               )}
             </div>
           )}
         </div>
-        {/* Spacer between ItemsNav and editor panels */}
-        <div className="w-1 ml-1" />
+        {/* Resize bar for Items panel */}
+        {!isItemsPanelCollapsed ? (
+          <div
+            className="flex-none w-1 bg-gray-300 hover:bg-gray-400 cursor-col-resize transition-colors relative mx-px"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              let isDragging = false;
+              let holdTimeout = null;
+
+              const target = e.currentTarget;
+              target.setPointerCapture(e.pointerId);
+
+              const startX = e.clientX;
+              const startWidth = itemsPanelWidth;
+
+              const handlePointerMove = (moveEvent) => {
+                if (!isDragging) return;
+
+                const delta = moveEvent.clientX - startX;
+                const newWidth = Math.max(120, Math.min(400, startWidth + delta));
+
+                setItemsPanelWidth(newWidth);
+
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('graffiticode:itemsPanelWidth', newWidth.toString());
+                }
+              };
+
+              const handlePointerUp = () => {
+                if (holdTimeout) {
+                  clearTimeout(holdTimeout);
+                  holdTimeout = null;
+                }
+                isDragging = false;
+                target.releasePointerCapture(e.pointerId);
+                target.removeEventListener('pointermove', handlePointerMove);
+                target.removeEventListener('pointerup', handlePointerUp);
+                target.removeEventListener('pointercancel', handlePointerUp);
+              };
+
+              target.addEventListener('pointermove', handlePointerMove);
+              target.addEventListener('pointerup', handlePointerUp);
+              target.addEventListener('pointercancel', handlePointerUp);
+
+              holdTimeout = setTimeout(() => {
+                isDragging = true;
+              }, 200);
+            }}
+            title="Drag to resize horizontally"
+          >
+            <div className="absolute inset-y-0 -left-1 -right-1 flex items-center justify-center">
+              <div className="h-16 w-1 bg-gray-400 rounded-full opacity-50"></div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-none w-1 mx-px" />
+        )}
         </>
         )}
         <div className="flex flex-col grow overflow-hidden">
@@ -598,7 +768,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
             <div
               ref={editorPanelRef}
               className={classNames(
-                "relative ring-0 border border-gray-200 rounded-none",
+                "relative ring-0 border border-gray-200 lg:border-r-0 rounded-none",
                 "order-2 lg:order-1",
                 isEditorPanelCollapsed ? "h-10" : "lg:h-full",
                 !isEditorPanelCollapsed && "lg:min-h-[300px]",
@@ -663,7 +833,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
             {/* Vertical resize bar between editor and preview (desktop) */}
             {!isEditorPanelCollapsed && !isFormPanelCollapsed && (
               <div
-                className="hidden lg:block w-1 bg-gray-300 hover:bg-gray-400 cursor-col-resize transition-colors relative lg:order-2 mx-1"
+                className="hidden lg:block w-1 bg-gray-300 hover:bg-gray-400 cursor-col-resize transition-colors relative lg:order-2 mx-px"
                 onPointerDown={(e) => {
                 e.preventDefault();
                 let isDragging = false;
@@ -727,13 +897,13 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
             )}
             {/* Spacer to maintain gap when drag bar is hidden */}
             {(isEditorPanelCollapsed || isFormPanelCollapsed) && (
-              <div className="hidden lg:block w-1 lg:order-2 mx-1" />
+              <div className="hidden lg:block w-1 lg:order-2 mx-px" />
             )}
             <div
               ref={previewPanelRef}
               className={classNames(
-                "relative ring-0 border border-gray-300 rounded-none",
-                "order-1 lg:order-3",
+                "relative ring-0 border border-gray-300 lg:border-l-0 rounded-none",
+                "order-1 lg:order-5",
                 isFormPanelCollapsed ? "h-10" : "lg:h-full",
                 !isFormPanelCollapsed && "lg:min-h-[200px]",
                 !isFormPanelCollapsed && "overflow-hidden",
