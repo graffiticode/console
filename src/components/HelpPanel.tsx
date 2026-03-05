@@ -790,18 +790,7 @@ export const HelpPanel = ({
       const { downloadURL, fileName } = await promise;
       setImageUploadProgress(null);
 
-      // Insert markdown image reference into the editor
-      const markdown = `![${fileName}](${downloadURL})`;
-      const editorElement: HTMLElement | null =
-        document.querySelector("[contenteditable=true]") ||
-        document.querySelector(".ProseMirror") ||
-        document.querySelector("[role='textbox']");
-      if (editorElement) {
-        editorElement.focus();
-        document.execCommand('insertText', false, markdown);
-      }
-
-      setUploadNotification({ type: 'success', message: `Image "${fileName}" uploaded`, fileName });
+      setUploadNotification({ type: 'success', message: `Image "${fileName}" uploaded. Use Images tab to reference.`, fileName });
       setTimeout(() => setUploadNotification(null), 3000);
     } catch (err: any) {
       setImageUploadProgress(null);
