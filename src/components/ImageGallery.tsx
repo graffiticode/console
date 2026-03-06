@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
-import { listUserImages, validateImageFile, uploadImageDeduped } from '../lib/image-upload';
+import { listUserImages, validateImageFile, uploadImageDeduped, deleteUserImage } from '../lib/image-upload';
 import type { ImageInfo } from '../lib/image-upload';
 
 function fileNameWithoutExt(name: string): string {
@@ -17,7 +17,7 @@ export function ImageGallery() {
   const [images, setImages] = useState<ImageInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
   const [dragging, setDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -45,13 +45,52 @@ export function ImageGallery() {
     loadImages();
   }, [loadImages]);
 
-  const handleCopy = async (img: ImageInfo) => {
-    const label = fileNameWithoutExt(img.name);
-    const markdown = `![${label}](${img.downloadURL})`;
-    await navigator.clipboard.writeText(markdown);
-    setCopiedUrl(img.downloadURL);
-    setTimeout(() => setCopiedUrl(null), 1500);
+  const handleClick = (img: ImageInfo, e: React.MouseEvent) => {
+    const url = img.downloadURL;
+    setSelectedUrls(prev => {
+      const next = new Set(prev);
+      if (e.metaKey || e.ctrlKey) {
+        // Toggle individual item
+        if (next.has(url)) {
+          next.delete(url);
+        } else {
+          next.add(url);
+        }
+      } else {
+        // Single select: toggle if already the only selection, otherwise select just this
+        if (next.size === 1 && next.has(url)) {
+          next.clear();
+        } else {
+          next.clear();
+          next.add(url);
+        }
+      }
+      return next;
+    });
   };
+
+  const buildMarkdown = (urls: Set<string>) => {
+    return images
+      .filter(img => urls.has(img.downloadURL))
+      .map(img => `![${fileNameWithoutExt(img.name)}](${img.downloadURL})`)
+      .join('\n');
+  };
+
+  const handleDelete = useCallback(async (img: ImageInfo, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const storage = getStorage(firebaseApp);
+      await deleteUserImage(storage, user.uid, img.name);
+      setImages(prev => prev.filter(i => i.downloadURL !== img.downloadURL));
+      setSelectedUrls(prev => {
+        const next = new Set(prev);
+        next.delete(img.downloadURL);
+        return next;
+      });
+    } catch (err) {
+      console.error('Failed to delete image:', err);
+    }
+  }, [firebaseApp, user?.uid]);
 
   const handleFiles = useCallback(async (files: FileList) => {
     if (!user?.uid || files.length === 0) return;
@@ -130,30 +169,45 @@ export function ImageGallery() {
         </div>
       ) : (
         <div className="flex flex-wrap gap-3">
-          {images.map((img) => (
-            <button
-              key={img.downloadURL}
-              onClick={() => handleCopy(img)}
-              draggable
-              onDragStart={(e) => {
-                const label = fileNameWithoutExt(img.name);
-                const markdown = `![${label}](${img.downloadURL})`;
-                e.dataTransfer.setData('text/plain', markdown);
-                e.dataTransfer.setData('application/x-gc-image', img.downloadURL);
-                e.dataTransfer.effectAllowed = 'copy';
-              }}
-              className="group relative flex flex-col items-center p-2 rounded hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200"
-            >
-              <img
-                src={img.downloadURL}
-                alt={fileNameWithoutExt(img.name)}
-                className="w-[100px] h-[100px] object-contain"
-              />
-              <span className="text-xs text-gray-500 mt-1 truncate w-full text-center">
-                {copiedUrl === img.downloadURL ? 'Copied!' : fileNameWithoutExt(img.name)}
-              </span>
-            </button>
-          ))}
+          {images.map((img) => {
+            const isSelected = selectedUrls.has(img.downloadURL);
+            // When dragging, use all selected if this image is selected, otherwise just this image
+            const dragUrls = isSelected && selectedUrls.size > 0 ? selectedUrls : new Set([img.downloadURL]);
+            return (
+              <button
+                key={img.downloadURL}
+                onClick={(e) => handleClick(img, e)}
+                draggable
+                onDragStart={(e) => {
+                  const markdown = buildMarkdown(dragUrls);
+                  e.dataTransfer.setData('text/plain', markdown);
+                  e.dataTransfer.setData('application/x-gc-image', 'true');
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
+                className={`group relative flex flex-col items-center p-2 rounded cursor-pointer border ${
+                  isSelected
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-transparent hover:border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <span
+                  onClick={(e) => handleDelete(img, e)}
+                  className="absolute top-1 right-1 hidden group-hover:flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-red-500 hover:text-white text-gray-500 text-xs cursor-pointer z-10"
+                  title="Delete image"
+                >
+                  ✕
+                </span>
+                <img
+                  src={img.downloadURL}
+                  alt={fileNameWithoutExt(img.name)}
+                  className="w-[100px] h-[100px] object-contain"
+                />
+                <span className="text-xs text-gray-500 mt-1 truncate w-full text-center">
+                  {fileNameWithoutExt(img.name)}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

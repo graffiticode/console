@@ -1,4 +1,4 @@
-import { ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata, deleteObject } from 'firebase/storage';
 import type { FirebaseStorage, UploadTask } from 'firebase/storage';
 
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
@@ -68,6 +68,15 @@ export async function listUserImages(
     if (item.hash) seen.add(dn);
     return true;
   });
+}
+
+export async function deleteUserImage(
+  storage: FirebaseStorage,
+  userId: string,
+  fileName: string,
+): Promise<void> {
+  const fileRef = ref(storage, `uploads/${userId}/${fileName}`);
+  await deleteObject(fileRef);
 }
 
 export function uploadImage(
