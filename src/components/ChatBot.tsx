@@ -13,12 +13,9 @@ const buildConversationSummary = (chatHistory: any[]) => {
   const previousRequests: string[] = [];
   const previousOutputs: string[] = [];
 
-  // Get last 6 messages (3 exchanges)
-  const limitedHistory = chatHistory.slice(-6);
-
-  for (const item of limitedHistory) {
+  for (const item of chatHistory) {
     if (item.type === 'user') {
-      previousRequests.push(stripImageMarkdown(item.user));
+      previousRequests.push(formatImageReferences(item.user));
     } else if (item.type === 'bot' && item.help?.type === 'code') {
       previousOutputs.push('[Generated code]');
     } else if (item.type === 'bot') {
@@ -26,19 +23,18 @@ const buildConversationSummary = (chatHistory: any[]) => {
     }
   }
 
-  // Calculate turn count (each exchange is a turn)
   const turnCount = Math.ceil(chatHistory.length / 2);
 
   return {
     turnCount,
-    previousRequests: previousRequests.slice(-3), // Last 3 requests
-    previousOutputs: previousOutputs.slice(-3), // Last 3 outputs
+    previousRequests,
+    previousOutputs,
   };
 };
 
-/** Strip image markdown references from text so they don't influence code generation */
-const stripImageMarkdown = (text: string): string =>
-  text.replace(/!\[[^\]]*\]\([^)]+\)\n?/g, '').trim();
+/** Convert image markdown into explicit labeled format for LLM context */
+const formatImageReferences = (text: string): string =>
+  text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '[Image name="$1" url="$2"]').trim();
 
 /**
  * Function to generate Graffiticode responses using the generateCode function
@@ -48,7 +44,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
     // Use our fetcher function directly
 
     // Format chat history as context for the prompt (strip image references)
-    let contextualPrompt = stripImageMarkdown(message);
+    let contextualPrompt = formatImageReferences(message);
 
     // Build conversation summary for DSPy service
     const conversationSummary = buildConversationSummary(chatHistory);
@@ -58,13 +54,10 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       // Build context from the chat history
       let conversationContext = "Previous conversation:\n\n";
 
-      // Add a limited number of previous exchanges as context (last 3 exchanges)
-      const limitedHistory = chatHistory.slice(-6); // Get last 6 messages (3 exchanges)
-
-      for (let i = 0; i < limitedHistory.length; i++) {
-        const item = limitedHistory[i];
+      for (let i = 0; i < chatHistory.length; i++) {
+        const item = chatHistory[i];
         if (item.type === 'user') {
-          conversationContext += `User: ${stripImageMarkdown(item.user)}\n`;
+          conversationContext += `User: ${formatImageReferences(item.user)}\n`;
         } else if (item.type === 'bot') {
           // For bot responses, include either the text (if a description) or a summary (if code)
           if (item.help && item.help.type === 'code') {
