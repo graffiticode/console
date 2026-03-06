@@ -43,7 +43,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
   try {
     // Use our fetcher function directly
 
-    // Format chat history as context for the prompt (strip image references)
+    // Format image references for clearer LLM context
     let contextualPrompt = formatImageReferences(message);
 
     // Build conversation summary for DSPy service

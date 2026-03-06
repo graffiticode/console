@@ -1020,8 +1020,9 @@ export async function generateCode({
   // Initial model selection (may be overridden later based on formatted prompt)
   let modelToUse = options.model || CLAUDE_MODELS.DEFAULT;
 
-  // Start analytics tracking (safe - won't break if unavailable)
-  safeRAGAnalytics.startRequest(requestId, prompt, userId, sessionId, {
+  // Start analytics tracking with the user's latest message (not full conversation context)
+  const userQuery = extractSearchQuery(prompt);
+  safeRAGAnalytics.startRequest(requestId, userQuery, userId, sessionId, {
     lang,
     hasCurrentCode: !!currentCode,
     model: modelToUse,
