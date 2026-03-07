@@ -266,7 +266,21 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     if (directItem && initialItemId) return;
 
     if (loadedItems && loadedItems.length > 0) {
-      setItems(loadedItems);
+      // Apply saved item order from localStorage
+      const savedOrder = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:itemOrder') : null;
+      let orderedItems = loadedItems;
+      if (savedOrder) {
+        try {
+          const orderIds: string[] = JSON.parse(savedOrder);
+          const orderMap = new Map(orderIds.map((id, idx) => [id, idx]));
+          orderedItems = [...loadedItems].sort((a, b) => {
+            const aIdx = orderMap.has(a.id) ? orderMap.get(a.id)! : Infinity;
+            const bIdx = orderMap.has(b.id) ? orderMap.get(b.id)! : Infinity;
+            return aIdx - bIdx;
+          });
+        } catch {}
+      }
+      setItems(orderedItems);
       // Priority: 1) initialItemId prop, 2) localStorage, 3) first item
       const targetItemId = initialItemId ||
         (typeof window !== 'undefined' ? localStorage.getItem(`graffiticode:selected:itemId`) : null);
@@ -281,11 +295,11 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         }
       }
       // Default to the first item if no saved selection
-      if (loadedItems[0]) {
-        setSelectedItemId(loadedItems[0].id);
-        setTaskId(loadedItems[0].taskId);
-        setEditorHelp(typeof loadedItems[0].help === "string" ? JSON.parse(loadedItems[0].help || "[]") : (loadedItems[0].help || []));
-        loadItemSource(loadedItems[0].id, loadedItems[0].taskId, loadedItems[0].code);
+      if (orderedItems[0]) {
+        setSelectedItemId(orderedItems[0].id);
+        setTaskId(orderedItems[0].taskId);
+        setEditorHelp(typeof orderedItems[0].help === "string" ? JSON.parse(orderedItems[0].help || "[]") : (orderedItems[0].help || []));
+        loadItemSource(orderedItems[0].id, orderedItems[0].taskId, orderedItems[0].code);
       }
     } else if (!initialItemId) {
       setItems([]);
@@ -690,6 +704,11 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
                   onSelectItem={handleSelectItem}
                   onUpdateItem={handleUpdateItem}
                   onRefresh={() => mutate()}
+                  onReorderItems={(reordered) => {
+                    setItems(reordered);
+                    const orderIds = reordered.map(i => i.id);
+                    localStorage.setItem('graffiticode:itemOrder', JSON.stringify(orderIds));
+                  }}
                   panelWidth={itemsPanelWidth}
                 />
               )}

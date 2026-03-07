@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
@@ -21,6 +21,9 @@ export function ImageGallery() {
   const [dragging, setDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const dragImageRef = useRef<string | null>(null);
+  const dragOverImageRef = useRef<string | null>(null);
+  const [dragOverUrl, setDragOverUrl] = useState<string | null>(null);
 
   const loadImages = useCallback(async () => {
     if (!user?.uid) {
@@ -31,7 +34,21 @@ export function ImageGallery() {
       setLoading(true);
       setError(null);
       const storage = getStorage(firebaseApp);
-      const result = await listUserImages(storage, user.uid);
+      let result = await listUserImages(storage, user.uid);
+      // Apply saved order from localStorage
+      const orderKey = `graffiticode:imageOrder:${user.uid}`;
+      const savedOrder = localStorage.getItem(orderKey);
+      if (savedOrder) {
+        try {
+          const orderUrls: string[] = JSON.parse(savedOrder);
+          const orderMap = new Map(orderUrls.map((url, idx) => [url, idx]));
+          result = [...result].sort((a, b) => {
+            const aIdx = orderMap.has(a.downloadURL) ? orderMap.get(a.downloadURL)! : Infinity;
+            const bIdx = orderMap.has(b.downloadURL) ? orderMap.get(b.downloadURL)! : Infinity;
+            return aIdx - bIdx;
+          });
+        } catch {}
+      }
       setImages(result);
     } catch (err) {
       setError('Failed to load images');
@@ -173,21 +190,60 @@ export function ImageGallery() {
             const isSelected = selectedUrls.has(img.downloadURL);
             // When dragging, use all selected if this image is selected, otherwise just this image
             const dragUrls = isSelected && selectedUrls.size > 0 ? selectedUrls : new Set([img.downloadURL]);
+            const isDragOver = dragOverUrl === img.downloadURL && dragImageRef.current !== img.downloadURL;
             return (
               <button
                 key={img.downloadURL}
                 onClick={(e) => handleClick(img, e)}
                 draggable
                 onDragStart={(e) => {
+                  dragImageRef.current = img.downloadURL;
                   const markdown = buildMarkdown(dragUrls);
                   e.dataTransfer.setData('text/plain', markdown);
                   e.dataTransfer.setData('application/x-gc-image', 'true');
-                  e.dataTransfer.effectAllowed = 'copy';
+                  e.dataTransfer.setData('application/x-gc-image-reorder', img.downloadURL);
+                  e.dataTransfer.effectAllowed = 'copyMove';
+                }}
+                onDragOver={(e) => {
+                  if (dragImageRef.current) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverImageRef.current !== img.downloadURL) {
+                      dragOverImageRef.current = img.downloadURL;
+                      setDragOverUrl(img.downloadURL);
+                    }
+                  }
+                }}
+                onDrop={(e) => {
+                  if (dragImageRef.current && dragImageRef.current !== img.downloadURL) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const fromIdx = images.findIndex(i => i.downloadURL === dragImageRef.current);
+                    const toIdx = images.findIndex(i => i.downloadURL === img.downloadURL);
+                    if (fromIdx !== -1 && toIdx !== -1) {
+                      const reordered = [...images];
+                      const [moved] = reordered.splice(fromIdx, 1);
+                      reordered.splice(toIdx, 0, moved);
+                      setImages(reordered);
+                      const orderKey = `graffiticode:imageOrder:${user.uid}`;
+                      localStorage.setItem(orderKey, JSON.stringify(reordered.map(i => i.downloadURL)));
+                    }
+                  }
+                  dragImageRef.current = null;
+                  dragOverImageRef.current = null;
+                  setDragOverUrl(null);
+                }}
+                onDragEnd={() => {
+                  dragImageRef.current = null;
+                  dragOverImageRef.current = null;
+                  setDragOverUrl(null);
                 }}
                 className={`group relative flex flex-col items-center p-2 rounded cursor-pointer border ${
-                  isSelected
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-transparent hover:border-gray-200 hover:bg-gray-50'
+                  isDragOver
+                    ? 'border-blue-400 bg-blue-50'
+                    : isSelected
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-transparent hover:border-gray-200 hover:bg-gray-50'
                 }`}
               >
                 <span

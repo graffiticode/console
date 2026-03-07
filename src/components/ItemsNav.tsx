@@ -268,8 +268,51 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
   )
 }
 
-export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh, panelWidth = 210 }) {
+export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh, onReorderItems, panelWidth = 210 }) {
   const [ showId, setShowId ] = useState("");
+  const dragItemRef = useRef<string | null>(null);
+  const dragOverItemRef = useRef<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, itemId: string) => {
+    dragItemRef.current = itemId;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/x-gc-item-reorder', itemId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, itemId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverItemRef.current !== itemId) {
+      dragOverItemRef.current = itemId;
+      setDragOverId(itemId);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const fromId = dragItemRef.current;
+    const toId = dragOverItemRef.current;
+    if (fromId && toId && fromId !== toId && onReorderItems) {
+      const fromIndex = items.findIndex(i => i.id === fromId);
+      const toIndex = items.findIndex(i => i.id === toId);
+      if (fromIndex !== -1 && toIndex !== -1) {
+        const reordered = [...items];
+        const [moved] = reordered.splice(fromIndex, 1);
+        reordered.splice(toIndex, 0, moved);
+        onReorderItems(reordered);
+      }
+    }
+    dragItemRef.current = null;
+    dragOverItemRef.current = null;
+    setDragOverId(null);
+  };
+
+  const handleDragEnd = () => {
+    dragItemRef.current = null;
+    dragOverItemRef.current = null;
+    setDragOverId(null);
+  };
 
   return (
     <div className="w-full flex flex-col gap-y-1 bg-gray-100 pt-1 pr-2">
@@ -279,7 +322,15 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
         ) : (
           <ul role="list" className="space-y-1 font-mono">
             {items.map((item) => (
-              <li key={item.id}>
+              <li
+                key={item.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, item.id)}
+                onDragOver={(e) => handleDragOver(e, item.id)}
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
+                className={dragOverId === item.id && dragItemRef.current !== item.id ? 'border-t-2 border-blue-400' : ''}
+              >
                 <div
                   className={classNames(
                     item.id === selectedItemId ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200',
