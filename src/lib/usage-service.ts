@@ -94,10 +94,16 @@ async function tryAutoRecharge(uid: string): Promise<boolean> {
   try {
     // Get billing settings
     const settingsDoc = await db.collection('users').doc(uid).collection('settings').doc('billing').get();
-    if (!settingsDoc.exists) return false;
+    if (!settingsDoc.exists) {
+      console.log('Auto-recharge: no billing settings for user', uid);
+      return false;
+    }
 
     const settings = settingsDoc.data();
-    if (!settings?.autoRecharge) return false;
+    if (!settings?.autoRecharge) {
+      console.log('Auto-recharge: disabled for user', uid);
+      return false;
+    }
 
     // Check monthly block limit — reset counter if last recharge was in a previous month
     let blocksUsed = settings.overageBlocksUsedThisPeriod || 0;
@@ -110,15 +116,24 @@ async function tryAutoRecharge(uid: string): Promise<boolean> {
       });
     }
     const limit = settings.autoRechargeLimit || 1;
-    if (blocksUsed >= limit) return false;
+    if (blocksUsed >= limit) {
+      console.log('Auto-recharge: block limit reached for user', uid, blocksUsed, '>=', limit);
+      return false;
+    }
 
     // Get user data
     const userDoc = await db.collection('users').doc(uid).get();
     const userData = userDoc.data();
-    if (!userData?.stripeCustomerId) return false;
+    if (!userData?.stripeCustomerId) {
+      console.log('Auto-recharge: no Stripe customer for user', uid);
+      return false;
+    }
 
     const plan = userData.subscription?.plan || 'demo';
-    if (plan === 'demo') return false;
+    if (plan === 'demo') {
+      console.log('Auto-recharge: demo plan for user', uid);
+      return false;
+    }
 
     const pricing = OVERAGE_PRICING[plan];
     if (!pricing) return false;
