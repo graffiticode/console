@@ -77,6 +77,11 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
+export function findLanguageByNumber(num: string): Language | undefined {
+  const name = `L${num.padStart(4, '0')}`;
+  return languages.find(l => l.name === name);
+}
+
 export function selectLanguages(domain: string) {
   domain = domain.toLowerCase();
   return languages.filter(language =>

@@ -13,7 +13,7 @@ import { useState, useEffect, useRef } from "react";
 import useLocalStorage from '../hooks/use-local-storage';
 import { marks } from "../components/mark-selector";
 import AuthWrapper from '../components/AuthWrapper';
-import { selectLanguages } from '../components/language-selector';
+import { selectLanguages, findLanguageByNumber } from '../components/language-selector';
 import { getTitle } from '../lib/utils';
 
 const queryClient = new QueryClient()
@@ -47,20 +47,39 @@ export default function App({
   const [language, setLanguage] = useLocalStorage("graffiticode:language", defaultLanguage);
   const [mark, setMark] = useLocalStorage("graffiticode:items:mark", marks[0]);
 
-  // Set language to first in domain list on initial load or when domain changes
+  // Set language/mark from query params or domain defaults on initial load
   useEffect(() => {
     if (!router.isReady) return;
     if (languageInitialized.current) return;
 
-    if (domainLanguages.length > 0) {
-      // Check if current language is in the domain's list
+    // Apply ?lang= query param (e.g. ?lang=0166)
+    const queryLang = router.query.lang;
+    const langStr = Array.isArray(queryLang) ? queryLang[0] : queryLang;
+    if (langStr) {
+      const found = findLanguageByNumber(langStr);
+      if (found) {
+        setLanguage(found);
+      }
+    } else if (domainLanguages.length > 0) {
       const currentInDomain = domainLanguages.some(l => l.name === language.name);
       if (!currentInDomain) {
         setLanguage(domainLanguages[0]);
       }
     }
+
+    // Apply ?mark= query param (e.g. ?mark=1)
+    const queryMark = router.query.mark;
+    const markStr = Array.isArray(queryMark) ? queryMark[0] : queryMark;
+    if (markStr) {
+      const markId = parseInt(markStr, 10);
+      const found = marks.find(m => m.id === markId);
+      if (found) {
+        setMark(found);
+      }
+    }
+
     languageInitialized.current = true;
-  }, [router.isReady, domainLanguages, language.name, setLanguage]);
+  }, [router.isReady, domainLanguages, language.name, setLanguage, setMark]);
 
   return (
     (pathName === "form" || pathName === "editor") &&
