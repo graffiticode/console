@@ -1,10 +1,68 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2026-03-03T23:43:13.835Z*
+*Downloaded on 2026-03-10T20:09:12.209Z*
 
 ## Language L0169
 
 ### Example 1
+
+#### Prompt
+"Create a concept web with custom edges, dark theme, topic, and instructions."
+
+#### Chat Transcript
+
+**User**: Create a concept web with custom edges, dark theme, topic, and instructions.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Explore the connections between concepts by following the edges in the diagram." theme DARK anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid-arrow" {}
+  edge from "Foo" to "Bar" type "dashed" text "related" {}
+  edge from "Bar" to "Baz" type "dashed" text "related" {}
+] {}..
+```
+
+---
+
+### Example 2
+
+#### Prompt
+"Create a concept web where the connections list has style defaults but one connection overrides with its own bg."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the connections list has style defaults but one connection overrides with its own bg.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" {} connections [
+  connection text "Foo" {}
+  connection text "Bar" bg "rose-500" {}
+  connection text "Baz" {}
+] bg "blue-500" color "white" {}..
+```
+
+---
+
+### Example 3
 
 #### Prompt
 "Create a concept web with an anchor with text set to empty string for drag-and-drop."
@@ -37,7 +95,119 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 2
+### Example 4
+
+#### Prompt
+"Create a concept web with images on connections. ![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)"
+
+#### Chat Transcript
+
+**User**: Create a concept web with images on connections. ![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" {} connections [
+  connection text "thumbnail_4" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36" {}
+  connection text "thumbnail_5" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9" {}
+  connection text "thumbnail_1" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+  connection text "thumbnail_2" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a" {}
+  connection text "thumbnail_3" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c" {}
+] {}..
+```
+
+---
+
+### Example 5
+
+#### Prompt
+"Create a concept web with solid edges from anchor to all connections plus a dashed peer-to-peer edge between two connections."
+
+#### Chat Transcript
+
+**User**: Create a concept web with solid edges from anchor to all connections plus a dashed peer-to-peer edge between two connections.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid" {}
+  edge from "Foo" to "Bar" type "dashed" {}
+] {}..
+```
+
+---
+
+### Example 6
+
+#### Prompt
+"Create a concept web with styled nodes, custom edges, assessment, and a concepts tray — combining styling with existing features."
+
+#### Chat Transcript
+
+**User**: Create a concept web with styled nodes, custom edges, assessment, and a concepts tray — combining styling with existing features.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the concepts from the tray onto the correct nodes." theme LIGHT anchor value "Hub" text "" w 28 h 28 bg "indigo-500" color "white" rounded "full" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" w 24 h 12 bg "sky-100" color "sky-800" border "sky-400" rounded "lg" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" w 24 h 12 bg "emerald-100" color "emerald-800" border "emerald-400" rounded "lg" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" w 24 h 12 bg "rose-100" color "rose-800" border "rose-400" rounded "lg" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" text "leads to" {}
+  edge from "Hub" to "Bar" type "dashed-arrow" text "relates to" {}
+  edge from "Hub" to "Baz" type "dashed" text "connects" {}
+  edge from "Foo" to "Bar" type "dashed" text "linked" {}
+] concepts [
+  concept value "Hub" bg "indigo-500" color "white" rounded "full" {}
+  concept value "Foo" bg "sky-100" color "sky-800" {}
+  concept value "Bar" bg "emerald-100" color "emerald-800" {}
+  concept value "Baz" bg "rose-100" color "rose-800" {}
+  concept value "Qux" text "Qux (distractor)" {}
+  concept value "Quux" text "Quux (distractor)" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 7
 
 #### Prompt
 "Make a drag-and-drop web with an invalid align value."
@@ -75,7 +245,85 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 3
+### Example 8
+
+#### Prompt
+"Create a fully featured concept web with topic, instructions, dark theme, a circular styled anchor, rectangular styled connections with container defaults, custom edges, assessed nodes, a concepts tray with styled items, and a relations tray with styled labels."
+
+#### Chat Transcript
+
+**User**: Create a fully featured concept web with topic, instructions, dark theme, a circular styled anchor, rectangular styled connections with container defaults, custom edges, assessed nodes, a concepts tray with styled items, and a relations tray with styled labels.
+
+#### Code
+
+```
+topic "Concept Web" instructions "**Instructions:** Drag the concepts onto the correct nodes, then drag the relationship labels onto the correct edges.
+- The **center node** is the main topic
+- **Solid arrows** show primary relationships
+- **Dashed lines** show secondary connections
+- Use the tray on the **right** for concepts and the tray on the **bottom** for relations" theme DARK anchor value "Hub" text "" w 28 h 28 rounded "full" bg "indigo-600" color "white" border "indigo-300" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+  connection value "Qux" text "" assess [
+    method "value"
+    expected "Qux"
+  ] {}
+] w 24 h 12 rounded "lg" bg "slate-700" color "white" border "slate-400" edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "leads to"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Baz" type "dashed-arrow" assess [
+    method "value"
+    expected "connects"
+  ] {}
+  edge from "Hub" to "Qux" type "dashed" assess [
+    method "value"
+    expected "influences"
+  ] {}
+  edge from "Foo" to "Bar" type "dashed" assess [
+    method "value"
+    expected "linked"
+  ] {}
+] concepts [
+  concept value "Hub" bg "indigo-500" color "white" {}
+  concept value "Foo" bg "sky-500" color "white" {}
+  concept value "Bar" bg "emerald-500" color "white" {}
+  concept value "Baz" bg "amber-500" color "white" {}
+  concept value "Qux" bg "rose-500" color "white" {}
+  concept value "Distractor1" text "Wrong A" bg "zinc-600" color "zinc-300" {}
+  concept value "Distractor2" text "Wrong B" bg "zinc-600" color "zinc-300" {}
+] align RIGHT relations [
+  relation value "leads to" text "Leads To →" bg "sky-100" color "sky-800" {}
+  relation value "relates to" text "Relates To ↔" bg "emerald-100" color "emerald-800" {}
+  relation value "connects" text "Connects ~" bg "amber-100" color "amber-800" {}
+  relation value "influences" text "Influences ⇢" bg "rose-100" color "rose-800" {}
+  relation value "linked" text "Linked --" bg "violet-100" color "violet-800" {}
+  relation value "causes" text "Causes ✕" bg "zinc-200" color "zinc-700" {}
+  relation value "opposes" text "Opposes ≠" bg "zinc-200" color "zinc-700" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 9
 
 #### Prompt
 "Make a standard concept web with a connections list of three connections (canonical format)."
@@ -108,7 +356,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 4
+### Example 10
 
 #### Prompt
 "Make a fully-featured concept web: topic, markdown instructions, theme, anchor assess, and three assessed connections."
@@ -149,7 +397,99 @@ Identify the key components and their relationships in a forest ecosystem.
 
 ---
 
-### Example 5
+### Example 11
+
+#### Prompt
+"Create a concept web with solid-arrow edges, an image on one edge, and a concepts tray with images."
+
+#### Chat Transcript
+
+**User**: Create a concept web with solid-arrow edges, an image on one edge, and a concepts tray with images.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" {}
+  edge from "Hub" to "Bar" type "solid-arrow" image "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/120px-PNG_transparency_demonstration_1.png" {}
+  edge from "Hub" to "Baz" type "solid-arrow" {}
+] concepts [
+  concept value "Hub" image "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Circle_-_black_simple.svg/120px-Circle_-_black_simple.svg.png" {}
+  concept value "Foo" image "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Solar_system.jpg/120px-Solar_system.jpg" {}
+  concept value "Bar" image "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/120px-PNG_transparency_demonstration_1.png" {}
+  concept value "Baz" image "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Stonehenge.jpg/120px-Stonehenge.jpg" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 12
+
+#### Prompt
+"![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+Create a concept web with a mix of image concepts and text concepts in the tray."
+
+#### Chat Transcript
+
+**User**: ![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+**User**: Create a concept web with a mix of image concepts and text concepts in the tray.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" text "Hub" {}
+  concept value "Foo" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+  concept value "Bar" text "Bar" {}
+  concept value "Baz" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 13
 
 #### Prompt
 "Create a concept web with three connections where expected values are multi-word strings."
@@ -182,7 +522,40 @@ topic "Concept Web" anchor text "Solar System" assess [
 
 ---
 
-### Example 6
+### Example 14
+
+#### Prompt
+"Create a light-themed concept web with a topic, instructions, and three connections."
+
+#### Chat Transcript
+
+**User**: Create a light-themed concept web with a topic, instructions, and three connections.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Explore the connections between concepts." theme LIGHT anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 15
 
 #### Prompt
 "Make a concept web where every connection has its own assess block."
@@ -215,7 +588,219 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 7
+### Example 16
+
+#### Prompt
+"Create a drag-and-drop concept web with a topic, instructions, blank anchor, blank connections, concepts tray, and assessment on all nodes."
+
+#### Chat Transcript
+
+**User**: Create a drag-and-drop concept web with a topic, instructions, blank anchor, blank connections, concepts tray, and assessment on all nodes.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the concepts from the tray onto the correct nodes." anchor text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 17
+
+#### Prompt
+"Create a concept web with solid edges from the anchor to all connections using the edges keyword."
+
+#### Chat Transcript
+
+**User**: Create a concept web with solid edges from the anchor to all connections using the edges keyword.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid" {}
+] {}..
+```
+
+---
+
+### Example 18
+
+#### Prompt
+"Create a fully featured drag-and-drop concept web with topic, markdown instructions, dark theme, blank assessed nodes with a concepts tray, assessed edges with mixed types, a relations tray with text overrides and distractors, concepts aligned right, and relations aligned bottom."
+
+#### Chat Transcript
+
+**User**: Create a fully featured drag-and-drop concept web with topic, markdown instructions, dark theme, blank assessed nodes with a concepts tray, assessed edges with mixed types, a relations tray with text overrides and distractors, concepts aligned right, and relations aligned bottom.
+
+#### Code
+
+```
+topic "Concept Web" instructions "**Instructions:** Drag the concepts onto the correct nodes, then drag the relationship labels onto the correct edges.
+- The **center node** is the main topic
+- **Solid arrows** show primary relationships
+- **Dashed lines** show secondary connections
+- Use the tray on the **right** for concepts and the tray on the **bottom** for relations" theme DARK anchor value "Hub" text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+  connection value "Qux" text "" assess [
+    method "value"
+    expected "Qux"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "leads to"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Baz" type "dashed-arrow" assess [
+    method "value"
+    expected "connects"
+  ] {}
+  edge from "Hub" to "Qux" type "dashed" assess [
+    method "value"
+    expected "influences"
+  ] {}
+  edge from "Foo" to "Bar" type "dashed" assess [
+    method "value"
+    expected "linked"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+  concept value "Qux" {}
+  concept value "Distractor1" text "Wrong A" {}
+  concept value "Distractor2" text "Wrong B" {}
+] align RIGHT relations [
+  relation value "leads to" text "Leads To →" {}
+  relation value "relates to" text "Relates To ↔" {}
+  relation value "connects" text "Connects ~" {}
+  relation value "influences" text "Influences ⇢" {}
+  relation value "linked" text "Linked --" {}
+  relation value "causes" text "Causes ✕" {}
+  relation value "opposes" text "Opposes ≠" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 19
+
+#### Prompt
+"Create a concept web with an anchor using larger rounded border radius."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor using larger rounded border radius.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" rounded "2xl" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 20
+
+#### Prompt
+"Create a concept web with a relation that uses text to override the display independently of its value."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a relation that uses text to override the display independently of its value.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" {} connections [
+  connection value "Foo" text "Foo" {}
+  connection value "Bar" text "Bar" {}
+  connection value "Baz" text "Baz" {}
+] edges [
+  edge from "Hub" to "*" type "solid" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+] relations [
+  relation value "relates to" text "Relates To →" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 21
 
 #### Prompt
 "Make a drag-and-drop web with a concepts tray but omit the align setting."
@@ -253,7 +838,43 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 8
+### Example 22
+
+#### Prompt
+"Create a concept web with edges using '*' wildcard from the anchor and one specific peer edge with a text label."
+
+#### Chat Transcript
+
+**User**: Create a concept web with edges using '*' wildcard from the anchor and one specific peer edge with a text label.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid" {}
+  edge from "Foo" to "Bar" type "dashed" text "related" {}
+] {}..
+```
+
+---
+
+### Example 23
 
 #### Prompt
 "Create a concept web with an anchor that has display text.
@@ -290,7 +911,7 @@ topic "Concept Web" anchor value "Hub" assess [
 
 ---
 
-### Example 9
+### Example 24
 
 #### Prompt
 "Make a concept web with markdown instructions that include quotation marks and apostrophes."
@@ -324,7 +945,74 @@ Drag concepts onto the correct nodes. Remember: \"practice makes perfect\" and d
 
 ---
 
-### Example 10
+### Example 25
+
+#### Prompt
+"Create a concept web with a relation that uses bg, color, and border together for full styling."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a relation that uses bg, color, and border together for full styling.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid" {}
+] relations [
+  relation value "relates to" bg "blue-500" color "white" border "blue-700" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 26
+
+#### Prompt
+"Create a concept web with an anchor that has background color set."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor that has background color set.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" bg "blue-500" color "white" {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 27
 
 #### Prompt
 "Create a concept web with a short one-line instruction."
@@ -357,7 +1045,7 @@ topic "Concept Web" instructions "Connect the related concepts to the central hu
 
 ---
 
-### Example 11
+### Example 28
 
 #### Prompt
 "Create a concept web with a topic and instructions that explain how to complete the assessment."
@@ -390,7 +1078,7 @@ topic "Concept Web" instructions "Welcome to the Concept Web assessment! Your go
 
 ---
 
-### Example 12
+### Example 29
 
 #### Prompt
 "Make a concept web with an intentionally empty instructions string."
@@ -423,7 +1111,7 @@ topic "Concept Web" instructions "" anchor text "Hub" assess [
 
 ---
 
-### Example 13
+### Example 30
 
 #### Prompt
 "Make a concept web with exactly one connection node."
@@ -448,7 +1136,36 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 14
+### Example 31
+
+#### Prompt
+"Create a concept web with the dark theme, a topic, and an anchor with two connections."
+
+#### Chat Transcript
+
+**User**: Create a concept web with the dark theme, a topic, and an anchor with two connections.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+] theme DARK {}..
+```
+
+---
+
+### Example 32
 
 #### Prompt
 "Create a concept web with a concepts tray aligned to the left."
@@ -486,7 +1203,53 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 15
+### Example 33
+
+#### Prompt
+"Create a concept web with assessed edges and assessed nodes on the same diagram."
+
+#### Chat Transcript
+
+**User**: Create a concept web with assessed edges and assessed nodes on the same diagram.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" text "relates to" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Bar" type "dashed" text "connects with" assess [
+    method "value"
+    expected "connects with"
+  ] {}
+  edge from "Hub" to "Baz" type "dashed-arrow" text "leads to" assess [
+    method "value"
+    expected "leads to"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 34
 
 #### Prompt
 "Make a concept web with an assess block missing the expected field."
@@ -518,7 +1281,94 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 16
+### Example 35
+
+#### Prompt
+"![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+Create a concepts tray where each concept has one of these images"
+
+#### Chat Transcript
+
+**User**: ![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+**User**: Create a concepts tray where each concept has one of these images
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+  concept value "Foo" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a" {}
+  concept value "Bar" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c" {}
+  concept value "Baz" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 36
+
+#### Prompt
+"Create a concept web with custom edges and assessment on all nodes."
+
+#### Chat Transcript
+
+**User**: Create a concept web with custom edges and assessment on all nodes.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" text "relates to" {}
+  edge from "Hub" to "Bar" type "dashed" text "connects with" {}
+  edge from "Hub" to "Baz" type "solid-arrow" text "leads to" {}
+] {}..
+```
+
+---
+
+### Example 37
 
 #### Prompt
 "Create a drag-and-drop concept web where both anchor and connections are blank with a concepts tray."
@@ -556,7 +1406,37 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 17
+### Example 38
+
+#### Prompt
+"Create a concept web where the anchor is styled differently from connections using different background and rounding values."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the anchor is styled differently from connections using different background and rounding values.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" bg "indigo-600" color "white" rounded "full" {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] bg "amber-100" rounded "lg" {}..
+```
+
+---
+
+### Example 39
 
 #### Prompt
 "Make a drag-and-drop concept web: anchor and connections have blank text, and students drag concepts in."
@@ -589,7 +1469,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 18
+### Example 40
 
 #### Prompt
 "Create a concept web where only the connections are assessed and the anchor is display-only."
@@ -619,7 +1499,7 @@ topic "Concept Web" anchor text "Hub" {} connections [
 
 ---
 
-### Example 19
+### Example 41
 
 #### Prompt
 "Create a concept web with a concepts tray containing two items."
@@ -655,7 +1535,7 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 20
+### Example 42
 
 #### Prompt
 "Make a drag-and-drop web with duplicate tray values, distractors, and mixed image/text overrides."
@@ -700,7 +1580,78 @@ topic "Concept Web Assessment" instructions "Drag the correct concepts to fill i
 
 ---
 
-### Example 21
+### Example 43
+
+#### Prompt
+"Create a concept web with bg and color applied to concepts in the tray."
+
+#### Chat Transcript
+
+**User**: Create a concept web with bg and color applied to concepts in the tray.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" bg "indigo-500" color "white" {}
+  concept value "Foo" bg "emerald-500" color "white" {}
+  concept value "Bar" bg "rose-500" color "white" {}
+  concept value "Baz" bg "amber-500" color "white" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 44
+
+#### Prompt
+"Create a concept web with an anchor using rounded 'sm' for small border radius."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor using rounded 'sm' for small border radius.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" rounded "sm" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 45
 
 #### Prompt
 "Make a concept web with just a topic and an anchor—no connections."
@@ -717,7 +1668,67 @@ topic "Anchor only" anchor text "Anchor" {} {}..
 
 ---
 
-### Example 22
+### Example 46
+
+#### Prompt
+"Create a concept web with a relations tray containing a mix of text and image relations. ![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)"
+
+#### Chat Transcript
+
+**User**: Create a concept web with a relations tray containing a mix of text and image relations. ![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the correct relationship labels onto the edges." anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "causes"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "supports"
+  ] {}
+  edge from "Hub" to "Baz" type "dashed-arrow" assess [
+    method "value"
+    expected "inhibits"
+  ] {}
+] relations [
+  relation value "causes" text "Causes" {}
+  relation value "supports" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+  relation value "inhibits" text "Inhibits" {}
+  relation value "activates" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a" {}
+  relation value "signals" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 47
 
 #### Prompt
 "Make a concept web where the anchor has an assess block with method value and an expected answer."
@@ -750,7 +1761,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 23
+### Example 48
 
 #### Prompt
 "Make a concept web with markdown instructions using backticks, including bullet points"
@@ -787,24 +1798,45 @@ topic "Concept Web" instructions "Complete the concept web by following these st
 
 ---
 
-### Example 24
+### Example 49
 
 #### Prompt
-"Create an empty concept web with only a topic label."
+"Create a drag-and-drop concept web where students drag relation labels from the tray onto assessed edges."
 
 #### Chat Transcript
 
-**User**: Create an empty concept web with only a topic label.
+**User**: Create a drag-and-drop concept web where students drag relation labels from the tray onto assessed edges.
 
 #### Code
 
 ```
-topic "Concept Web" {}..
+topic "Concept Web" instructions "Drag the relation labels from the tray onto the correct edges." anchor value "Hub" text "Hub" {} connections [
+  connection value "Foo" text "Foo" {}
+  connection value "Bar" text "Bar" {}
+  connection value "Baz" text "Baz" {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "causes"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "supports"
+  ] {}
+  edge from "Hub" to "Baz" type "solid-arrow" assess [
+    method "value"
+    expected "inhibits"
+  ] {}
+] relations [
+  relation value "causes" {}
+  relation value "supports" {}
+  relation value "inhibits" {}
+] align BOTTOM {}..
 ```
 
 ---
 
-### Example 25
+### Example 50
 
 #### Prompt
 "Create a concept web with one connection that has display text."
@@ -831,7 +1863,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 26
+### Example 51
 
 #### Prompt
 "Create a concept web with five connections, each assessed with different expected values."
@@ -872,7 +1904,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 27
+### Example 52
 
 #### Prompt
 "Create a concept web where the instructions tell students to drag concepts onto the correct nodes."
@@ -910,7 +1942,7 @@ topic "Concept Web" instructions "Drag concepts onto the correct nodes." anchor 
 
 ---
 
-### Example 28
+### Example 53
 
 #### Prompt
 "Make a concept web where only connections are assessed (anchor has no assess)."
@@ -940,7 +1972,225 @@ topic "Concept Web" anchor text "Hub" {} connections [
 
 ---
 
-### Example 29
+### Example 54
+
+#### Prompt
+"Create a dark-themed drag-and-drop concept web with assessment."
+
+#### Chat Transcript
+
+**User**: Create a dark-themed drag-and-drop concept web with assessment.
+
+#### Code
+
+```
+topic "Concept Web" theme DARK anchor text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 55
+
+#### Prompt
+"Create a concept web with an anchor that sets the border color."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor that sets the border color.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" border "blue-400" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 56
+
+#### Prompt
+"Create a concept web with an anchor using rounded 'xl' for extra-large border radius."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor using rounded 'xl' for extra-large border radius.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" rounded "xl" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 57
+
+#### Prompt
+"Create a concept web with an edge where from is a list of two node values."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an edge where from is a list of two node values.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from [
+    "Foo"
+    "Bar"
+  ] to "Hub" type "solid" {}
+  edge from "Baz" to "Hub" type "dashed" {}
+] {}..
+```
+
+---
+
+### Example 58
+
+#### Prompt
+"![gc-logo-sm](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd62983b8-6b83-4088-b4aa-5388ee03a96b_gc-logo-sm.png?alt=media&token=24ae2e84-d1cc-44a5-8f24-437187d9380a)
+
+Create a concept web with an image on the anchor node."
+
+#### Chat Transcript
+
+**User**: ![gc-logo-sm](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd62983b8-6b83-4088-b4aa-5388ee03a96b_gc-logo-sm.png?alt=media&token=24ae2e84-d1cc-44a5-8f24-437187d9380a)
+
+**User**: Create a concept web with an image on the anchor node.
+
+#### Code
+
+```
+topic "Concept Web" anchor image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd62983b8-6b83-4088-b4aa-5388ee03a96b_gc-logo-sm.png?alt=media&token=24ae2e84-d1cc-44a5-8f24-437187d9380a" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 59
+
+#### Prompt
+"Create a concept web where relation styles (bg, color, border) carry through to the edge label when placed."
+
+#### Chat Transcript
+
+**User**: Create a concept web where relation styles (bg, color, border) carry through to the edge label when placed.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the correct relationship labels onto the edges." anchor value "Hub" text "Hub" {} connections [
+  connection value "Foo" text "Foo" {}
+  connection value "Bar" text "Bar" {}
+  connection value "Baz" text "Baz" {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "connects with"
+  ] {}
+  edge from "Hub" to "Baz" type "solid-arrow" assess [
+    method "value"
+    expected "leads to"
+  ] {}
+] relations [
+  relation value "relates to" bg "blue-100" color "blue-800" border "blue-400" {}
+  relation value "connects with" bg "green-100" color "green-800" border "green-400" {}
+  relation value "leads to" bg "purple-100" color "purple-800" border "purple-400" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 60
 
 #### Prompt
 "Create a concept web with a topic and an anchor."
@@ -960,7 +2210,135 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 30
+### Example 61
+
+#### Prompt
+"Create a drag-and-drop concept web with relation labels where values differ from their display text."
+
+#### Chat Transcript
+
+**User**: Create a drag-and-drop concept web with relation labels where values differ from their display text.
+
+#### Code
+
+```
+topic "Ecosystem Relationships" instructions "Drag the concept labels onto the nodes, then drag the relationship labels onto the edges." anchor value "Producer" text "" assess [
+  method "value"
+  expected "Producer"
+] {} connections [
+  connection value "Consumer" text "" assess [
+    method "value"
+    expected "Consumer"
+  ] {}
+  connection value "Decomposer" text "" assess [
+    method "value"
+    expected "Decomposer"
+  ] {}
+  connection value "SunEnergy" text "" assess [
+    method "value"
+    expected "SunEnergy"
+  ] {}
+] edges [
+  edge from "Producer" to "Consumer" type "solid-arrow" assess [
+    method "value"
+    expected "feeds"
+  ] {}
+  edge from "Consumer" to "Decomposer" type "solid-arrow" assess [
+    method "value"
+    expected "recycles"
+  ] {}
+  edge from "SunEnergy" to "Producer" type "dashed-arrow" assess [
+    method "value"
+    expected "powers"
+  ] {}
+] concepts [
+  concept value "Producer" text "Makes its own food" {}
+  concept value "Consumer" text "Eats other organisms" {}
+  concept value "Decomposer" text "Breaks down dead matter" {}
+  concept value "SunEnergy" text "Primary energy source" {}
+] align LEFT relations [
+  relation value "feeds" text "Feeds →" {}
+  relation value "recycles" text "Recycles ↻" {}
+  relation value "powers" text "Powers ☀" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 62
+
+#### Prompt
+"Create a concept web where the concepts list has w, h, and rounded 'full' defaults for all tray items."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the concepts list has w, h, and rounded 'full' defaults for all tray items.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] w 24 h 24 rounded "full" align RIGHT {}..
+```
+
+---
+
+### Example 63
+
+#### Prompt
+"Create a concept web with edges using the '*' wildcard on the from field."
+
+#### Chat Transcript
+
+**User**: Create a concept web with edges using the '*' wildcard on the from field.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "*" to "Hub" type "solid-arrow" {}
+] {}..
+```
+
+---
+
+### Example 64
 
 #### Prompt
 "Create a drag-and-drop concept web with concepts that have values different from their display text."
@@ -1003,7 +2381,7 @@ topic "Solar System" instructions "Drag the planet names onto the correct nodes.
 
 ---
 
-### Example 31
+### Example 65
 
 #### Prompt
 "Make a concept web with an anchor and one connection, but don’t include a topic line."
@@ -1028,7 +2406,82 @@ anchor text "Hub" assess [
 
 ---
 
-### Example 32
+### Example 66
+
+#### Prompt
+"Create a concept web with edges where each edge has a different text label."
+
+#### Chat Transcript
+
+**User**: Create a concept web with edges where each edge has a different text label.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" text "relates to" {}
+  edge from "Hub" to "Bar" type "solid" text "connects with" {}
+  edge from "Hub" to "Baz" type "solid" text "leads to" {}
+] {}..
+```
+
+---
+
+### Example 67
+
+#### Prompt
+"Create a concept web where the relations list has style defaults but one relation overrides with its own bg."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the relations list has style defaults but one relation overrides with its own bg.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" {} connections [
+  connection value "Foo" text "Foo" {}
+  connection value "Bar" text "Bar" {}
+  connection value "Baz" text "Baz" {}
+] edges [
+  edge from "Hub" to "Foo" assess [
+    method "value"
+    expected "related"
+  ] {}
+  edge from "Hub" to "Bar" assess [
+    method "value"
+    expected "contrasts"
+  ] {}
+  edge from "Hub" to "Baz" assess [
+    method "value"
+    expected "related"
+  ] {}
+] relations [
+  relation value "related" {}
+  relation value "contrasts" bg "rose-500" color "white" {}
+  relation value "supports" {}
+] bg "blue-100" color "blue-800" align BOTTOM {}..
+```
+
+---
+
+### Example 68
 
 #### Prompt
 "Create a concept web with the topic "Solar System"."
@@ -1085,7 +2538,45 @@ topic "Solar System" anchor text "Solar System" assess [
 
 ---
 
-### Example 33
+### Example 69
+
+#### Prompt
+"Create a concept web where the concepts list has round shape as defaults for all tray items."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the concepts list has round shape as defaults for all tray items.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] border "blue-500" bg "blue-200" rounded "full" align RIGHT {}..
+```
+
+---
+
+### Example 70
 
 #### Prompt
 "Make a drag-and-drop web where the concepts tray is declared before the connections block"
@@ -1123,19 +2614,19 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 34
+### Example 71
 
 #### Prompt
-"Create a concept web with a topic, an anchor, and two connections."
+"Create a concept web with an anchor using small border radius for corners."
 
 #### Chat Transcript
 
-**User**: Create a concept web with a topic, an anchor, and two connections.
+**User**: Create a concept web with an anchor using small border radius for corners.
 
 #### Code
 
 ```
-topic "Concept Web" anchor text "Hub" assess [
+topic "Concept Web" anchor text "Hub" rounded "sm" assess [
   method "value"
   expected "Hub"
 ] {} connections [
@@ -1156,7 +2647,106 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 35
+### Example 72
+
+#### Prompt
+"Create a drag-and-drop concept web with both a concepts tray for nodes and a relations tray for edges."
+
+#### Chat Transcript
+
+**User**: Create a drag-and-drop concept web with both a concepts tray for nodes and a relations tray for edges.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag concepts onto the nodes and relation labels onto the edges." anchor value "Hub" text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "connects to"
+  ] {}
+  edge from "Hub" to "Baz" type "solid-arrow" assess [
+    method "value"
+    expected "links to"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT relations [
+  relation value "relates to" {}
+  relation value "connects to" {}
+  relation value "links to" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 73
+
+#### Prompt
+"Create a drag-and-drop concept web with custom edges, blank nodes, assessment, and a right-aligned concepts tray with distractors."
+
+#### Chat Transcript
+
+**User**: Create a drag-and-drop concept web with custom edges, blank nodes, assessment, and a right-aligned concepts tray with distractors.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the concepts from the tray onto the correct nodes." anchor value "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" {}
+  edge from "Hub" to "Bar" type "dashed-arrow" {}
+  edge from "Hub" to "Baz" type "dashed" {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+  concept value "Qux" {}
+  concept value "Quux" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 74
 
 #### Prompt
 "Create a concept web with markdown instructions that include bold and italic text."
@@ -1190,19 +2780,19 @@ topic "Concept Web" instructions "Complete the concept web by reviewing these gu
 
 ---
 
-### Example 36
+### Example 75
 
 #### Prompt
-"Create a concept web with a topic and empty instructions."
+"Create a concept web with the light theme."
 
 #### Chat Transcript
 
-**User**: Create a concept web with a topic and empty instructions.
+**User**: Create a concept web with the light theme.
 
 #### Code
 
 ```
-topic "Concept Web" instructions "" anchor text "Hub" assess [
+topic "Concept Web" theme LIGHT anchor text "Hub" assess [
   method "value"
   expected "Hub"
 ] {} connections [
@@ -1223,18 +2813,44 @@ topic "Concept Web" instructions "" anchor text "Hub" assess [
 
 ---
 
-### Example 37
+### Example 76
 
 #### Prompt
-"Create a concept web with an anchor and three connections.
-
-Create a concept web with an anchor and five connections."
+"Create a concept web with an anchor that has a bg background color set."
 
 #### Chat Transcript
 
-**User**: Create a concept web with an anchor and three connections.
+**User**: Create a concept web with an anchor that has a bg background color set.
 
-**User**: Create a concept web with an anchor and five connections.
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" bg "blue-500" {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 77
+
+#### Prompt
+"Create a concept web where the concepts list, connections list, and relations list each have different container-level style defaults."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the concepts list, connections list, and relations list each have different container-level style defaults.
 
 #### Code
 
@@ -1255,20 +2871,143 @@ topic "Concept Web" anchor text "Hub" assess [
     method "value"
     expected "Baz"
   ] {}
-  connection text "Qux" assess [
+] bg "indigo-200" color "indigo-900" rounded "xl" concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] bg "amber-300" color "amber-900" rounded "full" relations [
+  relation value "relates to" {}
+  relation value "depends on" {}
+  relation value "contrasts with" {}
+] bg "emerald-200" color "emerald-900" rounded "xs" align BOTTOM {}..
+```
+
+---
+
+### Example 78
+
+#### Prompt
+"Create a concept web with an anchor circular."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor circular.
+
+#### Code
+
+```
+topic "Concept Web" anchor rounded "full" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
     method "value"
-    expected "Qux"
+    expected "Foo"
   ] {}
-  connection text "Quux" assess [
+  connection text "Bar" assess [
     method "value"
-    expected "Quux"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
   ] {}
 ] {}..
 ```
 
 ---
 
-### Example 38
+### Example 79
+
+#### Prompt
+"Create a drag-and-drop concept web with image-based relation labels dragged onto assessed edges. ![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)"
+
+#### Chat Transcript
+
+**User**: Create a drag-and-drop concept web with image-based relation labels dragged onto assessed edges. ![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the correct relationship images onto the edges." anchor value "Hub" text "Hub" {} connections [
+  connection value "Foo" text "Foo" {}
+  connection value "Bar" text "Bar" {}
+  connection value "Baz" text "Baz" {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "thumbnail_1"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "thumbnail_2"
+  ] {}
+  edge from "Hub" to "Baz" type "solid-arrow" assess [
+    method "value"
+    expected "thumbnail_3"
+  ] {}
+] relations [
+  relation value "thumbnail_1" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+  relation value "thumbnail_2" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a" {}
+  relation value "thumbnail_3" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c" {}
+  relation value "thumbnail_4" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36" {}
+  relation value "thumbnail_5" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 80
+
+#### Prompt
+"Create a concept web with edges where from and to both use lists of multiple node values."
+
+#### Chat Transcript
+
+**User**: Create a concept web with edges where from and to both use lists of multiple node values.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from [
+    "Foo"
+    "Bar"
+  ] to [
+    "Hub"
+    "Baz"
+  ] type "solid" {}
+] {}..
+```
+
+---
+
+### Example 81
 
 #### Prompt
 "Create a concept web with a concepts tray containing three text concepts."
@@ -1305,7 +3044,7 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 39
+### Example 82
 
 #### Prompt
 "Create a concept web with five assessed connections and an assessed anchor, all using method 'value'."
@@ -1346,7 +3085,160 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 40
+### Example 83
+
+#### Prompt
+"![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+
+Create a concepts tray with two image concepts and one text-only concept."
+
+#### Chat Transcript
+
+**User**: ![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+
+**User**: Create a concepts tray with two image concepts and one text-only concept.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Foo" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+  concept value "Bar" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a" {}
+  concept value "Baz" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 84
+
+#### Prompt
+"Create a concept web with a relations tray containing two relation labels."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a relations tray containing two relation labels.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+] relations [
+  relation value "relates to" {}
+  relation value "depends on" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 85
+
+#### Prompt
+"Create a concept web with background and text color applied to individual connections."
+
+#### Chat Transcript
+
+**User**: Create a concept web with background and text color applied to individual connections.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" bg "red-500" color "white" {}
+  connection text "Bar" bg "green-600" color "white" {}
+  connection text "Baz" bg "blue-500" color "white" {}
+] {}..
+```
+
+---
+
+### Example 86
+
+#### Prompt
+"Create a concept web with an edge that has an image at the midpoint. ![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)"
+
+#### Chat Transcript
+
+**User**: Create a concept web with an edge that has an image at the midpoint. ![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+  edge from "Hub" to "Bar" type "solid" {}
+  edge from "Hub" to "Baz" type "solid" {}
+] {}..
+```
+
+---
+
+### Example 87
 
 #### Prompt
 "Create a concept web with a topic and instructions, but no nodes."
@@ -1363,7 +3255,47 @@ topic "Concept Web" instructions "Add your instructions here." {}..
 
 ---
 
-### Example 41
+### Example 88
+
+#### Prompt
+"Create a concept web with custom edges where one edge has assessment expecting a specific value."
+
+#### Chat Transcript
+
+**User**: Create a concept web with custom edges where one edge has assessment expecting a specific value.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" text "relates to" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Bar" type "dashed" text "connects with" {}
+  edge from "Hub" to "Baz" type "solid-arrow" text "leads to" {}
+] {}..
+```
+
+---
+
+### Example 89
 
 #### Prompt
 "Create a concept web with connections that have assessment on each node."
@@ -1398,14 +3330,57 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 42
+### Example 90
 
 #### Prompt
-"Create a concept web with an anchor and one connection."
+"Create a concept web with an edge where to is a list of two node values."
 
 #### Chat Transcript
 
-**User**: Create a concept web with an anchor and one connection.
+**User**: Create a concept web with an edge where to is a list of two node values.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to [
+    "Foo"
+    "Bar"
+  ] type "solid" {}
+  edge from "Hub" to "Baz" type "dashed" {}
+] {}..
+```
+
+---
+
+### Example 91
+
+#### Prompt
+"![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+
+Create a concept with a value and an image URL."
+
+#### Chat Transcript
+
+**User**: ![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+
+**User**: Create a concept with a value and an image URL.
 
 #### Code
 
@@ -1418,12 +3393,22 @@ topic "Concept Web" anchor text "Hub" assess [
     method "value"
     expected "Foo"
   ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd62983b8-6b83-4088-b4aa-5388ee03a96b_gc-logo-sm.png?alt=media&token=24ae2e84-d1cc-44a5-8f24-437187d9380a" {}
 ] {}..
 ```
 
 ---
 
-### Example 43
+### Example 92
 
 #### Prompt
 "Make a concept web with three connections and a trailing comma after the last one."
@@ -1456,7 +3441,27 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 44
+### Example 93
+
+#### Prompt
+"Create an assessed concept web with a topic, anchor, and three assessed connections. No concepts tray."
+
+#### Chat Transcript
+
+**User**: Create an assessed concept web with a topic, anchor, and three assessed connections. No concepts tray.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Explore the connections between the central concept and its related ideas." anchor text "Hub" {} connections [
+  connection text "Foo" {}
+  connection text "Bar" {}
+] {}..
+```
+
+---
+
+### Example 94
 
 #### Prompt
 "Create a concept web with a concepts tray aligned to the right."
@@ -1489,7 +3494,71 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 45
+### Example 95
+
+#### Prompt
+"Create a concept web where the connections list has bg and color defaults applied to all children."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the connections list has bg and color defaults applied to all children.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" {}
+  connection text "Bar" {}
+  connection text "Baz" {}
+] bg "blue-500" color "white" {}..
+```
+
+---
+
+### Example 96
+
+#### Prompt
+"Create a concept web with custom edges where some edges are assessed and others are display-only."
+
+#### Chat Transcript
+
+**User**: Create a concept web with custom edges where some edges are assessed and others are display-only.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" text "leads to" assess [
+    method "value"
+    expected "leads to"
+  ] {}
+  edge from "Hub" to "Bar" type "dashed" text "relates to" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Baz" type "solid" text "see also" {}
+] {}..
+```
+
+---
+
+### Example 97
 
 #### Prompt
 "Create a concept web with a concepts tray aligned to the bottom."
@@ -1527,7 +3596,40 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 46
+### Example 98
+
+#### Prompt
+"Create a concept web with an anchor using rounded 'none' for sharp corners."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor using rounded 'none' for sharp corners.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" rounded "none" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 99
 
 #### Prompt
 "Create a concept web where connections use both value and text with different strings."
@@ -1560,7 +3662,48 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 47
+### Example 100
+
+#### Prompt
+"![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+Create a drag-and-drop concept web with three image concepts and assessment on the nodes."
+
+#### Chat Transcript
+
+**User**: ![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+**User**: Create a drag-and-drop concept web with three image concepts and assessment on the nodes.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 101
 
 #### Prompt
 "Create a concept web where each connection has a value set."
@@ -1593,7 +3736,7 @@ topic "Concept Web" anchor text "Hub" value "Hub" assess [
 
 ---
 
-### Example 48
+### Example 102
 
 #### Prompt
 "Create a concept web with two connections, each with different text labels."
@@ -1622,7 +3765,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 49
+### Example 103
 
 #### Prompt
 "Create a concept web with a topic, instructions, an anchor, and one connection."
@@ -1647,7 +3790,7 @@ topic "Concept Web" instructions "Explore the connections between concepts." anc
 
 ---
 
-### Example 50
+### Example 104
 
 #### Prompt
 "Create a concept web with three connections where expected values are single-word strings."
@@ -1680,7 +3823,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 51
+### Example 105
 
 #### Prompt
 "Make a drag-and-drop web where only the anchor is blank, but connections show text."
@@ -1715,7 +3858,7 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 52
+### Example 106
 
 #### Prompt
 "Create a concept web with an anchor that has assessment expecting a specific value."
@@ -1727,7 +3870,7 @@ topic "Concept Web" anchor text "" assess [
 #### Code
 
 ```
-topic "Concept Web" anchor text "Anchor" assess [
+topic "Concept Web" anchor value "Hub" text "Anchor" assess [
   method "value"
   expected "Hub"
 ] {} connections [
@@ -1748,7 +3891,44 @@ topic "Concept Web" anchor text "Anchor" assess [
 
 ---
 
-### Example 53
+### Example 107
+
+#### Prompt
+"Create a concept web with an edge that has a text label at the midpoint."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an edge that has a text label at the midpoint.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" text "related" {}
+  edge from "Hub" to "Bar" type "solid" {}
+  edge from "Hub" to "Baz" type "solid" {}
+] {}..
+```
+
+---
+
+### Example 108
 
 #### Prompt
 "Create a concept web where the anchor and all connections are assessed."
@@ -1781,7 +3961,81 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 54
+### Example 109
+
+#### Prompt
+"Create a concept web with mixed edge types — some solid and some dashed."
+
+#### Chat Transcript
+
+**User**: Create a concept web with mixed edge types — some solid and some dashed.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" {}
+  edge from "Hub" to "Bar" type "dashed" {}
+  edge from "Hub" to "Baz" type "dashed" {}
+] {}..
+```
+
+---
+
+### Example 110
+
+#### Prompt
+"Create a concept web with bg applied to edges."
+
+#### Chat Transcript
+
+**User**: Create a concept web with bg applied to edges.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" text "foo" bg "blue-500" {}
+  edge from "Hub" to "Bar" type "solid" bg "green-500" {}
+  edge from "Hub" to "Baz" type "solid" bg "red-500" {}
+] {}..
+```
+
+---
+
+### Example 111
 
 #### Prompt
 "Create a drag-and-drop concept web where all connection texts are blank and concepts provide the answers."
@@ -1819,7 +4073,86 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 55
+### Example 112
+
+#### Prompt
+"Create a concept web with the dark theme."
+
+#### Chat Transcript
+
+**User**: Create a concept web with the dark theme.
+
+#### Code
+
+```
+topic "Concept Web" theme DARK anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 113
+
+#### Prompt
+"![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+Create a drag-and-drop concept web where concepts use images instead of text."
+
+#### Chat Transcript
+
+**User**: ![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+**User**: Create a drag-and-drop concept web where concepts use images instead of text.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the images onto the correct nodes." anchor text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36" {}
+  concept value "Foo" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+  concept value "Bar" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a" {}
+  concept value "Baz" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 114
 
 #### Prompt
 "Create a concept web with a concepts tray aligned to the top."
@@ -1857,7 +4190,116 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 56
+### Example 115
+
+#### Prompt
+"Create a concept web with a relations tray aligned to the left."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a relations tray aligned to the left.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" {} connections [
+  connection value "Foo" text "Foo" {}
+  connection value "Bar" text "Bar" {}
+  connection value "Baz" text "Baz" {}
+] edges [
+  edge from "Hub" to "Foo" assess [
+    method "value"
+    expected "related"
+  ] {}
+  edge from "Hub" to "Bar" assess [
+    method "value"
+    expected "related"
+  ] {}
+  edge from "Hub" to "Baz" assess [
+    method "value"
+    expected "related"
+  ] {}
+] relations [
+  relation value "related" {}
+] align LEFT {}..
+```
+
+---
+
+### Example 116
+
+#### Prompt
+"Create a drag-and-drop concept web with custom edges and a concepts tray."
+
+#### Chat Transcript
+
+**User**: Create a drag-and-drop concept web with custom edges and a concepts tray.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT edges [
+  edge from "Hub" to "*" type "solid" {}
+] {}..
+```
+
+---
+
+### Example 117
+
+#### Prompt
+"Create a concept web with an empty edges list so no edges are rendered."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an empty edges list so no edges are rendered.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [] {}..
+```
+
+---
+
+### Example 118
 
 #### Prompt
 "Create a concept web with a long descriptive instruction paragraph."
@@ -1890,7 +4332,7 @@ topic "Concept Web" instructions "In this activity, you will explore the relatio
 
 ---
 
-### Example 57
+### Example 119
 
 #### Prompt
 "Create a concept web with four connections."
@@ -1927,7 +4369,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 58
+### Example 120
 
 #### Prompt
 "Make a drag-and-drop web with the concepts tray aligned LEFT"
@@ -1965,7 +4407,64 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 59
+### Example 121
+
+#### Prompt
+"Create a fully featured concept web with topic, markdown instructions, dark theme, custom edges with mixed types and text labels, assessed anchor and connections, and a bottom-aligned concepts tray with image concepts and text distractors."
+
+#### Chat Transcript
+
+**User**: Create a fully featured concept web with topic, markdown instructions, dark theme, custom edges with mixed types and text labels, assessed anchor and connections, and a bottom-aligned concepts tray with image concepts and text distractors.
+
+#### Code
+
+```
+topic "Fully Featured Concept Web" instructions "**Instructions:** Drag the concepts from the tray below onto the correct nodes.
+- The **center node** is the main topic
+- Solid arrows show primary relationships
+- Dashed lines show secondary connections
+- Use the labels on edges as hints!" theme DARK anchor value "Hub" text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+  connection value "Qux" text "" assess [
+    method "value"
+    expected "Qux"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" text "leads to" {}
+  edge from "Hub" to "Bar" type "solid-arrow" text "relates to" {}
+  edge from "Hub" to "Baz" type "dashed-arrow" text "connects" {}
+  edge from "Hub" to "Qux" type "dashed" text "influences" {}
+  edge from "Foo" to "Bar" type "dashed" text "linked" {}
+  edge from "Baz" to "Qux" type "dashed" text "similar" {}
+] concepts [
+  concept value "Hub" image "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Circle_-_black_simple.svg/120px-Circle_-_black_simple.svg.png" {}
+  concept value "Foo" image "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/120px-PNG_transparency_demonstration_1.png" {}
+  concept value "Bar" image "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Camponotus_flavomarginatus_ant.jpg/120px-Camponotus_flavomarginatus_ant.jpg" {}
+  concept value "Baz" image "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Felis_silvestris_catus_lying_on_rice_straw.jpg/120px-Felis_silvestris_catus_lying_on_rice_straw.jpg" {}
+  concept value "Qux" image "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Solar_system.jpg/120px-Solar_system.jpg" {}
+  concept value "Distractor1" text "Wrong A" {}
+  concept value "Distractor2" text "Wrong B" {}
+  concept value "Distractor3" text "Wrong C" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 122
 
 #### Prompt
 "Create a concept web with an anchor using method VALUE tag instead of string 'value'."
@@ -2000,7 +4499,7 @@ topic "Concept Web" anchor value "Hub" text "Hub" assess [
 
 ---
 
-### Example 60
+### Example 123
 
 #### Prompt
 "Create a concept web where only the anchor is assessed and connections are display-only."
@@ -2024,7 +4523,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 61
+### Example 124
 
 #### Prompt
 "Create a concept web with six connections around a central anchor."
@@ -2069,7 +4568,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 62
+### Example 125
 
 #### Prompt
 "Create a concept web with three connections arranged around the anchor."
@@ -2102,7 +4601,85 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 63
+### Example 126
+
+#### Prompt
+"Create a concept web where the anchor is styled differently from connections using different bg and rounded values."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the anchor is styled differently from connections using different bg and rounded values.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" bg "indigo-600" color "white" rounded "full" {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] bg "sky-100" rounded "lg" {}..
+```
+
+---
+
+### Example 127
+
+#### Prompt
+"Create a concept web with a relation that uses an image for display. ![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)"
+
+#### Chat Transcript
+
+**User**: Create a concept web with a relation that uses an image for display. ![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Baz" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+] relations [
+  relation value "relates to" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 128
 
 #### Prompt
 "Create a drag-and-drop concept web with four blank connections, four concepts, and assessment on every node."
@@ -2145,7 +4722,7 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 64
+### Example 129
 
 #### Prompt
 "Create a concept web with an anchor that has display text."
@@ -2178,7 +4755,45 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 65
+### Example 130
+
+#### Prompt
+"Create a concept web with custom edges, light theme, topic, instructions, and images on connections."
+
+#### Chat Transcript
+
+**User**: Create a concept web with custom edges, light theme, topic, instructions, and images on connections.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Explore the connections between concepts below. Each node is linked by custom edges." theme LIGHT anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" image "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/120px-PNG_transparency_demonstration_1.png" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" image "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Camponotus_flavomarginatus_ant.jpg/120px-Camponotus_flavomarginatus_ant.jpg" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" image "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Felis_silvestris_catus_lying_on_rice_straw.jpg/120px-Felis_silvestris_catus_lying_on_rice_straw.jpg" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" text "leads to" {}
+  edge from "Hub" to "Bar" type "dashed-arrow" text "relates to" {}
+  edge from "Hub" to "Baz" type "dashed" text "connects" {}
+  edge from "Foo" to "Bar" type "dashed" text "linked" {}
+] {}..
+```
+
+---
+
+### Example 131
 
 #### Prompt
 "Create a concept web with three connections, each assessed with method 'value' and different expected values."
@@ -2211,7 +4826,40 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 66
+### Example 132
+
+#### Prompt
+"Create a concept web with an anchor that has a specific text color."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor that has a specific text color.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" color "red-500" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 133
 
 #### Prompt
 "Make a concept web where the anchor is written before the topic (keep it otherwise valid)."
@@ -2244,7 +4892,7 @@ anchor text "Hub" assess [
 
 ---
 
-### Example 67
+### Example 134
 
 #### Prompt
 "Make a concept web where only the anchor is assessed (connections have no assess)"
@@ -2268,7 +4916,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 68
+### Example 135
 
 #### Prompt
 "Create an assessed concept web where the anchor expects the value "Main"."
@@ -2301,7 +4949,7 @@ topic "Concept Web" anchor text "Main" assess [
 
 ---
 
-### Example 69
+### Example 136
 
 #### Prompt
 "Create a concept web where assessment uses the VALUE tag instead of the string 'value'."
@@ -2334,7 +4982,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 70
+### Example 137
 
 #### Prompt
 "Create a concept web where the anchor has a value, display text override, and assessment."
@@ -2367,7 +5015,7 @@ topic "Concept Web" anchor value "Hub" text "Central Hub" assess [
 
 ---
 
-### Example 71
+### Example 138
 
 #### Prompt
 "Make a drag-and-drop web with the concepts tray aligned top"
@@ -2405,7 +5053,81 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 72
+### Example 139
+
+#### Prompt
+"Create a concept web where the edges list has style defaults applied to all edge children."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the edges list has style defaults applied to all edge children.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" {}
+  edge from "Hub" to "Bar" {}
+  edge from "Hub" to "Baz" {}
+] type "solid-arrow" color "white" {
+  v: 1
+}..
+```
+
+---
+
+### Example 140
+
+#### Prompt
+"Create a concept web with a single solid edge from the anchor to one connection."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a single solid edge from the anchor to one connection.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" {}
+] {}..
+```
+
+---
+
+### Example 141
 
 #### Prompt
 "Create a concept web with three connections, only two of which are assessed."
@@ -2435,7 +5157,29 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 73
+### Example 142
+
+#### Prompt
+"Create a concept web with a topic, instructions, dark theme, anchor, and four connections. No assessment."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a topic, instructions, dark theme, anchor, and four connections. No assessment.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Explore the connections between concepts." anchor text "Hub" {} connections [
+  connection text "Foo" {}
+  connection text "Bar" {}
+  connection text "Baz" {}
+  connection text "Qux" {}
+] theme DARK {}..
+```
+
+---
+
+### Example 143
 
 #### Prompt
 "Create a drag-and-drop concept web with exactly one distractor concept in the tray."
@@ -2474,7 +5218,7 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 74
+### Example 144
 
 #### Prompt
 "Make a concept web and place the instructions at the very end of the program."
@@ -2493,7 +5237,128 @@ topic "Foo" anchor text "Bar" {} connections [
 
 ---
 
-### Example 75
+### Example 145
+
+#### Prompt
+"Create a concept web with an anchor using a raw CSS rounded value like '50% / 25%' for custom border radius."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor using a raw CSS rounded value like '50% / 25%' for custom border radius.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" rounded "50% / 25%" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 146
+
+#### Prompt
+"![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+Create a concepts tray with images aligned to the top of the diagram."
+
+#### Chat Transcript
+
+**User**: ![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+**User**: Create a concepts tray with images aligned to the top of the diagram.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36" {}
+  concept value "Foo" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+  concept value "Bar" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a" {}
+  concept value "Baz" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c" {}
+] align TOP {}..
+```
+
+---
+
+### Example 147
+
+#### Prompt
+"Create a concept web with a topic, instructions, assessed anchor, three assessed connections, and a right-aligned concepts tray with matching items."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a topic, instructions, assessed anchor, three assessed connections, and a right-aligned concepts tray with matching items.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the concepts from the tray onto the correct nodes." anchor text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 148
 
 #### Prompt
 "Make a concept web with a concepts tray on the RIGHT, containing three concept values."
@@ -2531,7 +5396,326 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 76
+### Example 149
+
+#### Prompt
+"Create a concept web with an anchor that uses w and h to set a custom size."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor that uses w and h to set a custom size.
+
+#### Code
+
+```
+topic "Concept Web" anchor w 32 h 32 text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {
+  v: 1
+}..
+```
+
+---
+
+### Example 150
+
+#### Prompt
+"Create a concept web with bg and border on relation labels in the tray."
+
+#### Chat Transcript
+
+**User**: Create a concept web with bg and border on relation labels in the tray.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" text "foo" type "solid" {}
+] relations [
+  relation value "relates to" bg "blue-500" border "blue-700" color "white" {}
+  relation value "depends on" bg "emerald-500" border "emerald-700" color "white" {}
+  relation value "contrasts with" bg "rose-500" border "rose-700" color "white" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 151
+
+#### Prompt
+"give all connections a blue background and white text"
+
+#### Chat Transcript
+
+**User**: give all connections a blue background and white text
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" {}
+  connection text "Bar" {}
+  connection text "Baz" {}
+] bg "blue-500" color "white" {}..
+```
+
+---
+
+### Example 152
+
+#### Prompt
+"Create a concept web with an anchor using rounded 'full' to make it circular."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor using rounded 'full' to make it circular.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" rounded "full" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 153
+
+#### Prompt
+"Create a concept web with a relations tray aligned to the bottom."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a relations tray aligned to the bottom.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" {} connections [
+  connection value "Foo" text "Foo" {}
+  connection value "Bar" text "Bar" {}
+  connection value "Baz" text "Baz" {}
+] edges [
+  edge from "Hub" to "*" type "solid" assess [
+    method "value"
+    expected "related"
+  ] {}
+] relations [
+  relation value "related" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 154
+
+#### Prompt
+"Create a concept web with edges where one edge uses '*' wildcard and another uses a specific list for from. make the node text blank but provide a tray of concept and validation on each connection"
+
+#### Chat Transcript
+
+**User**: Create a concept web with edges where one edge uses '*' wildcard and another uses a specific list for from. make the node text blank but provide a tray of concept and validation on each connection
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the concepts from the tray onto the correct nodes." anchor value "Hub" text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "*" to "Hub" type "solid-arrow" {}
+  edge from [
+    "Foo"
+    "Bar"
+  ] to "Baz" type "dashed" text "related" {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 155
+
+#### Prompt
+"Create a concept web with a relations tray aligned to the top."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a relations tray aligned to the top.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" {} connections [
+  connection value "Foo" text "Foo" {}
+  connection value "Bar" text "Bar" {}
+  connection value "Baz" text "Baz" {}
+] edges [
+  edge from "Hub" to "*" type "solid" assess [
+    method "value"
+    expected "related"
+  ] {}
+] relations [
+  relation value "related" {}
+] align TOP {}..
+```
+
+---
+
+### Example 156
+
+#### Prompt
+"Create a concept web with a relation that has a value for scoring."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a relation that has a value for scoring.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Baz" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+] relations [
+  relation value "relates to" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 157
+
+#### Prompt
+"Create a concept web with dashed edges, assessment, and a left-aligned concepts tray."
+
+#### Chat Transcript
+
+**User**: Create a concept web with dashed edges, assessment, and a left-aligned concepts tray.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "dashed" {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align LEFT {}..
+```
+
+---
+
+### Example 158
 
 #### Prompt
 "Create a concept web with just an anchor node labeled "Center"."
@@ -2548,7 +5732,7 @@ topic "Concept Web" anchor text "Center" {} {}..
 
 ---
 
-### Example 77
+### Example 159
 
 #### Prompt
 "Create a concept web with a concepts tray containing five items."
@@ -2587,7 +5771,43 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 78
+### Example 160
+
+#### Prompt
+"Create a concept web with solid-arrow edges from anchor to connections and a dashed-arrow edge between two connections."
+
+#### Chat Transcript
+
+**User**: Create a concept web with solid-arrow edges from anchor to connections and a dashed-arrow edge between two connections.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid-arrow" {}
+  edge from "Foo" to "Bar" type "dashed-arrow" {}
+] {}..
+```
+
+---
+
+### Example 161
 
 #### Prompt
 "Create a concept web where one connection has no assessment and the others do."
@@ -2617,7 +5837,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 79
+### Example 162
 
 #### Prompt
 "Create a concept web with two assessed connections using method VALUE tag."
@@ -2646,7 +5866,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 80
+### Example 163
 
 #### Prompt
 "Make a drag-and-drop web where only the connections are blank, but the anchor shows text."
@@ -2683,7 +5903,45 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 81
+### Example 164
+
+#### Prompt
+"Create a concept web with circular of specific radius on concepts in the tray."
+
+#### Chat Transcript
+
+**User**: Create a concept web with circular of specific radius on concepts in the tray.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" rounded "full" w 20 h 20 {}
+  concept value "Foo" rounded "full" w 20 h 20 {}
+  concept value "Bar" rounded "full" w 20 h 20 {}
+  concept value "Baz" rounded "full" w 20 h 20 {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 165
 
 #### Prompt
 "Create a concept web with an assessed anchor and four assessed connections."
@@ -2720,7 +5978,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 82
+### Example 166
 
 #### Prompt
 "Create a drag-and-drop concept web with three blank nodes and three matching concepts in the tray."
@@ -2754,7 +6012,82 @@ topic "Concept Web" anchor text "Hub" {} connections [
 
 ---
 
-### Example 83
+### Example 167
+
+#### Prompt
+"Create a concept web with mixed edge types, text labels on edges, and assessment on all nodes."
+
+#### Chat Transcript
+
+**User**: Create a concept web with mixed edge types, text labels on edges, and assessment on all nodes.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" text "relates to" {}
+  edge from "Hub" to "Bar" type "dashed" text "connects with" {}
+  edge from "Hub" to "Baz" type "dashed-arrow" text "leads to" {}
+] {}..
+```
+
+---
+
+### Example 168
+
+#### Prompt
+"Create a concept web with edges that mix solid, dashed, solid-arrow, and dashed-arrow types."
+
+#### Chat Transcript
+
+**User**: Create a concept web with edges that mix solid, dashed, solid-arrow, and dashed-arrow types.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" {}
+  edge from "Hub" to "Bar" type "dashed" {}
+  edge from "Hub" to "Baz" type "solid-arrow" {}
+  edge from "Foo" to "Bar" type "dashed-arrow" text "related" {}
+] {}..
+```
+
+---
+
+### Example 169
 
 #### Prompt
 "Make a concept web and include a short instructions line for students."
@@ -2787,7 +6120,230 @@ topic "Concept Web" instructions "Connect the related concepts to the central hu
 
 ---
 
-### Example 84
+### Example 170
+
+#### Prompt
+"![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+Create a drag-and-drop concept web where image concepts have values that differ from the image URL."
+
+#### Chat Transcript
+
+**User**: ![thumbnail_4](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36)
+![thumbnail_5](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F30937792-d124-4e11-ac9c-655e09e93446_thumbnail_5.png?alt=media&token=8ab2e9be-bdb0-4fde-95e6-52bdfbd3f0f9)
+![thumbnail_1](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557)
+![thumbnail_2](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a)
+![thumbnail_3](https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c)
+
+**User**: Create a drag-and-drop concept web where image concepts have values that differ from the image URL.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the images onto the correct nodes." anchor text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F84b31270-b402-4c11-beaf-4e0a7772a671_thumbnail_4.png?alt=media&token=49a2e8d1-75fa-4d46-b30f-76aab84d2a36" {}
+  concept value "Foo" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2Fd27e745e-b6d1-4a3b-a504-b01bdea0f416_thumbnail_1.png?alt=media&token=51a8781d-bab5-45c0-ab5b-38a4dbfb0557" {}
+  concept value "Bar" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F8fa5c11a-2146-48f9-8862-79ce6af6db75_thumbnail_2.png?alt=media&token=98efcf39-1991-43cc-b6a2-d1cc65479b0a" {}
+  concept value "Baz" image "https://firebasestorage.googleapis.com/v0/b/graffiticode.appspot.com/o/uploads%2F24493e1c7a7f1ad57e3c478087c74c2dacb0cba1%2F9a421a6c-2f51-4356-b1c3-7020dc6c1faa_thumbnail_3.png?alt=media&token=0f9ffcb3-a94a-48d6-940c-d89c0a2b714c" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 171
+
+#### Prompt
+"Create a drag-and-drop concept web with a relations tray containing more relations than edges as distractors."
+
+#### Chat Transcript
+
+**User**: Create a drag-and-drop concept web with a relations tray containing more relations than edges as distractors.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the concepts onto the correct nodes, then drag the correct relationship labels onto the edges." anchor value "Hub" text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "causes"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "supports"
+  ] {}
+  edge from "Hub" to "Baz" type "dashed-arrow" assess [
+    method "value"
+    expected "inhibits"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT relations [
+  relation value "causes" {}
+  relation value "supports" {}
+  relation value "inhibits" {}
+  relation value "requires" {}
+  relation value "produces" {}
+  relation value "blocks" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 172
+
+#### Prompt
+"Create a concept web with background and border on relation labels in the tray."
+
+#### Chat Transcript
+
+**User**: Create a concept web with background and border on relation labels in the tray.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+] relations [
+  relation value "relates to" bg "blue-100" border "blue-400" {}
+  relation value "depends on" bg "green-100" border "green-400" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 173
+
+#### Prompt
+"Create a concept web with a peer-to-peer edge that has both a text label and a specific type."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a peer-to-peer edge that has both a text label and a specific type.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" {}
+  edge from "Hub" to "Bar" type "solid" {}
+  edge from "Hub" to "Baz" type "solid" {}
+  edge from "Foo" to "Bar" type "dashed" text "peer" {}
+] {}..
+```
+
+---
+
+### Example 174
+
+#### Prompt
+"Create a concept web with a peer-to-peer edge between two connections, not through the anchor."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a peer-to-peer edge between two connections, not through the anchor.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid" {}
+  edge from "Foo" to "Bar" type "dashed" text "related" {}
+] {}..
+```
+
+---
+
+### Example 175
 
 #### Prompt
 "Create a concept web with an anchor and two connections."
@@ -2816,7 +6372,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 85
+### Example 176
 
 #### Prompt
 "Make a concept web with a topic and connections, but omit the anchor."
@@ -2846,7 +6402,7 @@ topic "Concept Web" connections [
 
 ---
 
-### Example 86
+### Example 177
 
 #### Prompt
 "Create a drag-and-drop concept web where the anchor text is blank and the concepts tray has the answer."
@@ -2881,7 +6437,197 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 87
+### Example 178
+
+#### Prompt
+"Create a drag-and-drop concept web with a concepts tray aligned right and a relations tray aligned bottom, with assessment on both nodes and edges. *"
+
+#### Chat Transcript
+
+**User**: Create a drag-and-drop concept web with a concepts tray aligned right and a relations tray aligned bottom, with assessment on both nodes and edges. *
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the concepts onto the correct nodes, then drag the relationship labels onto the edges." anchor value "Hub" text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "causes"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "supports"
+  ] {}
+  edge from "Hub" to "Baz" type "solid-arrow" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT relations [
+  relation value "causes" {}
+  relation value "supports" {}
+  relation value "relates to" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 179
+
+#### Prompt
+"Create a concept web where the relations list has bg, color, and border defaults applied to all relation children."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the relations list has bg, color, and border defaults applied to all relation children.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] relations [
+  relation value "activates" {}
+  relation value "inhibits" {}
+  relation value "requires" {}
+] bg "violet-100" color "violet-800" border "violet-400" align BOTTOM {}..
+```
+
+---
+
+### Example 180
+
+#### Prompt
+"Create an assessed concept web with a topic, anchor, and three assessed connections. No concepts tray."
+
+#### Chat Transcript
+
+**User**: Create an assessed concept web with a topic, anchor, and three assessed connections. No concepts tray.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 181
+
+#### Prompt
+"Create a concept web with dashed edges from the anchor to all connections."
+
+#### Chat Transcript
+
+**User**: Create a concept web with dashed edges from the anchor to all connections.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "dashed" {}
+] {}..
+```
+
+---
+
+### Example 182
+
+#### Prompt
+"Create a concept web with an anchor using width, height, rounded, backgrounds, text color, and border all together."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor using width, height, rounded, backgrounds, text color, and border all together.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" w 28 h 28 rounded "full" bg "indigo-600" color "white" border "indigo-300" {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 183
 
 #### Prompt
 "Create a concept web with instructions that include both a description and a bulleted list."
@@ -2918,7 +6664,7 @@ topic "Concept Web" instructions "This concept web explores key relationships be
 
 ---
 
-### Example 88
+### Example 184
 
 #### Prompt
 "Make a drag-and-drop web with the concepts tray aligned bottom"
@@ -2956,7 +6702,7 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 89
+### Example 185
 
 #### Prompt
 "Make a concept web with exactly two connection nodes."
@@ -2985,7 +6731,57 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 90
+### Example 186
+
+#### Prompt
+"Create a concept web with a topic, five connections with assessment, and a concepts tray with five items plus two distractors aligned to the left."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a topic, five connections with assessment, and a concepts tray with five items plus two distractors aligned to the left.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Qux"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Quux"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+  concept value "Qux" {}
+  concept value "Quux" {}
+  concept value "Corge" {}
+  concept value "Grault" {}
+] align LEFT {}..
+```
+
+---
+
+### Example 187
 
 #### Prompt
 "Make a concept web with an assess block missing the method field."
@@ -3017,7 +6813,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 91
+### Example 188
 
 #### Prompt
 "Create a concept web with connections where text is set to empty strings for drag-and-drop."
@@ -3055,7 +6851,147 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 92
+### Example 189
+
+#### Prompt
+"Create a concept web with edges where one edge uses '*' wildcard and another uses a specific list for from."
+
+#### Chat Transcript
+
+**User**: Create a concept web with edges where one edge uses '*' wildcard and another uses a specific list for from.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "*" to "Hub" type "solid-arrow" {}
+  edge from [
+    "Foo"
+    "Bar"
+  ] to "Baz" type "dashed" text "related" {}
+] {}..
+```
+
+---
+
+### Example 190
+
+#### Prompt
+"Create a drag-and-drop concept web with three assessed edges and three matching relation labels in the tray."
+
+#### Chat Transcript
+
+**User**: Create a drag-and-drop concept web with three assessed edges and three matching relation labels in the tray.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the concept labels onto the nodes, then drag the relation labels onto the edges." anchor value "Hub" text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "causes"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "supports"
+  ] {}
+  edge from "Hub" to "Baz" type "solid-arrow" assess [
+    method "value"
+    expected "inhibits"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT relations [
+  relation value "causes" {}
+  relation value "supports" {}
+  relation value "inhibits" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 191
+
+#### Prompt
+"Create a concept web with custom edges where every edge is assessed with different expected values."
+
+#### Chat Transcript
+
+**User**: Create a concept web with custom edges where every edge is assessed with different expected values.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid" text "relates to" assess [
+    method "value"
+    expected "relates to"
+  ] {}
+  edge from "Hub" to "Bar" type "dashed" text "connects with" assess [
+    method "value"
+    expected "connects with"
+  ] {}
+  edge from "Hub" to "Baz" type "solid-arrow" text "leads to" assess [
+    method "value"
+    expected "leads to"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 192
 
 #### Prompt
 "Create a concept web with numbered step-by-step instructions in markdown."
@@ -3093,7 +7029,98 @@ topic "Concept Web" instructions "Follow these steps to complete the concept web
 
 ---
 
-### Example 93
+### Example 193
+
+#### Prompt
+"Create a concept web where the connections list has style defaults but one connection overrides with its own background."
+
+#### Chat Transcript
+
+**User**: Create a concept web where the connections list has style defaults but one connection overrides with its own background.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" {} connections [
+  connection text "Foo" {}
+  connection text "Bar" bg "rose-500" {}
+  connection text "Baz" {}
+] bg "blue-500" color "white" {}..
+```
+
+---
+
+### Example 194
+
+#### Prompt
+"Create a concept web with dashed-arrow edges from the anchor to all connections."
+
+#### Chat Transcript
+
+**User**: Create a concept web with dashed-arrow edges from the anchor to all connections.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "dashed-arrow" {}
+] {}..
+```
+
+---
+
+### Example 195
+
+#### Prompt
+"Create a concept web with solid-arrow edges from the anchor to all connections."
+
+#### Chat Transcript
+
+**User**: Create a concept web with solid-arrow edges from the anchor to all connections.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid-arrow" {}
+] {}..
+```
+
+---
+
+### Example 196
 
 #### Prompt
 "Create a concept web with an anchor assessed with method 'value' and an expected value."
@@ -3126,7 +7153,40 @@ topic "Concept Web" anchor value "Hub" text "Anchor" assess [
 
 ---
 
-### Example 94
+### Example 197
+
+#### Prompt
+"Create a concept web where nodes have custom bg colors and assessment is active, showing that green/red assessment overrides the custom bg."
+
+#### Chat Transcript
+
+**User**: Create a concept web where nodes have custom bg colors and assessment is active, showing that green/red assessment overrides the custom bg.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Assessment is active — green/red overrides the custom background colors on each node." anchor text "Hub" bg "indigo-500" color "white" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" bg "amber-400" color "white" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" bg "rose-400" color "white" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" bg "teal-400" color "white" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 198
 
 #### Prompt
 "Make a concept web that includes two separate instructions lines."
@@ -3159,7 +7219,47 @@ topic "Concept Web" instructions "First." instructions "Each concept should be p
 
 ---
 
-### Example 95
+### Example 199
+
+#### Prompt
+"Create a concept web with a relation that sets the background color, border and text color together for full styling."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a relation that sets the background color, border and text color together for full styling.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid" assess [
+    method "value"
+    expected "relates"
+  ] {}
+] relations [
+  relation value "relates" bg "violet-600" color "white" border "violet-800" {}
+] align BOTTOM {}..
+```
+
+---
+
+### Example 200
 
 #### Prompt
 "Create the smallest valid concept web: a topic, one anchor, and one connection."
@@ -3178,7 +7278,115 @@ topic "Concept Web" anchor text "Hub" {} connections [
 
 ---
 
-### Example 96
+### Example 201
+
+#### Prompt
+"create a concept web that has 10 connections associated with the anchor fruit. make the connections ten fruit and create peer connections based on the region of farming
+
+order the nodes so that the regions are adjacent
+
+remove the edges from the anchor to the connections and leave the peer connections
+
+move all concepts into a tray and add validations for each of the connection nodes
+
+give the anchor as a freebee validation"
+
+#### Chat Transcript
+
+**User**: create a concept web that has 10 connections associated with the anchor fruit. make the connections ten fruit and create peer connections based on the region of farming
+
+**User**: order the nodes so that the regions are adjacent
+
+**User**: remove the edges from the anchor to the connections and leave the peer connections
+
+**User**: move all concepts into a tray and add validations for each of the connection nodes
+
+**User**: give the anchor as a freebee validation
+
+#### Code
+
+```
+topic "Fruit Concept Web" instructions "Explore how fruits are connected by their farming regions around the world." anchor value "Fruit" text "Fruit" assess [
+  method "value"
+  expected "Fruit"
+] {} connections [
+  connection value "Apple" text "" assess [
+    method "value"
+    expected "Apple"
+  ] {}
+  connection value "Peach" text "" assess [
+    method "value"
+    expected "Peach"
+  ] {}
+  connection value "Grape" text "" assess [
+    method "value"
+    expected "Grape"
+  ] {}
+  connection value "Strawberry" text "" assess [
+    method "value"
+    expected "Strawberry"
+  ] {}
+  connection value "Orange" text "" assess [
+    method "value"
+    expected "Orange"
+  ] {}
+  connection value "Mango" text "" assess [
+    method "value"
+    expected "Mango"
+  ] {}
+  connection value "Banana" text "" assess [
+    method "value"
+    expected "Banana"
+  ] {}
+  connection value "Pineapple" text "" assess [
+    method "value"
+    expected "Pineapple"
+  ] {}
+  connection value "Coconut" text "" assess [
+    method "value"
+    expected "Coconut"
+  ] {}
+  connection value "Papaya" text "" assess [
+    method "value"
+    expected "Papaya"
+  ] {}
+] edges [
+  edge from "Fruit" to "*" {}
+  edge from "Apple" to "Grape" type "dashed" text "Temperate" {}
+  edge from "Apple" to "Peach" type "dashed" text "Temperate" {}
+  edge from "Apple" to "Strawberry" type "dashed" text "Temperate" {}
+  edge from "Grape" to "Peach" type "dashed" text "Temperate" {}
+  edge from "Grape" to "Strawberry" type "dashed" text "Temperate" {}
+  edge from "Peach" to "Strawberry" type "dashed" text "Temperate" {}
+  edge from "Mango" to "Banana" type "dashed" text "Tropical" {}
+  edge from "Mango" to "Pineapple" type "dashed" text "Tropical" {}
+  edge from "Mango" to "Coconut" type "dashed" text "Tropical" {}
+  edge from "Mango" to "Papaya" type "dashed" text "Tropical" {}
+  edge from "Banana" to "Pineapple" type "dashed" text "Tropical" {}
+  edge from "Banana" to "Coconut" type "dashed" text "Tropical" {}
+  edge from "Banana" to "Papaya" type "dashed" text "Tropical" {}
+  edge from "Pineapple" to "Coconut" type "dashed" text "Tropical" {}
+  edge from "Pineapple" to "Papaya" type "dashed" text "Tropical" {}
+  edge from "Coconut" to "Papaya" type "dashed" text "Tropical" {}
+  edge from "Orange" to "Grape" type "dashed" text "Mediterranean" {}
+  edge from "Orange" to "Mango" type "dashed" text "Subtropical" {}
+] concepts [
+  concept value "Apple" {}
+  concept value "Peach" {}
+  concept value "Grape" {}
+  concept value "Strawberry" {}
+  concept value "Orange" {}
+  concept value "Mango" {}
+  concept value "Banana" {}
+  concept value "Pineapple" {}
+  concept value "Coconut" {}
+  concept value "Papaya" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 202
 
 #### Prompt
 "Create a concept web where one connection is assessed with expected value "A"."
@@ -3211,7 +7419,7 @@ topic "Concept Web" anchor text "Hub" assess [
 
 ---
 
-### Example 97
+### Example 203
 
 #### Prompt
 "Create a concept web with multiline markdown instructions using a bulleted list."
@@ -3248,7 +7456,7 @@ topic "Concept Web" instructions "Complete the concept web by following these st
 
 ---
 
-### Example 98
+### Example 204
 
 #### Prompt
 "Create a drag-and-drop concept web with the tray on the left side and three concepts."
@@ -3285,7 +7493,70 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 99
+### Example 205
+
+#### Prompt
+"Create a concept web with a topic, anchor with text override, three connections with text overrides, and assessment on all nodes using different expected values."
+
+#### Chat Transcript
+
+**User**: Create a concept web with a topic, anchor with text override, three connections with text overrides, and assessment on all nodes using different expected values.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 206
+
+#### Prompt
+"Create a concept web with an anchor using w, h, rounded, bg, color, and border all together."
+
+#### Chat Transcript
+
+**User**: Create a concept web with an anchor using w, h, rounded, bg, color, and border all together.
+
+#### Code
+
+```
+topic "Concept Web" anchor text "Hub" w 28 h 28 rounded "full" bg "indigo-600" color "white" border "indigo-300" {} connections [
+  connection text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] {}..
+```
+
+---
+
+### Example 207
 
 #### Prompt
 "Create a drag-and-drop concept web where the tray has more concepts than there are nodes (distractors)."
@@ -3325,7 +7596,52 @@ topic "Concept Web" anchor text "" assess [
 
 ---
 
-### Example 100
+### Example 208
+
+#### Prompt
+"Create a drag-and-drop concept web with topic, instructions, light theme, solid-arrow edges from anchor to all connections, dashed peer-to-peer edges with labels, blank assessed nodes, and a right-aligned concepts tray with matching concepts."
+
+#### Chat Transcript
+
+**User**: Create a drag-and-drop concept web with topic, instructions, light theme, solid-arrow edges from anchor to all connections, dashed peer-to-peer edges with labels, blank assessed nodes, and a right-aligned concepts tray with matching concepts.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag the concepts from the tray onto the correct nodes." theme LIGHT anchor value "Hub" text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" {}
+  edge from "Hub" to "Bar" type "solid-arrow" {}
+  edge from "Hub" to "Baz" type "solid-arrow" {}
+  edge from "Foo" to "Bar" type "dashed" text "related" {}
+  edge from "Bar" to "Baz" type "dashed" text "related" {}
+  edge from "Foo" to "Baz" type "dashed" text "related" {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 209
 
 #### Prompt
 "Create a concept web with an anchor that uses both value and text where text differs from value."
@@ -3358,7 +7674,7 @@ topic "Concept Web" anchor value "Hub" text "Central Hub" assess [
 
 ---
 
-### Example 101
+### Example 210
 
 #### Prompt
 "Make a concept web where connections are written before the anchor (keep it otherwise valid)."
@@ -3391,7 +7707,123 @@ connections [
 
 ---
 
-### Example 102
+### Example 211
+
+#### Prompt
+"Create a concept web with edges using the '*' wildcard on the to field to connect the anchor to all connections."
+
+#### Chat Transcript
+
+**User**: Create a concept web with edges using the '*' wildcard on the to field to connect the anchor to all connections.
+
+#### Code
+
+```
+topic "Concept Web" anchor value "Hub" text "Hub" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection value "Foo" text "Foo" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection value "Bar" text "Bar" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection value "Baz" text "Baz" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] edges [
+  edge from "Hub" to "*" type "solid" {}
+] {}..
+```
+
+---
+
+### Example 212
+
+#### Prompt
+"Create a concept web with the light theme and a concepts tray."
+
+#### Chat Transcript
+
+**User**: Create a concept web with the light theme and a concepts tray.
+
+#### Code
+
+```
+topic "Concept Web" theme LIGHT anchor text "" assess [
+  method "value"
+  expected "Hub"
+] {} connections [
+  connection text "" assess [
+    method "value"
+    expected "Foo"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Bar"
+  ] {}
+  connection text "" assess [
+    method "value"
+    expected "Baz"
+  ] {}
+] concepts [
+  concept value "Hub" {}
+  concept value "Foo" {}
+  concept value "Bar" {}
+  concept value "Baz" {}
+] align RIGHT {}..
+```
+
+---
+
+### Example 213
+
+#### Prompt
+"Create a concept web with styled connections, styled concepts tray, and styled relation labels, each with different colors."
+
+#### Chat Transcript
+
+**User**: Create a concept web with styled connections, styled concepts tray, and styled relation labels, each with different colors.
+
+#### Code
+
+```
+topic "Concept Web" instructions "Drag concepts onto the correct nodes, then label the edges." anchor value "Hub" text "" w 28 h 28 bg "indigo-500" color "white" rounded "full" {} connections [
+  connection value "Foo" text "" w 24 h 12 bg "rose-400" color "white" rounded "lg" {}
+  connection value "Bar" text "" w 24 h 12 bg "amber-400" color "white" rounded "lg" {}
+  connection value "Baz" text "" w 24 h 12 bg "teal-400" color "white" rounded "lg" {}
+] edges [
+  edge from "Hub" to "Foo" type "solid-arrow" assess [
+    method "value"
+    expected "causes"
+  ] {}
+  edge from "Hub" to "Bar" type "solid-arrow" assess [
+    method "value"
+    expected "supports"
+  ] {}
+  edge from "Hub" to "Baz" type "solid-arrow" assess [
+    method "value"
+    expected "inhibits"
+  ] {}
+] concepts [
+  concept value "Hub" bg "indigo-500" color "white" rounded "full" {}
+  concept value "Foo" bg "rose-400" color "white" rounded "lg" {}
+  concept value "Bar" bg "amber-400" color "white" rounded "lg" {}
+  concept value "Baz" bg "teal-400" color "white" rounded "lg" {}
+] relations [
+  relation value "causes" bg "violet-200" color "violet-900" rounded "xs" {}
+  relation value "supports" bg "sky-200" color "sky-900" rounded "xs" {}
+  relation value "inhibits" bg "orange-200" color "orange-900" rounded "xs" {}
+] {}..
+```
+
+---
+
+### Example 214
 
 #### Prompt
 "Create a concept web with an anchor and three connections."

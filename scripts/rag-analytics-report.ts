@@ -40,8 +40,8 @@ function parseArgs(argv: string[]): { period: string; output: string; language?:
       i++;
     }
   }
-  if (!['all', 'day', 'hour'].includes(period)) {
-    console.error('Error: --period must be "all", "day", or "hour"');
+  if (!['all', 'week', 'day', 'hour'].includes(period)) {
+    console.error('Error: --period must be "all", "week", "day", or "hour"');
     process.exit(1);
   }
   return { period, output, language };
@@ -100,6 +100,8 @@ function formatTimestamp(d: AnalyticsDoc, period?: string): string {
   const date = new Date(ms);
   if (period === 'hour' || period === 'day') {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } else if (period === 'week') {
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
   return date.toISOString();
 }
@@ -144,7 +146,7 @@ async function fetchDocs(period: string, language?: string): Promise<AnalyticsDo
   // Filter by period using stage startTime (Firestore timestamp field is unreliable)
   if (period !== 'all') {
     const now = Date.now();
-    const cutoffMs = now - (period === 'hour' ? 3600000 : 86400000);
+    const cutoffMs = now - (period === 'hour' ? 3600000 : period === 'day' ? 86400000 : 7 * 86400000);
     docs = docs.filter(d => {
       const ms = getTimestampMs(d);
       return ms != null && ms >= cutoffMs;
