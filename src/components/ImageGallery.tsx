@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
-import { listUserImages, validateImageFile, uploadImageDeduped, deleteUserImage } from '../lib/image-upload';
+import { listUserImages, validateImageFile, uploadImageDeduped, archiveUserImage } from '../lib/image-upload';
 import type { ImageInfo } from '../lib/image-upload';
 
 function fileNameWithoutExt(name: string): string {
@@ -93,11 +93,11 @@ export function ImageGallery() {
       .join('\n');
   };
 
-  const handleDelete = useCallback(async (img: ImageInfo, e: React.MouseEvent) => {
+  const handleArchive = useCallback(async (img: ImageInfo, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
       const storage = getStorage(firebaseApp);
-      await deleteUserImage(storage, user.uid, img.name);
+      await archiveUserImage(storage, user.uid, img.name);
       setImages(prev => prev.filter(i => i.downloadURL !== img.downloadURL));
       setSelectedUrls(prev => {
         const next = new Set(prev);
@@ -105,7 +105,7 @@ export function ImageGallery() {
         return next;
       });
     } catch (err) {
-      console.error('Failed to delete image:', err);
+      console.error('Failed to archive image:', err);
     }
   }, [firebaseApp, user?.uid]);
 
@@ -247,9 +247,9 @@ export function ImageGallery() {
                 }`}
               >
                 <span
-                  onClick={(e) => handleDelete(img, e)}
+                  onClick={(e) => handleArchive(img, e)}
                   className="absolute top-1 right-1 hidden group-hover:flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 hover:bg-red-500 hover:text-white text-gray-500 text-xs cursor-pointer z-10"
-                  title="Delete image"
+                  title="Archive image"
                 >
                   ✕
                 </span>

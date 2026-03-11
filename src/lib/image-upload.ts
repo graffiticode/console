@@ -1,4 +1,4 @@
-import { ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata, deleteObject } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata, updateMetadata } from 'firebase/storage';
 import type { FirebaseStorage, UploadTask } from 'firebase/storage';
 
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
@@ -34,11 +34,13 @@ export interface ImageInfo {
   downloadURL: string;
   timeCreated: string;
   hash?: string;
+  archived?: boolean;
 }
 
 export async function listUserImages(
   storage: FirebaseStorage,
   userId: string,
+  { includeArchived = false }: { includeArchived?: boolean } = {},
 ): Promise<ImageInfo[]> {
   const folderRef = ref(storage, `uploads/${userId}/`);
   const result = await listAll(folderRef);
@@ -53,13 +55,15 @@ export async function listUserImages(
         downloadURL,
         timeCreated: metadata.timeCreated,
         hash: metadata.customMetadata?.hash,
+        archived: metadata.customMetadata?.archived === 'true',
       };
     }),
   );
-  items.sort((a, b) => new Date(b.timeCreated).getTime() - new Date(a.timeCreated).getTime());
+  const filtered = includeArchived ? items : items.filter(item => !item.archived);
+  filtered.sort((a, b) => new Date(b.timeCreated).getTime() - new Date(a.timeCreated).getTime());
   // Deduplicate by displayName — keep newest (first after sort)
   const seen = new Set<string>();
-  return items.filter((item) => {
+  return filtered.filter((item) => {
     const dn = displayName(item.name);
     const key = item.hash ? `${dn}|${item.hash}` : dn;
     if (seen.has(key)) return false;
@@ -70,13 +74,22 @@ export async function listUserImages(
   });
 }
 
-export async function deleteUserImage(
+export async function archiveUserImage(
   storage: FirebaseStorage,
   userId: string,
   fileName: string,
 ): Promise<void> {
   const fileRef = ref(storage, `uploads/${userId}/${fileName}`);
-  await deleteObject(fileRef);
+  await updateMetadata(fileRef, { customMetadata: { archived: 'true' } });
+}
+
+export async function unarchiveUserImage(
+  storage: FirebaseStorage,
+  userId: string,
+  fileName: string,
+): Promise<void> {
+  const fileRef = ref(storage, `uploads/${userId}/${fileName}`);
+  await updateMetadata(fileRef, { customMetadata: { archived: 'false' } });
 }
 
 export function uploadImage(
