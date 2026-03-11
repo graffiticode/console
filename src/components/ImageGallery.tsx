@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
-import { listUserImages, validateImageFile, uploadImageDeduped, archiveUserImage } from '../lib/image-upload';
+import useGraffiticodeAuth, { useToken } from '../hooks/use-graffiticode-auth';
+import { listUserImages, validateImageFile, uploadImageDeduped, archiveUserImage, fetchArchivedImages } from '../lib/image-upload';
 import type { ImageInfo } from '../lib/image-upload';
 
 function fileNameWithoutExt(name: string): string {
@@ -14,6 +14,7 @@ function fileNameWithoutExt(name: string): string {
 export function ImageGallery() {
   const firebaseApp = useFirebaseApp();
   const { user } = useGraffiticodeAuth();
+  const { data: token } = useToken();
   const [images, setImages] = useState<ImageInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +27,7 @@ export function ImageGallery() {
   const [dragOverUrl, setDragOverUrl] = useState<string | null>(null);
 
   const loadImages = useCallback(async () => {
-    if (!user?.uid) {
+    if (!user?.uid || !token) {
       setLoading(false);
       return;
     }
@@ -34,7 +35,8 @@ export function ImageGallery() {
       setLoading(true);
       setError(null);
       const storage = getStorage(firebaseApp);
-      let result = await listUserImages(storage, user.uid);
+      const archivedNames = await fetchArchivedImages(token);
+      let result = await listUserImages(storage, user.uid, { archivedNames });
       // Apply saved order from localStorage
       const orderKey = `graffiticode:imageOrder:${user.uid}`;
       const savedOrder = localStorage.getItem(orderKey);
@@ -56,7 +58,7 @@ export function ImageGallery() {
     } finally {
       setLoading(false);
     }
-  }, [firebaseApp, user?.uid]);
+  }, [firebaseApp, user?.uid, token]);
 
   useEffect(() => {
     loadImages();
@@ -95,9 +97,9 @@ export function ImageGallery() {
 
   const handleArchive = useCallback(async (img: ImageInfo, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!token) return;
     try {
-      const storage = getStorage(firebaseApp);
-      await archiveUserImage(storage, user.uid, img.name);
+      await archiveUserImage(token, img.name);
       setImages(prev => prev.filter(i => i.downloadURL !== img.downloadURL));
       setSelectedUrls(prev => {
         const next = new Set(prev);
@@ -107,7 +109,7 @@ export function ImageGallery() {
     } catch (err) {
       console.error('Failed to archive image:', err);
     }
-  }, [firebaseApp, user?.uid]);
+  }, [token]);
 
   const handleFiles = useCallback(async (files: FileList) => {
     if (!user?.uid || files.length === 0) return;
@@ -121,9 +123,18 @@ export function ImageGallery() {
     setUploadProgress(0);
     const storage = getStorage(firebaseApp);
     try {
+      // Fetch archived images so we can unarchive on re-upload
+      let archivedImages: ImageInfo[] = [];
+      if (token) {
+        const archivedNames = await fetchArchivedImages(token);
+        if (archivedNames.length > 0) {
+          archivedImages = await listUserImages(storage, user.uid, { includeArchived: true, archivedNames });
+          archivedImages = archivedImages.filter(img => img.archived);
+        }
+      }
       const result = await uploadImageDeduped(storage, user.uid, file, images, (percent) => {
         setUploadProgress(percent);
-      });
+      }, { token, archivedImages });
       setUploadProgress(null);
       if (result.skipped) {
         setUploadError('Image already exists');
@@ -136,7 +147,7 @@ export function ImageGallery() {
       setUploadProgress(null);
       console.error(err);
     }
-  }, [firebaseApp, user?.uid, images, loadImages]);
+  }, [firebaseApp, user?.uid, token, images, loadImages]);
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();

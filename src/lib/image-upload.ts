@@ -1,4 +1,4 @@
-import { ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata, updateMetadata } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata } from 'firebase/storage';
 import type { FirebaseStorage, UploadTask } from 'firebase/storage';
 
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
@@ -40,8 +40,9 @@ export interface ImageInfo {
 export async function listUserImages(
   storage: FirebaseStorage,
   userId: string,
-  { includeArchived = false }: { includeArchived?: boolean } = {},
+  { includeArchived = false, archivedNames = [] as string[] }: { includeArchived?: boolean; archivedNames?: string[] } = {},
 ): Promise<ImageInfo[]> {
+  const archivedSet = new Set(archivedNames);
   const folderRef = ref(storage, `uploads/${userId}/`);
   const result = await listAll(folderRef);
   const items = await Promise.all(
@@ -55,7 +56,7 @@ export async function listUserImages(
         downloadURL,
         timeCreated: metadata.timeCreated,
         hash: metadata.customMetadata?.hash,
-        archived: metadata.customMetadata?.archived === 'true',
+        archived: archivedSet.has(itemRef.name),
       };
     }),
   );
@@ -74,22 +75,29 @@ export async function listUserImages(
   });
 }
 
-export async function archiveUserImage(
-  storage: FirebaseStorage,
-  userId: string,
-  fileName: string,
-): Promise<void> {
-  const fileRef = ref(storage, `uploads/${userId}/${fileName}`);
-  await updateMetadata(fileRef, { customMetadata: { archived: 'true' } });
+export async function fetchArchivedImages(token: string): Promise<string[]> {
+  const res = await fetch('/api/images/archive', {
+    headers: { authorization: token },
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.archived || [];
 }
 
-export async function unarchiveUserImage(
-  storage: FirebaseStorage,
-  userId: string,
-  fileName: string,
-): Promise<void> {
-  const fileRef = ref(storage, `uploads/${userId}/${fileName}`);
-  await updateMetadata(fileRef, { customMetadata: { archived: 'false' } });
+export async function archiveUserImage(token: string, fileName: string): Promise<void> {
+  await fetch('/api/images/archive', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', authorization: token },
+    body: JSON.stringify({ fileName }),
+  });
+}
+
+export async function unarchiveUserImage(token: string, fileName: string): Promise<void> {
+  await fetch('/api/images/archive', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', authorization: token },
+    body: JSON.stringify({ fileName }),
+  });
 }
 
 export function uploadImage(
@@ -134,10 +142,22 @@ export async function uploadImageDeduped(
   file: File,
   existingImages: ImageInfo[],
   onProgress?: (percent: number) => void,
-): Promise<{ downloadURL: string; fileName: string; skipped?: boolean }> {
+  options?: { token?: string; archivedImages?: ImageInfo[] },
+): Promise<{ downloadURL: string; fileName: string; skipped?: boolean; unarchived?: boolean }> {
   const hash = await computeFileHash(file);
   const baseName = file.name.replace(/\.[^.]+$/, '');
   const ext = file.name.split('.').pop() || 'png';
+
+  // Check archived images first — unarchive if exact match found
+  if (options?.token && options?.archivedImages) {
+    const archivedMatch = options.archivedImages.find(
+      (img) => displayName(img.name) === baseName && (!img.hash || img.hash === hash),
+    );
+    if (archivedMatch) {
+      await unarchiveUserImage(options.token, archivedMatch.name);
+      return { downloadURL: archivedMatch.downloadURL, fileName: file.name, unarchived: true };
+    }
+  }
 
   // Find images with the same base display name
   const sameNameImages = existingImages.filter(
