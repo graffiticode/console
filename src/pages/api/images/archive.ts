@@ -19,6 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const docRef = db.doc(`users/${uid}/settings/archivedImages`);
 
   if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'no-store');
     const doc = await docRef.get();
     const archived: string[] = doc.exists ? doc.data()?.fileNames || [] : [];
     return res.status(200).json({ archived });
