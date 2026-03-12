@@ -280,7 +280,8 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
   const [ showId, setShowId ] = useState("");
   const [ openMenuId, setOpenMenuId ] = useState<string | null>(null);
 
-  const handleNavigate = (direction: number) => {
+  const navigateRef = useRef<(direction: number) => void>(() => {});
+  navigateRef.current = (direction: number) => {
     if (!openMenuId) return;
     const currentIndex = items.findIndex(i => i.id === openMenuId);
     const nextIndex = currentIndex + direction;
@@ -298,12 +299,12 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
-        handleNavigate(e.key === 'ArrowUp' ? -1 : 1);
+        navigateRef.current(e.key === 'ArrowUp' ? -1 : 1);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [openMenuId, items, onSelectItem]);
+  }, [openMenuId]);
   const dragItemRef = useRef<string | null>(null);
   const dragOverItemRef = useRef<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
