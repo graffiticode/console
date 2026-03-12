@@ -78,6 +78,7 @@ export async function listUserImages(
 export async function fetchArchivedImages(token: string): Promise<string[]> {
   const res = await fetch('/api/images/archive', {
     headers: { authorization: token },
+    cache: 'no-store',
   });
   if (!res.ok) return [];
   const data = await res.json();

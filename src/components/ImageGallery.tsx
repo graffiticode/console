@@ -18,6 +18,7 @@ export function ImageGallery() {
   const [images, setImages] = useState<ImageInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
   const [dragging, setDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -26,43 +27,47 @@ export function ImageGallery() {
   const dragOverImageRef = useRef<string | null>(null);
   const [dragOverUrl, setDragOverUrl] = useState<string | null>(null);
 
-  const loadImages = useCallback(async () => {
+  useEffect(() => {
     if (!user?.uid || !token) {
       setLoading(false);
       return;
     }
-    try {
-      setLoading(true);
-      setError(null);
-      const storage = getStorage(firebaseApp);
-      const archivedNames = await fetchArchivedImages(token);
-      let result = await listUserImages(storage, user.uid, { archivedNames });
-      // Apply saved order from localStorage
-      const orderKey = `graffiticode:imageOrder:${user.uid}`;
-      const savedOrder = localStorage.getItem(orderKey);
-      if (savedOrder) {
-        try {
-          const orderUrls: string[] = JSON.parse(savedOrder);
-          const orderMap = new Map(orderUrls.map((url, idx) => [url, idx]));
-          result = [...result].sort((a, b) => {
-            const aIdx = orderMap.has(a.downloadURL) ? orderMap.get(a.downloadURL)! : Infinity;
-            const bIdx = orderMap.has(b.downloadURL) ? orderMap.get(b.downloadURL)! : Infinity;
-            return aIdx - bIdx;
-          });
-        } catch {}
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const storage = getStorage(firebaseApp);
+        const archivedNames = await fetchArchivedImages(token);
+        if (cancelled) return;
+        let result = await listUserImages(storage, user.uid, { archivedNames });
+        if (cancelled) return;
+        // Apply saved order from localStorage
+        const orderKey = `graffiticode:imageOrder:${user.uid}`;
+        const savedOrder = localStorage.getItem(orderKey);
+        if (savedOrder) {
+          try {
+            const orderUrls: string[] = JSON.parse(savedOrder);
+            const orderMap = new Map(orderUrls.map((url, idx) => [url, idx]));
+            result = [...result].sort((a, b) => {
+              const aIdx = orderMap.has(a.downloadURL) ? orderMap.get(a.downloadURL)! : Infinity;
+              const bIdx = orderMap.has(b.downloadURL) ? orderMap.get(b.downloadURL)! : Infinity;
+              return aIdx - bIdx;
+            });
+          } catch {}
+        }
+        setImages(result);
+      } catch (err) {
+        if (!cancelled) {
+          setError('Failed to load images');
+          console.error(err);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setImages(result);
-    } catch (err) {
-      setError('Failed to load images');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [firebaseApp, user?.uid, token]);
-
-  useEffect(() => {
-    loadImages();
-  }, [loadImages]);
+    })();
+    return () => { cancelled = true; };
+  }, [firebaseApp, user?.uid, token, reloadKey]);
 
   const handleClick = (img: ImageInfo, e: React.MouseEvent) => {
     const url = img.downloadURL;
@@ -140,14 +145,14 @@ export function ImageGallery() {
         setUploadError('Image already exists');
         setTimeout(() => setUploadError(null), 2000);
       } else {
-        loadImages();
+        setReloadKey(k => k + 1);
       }
     } catch (err) {
       setUploadError('Upload failed');
       setUploadProgress(null);
       console.error(err);
     }
-  }, [firebaseApp, user?.uid, token, images, loadImages]);
+  }, [firebaseApp, user?.uid, token, images]);
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
