@@ -683,7 +683,7 @@ export async function getItems({ auth, lang, mark, app }) {
     // Filter by app - default to 'console' if not specified
     const appFilter = app || 'console';
     query = query.where("app", "==", appFilter);
-    const itemsSnapshot = await query.orderBy("updated", "desc").get();
+    const itemsSnapshot = await query.get();
     const items = [];
 
     // Get the user's sharedItems data to add to items
@@ -774,9 +774,11 @@ export async function getItems({ auth, lang, mark, app }) {
         app: data.app || null,
       };
 
-      items.push(item);
+      const timestamp = data.updated || data.created || 0;
+      items.push({ ...item, _sortKey: timestamp });
     }
-    return items;
+    items.sort((a, b) => b._sortKey - a._sortKey);
+    return items.map(({ _sortKey, ...item }) => item);
   } catch (error) {
     console.error("getItems()", "ERROR", error);
     throw new Error(`Failed to get items: ${error.message}`);
