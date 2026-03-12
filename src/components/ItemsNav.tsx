@@ -112,9 +112,14 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
     }
   };
 
-  // Reposition on window resize and focus on name input when opened
+  // Position menu and focus input when opened
   useEffect(() => {
     if (isOpen) {
+      // Position menu after render
+      setTimeout(() => {
+        positionMenu();
+        setTimeout(positionMenu, 50);
+      }, 0);
       window.addEventListener('resize', positionMenu);
       // Set focus on the name input field when menu opens and select all text
       setTimeout(() => {
