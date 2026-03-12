@@ -430,6 +430,10 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
           setTaskId(nextItem.taskId);
           setEditorHelp(typeof nextItem.help === "string" ? JSON.parse(nextItem.help || "[]") : (nextItem.help || []));
           loadItemSource(nextItem.id, nextItem.taskId, nextItem.code);
+          // Persist so SWR refetch doesn't override
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`graffiticode:selected:itemId`, nextItem.id);
+          }
         } else {
           setSelectedItemId("");
           setTaskId("");
