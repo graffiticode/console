@@ -60,11 +60,11 @@ export async function listUserImages(
       };
     }),
   );
-  const filtered = includeArchived ? items : items.filter(item => !item.archived);
-  filtered.sort((a, b) => new Date(b.timeCreated).getTime() - new Date(a.timeCreated).getTime());
-  // Deduplicate by displayName — keep newest (first after sort)
+  // Sort by newest first
+  items.sort((a, b) => new Date(b.timeCreated).getTime() - new Date(a.timeCreated).getTime());
+  // Deduplicate by displayName first — keep newest (first after sort)
   const seen = new Set<string>();
-  return filtered.filter((item) => {
+  const deduped = items.filter((item) => {
     const dn = displayName(item.name);
     const key = item.hash ? `${dn}|${item.hash}` : dn;
     if (seen.has(key)) return false;
@@ -73,6 +73,8 @@ export async function listUserImages(
     if (item.hash) seen.add(dn);
     return true;
   });
+  // Then filter archived
+  return includeArchived ? deduped : deduped.filter(item => !item.archived);
 }
 
 export async function fetchArchivedImages(token: string): Promise<string[]> {
