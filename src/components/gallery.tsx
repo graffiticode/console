@@ -419,14 +419,17 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         return updated;
       });
 
-      // If we removed the current selected item, select the first item
+      // If we removed the current selected item, select the item at the same index
       if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark && selectedItemId === itemId) {
+        const currentIndex = items.findIndex(item => item.id === itemId);
         const remainingItems = items.filter(item => item.id !== itemId);
         if (remainingItems.length > 0) {
-          setSelectedItemId(remainingItems[0].id);
-          setTaskId(remainingItems[0].taskId);
-          setEditorHelp(typeof remainingItems[0].help === "string" ? JSON.parse(remainingItems[0].help || "[]") : (remainingItems[0].help || []));
-          loadItemSource(remainingItems[0].id, remainingItems[0].taskId, remainingItems[0].code);
+          const nextIndex = Math.min(currentIndex, remainingItems.length - 1);
+          const nextItem = remainingItems[nextIndex];
+          setSelectedItemId(nextItem.id);
+          setTaskId(nextItem.taskId);
+          setEditorHelp(typeof nextItem.help === "string" ? JSON.parse(nextItem.help || "[]") : (nextItem.help || []));
+          loadItemSource(nextItem.id, nextItem.taskId, nextItem.code);
         } else {
           setSelectedItemId("");
           setTaskId("");
