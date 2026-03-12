@@ -39,8 +39,10 @@ export function ImageGallery() {
         setError(null);
         const storage = getStorage(firebaseApp);
         const archivedNames = await fetchArchivedImages(token);
+        console.log('[ImageGallery] archived names:', archivedNames.length, archivedNames);
         if (cancelled) return;
         let result = await listUserImages(storage, user.uid, { archivedNames });
+        console.log('[ImageGallery] images after filter:', result.length, result.map(i => i.name));
         if (cancelled) return;
         // Apply saved order from localStorage
         const orderKey = `graffiticode:imageOrder:${user.uid}`;
