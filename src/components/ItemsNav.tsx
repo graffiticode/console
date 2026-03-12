@@ -13,7 +13,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, onChange, onRefresh, isOpen, onOpen, onClose, onNavigate }) {
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, onChange, onRefresh, isOpen, onOpen, onClose }) {
   const { user } = useGraffiticodeAuth();
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -21,7 +21,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const nameInputRef = useRef(null);
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [menuPosition, setMenuPosition] = useState({ top: -9999, left: -9999 });
 
   // Position menu next to the button
   const positionMenu = () => {
@@ -114,6 +114,10 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
 
   // Position menu and focus input when opened
   useEffect(() => {
+    if (!isOpen) {
+      setMenuPosition({ top: -9999, left: -9999 });
+      return;
+    }
     if (isOpen) {
       // Position menu after render
       setTimeout(() => {
@@ -131,19 +135,6 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
       return () => window.removeEventListener('resize', positionMenu);
     }
   }, [isOpen]);
-
-  // Handle arrow key navigation when menu is open
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        onNavigate(e.key === 'ArrowUp' ? -1 : 1);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onNavigate]);
 
   return (
     <div className="relative" style={{ display: 'inline-block' }}>
@@ -300,6 +291,19 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
       onSelectItem(nextItem.id);
     }
   };
+
+  // Handle arrow key navigation when a menu is open
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        handleNavigate(e.key === 'ArrowUp' ? -1 : 1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [openMenuId, items, onSelectItem]);
   const dragItemRef = useRef<string | null>(null);
   const dragOverItemRef = useRef<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -400,7 +404,6 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                       isOpen={openMenuId === item.id}
                       onOpen={() => setOpenMenuId(item.id)}
                       onClose={() => setOpenMenuId(null)}
-                      onNavigate={handleNavigate}
                     /> || <div />
                   }
                 </div>
