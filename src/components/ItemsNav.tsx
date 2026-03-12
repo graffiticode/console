@@ -292,6 +292,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
       const nextItem = items[nextIndex];
       setOpenMenuId(nextItem.id);
       setShowId(nextItem.id);
+      onSelectItem(nextItem.id);
     }
   };
   const dragItemRef = useRef<string | null>(null);
