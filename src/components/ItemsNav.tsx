@@ -13,9 +13,8 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, onChange, onRefresh }) {
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, onChange, onRefresh, isOpen, onOpen, onClose, onNavigate }) {
   const { user } = useGraffiticodeAuth();
-  const [isOpen, setIsOpen] = useState(false);
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
@@ -64,9 +63,9 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
     e.stopPropagation();
 
     if (isOpen) {
-      setIsOpen(false);
+      onClose();
     } else {
-      setIsOpen(true);
+      onOpen();
       // Wait for menu to be rendered before positioning
       setTimeout(() => {
         positionMenu();
@@ -102,7 +101,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
 
       if (newItem && newItem.id) {
         // Close the menu
-        setIsOpen(false);
+        onClose();
         // Refresh the items list
         onRefresh();
       }
@@ -128,6 +127,19 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
     }
   }, [isOpen]);
 
+  // Handle arrow key navigation when menu is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        onNavigate(e.key === 'ArrowUp' ? -1 : 1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onNavigate]);
+
   return (
     <div className="relative" style={{ display: 'inline-block' }}>
       <button
@@ -142,7 +154,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
       {isOpen && (
         <div
           className="fixed inset-0 z-50"
-          onClick={() => setIsOpen(false)}
+          onClick={() => onClose()}
         >
           <div
             ref={menuRef}
@@ -238,7 +250,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowShareDialog(true);
-                    setIsOpen(false);
+                    onClose();
                   }}
                   className="flex items-center w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-none"
                 >
@@ -270,6 +282,18 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
 
 export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh, onReorderItems, panelWidth = 210 }) {
   const [ showId, setShowId ] = useState("");
+  const [ openMenuId, setOpenMenuId ] = useState<string | null>(null);
+
+  const handleNavigate = (direction: number) => {
+    if (!openMenuId) return;
+    const currentIndex = items.findIndex(i => i.id === openMenuId);
+    const nextIndex = currentIndex + direction;
+    if (nextIndex >= 0 && nextIndex < items.length) {
+      const nextItem = items[nextIndex];
+      setOpenMenuId(nextItem.id);
+      setShowId(nextItem.id);
+    }
+  };
   const dragItemRef = useRef<string | null>(null);
   const dragOverItemRef = useRef<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -367,6 +391,10 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                       code={item.code}
                       onChange={onUpdateItem}
                       onRefresh={onRefresh}
+                      isOpen={openMenuId === item.id}
+                      onOpen={() => setOpenMenuId(item.id)}
+                      onClose={() => setOpenMenuId(null)}
+                      onNavigate={handleNavigate}
                     /> || <div />
                   }
                 </div>
