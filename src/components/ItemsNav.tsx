@@ -279,6 +279,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
 export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh, onReorderItems, panelWidth = 210 }) {
   const [ showId, setShowId ] = useState("");
   const [ openMenuId, setOpenMenuId ] = useState<string | null>(null);
+  const itemRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
   const navigateRef = useRef<(direction: number) => void>(() => {});
   navigateRef.current = (direction: number) => {
@@ -290,6 +291,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
       setOpenMenuId(nextItem.id);
       setShowId(nextItem.id);
       onSelectItem(nextItem.id);
+      itemRefs.current[nextItem.id]?.scrollIntoView({ block: 'nearest' });
     }
   };
 
@@ -359,6 +361,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
             {items.map((item) => (
               <li
                 key={item.id}
+                ref={(el) => { itemRefs.current[item.id] = el; }}
                 draggable
                 onDragStart={(e) => handleDragStart(e, item.id)}
                 onDragOver={(e) => handleDragOver(e, item.id)}
