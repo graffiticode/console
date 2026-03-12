@@ -683,7 +683,7 @@ export async function getItems({ auth, lang, mark, app }) {
     // Filter by app - default to 'console' if not specified
     const appFilter = app || 'console';
     query = query.where("app", "==", appFilter);
-    const itemsSnapshot = await query.orderBy("created", "desc").get();
+    const itemsSnapshot = await query.orderBy("updated", "desc").get();
     const items = [];
 
     // Get the user's sharedItems data to add to items
