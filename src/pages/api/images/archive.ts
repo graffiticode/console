@@ -22,6 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Cache-Control', 'no-store');
     const doc = await docRef.get();
     const archived: string[] = doc.exists ? doc.data()?.fileNames || [] : [];
+    console.log(`GET archive uid=${uid} path=${docRef.path} exists=${doc.exists} count=${archived.length} files=${JSON.stringify(archived)}`);
     return res.status(200).json({ archived });
   }
 
@@ -31,6 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'fileName is required' });
     }
     const { FieldValue } = await import('firebase-admin/firestore');
+    console.log(`POST archive uid=${uid} path=${docRef.path} fileName=${fileName}`);
     await docRef.set(
       { fileNames: FieldValue.arrayUnion(fileName) },
       { merge: true },
