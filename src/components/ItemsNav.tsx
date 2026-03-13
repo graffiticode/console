@@ -286,6 +286,14 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
   const [ showId, setShowId ] = useState("");
   const [ openMenuId, setOpenMenuId ] = useState<string | null>(null);
   const itemRefs = useRef<Record<string, HTMLLIElement | null>>({});
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Focus the list when items load
+  useEffect(() => {
+    if (items.length > 0 && listRef.current) {
+      listRef.current.focus();
+    }
+  }, [items.length > 0]);
 
   const navigateItems = (direction: number) => {
     if (!openMenuId) return;
@@ -354,6 +362,7 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
           <p className="text-xs text-gray-500 text-left pl-4 py-0 leading-6">No items found</p>
         ) : (
           <ul
+            ref={listRef}
             role="list"
             className="space-y-1 font-mono focus:outline-none"
             tabIndex={0}
