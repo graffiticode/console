@@ -1,5 +1,5 @@
 import { Menu, Transition } from '@headlessui/react'
-import { Fragment, useEffect, useState, useRef } from 'react';
+import { Fragment, useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { PlusIcon, ShareIcon, UserIcon } from '@heroicons/react/20/solid';
 import { DocumentDuplicateIcon } from '@heroicons/react/24/outline';
@@ -13,7 +13,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, onChange, onRefresh, isOpen, onOpen, onClose }) {
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
   const { user } = useGraffiticodeAuth();
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -176,6 +176,12 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                   className="w-full rounded-none border border-gray-300 p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-500"
                   value={nameValue}
                   onChange={(e) => setNameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      onArrowKey(e.key === 'ArrowUp' ? -1 : 1);
+                    }
+                  }}
                   onBlur={(e) => {
                     const newName = e.target.value.trim();
                     if (newName && newName !== name) {
@@ -276,13 +282,12 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
   )
 }
 
-export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh, onReorderItems, panelWidth = 210 }) {
+const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh, onReorderItems, panelWidth = 210 }: any, ref) {
   const [ showId, setShowId ] = useState("");
   const [ openMenuId, setOpenMenuId ] = useState<string | null>(null);
   const itemRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
-  const navigateRef = useRef<(direction: number) => void>(() => {});
-  navigateRef.current = (direction: number) => {
+  const navigateItems = (direction: number) => {
     if (!openMenuId) return;
     const currentIndex = items.findIndex(i => i.id === openMenuId);
     const nextIndex = currentIndex + direction;
@@ -291,22 +296,13 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
       setOpenMenuId(nextItem.id);
       setShowId(nextItem.id);
       onSelectItem(nextItem.id);
-      itemRefs.current[nextItem.id]?.scrollIntoView({ block: 'nearest' });
     }
   };
 
-  // Handle arrow key navigation when a menu is open
-  useEffect(() => {
-    if (!openMenuId) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        navigateRef.current(e.key === 'ArrowUp' ? -1 : 1);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [openMenuId]);
+  useImperativeHandle(ref, () => ({
+    get hasOpenMenu() { return !!openMenuId; },
+    navigate: navigateItems,
+  }));
   const dragItemRef = useRef<string | null>(null);
   const dragOverItemRef = useRef<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -357,7 +353,25 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
         {items.length === 0 ? (
           <p className="text-xs text-gray-500 text-left pl-4 py-0 leading-6">No items found</p>
         ) : (
-          <ul role="list" className="space-y-1 font-mono">
+          <ul
+            role="list"
+            className="space-y-1 font-mono focus:outline-none"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (openMenuId) return;
+              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                const currentIndex = items.findIndex(i => i.id === selectedItemId);
+                const nextIndex = currentIndex + (e.key === 'ArrowUp' ? -1 : 1);
+                if (nextIndex >= 0 && nextIndex < items.length) {
+                  const nextItem = items[nextIndex];
+                  onSelectItem(nextItem.id);
+                  setShowId(nextItem.id);
+                  itemRefs.current[nextItem.id]?.scrollIntoView({ block: 'nearest' });
+                }
+              }
+            }}
+          >
             {items.map((item) => (
               <li
                 key={item.id}
@@ -408,6 +422,7 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
                       isOpen={openMenuId === item.id}
                       onOpen={() => setOpenMenuId(item.id)}
                       onClose={() => setOpenMenuId(null)}
+                      onArrowKey={navigateItems}
                     /> || <div />
                   }
                 </div>
@@ -418,4 +433,6 @@ export default function ItemsNav({ items, selectedItemId, onSelectItem, onUpdate
       </nav>
     </div>
   )
-}
+});
+
+export default ItemsNav;

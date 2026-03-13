@@ -56,6 +56,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
+  const itemsNavRef = useRef<any>(null);
 
   // Save the current taskId to localStorage when it changes so it can be used in Tasks view
   useEffect(() => {
@@ -449,6 +450,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   };
 
   const handleSelectItem = (itemId) => {
+    console.log('[Gallery] handleSelectItem', { itemId, found: !!items.find(i => i.id === itemId) });
     const item = items.find(i => i.id === itemId);
     if (item) {
       setSelectedItemId(item.id);
@@ -706,6 +708,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
                 </div>
               ) : (
                 <ItemsNav
+                  ref={itemsNavRef}
                   items={items}
                   selectedItemId={selectedItemId}
                   onSelectItem={handleSelectItem}
