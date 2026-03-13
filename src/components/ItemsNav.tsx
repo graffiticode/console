@@ -405,7 +405,7 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
                 >
                   <button
                     onClick={() => onSelectItem(item.id)}
-                    className="flex items-center rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate text-left"
+                    className="flex items-center rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate text-left focus:outline-none"
                     style={{ maxWidth: panelWidth - 40 }}
                     title={item.name}
                   >
