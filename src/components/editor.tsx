@@ -149,16 +149,16 @@ export default function Editor({
     }
   }, [code, isUserEdit, isPostingTask]);
 
-  // Notify parent of code changes
+  // Notify parent of code changes (only from user edits, not parent-driven updates)
   useEffect(() => {
-    if (onCodeChange && code !== undefined) {
+    if (onCodeChange && code !== undefined && code !== initialCode) {
       onCodeChange(code);
     }
   }, [code, onCodeChange]);
 
-  // Notify parent of help changes
+  // Notify parent of help changes (only from user edits, not parent-driven updates)
   useEffect(() => {
-    if (onHelpChange && help !== undefined) {
+    if (onHelpChange && help !== undefined && help !== initialHelp) {
       onHelpChange(help);
     }
   }, [help, onHelpChange]);
