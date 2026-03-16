@@ -120,7 +120,7 @@ const typeDefs = `
     task(id: String!): Task
     items(lang: String!, mark: Int, app: String): [Item!]
     item(id: String!): Item
-    languages(category: String, search: String): [Language!]!
+    languages(category: String, search: String, domain: String): [Language!]!
     language(id: String!): LanguageInfo
   }
 
@@ -204,8 +204,8 @@ const resolvers = {
       return await getItem({ auth: { uid, token }, id });
     },
     languages: async (_, args) => {
-      const { category, search } = args;
-      return listLanguages({ category, search });
+      const { category, search, domain } = args;
+      return listLanguages({ category, search, domain });
     },
     language: async (_, args) => {
       const { id } = args;

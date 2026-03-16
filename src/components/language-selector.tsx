@@ -16,80 +16,17 @@ import { useState } from 'react'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
 import { Combobox } from '@headlessui/react'
 import { getTitle } from '../lib/utils';
-
-interface Language {
-  id: number;
-  name: string;
-  desc: string;
-  domains: string[];
-}
-
-const languages: Language[] = [
-  {id: 1,  name: 'L0001', desc: "Base language", domains: ["hide"]},
-  {id: 2,  name: 'L0002', desc: "Base language", domains: ["graffiticode"]},
-  {id: 3,  name: 'L0011', desc: "Property editors", domains: ["hide"]},
-  {id: 4,  name: 'L0012', desc: "Object viewers", domains: ["hide"]},
-  {id: 5,  name: 'L0137', desc: "Data transformers", domains: ["hide"]},
-  {id: 6,  name: 'L0146', desc: "SVG scrapers", domains: ["hide"]},
-  {id: 7,  name: 'L0147', desc: "Chart renderers", domains: ["hide"]},
-  {id: 8,  name: 'L0150', desc: "Free shipping calculators", domains: ["hide"]},
-  {id: 9,  name: 'L0151', desc: "Spreadsheets questions", domains: ["hide"]},
-  {id: 10, name: 'L0152', desc: "Interactive map questions", domains: [
-    "appliedscoring",
-    "graffiticode",
-  ]},
-  {id: 11, name: 'L0153', desc: "Area model questions", domains: [
-    "appliedscoring",
-    "graffiticode",
-  ]},
-  {id: 12, name: 'L0154', desc: "Magic square questions", domains: ["hide"]},
-  {id: 13, name: 'L0155', desc: "Stoplight questions", domains: ["hide"]},
-  {id: 14, name: 'L0156', desc: "Short text scorers", domains: ["hide"]},
-  {id: 15, name: 'L0157', desc: "Geoboard manipulatives", domains: [
-    "appliedscoring",
-    "graffiticode",
-  ]},
-  {id: 16, name: 'L0158', desc: "Learnosity integrations", domains: [
-    "appliedscoring",
-    "graffiticode",
-  ]},
-  {id: 17, name: 'L0159', desc: "Flashcard sets", domains: [
-    "appliedscoring",
-    "graffiticode",
-  ]},
-  {id: 18, name: 'L0160', desc: "Learnosity QTI Importer", domains: ["hide"]},
-  {id: 19, name: 'L0161', desc: "Expression translators", domains: ["hide"]},
-  {id: 20, name: 'L0162', desc: "Walking routes", domains: ["hide"]},
-  {id: 21, name: 'L0163', desc: "Code editors", domains: ["hide"]},
-  {id: 22, name: 'L0164', desc: "Code generators", domains: ["hide"]},
-  {id: 23, name: 'L0166', desc: "Spreadsheets", domains: [
-    "appliedscoring",
-    "embedsheets",
-    "graffiticode",
-  ]},
-  {id: 24, name: 'L0169', desc: "Concept web assessments", domains: [
-    "appliedscoring",
-    "graffiticode",
-  ]},
-];
+import { LANGUAGES, selectLanguages as selectLangs, findLanguageById, type Language } from '../lib/languages';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
 export function findLanguageByNumber(num: string): Language | undefined {
-  const name = `L${num.padStart(4, '0')}`;
-  return languages.find(l => l.name === name);
+  return findLanguageById(num);
 }
 
-export function selectLanguages(domain: string) {
-  domain = domain.toLowerCase();
-  return languages.filter(language =>
-    domain === "graffiticode" && !language.domains.includes("hide") ||
-      language.domains.length === 0 ||
-      language.domains.includes(domain)
-  );
-}
+export { selectLangs as selectLanguages };
 
 interface LanguageSelectorProps {
   domain: string;
@@ -100,13 +37,7 @@ interface LanguageSelectorProps {
 export default function LanguageSelector({ domain, language, setLanguage }: LanguageSelectorProps) {
   domain = domain.toLowerCase();
   const [query, setQuery] = useState('')
-  const domainLanguages =
-        languages.filter(language =>
-          !language.domains.includes("hide") && (
-            language.domains.length === 0 ||
-              language.domains.includes(domain.toLowerCase())
-          )
-        );
+  const domainLanguages = selectLangs(domain);
   // Normalize the query to ensure it has the leading "L" if it's just numbers
   const normalizedQuery = query && /^\d+$/.test(query) ? `L${query}` : query;
   // Check if query is a valid custom language format (e.g., "L0177" or just "0177")
@@ -149,7 +80,7 @@ export default function LanguageSelector({ domain, language, setLanguage }: Lang
             {isCustomLanguage && (
               <Combobox.Option
                 key="custom"
-                value={{ id: 'custom', name: normalizedQuery.toUpperCase(), desc: "Custom language" }}
+                value={{ id: 'custom', name: normalizedQuery.toUpperCase(), description: "Custom language", category: "general", domains: [] }}
                 className={({ active }) =>
                   classNames(
                     'relative cursor-default select-none py-2 pl-8 pr-4',

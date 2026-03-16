@@ -4,14 +4,9 @@
  * Language specs are fetched dynamically from l{langId}.graffiticode.org/spec.html
  */
 
-import bent from "bent";
+import { LANGUAGES, listLanguages as listLangs, type Language } from "../../lib/languages";
 
-export interface Language {
-  id: string;
-  name: string;
-  description: string;
-  category?: string;
-}
+export type { Language };
 
 export interface LanguageInfo extends Language {
   examples: string[];
@@ -23,49 +18,7 @@ export interface LanguageInfo extends Language {
   specUrl: string;
 }
 
-// Minimal registry of known languages
-// Description and category can be overridden by fetched spec
-const LANGUAGES: Language[] = [
-  {
-    id: "0002",
-    name: "L0002",
-    description: "Simple programs with text rendering and theming",
-    category: "general",
-  },
-  {
-    id: "0159",
-    name: "L0159",
-    description: "Flashcards, Match and Memory card games",
-    category: "data",
-  },
-  {
-    id: "0166",
-    name: "L0166",
-    description: "Spreadsheets and tabular data with formulas",
-    category: "data",
-  },
-];
-
-/**
- * List available languages with optional filtering
- */
-export function listLanguages({ category, search }: { category?: string; search?: string }): Language[] {
-  let results = [...LANGUAGES];
-
-  if (category) {
-    results = results.filter(lang => lang.category === category);
-  }
-
-  if (search) {
-    const searchLower = search.toLowerCase();
-    results = results.filter(lang =>
-      lang.name.toLowerCase().includes(searchLower) ||
-      lang.description.toLowerCase().includes(searchLower)
-    );
-  }
-
-  return results;
-}
+export { listLangs as listLanguages };
 
 /**
  * Get detailed info for a specific language

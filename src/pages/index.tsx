@@ -85,7 +85,7 @@ function LanguageList({ language, setLanguage }) {
             </div>
             <div className="flex flex-1 items-center justify-between truncate rounded-none border-b border-r border-t border-gray-200 bg-white">
               <div className="flex-1 truncate px-4 py-2 text-sm">
-                {language.desc}
+                {language.description}
                    <p className="text-gray-500">{data && data[language.name] || "0"} Items</p>
               </div>
               <div className="flex-shrink-0 pr-2">
