@@ -999,7 +999,8 @@ export const HelpPanel = ({
     const skipUserMessage = botResponse.skipUserMessage;
 
     // If the bot response is code, automatically update the code panel
-    if (botResponse?.type === 'code' && typeof setCode === 'function') {
+    // Skip if text is null/empty (e.g., compile error) to keep current code
+    if (botResponse?.type === 'code' && botResponse.text && typeof setCode === 'function') {
       setCode(botResponse.text);
     }
 

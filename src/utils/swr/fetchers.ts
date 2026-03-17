@@ -400,6 +400,9 @@ export const generateCode = async ({ user, prompt, language, options, currentCod
           input_tokens
           output_tokens
         }
+        errors {
+          message
+        }
       }
     }
   `;

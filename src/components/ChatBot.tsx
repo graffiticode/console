@@ -99,6 +99,14 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
 
 
     // Transform the response to match our expected format
+    // If there are errors, return as error type to preserve current code
+    if (result.errors && result.errors.length > 0) {
+      return {
+        text: result.errors.map(e => e.message).join('\n'),
+        type: 'error',
+        timestamp: new Date().toISOString()
+      };
+    }
     return {
       text: result.code,
       type: 'code',
