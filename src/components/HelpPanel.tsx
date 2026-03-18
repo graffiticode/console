@@ -56,6 +56,7 @@ export const HelpPanel = ({
   setCode,
   setTaskId,
   onLoadTaskFromHelp,
+  onError,
   taskId
 }) => {
   const [data, setData] = useState({});
@@ -1004,6 +1005,11 @@ export const HelpPanel = ({
       setCode(botResponse.text);
     }
 
+    // Propagate errors to parent (gallery alert)
+    if (botResponse?.type === 'error' && botResponse.text) {
+      onError?.(botResponse.text);
+    }
+
     // If the bot response includes a taskId or timestamp, update the last user message
     if (botResponse?.taskId || botResponse?.timestamp) {
       setHelp(prev => {
@@ -1025,7 +1031,7 @@ export const HelpPanel = ({
         return newHelp;
       });
     }
-  }, [setCode]);
+  }, [setCode, onError]);
 
   // State for the input field
   const [messageText, setMessageText] = useState('');

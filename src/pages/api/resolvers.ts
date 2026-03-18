@@ -3,7 +3,7 @@ import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
 import { getFirestore } from "../../utils/db";
 import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } from "../../lib/api";
-import { unparse } from "@graffiticode/parser";
+import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService } from "../../lib/code-generation-service";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import fs from "fs";
@@ -18,6 +18,43 @@ const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
 const taskDao = getTaskDaoForStore("firestore");
 
 const db = getFirestore();
+
+export async function parseCode({ lang, code }: { lang: string; code: string }) {
+  try {
+    const lexicon = await getLanguageLexicon(lang);
+    if (!lexicon) {
+      return { ast: null, errors: [{ message: `No lexicon found for language ${lang}`, from: -1, to: -1 }] };
+    }
+    const astPool = await parser.parse(lang, code, lexicon);
+
+    // Scan the AST pool for ERROR nodes
+    const errors: Array<{ message: string; from: number; to: number }> = [];
+    for (const key of Object.keys(astPool)) {
+      if (key === "root") continue;
+      const node = astPool[key];
+      if (node && node.tag === "ERROR") {
+        // ERROR node elts: [STR_nid, NUM_nid(from), NUM_nid(to)]
+        const msgNode = astPool[node.elts[0]];
+        const fromNode = astPool[node.elts[1]];
+        const toNode = astPool[node.elts[2]];
+        const message = typeof msgNode === "string" ? msgNode
+          : (msgNode?.tag === "STR" ? msgNode.elts[0] : String(msgNode));
+        const from = typeof fromNode === "number" ? fromNode
+          : (fromNode?.tag === "NUM" ? Number(fromNode.elts[0]) : -1);
+        const to = typeof toNode === "number" ? toNode
+          : (toNode?.tag === "NUM" ? Number(toNode.elts[0]) : -1);
+        errors.push({ message, from, to });
+      }
+    }
+
+    if (errors.length > 0) {
+      return { ast: null, errors };
+    }
+    return { ast: JSON.stringify(astPool), errors: null };
+  } catch (err) {
+    return { ast: null, errors: [{ message: err.message || "Parse error", from: -1, to: -1 }] };
+  }
+}
 
 export async function logCompile({ auth, units, id, timestamp, status, data }) {
   try {
@@ -177,6 +214,10 @@ export async function getData({ authToken, id }) {
     const baseUrl = getBaseUrlForApi();
     const get = bent(baseUrl, "GET", "json", 200);
     const resp = await get(`/data?id=${id}&access_token=${authToken}`);
+    console.log(
+      "getData()",
+      "resp.data=" + JSON.stringify(resp.data, null, 2),
+    );
     return resp.data;
   } catch (x) {
     console.log("getData()", "ERROR", x);
@@ -449,14 +490,26 @@ export async function generateCode({
       usage = successResult.usage;
     }
 
-    // Post the task to get a task ID
+    // Parse source code to AST, then post the task
+    const parseResult = await parseCode({ lang: language, code });
+    if (parseResult.errors) {
+      return {
+        code: null,
+        taskId: null,
+        language,
+        description: "Parse error",
+        model: null,
+        usage: null,
+        errors: parseResult.errors,
+      };
+    }
     const taskData = await postTask({
       auth,
       task: {
         lang: language,
-        code: code,
+        code: JSON.parse(parseResult.ast),
       },
-      ephemeral: true, // Make it ephemeral since it's just a template
+      ephemeral: true,
       isPublic: false,
     });
     taskId = taskData.id;
@@ -536,14 +589,17 @@ export async function createItem({
       });
       taskId = result.taskId;
       if (!taskId) {
-        // Fallback: post a minimal task directly
-        const fallbackData = await postTask({
-          auth,
-          task: { lang, code: "{}.." },
-          ephemeral: true,
-          isPublic: false,
-        });
-        taskId = fallbackData?.id;
+        // Fallback: parse and post a minimal task directly
+        const fallbackParse = await parseCode({ lang, code: "{}.." });
+        if (fallbackParse.ast) {
+          const fallbackData = await postTask({
+            auth,
+            task: { lang, code: JSON.parse(fallbackParse.ast) },
+            ephemeral: true,
+            isPublic: false,
+          });
+          taskId = fallbackData?.id;
+        }
       }
       if (!taskId) {
         throw new Error("Failed to generate template task");
@@ -627,9 +683,7 @@ export async function updateItem({
             const apiTask = await getApiTask({ id: itemTaskId, auth });
             const taskData = apiTask[0] || apiTask;
             const ast = taskData.code;
-            const lexicon = await getLanguageLexicon(taskData.lang);
-            const source = unparse(ast, lexicon || {});
-            await makeApiTaskPublic({ auth, lang: itemData.lang, code: source });
+            await makeApiTaskPublic({ auth, lang: itemData.lang, code: ast });
           } catch (err) {
             console.error("updateItem: failed to fetch source for makeApiTaskPublic", err);
           }

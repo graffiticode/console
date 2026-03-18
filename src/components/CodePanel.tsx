@@ -287,10 +287,10 @@ export const CodePanel = ({
 
           // Use the from/to properties directly from the error object
           let from = parseInt(error.from, 10);
-          from = isNaN(from) ? 0 : from;
+          if (isNaN(from) || from < 0) return; // Skip errors without valid positions
 
           let to = parseInt(error.to, 10);
-          to = isNaN(to) ? from + 1 : to;
+          to = isNaN(to) || to < 0 ? from + 1 : to;
 
           // Ensure the range is valid - to must be greater than from
           if (to <= from) {

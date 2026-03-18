@@ -19,6 +19,7 @@ import {
   getItems,
   getItem,
   shareItem,
+  parseCode,
 } from "./resolvers";
 import { checkCompileAllowed } from "../../lib/usage-service";
 import { listLanguages, getLanguageInfo } from "./languages";
@@ -73,8 +74,13 @@ const typeDefs = `
 
   type CodeError {
     message: String!
-    line: Int
-    column: Int
+    from: Int
+    to: Int
+  }
+
+  type ParseResult {
+    ast: String
+    errors: [CodeError]
   }
 
   type UsageInfo {
@@ -114,6 +120,7 @@ const typeDefs = `
 
   type Query {
     checkCompileAllowed: CompileAllowedResponse!
+    parse(lang: String!, code: String!): ParseResult!
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
@@ -132,7 +139,7 @@ const typeDefs = `
 
   type Mutation {
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
-    postTask(lang: String!, code: String!, ephemeral: Boolean): String!
+    postTask(lang: String!, ast: String!, ephemeral: Boolean): String!
     generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String, conversationSummary: ConversationSummaryInput): GeneratedCode!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean, app: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
@@ -165,6 +172,10 @@ const resolvers = {
       } catch (error) {
         return { allowed: false, reason: 'Authentication failed' };
       }
+    },
+    parse: async (_, args) => {
+      const { lang, code } = args;
+      return await parseCode({ lang, code });
     },
     data: async (_, args, ctx) => {
       const { token } = ctx;
@@ -229,8 +240,9 @@ const resolvers = {
 
     postTask: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, code, ephemeral } = args;
+      const { lang, ast, ephemeral } = args;
       const { uid } = await client.verifyToken(token);
+      const code = JSON.parse(ast);
       const task = { lang, code };
       const { id } = await postTask({ auth: { uid, token }, task, ephemeral, isPublic: false });
       return id;

@@ -12,7 +12,7 @@
 
 import axios from "axios";
 import { postApiCompile, getLanguageAsset, getLanguageLexicon } from "./api";
-import { postTask, getData } from "../pages/api/resolvers";
+import { postTask, getData, parseCode } from "../pages/api/resolvers";
 import admin from "firebase-admin";
 import { ragLog, generateRequestId } from "./logger";
 import {
@@ -699,7 +699,28 @@ async function verifyCode(code, authToken, rid = null) {
   }
 
   try {
-    const task = { lang: "0002", code };
+    // Parse first to catch syntax errors before posting
+    const lang = "0002";
+    const parseResult = await parseCode({ lang, code });
+    if (parseResult.errors) {
+      if (rid) {
+        ragLog(rid, "verification.parse_error", {
+          errors: parseResult.errors,
+          latency: Date.now() - startTime,
+        });
+      }
+      return {
+        status: "error",
+        error: {
+          message: parseResult.errors.map(e => e.message).join("; "),
+        },
+        errors: parseResult.errors,
+        data: null,
+      };
+    }
+
+    // Post the parsed AST
+    const task = { lang, code: JSON.parse(parseResult.ast) };
     let id;
     try {
       const result = await postTask({
@@ -711,7 +732,6 @@ async function verifyCode(code, authToken, rid = null) {
       id = result?.id;
     } catch (postError) {
       console.error("postTask() ERROR", postError);
-      // Return error response if postTask fails
       return {
         status: "error",
         error: {

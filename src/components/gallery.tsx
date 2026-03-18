@@ -56,6 +56,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
+  const [ systemAlert, setSystemAlert ] = useState<string | null>(null);
+  const dismissedAlertRef = useRef<string | null>(null);
   const itemsNavRef = useRef<any>(null);
 
   // Save the current taskId to localStorage when it changes so it can be used in Tasks view
@@ -563,7 +565,19 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full">
+    <div className="flex flex-col h-[calc(100vh-64px)] w-full">
+      {/* System alert banner */}
+      {systemAlert && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-3 flex items-center justify-between flex-none">
+          <span className="text-sm text-red-700">{systemAlert}</span>
+          <button
+            onClick={() => { dismissedAlertRef.current = systemAlert; setSystemAlert(null); }}
+            className="ml-4 text-red-400 hover:text-red-600 flex-none"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+      )}
       {/* Main content area */}
       <div className="flex grow w-full overflow-hidden">
         {/* Assets panel */}
@@ -854,6 +868,18 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
                 height="100%"
                 onCodeChange={setEditorCode}
                 onHelpChange={setEditorHelp}
+                onCompileError={(errors) => {
+                  if (errors && errors.length > 0) {
+                    const systemErrors = errors.filter(e => e.from < 0);
+                    if (systemErrors.length > 0) {
+                      const msg = systemErrors.map(e => e.message).join('; ');
+                      if (msg !== dismissedAlertRef.current) {
+                        setSystemAlert(msg);
+                      }
+                    }
+                  }
+                }}
+                onError={(msg) => { dismissedAlertRef.current = null; setSystemAlert(msg); }}
                 initialCode={editorCode}
                 initialHelp={editorHelp}
               />
