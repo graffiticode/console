@@ -275,12 +275,18 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
       if (savedOrder) {
         try {
           const orderIds: string[] = JSON.parse(savedOrder);
-          const orderMap = new Map(orderIds.map((id, idx) => [id, idx]));
-          orderedItems = [...loadedItems].sort((a, b) => {
-            const aIdx = orderMap.has(a.id) ? orderMap.get(a.id)! : Infinity;
-            const bIdx = orderMap.has(b.id) ? orderMap.get(b.id)! : Infinity;
-            return aIdx - bIdx;
+          const orderSet = new Set(orderIds);
+          const newItems = loadedItems.filter(i => !orderSet.has(i.id));
+          const savedItems = orderIds
+            .map(id => loadedItems.find(i => i.id === id))
+            .filter(Boolean);
+          // New items first (sorted by updated desc), then saved order
+          newItems.sort((a, b) => {
+            const aTime = Number(a.updated || a.created || 0);
+            const bTime = Number(b.updated || b.created || 0);
+            return bTime - aTime;
           });
+          orderedItems = [...newItems, ...savedItems];
         } catch {}
       }
       setItems(orderedItems);
