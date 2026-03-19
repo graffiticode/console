@@ -874,17 +874,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
                 height="100%"
                 onCodeChange={setEditorCode}
                 onHelpChange={setEditorHelp}
-                onCompileError={(errors) => {
-                  if (errors && errors.length > 0) {
-                    const systemErrors = errors.filter(e => e.from < 0);
-                    if (systemErrors.length > 0) {
-                      const msg = systemErrors.map(e => e.message).join('; ');
-                      if (msg !== dismissedAlertRef.current) {
-                        setSystemAlert(msg);
-                      }
-                    }
-                  }
-                }}
+                onCompileError={() => {}}
                 onError={(msg) => { dismissedAlertRef.current = null; setSystemAlert(msg); }}
                 initialCode={editorCode}
                 initialHelp={editorHelp}
