@@ -61,27 +61,6 @@ class ErrorMarker extends GutterMarker {
     const marker = document.createElement("div");
     marker.className = "cm-gutter-error-marker";
     marker.textContent = "⚠️";
-
-    let tooltip: HTMLDivElement | null = null;
-
-    marker.addEventListener("mouseenter", () => {
-      tooltip = document.createElement("div");
-      tooltip.className = "cm-gutter-error-tooltip";
-      tooltip.textContent = this.message;
-      document.body.appendChild(tooltip);
-
-      const rect = marker.getBoundingClientRect();
-      tooltip.style.left = `${rect.right + 4}px`;
-      tooltip.style.top = `${rect.top}px`;
-    });
-
-    marker.addEventListener("mouseleave", () => {
-      if (tooltip) {
-        tooltip.remove();
-        tooltip = null;
-      }
-    });
-
     return marker;
   }
 }
@@ -452,22 +431,6 @@ export const CodePanel = ({
           text-shadow: none;
           box-shadow: none;
           filter: none;
-        }
-        .cm-gutter-error-tooltip {
-          position: fixed;
-          background-color: #f44336;
-          color: white;
-          padding: 10px 15px;
-          border-radius: 6px;
-          z-index: 10000;
-          max-width: 400px;
-          min-width: 200px;
-          white-space: pre-wrap;
-          font-family: sans-serif;
-          font-size: 14px;
-          line-height: 1.5;
-          text-align: left;
-          pointer-events: none;
         }
       `}</style>
       <div

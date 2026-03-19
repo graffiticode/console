@@ -50,6 +50,10 @@ export async function parseCode({ lang, code }: { lang: string; code: string }) 
     if (errors.length > 0) {
       return { ast: null, errors };
     }
+    console.log(
+      "parseCode()",
+      "astPool=" + JSON.stringify(astPool, null, 2),
+    );
     return { ast: JSON.stringify(astPool), errors: null };
   } catch (err) {
     return { ast: null, errors: [{ message: err.message || "Parse error", from: -1, to: -1 }] };
