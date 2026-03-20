@@ -194,7 +194,7 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
       if (results && results.length > 0) {
         // Filter out low-quality matches — with a specific DSL, bad examples
         // are worse than no examples since the prompt already has detailed instructions.
-        const MIN_COMBINED_SCORE = 0.65;
+        const MIN_COMBINED_SCORE = 0.50;
         const filteredResults = results.filter(doc => (doc.combinedScore || doc.similarity || 0) >= MIN_COMBINED_SCORE);
 
         // Transform the results to match the expected format
