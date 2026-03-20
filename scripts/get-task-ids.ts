@@ -9,27 +9,29 @@ const args = process.argv.slice(2);
 
 if (args.includes('--help') || !args.includes('--lang')) {
   console.log(`
-Usage: npx tsx scripts/get-task-ids.ts --lang <language> [--mark <marks>]
+Usage: npx tsx scripts/get-task-ids.ts --uid <userId> --lang <language> [--mark <marks>]
 
 Options:
+  --uid <userId>      User ID [required]
   --lang <language>   Language code (e.g., "0166") [required]
   --mark <marks>      Filter by mark value(s), comma-separated (default: all)
   --help              Show this help message
 
 Examples:
-  npx tsx scripts/get-task-ids.ts --lang 0166
-  npx tsx scripts/get-task-ids.ts --lang 0166 --mark 4
-  npx tsx scripts/get-task-ids.ts --lang 0166 --mark 3,4
+  npx tsx scripts/get-task-ids.ts --uid abc123 --lang 0166
+  npx tsx scripts/get-task-ids.ts --uid abc123 --lang 0166 --mark 4
+  npx tsx scripts/get-task-ids.ts --uid abc123 --lang 0166 --mark 3,4
 `);
   process.exit(args.includes('--help') ? 0 : 1);
 }
 
+const userId = args.includes('--uid')
+  ? args[args.indexOf('--uid') + 1]
+  : '24493e1c7a7f1ad57e3c478087c74c2dacb0cba1';
 const lang = args[args.indexOf('--lang') + 1];
 const markValues: number[] | null = args.includes('--mark')
   ? args[args.indexOf('--mark') + 1].split(',').map(v => parseInt(v.trim()))
   : null;
-
-const userId = '24493e1c7a7f1ad57e3c478087c74c2dacb0cba1';
 
 if (process.env.GRAFFITICODE_APP_CREDENTIALS) {
   process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GRAFFITICODE_APP_CREDENTIALS;
