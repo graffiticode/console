@@ -416,14 +416,15 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
 - **Booleans**: \`true\`, \`false\`; **Null**: \`null\`
 - **Lists**: \`[1 2 3]\`; support pattern matching
 - **Records**: \`{name: "Alice" age: 30}\`; access via \`get\`, support destructuring
-- **Tags**: Unbound identifiers like \`Running\`, \`Error\` used for symbolic values
+- **Tags**: Defined with the \`tag\` keyword: \`tag red\`, \`tag blue\`
 
 ## Pattern Matching
 Use \`case\` for match expressions:
 \`\`\`
 case x of
-  pattern1: result1
-  _: fallback
+  tag red: "red"
+  tag blue: "blue"
+  _: "unknown"
 end
 \`\`\`
 
@@ -1305,7 +1306,9 @@ export async function generateCode({
     }, streamResult.code);
 
     // Process the generated code to fix any issues
+    console.log(`[code-gen] rid=${rid} lang=${lang} raw code:\n${streamResult.code}`);
     let generatedCode = await processGeneratedCode(streamResult.code, lang, rid);
+    console.log(`[code-gen] rid=${rid} lang=${lang} processed code:\n${generatedCode}`);
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
