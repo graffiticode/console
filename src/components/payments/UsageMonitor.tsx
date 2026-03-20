@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Switch } from '@headlessui/react';
 import { BoltIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 
@@ -12,13 +11,6 @@ interface UsageData {
   overageUnits: number;
   lastResetDate: string;
   currentPeriodEnd: string;
-}
-
-interface BillingSettings {
-  autoRecharge: boolean;
-  autoRechargeLimit: number;
-  overageBlocksUsedThisPeriod: number;
-  autoRechargeDisabledReason?: string;
 }
 
 interface PricingInfo {
@@ -39,7 +31,6 @@ interface UsageMonitorProps {
 
 export default function UsageMonitor({ userId }: UsageMonitorProps) {
   const [usage, setUsage] = useState<UsageData | null>(null);
-  const [billing, setBilling] = useState<BillingSettings | null>(null);
   const [pricing, setPricing] = useState<PricingInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
@@ -51,13 +42,11 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
   const fetchUsageData = async () => {
     try {
-      const [usageResponse, billingResponse, pricingResponse] = await Promise.all([
+      const [usageResponse, pricingResponse] = await Promise.all([
         axios.get(`/api/payments/usage?userId=${userId}`),
-        axios.get(`/api/payments/billing-settings?userId=${userId}`),
         axios.get(`/api/payments/purchase-overage?userId=${userId}`)
       ]);
       setUsage(usageResponse.data);
-      setBilling(billingResponse.data);
       setPricing(pricingResponse.data);
     } catch (error) {
       console.error('Error fetching usage data:', error);
@@ -91,37 +80,6 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
     }
   };
 
-  const handleAutoRechargeToggle = async (enabled: boolean) => {
-    try {
-      await axios.post('/api/payments/update-billing-settings', {
-        userId,
-        autoRecharge: enabled,
-        autoRechargeLimit: billing?.autoRechargeLimit || 1
-      });
-      setBilling(prev => prev ? {
-        ...prev,
-        autoRecharge: enabled,
-        autoRechargeDisabledReason: enabled ? undefined : prev.autoRechargeDisabledReason,
-      } : null);
-    } catch (error) {
-      console.error('Error updating auto-recharge:', error);
-      alert('Failed to update auto-recharge settings.');
-    }
-  };
-
-  const handleLimitChange = async (limit: number) => {
-    try {
-      await axios.post('/api/payments/update-billing-settings', {
-        userId,
-        autoRecharge: billing?.autoRecharge || false,
-        autoRechargeLimit: limit
-      });
-      setBilling(prev => prev ? { ...prev, autoRechargeLimit: limit } : null);
-    } catch (error) {
-      console.error('Error updating limit:', error);
-    }
-  };
-
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
@@ -131,7 +89,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
     );
   }
 
-  if (!usage || !billing) {
+  if (!usage) {
     return <div>Error loading usage data</div>;
   }
 
@@ -301,66 +259,6 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
             </h3>
 
             <div className="space-y-4">
-            {pricing.overageAvailable && (
-              <>
-                {billing.autoRechargeDisabledReason && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-none p-3">
-                    <div className="flex items-center">
-                      <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0" />
-                      <p className="text-sm text-yellow-800">
-                        {billing.autoRechargeDisabledReason === 'no_payment_method'
-                          ? 'Auto-recharge was disabled because no payment method is on file.'
-                          : 'Auto-recharge was disabled because a payment failed. Please check your payment method and re-enable.'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Auto-recharge</p>
-                    <p className="text-sm text-gray-500">
-                      Automatically purchase overage blocks when you run out of compile units
-                    </p>
-                  </div>
-                  <Switch
-                    checked={billing.autoRecharge}
-                    onChange={handleAutoRechargeToggle}
-                    className={`${
-                      billing.autoRecharge ? 'bg-green-600' : 'bg-gray-200'
-                    } relative inline-flex h-6 w-11 items-center rounded-none transition-colors focus:outline-none`}
-                  >
-                    <span
-                      className={`${
-                        billing.autoRecharge ? 'translate-x-6' : 'translate-x-1'
-                      } inline-block h-4 w-4 transform rounded-none bg-white transition-transform`}
-                    />
-                  </Switch>
-                </div>
-
-                {billing.autoRecharge && pricing.blockSize && (
-                  <div className="ml-4 pb-4 border-b">
-                    <label className="text-sm font-medium text-gray-700">
-                      Monthly limit
-                    </label>
-                    <select
-                      value={billing.autoRechargeLimit}
-                      onChange={(e) => handleLimitChange(Number(e.target.value))}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-none"
-                    >
-                      <option value={1}>1 block ({pricing.blockSize.toLocaleString()} units)</option>
-                      <option value={3}>3 blocks ({(3 * pricing.blockSize).toLocaleString()} units)</option>
-                      <option value={5}>5 blocks ({(5 * pricing.blockSize).toLocaleString()} units)</option>
-                      <option value={10}>10 blocks ({(10 * pricing.blockSize).toLocaleString()} units)</option>
-                    </select>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {billing.overageBlocksUsedThisPeriod} of {billing.autoRechargeLimit} blocks used this month
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-
             {pricing && pricing.overageAvailable && (
               <div className="pt-4">
                 <div className="mb-4">

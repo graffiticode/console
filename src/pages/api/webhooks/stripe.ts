@@ -290,48 +290,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const blocks = parseInt(paymentIntent.metadata.blocks || '1');
           const plan = paymentIntent.metadata.plan;
           const pricePerUnit = parseFloat(paymentIntent.metadata.pricePerUnit || '0');
-          const isAutoRecharge = paymentIntent.metadata.autoRecharge === 'true';
 
           if (userId && units) {
-            if (isAutoRecharge) {
-              // Auto-recharge: units already credited immediately — just log payment
-              await db.collection('overage_purchases').doc(paymentIntent.id).set({
-                userId,
-                units,
-                blocks,
-                plan,
-                pricePerUnit,
-                amount: paymentIntent.amount / 100,
-                paymentIntentId: paymentIntent.id,
-                timestamp: new Date(),
-                status: 'completed',
-                autoRecharge: true,
-                webhookProcessed: true,
-              });
-            } else {
-              // Manual purchase: credit units now
-              const userDoc = await db.collection('users').doc(userId).get();
-              const userData = userDoc.data();
-              const currentOverage = userData?.subscription?.overageUnits || 0;
+            // Credit units now
+            const userDoc = await db.collection('users').doc(userId).get();
+            const userData = userDoc.data();
+            const currentOverage = userData?.subscription?.overageUnits || 0;
 
-              await db.collection('users').doc(userId).update({
-                'subscription.overageUnits': currentOverage + units,
-                'subscription.lastOveragePurchase': new Date().toISOString(),
-              });
+            await db.collection('users').doc(userId).update({
+              'subscription.overageUnits': currentOverage + units,
+              'subscription.lastOveragePurchase': new Date().toISOString(),
+            });
 
-              await db.collection('overage_purchases').add({
-                userId,
-                units,
-                blocks,
-                plan,
-                pricePerUnit,
-                amount: paymentIntent.amount / 100,
-                paymentIntentId: paymentIntent.id,
-                timestamp: new Date(),
-                status: 'completed',
-                webhookProcessed: true,
-              });
-            }
+            await db.collection('overage_purchases').add({
+              userId,
+              units,
+              blocks,
+              plan,
+              pricePerUnit,
+              amount: paymentIntent.amount / 100,
+              paymentIntentId: paymentIntent.id,
+              timestamp: new Date(),
+              status: 'completed',
+              webhookProcessed: true,
+            });
           }
         }
 

@@ -1,23 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '../../../utils/db';
-import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2022-08-01',
-});
-
-interface BillingSettings {
-  autoRecharge: {
-    enabled: boolean;
-    threshold: number; // Percentage (0-100)
-    amount: number; // Number of units to purchase
-  };
-  notifications: {
-    emailOnLowBalance: boolean;
-    emailOnPurchase: boolean;
-    lowBalanceThreshold: number; // Percentage (0-100)
-  };
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { userId } = req.query;
@@ -30,7 +12,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (req.method === 'GET') {
-      // Get billing settings
       const settingsDoc = await db
         .collection('users')
         .doc(userId)
@@ -39,92 +20,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .get();
 
       const defaultSettings: Record<string, any> = {
-        autoRecharge: false,
-        autoRechargeLimit: 1,
-        overageBlocksUsedThisPeriod: 0,
-        autoRechargeDisabledReason: null,
-        // Extended settings for future use
-        extended: {
-          autoRecharge: {
-            enabled: false,
-            threshold: 20, // 20% remaining
-            amount: 10000, // 10,000 units
-          },
-          notifications: {
-            emailOnLowBalance: true,
-            emailOnPurchase: true,
-            lowBalanceThreshold: 25, // 25% remaining
-          },
-        }
+        notifications: {
+          emailOnLowBalance: true,
+          emailOnPurchase: true,
+          lowBalanceThreshold: 25,
+        },
       };
 
-      // Get settings or use defaults
-      let settings = defaultSettings;
-      if (settingsDoc.exists) {
-        const data = settingsDoc.data();
-        settings = {
-          autoRecharge: data?.autoRecharge || false,
-          autoRechargeLimit: data?.autoRechargeLimit || 1,
-          overageBlocksUsedThisPeriod: data?.overageBlocksUsedThisPeriod || 0,
-          autoRechargeDisabledReason: data?.autoRechargeDisabledReason || null,
-          extended: data?.extended || defaultSettings.extended,
-        };
-      }
+      const settings = settingsDoc.exists ? settingsDoc.data() : defaultSettings;
 
       return res.status(200).json(settings);
     } else if (req.method === 'PUT' || req.method === 'PATCH' || req.method === 'POST') {
-      // Update billing settings - support both simple and extended formats
       const updates = req.body;
 
-      // Handle simple format from UsageMonitor component
-      if ('autoRecharge' in updates && typeof updates.autoRecharge === 'boolean') {
-        // Simple format update — clear failure reason when re-enabling
-        const simpleUpdate: Record<string, any> = {
-          autoRecharge: updates.autoRecharge,
-          autoRechargeLimit: updates.autoRechargeLimit || 1,
-          overageBlocksUsedThisPeriod: updates.overageBlocksUsedThisPeriod || 0,
-        };
-        if (updates.autoRecharge) {
-          simpleUpdate.autoRechargeDisabledReason = null;
-          simpleUpdate.autoRechargeDisabledAt = null;
-        }
-
-        // Save the updated settings
-        const settingsRef = db
-          .collection('users')
-          .doc(userId)
-          .collection('settings')
-          .doc('billing');
-
-        await settingsRef.set({
-          ...simpleUpdate,
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
-
-        return res.status(200).json({
-          success: true,
-          ...simpleUpdate,
-        });
-      }
-
-      // Handle extended format (for future use)
-      if (updates.extended?.autoRecharge) {
-        const { enabled, threshold, amount } = updates.extended.autoRecharge;
-
-        if (enabled !== undefined && typeof enabled !== 'boolean') {
-          return res.status(400).json({ error: 'autoRecharge.enabled must be a boolean' });
-        }
-
-        if (threshold !== undefined && (threshold < 0 || threshold > 100)) {
-          return res.status(400).json({ error: 'autoRecharge.threshold must be between 0 and 100' });
-        }
-
-        if (amount !== undefined && amount < 1000) {
-          return res.status(400).json({ error: 'autoRecharge.amount must be at least 1000 units' });
-        }
-      }
-
-      // Save the updated settings
       const settingsRef = db
         .collection('users')
         .doc(userId)
@@ -144,32 +52,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await settingsRef.update(mergedSettings);
       } else {
         await settingsRef.set(mergedSettings);
-      }
-
-      // If auto-recharge is being enabled, verify payment method exists
-      if (updates.autoRecharge?.enabled) {
-        const userDoc = await db.collection('users').doc(userId).get();
-        const userData = userDoc.data();
-
-        if (userData?.stripeCustomerId) {
-          const paymentMethods = await stripe.paymentMethods.list({
-            customer: userData.stripeCustomerId,
-            type: 'card',
-            limit: 1,
-          });
-
-          if (!paymentMethods.data.length) {
-            return res.status(400).json({
-              error: 'Cannot enable auto-recharge without a payment method',
-              requiresPaymentMethod: true,
-            });
-          }
-        } else {
-          return res.status(400).json({
-            error: 'Cannot enable auto-recharge without a payment method',
-            requiresPaymentMethod: true,
-          });
-        }
       }
 
       return res.status(200).json({
