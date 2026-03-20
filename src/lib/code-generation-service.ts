@@ -416,7 +416,7 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
 - **Booleans**: \`true\`, \`false\`; **Null**: \`null\`
 - **Lists**: \`[1 2 3]\`; support pattern matching
 - **Records**: \`{name: "Alice" age: 30}\`; access via \`get\`, support destructuring
-- **Tags**: Defined with the \`tag\` keyword: \`tag red\`, \`tag blue\`
+- **Tags**: The \`tag\` keyword constructs a tag value: \`tag red\`, \`tag blue\`. Use \`let\` to bind a tag to a name like any other value: \`let x = tag medium..\`
 
 ## Pattern Matching
 Use \`case\` for match expressions:
