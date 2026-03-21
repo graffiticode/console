@@ -157,6 +157,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const invoice = await stripe.invoices.create({
       customer: stripeCustomerId,
+      description: `${units.toLocaleString()} compile units (${blocks} block${blocks > 1 ? 's' : ''}) - ${currentPlan} plan @ ${pricing.description}`,
       auto_advance: true,
       collection_method: 'charge_automatically',
       default_payment_method: paymentMethods.data[0].id,
