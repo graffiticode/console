@@ -139,12 +139,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Create an invoice item and invoice for the overage purchase
-    await stripe.invoiceItems.create({
+    // Create invoice first, then attach the item to it
+    const itemDescription = `${units.toLocaleString()} compile units (${blocks} block${blocks > 1 ? 's' : ''}) - ${currentPlan} plan @ ${pricing.description}`;
+
+    const invoice = await stripe.invoices.create({
       customer: stripeCustomerId,
-      amount,
-      currency: 'usd',
-      description: `${units.toLocaleString()} compile units (${blocks} block${blocks > 1 ? 's' : ''}) - ${currentPlan} plan @ ${pricing.description}`,
+      description: itemDescription,
+      auto_advance: true,
+      collection_method: 'charge_automatically',
+      default_payment_method: paymentMethods.data[0].id,
       metadata: {
         userId,
         units: units.toString(),
@@ -155,12 +158,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    const invoice = await stripe.invoices.create({
+    await stripe.invoiceItems.create({
       customer: stripeCustomerId,
-      description: `${units.toLocaleString()} compile units (${blocks} block${blocks > 1 ? 's' : ''}) - ${currentPlan} plan @ ${pricing.description}`,
-      auto_advance: true,
-      collection_method: 'charge_automatically',
-      default_payment_method: paymentMethods.data[0].id,
+      invoice: invoice.id,
+      amount,
+      currency: 'usd',
+      description: itemDescription,
       metadata: {
         userId,
         units: units.toString(),
