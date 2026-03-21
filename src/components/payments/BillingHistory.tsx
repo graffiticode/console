@@ -65,6 +65,7 @@ export default function BillingHistory({ userId }: BillingHistoryProps) {
 
   return (
     <div>
+      <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Invoices</h3>
       {/* Filter Tabs */}
       <div className="mb-6">
         <div className="border-b border-gray-200">
