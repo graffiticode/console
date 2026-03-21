@@ -5,7 +5,6 @@ import useSWR from "swr";
 import {
   ChevronDownIcon,
   CreditCardIcon,
-  ChartBarIcon,
   UserCircleIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
@@ -170,22 +169,6 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
               <Menu.Item>
                 {({ active }) => (
                   <Link
-                    href="/usage"
-                    className={`${
-                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
-                    } group flex items-center px-4 py-2 text-sm`}
-                  >
-                    <ChartBarIcon
-                      className="mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"
-                      aria-hidden="true"
-                    />
-                    Usage
-                  </Link>
-                )}
-              </Menu.Item>
-              <Menu.Item>
-                {({ active }) => (
-                  <Link
                     href="/billing"
                     className={`${
                       active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
@@ -195,7 +178,7 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
                       className="mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"
                       aria-hidden="true"
                     />
-                    Billing
+                    Subscription
                   </Link>
                 )}
               </Menu.Item>
