@@ -125,7 +125,7 @@ interface DailyBucket {
 
 // Plan price per unit (monthly price / monthly units)
 const PLAN_PRICE_PER_UNIT: Record<string, number> = {
-  demo: 0, starter: 10 / 2000, pro: 100 / 100000, teams: 1000 / 2000000,
+  demo: 0, starter: 10 / 5000, pro: 100 / 100000, teams: 1000 / 2000000,
 };
 
 // Actual daily data loaded from data/daily-usage/ files (populated by fetch-daily-usage.ts)

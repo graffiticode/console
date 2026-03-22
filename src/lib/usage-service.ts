@@ -2,7 +2,7 @@ import { getFirestore } from "../utils/db";
 
 const PLAN_ALLOCATIONS = {
   demo: 100,
-  starter: 2000,
+  starter: 5000,
   pro: 100000,
   teams: 2000000
 };

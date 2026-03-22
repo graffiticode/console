@@ -17,8 +17,8 @@ export const config = {
 
 // Map Stripe price IDs to our plan names
 const PLAN_MAPPING = {
-  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || '']: { name: 'starter', units: 2000 },
-  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || '']: { name: 'starter', units: 2000 },
+  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || '']: { name: 'starter', units: 5000 },
+  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || '']: { name: 'starter', units: 5000 },
   [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: { name: 'pro', units: 100000 },
   [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: { name: 'pro', units: 100000 },
   [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: { name: 'teams', units: 2000000 },
@@ -134,7 +134,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Get plan details
         const priceId = subscription.items.data[0]?.price.id;
-        const planInfo = PLAN_MAPPING[priceId] || { name: 'starter', units: 2000 };
+        const planInfo = PLAN_MAPPING[priceId] || { name: 'starter', units: 5000 };
 
         // Build update object
         const updateData: Record<string, any> = {
@@ -182,7 +182,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await db.collection('users').doc(userId).update({
           'subscription.status': 'canceled',
           'subscription.plan': 'starter',
-          'subscription.units': 2000,
+          'subscription.units': 5000,
           'subscription.stripeSubscriptionId': null,
           'subscription.canceledAt': new Date().toISOString(),
           // DO NOT reset overage units - they roll over and persist until used

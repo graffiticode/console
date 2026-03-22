@@ -243,7 +243,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Base units are monthly - multiply by 12 for annual plans
     const baseUnitAllocation = {
       demo: 100,
-      starter: 2000,
+      starter: 5000,
       pro: 100000,
       teams: 2000000,
     };

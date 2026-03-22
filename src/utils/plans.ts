@@ -37,10 +37,10 @@ export const plans: Plan[] = [
     description: 'Perfect for getting started',
     monthlyPrice: 10,
     annualPrice: 100,
-    monthlyUnits: 2000,
+    monthlyUnits: 5000,
     features: [
-      '2,000 compile units per month',
-      'Additional compiles at $0.005 each',
+      '5,000 compile units per month',
+      'Additional compiles at $0.002 each',
       'Community support',
       'Email support',
       'Cancel anytime'

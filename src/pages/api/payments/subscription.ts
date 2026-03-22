@@ -191,7 +191,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get unit allocation based on plan (monthly base)
     const baseUnitAllocation = {
-      starter: 2000,
+      starter: 5000,
       pro: 100000,
       teams: 2000000,
     };
