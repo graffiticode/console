@@ -82,7 +82,7 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
 
           // Get plan allocation
           const planAllocations = {
-            demo: 100,
+            demo: 250,
             starter: 5000,
             pro: 100000,
             teams: 2000000
@@ -168,7 +168,7 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
       const overageUnits = subscription.overageUnits || 0;
 
       const planAllocations = {
-        demo: 100,
+        demo: 250,
         starter: 5000,
         pro: 100000,
         teams: 2000000

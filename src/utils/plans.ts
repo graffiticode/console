@@ -20,9 +20,9 @@ export const plans: Plan[] = [
     description: 'Try Graffiticode for free',
     monthlyPrice: 0,
     annualPrice: 0,
-    monthlyUnits: 100,
+    monthlyUnits: 250,
     features: [
-      '100 compile units per month',
+      '250 compile units per month',
       'No credit card required',
       'Community support',
       'Email support',

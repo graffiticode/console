@@ -1517,7 +1517,7 @@ export async function generateCode({
 
           // Get plan allocation
           const planAllocations = {
-            demo: 100,
+            demo: 250,
             starter: 5000,
             pro: 100000,
             teams: 2000000
