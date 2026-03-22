@@ -125,12 +125,10 @@ export default function ToolsGallery({ language, setLanguage }) {
                       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                         e.preventDefault();
                         const currentIndex = languages.findIndex(l => l.name === selectedLang);
-                        const nextIndex = currentIndex + (e.key === 'ArrowUp' ? -1 : 1);
-                        if (nextIndex >= 0 && nextIndex < languages.length) {
-                          const nextLang = languages[nextIndex];
-                          handleSelectLanguage(nextLang);
-                          langItemRefs.current[nextLang.name]?.scrollIntoView({ block: 'nearest' });
-                        }
+                        const nextIndex = (currentIndex + (e.key === 'ArrowUp' ? -1 : 1) + languages.length) % languages.length;
+                        const nextLang = languages[nextIndex];
+                        handleSelectLanguage(nextLang);
+                        langItemRefs.current[nextLang.name]?.scrollIntoView({ block: 'nearest' });
                       }
                     }}
                   >

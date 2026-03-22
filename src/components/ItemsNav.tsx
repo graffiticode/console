@@ -371,13 +371,11 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
               if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                 e.preventDefault();
                 const currentIndex = items.findIndex(i => i.id === selectedItemId);
-                const nextIndex = currentIndex + (e.key === 'ArrowUp' ? -1 : 1);
-                if (nextIndex >= 0 && nextIndex < items.length) {
-                  const nextItem = items[nextIndex];
-                  onSelectItem(nextItem.id);
-                  setShowId(nextItem.id);
-                  itemRefs.current[nextItem.id]?.scrollIntoView({ block: 'nearest' });
-                }
+                const nextIndex = (currentIndex + (e.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
+                const nextItem = items[nextIndex];
+                onSelectItem(nextItem.id);
+                setShowId(nextItem.id);
+                itemRefs.current[nextItem.id]?.scrollIntoView({ block: 'nearest' });
               }
             }}
           >

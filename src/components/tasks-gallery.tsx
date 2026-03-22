@@ -292,12 +292,10 @@ export default function TasksGallery({ lang }) {
                       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                         e.preventDefault();
                         const currentIndex = taskIds.findIndex(t => t.id === selectedTaskId);
-                        const nextIndex = currentIndex + (e.key === 'ArrowUp' ? -1 : 1);
-                        if (nextIndex >= 0 && nextIndex < taskIds.length) {
-                          const nextTask = taskIds[nextIndex];
-                          handleSelectTask(nextTask.id);
-                          taskItemsRef.current[nextTask.id]?.scrollIntoView({ block: 'nearest' });
-                        }
+                        const nextIndex = (currentIndex + (e.key === 'ArrowUp' ? -1 : 1) + taskIds.length) % taskIds.length;
+                        const nextTask = taskIds[nextIndex];
+                        handleSelectTask(nextTask.id);
+                        taskItemsRef.current[nextTask.id]?.scrollIntoView({ block: 'nearest' });
                       }
                     }}
                   >
