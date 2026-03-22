@@ -1321,7 +1321,7 @@ export async function generateCode({
     // Estimate compile units from initial generation.
     // Skip fix attempts if already expensive (>50 units).
     const MAX_UNITS_FOR_FIXES = 50;
-    const estimatedUnits = Math.ceil(finalUsage.total_tokens / 1000);
+    const estimatedUnits = Math.ceil(finalUsage.total_tokens / 750);
 
     // Verify the code if an access token is provided
     if (accessToken) {
@@ -1501,8 +1501,8 @@ export async function generateCode({
         const subscription = userData?.subscription || {};
         const plan = subscription.plan || 'demo';
 
-        // Fixed ratio: 1000 tokens = 1 compile unit, capped at 20 units per call
-        const TOKENS_PER_UNIT = 1000;
+        // Fixed ratio: 750 tokens = 1 compile unit, capped at 20 units per call
+        const TOKENS_PER_UNIT = 750;
         const MAX_UNITS_PER_CALL = 20;
         const totalTokenCost = 0; // kept for usage record
         const rawUnits = Math.max(1, Math.ceil(finalUsage.total_tokens / TOKENS_PER_UNIT));

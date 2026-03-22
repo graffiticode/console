@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import useSWR from 'swr';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { selectLanguages } from './language-selector';
@@ -160,7 +161,16 @@ export default function ToolsGallery({ language, setLanguage }) {
         <div className="flex flex-col grow border border-gray-200 rounded-none h-[calc(100vh-90px)]">
           {selectedLang ? (
             <div className="p-4">
-              <h2 className="text-lg font-medium text-gray-800">{selectedLang}</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-medium text-gray-800">{selectedLang}</h2>
+                <Link
+                  href="/items"
+                  onClick={() => setLanguage({ name: selectedLang })}
+                  className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-none"
+                >
+                  Edit Items
+                </Link>
+              </div>
               <p className="text-sm text-gray-500 mt-1">
                 {languages.find(l => l.name === selectedLang)?.description}
               </p>

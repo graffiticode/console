@@ -215,6 +215,7 @@ function generateHtml(data: {
   hasActualUsage: boolean;
   totalAiUnits: number;
   totalCompileUnits: number;
+  cappedRequests: number;
   unitsByPlan: Record<string, number>;
   totalProjectedRevenue: number;
   dailyBuckets: DailyBucket[];
@@ -405,6 +406,7 @@ ${data.hasActualUsage ? `
       <tr><td>Total tokens</td><td>${(data.totalInputTokens + data.totalOutputTokens).toLocaleString()}</td>${data.hasActualUsage ? `<td>${(data.totalActualInputTokens + data.totalActualOutputTokens).toLocaleString()}</td>` : ''}</tr>
       <tr><td>AI generation units</td><td>${data.totalAiUnits.toLocaleString()}</td>${data.hasActualUsage ? '<td></td>' : ''}</tr>
       <tr><td>Plain compile units</td><td>${data.totalCompileUnits.toLocaleString()}</td>${data.hasActualUsage ? '<td></td>' : ''}</tr>
+      <tr><td>Requests at 20-unit cap</td><td>${data.cappedRequests.toLocaleString()} of ${data.aiRecords.length.toLocaleString()}</td>${data.hasActualUsage ? '<td></td>' : ''}</tr>
     </tbody>
   </table>
 </div>
@@ -512,6 +514,7 @@ async function main() {
 
   const totalAiUnits = aiRecords.reduce((sum, r) => sum + (r.units || 0), 0);
   const totalCompileUnits = compileRecords.reduce((sum, r) => sum + (r.units || 0), 0);
+  const cappedRequests = aiRecords.filter(r => (r.units || 0) >= 20).length;
 
   const unitsByPlan: Record<string, number> = {};
   for (const r of records) {
@@ -599,7 +602,7 @@ async function main() {
     totalInputTokens, totalOutputTokens, costByModel,
     actualCostByModel, actualUsageByModel,
     totalActualInputTokens, totalActualOutputTokens, hasActualUsage,
-    totalAiUnits, totalCompileUnits, unitsByPlan, totalProjectedRevenue,
+    totalAiUnits, totalCompileUnits, cappedRequests, unitsByPlan, totalProjectedRevenue,
     dailyBuckets,
   });
 
