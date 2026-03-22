@@ -1,10 +1,27 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2026-03-20T19:40:22.172Z*
+*Downloaded on 2026-03-20T22:57:46.727Z*
 
 ## Language L0002
 
 ### Example 1
+
+#### Prompt
+"Checks if 3 is less than or equal to 8"
+
+#### Chat Transcript
+
+**User**: Checks if 3 is less than or equal to 8
+
+#### Code
+
+```
+le 3 8..
+```
+
+---
+
+### Example 2
 
 #### Prompt
 "Adds 3, 4, and 5 together."
@@ -21,7 +38,7 @@ add 3 (add 4 5)..
 
 ---
 
-### Example 2
+### Example 3
 
 #### Prompt
 "Write Graffiticode that doubles numbers in [1 2 3 4] and then sums them."
@@ -43,7 +60,7 @@ reduce (<acc x: add acc x>) 0 map (<x: mul 2 x>) [
 
 ---
 
-### Example 3
+### Example 4
 
 #### Prompt
 "say "hello, world" and set theme to dark"
@@ -64,7 +81,7 @@ theme dark hello "world"..
 
 ---
 
-### Example 4
+### Example 5
 
 #### Prompt
 "Write Graffiticode that defines a function addOne."
@@ -81,7 +98,7 @@ add 1 42..
 
 ---
 
-### Example 5
+### Example 6
 
 #### Prompt
 "concatenates [1 2 3] and [4 5] into a single list."
@@ -105,7 +122,33 @@ concat [
 
 ---
 
-### Example 6
+### Example 7
+
+#### Prompt
+"Defines three tags small, medium, and large, binds one to a variable, and uses case to return a number for each.
+
+Defines three tags small, medium, and large, binds one to a variable, and uses case to return a number for each."
+
+#### Chat Transcript
+
+**User**: Defines three tags small, medium, and large, binds one to a variable, and uses case to return a number for each.
+
+**User**: Defines three tags small, medium, and large, binds one to a variable, and uses case to return a number for each.
+
+#### Code
+
+```
+case tag medium of
+  tag small: 1
+  tag medium: 2
+  tag large: 3
+  tag _: 0
+end..
+```
+
+---
+
+### Example 8
 
 #### Prompt
 "Write Graffiticode that filters numbers greater than 10 from [5 12 7 20]."
@@ -127,7 +170,7 @@ filter (<x: gt x 10>) [
 
 ---
 
-### Example 7
+### Example 9
 
 #### Prompt
 "Defines two tags and uses equiv to check if they are the same."
@@ -144,7 +187,7 @@ equiv tag red tag blue..
 
 ---
 
-### Example 8
+### Example 10
 
 #### Prompt
 "Write Graffiticode that creates the list of numbers from 0 to 10 with step 2."
@@ -161,7 +204,28 @@ range 0 11 2..
 
 ---
 
-### Example 9
+### Example 11
+
+#### Prompt
+"Returns the last element of [10 20 30]"
+
+#### Chat Transcript
+
+**User**: Returns the last element of [10 20 30]
+
+#### Code
+
+```
+last [
+  10
+  20
+  30
+]..
+```
+
+---
+
+### Example 12
 
 #### Prompt
 "simple case expression"
@@ -181,7 +245,7 @@ end..
 
 ---
 
-### Example 10
+### Example 13
 
 #### Prompt
 "defines a function double, maps it over [1 2 3 4], and sums the result."
@@ -203,7 +267,7 @@ reduce (<acc x: add acc x>) 0 map (<x: mul x 2>) [
 
 ---
 
-### Example 11
+### Example 14
 
 #### Prompt
 "Write Graffiticode that adds 100 and -5."
@@ -220,7 +284,7 @@ reduce (<acc x: add acc x>) 0 map (<x: mul x 2>) [
 
 ---
 
-### Example 12
+### Example 15
 
 #### Prompt
 "write code that checks if the list [] is empty"
@@ -237,7 +301,7 @@ isempty []..
 
 ---
 
-### Example 13
+### Example 16
 
 #### Prompt
 "squares numbers and then sums them."
@@ -260,7 +324,7 @@ reduce (<acc x: add acc x>) 0 map (<x: mul x x>) [
 
 ---
 
-### Example 14
+### Example 17
 
 #### Prompt
 "Write Graffiticode that reduces [2 3 4] using multiplication."
@@ -281,7 +345,7 @@ reduce (<acc x: mul acc x>) 1 [
 
 ---
 
-### Example 15
+### Example 18
 
 #### Prompt
 "sums numbers in a list using reduce and a lambda."
@@ -304,7 +368,7 @@ reduce (<acc x: add acc x>) 0 [
 
 ---
 
-### Example 16
+### Example 19
 
 #### Prompt
 "Multiplies 2 by the sum of 3 and 4."
@@ -323,7 +387,7 @@ mul
 
 ---
 
-### Example 17
+### Example 20
 
 #### Prompt
 "Write Graffiticode that filters even numbers from the range 1 to 10."
@@ -340,7 +404,7 @@ filter (<x: eq 0 (mod x 2)>) range 1 11 1..
 
 ---
 
-### Example 18
+### Example 21
 
 #### Prompt
 "Write Graffiticode that defines a function triple and maps it over [1 2 3]."
@@ -361,7 +425,7 @@ map (<x: mul 3 x>) [
 
 ---
 
-### Example 19
+### Example 22
 
 #### Prompt
 "Write Graffiticode that doubles numbers from 1 to 10."
@@ -378,7 +442,7 @@ map (<x: mul 2 x>) range 1 11 1..
 
 ---
 
-### Example 20
+### Example 23
 
 #### Prompt
 "counts how many numbers in [1 2 3 4 5] are even."
@@ -404,7 +468,7 @@ else
 
 ---
 
-### Example 21
+### Example 24
 
 #### Prompt
 "Write Graffiticode that keeps only the even numbers in [1 2 3 4 5 6]."
@@ -428,7 +492,7 @@ filter (<x: eq 0 (mod x 2)>) [
 
 ---
 
-### Example 22
+### Example 25
 
 #### Prompt
 "Write Graffiticode that creates the list from 5 to 20 with step 5."
@@ -445,7 +509,7 @@ range 5 25 5..
 
 ---
 
-### Example 23
+### Example 26
 
 #### Prompt
 "Write Graffiticode that sums numbers in [1 2 3 4 5] using reduce."
@@ -468,7 +532,7 @@ reduce (<acc x: add acc x>) 0 [
 
 ---
 
-### Example 24
+### Example 27
 
 #### Prompt
 "Write Graffiticode that filters numbers greater than 3 from [1 2 3 4 5]."
@@ -491,7 +555,7 @@ filter (<x: gt x 3>) [
 
 ---
 
-### Example 25
+### Example 28
 
 #### Prompt
 "Write Graffiticode that returns the third element of [10 20 30 40]."
@@ -513,7 +577,7 @@ nth 2 [
 
 ---
 
-### Example 26
+### Example 29
 
 #### Prompt
 "Write Graffiticode that counts the number of elements in [5 6 7 8]."
@@ -530,7 +594,7 @@ nth 2 [
 
 ---
 
-### Example 27
+### Example 30
 
 #### Prompt
 "triples the number 7."
@@ -547,7 +611,7 @@ mul 3 7..
 
 ---
 
-### Example 28
+### Example 31
 
 #### Prompt
 "Multiplies 6 by 4."
@@ -564,7 +628,7 @@ mul 6 4..
 
 ---
 
-### Example 29
+### Example 32
 
 #### Prompt
 "returns the third number from range 1 10 1."
@@ -581,7 +645,50 @@ nth 2 range 1 10 1..
 
 ---
 
-### Example 30
+### Example 33
+
+#### Prompt
+"Prepends the number 0 to the list [1 2 3]"
+
+#### Chat Transcript
+
+**User**: Prepends the number 0 to the list [1 2 3]
+
+#### Code
+
+```
+[
+  0
+  1
+  2
+  3
+]..
+```
+
+---
+
+### Example 34
+
+#### Prompt
+"Appends the number 4 to the list [1 2 3] using append."
+
+#### Chat Transcript
+
+**User**: Appends the number 4 to the list [1 2 3] using append.
+
+#### Code
+
+```
+append 4 [
+  1
+  2
+  3
+]..
+```
+
+---
+
+### Example 35
 
 #### Prompt
 "defines a tag value red using the tag keyword."
@@ -598,7 +705,30 @@ tag red..
 
 ---
 
-### Example 31
+### Example 36
+
+#### Prompt
+"Takes the first three elements of [1 2 3 4 5]"
+
+#### Chat Transcript
+
+**User**: Takes the first three elements of [1 2 3 4 5]
+
+#### Code
+
+```
+take 3 [
+  1
+  2
+  3
+  4
+  5
+]..
+```
+
+---
+
+### Example 37
 
 #### Prompt
 "drops the first three numbers from range 1 10 1."
@@ -615,7 +745,7 @@ drop 3 range 1 11 1..
 
 ---
 
-### Example 32
+### Example 38
 
 #### Prompt
 "Write Graffiticode that matches a list and returns the head."
@@ -632,7 +762,7 @@ drop 3 range 1 11 1..
 
 ---
 
-### Example 33
+### Example 39
 
 #### Prompt
 "Write Graffiticode that filters out negative numbers from [3 -1 4 -2 5]."
@@ -654,7 +784,7 @@ filter (<x: ge x 0>) [
 
 ---
 
-### Example 34
+### Example 40
 
 #### Prompt
 "Write Graffiticode that sums all numbers in [1 2 3 4]."
@@ -676,7 +806,27 @@ reduce (<acc x: add acc x>) 0 [
 
 ---
 
-### Example 35
+### Example 41
+
+#### Prompt
+"Checks if 3 is not equal to 7"
+
+#### Chat Transcript
+
+**User**: Checks if 3 is not equal to 7
+
+#### Code
+
+```
+if ne 3 7 then
+  "3 is not equal to 7"
+else
+  "3 is equal to 7"..
+```
+
+---
+
+### Example 42
 
 #### Prompt
 "get the first element in a list of strings"
@@ -702,7 +852,24 @@ print hd [
 
 ---
 
-### Example 36
+### Example 43
+
+#### Prompt
+"Concatenates the strings "hello " and "world""
+
+#### Chat Transcript
+
+**User**: Concatenates the strings "hello " and "world"
+
+#### Code
+
+```
+concat "hello " "world"..
+```
+
+---
+
+### Example 44
 
 #### Prompt
 "get the value of binding 'x' from and object that contains 'x'"
@@ -723,7 +890,7 @@ print get "x" {
 
 ---
 
-### Example 37
+### Example 45
 
 #### Prompt
 "doubles numbers in [1 2 3 4] and keeps only those greater than 5."
@@ -745,7 +912,7 @@ filter (<x: gt x 5>) map (<x: mul 2 x>) [
 
 ---
 
-### Example 38
+### Example 46
 
 #### Prompt
 "Write Graffiticode that sums the squares of [1 2 3 4]."
@@ -767,7 +934,7 @@ reduce (<acc x: add acc x>) 0 map (<x: mul x x>) [
 
 ---
 
-### Example 39
+### Example 47
 
 #### Prompt
 "Write Graffiticode that adds the elements of a pair (3, 7)."
@@ -784,7 +951,48 @@ add 3 7..
 
 ---
 
-### Example 40
+### Example 48
+
+#### Prompt
+"Checks if 5 equals 5 using eq."
+
+#### Chat Transcript
+
+**User**: Checks if 5 equals 5 using eq.
+
+#### Code
+
+```
+if eq 5 5 then
+  "5 equals 5"
+else
+  "5 does not equal 5"..
+```
+
+---
+
+### Example 49
+
+#### Prompt
+"Computes 2 raised to the power of 10 using pow.
+
+Computes 2 raised to the power of 10 using pow."
+
+#### Chat Transcript
+
+**User**: Computes 2 raised to the power of 10 using pow.
+
+**User**: Computes 2 raised to the power of 10 using pow.
+
+#### Code
+
+```
+pow 2 10..
+```
+
+---
+
+### Example 50
 
 #### Prompt
 "doubles the number 9."
@@ -801,7 +1009,7 @@ mul 2 9..
 
 ---
 
-### Example 41
+### Example 51
 
 #### Prompt
 "Write Graffiticode that defines a function that adds two numbers."
@@ -818,7 +1026,27 @@ add 1 2..
 
 ---
 
-### Example 42
+### Example 52
+
+#### Prompt
+"Defines tags yes and no and uses case to return true for yes and false for no."
+
+#### Chat Transcript
+
+**User**: Defines tags yes and no and uses case to return true for yes and false for no.
+
+#### Code
+
+```
+case tag yes of
+  tag yes: true
+  tag no: false
+end..
+```
+
+---
+
+### Example 53
 
 #### Prompt
 "finds the largest number in [3 9 2 7]."
@@ -843,7 +1071,7 @@ else
 
 ---
 
-### Example 43
+### Example 54
 
 #### Prompt
 "Write Graffiticode that squares numbers from 1 to 10 and filters even results."
@@ -860,7 +1088,7 @@ filter (<x: eq 0 (mod x 2)>) map (<x: mul x x>) range 1 11 1..
 
 ---
 
-### Example 44
+### Example 55
 
 #### Prompt
 "compute fizzbuzz through 100"
@@ -890,7 +1118,7 @@ else
 
 ---
 
-### Example 45
+### Example 56
 
 #### Prompt
 "Write Graffiticode that triples every number in [2 4 6]."
@@ -911,7 +1139,7 @@ map (<x: mul 3 x>) [
 
 ---
 
-### Example 46
+### Example 57
 
 #### Prompt
 "Write Graffiticode that multiplies the result of 2+3 by 4."
@@ -928,7 +1156,7 @@ mul 5 4..
 
 ---
 
-### Example 47
+### Example 58
 
 #### Prompt
 "create an record with field named foo to 10 and then set another field named bar to 20"
@@ -949,7 +1177,7 @@ print set "bar" 20 {
 
 ---
 
-### Example 48
+### Example 59
 
 #### Prompt
 "double a list of integers"
@@ -970,7 +1198,7 @@ map (<x: mul 2 x>) [
 
 ---
 
-### Example 49
+### Example 60
 
 #### Prompt
 "Write Graffiticode that multiplies three numbers: 2, 3, and 4."
@@ -987,7 +1215,30 @@ mul 2 mul 3 4..
 
 ---
 
-### Example 50
+### Example 61
+
+#### Prompt
+"Filters numbers equal to 3 from [1 2 3 3 4]"
+
+#### Chat Transcript
+
+**User**: Filters numbers equal to 3 from [1 2 3 3 4]
+
+#### Code
+
+```
+filter (<x: eq x 3>) [
+  1
+  2
+  3
+  3
+  4
+]..
+```
+
+---
+
+### Example 62
 
 #### Prompt
 "Write Graffiticode that counts the number of elements in [5 6 7 8]."
@@ -1009,7 +1260,7 @@ reduce (<acc x: add acc 1>) 0 [
 
 ---
 
-### Example 51
+### Example 63
 
 #### Prompt
 "Write Graffiticode that adds three numbers: 1, 2, and 3."
@@ -1026,7 +1277,7 @@ reduce (<acc x: add acc 1>) 0 [
 
 ---
 
-### Example 52
+### Example 64
 
 #### Prompt
 "create a program with a let definition and an expression that calls the let definition"
@@ -1043,7 +1294,27 @@ reduce (<acc x: add acc 1>) 0 [
 
 ---
 
-### Example 53
+### Example 65
+
+#### Prompt
+"Checks if 10 is greater than 4"
+
+#### Chat Transcript
+
+**User**: Checks if 10 is greater than 4
+
+#### Code
+
+```
+if gt 10 4 then
+  "Yes, 10 is greater than 4"
+else
+  "No, 10 is not greater than 4"..
+```
+
+---
+
+### Example 66
 
 #### Prompt
 "squares the number 6."
@@ -1060,7 +1331,7 @@ mul 6 6..
 
 ---
 
-### Example 54
+### Example 67
 
 #### Prompt
 "computes the remainder when 17 is divided by 5."
@@ -1077,7 +1348,7 @@ mod 17 5..
 
 ---
 
-### Example 55
+### Example 68
 
 #### Prompt
 "create a function that prints the names of the first 10 integers in french and calls it with one of the integers"
@@ -1106,7 +1377,24 @@ end..
 
 ---
 
-### Example 56
+### Example 69
+
+#### Prompt
+"Parses the string '{"x": 1}' using json."
+
+#### Chat Transcript
+
+**User**: Parses the string '{"x": 1}' using json.
+
+#### Code
+
+```
+json "{\"x\": 1}"..
+```
+
+---
+
+### Example 70
 
 #### Prompt
 "Write Graffiticode that defines a function that subtracts two numbers.
@@ -1127,7 +1415,7 @@ sub 10 3..
 
 ---
 
-### Example 57
+### Example 71
 
 #### Prompt
 "Write Graffiticode that returns the first element of [5 6 7]."
@@ -1148,7 +1436,7 @@ hd [
 
 ---
 
-### Example 58
+### Example 72
 
 #### Prompt
 "Write Graffiticode that defines a function double and uses it with map."
@@ -1171,7 +1459,7 @@ map (<x: mul x 2>) [
 
 ---
 
-### Example 59
+### Example 73
 
 #### Prompt
 "Write Graffiticode that squares numbers from 1 to 5."
@@ -1188,7 +1476,24 @@ map (<x: mul x x>) range 1 6 1..
 
 ---
 
-### Example 60
+### Example 74
+
+#### Prompt
+"Returns the length of the string "hello""
+
+#### Chat Transcript
+
+**User**: Returns the length of the string "hello"
+
+#### Code
+
+```
+length "hello"..
+```
+
+---
+
+### Example 75
 
 #### Prompt
 "write a program that translates integers from 1 to 10 to their french names
@@ -1263,7 +1568,7 @@ end>) range 10 110 10..
 
 ---
 
-### Example 61
+### Example 76
 
 #### Prompt
 "Write Graffiticode that squares every number in [1 2 3 4]."
@@ -1285,7 +1590,7 @@ map (<x: mul x x>) [
 
 ---
 
-### Example 62
+### Example 77
 
 #### Prompt
 "creates numbers 1 to 10 and sums them."
@@ -1302,7 +1607,24 @@ reduce (<acc x: add acc x>) 0 range 1 11 1..
 
 ---
 
-### Example 63
+### Example 78
+
+#### Prompt
+"Squares a number"
+
+#### Chat Transcript
+
+**User**: Squares a number
+
+#### Code
+
+```
+pow 42 2..
+```
+
+---
+
+### Example 79
 
 #### Prompt
 "defines two tags red and blue and binds red to a variable color."
@@ -1322,7 +1644,7 @@ end..
 
 ---
 
-### Example 64
+### Example 80
 
 #### Prompt
 "adds the first and last numbers of [2 4 6 8]."
@@ -1349,7 +1671,30 @@ add (hd [
 
 ---
 
-### Example 65
+### Example 81
+
+#### Prompt
+"Filters numbers equal to 3 from [1 2 3 3 4] using eq."
+
+#### Chat Transcript
+
+**User**: Filters numbers equal to 3 from [1 2 3 3 4] using eq.
+
+#### Code
+
+```
+filter (<x: eq x 3>) [
+  1
+  2
+  3
+  3
+  4
+]..
+```
+
+---
+
+### Example 82
 
 #### Prompt
 "multiplies the first two numbers of [3 5 7]."
@@ -1374,7 +1719,7 @@ mul (hd [
 
 ---
 
-### Example 66
+### Example 83
 
 #### Prompt
 "takes the first three numbers from range 1 10 1."
@@ -1391,7 +1736,7 @@ take 3 range 1 10 1..
 
 ---
 
-### Example 67
+### Example 84
 
 #### Prompt
 "Write Graffiticode that subtracts 4 from -10."
@@ -1408,7 +1753,7 @@ sub -10 4..
 
 ---
 
-### Example 68
+### Example 85
 
 #### Prompt
 "create a minimal correct program"
@@ -1425,7 +1770,7 @@ sub -10 4..
 
 ---
 
-### Example 69
+### Example 86
 
 #### Prompt
 "finds the smallest number in [3 9 2 7]."
@@ -1455,7 +1800,7 @@ else
 
 ---
 
-### Example 70
+### Example 87
 
 #### Prompt
 "define a function and call it"
@@ -1472,7 +1817,7 @@ print mul 42 2..
 
 ---
 
-### Example 71
+### Example 88
 
 #### Prompt
 "Write Graffiticode that doubles every number in [1 2 3 4]."
@@ -1494,7 +1839,7 @@ map (<x: mul 2 x>) [
 
 ---
 
-### Example 72
+### Example 89
 
 #### Prompt
 "drops the first two elements of [1 2 3 4 5]."
@@ -1517,7 +1862,7 @@ drop 2 [
 
 ---
 
-### Example 73
+### Example 90
 
 #### Prompt
 "Returns the number 42."
@@ -1534,7 +1879,7 @@ drop 2 [
 
 ---
 
-### Example 74
+### Example 91
 
 #### Prompt
 "Write Graffiticode that reduces [1 2 3 4] using addition."
@@ -1556,7 +1901,73 @@ reduce (<acc x: add acc x>) 0 [
 
 ---
 
-### Example 75
+### Example 92
+
+#### Prompt
+"Checks if 2 is less than 9"
+
+#### Chat Transcript
+
+**User**: Checks if 2 is less than 9
+
+#### Code
+
+```
+if lt 2 9 then
+  "Yes, 2 is less than 9"
+else
+  "No, 2 is not less than 9"..
+```
+
+---
+
+### Example 93
+
+#### Prompt
+"Drops the first two elements of [1 2 3 4 5]"
+
+#### Chat Transcript
+
+**User**: Drops the first two elements of [1 2 3 4 5]
+
+#### Code
+
+```
+drop 2 [
+  1
+  2
+  3
+  4
+  5
+]..
+```
+
+---
+
+### Example 94
+
+#### Prompt
+"Concatenates two lists [1 2] and [3 4]"
+
+#### Chat Transcript
+
+**User**: Concatenates two lists [1 2] and [3 4]
+
+#### Code
+
+```
+concat [
+  1
+  2
+] [
+  3
+  4
+]..
+```
+
+---
+
+### Example 95
 
 #### Prompt
 "use parenthesis to call a higher order function"
@@ -1578,7 +1989,7 @@ print map (<x: mul 2 x>) [
 
 ---
 
-### Example 76
+### Example 96
 
 #### Prompt
 "Write Graffiticode that adds all numbers in the range from 1 to 10."
@@ -1595,7 +2006,7 @@ reduce (<acc x: add acc x>) 0 range 1 11 1..
 
 ---
 
-### Example 77
+### Example 97
 
 #### Prompt
 "Write Graffiticode that appends [4 5] to [1 2 3]."
@@ -1619,7 +2030,27 @@ concat [
 
 ---
 
-### Example 78
+### Example 98
+
+#### Prompt
+"Defines two tags and puts them in a list."
+
+#### Chat Transcript
+
+**User**: Defines two tags and puts them in a list.
+
+#### Code
+
+```
+[
+  tag red
+  tag blue
+]..
+```
+
+---
+
+### Example 99
 
 #### Prompt
 "write a program with a simple conditional expression"
@@ -1639,7 +2070,24 @@ else
 
 ---
 
-### Example 79
+### Example 100
+
+#### Prompt
+"Checks if 5 is greater than or equal to 5"
+
+#### Chat Transcript
+
+**User**: Checks if 5 is greater than or equal to 5
+
+#### Code
+
+```
+ge 5 5..
+```
+
+---
+
+### Example 101
 
 #### Prompt
 "Write Graffiticode that multiplies all numbers in [2 3 4]."
@@ -1660,7 +2108,7 @@ reduce (<acc x: mul acc x>) 1 [
 
 ---
 
-### Example 80
+### Example 102
 
 #### Prompt
 "Write Graffiticode that returns the length of [1 2 3 4]."
@@ -1682,7 +2130,24 @@ length [
 
 ---
 
-### Example 81
+### Example 103
+
+#### Prompt
+"Squares a number using pow."
+
+#### Chat Transcript
+
+**User**: Squares a number using pow.
+
+#### Code
+
+```
+pow 42 2..
+```
+
+---
+
+### Example 104
 
 #### Prompt
 "Write Graffiticode that keeps only numbers greater than 5 in [3 5 7 9]."
@@ -1704,7 +2169,7 @@ filter (<x: gt x 5>) [
 
 ---
 
-### Example 82
+### Example 105
 
 #### Prompt
 "creates numbers 1 to 10 and doubles them."
@@ -1721,7 +2186,7 @@ map (<x: mul 2 x>) range 1 11 1..
 
 ---
 
-### Example 83
+### Example 106
 
 #### Prompt
 "Write Graffiticode that defines a function increment and uses it on 5."
@@ -1738,7 +2203,7 @@ add 1 5..
 
 ---
 
-### Example 84
+### Example 107
 
 #### Prompt
 "Write Graffiticode that maps a lambda that squares numbers over [2 3 4]."
@@ -1759,7 +2224,7 @@ map (<x: mul x x>) [
 
 ---
 
-### Example 85
+### Example 108
 
 #### Prompt
 "Write Graffiticode that returns the list [1 2 3]."
@@ -1780,7 +2245,7 @@ map (<x: mul x x>) [
 
 ---
 
-### Example 86
+### Example 109
 
 #### Prompt
 "Write Graffiticode that defines a function double that multiplies a number by 2."
@@ -1797,7 +2262,7 @@ true..
 
 ---
 
-### Example 87
+### Example 110
 
 #### Prompt
 "get the tail of a list of integers"
@@ -1827,7 +2292,7 @@ print tl [
 
 ---
 
-### Example 88
+### Example 111
 
 #### Prompt
 "Write Graffiticode that returns the tail of [5 6 7 8]."
@@ -1849,7 +2314,7 @@ tl [
 
 ---
 
-### Example 89
+### Example 112
 
 #### Prompt
 "Write Graffiticode that defines a function square."
@@ -1866,7 +2331,7 @@ mul 5 5..
 
 ---
 
-### Example 90
+### Example 113
 
 #### Prompt
 "takes the first three elements of [1 2 3 4 5]."
@@ -1889,7 +2354,7 @@ take 3 [
 
 ---
 
-### Example 91
+### Example 114
 
 #### Prompt
 "Defines tags on and off, binds one to a variable, and matches it with a wildcard fallback returning "unknown"."
@@ -1909,7 +2374,7 @@ end..
 
 ---
 
-### Example 92
+### Example 115
 
 #### Prompt
 "Write Graffiticode that matches the number 1 and returns "one"."
@@ -1929,7 +2394,7 @@ end..
 
 ---
 
-### Example 93
+### Example 116
 
 #### Prompt
 "Defines a tag red and uses equiv to compare it to itself."
@@ -1946,7 +2411,7 @@ equiv tag red tag red..
 
 ---
 
-### Example 94
+### Example 117
 
 #### Prompt
 "Write Graffiticode that creates the list of numbers from 1 to 5 using range."
@@ -1963,7 +2428,53 @@ range 1 6 1..
 
 ---
 
-### Example 95
+### Example 118
+
+#### Prompt
+"Filters numbers greater than 5 from [2 4 6 8 10]"
+
+#### Chat Transcript
+
+**User**: Filters numbers greater than 5 from [2 4 6 8 10]
+
+#### Code
+
+```
+filter (<x: gt x 5>) [
+  2
+  4
+  6
+  8
+  10
+]..
+```
+
+---
+
+### Example 119
+
+#### Prompt
+"Returns the length of [5 6 7 8 9]"
+
+#### Chat Transcript
+
+**User**: Returns the length of [5 6 7 8 9]
+
+#### Code
+
+```
+length [
+  5
+  6
+  7
+  8
+  9
+]..
+```
+
+---
+
+### Example 120
 
 #### Prompt
 "Write Graffiticode that adds the number 1 to the front of [2 3 4]."
@@ -1984,7 +2495,7 @@ cons 1 [
 
 ---
 
-### Example 96
+### Example 121
 
 #### Prompt
 "Write Graffiticode that defines a function sum3 that adds three numbers."
@@ -2001,7 +2512,7 @@ sub 10 3..
 
 ---
 
-### Example 97
+### Example 122
 
 #### Prompt
 "Subtracts 3 from 10."
@@ -2018,7 +2529,7 @@ sub 10 3..
 
 ---
 
-### Example 98
+### Example 123
 
 #### Prompt
 "computes the sum of 8 and the product of 2 and 5."
@@ -2035,7 +2546,7 @@ add 8 mul 2 5..
 
 ---
 
-### Example 99
+### Example 124
 
 #### Prompt
 "sums the even numbers in [1 2 3 4 5 6]."
@@ -2059,7 +2570,7 @@ reduce (<acc x: add acc x>) 0 (filter (<x: eq 0 (mod x 2)>) [
 
 ---
 
-### Example 100
+### Example 125
 
 #### Prompt
 "Write Graffiticode that multiplies -3 by 8."
@@ -2076,7 +2587,7 @@ mul -3 8..
 
 ---
 
-### Example 101
+### Example 126
 
 #### Prompt
 "Adds 7 and 5."
@@ -2093,7 +2604,24 @@ add 7 5..
 
 ---
 
-### Example 102
+### Example 127
+
+#### Prompt
+"Concatenates the strings "hello " and "world" using concat."
+
+#### Chat Transcript
+
+**User**: Concatenates the strings "hello " and "world" using concat.
+
+#### Code
+
+```
+concat "hello " "world"..
+```
+
+---
+
+### Example 128
 
 #### Prompt
 "Defines tags red and blue, then uses case to return "warm" for red and "cool" for blue."
@@ -2113,7 +2641,24 @@ end..
 
 ---
 
-### Example 103
+### Example 129
+
+#### Prompt
+"Computes 2 raised to the power of 10"
+
+#### Chat Transcript
+
+**User**: Computes 2 raised to the power of 10
+
+#### Code
+
+```
+pow 2 10..
+```
+
+---
+
+### Example 130
 
 #### Prompt
 "Write Graffiticode that adds the result of 4x5 to 6."
@@ -2130,7 +2675,7 @@ add mul 4 5 6..
 
 ---
 
-### Example 104
+### Example 131
 
 #### Prompt
 "Write Graffiticode that defines a function that multiplies two numbers."
@@ -2147,7 +2692,7 @@ mul 6 7..
 
 ---
 
-### Example 105
+### Example 132
 
 #### Prompt
 "Write Graffiticode that checks if the list [1 2 3] is empty."
@@ -2168,7 +2713,7 @@ isempty [
 
 ---
 
-### Example 106
+### Example 133
 
 #### Prompt
 "Write Graffiticode that maps a lambda that doubles numbers over [3 6 9]."
@@ -2189,7 +2734,33 @@ map (<x: mul 2 x>) [
 
 ---
 
-### Example 107
+### Example 134
+
+#### Prompt
+"Defines tags cat and dog, creates a list of them, and maps a lambda that uses case to convert each to a string."
+
+#### Chat Transcript
+
+**User**: Defines tags cat and dog, creates a list of them, and maps a lambda that uses case to convert each to a string.
+
+#### Code
+
+```
+map (<a: case a of
+  tag cat: "cat"
+  tag dog: "dog"
+  tag _: "unknown"
+end>) [
+  tag cat
+  tag dog
+  tag cat
+  tag dog
+]..
+```
+
+---
+
+### Example 135
 
 #### Prompt
 "Write Graffiticode that returns the last element of [2 4 6 8]."
@@ -2211,7 +2782,7 @@ nth 3 [
 
 ---
 
-### Example 108
+### Example 136
 
 #### Prompt
 "Write Graffiticode that adds 1 to every element of [5 6 7]."
@@ -2232,7 +2803,7 @@ map (<x: add 1 x>) [
 
 ---
 
-### Example 109
+### Example 137
 
 #### Prompt
 "Write Graffiticode that matches numbers 1, 2, or anything else and returns a string."
@@ -2253,7 +2824,7 @@ end..
 
 ---
 
-### Example 110
+### Example 138
 
 #### Prompt
 "computes 10 minus the product of 2 and 3."
@@ -2270,7 +2841,7 @@ sub 10 mul 2 3..
 
 ---
 
-### Example 111
+### Example 139
 
 #### Prompt
 "Returns the string "hello"."
@@ -2287,7 +2858,7 @@ sub 10 mul 2 3..
 
 ---
 
-### Example 112
+### Example 140
 
 #### Prompt
 "Write Graffiticode that returns the list [10 20 30 40]."

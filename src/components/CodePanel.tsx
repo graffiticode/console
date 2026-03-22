@@ -399,6 +399,7 @@ export const CodePanel = ({
           content: attr(data-error);
           position: absolute;
           left: 0;
+          top: calc(100% + 5px);
           max-height: 300px;
           overflow-y: auto;
           width: max-content;
@@ -409,11 +410,7 @@ export const CodePanel = ({
           border-radius: 6px;
           z-index: 10000;
           box-shadow: none;
-        }
-        /* Position tooltip below for errors at the top of the editor */
-        .cm-error-highlight.tooltip-bottom:hover::after {
-          top: calc(100% + 5px);
-          bottom: auto;
+          pointer-events: none;
         }
         /* Position tooltip above for errors at the bottom of the editor */
         .cm-error-highlight.tooltip-top:hover::after {
