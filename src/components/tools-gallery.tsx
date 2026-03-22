@@ -136,10 +136,10 @@ export default function ToolsGallery({ language, setLanguage }) {
                     {languages.map((lang) => (
                       <li key={lang.name} ref={(el) => { langItemRefs.current[lang.name] = el; }}>
                         <button
-                          onClick={() => handleSelectLanguage(lang)}
+                          onClick={() => { handleSelectLanguage(lang); langListRef.current?.focus(); }}
                           className={classNames(
                             selectedLang === lang.name ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200',
-                            "flex flex-col w-full text-left rounded-none py-1 pl-4 pr-2"
+                            "flex flex-col w-full text-left rounded-none py-1 pl-4 pr-2 focus:outline-none"
                           )}
                         >
                           <span className="text-xs font-bold text-gray-700">{lang.name}</span>
