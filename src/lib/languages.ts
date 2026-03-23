@@ -31,6 +31,7 @@ export const LANGUAGES: Language[] = [
   { id: "0164", name: "L0164", description: "Code generators", category: "data", domains: ["hide"] },
   { id: "0166", name: "L0166", description: "Spreadsheets", category: "data", domains: ["appliedscoring", "embedsheets", "graffiticode"] },
   { id: "0169", name: "L0169", description: "Concept web assessments", category: "data", domains: ["appliedscoring", "graffiticode"] },
+  { id: "0170", name: "L0170", description: "Data transformations", category: "data", domains: ["graffiticode"] },
 ];
 
 export function findLanguageById(id: string): Language | undefined {
