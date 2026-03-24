@@ -21,7 +21,8 @@
     "test:streaming": "npx tsx scripts/test-streaming.ts",
     "gcp:build": "gcloud builds submit --config cloudbuild.yaml --project graffiticode-app --substitutions=_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')",
     "gcp:logs": "gcloud logging read 'resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"console\"' --project graffiticode-app --limit 100 --format='table(timestamp,severity,httpRequest.status,httpRequest.requestMethod,httpRequest.requestUrl,httpRequest.latency,textPayload)'",
-    "gcp:logs:tail": "gcloud beta run services logs tail console --project graffiticode-app --region us-central1"
+    "gcp:logs:tail": "gcloud beta run services logs tail console --project graffiticode-app --region us-central1",
+    "upgrade-basis": "npx tsx scripts/upgrade-basis.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",
@@ -31,6 +32,7 @@
     "@codemirror/view": "^6.36.2",
     "@ethereumjs/util": "^8.0.3",
     "@graffiticode/auth": "^2.1.2",
+    "@graffiticode/basis": "^1.8.2",
     "@graffiticode/l0002": "^0.1.0",
     "@graffiticode/l0011": "^0.0.6",
     "@graffiticode/l0012": "^0.1.1",
