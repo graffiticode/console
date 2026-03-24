@@ -74,7 +74,7 @@ export const plans: Plan[] = [
       '2,000,000 compile units per month',
       'Additional compiles at $0.0005 each',
       'Up to 10 accounts included',
-      'Priority email support',
+      'Priority support',
       'Language development services',
       'Cancel anytime'
     ],
