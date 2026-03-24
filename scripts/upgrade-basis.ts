@@ -1,9 +1,18 @@
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { basename, resolve } from 'path';
 
 const BATCH_SIZE = 5;
 const BASE_DIR = resolve(process.cwd(), '..');
+
+function run(cmd: string, cwd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    exec(cmd, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) reject(new Error((stdout || '') + (stderr || '')));
+      else resolve(stdout);
+    });
+  });
+}
 
 function findRepos(): string[] {
   return readdirSync(BASE_DIR)
@@ -18,29 +27,24 @@ function findRepos(): string[] {
     .sort();
 }
 
-function upgradeAndDeploy(dir: string): Promise<{ name: string; ok: boolean; error?: string }> {
+async function upgradeAndDeploy(dir: string): Promise<{ name: string; ok: boolean; error?: string }> {
   const name = basename(dir);
-  return new Promise(resolve => {
-    try {
-      console.log(`[${name}] Starting upgrade + deploy...`);
-      execSync('npm i @graffiticode/basis@latest', {
-        cwd: resolve(dir, 'packages/api'),
-        stdio: 'pipe',
-        timeout: 120_000,
-      });
-      execSync('npm run gcp:build', {
-        cwd: dir,
-        stdio: 'pipe',
-        timeout: 900_000,
-      });
-      console.log(`[${name}] Done`);
-      resolve({ name, ok: true });
-    } catch (err: any) {
-      const output = (err.stdout?.toString() || '') + (err.stderr?.toString() || '');
-      console.error(`[${name}] FAILED`);
-      resolve({ name, ok: false, error: output.slice(-500) });
+  try {
+    console.log(`[${name}] Starting upgrade + deploy...`);
+    const apiDir = resolve(dir, 'packages/api');
+    await run('npm i @graffiticode/basis@latest', apiDir);
+    // Ensure graphql peer dep is present if graphql-request is used
+    const apiPkg = readFileSync(resolve(apiDir, 'package.json'), 'utf-8');
+    if (apiPkg.includes('graphql-request') && !apiPkg.includes('"graphql"')) {
+      await run('npm i graphql', apiDir);
     }
-  });
+    await run('npm run gcp:build', dir);
+    console.log(`[${name}] Done`);
+    return { name, ok: true };
+  } catch (err: any) {
+    console.error(`[${name}] FAILED`);
+    return { name, ok: false, error: (err.message || '').slice(-500) };
+  }
 }
 
 async function main() {

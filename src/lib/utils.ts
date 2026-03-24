@@ -25,5 +25,5 @@ export function getTitle() {
 
 export function getPageTitle(suffix?: string): string {
   const title = getTitle();
-  return suffix ? `Console | ${title} - ${suffix}` : `Console | ${title}`;
+  return suffix ? `Console - ${suffix}` : 'Console';
 }
