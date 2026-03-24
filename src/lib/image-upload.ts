@@ -1,7 +1,12 @@
 import { ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata } from 'firebase/storage';
 import type { FirebaseStorage, UploadTask } from 'firebase/storage';
 
-const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const ALLOWED_TEXT_EXTENSIONS = [
+  '.json', '.csv', '.txt', '.xml', '.md', '.log', '.yaml', '.yml', '.toml',
+  '.gc', '.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.sql', '.sh',
+  '.go', '.rs', '.rb', '.java', '.c', '.h', '.cpp', '.cc',
+];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 async function computeFileHash(file: File): Promise<string> {
@@ -15,8 +20,25 @@ function displayName(storageName: string): string {
   return withoutUuid.replace(/\.[^.]+$/, '');
 }
 
+export function isTextAsset(fileName: string): boolean {
+  const ext = '.' + (fileName.split('.').pop() || '').toLowerCase();
+  return ALLOWED_TEXT_EXTENSIONS.includes(ext);
+}
+
+export function validateAssetFile(file: File): string | null {
+  const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
+  const isText = isTextAsset(file.name);
+  if (!isImage && !isText) {
+    return `Unsupported file type. Use images (PNG, JPEG, GIF, WebP) or text files (JSON, CSV, TXT, etc.).`;
+  }
+  if (file.size > MAX_SIZE) {
+    return `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 5MB.`;
+  }
+  return null;
+}
+
 export function validateImageFile(file: File): string | null {
-  if (!ALLOWED_TYPES.includes(file.type)) {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
     return `Unsupported image type: ${file.type}. Use PNG, JPEG, GIF, or WebP.`;
   }
   if (file.size > MAX_SIZE) {
@@ -115,8 +137,9 @@ export function uploadImage(
   const sanitized = sanitizeFileName(file.name.replace(/\.[^.]+$/, ''));
   const path = `uploads/${userId}/${uuid}_${sanitized}.${ext}`;
   const storageRef = ref(storage, path);
+  const contentType = file.type || (isTextAsset(file.name) ? 'text/plain' : 'application/octet-stream');
   const task: UploadTask = uploadBytesResumable(storageRef, file, {
-    contentType: file.type,
+    contentType,
     customMetadata: fileHash ? { hash: fileHash } : undefined,
   });
 

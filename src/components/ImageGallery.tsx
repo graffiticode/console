@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
 import useGraffiticodeAuth, { useToken } from '../hooks/use-graffiticode-auth';
-import { listUserImages, validateImageFile, uploadImageDeduped, archiveUserImage, fetchArchivedImages } from '../lib/image-upload';
+import { listUserImages, validateAssetFile, uploadImageDeduped, archiveUserImage, fetchArchivedImages, isTextAsset } from '../lib/image-upload';
 import type { ImageInfo } from '../lib/image-upload';
 
 function fileNameWithoutExt(name: string): string {
@@ -98,8 +98,20 @@ export function ImageGallery() {
   const buildMarkdown = (urls: Set<string>) => {
     return images
       .filter(img => urls.has(img.downloadURL))
-      .map(img => `![${fileNameWithoutExt(img.name)}](${img.downloadURL})`)
+      .map(img => {
+        const name = fileNameWithoutExt(img.name);
+        if (isTextAsset(img.name)) {
+          return `[${name}](${img.downloadURL})`;
+        }
+        return `![${name}](${img.downloadURL})`;
+      })
       .join('\n');
+  };
+
+  const hasOnlyTextAssets = (urls: Set<string>) => {
+    return images
+      .filter(img => urls.has(img.downloadURL))
+      .every(img => isTextAsset(img.name));
   };
 
   const handleArchive = useCallback(async (img: ImageInfo, e: React.MouseEvent) => {
@@ -121,7 +133,7 @@ export function ImageGallery() {
   const handleFiles = useCallback(async (files: FileList) => {
     if (!user?.uid || files.length === 0) return;
     const file = files[0];
-    const validationError = validateImageFile(file);
+    const validationError = validateAssetFile(file);
     if (validationError) {
       setUploadError(validationError);
       return;
@@ -200,7 +212,7 @@ export function ImageGallery() {
       )}
       {images.length === 0 ? (
         <div className="text-sm text-gray-400 text-center py-8">
-          No images uploaded yet. Drag images here to upload.
+          No assets yet. Drag images or text files here to upload.
         </div>
       ) : (
         <div className="flex flex-wrap gap-3">
@@ -218,8 +230,12 @@ export function ImageGallery() {
                   dragImageRef.current = img.downloadURL;
                   const markdown = buildMarkdown(dragUrls);
                   e.dataTransfer.setData('text/plain', markdown);
-                  e.dataTransfer.setData('application/x-gc-image', 'true');
                   e.dataTransfer.setData('application/x-gc-image-reorder', img.downloadURL);
+                  if (hasOnlyTextAssets(dragUrls)) {
+                    e.dataTransfer.setData('application/x-gc-text', 'true');
+                  } else {
+                    e.dataTransfer.setData('application/x-gc-image', 'true');
+                  }
                   e.dataTransfer.effectAllowed = 'copyMove';
                 }}
                 onDragOver={(e) => {
@@ -271,11 +287,20 @@ export function ImageGallery() {
                 >
                   ✕
                 </span>
-                <img
-                  src={img.downloadURL}
-                  alt={fileNameWithoutExt(img.name)}
-                  className="w-[100px] h-[100px] object-contain"
-                />
+                {isTextAsset(img.name) ? (
+                  <div className="w-[100px] h-[100px] flex flex-col items-center justify-center bg-gray-50 rounded">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-[10px] text-gray-400 mt-1">{(img.name.split('.').pop() || '').toUpperCase()}</span>
+                  </div>
+                ) : (
+                  <img
+                    src={img.downloadURL}
+                    alt={fileNameWithoutExt(img.name)}
+                    className="w-[100px] h-[100px] object-contain"
+                  />
+                )}
                 <span className="text-xs text-gray-500 mt-1 truncate w-full text-center">
                   {fileNameWithoutExt(img.name)}
                 </span>
