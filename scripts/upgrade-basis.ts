@@ -5,9 +5,9 @@ import { basename, resolve } from 'path';
 const BATCH_SIZE = 5;
 const BASE_DIR = resolve(process.cwd(), '..');
 
-function run(cmd: string, cwd: string): Promise<string> {
+function run(cmd: string, cwd: string, timeoutMs = 10 * 60 * 1000): Promise<string> {
   return new Promise((resolve, reject) => {
-    exec(cmd, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    exec(cmd, { cwd, maxBuffer: 10 * 1024 * 1024, timeout: timeoutMs }, (err, stdout, stderr) => {
       if (err) reject(new Error((stdout || '') + (stderr || '')));
       else resolve(stdout);
     });
@@ -38,8 +38,15 @@ async function upgradeAndDeploy(dir: string): Promise<{ name: string; ok: boolea
     if (apiPkg.includes('graphql-request') && !apiPkg.includes('"graphql"')) {
       await run('npm i graphql', apiDir);
     }
-    await run('npm run gcp:build', dir);
-    console.log(`[${name}] Done`);
+    const status = await run('git status --porcelain', dir);
+    if (status.trim()) {
+      await run('git add -A && git commit -m "Upgrade basis to latest"', dir);
+      await run('git push', dir);
+      await run('npm run gcp:build', dir, 20 * 60 * 1000);
+      console.log(`[${name}] Done`);
+    } else {
+      console.log(`[${name}] Already up to date, skipping deploy`);
+    }
     return { name, ok: true };
   } catch (err: any) {
     console.error(`[${name}] FAILED`);
