@@ -8,7 +8,34 @@ import { generateCode as codeGenerationService } from "../../lib/code-generation
 import { ragLog, generateRequestId } from "../../lib/logger";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 // import { buildDynamicSchema } from "./schemas";
+
+function encrypt(plaintext: string): string {
+  const key = process.env.GRAFFITICODE_SECRET_KEY;
+  if (!key) return plaintext;
+  const keyHash = crypto.createHash('sha256').update(key).digest();
+  const iv = crypto.createHmac('sha256', key).update(plaintext).digest().subarray(0, 16);
+  const cipher = crypto.createCipheriv('aes-256-cbc', keyHash, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+function encryptCryptNodes(astPool: Record<string, any>): Record<string, any> {
+  if (!process.env.GRAFFITICODE_SECRET_KEY) return astPool;
+  for (const nodeId of Object.keys(astPool)) {
+    if (nodeId === "root") continue;
+    const node = astPool[nodeId];
+    if (node?.tag === "CRYPT") {
+      const strNodeId = node.elts[0];
+      const strNode = astPool[strNodeId];
+      if (strNode?.tag === "STR") {
+        strNode.elts[0] = encrypt(strNode.elts[0]);
+      }
+    }
+  }
+  return astPool;
+}
 
 // Global cache for templates to avoid repeated fetches
 const templateCache = new Map<string, string>();
@@ -50,6 +77,7 @@ export async function parseCode({ lang, code }: { lang: string; code: string }) 
     if (errors.length > 0) {
       return { ast: null, errors };
     }
+    encryptCryptNodes(astPool);
     console.log(
       "parseCode()",
       "astPool=" + JSON.stringify(astPool, null, 2),
