@@ -878,6 +878,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
                 onError={(msg) => { dismissedAlertRef.current = null; setSystemAlert(msg); }}
                 initialCode={editorCode}
                 initialHelp={editorHelp}
+                itemId={selectedItemId}
               />
               </div>
             </div>
