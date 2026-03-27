@@ -21,21 +21,9 @@ function encrypt(plaintext: string): string {
   return iv.toString('hex') + ':' + encrypted.toString('hex');
 }
 
-function encryptCryptNodes(astPool: Record<string, any>): Record<string, any> {
-  if (!process.env.GRAFFITICODE_SECRET_KEY) return astPool;
-  for (const nodeId of Object.keys(astPool)) {
-    if (nodeId === "root") continue;
-    const node = astPool[nodeId];
-    if (node?.tag === "CRYPT") {
-      const strNodeId = node.elts[0];
-      const strNode = astPool[strNodeId];
-      if (strNode?.tag === "STR") {
-        strNode.elts[0] = encrypt(strNode.elts[0]);
-      }
-    }
-  }
-  return astPool;
-}
+const parseCallbacks = {
+  CRYPT: (value: string) => encrypt(value),
+};
 
 // Global cache for templates to avoid repeated fetches
 const templateCache = new Map<string, string>();
@@ -52,7 +40,7 @@ export async function parseCode({ lang, code }: { lang: string; code: string }) 
     if (!lexicon) {
       return { ast: null, errors: [{ message: `No lexicon found for language ${lang}`, from: -1, to: -1 }] };
     }
-    const astPool = await parser.parse(lang, code, lexicon);
+    const astPool = await parser.parse(lang, code, lexicon, parseCallbacks);
 
     // Scan the AST pool for ERROR nodes
     const errors: Array<{ message: string; from: number; to: number }> = [];
@@ -77,7 +65,6 @@ export async function parseCode({ lang, code }: { lang: string; code: string }) 
     if (errors.length > 0) {
       return { ast: null, errors };
     }
-    encryptCryptNodes(astPool);
     console.log(
       "parseCode()",
       "astPool=" + JSON.stringify(astPool, null, 2),
