@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2026-03-25T17:59:48.713Z*
+*Downloaded on 2026-03-26T17:25:10.536Z*
 
 ## Language L0170
 
@@ -47,6 +47,30 @@ filter {
 ### Example 3
 
 #### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, selects title, price, and rating, formats price as "$#,##0.00" and rating as "0.0", and takes the first 10."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, selects title, price, and rating, formats price as "$#,##0.00" and rating as "0.0", and takes the first 10.
+
+#### Code
+
+```
+take 10 format {
+  price: "$#,##0.00"
+  rating: "0.0"
+} select [
+  "title"
+  "price"
+  "rating"
+] get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 4
+
+#### Prompt
 "Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and sorts by sepal_length ascending."
 
 #### Chat Transcript
@@ -61,32 +85,76 @@ sort "sepal_length" fetch "https://raw.githubusercontent.com/mwaskom/seaborn-dat
 
 ---
 
-### Example 4
+### Example 5
 
 #### Prompt
-"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and adds a totalValue field by multiplying price and stock, rounded to 2 decimal places."
+"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv", groups by species and computes average sepal_length rounded to 2, and sorts by sepal_length descending."
 
 #### Chat Transcript
 
-**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and adds a totalValue field by multiplying price and stock, rounded to 2 decimal places.
+**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv", groups by species and computes average sepal_length rounded to 2, and sorts by sepal_length descending.
+
+#### Code
+
+```
+sort {
+  field: "sepal_length"
+  order: "desc"
+} group {
+  by: "species"
+  avg: {
+    round: 2
+    as: "sepal_length"
+    field: "sepal_length"
+  }
+} fetch "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"..
+```
+
+---
+
+### Example 6
+
+#### Prompt
+"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a total_length field by summing sepal_length and petal_length, rounded to 1."
+
+#### Chat Transcript
+
+**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a total_length field by summing sepal_length and petal_length, rounded to 1.
 
 #### Code
 
 ```
 mutate {
-  totalValue: {
-    mul: [
-      "price"
-      "stock"
+  total_length: {
+    add: [
+      "sepal_length"
+      "petal_length"
     ]
-    dp: 2
+    round: 1
   }
-} get "products" fetch "https://dummyjson.com/products?limit=100"..
+} fetch "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"..
 ```
 
 ---
 
-### Example 5
+### Example 7
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and flattens the "tags" field."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and flattens the "tags" field.
+
+#### Code
+
+```
+flatten "tags" get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 8
 
 #### Prompt
 "Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and groups by species computing average petal_width."
@@ -106,7 +174,7 @@ group {
 
 ---
 
-### Example 6
+### Example 9
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and sorts by rating descending."
@@ -126,7 +194,7 @@ sort {
 
 ---
 
-### Example 7
+### Example 10
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category summing price as totalPrice."
@@ -149,7 +217,7 @@ group {
 
 ---
 
-### Example 8
+### Example 11
 
 #### Prompt
 "Fetch comments from "https://jsonplaceholder.typicode.com/comments" and filters rows where email ends with ".biz"."
@@ -170,21 +238,21 @@ filter {
 
 ---
 
-### Example 9
+### Example 12
 
 #### Prompt
-"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a sepal_area field by multiplying sepal_length and sepal_width, rounded to 2 decimal places."
+"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a sepal_area field by multiplying sepal_length and sepal_width, rounded to 2."
 
 #### Chat Transcript
 
-**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a sepal_area field by multiplying sepal_length and sepal_width, rounded to 2 decimal places.
+**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a sepal_area field by multiplying sepal_length and sepal_width, rounded to 2.
 
 #### Code
 
 ```
 mutate {
   sepal_area: {
-    dp: 2
+    round: 2
     mul: [
       "sepal_length"
       "sepal_width"
@@ -195,7 +263,7 @@ mutate {
 
 ---
 
-### Example 10
+### Example 13
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category summing stock as totalStock."
@@ -218,7 +286,7 @@ group {
 
 ---
 
-### Example 11
+### Example 14
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and filters rows where address.city equals "Gwenborough"."
@@ -239,7 +307,7 @@ filter {
 
 ---
 
-### Example 12
+### Example 15
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and selects address.city and address.zipcode."
@@ -259,14 +327,33 @@ select [
 
 ---
 
-### Example 13
+### Example 16
 
 #### Prompt
-"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and groups by species computing average sepal_length rounded to 2 decimal places."
+"Fetch users from "https://jsonplaceholder.typicode.com/users" and gets the "company.name" field."
 
 #### Chat Transcript
 
-**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and groups by species computing average sepal_length rounded to 2 decimal places.
+**User**: Fetch users from "https://jsonplaceholder.typicode.com/users" and gets the "company.name" field.
+
+#### Code
+
+```
+select [
+  "company.name"
+] fetch "https://jsonplaceholder.typicode.com/users"..
+```
+
+---
+
+### Example 17
+
+#### Prompt
+"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and groups by species computing average sepal_length rounded to 2."
+
+#### Chat Transcript
+
+**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and groups by species computing average sepal_length rounded to 2.
 
 #### Code
 
@@ -274,7 +361,7 @@ select [
 group {
   by: "species"
   avg: {
-    dp: 2
+    round: 2
     as: "sepal_length_avg"
     field: "sepal_length"
   }
@@ -283,7 +370,7 @@ group {
 
 ---
 
-### Example 14
+### Example 18
 
 #### Prompt
 "Fetch todos from "https://jsonplaceholder.typicode.com/todos" and groups by userId counting rows as totalTodos."
@@ -303,7 +390,70 @@ group {
 
 ---
 
-### Example 15
+### Example 19
+
+#### Prompt
+"Fetch earthquake data from "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=20", gets the "features" field, selects "properties.place", "properties.mag", and "properties.time", and formats time as "yyyy-mm-dd hh:mm"."
+
+#### Chat Transcript
+
+**User**: Fetch earthquake data from "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=20", gets the "features" field, selects "properties.place", "properties.mag", and "properties.time", and formats time as "yyyy-mm-dd hh:mm".
+
+#### Code
+
+```
+format {
+  time: "yyyy-mm-dd hh:mm"
+} select [
+  "properties.place"
+  "properties.mag"
+  "properties.time"
+] get "features" fetch "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=20"..
+```
+
+---
+
+### Example 20
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, selects title and rating, sorts by rating descending, and takes the first 5."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, selects title and rating, sorts by rating descending, and takes the first 5.
+
+#### Code
+
+```
+take 5 sort {
+  field: "rating"
+  order: "desc"
+} select [
+  "title"
+  "rating"
+] get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 21
+
+#### Prompt
+"Fetch posts from "https://jsonplaceholder.typicode.com/posts" and deduplicates by userId."
+
+#### Chat Transcript
+
+**User**: Fetch posts from "https://jsonplaceholder.typicode.com/posts" and deduplicates by userId.
+
+#### Code
+
+```
+unique "userId" fetch "https://jsonplaceholder.typicode.com/posts"..
+```
+
+---
+
+### Example 22
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and selects company.name and name."
@@ -326,7 +476,41 @@ select [
 
 ---
 
-### Example 16
+### Example 23
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and deduplicates by category."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and deduplicates by category.
+
+#### Code
+
+```
+unique "category" get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 24
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and flattens the "reviews" field."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and flattens the "reviews" field.
+
+#### Code
+
+```
+flatten "reviews" get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 25
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and sorts by username."
@@ -346,7 +530,51 @@ sort {
 
 ---
 
-### Example 17
+### Example 26
+
+#### Prompt
+"Fetch comments from "https://jsonplaceholder.typicode.com/comments", deduplicates by email, selects name and email, and sorts by email."
+
+#### Chat Transcript
+
+**User**: Fetch comments from "https://jsonplaceholder.typicode.com/comments", deduplicates by email, selects name and email, and sorts by email.
+
+#### Code
+
+```
+sort "email" select [
+  "name"
+  "email"
+] unique "email" fetch "https://jsonplaceholder.typicode.com/comments"..
+```
+
+---
+
+### Example 27
+
+#### Prompt
+"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv", filters where sepal_length is greater than 6, and sorts by sepal_length descending."
+
+#### Chat Transcript
+
+**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv", filters where sepal_length is greater than 6, and sorts by sepal_length descending.
+
+#### Code
+
+```
+sort {
+  field: "sepal_length"
+  order: "desc"
+} filter {
+  sepal_length: {
+    gt: 6
+  }
+} fetch "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"..
+```
+
+---
+
+### Example 28
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and adds a contact field by concatenating name, " (", phone, and ")"."
@@ -372,7 +600,7 @@ mutate {
 
 ---
 
-### Example 18
+### Example 29
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and filters rows where price is less than 50."
@@ -393,7 +621,7 @@ filter {
 
 ---
 
-### Example 19
+### Example 30
 
 #### Prompt
 "Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and groups by species computing min and max of sepal_length."
@@ -420,7 +648,7 @@ group {
 
 ---
 
-### Example 20
+### Example 31
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and filters rows where rating is greater than 4 and category equals "smartphones"."
@@ -443,7 +671,7 @@ filter {
 
 ---
 
-### Example 21
+### Example 32
 
 #### Prompt
 "Fetch todos from "https://jsonplaceholder.typicode.com/todos" and takes the last 10 items."
@@ -462,7 +690,7 @@ take {
 
 ---
 
-### Example 22
+### Example 33
 
 #### Prompt
 "Fetch post data from "https://jsonplaceholder.typicode.com/posts"."
@@ -479,7 +707,26 @@ fetch "https://jsonplaceholder.typicode.com/posts"..
 
 ---
 
-### Example 23
+### Example 34
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and formats stock as integer"
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and formats stock as integer
+
+#### Code
+
+```
+format {
+  stock: "#,##0"
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 35
 
 #### Prompt
 "Fetch comment data from "https://jsonplaceholder.typicode.com/comments"."
@@ -496,7 +743,7 @@ fetch "https://jsonplaceholder.typicode.com/comments"..
 
 ---
 
-### Example 24
+### Example 36
 
 #### Prompt
 "Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and sorts by petal_length descending."
@@ -516,7 +763,7 @@ sort {
 
 ---
 
-### Example 25
+### Example 37
 
 #### Prompt
 "Fetch comments from "https://jsonplaceholder.typicode.com/comments" and selects only the email field."
@@ -535,7 +782,7 @@ select [
 
 ---
 
-### Example 26
+### Example 38
 
 #### Prompt
 "Fetch posts from "https://jsonplaceholder.typicode.com/posts" and groups by userId counting rows as postCount."
@@ -555,7 +802,7 @@ group {
 
 ---
 
-### Example 27
+### Example 39
 
 #### Prompt
 "Fetch posts from "https://jsonplaceholder.typicode.com/posts" and takes the last 3 items."
@@ -574,7 +821,7 @@ take {
 
 ---
 
-### Example 28
+### Example 40
 
 #### Prompt
 "Fetch posts from "https://jsonplaceholder.typicode.com/posts" and sorts by title ascending."
@@ -594,7 +841,7 @@ sort {
 
 ---
 
-### Example 29
+### Example 41
 
 #### Prompt
 "Fetch comments from "https://jsonplaceholder.typicode.com/comments" and joins with posts fetched from "https://jsonplaceholder.typicode.com/posts" on postId matching id."
@@ -614,7 +861,7 @@ join {
 
 ---
 
-### Example 30
+### Example 42
 
 #### Prompt
 "Fetch JSON data from "https://jsonplaceholder.typicode.com/users".
@@ -635,7 +882,7 @@ fetch "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"..
 
 ---
 
-### Example 31
+### Example 43
 
 #### Prompt
 "Fetch posts from "https://jsonplaceholder.typicode.com/posts" and joins with users fetched from "https://jsonplaceholder.typicode.com/users" on userId matching id."
@@ -648,14 +895,14 @@ fetch "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"..
 
 ```
 join {
-  right: fetch "https://jsonplaceholder.typicode.com/posts"
+  right: (fetch "https://jsonplaceholder.typicode.com/posts")
   on: "id"
 } fetch "https://jsonplaceholder.typicode.com/users"..
 ```
 
 ---
 
-### Example 32
+### Example 44
 
 #### Prompt
 "Fetch photos from "https://jsonplaceholder.typicode.com/photos" and joins with albums fetched from "https://jsonplaceholder.typicode.com/albums" on albumId matching id."
@@ -676,7 +923,7 @@ join {
 
 ---
 
-### Example 33
+### Example 45
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and takes the first 5 items."
@@ -693,7 +940,7 @@ take 5 get "products" fetch "https://dummyjson.com/products?limit=100"..
 
 ---
 
-### Example 34
+### Example 46
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and filters rows where stock is less than or equal to 10."
@@ -714,7 +961,112 @@ filter {
 
 ---
 
-### Example 35
+### Example 47
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and adds a pricePerUnit field by dividing price and stock, rounded to 2."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and adds a pricePerUnit field by dividing price and stock, rounded to 2.
+
+#### Code
+
+```
+mutate {
+  pricePerUnit: {
+    div: [
+      "price"
+      "stock"
+    ]
+    round: 2
+  }
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 48
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, groups by category and sums price as totalPrice rounded to 2, sorts by totalPrice descending, and formats totalPrice as "$#,##0.00"."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, groups by category and sums price as totalPrice rounded to 2, sorts by totalPrice descending, and formats totalPrice as "$#,##0.00".
+
+#### Code
+
+```
+format {
+  totalPrice: "$#,##0.00"
+} sort {
+  field: "totalPrice"
+  order: "desc"
+} group {
+  by: "category"
+  sum: {
+    field: "price"
+    as: "totalPrice"
+    round: 2
+  }
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 49
+
+#### Prompt
+"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a sepal_ratio field by dividing sepal_length and sepal_width, rounded to 2."
+
+#### Chat Transcript
+
+**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a sepal_ratio field by dividing sepal_length and sepal_width, rounded to 2.
+
+#### Code
+
+```
+mutate {
+  sepal_ratio: {
+    div: [
+      "sepal_length"
+      "sepal_width"
+    ]
+    round: 2
+  }
+} fetch "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"..
+```
+
+---
+
+### Example 50
+
+#### Prompt
+"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv", groups by species and computes average sepal_length rounded to 2, and formats sepal_length as "0.00"."
+
+#### Chat Transcript
+
+**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv", groups by species and computes average sepal_length rounded to 2, and formats sepal_length as "0.00".
+
+#### Code
+
+```
+format {
+  sepal_length: "0.00"
+} group {
+  by: "species"
+  avg: {
+    round: 2
+    as: "sepal_length"
+    field: "sepal_length"
+  }
+} fetch "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"..
+```
+
+---
+
+### Example 51
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, sorts by price descending, and takes the first 1 item."
@@ -734,7 +1086,7 @@ take 1 sort {
 
 ---
 
-### Example 36
+### Example 52
 
 #### Prompt
 "Fetch todos from "https://jsonplaceholder.typicode.com/todos" and filters rows where completed is not equal to true."
@@ -755,7 +1107,7 @@ filter {
 
 ---
 
-### Example 37
+### Example 53
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and adds a label field by concatenating name, " <", and email, and ">"."
@@ -781,32 +1133,68 @@ mutate {
 
 ---
 
-### Example 38
+### Example 54
 
 #### Prompt
-"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and adds a salePrice field by multiplying price and discountPercentage, rounded to 2 decimal places."
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and formats price as "#,##0.00;(#,##0.00)"."
 
 #### Chat Transcript
 
-**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and adds a salePrice field by multiplying price and discountPercentage, rounded to 2 decimal places.
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and formats price as "#,##0.00;(#,##0.00)".
+
+#### Code
+
+```
+format {
+  price: "#,##0.00;(#,##0.00)"
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 55
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and adds a salePrice field by multiplying price and discountPercentage, rounded to 2."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and adds a salePrice field by multiplying price and discountPercentage, rounded to 2.
 
 #### Code
 
 ```
 mutate {
   salePrice: {
-    dp: 2
     mul: [
       "price"
       "discountPercentage"
     ]
+    round: 2
   }
 } get "products" fetch "https://dummyjson.com/products?limit=100"..
 ```
 
 ---
 
-### Example 39
+### Example 56
+
+#### Prompt
+"Fetch comments from "https://jsonplaceholder.typicode.com/comments" and deduplicates by email."
+
+#### Chat Transcript
+
+**User**: Fetch comments from "https://jsonplaceholder.typicode.com/comments" and deduplicates by email.
+
+#### Code
+
+```
+unique "email" fetch "https://jsonplaceholder.typicode.com/comments"..
+```
+
+---
+
+### Example 57
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and filters rows where rating is greater than or equal to 4.5."
@@ -827,7 +1215,7 @@ filter {
 
 ---
 
-### Example 40
+### Example 58
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and sorts by name ascending."
@@ -847,7 +1235,7 @@ sort {
 
 ---
 
-### Example 41
+### Example 59
 
 #### Prompt
 "Fetch comments from "https://jsonplaceholder.typicode.com/comments" and groups by postId counting rows as commentCount."
@@ -867,7 +1255,7 @@ group {
 
 ---
 
-### Example 42
+### Example 60
 
 #### Prompt
 "Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a total_length field by summing sepal_length and petal_length, rounded to 1 decimal place."
@@ -892,7 +1280,46 @@ mutate {
 
 ---
 
-### Example 43
+### Example 61
+
+#### Prompt
+"Fetch users from "https://jsonplaceholder.typicode.com/users" and gets the "address.geo" field."
+
+#### Chat Transcript
+
+**User**: Fetch users from "https://jsonplaceholder.typicode.com/users" and gets the "address.geo" field.
+
+#### Code
+
+```
+select [
+  "address.geo"
+] fetch "https://jsonplaceholder.typicode.com/users"..
+```
+
+---
+
+### Example 62
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and deduplicates by category and brand."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and deduplicates by category and brand.
+
+#### Code
+
+```
+unique [
+  "category"
+  "brand"
+] get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 63
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and sorts by stock descending."
@@ -912,14 +1339,33 @@ sort {
 
 ---
 
-### Example 44
+### Example 64
 
 #### Prompt
-"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category computing average price rounded to 2 decimal places."
+"Fetch todos from "https://jsonplaceholder.typicode.com/todos", filters where completed equals true, and sorts by title."
 
 #### Chat Transcript
 
-**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category computing average price rounded to 2 decimal places.
+**User**: Fetch todos from "https://jsonplaceholder.typicode.com/todos", filters where completed equals true, and sorts by title.
+
+#### Code
+
+```
+sort "title" filter {
+  completed: true
+} fetch "https://jsonplaceholder.typicode.com/todos"..
+```
+
+---
+
+### Example 65
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category computing average price rounded to 2."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category computing average price rounded to 2.
 
 #### Code
 
@@ -927,7 +1373,7 @@ sort {
 group {
   by: "category"
   avg: {
-    dp: 2
+    round: 2
     field: "price"
     as: "avgPrice"
   }
@@ -936,7 +1382,7 @@ group {
 
 ---
 
-### Example 45
+### Example 66
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category counting rows as n."
@@ -956,7 +1402,7 @@ group {
 
 ---
 
-### Example 46
+### Example 67
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and selects category and price."
@@ -976,7 +1422,59 @@ select [
 
 ---
 
-### Example 47
+### Example 68
+
+#### Prompt
+"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv", adds a sepal_area field by multiplying sepal_length and sepal_width rounded to 2, and formats sepal_area as with 2 decimal places"
+
+#### Chat Transcript
+
+**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv", adds a sepal_area field by multiplying sepal_length and sepal_width rounded to 2, and formats sepal_area as with 2 decimal places
+
+#### Code
+
+```
+format {
+  sepal_area: "#,##0.00"
+} mutate {
+  sepal_area: {
+    round: 2
+    mul: [
+      "sepal_length"
+      "sepal_width"
+    ]
+  }
+} fetch "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"..
+```
+
+---
+
+### Example 69
+
+#### Prompt
+"Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a length_diff field by subtracting sepal_length and petal_length, rounded to 2."
+
+#### Chat Transcript
+
+**User**: Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a length_diff field by subtracting sepal_length and petal_length, rounded to 2.
+
+#### Code
+
+```
+mutate {
+  length_diff: {
+    sub: [
+      "sepal_length"
+      "petal_length"
+    ]
+    round: 2
+  }
+} fetch "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"..
+```
+
+---
+
+### Example 70
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users", renames company.name to companyName, and selects name."
@@ -999,7 +1497,7 @@ select [
 
 ---
 
-### Example 48
+### Example 71
 
 #### Prompt
 "Fetch album data from "https://jsonplaceholder.typicode.com/albums"."
@@ -1016,7 +1514,45 @@ fetch "https://jsonplaceholder.typicode.com/albums"..
 
 ---
 
-### Example 49
+### Example 72
+
+#### Prompt
+"Fetch todos from "https://jsonplaceholder.typicode.com/todos", filters where completed equals true, and sorts by title."
+
+#### Chat Transcript
+
+**User**: Fetch todos from "https://jsonplaceholder.typicode.com/todos", filters where completed equals true, and sorts by title.
+
+#### Code
+
+```
+sort "title" filter {
+  completed: true
+} fetch "https://jsonplaceholder.typicode.com/todos"..
+```
+
+---
+
+### Example 73
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and formats price as "$#,##0.00"."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and formats price as "$#,##0.00".
+
+#### Code
+
+```
+format {
+  price: "$#,##0.00"
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 74
 
 #### Prompt
 "Fetch JSON data from "https://jsonplaceholder.typicode.com/users"."
@@ -1033,7 +1569,7 @@ fetch "https://jsonplaceholder.typicode.com/users"..
 
 ---
 
-### Example 50
+### Example 75
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and filters rows where category is in ["furniture", "groceries", "smartphones"]."
@@ -1058,7 +1594,7 @@ filter {
 
 ---
 
-### Example 51
+### Example 76
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and filters rows where address.city is not in ["Gwenborough", "South Elvis", "Wisokyburgh"]."
@@ -1089,7 +1625,7 @@ filter {
 
 ---
 
-### Example 52
+### Example 77
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and adds an info field by concatenating username, " - ", website."
@@ -1114,7 +1650,31 @@ mutate {
 
 ---
 
-### Example 53
+### Example 78
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, filters where rating is greater than or equal to 4, and selects title and price."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, filters where rating is greater than or equal to 4, and selects title and price.
+
+#### Code
+
+```
+select [
+  "title"
+  "price"
+] filter {
+  "rating": {
+    "ge": 4
+  }
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 79
 
 #### Prompt
 "Fetch photos from "https://jsonplaceholder.typicode.com/photos" and takes the first 10 items."
@@ -1131,7 +1691,7 @@ take 10 fetch "https://jsonplaceholder.typicode.com/photos"..
 
 ---
 
-### Example 54
+### Example 80
 
 #### Prompt
 "Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and filters rows where sepal_length is greater than 5 and sepal_width is greater than 3."
@@ -1155,7 +1715,72 @@ filter {
 
 ---
 
-### Example 55
+### Example 81
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, adds a salePrice field by multiplying price and discountPercentage rounded to 2, and formats salePrice as "$#,##0.00"."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, adds a salePrice field by multiplying price and discountPercentage rounded to 2, and formats salePrice as "$#,##0.00".
+
+#### Code
+
+```
+format {
+  salePrice: "$#,##0.00"
+} mutate {
+  salePrice: {
+    mul: [
+      "price"
+      "discountPercentage"
+    ]
+    round: 2
+  }
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 82
+
+#### Prompt
+"Fetch users from "https://jsonplaceholder.typicode.com/users" and gets the "address" field."
+
+#### Chat Transcript
+
+**User**: Fetch users from "https://jsonplaceholder.typicode.com/users" and gets the "address" field.
+
+#### Code
+
+```
+select [
+  "address"
+] fetch "https://jsonplaceholder.typicode.com/users"..
+```
+
+---
+
+### Example 83
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100" and gets the "products.title" field."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100" and gets the "products.title" field.
+
+#### Code
+
+```
+select [
+  "title"
+] get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 84
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and adds a greeting field by concatenating "Hello, " and name."
@@ -1179,14 +1804,14 @@ mutate {
 
 ---
 
-### Example 56
+### Example 85
 
 #### Prompt
-"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category computing average rating rounded to 1 decimal place."
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category computing average rating rounded to 1."
 
 #### Chat Transcript
 
-**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category computing average rating rounded to 1 decimal place.
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and groups by category computing average rating rounded to 1.
 
 #### Code
 
@@ -1194,7 +1819,7 @@ mutate {
 group {
   by: "category"
   avg: {
-    dp: 1
+    round: 1
     field: "rating"
     as: "avgRating"
   }
@@ -1203,7 +1828,7 @@ group {
 
 ---
 
-### Example 57
+### Example 86
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and selects name, email, and phone."
@@ -1224,7 +1849,7 @@ select [
 
 ---
 
-### Example 58
+### Example 87
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and filters rows where address.city equals "South Elvis"."
@@ -1243,7 +1868,7 @@ filter {
 
 ---
 
-### Example 59
+### Example 88
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and filters rows where category equals "furniture" and price is greater than 30."
@@ -1266,7 +1891,32 @@ filter {
 
 ---
 
-### Example 60
+### Example 89
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and adds a discount field by subtracting price and salePrice, rounded to 2."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and adds a discount field by subtracting price and salePrice, rounded to 2.
+
+#### Code
+
+```
+mutate {
+  discount: {
+    sub: [
+      "price"
+      "salePrice"
+    ]
+    round: 2
+  }
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 90
 
 #### Prompt
 "Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and groups by species counting rows as count and computing average petal_length."
@@ -1287,7 +1937,7 @@ group {
 
 ---
 
-### Example 61
+### Example 91
 
 #### Prompt
 "Fetch comments from "https://jsonplaceholder.typicode.com/comments" and takes the first 20 items."
@@ -1304,7 +1954,70 @@ take 20 fetch "https://jsonplaceholder.typicode.com/comments"..
 
 ---
 
-### Example 62
+### Example 92
+
+#### Prompt
+"Fetch users from "https://jsonplaceholder.typicode.com/users", selects name and email, and sorts by name."
+
+#### Chat Transcript
+
+**User**: Fetch users from "https://jsonplaceholder.typicode.com/users", selects name and email, and sorts by name.
+
+#### Code
+
+```
+sort {
+  field: "name"
+  order: "asc"
+} select [
+  "name"
+  "email"
+] fetch "https://jsonplaceholder.typicode.com/users"..
+```
+
+---
+
+### Example 93
+
+#### Prompt
+"Given data with rows containing an "items" array of records (e.g., [{order: 1, items: [{sku: "A1", qty: 2}, {sku: "B3", qty: 1}]}, {order: 2, items: [{sku: "A1", qty: 5}]}]), flatten the "items" field to produce one row per item."
+
+#### Chat Transcript
+
+**User**: Given data with rows containing an "items" array of records (e.g., [{order: 1, items: [{sku: "A1", qty: 2}, {sku: "B3", qty: 1}]}, {order: 2, items: [{sku: "A1", qty: 5}]}]), flatten the "items" field to produce one row per item.
+
+#### Code
+
+```
+flatten "items" [
+  {
+    order: 1
+    items: [
+      {
+        sku: "A1"
+        qty: 2
+      }
+      {
+        sku: "B3"
+        qty: 1
+      }
+    ]
+  }
+  {
+    order: 2
+    items: [
+      {
+        sku: "A1"
+        qty: 5
+      }
+    ]
+  }
+]..
+```
+
+---
+
+### Example 94
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and filters rows where name contains "Leanne"."
@@ -1325,7 +2038,7 @@ filter {
 
 ---
 
-### Example 63
+### Example 95
 
 #### Prompt
 "Fetch users from "https://jsonplaceholder.typicode.com/users" and selects name and email."
@@ -1345,7 +2058,7 @@ select [
 
 ---
 
-### Example 64
+### Example 96
 
 #### Prompt
 "Fetch todos from "https://jsonplaceholder.typicode.com/todos" and adds a source field with the literal value "jsonplaceholder"."
@@ -1368,7 +2081,57 @@ mutate {
 
 ---
 
-### Example 65
+### Example 97
+
+#### Prompt
+"Given data with rows containing a "scores" array of numbers (e.g., [{student: "Alice", scores: [90, 85, 92]}, {student: "Bob", scores: [78, 88]}]), flatten the "scores" field to produce one row per score."
+
+#### Chat Transcript
+
+**User**: Given data with rows containing a "scores" array of numbers (e.g., [{student: "Alice", scores: [90, 85, 92]}, {student: "Bob", scores: [78, 88]}]), flatten the "scores" field to produce one row per score.
+
+#### Code
+
+```
+flatten "scores" [
+  {
+    student: "Alice"
+    scores: [
+      90
+      85
+      92
+    ]
+  }
+  {
+    student: "Bob"
+    scores: [
+      78
+      88
+    ]
+  }
+]..
+```
+
+---
+
+### Example 98
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100" and gets the "products" field."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100" and gets the "products" field.
+
+#### Code
+
+```
+get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 99
 
 #### Prompt
 "Fetch JSON data from "https://dummyjson.com/products?limit=100"."
@@ -1385,7 +2148,36 @@ fetch "https://dummyjson.com/products?limit=100"..
 
 ---
 
-### Example 66
+### Example 100
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, groups by category and sums price as totalPrice rounded to 2, sorts by totalPrice descending, and formats totalPrice as currency"
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, groups by category and sums price as totalPrice rounded to 2, sorts by totalPrice descending, and formats totalPrice as currency
+
+#### Code
+
+```
+format {
+  totalPrice: "$#,##0.00"
+} sort {
+  field: "totalPrice"
+  order: "desc"
+} group {
+  by: "category"
+  sum: {
+    field: "price"
+    as: "totalPrice"
+    round: 2
+  }
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 101
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and sorts by price descending."
@@ -1405,7 +2197,7 @@ sort {
 
 ---
 
-### Example 67
+### Example 102
 
 #### Prompt
 "Fetch todo data from "https://jsonplaceholder.typicode.com/todos"."
@@ -1422,7 +2214,56 @@ fetch "https://jsonplaceholder.typicode.com/todos"..
 
 ---
 
-### Example 68
+### Example 103
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, selects title and price, formats price as currency whole number, and sorts by title."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, selects title and price, formats price as currency whole number, and sorts by title.
+
+#### Code
+
+```
+sort "title" format {
+  price: "$#,##0"
+} select [
+  "title"
+  "price"
+] get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 104
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, groups by category and sums price as totalPrice rounded to 2, and sorts by totalPrice descending."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, groups by category and sums price as totalPrice rounded to 2, and sorts by totalPrice descending.
+
+#### Code
+
+```
+sort {
+  field: "totalPrice"
+  order: "desc"
+} group {
+  by: "category"
+  sum: {
+    field: "price"
+    as: "totalPrice"
+    round: 2
+  }
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 105
 
 #### Prompt
 "Fetch todos from "https://jsonplaceholder.typicode.com/todos" and selects id, title, and completed."
@@ -1443,7 +2284,7 @@ select [
 
 ---
 
-### Example 69
+### Example 106
 
 #### Prompt
 "Fetch posts from "https://jsonplaceholder.typicode.com/posts" and filters rows where userId equals 1."
@@ -1464,7 +2305,7 @@ filter {
 
 ---
 
-### Example 70
+### Example 107
 
 #### Prompt
 "Fetch albums from "https://jsonplaceholder.typicode.com/albums" and joins with users fetched from "https://jsonplaceholder.typicode.com/users" on userId matching id."
@@ -1484,7 +2325,93 @@ join {
 
 ---
 
-### Example 71
+### Example 108
+
+#### Prompt
+"Fetch users from "https://jsonplaceholder.typicode.com/users" and gets the "address.city" field."
+
+#### Chat Transcript
+
+**User**: Fetch users from "https://jsonplaceholder.typicode.com/users" and gets the "address.city" field.
+
+#### Code
+
+```
+select [
+  "address.city"
+] fetch "https://jsonplaceholder.typicode.com/users"..
+```
+
+---
+
+### Example 109
+
+#### Prompt
+"Fetch todos from "https://jsonplaceholder.typicode.com/todos", groups by userId and counts as totalTodos, sorts by totalTodos descending, and takes the first 3."
+
+#### Chat Transcript
+
+**User**: Fetch todos from "https://jsonplaceholder.typicode.com/todos", groups by userId and counts as totalTodos, sorts by totalTodos descending, and takes the first 3.
+
+#### Code
+
+```
+take 3 sort {
+  field: "totalTodos"
+  order: "desc"
+} group {
+  by: "userId"
+  count: "totalTodos"
+} fetch "https://jsonplaceholder.typicode.com/todos"..
+```
+
+---
+
+### Example 110
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, groups by category computing average rating rounded to 1, sorts by rating descending, and takes the first 5."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, groups by category computing average rating rounded to 1, sorts by rating descending, and takes the first 5.
+
+#### Code
+
+```
+take 5 sort {
+  field: "avgRating"
+  order: "desc"
+} group {
+  by: "category"
+  avg: {
+    field: "rating"
+    as: "avgRating"
+    round: 1
+  }
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 111
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, flattens the "tags" field, deduplicates by tags, and sorts by tags."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, flattens the "tags" field, deduplicates by tags, and sorts by tags.
+
+#### Code
+
+```
+sort "tags" unique "tags" flatten "tags" get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 112
 
 #### Prompt
 "Fetch posts from "https://jsonplaceholder.typicode.com/posts" and renames userId to author and selects title."
@@ -1507,7 +2434,7 @@ select [
 
 ---
 
-### Example 72
+### Example 113
 
 #### Prompt
 "Fetch iris data from "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv" and adds a petal_area field by multiplying petal_length and petal_width."
@@ -1531,7 +2458,62 @@ mutate {
 
 ---
 
-### Example 73
+### Example 114
+
+#### Prompt
+"Fetch users from "https://jsonplaceholder.typicode.com/users", adds a label field by concatenating name, " <", email, and ">", and selects label and phone."
+
+#### Chat Transcript
+
+**User**: Fetch users from "https://jsonplaceholder.typicode.com/users", adds a label field by concatenating name, " <", email, and ">", and selects label and phone.
+
+#### Code
+
+```
+select [
+  "label"
+  "phone"
+] mutate {
+  label: {
+    concat: [
+      "name"
+      " <"
+      "email"
+      ">"
+    ]
+  }
+} fetch "https://jsonplaceholder.typicode.com/users"..
+```
+
+---
+
+### Example 115
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, mutates discountRate by dividing discountPercentage by 100, and formats discountRate as "0.0%"."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, mutates discountRate by dividing discountPercentage by 100, and formats discountRate as "0.0%".
+
+#### Code
+
+```
+format {
+  discountRate: "0.0%"
+} mutate {
+  discountRate: {
+    div: [
+      "discountPercentage"
+      100
+    ]
+  }
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 116
 
 #### Prompt
 "Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, and renames title to name."
@@ -1553,7 +2535,34 @@ select [
 
 ---
 
-### Example 74
+### Example 117
+
+#### Prompt
+"Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, filters where price is greater than 100, selects title and price, and sorts by price descending."
+
+#### Chat Transcript
+
+**User**: Fetch products from "https://dummyjson.com/products?limit=100", gets the "products" field, filters where price is greater than 100, selects title and price, and sorts by price descending.
+
+#### Code
+
+```
+sort {
+  field: "price"
+  order: "desc"
+} select [
+  "title"
+  "price"
+] filter {
+  price: {
+    gt: 100
+  }
+} get "products" fetch "https://dummyjson.com/products?limit=100"..
+```
+
+---
+
+### Example 118
 
 #### Prompt
 "Fetch photo data from "https://jsonplaceholder.typicode.com/photos"."
