@@ -22,7 +22,8 @@ function encrypt(plaintext: string): string {
 }
 
 const parseCallbacks = {
-  CRYPT: (value: string) => encrypt(value),
+  GET_PRIVATE_VAR: (value: string) => encrypt(value),
+  GET_PUBLIC_VAR: (value: string) => value,
 };
 
 // Global cache for templates to avoid repeated fetches
