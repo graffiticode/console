@@ -117,12 +117,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Check for existing active subscription
-    const existingSubscriptions = await stripe.subscriptions.list({
-      customer: stripeCustomerId,
-      status: 'active',
-      limit: 1,
-    });
+    // Check for existing active or trialing subscription
+    const [activeSubs, trialingSubs] = await Promise.all([
+      stripe.subscriptions.list({ customer: stripeCustomerId, status: 'active', limit: 1 }),
+      stripe.subscriptions.list({ customer: stripeCustomerId, status: 'trialing', limit: 1 }),
+    ]);
+    const existingSubscriptions = {
+      data: [...activeSubs.data, ...trialingSubs.data],
+    };
 
     // If user has an existing subscription, they should use quick-subscribe (Payment Methods tab)
     // Stripe Checkout cannot properly handle subscription upgrades/downgrades with prorations

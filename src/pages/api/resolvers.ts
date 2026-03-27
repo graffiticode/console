@@ -21,10 +21,17 @@ function encrypt(plaintext: string): string {
   return iv.toString('hex') + ':' + encrypted.toString('hex');
 }
 
-const parseCallbacks = {
-  GET_PRIVATE_VAR: (value: string) => encrypt(value),
-  GET_PUBLIC_VAR: (value: string) => value,
-};
+function buildParseCallbacks(publicVars: Record<string, string> = {}) {
+  console.log("buildParseCallbacks()", "publicVars:", JSON.stringify(publicVars));
+  return {
+    GET_PRIVATE_VAR: (value: string) => encrypt(value),
+    GET_PUBLIC_VAR: (name: string) => {
+      const result = publicVars[name] || "";
+      console.log("GET_PUBLIC_VAR()", "name:", name, "result:", result);
+      return result;
+    },
+  };
+}
 
 // Global cache for templates to avoid repeated fetches
 const templateCache = new Map<string, string>();
@@ -35,13 +42,16 @@ const taskDao = getTaskDaoForStore("firestore");
 
 const db = getFirestore();
 
-export async function parseCode({ lang, code }: { lang: string; code: string }) {
+export async function parseCode({ lang, code, itemId }: { lang: string; code: string; itemId?: string }) {
+  console.log("parseCode()", "lang:", lang, "itemId:", itemId);
   try {
     const lexicon = await getLanguageLexicon(lang);
     if (!lexicon) {
       return { ast: null, errors: [{ message: `No lexicon found for language ${lang}`, from: -1, to: -1 }] };
     }
-    const astPool = await parser.parse(lang, code, lexicon, parseCallbacks);
+    const publicVars: Record<string, string> = {};
+    if (itemId) publicVars.itemId = itemId;
+    const astPool = await parser.parse(lang, code, lexicon, buildParseCallbacks(publicVars));
 
     // Scan the AST pool for ERROR nodes
     const errors: Array<{ message: string; from: number; to: number }> = [];

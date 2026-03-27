@@ -27,7 +27,7 @@ export const compile = async ({ user, id, data = {} }) => {
   }
 };
 
-export const parse = async ({ user, lang, code }) => {
+export const parse = async ({ user, lang, code, itemId }: { user: any; lang: string; code: string; itemId?: string }) => {
   const token = await user.getToken();
   const client = new GraphQLClient("/api", {
     headers: {
@@ -35,20 +35,20 @@ export const parse = async ({ user, lang, code }) => {
     }
   });
   const query = gql`
-    query parse($lang: String!, $code: String!) {
-      parse(lang: $lang, code: $code) {
+    query parse($lang: String!, $code: String!, $itemId: String) {
+      parse(lang: $lang, code: $code, itemId: $itemId) {
         ast
         errors { message from to }
       }
     }
   `;
-  return client.request(query, { lang, code }).then(data => data.parse);
+  return client.request(query, { lang, code, itemId }).then(data => data.parse);
 };
 
-export const postTask = async ({ user, lang, ast }) => {
+export const postTask = async ({ user, lang, ast, item }: { user: any, lang: string, ast: string, item?: string }) => {
   const query = gql`
-    mutation post ($lang: String!, $ast: String!, $ephemeral: Boolean!) {
-      postTask(lang: $lang, ast: $ast, ephemeral: $ephemeral)
+    mutation post ($lang: String!, $ast: String!, $ephemeral: Boolean!, $item: String) {
+      postTask(lang: $lang, ast: $ast, ephemeral: $ephemeral, item: $item)
     }
   `;
   const token = await user.getToken();
@@ -58,7 +58,7 @@ export const postTask = async ({ user, lang, ast }) => {
     }
   });
   const ephemeral = true;
-  return client.request(query, { lang, ast, ephemeral }).then(data => data.postTask);
+  return client.request(query, { lang, ast, ephemeral, item }).then(data => data.postTask);
 };
 
 

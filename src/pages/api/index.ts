@@ -120,7 +120,7 @@ const typeDefs = `
 
   type Query {
     checkCompileAllowed: CompileAllowedResponse!
-    parse(lang: String!, code: String!): ParseResult!
+    parse(lang: String!, code: String!, itemId: String): ParseResult!
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
@@ -139,7 +139,7 @@ const typeDefs = `
 
   type Mutation {
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
-    postTask(lang: String!, ast: String!, ephemeral: Boolean): String!
+    postTask(lang: String!, ast: String!, ephemeral: Boolean, item: String): String!
     generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String, conversationSummary: ConversationSummaryInput): GeneratedCode!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean, app: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
@@ -174,8 +174,8 @@ const resolvers = {
       }
     },
     parse: async (_, args) => {
-      const { lang, code } = args;
-      return await parseCode({ lang, code });
+      const { lang, code, itemId } = args;
+      return await parseCode({ lang, code, itemId });
     },
     data: async (_, args, ctx) => {
       const { token } = ctx;
@@ -240,10 +240,13 @@ const resolvers = {
 
     postTask: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, ast, ephemeral } = args;
+      const { lang, ast, ephemeral, item } = args;
       const { uid } = await client.verifyToken(token);
       const code = JSON.parse(ast);
-      const task = { lang, code };
+      const task: Record<string, unknown> = { lang, code };
+      if (item) {
+        task.item = item;
+      }
       const { id } = await postTask({ auth: { uid, token }, task, ephemeral, isPublic: false });
       return id;
     },

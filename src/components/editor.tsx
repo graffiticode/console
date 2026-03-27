@@ -68,6 +68,7 @@ export default function Editor({
   onError,
   initialCode,
   initialHelp,
+  itemId,
 }) {
   const [ code, setCode ] = useState(initialCode || "");
   const [ help, setHelp ] = useState(initialHelp || []);
@@ -150,14 +151,14 @@ export default function Editor({
 
       (async () => {
         try {
-          const result = await parse({ user, lang, code });
+          const result = await parse({ user, lang, code, itemId });
           if (result.errors) {
             setCompileErrors(result.errors);
             setIsPostingTask(false);
             return;
           }
           setCompileErrors(null);
-          const newTaskId = await postTask({ user, lang, ast: result.ast });
+          const newTaskId = await postTask({ user, lang, ast: result.ast, item: itemId });
           setTaskId(newTaskId);
         } catch (err) {
           console.error("Parse/postTask error:", err);
