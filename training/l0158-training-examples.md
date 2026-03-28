@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2026-03-27T00:32:24.730Z*
+*Downloaded on 2026-03-27T22:09:31.076Z*
 
 ## Language L0158
 
@@ -77,6 +77,31 @@ items [
 ### Example 4
 
 #### Prompt
+"Create a cloze text question with the template "Water is made of {{response}} and oxygen" with the correct answer "hydrogen", case insensitive."
+
+#### Chat Transcript
+
+**User**: Create a cloze text question with the template "Water is made of {{response}} and oxygen" with the correct answer "hydrogen", case insensitive.
+
+#### Code
+
+```
+items [
+  item questions [
+    clozetext stimulus "Water is made of {{response}} and oxygen" valid-response [
+      [
+        "hydrogen"
+      ]
+    ] case-sensitive false {}
+  ] {}
+]..
+```
+
+---
+
+### Example 5
+
+#### Prompt
 "Create a multiple choice question with instant feedback asking "What is 2 + 2?" with options "3", "4", "5", "6" where 4 is correct."
 
 #### Chat Transcript
@@ -102,7 +127,7 @@ items [
 
 ---
 
-### Example 5
+### Example 6
 
 #### Prompt
 "Create a short text question asking "What is the abbreviation for Doctor?" with the correct answer "Dr.", case sensitive."
@@ -123,7 +148,7 @@ items [
 
 ---
 
-### Example 6
+### Example 7
 
 #### Prompt
 "Create a multiple choice question asking "What is the square root of 144?" with options "10", "11", "12", "13" where 12 is correct, with instant feedback."
@@ -151,7 +176,7 @@ items [
 
 ---
 
-### Example 7
+### Example 8
 
 #### Prompt
 "Create a multiple choice question asking "Select all even numbers" with options "1", "2", "3", "4" where 2 and 4 are correct, allowing multiple responses."
@@ -180,7 +205,7 @@ items [
 
 ---
 
-### Example 8
+### Example 9
 
 #### Prompt
 "Create a plain text essay question asking "List three things you learned today" with a 100-word limit."
@@ -201,7 +226,7 @@ items [
 
 ---
 
-### Example 9
+### Example 10
 
 #### Prompt
 "Create a short text question asking "What is the chemical symbol for water?" with the correct answer "H2O"."
@@ -222,7 +247,7 @@ items [
 
 ---
 
-### Example 10
+### Example 11
 
 #### Prompt
 "Create a multiple choice question asking "Which planet is largest?" with options "Earth", "Jupiter", "Mars", "Saturn" where Jupiter is correct."
@@ -234,21 +259,23 @@ items [
 #### Code
 
 ```
-items questions [
-  mcq stimulus "Which planet is largest?" options [
-    "Earth"
-    "Jupiter"
-    "Mars"
-    "Saturn"
-  ] valid-response [
-    1
+items [
+  item questions [
+    mcq stimulus "Which planet is largest?" options [
+      "Earth"
+      "Jupiter"
+      "Mars"
+      "Saturn"
+    ] valid-response [
+      1
+    ] {}
   ] {}
-] {}..
+]..
 ```
 
 ---
 
-### Example 11
+### Example 12
 
 #### Prompt
 "Create an items assessment with a long text essay asking "Compare and contrast two historical events" with a 400-word limit."
@@ -269,7 +296,7 @@ items [
 
 ---
 
-### Example 12
+### Example 13
 
 #### Prompt
 "Create a long text essay question asking "Discuss the causes of climate change" with a 500-word limit and placeholder "Begin your essay..."."
@@ -290,7 +317,7 @@ items [
 
 ---
 
-### Example 13
+### Example 14
 
 #### Prompt
 "Create a short text question asking "Spell the number 4" with the correct answer "four", case insensitive."
@@ -311,7 +338,32 @@ items [
 
 ---
 
-### Example 14
+### Example 15
+
+#### Prompt
+"Create a cloze text question with the template "The {{response}} is the powerhouse of the cell" with the correct answer "mitochondria"."
+
+#### Chat Transcript
+
+**User**: Create a cloze text question with the template "The {{response}} is the powerhouse of the cell" with the correct answer "mitochondria".
+
+#### Code
+
+```
+items [
+  item questions [
+    clozetext stimulus "The {{response}} is the powerhouse of the cell." valid-response [
+      [
+        "mitochondria"
+      ]
+    ] {}
+  ] {}
+] {}..
+```
+
+---
+
+### Example 16
 
 #### Prompt
 "Create a multiple choice question asking "Which element has atomic number 1?" with options "Helium", "Hydrogen", "Lithium", "Carbon" where Hydrogen is correct, with shuffled options."
@@ -339,7 +391,7 @@ items [
 
 ---
 
-### Example 15
+### Example 17
 
 #### Prompt
 "Create a multiple choice question asking "Which season comes after spring?" with options "Summer", "Fall", "Winter" where Summer is correct."
@@ -366,7 +418,7 @@ items [
 
 ---
 
-### Example 16
+### Example 18
 
 #### Prompt
 "Create an items assessment with an MCQ asking "What is the largest continent?" with options "Asia", "Africa", "Europe", "Antarctica" where Asia is correct."
@@ -394,7 +446,7 @@ items [
 
 ---
 
-### Example 17
+### Example 19
 
 #### Prompt
 "Create a plain text question asking "Write a brief biography" with a 250-word limit and placeholder "Name, birth date, achievements..."."
@@ -415,7 +467,7 @@ items [
 
 ---
 
-### Example 18
+### Example 20
 
 #### Prompt
 "Create a multiple choice true/false question asking "The Earth is flat" with options "True", "False" where False is correct."
@@ -441,7 +493,7 @@ items [
 
 ---
 
-### Example 19
+### Example 21
 
 #### Prompt
 "Create a long text essay question asking "Explain how gravity works" with a 400-word limit and placeholder "Begin your explanation..."."
@@ -462,7 +514,7 @@ items [
 
 ---
 
-### Example 20
+### Example 22
 
 #### Prompt
 "Create a short text question asking "What gas do plants absorb?" with the correct answer "carbon dioxide", case insensitive."
@@ -483,7 +535,7 @@ items [
 
 ---
 
-### Example 21
+### Example 23
 
 #### Prompt
 "Create a plain text essay question asking "Summarize the main argument" with a 150-word limit."
@@ -504,7 +556,7 @@ items [
 
 ---
 
-### Example 22
+### Example 24
 
 #### Prompt
 "Create a multiple choice question allowing multiple responses asking "Which are prime numbers?" with options "2", "4", "7", "9" where 2 and 7 are correct."
@@ -533,7 +585,7 @@ items [
 
 ---
 
-### Example 23
+### Example 25
 
 #### Prompt
 "Create a multiple choice question with shuffled options asking "What color is the sky?" with options "Blue", "Green", "Red" where Blue is correct."
@@ -560,7 +612,7 @@ items [
 
 ---
 
-### Example 24
+### Example 26
 
 #### Prompt
 "Create an items assessment with a single MCQ asking "What is 3 × 4?" with options "7", "10", "12", "15" where 12 is correct."
@@ -588,7 +640,7 @@ items [
 
 ---
 
-### Example 25
+### Example 27
 
 #### Prompt
 "Create a long text essay question asking "Describe the water cycle in your own words" with a 300-word limit."
@@ -609,7 +661,7 @@ items [
 
 ---
 
-### Example 26
+### Example 28
 
 #### Prompt
 "Create a multiple choice question asking "Which is a mammal?" with options "Shark", "Eagle", "Dolphin", "Lizard" where Dolphin is correct, with instant feedback enabled."
@@ -637,7 +689,7 @@ items [
 
 ---
 
-### Example 27
+### Example 29
 
 #### Prompt
 "Create a short text question asking "Type the missing word: The quick brown ___" with the correct answer "fox", with a maximum length of 20 characters."
@@ -658,7 +710,7 @@ items [
 
 ---
 
-### Example 28
+### Example 30
 
 #### Prompt
 "Create a long text essay asking "Analyze the themes in the poem" with a 600-word limit."
@@ -679,7 +731,7 @@ items [
 
 ---
 
-### Example 29
+### Example 31
 
 #### Prompt
 "Create a short text question with a placeholder "Enter your answer here" asking "Name the largest ocean" with the correct answer "Pacific"."
@@ -700,7 +752,7 @@ items [
 
 ---
 
-### Example 30
+### Example 32
 
 #### Prompt
 "Create an items assessment with a short text question asking "What year did World War II end?" with the correct answer "1945"."
@@ -721,7 +773,7 @@ items [
 
 ---
 
-### Example 31
+### Example 33
 
 #### Prompt
 "Create a multiple choice question asking "What is the boiling point of water?" with options "50°C", "100°C", "150°C", "200°C" where 100°C is correct."
@@ -749,7 +801,7 @@ items [
 
 ---
 
-### Example 32
+### Example 34
 
 #### Prompt
 "Create a multiple choice question asking "What is the capital of France?" with options "Paris", "London", "Berlin", "Madrid" where Paris is correct."
@@ -761,24 +813,12 @@ items [
 #### Code
 
 ```
-items [
-  item questions [
-    mcq stimulus "What is the capital of France?" options [
-      "Paris"
-      "London"
-      "Berlin"
-      "Madrid"
-    ] valid-response [
-      0
-    ] {}
-  ] {}
-]
 {}..
 ```
 
 ---
 
-### Example 33
+### Example 35
 
 #### Prompt
 "Create a plain text essay question asking "Explain your reasoning" with a 200-word limit."
@@ -799,7 +839,32 @@ items [
 
 ---
 
-### Example 34
+### Example 36
+
+#### Prompt
+"Create a multiple choice question asking "What is the capital of France?" with options "Paris", "London", "Berlin", "Madrid" where Paris is correct.
+
+Create a multiple choice question asking "What is the capital of France?" with options "Paris", "London", "Berlin", "Madrid" where Paris is correct."
+
+#### Chat Transcript
+
+**User**: Create a multiple choice question asking "What is the capital of France?" with options "Paris", "London", "Berlin", "Madrid" where Paris is correct.
+
+**User**: Create a multiple choice question asking "What is the capital of France?" with options "Paris", "London", "Berlin", "Madrid" where Paris is correct.
+
+#### Code
+
+```
+items [
+  item questions [
+    mcq {}
+  ] {}
+]..
+```
+
+---
+
+### Example 37
 
 #### Prompt
 "Create a short text question asking "What is the opposite of hot?" with the correct answer "cold", case insensitive."
@@ -820,7 +885,7 @@ items [
 
 ---
 
-### Example 35
+### Example 38
 
 #### Prompt
 "Create a short text question asking "What is 7 × 8?" with the correct answer "56"."
