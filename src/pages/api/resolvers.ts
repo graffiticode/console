@@ -21,13 +21,17 @@ function encrypt(plaintext: string): string {
   return iv.toString('hex') + ':' + encrypted.toString('hex');
 }
 
-function buildParseCallbacks(publicVars: Record<string, string> = {}) {
-  console.log("buildParseCallbacks()", "publicVars:", JSON.stringify(publicVars));
+function buildParseCallbacks(systemValues: Record<string, string> = {}) {
+  console.log("buildParseCallbacks()", "systemValues:", JSON.stringify(systemValues));
   return {
-    GET_PRIVATE_VAR: (value: string) => encrypt(value),
-    GET_PUBLIC_VAR: (name: string) => {
-      const result = publicVars[name] || "";
-      console.log("GET_PUBLIC_VAR()", "name:", name, "result:", result);
+    GET_VAL_PRIVATE: (name: string) => {
+      const result = systemValues[name] || "";
+      console.log("GET_VAL_PRIVATE()", "name:", name, "result:", encrypt(result));
+      return encrypt(result);
+    },
+    GET_VAL_PUBLIC: (name: string) => {
+      const result = systemValues[name] || "";
+      console.log("GET_VAL_PUBLIC()", "name:", name, "result:", result);
       return result;
     },
   };
@@ -49,9 +53,10 @@ export async function parseCode({ lang, code, itemId }: { lang: string; code: st
     if (!lexicon) {
       return { ast: null, errors: [{ message: `No lexicon found for language ${lang}`, from: -1, to: -1 }] };
     }
-    const publicVars: Record<string, string> = {};
-    if (itemId) publicVars.itemId = itemId;
-    const astPool = await parser.parse(lang, code, lexicon, buildParseCallbacks(publicVars));
+    const systemValues: Record<string, string> = {};
+    if (itemId) systemValues.itemId = itemId;
+    const fullCode = code; //`set-var "id" get-val-public "itemId" ${code}`;
+    const astPool = await parser.parse(lang, fullCode, lexicon, buildParseCallbacks(systemValues));
 
     // Scan the AST pool for ERROR nodes
     const errors: Array<{ message: string; from: number; to: number }> = [];
