@@ -80,7 +80,7 @@ export default function Editor({
   const [ isPublic, setIsPublic ] = useState(false);
   const [ isUserEdit, setIsUserEdit ] = useState(false);
   const [ compileErrors, setCompileErrors ] = useState<Array<{message: string, from: number, to: number}> | null>(null);
-  const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Make");
+  const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Help");
   const { user } = useGraffiticodeAuth();
   const [ isPostingTask, setIsPostingTask ] = useState(false);
   const dataPanelRef = React.useRef(null);
@@ -214,7 +214,7 @@ export default function Editor({
             height: height === "100%" ? undefined : (height || "calc(100vh - 120px)") // Use flexbox when 100%
           }}
         >
-          <div style={{ display: tab === "Make" ? undefined : "none" }}>
+          <div style={{ display: tab === "Help" ? undefined : "none" }}>
             <HelpPanel
               help={help}
               setHelp={setHelp}

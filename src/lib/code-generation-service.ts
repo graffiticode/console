@@ -44,9 +44,10 @@ import {
 } from "./prompt-renderer";
 import { checkCompileAllowed } from "./usage-service";
 
-// Global cache for language assets to avoid repeated fetches
+// Global cache for language assets with TTL
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const languageAssetsCache = {
-  instructions: new Map<string, string>(),
+  instructions: new Map<string, { value: string; expires: number }>(),
   templates: new Map<string, string>(),
 };
 
@@ -341,30 +342,20 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
  * @returns {Promise<string>} - The dialect-specific instructions, or empty string if none found
  */
 async function readDialectInstructions(lang) {
-  // Check cache first
   const cacheKey = `L${lang}`;
-  if (languageAssetsCache.instructions.has(cacheKey)) {
-    const cached = languageAssetsCache.instructions.get(cacheKey);
-    return cached;
+  const cached = languageAssetsCache.instructions.get(cacheKey);
+  if (cached && Date.now() < cached.expires) {
+    return cached.value;
   }
 
   try {
-    // Fetch instructions from the language server
     const instructions = await getLanguageAsset(`L${lang}`, 'instructions.md');
-    if (instructions) {
-      const formatted = `\n${instructions}\n`;
-      // Cache the result
-      languageAssetsCache.instructions.set(cacheKey, formatted);
-      return formatted;
-    } else {
-      // Cache empty result to avoid repeated failed fetches
-      languageAssetsCache.instructions.set(cacheKey, "");
-      return "";
-    }
+    const value = instructions ? `\n${instructions}\n` : "";
+    languageAssetsCache.instructions.set(cacheKey, { value, expires: Date.now() + CACHE_TTL_MS });
+    return value;
   } catch (error) {
     console.error(`Error fetching dialect instructions from language server for L${lang}:`, error);
-    // Cache empty result to avoid repeated failed fetches
-    languageAssetsCache.instructions.set(cacheKey, "");
+    languageAssetsCache.instructions.set(cacheKey, { value: "", expires: Date.now() + CACHE_TTL_MS });
     return "";
   }
 }

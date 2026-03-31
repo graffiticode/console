@@ -1,23 +1,51 @@
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { basename, resolve } from 'path';
 
 const BATCH_SIZE = 5;
 const FORCE_DEPLOY = process.argv.includes('--force');
+const VERBOSE = process.argv.includes('--verbose');
 const BASE_DIR = resolve(process.cwd(), '..');
+
+function parseLangs(): string[] | null {
+  const idx = process.argv.indexOf('--lang');
+  if (idx === -1) return null;
+  const langs: string[] = [];
+  for (let i = idx + 1; i < process.argv.length; i++) {
+    if (process.argv[i].startsWith('--')) break;
+    langs.push(process.argv[i].replace(/^l/i, ''));
+  }
+  return langs.length > 0 ? langs : null;
+}
+const LANGS = parseLangs();
 
 function run(cmd: string, cwd: string, timeoutMs = 10 * 60 * 1000): Promise<string> {
   return new Promise((resolve, reject) => {
-    exec(cmd, { cwd, maxBuffer: 10 * 1024 * 1024, timeout: timeoutMs }, (err, stdout, stderr) => {
-      if (err) reject(new Error((stdout || '') + (stderr || '')));
-      else resolve(stdout);
+    const stdio = VERBOSE ? 'inherit' as const : 'pipe' as const;
+    const child = spawn('bash', ['-c', cmd], { cwd, stdio });
+    const timer = setTimeout(() => { child.kill(); reject(new Error('Timed out')); }, timeoutMs);
+    let output = '';
+    if (!VERBOSE) {
+      child.stdout?.on('data', d => output += d);
+      child.stderr?.on('data', d => output += d);
+    }
+    child.on('close', code => {
+      clearTimeout(timer);
+      if (code !== 0) reject(new Error(output.slice(-500) || `Exit code ${code}`));
+      else resolve(output);
     });
   });
+}
+
+function isDeprecated(dir: string): boolean {
+  const pkg = readFileSync(resolve(dir, 'package.json'), 'utf-8');
+  return /gcp:build.*deprecated/i.test(pkg);
 }
 
 function findRepos(): string[] {
   return readdirSync(BASE_DIR)
     .filter(name => /^l0\d{3}$/.test(name))
+    .filter(name => !LANGS || LANGS.includes(name.slice(1)))
     .map(name => resolve(BASE_DIR, name))
     .filter(dir => {
       if (!existsSync(resolve(dir, 'packages/api/package.json'))) return false;
@@ -45,10 +73,12 @@ async function upgradeAndDeploy(dir: string): Promise<{ name: string; ok: boolea
       await run('git push', dir);
       await run('npm run gcp:build', dir, 20 * 60 * 1000);
       console.log(`[${name}] Done`);
-    } else if (FORCE_DEPLOY) {
+    } else if (FORCE_DEPLOY && !isDeprecated(dir)) {
       console.log(`[${name}] Already up to date, force deploying...`);
       await run('npm run gcp:build', dir, 20 * 60 * 1000);
       console.log(`[${name}] Done`);
+    } else if (FORCE_DEPLOY) {
+      console.log(`[${name}] Deprecated, skipping deploy`);
     } else {
       console.log(`[${name}] Already up to date, skipping deploy`);
     }

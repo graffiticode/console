@@ -5,7 +5,7 @@ function classNames(...classes) {
 }
 
 const tabs = [
-  { name: 'Make', current: false },
+  { name: 'Help', current: false },
   { name: 'Code', current: true },
   { name: 'Data', current: false },
 ];
