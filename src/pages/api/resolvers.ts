@@ -388,6 +388,7 @@ export async function generateCode({
   options,
   currentCode,
   conversationSummary = null,
+  itemId = undefined,
 }) {
   // TODO add support for calling the compiler to check generated code.
   const rid = generateRequestId();
@@ -526,7 +527,7 @@ export async function generateCode({
     }
 
     // Parse source code to AST, then post the task
-    const parseResult = await parseCode({ lang: language, code });
+    const parseResult = await parseCode({ lang: language, code, itemId });
     if (parseResult.errors) {
       return {
         code: null,
@@ -621,6 +622,7 @@ export async function createItem({
         language: lang,
         options: {},
         currentCode: null,
+        itemId: id,
       });
       taskId = result.taskId;
       if (!taskId) {
