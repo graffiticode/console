@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'fs';
 import { basename, resolve } from 'path';
 
 const BATCH_SIZE = 5;
+const FORCE_DEPLOY = process.argv.includes('--force');
 const BASE_DIR = resolve(process.cwd(), '..');
 
 function run(cmd: string, cwd: string, timeoutMs = 10 * 60 * 1000): Promise<string> {
@@ -42,6 +43,10 @@ async function upgradeAndDeploy(dir: string): Promise<{ name: string; ok: boolea
     if (status.trim()) {
       await run('git add -A && git commit -m "Upgrade basis to latest"', dir);
       await run('git push', dir);
+      await run('npm run gcp:build', dir, 20 * 60 * 1000);
+      console.log(`[${name}] Done`);
+    } else if (FORCE_DEPLOY) {
+      console.log(`[${name}] Already up to date, force deploying...`);
       await run('npm run gcp:build', dir, 20 * 60 * 1000);
       console.log(`[${name}] Done`);
     } else {
