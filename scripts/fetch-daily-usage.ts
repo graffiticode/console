@@ -75,15 +75,38 @@ async function findApiKeyId(): Promise<{ id: string; name: string } | null> {
 type TokenStats = { input: number; cached_input: number; cache_creation: number; output: number; web_searches: number };
 
 async function main() {
-  // Accept optional --date YYYY-MM-DD argument, default to yesterday UTC
+  // Accept optional --date YYYY-MM-DD and --tz IANA_TIMEZONE arguments
   const dateArg = process.argv.find((_, i) => process.argv[i - 1] === '--date');
+  const tzArg = process.argv.find((_, i) => process.argv[i - 1] === '--tz');
   const now = new Date();
   const today = now.toISOString().split('T')[0];
   const dateStr = dateArg || new Date(new Date(today).getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  const nextDay = new Date(new Date(dateStr).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  const startingAt = dateStr + 'T00:00:00Z';
-  const endingAt = nextDay + 'T00:00:00Z';
+  // Calculate UTC offset for the given timezone on the given date
+  function getUtcOffset(date: string, tz: string): string {
+    const d = new Date(date + 'T12:00:00'); // noon to avoid DST edge cases
+    const utcStr = d.toLocaleString('en-US', { timeZone: 'UTC' });
+    const tzStr = d.toLocaleString('en-US', { timeZone: tz });
+    const diffMs = new Date(utcStr).getTime() - new Date(tzStr).getTime();
+    const diffH = Math.round(diffMs / (60 * 60 * 1000));
+    const sign = diffH >= 0 ? '+' : '-';
+    return `${sign}${String(Math.abs(diffH)).padStart(2, '0')}:00`;
+  }
+
+  let startingAt: string, endingAt: string;
+  if (tzArg) {
+    const offset = getUtcOffset(dateStr, tzArg);
+    const nextDay = new Date(new Date(dateStr).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Convert local midnight to UTC
+    const startLocal = new Date(`${dateStr}T00:00:00${offset}`);
+    const endLocal = new Date(`${nextDay}T00:00:00${offset}`);
+    startingAt = startLocal.toISOString().replace(/\.\d+Z$/, 'Z');
+    endingAt = endLocal.toISOString().replace(/\.\d+Z$/, 'Z');
+  } else {
+    const nextDay = new Date(new Date(dateStr).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    startingAt = dateStr + 'T00:00:00Z';
+    endingAt = nextDay + 'T00:00:00Z';
+  }
 
   console.log(`Fetching usage for ${dateStr}...`);
 

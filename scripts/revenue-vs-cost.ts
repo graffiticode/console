@@ -51,19 +51,21 @@ function getModelCost(model: string, inputTokens: number, outputTokens: number):
   return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
 }
 
-function parseArgs(argv: string[]): { period: string; output: string; lang?: string; from?: string; to?: string } {
+function parseArgs(argv: string[]): { period: string; output: string; lang?: string; from?: string; to?: string; tz?: string } {
   const args = argv.slice(2);
   let period = 'all';
   let output = 'revenue-vs-cost.html';
   let lang: string | undefined;
   let from: string | undefined;
   let to: string | undefined;
+  let tz: string | undefined;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--period' && args[i + 1]) { period = args[i + 1]; i++; }
     else if (args[i] === '--output' && args[i + 1]) { output = args[i + 1]; i++; }
     else if (args[i] === '--lang' && args[i + 1]) { lang = args[i + 1]; i++; }
     else if (args[i] === '--from' && args[i + 1]) { from = args[i + 1]; i++; }
     else if (args[i] === '--to' && args[i + 1]) { to = args[i + 1]; i++; }
+    else if (args[i] === '--tz' && args[i + 1]) { tz = args[i + 1]; i++; }
   }
   if (from) {
     period = 'custom';
@@ -71,22 +73,35 @@ function parseArgs(argv: string[]): { period: string; output: string; lang?: str
     console.error('Error: --period must be "all", "month", "week", or "day", or use --from/--to YYYY-MM-DD');
     process.exit(1);
   }
-  return { period, output, lang, from, to };
+  return { period, output, lang, from, to, tz };
 }
 
-function getPeriodStart(period: string, from?: string): Date | null {
+// Convert a UTC ms timestamp to a YYYY-MM-DD string in the given timezone
+function msToDateStr(ms: number, tz?: string): string {
+  if (!tz) return new Date(ms).toISOString().split('T')[0];
+  return new Date(ms).toLocaleDateString('en-CA', { timeZone: tz }); // en-CA gives YYYY-MM-DD
+}
+
+// Get "today" as YYYY-MM-DD in the given timezone
+function getToday(tz?: string): string {
+  if (!tz) return new Date().toISOString().split('T')[0];
+  return new Date().toLocaleDateString('en-CA', { timeZone: tz });
+}
+
+function getPeriodStart(period: string, from?: string, tz?: string): Date | null {
   if (period === 'all') return null;
   if (period === 'custom' && from) return new Date(from + 'T00:00:00Z');
-  const today = new Date(new Date().toISOString().split('T')[0] + 'T00:00:00Z');
+  const todayStr = getToday(tz);
+  const today = new Date(todayStr + 'T00:00:00Z');
   if (period === 'day') return today;
   if (period === 'week') return new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   if (period === 'month') return new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
   return null;
 }
 
-function getPeriodEnd(to?: string): string {
+function getPeriodEnd(to?: string, tz?: string): string {
   if (to) return new Date(new Date(to + 'T00:00:00Z').getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  return new Date().toISOString().split('T')[0];
+  return getToday(tz);
 }
 
 function getTimestampMs(r: UsageRecord): number | null {
@@ -465,9 +480,9 @@ if (document.getElementById('tokenChart')) {
 }
 
 async function main() {
-  const { period, output, lang, from, to } = parseArgs(process.argv);
-  const periodStart = getPeriodStart(period, from);
-  const periodEnd = getPeriodEnd(to);
+  const { period, output, lang, from, to, tz } = parseArgs(process.argv);
+  const periodStart = getPeriodStart(period, from, tz);
+  const periodEnd = getPeriodEnd(to, tz);
 
   console.log(`Fetching data (period: ${period}${from ? `, from: ${from}` : ''}${to ? `, to: ${to}` : ''})...`);
 
@@ -571,7 +586,7 @@ async function main() {
   for (const r of records) {
     const ms = getTimestampMs(r);
     if (!ms) continue;
-    const date = new Date(ms).toISOString().split('T')[0];
+    const date = msToDateStr(ms, tz);
     if (!dailyMap[date]) dailyMap[date] = emptyBucket(date);
     const plan = r.plan || 'demo';
     dailyMap[date].projectedRevenue += (r.units || 0) * (PLAN_PRICE_PER_UNIT[plan] || 0);
@@ -580,7 +595,7 @@ async function main() {
   for (const r of aiRecords) {
     const ms = getTimestampMs(r);
     if (!ms) continue;
-    const date = new Date(ms).toISOString().split('T')[0];
+    const date = msToDateStr(ms, tz);
     if (!dailyMap[date]) dailyMap[date] = emptyBucket(date);
     dailyMap[date].projectedCost += getModelCost(r.model || 'unknown', r.tokens?.input || 0, r.tokens?.output || 0);
   }
