@@ -769,23 +769,25 @@ export async function getItems({ auth, lang, mark, app }) {
       let help = data.help;
       let taskId = data.taskId;
 
-      // If item doesn't have a taskId (e.g., shared item), post the task to create one
+      // If item doesn't have a taskId (e.g., shared item), parse and post to create one
       if (!taskId && code) {
         try {
-          const taskData = await postTask({
-            auth,
-            task: {
-              lang: data.lang,
-              code: code,
-            },
-            ephemeral: false,
-            isPublic: false,
-          });
+          const parseResult = await parseCode({ lang: data.lang, code });
+          if (parseResult.ast) {
+            const taskData = await postTask({
+              auth,
+              task: {
+                lang: data.lang,
+                code: JSON.parse(parseResult.ast),
+              },
+              ephemeral: false,
+              isPublic: false,
+            });
 
-          if (taskData && taskData.id) {
-            taskId = taskData.id;
-            // Update the item with the new taskId
-            await doc.ref.update({ taskId });
+            if (taskData && taskData.id) {
+              taskId = taskData.id;
+              await doc.ref.update({ taskId });
+            }
           }
         } catch (error) {
           console.error(
@@ -904,6 +906,31 @@ export async function getItem({ auth, id }) {
         }
       } catch (error) {
         console.log("getItem()", "Failed to fetch legacy task data", error);
+      }
+    }
+
+    // If item has source code but no taskId, parse and post to get one
+    if (!taskId && code) {
+      try {
+        const parseResult = await parseCode({ lang: data.lang, code });
+        if (parseResult.ast) {
+          const taskData = await postTask({
+            auth,
+            task: {
+              lang: data.lang,
+              code: JSON.parse(parseResult.ast),
+            },
+            ephemeral: false,
+            isPublic: false,
+          });
+
+          if (taskData && taskData.id) {
+            taskId = taskData.id;
+            await itemRef.update({ taskId });
+          }
+        }
+      } catch (error) {
+        console.error("getItem()", "Failed to create task for item", id, error);
       }
     }
 
