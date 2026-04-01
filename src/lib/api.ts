@@ -42,11 +42,12 @@ export const getLanguageLexicon = async (lang: string) => {
       }
     }
 
-    lexiconCache.set(lang, { value: lexicon, expires: Date.now() + LEXICON_CACHE_TTL_MS });
+    if (lexicon) {
+      lexiconCache.set(lang, { value: lexicon, expires: Date.now() + LEXICON_CACHE_TTL_MS });
+    }
     return lexicon;
   } catch (error) {
     console.warn(`Failed to fetch lexicon for L${lang}:`, error.message);
-    lexiconCache.set(lang, { value: null, expires: Date.now() + LEXICON_CACHE_TTL_MS });
     return null;
   }
 };
