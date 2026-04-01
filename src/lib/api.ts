@@ -5,7 +5,14 @@ const getApiString = bent(apiUrl, "GET", "string");
 const getApiJSON = bent(apiUrl, "GET", "json");
 
 export const getBaseUrlForApi = () => apiUrl;
-export const getLanguageAsset = (lang, file) => getApiString(`/${lang}/${file}`);
+export const getLanguageAsset = async (lang, file) => {
+  try {
+    return await getApiString(`/${lang}/${file}`);
+  } catch (err) {
+    console.warn(`Failed to fetch ${lang}/${file}:`, err.message);
+    return null;
+  }
+};
 
 // Lexicon cache with 1 hour TTL
 const LEXICON_CACHE_TTL_MS = 60 * 60 * 1000;
