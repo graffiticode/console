@@ -78,8 +78,8 @@ export function useOAuth() {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || error.message || 'Failed to sign in with Google');
+      const body = await response.json();
+      throw new Error(body.error?.message || body.message || 'Failed to sign in with Google');
     }
 
     const data = await response.json();
@@ -102,13 +102,12 @@ export function useOAuth() {
       body: JSON.stringify({ provider: 'google', email }),
     });
 
+    const body = await response.json();
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || error.message || 'Failed to link email');
+      return { success: false, error: body.error?.message || body.message || 'Failed to link email' };
     }
 
-    const data = await response.json();
-    return { success: true, provider: 'google', email: data.data?.email || email };
+    return { success: true, provider: 'google', email: body.data?.email || email };
   }, [user]);
 
   // Get linked OAuth accounts
@@ -126,8 +125,8 @@ export function useOAuth() {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || error.message || 'Failed to get OAuth links');
+      const body = await response.json();
+      throw new Error(body.error?.message || body.message || 'Failed to get OAuth links');
     }
 
     const data = await response.json();
@@ -149,8 +148,8 @@ export function useOAuth() {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || error.message || 'Failed to unlink Google account');
+      const body = await response.json();
+      throw new Error(body.error?.message || body.message || 'Failed to unlink Google account');
     }
 
     return { success: true };

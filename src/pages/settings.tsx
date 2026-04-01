@@ -33,18 +33,16 @@ function OAuthCard() {
   const handleAddEmail = async () => {
     const email = emailInput.trim().toLowerCase();
     if (!email) return;
-    try {
-      setOauthLoading(true);
-      setError(null);
-      await linkEmail(email);
+    setOauthLoading(true);
+    setError(null);
+    const result = await linkEmail(email);
+    if (result.success) {
       setEmailInput('');
       await fetchOAuthLinks();
-    } catch (err: any) {
-      console.error('Error linking email:', err);
-      setError(err.message || 'Failed to link email');
-    } finally {
-      setOauthLoading(false);
+    } else {
+      setError(result.error || 'Failed to link email');
     }
+    setOauthLoading(false);
   };
 
   const handleUnlinkGoogle = async () => {
