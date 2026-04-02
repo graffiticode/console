@@ -1492,8 +1492,8 @@ export async function generateCode({
         const subscription = userData?.subscription || {};
         const plan = subscription.plan || 'demo';
 
-        // Fixed ratio: 500 tokens = 1 compile unit, capped at 20 units per call
-        const TOKENS_PER_UNIT = 500;
+        // Fixed ratio: 250 tokens = 1 compile unit, capped at 20 units per call
+        const TOKENS_PER_UNIT = 250;
         const MAX_UNITS_PER_CALL = 20;
         const totalTokenCost = 0; // kept for usage record
         const rawUnits = Math.max(1, Math.ceil(finalUsage.total_tokens / TOKENS_PER_UNIT));
