@@ -10,7 +10,6 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import useSWR from 'swr';
 import { TextEditor } from "./TextEditor";
 import { createState } from "../lib/state";
-import { generateCode } from "../utils/swr/fetchers";
 import { ChatBot } from './ChatBot';
 import { CsvDropzone } from './CsvDropzone';
 import useGraffiticodeAuth, { useToken } from '../hooks/use-graffiticode-auth';

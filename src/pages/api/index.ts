@@ -140,7 +140,7 @@ const typeDefs = `
   type Mutation {
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, ast: String!, ephemeral: Boolean, item: String): String!
-    generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String, conversationSummary: ConversationSummaryInput): GeneratedCode!
+    generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentCode: String, conversationSummary: ConversationSummaryInput): GeneratedCode!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean, app: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!

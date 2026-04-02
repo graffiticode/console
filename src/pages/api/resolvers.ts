@@ -390,99 +390,56 @@ export async function generateCode({
   conversationSummary = null,
   itemId = undefined,
 }) {
-  // TODO add support for calling the compiler to check generated code.
   const rid = generateRequestId();
 
   try {
+    if (!language) {
+      return { code: null, taskId: null, language, description: null, model: null, usage: null, errors: [{ message: "language is required" }] };
+    }
+
     prompt = prompt.trim();
     let code = null;
     let taskId = null;
     let description = null;
     let model = null;
-    let usage = {
-      input_tokens: 0,
-      output_tokens: 0,
-    };
+    let usage = { input_tokens: 0, output_tokens: 0 };
 
-    // Log request start
     ragLog(rid, "request.start", {
       promptLength: prompt.length,
-      promptHash: Buffer.from(prompt).toString("base64").substring(0, 16),
       language,
       hasCurrentCode: !!currentCode,
-      options: {
-        model: options?.model,
-        temperature: options?.temperature,
-        maxTokens: options?.maxTokens,
-      },
     });
 
-    // Check if this is the specific prompt for template generation
+    // Template generation — parse and post to get a taskId
     if (prompt === "Create a minimal starting template") {
       const cacheKey = `L${language}`;
-
-      // Check cache first
       if (templateCache.has(cacheKey)) {
         code = templateCache.get(cacheKey);
-        description = "Template loaded from cache";
         model = "template-file";
-        ragLog(rid, "template.loaded", {
-          source: "cache",
-          lang: cacheKey,
-          codeLength: code.length,
-        });
       } else {
-        try {
-          // Fetch template from language server
-          const templateCode = await getLanguageAsset(`L${language}`, 'template.gc');
-          if (templateCode) {
-            code = templateCode;
-            // Cache the template
-            templateCache.set(cacheKey, templateCode);
-            description = "Template loaded from language server";
-            model = "template-file";
-            ragLog(rid, "template.loaded", {
-              source: "language-server",
-              lang: cacheKey,
-              codeLength: code.length,
-            });
-          }
-        } catch (error) {
-          console.log(
-            "generateCode()",
-            "Template not found on language server, using default template",
-            error.message,
-          );
-          ragLog(rid, "template.error", {
-            error: error.message,
-            source: "language-server",
-          });
-          // Use default template code
+        code = await getLanguageAsset(`L${language}`, 'template.gc');
+        if (!code) {
           code = "{}..";
-          description = "Default template (no template.gc found)";
-          model = "default-template";
-          templateCache.set(cacheKey, code);
-          ragLog(rid, "template.loaded", {
-            source: "default",
-            lang: cacheKey,
-            codeLength: code.length,
-          });
         }
-      }
-      // If template.gc returned empty, use default template
-      if (!code) {
-        code = "{}..";
-        description = "Default template (empty template.gc)";
-        model = "default-template";
         templateCache.set(cacheKey, code);
-        ragLog(rid, "template.loaded", {
-          source: "default",
-          lang: cacheKey,
-          codeLength: code.length,
-        });
+        model = code === "{}.." ? "default-template" : "template-file";
       }
+      description = "Template";
+
+      const parseResult = await parseCode({ lang: language, code, itemId });
+      if (parseResult.errors) {
+        return { code: null, taskId: null, language, description: null, model: null, usage: null, errors: parseResult.errors };
+      }
+      const taskData = await postTask({
+        auth,
+        task: { lang: language, code: JSON.parse(parseResult.ast) },
+        ephemeral: true,
+        isPublic: false,
+      });
+      taskId = taskData.id;
     }
-    // If no template was loaded (not a template request), fall back to code generation service
+
+    // Code generation — service parses, posts, and returns taskId
     if (!code) {
       const result = await codeGenerationService({
         auth,
@@ -498,62 +455,27 @@ export async function generateCode({
         conversationSummary,
       });
 
-      // Handle usage limit errors (returned as errors array)
-      console.log("generateCode() result:", { hasErrors: 'errors' in result, errors: 'errors' in result ? result.errors : null });
       if ('errors' in result && result.errors) {
-        const elaboratedErrors = result.errors.map(err => ({
+        const errors = result.errors.map(err => ({
           ...err,
           message: err.message === 'Usage limit reached'
             ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
             : err.message
         }));
-
-        return {
-          code: null,
-          taskId: null,
-          language,
-          description: "Error response",
-          model: null,
-          usage: null,
-          errors: elaboratedErrors,
-        };
+        return { code: null, taskId: null, language, description: null, model: null, usage: null, errors };
       }
 
-      // After error check, result is the success type
-      const successResult = result as { code: any; model: string; usage: any };
+      const successResult = result as { code: any; taskId: string; model: string; usage: any };
       code = successResult.code;
+      taskId = successResult.taskId;
       model = successResult.model;
       usage = successResult.usage;
     }
 
-    // Parse source code to AST, then post the task
-    const parseResult = await parseCode({ lang: language, code, itemId });
-    if (parseResult.errors) {
-      return {
-        code: null,
-        taskId: null,
-        language,
-        description: "Parse error",
-        model: null,
-        usage: null,
-        errors: parseResult.errors,
-      };
-    }
-    const taskData = await postTask({
-      auth,
-      task: {
-        lang: language,
-        code: JSON.parse(parseResult.ast),
-      },
-      ephemeral: true,
-      isPublic: false,
-    });
-    taskId = taskData.id;
     if (!taskId) {
-      throw new Error("Failed to get taskId from postTask");
+      throw new Error("Failed to get taskId");
     }
 
-    // Log request end
     ragLog(rid, "request.end", {
       codeLength: code?.length || 0,
       taskId,
@@ -562,35 +484,11 @@ export async function generateCode({
       success: true,
     });
 
-    return {
-      code: code,
-      taskId: taskId,
-      language: language,
-      description: description,
-      model: model,
-      usage: usage,
-      errors: null,
-    };
+    return { code, taskId, language, description, model, usage, errors: null };
   } catch (error) {
     console.error("generateCode()", "ERROR", error);
-
-    // Log request error
-    ragLog(rid, "request.error", {
-      error: error.message,
-      success: false,
-    });
-
-    const errors = [{ message: error.message }];
-
-    return {
-      code: null,
-      taskId: null,
-      language,
-      description: null,
-      model: null,
-      usage: null,
-      errors,
-    };
+    ragLog(rid, "request.error", { error: error.message });
+    return { code: null, taskId: null, language, description: null, model: null, usage: null, errors: [{ message: error.message }] };
   }
 }
 

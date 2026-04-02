@@ -402,7 +402,7 @@ export const generateCode = async ({ user, prompt, language, options, currentCod
     }
   });
   const query = gql`
-    mutation GenerateCode($prompt: String!, $language: String, $options: CodeGenerationOptions, $currentCode: String, $conversationSummary: ConversationSummaryInput) {
+    mutation GenerateCode($prompt: String!, $language: String!, $options: CodeGenerationOptions, $currentCode: String, $conversationSummary: ConversationSummaryInput) {
       generateCode(prompt: $prompt, language: $language, options: $options, currentCode: $currentCode, conversationSummary: $conversationSummary) {
         code
         taskId

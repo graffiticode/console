@@ -8,7 +8,7 @@ import {
 import Editor from './editor';
 import { ImageGallery } from './ImageGallery';
 import SignIn from "./SignIn";
-import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
+import { getAccessToken, loadItems, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'

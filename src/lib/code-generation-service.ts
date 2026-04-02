@@ -680,7 +680,7 @@ function getFallbackResponse(prompt, options) {
  * @param {string} accessToken - Authentication token for the API
  * @returns {Promise<Object>} - Compilation results including any errors
  */
-async function verifyCode(code, authToken, rid = null) {
+async function verifyCode(code, authToken, lang, rid = null) {
 
   const startTime = Date.now();
 
@@ -692,7 +692,6 @@ async function verifyCode(code, authToken, rid = null) {
 
   try {
     // Parse first to catch syntax errors before posting
-    const lang = "0002";
     const parseResult = await parseCode({ lang, code });
     if (parseResult.errors) {
       if (rid) {
@@ -778,6 +777,7 @@ async function verifyCode(code, authToken, rid = null) {
       });
     }
 
+    compileResponse.taskId = id;
     return compileResponse;
   } catch (error) {
     console.error("Error verifying Graffiticode:", error);
@@ -993,7 +993,7 @@ interface GenerateCodeOptions {
 export async function generateCode({
   auth,
   prompt,
-  lang = "0002",
+  lang,
   options = {},
   currentCode = null,
   rid = null,
@@ -1320,7 +1320,7 @@ export async function generateCode({
 
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
       while (fixAttempts < MAX_FIX_ATTEMPTS && estimatedUnits <= MAX_UNITS_FOR_FIXES) {
-        verificationResult = await verifyCode(generatedCode, accessToken, requestId);
+        verificationResult = await verifyCode(generatedCode, accessToken, lang, requestId);
 
         // If compilation was successful, break the loop
         if (
@@ -1604,8 +1604,9 @@ export async function generateCode({
     // Return formatted response with the language name
     const result = {
       code: finalProcessedCode,
+      taskId: verificationResult?.taskId || null,
       lang: lang,
-      model: modelToUse,  // Use the actual model that was used
+      model: modelToUse,
       usage: {
         input_tokens: finalUsage.prompt_tokens,
         output_tokens: finalUsage.completion_tokens,
@@ -1614,8 +1615,7 @@ export async function generateCode({
       fixAttempts,
       streaming: true,
       chunks: streamResult.chunks,
-      requestId: requestId,  // Include for feedback tracking
-      // DSPy telemetry
+      requestId: requestId,
       usedDSPy,
       promptSpecId,
     };

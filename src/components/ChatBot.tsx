@@ -83,8 +83,6 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       contextualPrompt = conversationContext + message;
     }
 
-
-
     const result = await generateCode({
       user,
       prompt: contextualPrompt,
@@ -96,7 +94,6 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       currentCode,
       conversationSummary
     });
-
 
     // Transform the response to match our expected format
     // If there are errors, return as error type to preserve current code
