@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2026-04-02T10:13:18.754Z*
+*Downloaded on 2026-04-02T17:33:45.360Z*
 
 ## Language L0158
 
@@ -16,7 +16,7 @@
 #### Code
 
 ```
-set-var "lrn-id" "0CWYEi6pFPl2NrLHXDVX"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "Water is made of {{response}} and oxygen" valid-response [
@@ -40,7 +40,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "1V4AMX4VIGEltcWItLJA"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     classification stimulus "Classify the words" possible-responses [
@@ -79,7 +79,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "1iIqfydiLVYunlYHRSmr"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "What is the largest continent?" options [
@@ -108,7 +108,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "2f309M4t6oQOtMJ6cEY8"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozedropdown stimulus "{{response}} are mammals and {{response}} are reptiles" possible-responses [
@@ -144,7 +144,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "3KtEwfzYbCZdUk4DYVeF"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "The Earth is flat" options [
@@ -171,7 +171,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "4MeVz6J5YQwlMke908aL"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     orderlist stimulus "Order from smallest to largest" list [
@@ -203,7 +203,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "6EPSzt5eGhDCoOCLBMWS"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     choicematrix stimulus "Classify each statement" rows [
@@ -238,7 +238,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "76bHzUdLkIXhU27HBvQW"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozeassociation stimulus "Drag the correct answer: {{response}} is the largest planet" possible-responses [
@@ -266,7 +266,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "8tW2HFMk1QxsXCLo0up4"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "What is the capital of France?" options [
@@ -295,7 +295,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "8yTxs8DyYrj6JDGxAG8h"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     choicematrix stimulus "Match each country to its continent." rows [
@@ -335,7 +335,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "9Rn5W3fQZzWdzhLwGhxI"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "What color is the sky?" options [
@@ -363,7 +363,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "9lCqtQazEt98Z13rjNkE"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     orderlist stimulus "Order these fractions from least to greatest" list [
@@ -395,7 +395,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "A4oD07fgZQYA67baK56N"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     plaintext stimulus "Summarize the main argument." max-word-count 150 placeholder "Start writing here..." {}
@@ -417,7 +417,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "AOpDIOj1WYYjPs4moLlo"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     classification stimulus "Sort by food group" possible-responses [
@@ -456,7 +456,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "AbEVW9LWKAKVZK63Adxk"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozeassociation stimulus "{{response}} is to hot as {{response}} is to cold" possible-responses [
@@ -485,7 +485,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "CBFf0iZXE6dzLIwPqUSq"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     choicematrix stimulus "What weather is associated with each condition?" rows [
@@ -524,7 +524,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "DQY5faoPeSts6rqvmvIy"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "The {{response}} is in the {{response}} system" valid-response [
@@ -549,7 +549,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "Eu78Hz5gTkin87YnCaN4"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     classification stimulus "Sort by type of energy" possible-responses [
@@ -588,7 +588,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "FcDfEkWXxYQMSVrkPiCD"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     choicematrix stimulus "Is each statement a fact or opinion?" rows [
@@ -623,7 +623,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "G491zsxoL4gxiW0CQKa9"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "What is the boiling point of water?" options [
@@ -652,7 +652,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "G7lRKqs44gQxUbxlAlxR"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "What is the square root of 144?" options [
@@ -681,7 +681,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "GbXn45DoKLRksAGY8a49"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "What is 7 × 8?" valid-response "56" {}
@@ -703,7 +703,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "Gf0e2U4x56unuFEo0XZj"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     orderlist stimulus "Order these numbers" list [
@@ -735,7 +735,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "GwwEpssNLIC68T6KB6hu"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "What is the abbreviation for Doctor?" valid-response "Dr." case-sensitive true {}
@@ -757,7 +757,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "Ij6Lz1eJ0PWsatnCLpKL"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     orderlist stimulus "Arrange in chronological order" list [
@@ -789,7 +789,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "J4SPxXU3qOqHzyAU7Dqw"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     orderlist stimulus "Arrange the steps of the scientific method" list [
@@ -821,7 +821,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "JaPfEmdcpJnrVt5QJR0s"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "The speed of {{response}} is approximately 300,000 km/s" valid-response [
@@ -845,7 +845,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "Jos6C0l31LIvj7Bw5yI9"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     plaintext stimulus "List three things you learned today." max-word-count 100 placeholder "Start writing here..." {}
@@ -867,7 +867,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "KEaVtFGSDi6nhi9Zli0M"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     plaintext stimulus "Reflect on what you learned" max-length 200 placeholder "Start writing here..." {}
@@ -900,7 +900,7 @@ Create a cloze association question with the template "The chemical formula for 
 #### Code
 
 ```
-set-var "lrn-id" "LKgPhMVyBfJNTr1yx7Qt"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozeassociation stimulus "The chemical formula for water is {{response}}" possible-responses [
@@ -928,7 +928,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "LSsto9e6kxShe6BdgnoI"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     classification stimulus "Sort instruments" possible-responses [
@@ -974,7 +974,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "Ln0CQd5rHdc7Fiz7ZKQh"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     longtext stimulus "Write about your favorite book" placeholder "Start writing here..." {}
@@ -996,7 +996,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "MBbgj24A1sdfVCZx0ijx"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     longtext stimulus "Describe photosynthesis." max-length 300 placeholder "Start writing here..." {}
@@ -1025,7 +1025,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "Nu3pkq0Q2yl44NeMkVpQ"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozeassociation stimulus "{{response}} is the capital of {{response}}" possible-responses [
@@ -1055,7 +1055,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "OlSIubdYwfPwyF4ErtjJ"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     classification stimulus "Sort by type" possible-responses [
@@ -1094,7 +1094,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "PhiY6MxYQp3JFShuWO9L"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     longtext stimulus "Discuss the causes of climate change" max-length 500 placeholder "Begin your essay..." {}
@@ -1116,7 +1116,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "R6EkIDQPrTtM7EhAWMpm"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "DNA stands for {{response}} acid" valid-response [
@@ -1140,7 +1140,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "U2jYeBmDxnoelNYNAkrE"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "Which language is L0158 built for?" options [
@@ -1169,7 +1169,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "Ufp3CAZ9FAIG2o4JzpXi"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "The {{response}} is the largest organ" valid-response [
@@ -1200,7 +1200,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "Um85r82icdiwrVKcXOHY"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "What is 6 × 7?" options [
@@ -1245,7 +1245,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "UzoR9V7pOsB9PWtbrcQ1"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozeassociation stimulus "{{response}} discovered gravity" possible-responses [
@@ -1273,7 +1273,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "WO02bg3vn20SSt0YROAR"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "What is the opposite of hot?" valid-response "cold" case-sensitive false {}
@@ -1295,7 +1295,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "WXAhrGuzCuFciwWAvz1U"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "What is 2 + 2?" options [
@@ -1324,7 +1324,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "WlSViIcmTuzEQ6xhVuMf"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "What is 2+2?" options [
@@ -1353,7 +1353,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "XHqy0kuCXNPkpGMywuKk"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "Which element has atomic number 1?" options [
@@ -1382,7 +1382,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "ZPIbSaCWeQSvWslLWtgO"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "Select all even numbers" options [
@@ -1412,7 +1412,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "aW4PNS2tUwT4liKFCE0d"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "What is the capital of France?" options [
@@ -1457,7 +1457,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "baoxExCbFW6Z10VHe0We"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "The {{response}} War ended in {{response}}" valid-response [
@@ -1482,7 +1482,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "bbzAz7HFxShdKWLkMrbb"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     plaintext stimulus "Write a brief biography" max-word-count 250 placeholder "Name, birth date, achievements..." {}
@@ -1504,7 +1504,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "dBttrwXUT2jPWJGvnQCT"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     longtext stimulus "Compare and contrast two historical events." max-length 400 placeholder "Start writing here..." {}
@@ -1526,7 +1526,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "dzs9dtJ428folM3XHrkN"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "What year did World War II end?" valid-response "1945" {}
@@ -1548,7 +1548,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "gyPXDYMmFtCadIjPZQg7"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "What is the chemical symbol for water?" valid-response "H2O" {}
@@ -1570,7 +1570,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "h0SEmDpHJE8JykVOarhx"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     choicematrix stimulus "Is each number even or odd?" rows [
@@ -1613,7 +1613,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "hgmanZ5mIzwfwZcYTJZK"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     longtext stimulus "Analyze the themes in the poem." max-length 600 placeholder "Start writing here..." {}
@@ -1635,7 +1635,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "iFffm8nA39PMDzCdG8Tf"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "What is 3 × 4?" options [
@@ -1664,7 +1664,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "iROym5pdezvgIoW5tqDm"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     longtext stimulus "Explain how gravity works" max-length 400 placeholder "Begin your explanation..." {}
@@ -1686,7 +1686,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "iUwHEfU1xOibx4wZstVN"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "Spell the number 4" valid-response "four" case-sensitive false {}
@@ -1708,7 +1708,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "j69hpRjJTpgppZv1SjNZ"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "What gas do plants absorb?" valid-response "carbon dioxide" case-sensitive false {}
@@ -1730,7 +1730,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "j8ZVFtxnkjpNQgY1pvZd"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "Which is a mammal?" options [
@@ -1759,7 +1759,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "jbJ3MRfIJhDOhyI3dZj5"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozedropdown stimulus "The sky is {{response}}" possible-responses [
@@ -1793,7 +1793,7 @@ Create a short text question asking "What is 7 × 8?" with the correct answer "5
 #### Code
 
 ```
-set-var "lrn-id" "kH8LdimeF3GubNUBdMmp"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "What is 7 × 8?" valid-response "56" {}
@@ -1815,7 +1815,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "kxHQQTjCSDqgMj0zwPmh"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "What is the capital of Japan?" valid-response "Tokyo" {}
@@ -1837,7 +1837,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "kyKqpxDstpPgVxVrrYg1"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "The {{response}} is the powerhouse of the cell." valid-response [
@@ -1861,7 +1861,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "mAEaotnU8PfcPCi9wauA"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "Plants convert {{response}} into oxygen" valid-response [
@@ -1885,7 +1885,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "mHfK51uT3A1RYTdPpNMK"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozedropdown stimulus "Water boils at {{response}} degrees Celsius" possible-responses [
@@ -1915,7 +1915,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "naCL2FwAvR42WeaDg6dU"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "Name the largest ocean" valid-response "Pacific" placeholder "Enter your answer here" {}
@@ -1937,7 +1937,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "oRgZH97JdQH3m3EzmltR"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     choicematrix stimulus "Identify the part of speech" rows [
@@ -1978,7 +1978,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "qQwZCTUKYmPhin7T5m0L"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     choicematrix stimulus "Classify each animal" rows [
@@ -2018,7 +2018,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "qYoYqHqILrDpcEXncVQZ"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     orderlist stimulus "Order the planets from the Sun" list [
@@ -2068,7 +2068,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "qlgcX9FbjHsYp4Let4ze"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "{{response}} is the chemical symbol for gold." valid-response [
@@ -2092,7 +2092,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "qm1oinP0HATrRPKTWNrV"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozedropdown stimulus "HTML stands for {{response}}" possible-responses [
@@ -2122,7 +2122,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "qxIteQq05TVPnTiCQxzp"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     orderlist stimulus "Arrange alphabetically" list [
@@ -2154,7 +2154,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "qxqT7tOYgJZWnmYNhup2"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     plaintext stimulus "Explain your reasoning" max-word-count 200 {}
@@ -2176,7 +2176,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "r0C2wp9BMFKgr5LQwirZ"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "Photosynthesis occurs in the {{response}} of plant cells" valid-response [
@@ -2200,7 +2200,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "rGQnE1ZH3uNYMRF9guy5"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozedropdown stimulus "Water is {{response}}" possible-responses [
@@ -2237,7 +2237,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "rZiPu2MBaju6jeYTUZHF"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozeformula stimulus "Solve: 2x = 10. x = {{response}}" valid-response [
@@ -2262,7 +2262,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "rcT3o89kxm3J22ffD1Z8"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     classification stimulus "Sort by era" categories [
@@ -2301,7 +2301,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "rd5x1kfGrAiuaLbIktO6"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozedropdown stimulus "The largest mammal is the {{response}}" possible-responses [
@@ -2331,7 +2331,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "sZkL8FWXatwFEkjntIln"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "Which are prime numbers?" options [
@@ -2361,7 +2361,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "t0LtJtgOVzN7TMft9gQE"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozeassociation stimulus "{{response}} wrote Romeo and Juliet" possible-responses [
@@ -2389,7 +2389,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "tCmM77ihs7hzAPzbXi9T"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozedropdown stimulus "The Earth revolves around the {{response}}" possible-responses [
@@ -2419,7 +2419,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "uupHzrzoy5K4SDiihOND"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozetext stimulus "The {{response}} of the United States is Washington, D.C." valid-response [
@@ -2444,7 +2444,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "vpTq3zuiqu1XsWAIwi6z"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     choicematrix stimulus "Rate your agreement" rows [
@@ -2479,7 +2479,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "wmONxFLzJBT4q7cigm7E"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "Which season comes after spring?" options [
@@ -2507,7 +2507,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "wxvVKM4onYqsKdSsxluy"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     mcq stimulus "Which planet is largest?" options [
@@ -2536,7 +2536,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "xwvw99vROeXxQZUWatYn"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     shorttext stimulus "What is the opposite of hot?" valid-response "cold" case-sensitive false {}
@@ -2558,7 +2558,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "yZPmEqFtw9NxOJ0mPfSL"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     classification stimulus "Sort by state of matter" possible-responses [
@@ -2604,7 +2604,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "yq1spzgmjMhMnLygJKRs"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     classification stimulus "Sort the animals" possible-responses [
@@ -2643,7 +2643,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "z2h86vRSBUiH1htDjSWO"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     clozeassociation stimulus "The {{response}} is the closest star to Earth" possible-responses [
@@ -2671,7 +2671,7 @@ learnosity items [
 #### Code
 
 ```
-set-var "lrn-id" "z68SLqTswjfUTEZoEZ21"
+set-var "lrn-id" get-val-public "itemId"
 learnosity items [
   item questions [
     orderlist stimulus "Order from coldest to hottest" list [

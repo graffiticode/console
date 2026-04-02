@@ -207,6 +207,7 @@ function convertToMarkdownFormat(trainingExamples: any[]): string {
     examples.forEach((example, index) => {
       const prompt = extractTaskFromMessages(example.messages);
       const code = example.code.trim()
+        .replace(/set-var "lrn-id" "[^"]*"/g, 'set-var "lrn-id" get-val-public "itemId"')
         .split("\n")
         .map((line: string) => line.trimRight())
         .join("\n");
