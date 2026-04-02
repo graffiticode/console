@@ -27,7 +27,7 @@ export const compile = async ({ user, id, data = {} }) => {
   }
 };
 
-export const parse = async ({ user, lang, code, itemId }: { user: any; lang: string; code: string; itemId?: string }) => {
+export const parse = async ({ user, lang, src, itemId }: { user: any; lang: string; src: string; itemId?: string }) => {
   const token = await user.getToken();
   const client = new GraphQLClient("/api", {
     headers: {
@@ -35,14 +35,14 @@ export const parse = async ({ user, lang, code, itemId }: { user: any; lang: str
     }
   });
   const query = gql`
-    query parse($lang: String!, $code: String!, $itemId: String) {
-      parse(lang: $lang, code: $code, itemId: $itemId) {
+    query parse($lang: String!, $src: String!, $itemId: String) {
+      parse(lang: $lang, src: $src, itemId: $itemId) {
         ast
         errors { message from to }
       }
     }
   `;
-  return client.request(query, { lang, code, itemId }).then(data => data.parse);
+  return client.request(query, { lang, src, itemId }).then(data => data.parse);
 };
 
 export const postTask = async ({ user, lang, ast, item }: { user: any, lang: string, ast: string, item?: string }) => {
@@ -385,11 +385,11 @@ export const getItem = async ({ user, id }) => {
   return client.request(query, { id }).then(data => data.item);
 };
 
-export const generateCode = async ({ user, prompt, language, options, currentCode, conversationSummary = null }) => {
+export const generateCode = async ({ user, prompt, language, options, currentSrc, conversationSummary = null }) => {
   console.log(
     "fetchers/generateCode()",
     "language=" + language,
-    "currentCode length=" + (currentCode ? currentCode.length : 0),
+    "currentSrc length=" + (currentSrc ? currentSrc.length : 0),
     "conversationSummary=" + (conversationSummary ? JSON.stringify(conversationSummary) : "null")
   );
   if (!user) {
@@ -402,9 +402,9 @@ export const generateCode = async ({ user, prompt, language, options, currentCod
     }
   });
   const query = gql`
-    mutation GenerateCode($prompt: String!, $language: String!, $options: CodeGenerationOptions, $currentCode: String, $conversationSummary: ConversationSummaryInput) {
-      generateCode(prompt: $prompt, language: $language, options: $options, currentCode: $currentCode, conversationSummary: $conversationSummary) {
-        code
+    mutation GenerateCode($prompt: String!, $language: String!, $options: CodeGenerationOptions, $currentSrc: String, $conversationSummary: ConversationSummaryInput) {
+      generateCode(prompt: $prompt, language: $language, options: $options, currentSrc: $currentSrc, conversationSummary: $conversationSummary) {
+        src
         taskId
         description
         language
@@ -427,7 +427,7 @@ export const generateCode = async ({ user, prompt, language, options, currentCod
     prompt,
     language,
     options,
-    currentCode,
+    currentSrc,
     conversationSummary
   };
 

@@ -692,7 +692,7 @@ async function verifyCode(code, authToken, lang, rid = null) {
 
   try {
     // Parse first to catch syntax errors before posting
-    const parseResult = await parseCode({ lang, code });
+    const parseResult = await parseCode({ lang, src: code });
     if (parseResult.errors) {
       if (rid) {
         ragLog(rid, "verification.parse_error", {

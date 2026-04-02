@@ -943,7 +943,7 @@ export const HelpPanel = ({
     user,
     language,
     chatHistory: help, // Pass the current help array as chat history
-    currentCode: code, // Pass the current code from the code panel
+    currentSrc: code, // Pass the current source from the code panel
   });
 
   // Setup dropzone for the entire panel

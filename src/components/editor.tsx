@@ -151,7 +151,7 @@ export default function Editor({
 
       (async () => {
         try {
-          const result = await parse({ user, lang, code, itemId });
+          const result = await parse({ user, lang, src: code, itemId });
           if (result.errors) {
             setCompileErrors(result.errors);
             setIsPostingTask(false);

@@ -39,7 +39,7 @@ const formatImageReferences = (text: string): string =>
 /**
  * Function to generate Graffiticode responses using the generateCode function
  */
-const generateBotResponse = async ({message, user, language, chatHistory = [], currentCode = ''}) => {
+const generateBotResponse = async ({message, user, language, chatHistory = [], currentSrc = ''}) => {
   try {
     // Use our fetcher function directly
 
@@ -73,9 +73,9 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       }
 
       // Include the current code as the Assistant's most recent output
-      if (currentCode && currentCode.trim().length > 0) {
+      if (currentSrc && currentSrc.trim().length > 0) {
         conversationContext += "\nAssistant's latest generated code:\n```\n";
-        conversationContext += currentCode;
+        conversationContext += currentSrc;
         conversationContext += "\n```\n";
       }
 
@@ -91,7 +91,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
         maxTokens: 2000
       },
       language,
-      currentCode,
+      currentSrc,
       conversationSummary
     });
 
@@ -105,7 +105,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       };
     }
     return {
-      text: result.code,
+      text: result.src,
       type: 'code',
       language: result.language || 'graffiticode',
       model: result.model,
@@ -159,7 +159,7 @@ greeting "user"..`,
 /**
  * ChatBot component that provides a chat interface
  */
-export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], currentCode = '' }) => {
+export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], currentSrc = '' }) => {
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -168,7 +168,7 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
 
   // Use refs to always have access to the latest props
   const chatHistoryRef = useRef(chatHistory);
-  const currentCodeRef = useRef(currentCode);
+  const currentSrcRef = useRef(currentSrc);
 
   // Update refs when props change
   useEffect(() => {
@@ -176,8 +176,8 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
   }, [chatHistory]);
 
   useEffect(() => {
-    currentCodeRef.current = currentCode;
-  }, [currentCode]);
+    currentSrcRef.current = currentSrc;
+  }, [currentSrc]);
 
   // Function to cancel the current code generation
   const cancelGeneration = useCallback(() => {
@@ -200,7 +200,7 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
     try {
       // Access the latest values from refs
       const latestChatHistory = chatHistoryRef.current;
-      const latestCode = currentCodeRef.current;
+      const latestSrc = currentSrcRef.current;
 
 
       // Check if generation has been cancelled before making the API call
@@ -214,7 +214,7 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
         user,
         language,
         chatHistory: latestChatHistory,
-        currentCode: latestCode
+        currentSrc: latestSrc
       });
 
       // Check if generation was cancelled while the API call was in progress

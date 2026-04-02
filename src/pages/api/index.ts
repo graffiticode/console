@@ -63,7 +63,7 @@ const typeDefs = `
   }
 
   type GeneratedCode {
-    code: String
+    src: String
     taskId: String
     description: String
     language: String
@@ -120,7 +120,7 @@ const typeDefs = `
 
   type Query {
     checkCompileAllowed: CompileAllowedResponse!
-    parse(lang: String!, code: String!, itemId: String): ParseResult!
+    parse(lang: String!, src: String!, itemId: String): ParseResult!
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
@@ -140,7 +140,7 @@ const typeDefs = `
   type Mutation {
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, ast: String!, ephemeral: Boolean, item: String): String!
-    generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentCode: String, conversationSummary: ConversationSummaryInput): GeneratedCode!
+    generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput): GeneratedCode!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean, app: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
@@ -174,8 +174,8 @@ const resolvers = {
       }
     },
     parse: async (_, args) => {
-      const { lang, code, itemId } = args;
-      return await parseCode({ lang, code, itemId });
+      const { lang, src, itemId } = args;
+      return await parseCode({ lang, src, itemId });
     },
     data: async (_, args, ctx) => {
       const { token } = ctx;
@@ -228,10 +228,10 @@ const resolvers = {
       const { token } = ctx;
       const { uid } = await client.verifyToken(token);
       const auth = {uid, token};
-      const { prompt, language, options, currentCode, conversationSummary } = args;
+      const { prompt, language, options, currentSrc, conversationSummary } = args;
       try {
         // No authentication required for code generation
-        return await generateCode({ auth, prompt, language, options, currentCode, conversationSummary });
+        return await generateCode({ auth, prompt, language, options, currentSrc, conversationSummary });
       } catch (error) {
         console.error("Error in generateCode mutation:", error);
         throw error;

@@ -46,7 +46,7 @@ const taskDao = getTaskDaoForStore("firestore");
 
 const db = getFirestore();
 
-export async function parseCode({ lang, code, itemId }: { lang: string; code: string; itemId?: string }) {
+export async function parseCode({ lang, src, itemId }: { lang: string; src: string; itemId?: string }) {
   console.log("parseCode()", "lang:", lang, "itemId:", itemId);
   try {
     const lexicon = await getLanguageLexicon(lang);
@@ -55,8 +55,7 @@ export async function parseCode({ lang, code, itemId }: { lang: string; code: st
     }
     const systemValues: Record<string, string> = {};
     if (itemId) systemValues.itemId = itemId;
-    const fullCode = code; //`set-var "id" get-val-public "itemId" ${code}`;
-    const astPool = await parser.parse(lang, fullCode, lexicon, buildParseCallbacks(systemValues));
+    const astPool = await parser.parse(lang, src, lexicon, buildParseCallbacks(systemValues));
 
     // Scan the AST pool for ERROR nodes
     const errors: Array<{ message: string; from: number; to: number }> = [];
@@ -386,7 +385,7 @@ export async function generateCode({
   prompt,
   language,
   options,
-  currentCode,
+  currentSrc,
   conversationSummary = null,
   itemId = undefined,
 }) {
@@ -394,11 +393,11 @@ export async function generateCode({
 
   try {
     if (!language) {
-      return { code: null, taskId: null, language, description: null, model: null, usage: null, errors: [{ message: "language is required" }] };
+      return { src: null, taskId: null, language, description: null, model: null, usage: null, errors: [{ message: "language is required" }] };
     }
 
     prompt = prompt.trim();
-    let code = null;
+    let src = null;
     let taskId = null;
     let description = null;
     let model = null;
@@ -407,28 +406,27 @@ export async function generateCode({
     ragLog(rid, "request.start", {
       promptLength: prompt.length,
       language,
-      hasCurrentCode: !!currentCode,
+      hasCurrentSrc: !!currentSrc,
     });
 
     // Template generation — parse and post to get a taskId
     if (prompt === "Create a minimal starting template") {
       const cacheKey = `L${language}`;
       if (templateCache.has(cacheKey)) {
-        code = templateCache.get(cacheKey);
+        src = templateCache.get(cacheKey);
         model = "template-file";
       } else {
-        code = await getLanguageAsset(`L${language}`, 'template.gc');
-        if (!code) {
-          code = "{}..";
+        src = await getLanguageAsset(`L${language}`, 'template.gc');
+        if (!src) {
+          src = "{}..";
         }
-        templateCache.set(cacheKey, code);
-        model = code === "{}.." ? "default-template" : "template-file";
+        templateCache.set(cacheKey, src);
+        model = src === "{}.." ? "default-template" : "template-file";
       }
       description = "Template";
-
-      const parseResult = await parseCode({ lang: language, code, itemId });
+      const parseResult = await parseCode({ lang: language, src, itemId });
       if (parseResult.errors) {
-        return { code: null, taskId: null, language, description: null, model: null, usage: null, errors: parseResult.errors };
+        return { src: null, taskId: null, language, description: null, model: null, usage: null, errors: parseResult.errors };
       }
       const taskData = await postTask({
         auth,
@@ -440,7 +438,7 @@ export async function generateCode({
     }
 
     // Code generation — service parses, posts, and returns taskId
-    if (!code) {
+    if (!src) {
       const result = await codeGenerationService({
         auth,
         prompt,
@@ -450,7 +448,7 @@ export async function generateCode({
           temperature: options?.temperature,
           maxTokens: options?.maxTokens,
         },
-        currentCode,
+        currentCode: currentSrc,
         rid,
         conversationSummary,
       });
@@ -462,11 +460,11 @@ export async function generateCode({
             ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
             : err.message
         }));
-        return { code: null, taskId: null, language, description: null, model: null, usage: null, errors };
+        return { src: null, taskId: null, language, description: null, model: null, usage: null, errors };
       }
 
       const successResult = result as { code: any; taskId: string; model: string; usage: any };
-      code = successResult.code;
+      src = successResult.code;
       taskId = successResult.taskId;
       model = successResult.model;
       usage = successResult.usage;
@@ -477,18 +475,18 @@ export async function generateCode({
     }
 
     ragLog(rid, "request.end", {
-      codeLength: code?.length || 0,
+      srcLength: src?.length || 0,
       taskId,
       model,
       usage,
       success: true,
     });
 
-    return { code, taskId, language, description, model, usage, errors: null };
+    return { src, taskId, language, description, model, usage, errors: null };
   } catch (error) {
     console.error("generateCode()", "ERROR", error);
     ragLog(rid, "request.error", { error: error.message });
-    return { code: null, taskId: null, language, description: null, model: null, usage: null, errors: [{ message: error.message }] };
+    return { src: null, taskId: null, language, description: null, model: null, usage: null, errors: [{ message: error.message }] };
   }
 }
 
@@ -519,13 +517,13 @@ export async function createItem({
         prompt: "Create a minimal starting template",
         language: lang,
         options: {},
-        currentCode: null,
+        currentSrc: null,
         itemId: id,
       });
       taskId = result.taskId;
       if (!taskId) {
         // Fallback: parse and post a minimal task directly
-        const fallbackParse = await parseCode({ lang, code: "{}.." });
+        const fallbackParse = await parseCode({ lang, src: "{}.." });
         if (fallbackParse.ast) {
           const fallbackData = await postTask({
             auth,
