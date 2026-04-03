@@ -23,6 +23,7 @@ import {
 } from "./embedding-service";
 import { generateCodeWithContinuation } from "./claude-stream-service";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
+import { findBestLanguages } from "./language-router";
 import { getRAGConfig, withRAGFallback } from "./rag-config";
 import { parser } from "@graffiticode/parser";
 import {
@@ -381,6 +382,11 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
   }
 
   prompt += `
+## Out-of-Scope Detection
+If the user's request is clearly outside the capabilities of this dialect (L${lang}), do NOT generate code. Instead, respond with ONLY:
+OUT_OF_SCOPE: <one sentence explaining what this dialect does and why the request doesn't fit>
+When in doubt, attempt to generate code. Only use OUT_OF_SCOPE when you are confident the request cannot be fulfilled.
+
 ## Response Requirements
 - **IMPORTANT**: When current code is provided in the context, treat it as the starting point and make only the necessary incremental changes requested by the user. Preserve existing data, formatting, and structure unless specifically asked to modify them.
 
@@ -1295,6 +1301,32 @@ export async function generateCode({
       maxTokens: options.maxTokens || 4096,
       success: true,
     }, streamResult.code);
+
+    // Check for out-of-scope signal before processing
+    const outOfScopeMatch = streamResult.code?.match(/^OUT_OF_SCOPE:\s*(.+)/m);
+    if (outOfScopeMatch) {
+      const reason = outOfScopeMatch[1].trim();
+      console.log(`[code-gen] rid=${rid} lang=${lang} out-of-scope: ${reason}`);
+      const routing = await findBestLanguages({ userRequest: prompt, outOfScopeReason: reason, currentLang: lang });
+
+      let errorMessage = `Out of scope: ${reason}`;
+      if (routing.suggestions.length > 0) {
+        errorMessage += "\n\nSuggested alternatives:\n" +
+          routing.suggestions.map(s => `- L${s.id} (${s.description}): ${s.reason}`).join("\n");
+      }
+
+      return {
+        errors: [{ message: errorMessage }],
+        code: null,
+        taskId: null,
+        lang,
+        model: modelToUse,
+        usage: {
+          input_tokens: streamResult.usage.inputTokens,
+          output_tokens: streamResult.usage.outputTokens,
+        },
+      };
+    }
 
     // Process the generated code to fix any issues
     console.log(`[code-gen] rid=${rid} lang=${lang} raw code:\n${streamResult.code}`);
