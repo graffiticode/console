@@ -37,7 +37,7 @@ export const parse = async ({ user, lang, src, itemId }: { user: any; lang: stri
   const query = gql`
     query parse($lang: String!, $src: String!, $itemId: String) {
       parse(lang: $lang, src: $src, itemId: $itemId) {
-        ast
+        code
         errors { message from to }
       }
     }
@@ -45,10 +45,10 @@ export const parse = async ({ user, lang, src, itemId }: { user: any; lang: stri
   return client.request(query, { lang, src, itemId }).then(data => data.parse);
 };
 
-export const postTask = async ({ user, lang, ast, item }: { user: any, lang: string, ast: string, item?: string }) => {
+export const postTask = async ({ user, lang, code, item }: { user: any, lang: string, code: string, item?: string }) => {
   const query = gql`
-    mutation post ($lang: String!, $ast: String!, $ephemeral: Boolean!, $item: String) {
-      postTask(lang: $lang, ast: $ast, ephemeral: $ephemeral, item: $item)
+    mutation post ($lang: String!, $code: String!, $ephemeral: Boolean!, $item: String) {
+      postTask(lang: $lang, code: $code, ephemeral: $ephemeral, item: $item)
     }
   `;
   const token = await user.getToken();
@@ -58,7 +58,7 @@ export const postTask = async ({ user, lang, ast, item }: { user: any, lang: str
     }
   });
   const ephemeral = true;
-  return client.request(query, { lang, ast, ephemeral, item }).then(data => data.postTask);
+  return client.request(query, { lang, code, ephemeral, item }).then(data => data.postTask);
 };
 
 
@@ -226,7 +226,6 @@ export const loadItems = async ({ user, lang, mark, app }) => {
         lang
         mark
         help
-        code
         isPublic
         created
         updated
@@ -238,7 +237,7 @@ export const loadItems = async ({ user, lang, mark, app }) => {
   return client.request(query, { lang, mark, app }).then(data => data.items);
 };
 
-export const createItem = async ({ user, lang, name, taskId, mark, help, code, isPublic, app }) => {
+export const createItem = async ({ user, lang, name, taskId, mark, help, isPublic, app }) => {
   if (!user) {
     return null;
   }
@@ -249,15 +248,14 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, code, i
     }
   });
   const mutation = gql`
-    mutation createItem($lang: String!, $name: String, $taskId: String, $mark: Int, $help: String, $code: String, $isPublic: Boolean, $app: String) {
-      createItem(lang: $lang, name: $name, taskId: $taskId, mark: $mark, help: $help, code: $code, isPublic: $isPublic, app: $app) {
+    mutation createItem($lang: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $app: String) {
+      createItem(lang: $lang, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, app: $app) {
         id
         name
         taskId
         lang
         mark
         help
-        code
         isPublic
         created
         updated
@@ -265,7 +263,7 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, code, i
       }
     }
   `;
-  return client.request(mutation, { lang, name, taskId, mark, help, code, isPublic, app }).then(data => data.createItem);
+  return client.request(mutation, { lang, name, taskId, mark, help, isPublic, app }).then(data => data.createItem);
 };
 
 export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic }) => {
@@ -287,7 +285,6 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic 
         lang
         mark
         help
-        code
         isPublic
         created
         updated
@@ -349,7 +346,7 @@ export const getTask = async ({ user, id }) => {
         id
         lang
         code
-        source
+        src
       }
     }
   `;
@@ -375,7 +372,6 @@ export const getItem = async ({ user, id }) => {
         lang
         mark
         help
-        code
         isPublic
         created
         updated

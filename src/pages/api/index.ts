@@ -35,10 +35,9 @@ const typeDefs = `
 
   type Task {
     id: String!
-    src: String!
     lang: String!
     code: String!
-    source: String
+    src: String!
     help: String!
     taskId: String!
     isPublic: Boolean
@@ -54,7 +53,6 @@ const typeDefs = `
     lang: String!
     mark: Int
     help: String
-    code: String
     isPublic: Boolean
     created: String!
     updated: String
@@ -79,7 +77,7 @@ const typeDefs = `
   }
 
   type ParseResult {
-    ast: String
+    code: String
     errors: [CodeError]
   }
 
@@ -139,10 +137,10 @@ const typeDefs = `
 
   type Mutation {
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
-    postTask(lang: String!, ast: String!, ephemeral: Boolean, item: String): String!
+    postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
     generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput): GeneratedCode!
-    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean, app: String): Item!
-    updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
+    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, app: String): Item!
+    updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
   }
 
@@ -175,7 +173,9 @@ const resolvers = {
     },
     parse: async (_, args) => {
       const { lang, src, itemId } = args;
-      return await parseCode({ lang, src, itemId });
+      const systemValues: Record<string, string> = {};
+      if (itemId) systemValues.itemId = itemId;
+      return await parseCode({ lang, src, systemValues });
     },
     data: async (_, args, ctx) => {
       const { token } = ctx;
@@ -240,9 +240,9 @@ const resolvers = {
 
     postTask: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, ast, ephemeral, item } = args;
+      const { lang, code: codeStr, ephemeral, item } = args;
       const { uid } = await client.verifyToken(token);
-      const code = JSON.parse(ast);
+      const code = JSON.parse(codeStr);
       const task: Record<string, unknown> = { lang, code };
       if (item) {
         task.item = item;
@@ -263,15 +263,15 @@ const resolvers = {
     },
     createItem: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, name, taskId, mark, help, code, isPublic, app } = args;
+      const { lang, name, taskId, mark, help, isPublic, app } = args;
       const { uid } = await client.verifyToken(token);
-      return await createItem({ auth: { uid, token }, lang, name, taskId, mark, help, code, isPublic, app });
+      return await createItem({ auth: { uid, token }, lang, name, taskId, mark, help, isPublic, app });
     },
     updateItem: async (_, args, ctx) => {
       const { token } = ctx;
-      const { id, name, taskId, mark, help, code, isPublic } = args;
+      const { id, name, taskId, mark, help, isPublic } = args;
       const { uid } = await client.verifyToken(token);
-      return await updateItem({ auth: { uid, token }, id, name, taskId, mark, help, code, isPublic });
+      return await updateItem({ auth: { uid, token }, id, name, taskId, mark, help, isPublic });
     },
     shareItem: async (_, args, ctx) => {
       const { token } = ctx;

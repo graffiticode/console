@@ -711,7 +711,7 @@ async function verifyCode(code, authToken, lang, rid = null) {
     }
 
     // Post the parsed AST
-    const task = { lang, code: JSON.parse(parseResult.ast) };
+    const task = { lang, code: JSON.parse(parseResult.code) };
     let id;
     try {
       const result = await postTask({

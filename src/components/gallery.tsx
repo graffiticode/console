@@ -197,18 +197,13 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   }, []);
 
   // Load source code for an item via its taskId
-  const loadItemSource = useCallback(async (itemId: string, itemTaskId: string, cachedAst: string) => {
+  const loadItemSource = useCallback(async (itemId: string, itemTaskId: string) => {
     if (!itemTaskId || !user) {
       setEditorCode("");
       return;
     }
-    // Cache miss — fetch from API
     const taskData = await getTask({ user, id: itemTaskId });
-    setEditorCode(taskData?.source || "");
-    // Write AST to cache
-    if (taskData?.code && itemId) {
-      updateItem({ user, id: itemId, taskId: itemTaskId, help: undefined, name: undefined, mark: undefined, isPublic: undefined });
-    }
+    setEditorCode(taskData?.src || "");
   }, [user]);
 
   // Load items from the API only once on initialization
@@ -260,7 +255,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
       setSelectedItemId(directItem.id);
       setTaskId(directItem.taskId);
       setEditorHelp(typeof directItem.help === "string" ? JSON.parse(directItem.help || "[]") : (directItem.help || []));
-      loadItemSource(directItem.id, directItem.taskId, directItem.code);
+      loadItemSource(directItem.id, directItem.taskId);
     }
   }, [directItem, initialItemId]);
 
@@ -299,7 +294,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
           setSelectedItemId(matchingItem.id);
           setTaskId(matchingItem.taskId);
           setEditorHelp(typeof matchingItem.help === "string" ? JSON.parse(matchingItem.help || "[]") : (matchingItem.help || []));
-          loadItemSource(matchingItem.id, matchingItem.taskId, matchingItem.code);
+          loadItemSource(matchingItem.id, matchingItem.taskId);
           return;
         }
       }
@@ -308,7 +303,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         setSelectedItemId(orderedItems[0].id);
         setTaskId(orderedItems[0].taskId);
         setEditorHelp(typeof orderedItems[0].help === "string" ? JSON.parse(orderedItems[0].help || "[]") : (orderedItems[0].help || []));
-        loadItemSource(orderedItems[0].id, orderedItems[0].taskId, orderedItems[0].code);
+        loadItemSource(orderedItems[0].id, orderedItems[0].taskId);
       }
     } else if (!initialItemId) {
       setItems([]);
@@ -359,7 +354,6 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         taskId: null,
         mark: mark?.id || 1,
         help: "[]",
-        code: "",
         isPublic: false,
         app
       });
@@ -368,7 +362,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         setSelectedItemId(newItem.id);
         setTaskId(newItem.taskId);
         setEditorHelp(typeof newItem.help === "string" ? JSON.parse(newItem.help || "[]") : (newItem.help || []));
-        loadItemSource(newItem.id, newItem.taskId, newItem.code);
+        loadItemSource(newItem.id, newItem.taskId);
         if (typeof window !== 'undefined') {
           localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
         }
@@ -407,7 +401,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         if (result.help !== undefined) {
           setEditorHelp(typeof result.help === "string" ? JSON.parse(result.help || "[]") : (result.help || []));
         }
-        loadItemSource(itemId, result.taskId, result.code);
+        loadItemSource(itemId, result.taskId);
       }
 
       // Update local state after successful backend update
@@ -438,7 +432,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
           setSelectedItemId(nextItem.id);
           setTaskId(nextItem.taskId);
           setEditorHelp(typeof nextItem.help === "string" ? JSON.parse(nextItem.help || "[]") : (nextItem.help || []));
-          loadItemSource(nextItem.id, nextItem.taskId, nextItem.code);
+          loadItemSource(nextItem.id, nextItem.taskId);
           // Persist so SWR refetch doesn't override
           if (typeof window !== 'undefined') {
             localStorage.setItem(`graffiticode:selected:itemId`, nextItem.id);
@@ -464,7 +458,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
       setSelectedItemId(item.id);
       setTaskId(item.taskId);
       setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
-      loadItemSource(item.id, item.taskId, item.code);
+      loadItemSource(item.id, item.taskId);
       if (typeof window !== 'undefined') {
         localStorage.setItem(`graffiticode:selected:itemId`, item.id);
       }
@@ -480,7 +474,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
 
       if (taskData) {
         setTaskId(taskIdToLoad);
-        setEditorCode(taskData.source || "");
+        setEditorCode(taskData.src || "");
 
         if (taskData.help !== undefined) {
           const helpData = typeof taskData.help === "string" ?

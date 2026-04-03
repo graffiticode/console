@@ -158,7 +158,7 @@ export default function Editor({
             return;
           }
           setCompileErrors(null);
-          const newTaskId = await postTask({ user, lang, ast: result.ast, item: itemId });
+          const newTaskId = await postTask({ user, lang, code: result.code, item: itemId });
           setTaskId(newTaskId);
         } catch (err) {
           console.error("Parse/postTask error:", err);

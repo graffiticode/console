@@ -135,7 +135,6 @@ export default function Editor({ language, setLanguage, mark }) {
         taskId: "",
         mark: 1,
         help: "[]",
-        code: "",
         isPublic: false,
         app: 'console'
       };
