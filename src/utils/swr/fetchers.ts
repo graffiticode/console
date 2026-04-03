@@ -381,7 +381,7 @@ export const getItem = async ({ user, id }) => {
   return client.request(query, { id }).then(data => data.item);
 };
 
-export const generateCode = async ({ user, prompt, language, options, currentSrc, conversationSummary = null }) => {
+export const generateCode = async ({ user, prompt, language, options, currentSrc, conversationSummary = null, itemId = undefined }) => {
   console.log(
     "fetchers/generateCode()",
     "language=" + language,
@@ -398,8 +398,8 @@ export const generateCode = async ({ user, prompt, language, options, currentSrc
     }
   });
   const query = gql`
-    mutation GenerateCode($prompt: String!, $language: String!, $options: CodeGenerationOptions, $currentSrc: String, $conversationSummary: ConversationSummaryInput) {
-      generateCode(prompt: $prompt, language: $language, options: $options, currentSrc: $currentSrc, conversationSummary: $conversationSummary) {
+    mutation GenerateCode($prompt: String!, $language: String!, $options: CodeGenerationOptions, $currentSrc: String, $conversationSummary: ConversationSummaryInput, $itemId: String) {
+      generateCode(prompt: $prompt, language: $language, options: $options, currentSrc: $currentSrc, conversationSummary: $conversationSummary, itemId: $itemId) {
         src
         taskId
         description
@@ -424,7 +424,8 @@ export const generateCode = async ({ user, prompt, language, options, currentSrc
     language,
     options,
     currentSrc,
-    conversationSummary
+    conversationSummary,
+    itemId,
   };
 
   try {

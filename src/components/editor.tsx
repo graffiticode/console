@@ -220,6 +220,7 @@ export default function Editor({
               setHelp={setHelp}
               language={lang}
               code={code}
+              itemId={itemId}
               setCode={(newCode) => {
                 if (isCodeNew(newCode)) {
                   setIsUserEdit(true);

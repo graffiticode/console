@@ -138,7 +138,7 @@ const typeDefs = `
   type Mutation {
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
-    generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput): GeneratedCode!
+    generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, app: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
@@ -228,10 +228,9 @@ const resolvers = {
       const { token } = ctx;
       const { uid } = await client.verifyToken(token);
       const auth = {uid, token};
-      const { prompt, language, options, currentSrc, conversationSummary } = args;
+      const { prompt, language, options, currentSrc, conversationSummary, itemId } = args;
       try {
-        // No authentication required for code generation
-        return await generateCode({ auth, prompt, language, options, currentSrc, conversationSummary });
+        return await generateCode({ auth, prompt, language, options, currentSrc, conversationSummary, itemId });
       } catch (error) {
         console.error("Error in generateCode mutation:", error);
         throw error;

@@ -57,7 +57,8 @@ export const HelpPanel = ({
   setTaskId,
   onLoadTaskFromHelp,
   onError,
-  taskId
+  taskId,
+  itemId,
 }) => {
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
@@ -944,6 +945,7 @@ export const HelpPanel = ({
     language,
     chatHistory: help, // Pass the current help array as chat history
     currentSrc: code, // Pass the current source from the code panel
+    itemId,
   });
 
   // Setup dropzone for the entire panel

@@ -39,7 +39,7 @@ const formatImageReferences = (text: string): string =>
 /**
  * Function to generate Graffiticode responses using the generateCode function
  */
-const generateBotResponse = async ({message, user, language, chatHistory = [], currentSrc = ''}) => {
+const generateBotResponse = async ({message, user, language, chatHistory = [], currentSrc = '', itemId = undefined}) => {
   try {
     // Use our fetcher function directly
 
@@ -92,6 +92,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       },
       language,
       currentSrc,
+      itemId,
       conversationSummary
     });
 
@@ -159,7 +160,7 @@ greeting "user"..`,
 /**
  * ChatBot component that provides a chat interface
  */
-export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], currentSrc = '' }) => {
+export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], currentSrc = '', itemId = undefined }) => {
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -214,7 +215,8 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
         user,
         language,
         chatHistory: latestChatHistory,
-        currentSrc: latestSrc
+        currentSrc: latestSrc,
+        itemId,
       });
 
       // Check if generation was cancelled while the API call was in progress
