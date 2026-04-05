@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'fs';
 import { basename, resolve } from 'path';
 
 const BATCH_SIZE = 5;
-const FORCE_DEPLOY = process.argv.includes('--force');
+const FORCE_DEPLOY = !process.argv.includes('--no-force');
 const VERBOSE = process.argv.includes('--verbose');
 const BASE_DIR = resolve(process.cwd(), '..');
 

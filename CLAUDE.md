@@ -76,9 +76,9 @@ export GRAFFITICODE_APP_CREDENTIALS=~/graffiticode-app-key.json # graffiticode-a
 - `npx tsx scripts/get-app-names.ts` - List app names from items
 - `npx tsx scripts/update-embeddings.ts` - Update training example embeddings
 - `npx tsx scripts/download-training-examples.ts` - Download training examples to markdown
-- `npx tsx scripts/upgrade-basis.ts` - Upgrade @graffiticode/basis in all language repos and deploy
+- `npx tsx scripts/upgrade-basis-and-deploy.ts` - Upgrade @graffiticode/basis in all language repos and deploy
   - `--lang 0158 0166` - Only upgrade specific languages
-  - `--force` - Deploy even if basis is already up to date (skips deprecated repos)
+  - `--no-force` - Skip deploy if basis is already up to date
   - `--verbose` - Stream build output to terminal
 
 ## Local Development
