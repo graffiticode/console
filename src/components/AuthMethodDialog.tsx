@@ -69,9 +69,9 @@ export default function AuthMethodDialog({
 
                   {/* Ethereum Wallet Button */}
                   <p className="text-sm text-gray-500 text-center">
-                    Sign-in with an Ethereum wallet.
+                    New here? Create a free account by signing in with an Ethereum wallet.
                     <br />
-                    No blockchain fees required.
+                    No blockchain fees required. No credit card required.
                   </p>
 
                   <button
