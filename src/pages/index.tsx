@@ -1,3 +1,4 @@
+import Link from "next/link";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 
 export default function Home() {
@@ -8,7 +9,7 @@ export default function Home() {
       <p className="text-sm text-gray-500 text-justify w-1/2">
         Graffiticode is a platform for deploying smart tools for agents and humans.
         Visit our community <a href="https://forum.graffiticode.org" className="text-blue-600 hover:underline">Forum</a> to learn more.
-        If you are feeling adventurous go straight to <a href="/tools" className="text-blue-600 hover:underline">Tools</a> to see what you can make with Graffiticode.
+        If you are feeling adventurous go straight to <Link href="/tools" className="text-blue-600 hover:underline">Tools</Link> to see what you can make with Graffiticode.
         {!user && (
           <>
             <br /><br />
