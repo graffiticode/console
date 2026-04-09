@@ -382,12 +382,6 @@ export const getItem = async ({ user, id }) => {
 };
 
 export const generateCode = async ({ user, prompt, language, options, currentSrc, conversationSummary = null, itemId = undefined }) => {
-  console.log(
-    "fetchers/generateCode()",
-    "language=" + language,
-    "currentSrc length=" + (currentSrc ? currentSrc.length : 0),
-    "conversationSummary=" + (conversationSummary ? JSON.stringify(conversationSummary) : "null")
-  );
   if (!user) {
     return {};
   }

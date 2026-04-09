@@ -22,11 +22,9 @@ function encrypt(plaintext: string): string {
 }
 
 function buildParseCallbacks(systemValues: Record<string, string> = {}) {
-  console.log("buildParseCallbacks()", "systemValues:", JSON.stringify(systemValues));
   return {
     GET_VAL_PRIVATE: (name: string) => {
       const result = systemValues[name] || "";
-      console.log("GET_VAL_PRIVATE()", "name:", name, "result:", encrypt(result));
       return encrypt(result);
     },
     GET_VAL_PUBLIC: (name: string) => {
@@ -47,7 +45,6 @@ const taskDao = getTaskDaoForStore("firestore");
 const db = getFirestore();
 
 export async function parseCode({ lang, src, systemValues = {} }: { lang: string; src: string; systemValues?: Record<string, string> }) {
-  console.log("parseCode()", "lang:", lang);
   try {
     const lexicon = await getLanguageLexicon(lang);
     if (!lexicon) {
@@ -78,10 +75,6 @@ export async function parseCode({ lang, src, systemValues = {} }: { lang: string
     if (errors.length > 0) {
       return { code: null, errors };
     }
-    console.log(
-      "parseCode()",
-      "nodePool=" + JSON.stringify(nodePool, null, 2),
-    );
     return { code: JSON.stringify(nodePool), errors: null };
   } catch (err) {
     return { code: null, errors: [{ message: err.message || "Parse error", from: -1, to: -1 }] };

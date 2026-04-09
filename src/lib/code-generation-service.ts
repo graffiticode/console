@@ -1338,9 +1338,7 @@ export async function generateCode({
     }
 
     // Process the generated code to fix any issues
-    console.log(`[code-gen] rid=${rid} lang=${lang} raw code:\n${streamResult.code}`);
     let generatedCode = await processGeneratedCode(streamResult.code, lang, rid);
-    console.log(`[code-gen] rid=${rid} lang=${lang} processed code:\n${generatedCode}`);
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
@@ -1659,11 +1657,6 @@ export async function generateCode({
       usedDSPy,
       promptSpecId,
     };
-
-    console.log(
-      "generateCode()",
-      "result=" + JSON.stringify(result, null, 2),
-    );
 
     return result;
   } catch (error) {

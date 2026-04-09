@@ -89,10 +89,8 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
         return;
       }
 
-      console.log('[FormIFrame] Received event:', JSON.stringify(event.data, null, 2));
       // Check for focus events first
       if (event.data.focus) {
-        console.log('[FormIFrame] Received focus event:', event.data.focus, 'isTaskChange:', justChangedTaskRef.current);
         hasReceivedFocus.current = true;
         lastFocusDataRef.current = event.data.focus; // Store for re-sending
         onFocus && onFocus(event.data.focus);

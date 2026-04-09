@@ -219,18 +219,8 @@ export async function* streamClaudeCode({
       isTruncated = !fullContent.includes('..');
     }
 
-    console.log(
-      "streamClaudeCode()",
-      "fullContent=" + fullContent,
-      "codeBlockCount=" + codeBlockCount,
-      "isComplete=" + isComplete,
-      "chunkLength=" + chunkContent.length,
-      "isTruncated=" + isTruncated,
-    );
-
     // If API says complete AND code ends with .., we're done
     if (isComplete && !isTruncated) {
-      console.log(`Response completed after ${continuationCount + 1} chunk(s)`);
       break;
     }
 
