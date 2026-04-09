@@ -31,7 +31,7 @@ export async function findBestLanguages({
     }
 
     const catalog = candidates
-      .map((l) => `- L${l.id}: ${l.name} — ${l.description}`)
+      .map((l) => `- L${l.id}: ${l.routingHint || l.description}`)
       .join("\n");
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -56,7 +56,7 @@ This was rejected by the current language (L${currentLang}) because: ${outOfScop
 Available languages:
 ${catalog}
 
-Which languages (max 3) could handle this request? Return JSON only:
+Which languages (max 3) could handle this request? Match based on specific capabilities described above. Return JSON only:
 {"suggestions": [{"id": "0159", "reason": "brief explanation"}]}
 
 If none fit, return {"suggestions": []}`,

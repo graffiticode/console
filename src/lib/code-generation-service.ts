@@ -1473,24 +1473,23 @@ export async function generateCode({
             break;
           }
 
-          // Update the generated code with the fixed version and process to fix escaping issues
-          // Only accept the fix if it contains a code block; otherwise keep the original
-          const hasCodeBlock = /```[\s\S]*```/.test(fixResult.code);
-          if (hasCodeBlock) {
-            generatedCode = await processGeneratedCode(fixResult.code, lang, requestId);
-          } else {
-            if (requestId) {
-              ragLog(requestId, "fix.skipped", { reason: "no code block in fix response" });
-            }
-            break;
-          }
-
           // Add fix attempt usage to total
           finalUsage.prompt_tokens += fixResult.usage.inputTokens;
           finalUsage.completion_tokens += fixResult.usage.outputTokens;
           finalUsage.total_tokens += fixResult.usage.inputTokens + fixResult.usage.outputTokens;
 
           fixAttempts++;
+
+          // Update the generated code with the fixed version and process to fix escaping issues
+          // Only accept the fix if it contains a code block; otherwise retry
+          const hasCodeBlock = /```[\s\S]*```/.test(fixResult.code);
+          if (hasCodeBlock) {
+            generatedCode = await processGeneratedCode(fixResult.code, lang, requestId);
+          } else {
+            if (requestId) {
+              ragLog(requestId, "fix.skipped", { reason: "no code block in fix response", attempt: fixAttempts });
+            }
+          }
         } else {
           // No errors found, break the loop
           break;

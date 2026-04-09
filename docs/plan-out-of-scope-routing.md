@@ -186,6 +186,22 @@ When the response contains `outOfScope`, render a friendly message:
 | `../graffiticode-mcp-server/src/tools.ts` | Handle outOfScope in create/update item |
 | Console UI component | Render out-of-scope suggestions |
 
+## Current Implementation Status
+
+Steps 1-3 are **done**. Steps 4-6 are **not yet implemented**.
+
+What exists today:
+- System prompt includes OUT_OF_SCOPE instruction (Step 1) ✅
+- `language-router.ts` exists with Haiku-based routing (Step 2) ✅
+- `code-generation-service.ts` detects OUT_OF_SCOPE and calls router (Step 3) ✅
+- Router now uses `routingHint` field from `languages.ts` for richer catalog descriptions ✅
+- Suggestions are returned as plain-text error messages, not structured data
+
+What's missing:
+- **Step 4 (resolvers.ts + GraphQL schema)**: `outOfScope` is not a separate field — it's flattened into `errors[].message`. The GraphQL schema needs an `OutOfScope` type with structured fields (reason, suggestions array with id/name/description/reason). The resolver needs to return this as a distinct field alongside `errors`.
+- **Step 5 (MCP server)**: `graffiticode-mcp-server/src/tools.ts` has no out-of-scope handling. It currently receives errors as strings. Once Step 4 exposes structured `outOfScope` data via GraphQL, the MCP server should return it as structured tool result content (not `isError: true`) so the client model can automatically call `create_item()` with the suggested language. Key: the MCP tool result should include the suggestion language IDs so the client doesn't have to parse text.
+- **Step 6 (Console UI)**: `ChatBot.tsx` renders out-of-scope as `type: 'error'`. Should render as a friendly message with clickable language links/buttons to switch.
+
 ## Future: Agent Mode
 
 The `findBestLanguages()` function in `language-router.ts` is designed to also serve a future agent mode where users make generic requests without pre-selecting a language. In that flow, the agent calls `findBestLanguages()` proactively (without an OUT_OF_SCOPE trigger) to select the right language before calling `create_item`. Same router, different entry point.
