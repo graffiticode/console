@@ -918,49 +918,58 @@ When fixing code:
 
 
 /**
- * Processes generated code to fix common issues and extract only the code portion
+ * Processes generated source to fix common issues and extract only the src portion
  * @param {string} content - The content returned from Claude API
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
- * @returns {Promise<string>} - The processed and reformatted code with fixes applied
+ * @returns {Promise<string>} - The processed and reformatted src with fixes applied
  */
 async function processGeneratedCode(content, lang = "0002", rid = null) {
   if (!content) return content;
 
   const originalLength = content.length;
 
-  // Try to extract code from between triple backticks
+  // Try to extract src from between triple backticks
   const codeBlockRegex = /```(?:[\w]*\n|\n)?([\s\S]*?)```/;
   const match = content.match(codeBlockRegex);
 
   // If we found a code block, extract it
-  let code = match ? match[1].trim() : content;
-  let processed = code;
+  let src = match ? match[1].trim() : content;
+  let processed = src;
   const codeBlockExtracted = !!match;
 
-  // Try to reformat the code using the parser
+  // Try to reformat the src using the parser
   try {
-    // Get the lexicon for the language
     const lexicon = await getLanguageLexicon(lang);
+    const reformatted = await parser.reformat(lang, processed, lexicon, {});
 
-    // Use parser.reformat with the lang identifier (without L prefix)
-    processed = await parser.reformat(lang, processed, lexicon, {});
-
-    if (rid) {
-      ragLog(rid, "reformat.success", {
-        lang: `L${lang}`,
-        lengthBefore: code.length,
-        lengthAfter: processed.length,
-      });
+    // If reformat produced an error comment, keep the original src
+    if (/^\/\*\s*ERROR:/.test(reformatted)) {
+      if (rid) {
+        ragLog(rid, "reformat.error", {
+          error: "reformat produced error comment",
+          lang: `L${lang}`,
+        });
+      }
+      console.warn(`Failed to reformat src for L${lang}: reformat produced error comment`);
+    } else {
+      processed = reformatted;
+      if (rid) {
+        ragLog(rid, "reformat.success", {
+          lang: `L${lang}`,
+          lengthBefore: src.length,
+          lengthAfter: processed.length,
+        });
+      }
     }
   } catch (reformatError) {
-    // If reformatting fails, log it but continue with the processed code
+    // If reformatting fails, log it but continue with the original src
     if (rid) {
       ragLog(rid, "reformat.error", {
         error: reformatError.message,
         lang: `L${lang}`,
       });
     }
-    console.warn(`Failed to reformat code for L${lang}:`, reformatError.message);
+    console.warn(`Failed to reformat src for L${lang}:`, reformatError.message);
   }
 
   // Replace all double backslashes with single backslashes
