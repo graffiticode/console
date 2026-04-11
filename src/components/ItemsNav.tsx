@@ -195,6 +195,31 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
               </div>
 
               <div className="mb-4">
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Item ID</label>
+                <div
+                  className="text-xs font-mono text-gray-600 hover:text-gray-900 cursor-pointer py-1.5 truncate"
+                  onClick={(e) => {
+                    navigator.clipboard.writeText(itemId);
+                    const element = e.currentTarget;
+                    element.innerHTML = `
+                      <span class="text-green-500 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1">
+                          <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
+                        </svg>
+                        Copied!
+                      </span>
+                    `;
+                    setTimeout(() => {
+                      element.textContent = itemId;
+                    }, 1000);
+                  }}
+                  title="Click to copy"
+                >
+                  {itemId}
+                </div>
+              </div>
+
+              <div className="mb-4">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Task ID</label>
                 <div
                   className="text-xs font-mono text-gray-600 hover:text-gray-900 cursor-pointer py-1.5 truncate"
