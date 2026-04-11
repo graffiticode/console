@@ -24,6 +24,14 @@ import { checkCompileAllowed } from "../../lib/usage-service";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
 
+async function authenticate(token) {
+  try {
+    return await client.verifyToken(token);
+  } catch {
+    return await client.apiKeys.authenticate({ token });
+  }
+}
+
 const typeDefs = `
   type Compile {
     id: String!
@@ -122,6 +130,7 @@ const typeDefs = `
     item(id: String!): Item
     languages(category: String, search: String, domain: String): [Language!]!
     language(id: String!): LanguageInfo
+    itemData(id: String!): String!
   }
 
   type ShareItemResult {
@@ -211,6 +220,17 @@ const resolvers = {
       const { id } = args;
       return await getLanguageInfo(id);
     },
+    itemData: async (_, args, ctx) => {
+      const { token } = ctx;
+      const { id } = args;
+      const { uid } = await authenticate(token);
+      const item = await getItem({ auth: { uid, token }, id });
+      if (!item || !item.taskId) {
+        throw new Error("Item not found or has no associated task");
+      }
+      const data = await getData({ authToken: token, id: item.taskId });
+      return JSON.stringify(data);
+    },
   },
   Mutation: {
     generateCode: async (_, args, ctx) => {
@@ -270,6 +290,14 @@ const resolvers = {
 const schema = makeExecutableSchema({ typeDefs, resolvers });
 
 export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   const request = {
     method: req.method,
     headers: req.headers,
