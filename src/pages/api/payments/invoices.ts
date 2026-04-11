@@ -59,12 +59,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         starting_after: startingAfter as string,
       });
 
-      for (const invoice of stripeInvoices.data) {
-        // Extract plan information from line items
-        let planName = 'Unknown';
-        let type: Invoice['type'] = 'subscription';
+      const invoiceIds = new Set<string>();
 
-        if (invoice.lines.data.length > 0) {
+      for (const invoice of stripeInvoices.data) {
+        const isOverage = invoice.metadata?.type === 'overage_purchase';
+        let planName = 'Unknown';
+        let type: Invoice['type'] = isOverage ? 'overage' : 'subscription';
+
+        if (!isOverage && invoice.lines.data.length > 0) {
           const firstLineItem = invoice.lines.data[0];
           if (firstLineItem.description?.toLowerCase().includes('pro')) {
             planName = 'Pro';
@@ -74,24 +76,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } else if (firstLineItem.description?.toLowerCase().includes('starter') ||
                      firstLineItem.description?.toLowerCase().includes('free')) {
             planName = 'Starter';
-          } else if (firstLineItem.description?.toLowerCase().includes('overage')) {
-            type = 'overage';
-            planName = 'Overage Units';
           }
         }
 
-        // Always use our generated description to avoid showing "free" from Stripe
-        const displayDescription = `${planName} subscription`;
+        const displayDescription = isOverage
+          ? (invoice.description || 'Overage units purchase')
+          : `${planName} subscription`;
 
+        invoiceIds.add(invoice.id);
         invoices.push({
           id: invoice.id,
           date: new Date(invoice.created * 1000).toISOString(),
-          amount: (invoice.amount_paid || invoice.amount_due) / 100, // Convert from cents
+          amount: (invoice.amount_paid || invoice.amount_due) / 100,
           status: invoice.status || 'pending',
           description: displayDescription,
           invoicePdf: invoice.invoice_pdf || undefined,
           type,
-          plan: planName,
+          plan: isOverage ? invoice.metadata?.plan : planName,
           period: invoice.period_start && invoice.period_end ? {
             start: new Date(invoice.period_start * 1000).toISOString(),
             end: new Date(invoice.period_end * 1000).toISOString(),
@@ -99,7 +100,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      // Also fetch recent payment intents for overage purchases
+      // Fetch legacy overage PaymentIntents (before invoice-based purchases)
       const payments = await stripe.paymentIntents.list({
         customer: stripeCustomerId,
         limit: Number(limit),
@@ -107,6 +108,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       for (const payment of payments.data) {
         if (payment.metadata?.type === 'overage_purchase' && payment.status === 'succeeded') {
+          // Skip if this payment is already represented by an invoice
+          if (payment.invoice && invoiceIds.has(payment.invoice as string)) continue;
           invoices.push({
             id: payment.id,
             date: new Date(payment.created * 1000).toISOString(),

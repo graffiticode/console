@@ -72,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId, blocks = 1, useDefaultPaymentMethod = true } = req.body; // Default to 1 block
+    const { userId, blocks = 1 } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
@@ -125,34 +125,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Calculate the cost
     const amount = Math.round(units * pricing.pricePerUnit * 100); // Convert to cents
 
-    // Get default payment method if requested
-    let paymentMethodId: string | undefined;
+    // Verify payment method exists
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: stripeCustomerId,
+      type: 'card',
+      limit: 1,
+    });
 
-    if (useDefaultPaymentMethod) {
-      const paymentMethods = await stripe.paymentMethods.list({
-        customer: stripeCustomerId,
-        type: 'card',
-        limit: 1,
+    if (!paymentMethods.data.length) {
+      return res.status(400).json({
+        error: 'No payment method on file',
+        requiresPaymentMethod: true
       });
-
-      if (!paymentMethods.data.length) {
-        return res.status(400).json({
-          error: 'No payment method on file',
-          requiresPaymentMethod: true
-        });
-      }
-
-      paymentMethodId = paymentMethods.data[0].id;
     }
 
-    // Create a payment intent for immediate charge
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency: 'usd',
+    // Create invoice first, then attach the item to it
+    const itemDescription = `${units.toLocaleString()} compile units (${blocks} block${blocks > 1 ? 's' : ''}) - ${currentPlan} plan @ ${pricing.description}`;
+
+    const invoice = await stripe.invoices.create({
       customer: stripeCustomerId,
-      payment_method: paymentMethodId,
-      confirm: useDefaultPaymentMethod, // Auto-confirm if using default payment method
-      description: `${units.toLocaleString()} compile units (${blocks} block${blocks > 1 ? 's' : ''}) - ${currentPlan} plan @ ${pricing.description}`,
+      description: itemDescription,
+      auto_advance: true,
+      collection_method: 'charge_automatically',
+      default_payment_method: paymentMethods.data[0].id,
       metadata: {
         userId,
         units: units.toString(),
@@ -163,13 +158,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    // If payment was confirmed successfully, return success
-    // The actual crediting happens in the webhook to prevent double-crediting
-    if (paymentIntent.status === 'succeeded') {
+    await stripe.invoiceItems.create({
+      customer: stripeCustomerId,
+      invoice: invoice.id,
+      amount,
+      currency: 'usd',
+      description: itemDescription,
+      metadata: {
+        userId,
+        units: units.toString(),
+        blocks: blocks.toString(),
+        plan: currentPlan,
+        type: 'overage_purchase',
+        pricePerUnit: pricing.pricePerUnit.toString(),
+      },
+    });
+
+    // Finalize and pay the invoice immediately
+    const paidInvoice = await stripe.invoices.pay(invoice.id);
+
+    if (paidInvoice.status === 'paid') {
       const currentOverage = subscriptionData.overageUnits || 0;
 
-      // Note: Units will be credited via webhook - not here to prevent double-crediting
-      // Just return success with the expected new balance
       return res.status(200).json({
         success: true,
         units,
@@ -177,25 +187,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         blockSize: pricing.blockSize,
         pricePerBlock: pricing.blockSize * pricing.pricePerUnit,
         amount: amount / 100,
-        newOverageBalance: currentOverage + units, // This is what it WILL be after webhook processes
-        paymentIntentId: paymentIntent.id,
+        newOverageBalance: currentOverage + units,
+        invoiceId: paidInvoice.id,
         description: pricing.description,
         note: 'Units will be credited shortly via payment processing'
       });
-    } else if (paymentIntent.status === 'requires_action') {
-      // 3D Secure or other additional authentication required
-      return res.status(200).json({
-        requiresAction: true,
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
-      });
     } else {
-      // Payment requires additional steps
       return res.status(200).json({
         success: false,
-        status: paymentIntent.status,
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
+        status: paidInvoice.status,
+        invoiceId: paidInvoice.id,
       });
     }
   } catch (error) {

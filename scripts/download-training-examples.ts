@@ -140,15 +140,27 @@ function getCachedLexicon(lang: string): any {
 
 // Fetch source code from task AST in the graffiticode project
 async function fetchCodeFromTask(taskId: string, lang: string): Promise<string | null> {
-  if (!apiFirestore || !taskId) return null;
+  if (!apiFirestore || !taskId) {
+    console.log(`    fetchCode: no apiFirestore=${!!apiFirestore} or taskId=${taskId}`);
+    return null;
+  }
   try {
     const decoded = JSON.parse(Buffer.from(taskId, 'base64').toString());
     const innerIds = decoded.taskIds || [];
-    if (innerIds.length === 0) return null;
+    if (innerIds.length === 0) {
+      console.log(`    fetchCode: no innerIds in taskId=${taskId}`);
+      return null;
+    }
     const taskDoc = await apiFirestore.collection('tasks').doc(innerIds[0]).get();
-    if (!taskDoc.exists) return null;
+    if (!taskDoc.exists) {
+      console.log(`    fetchCode: task doc ${innerIds[0]} not found`);
+      return null;
+    }
     const ast = taskDoc.data()!.code;
-    if (!ast) return null;
+    if (!ast) {
+      console.log(`    fetchCode: task doc ${innerIds[0]} has no code`);
+      return null;
+    }
     const lexicon = getCachedLexicon(lang);
     return unparse(ast, lexicon || {});
   } catch (err: any) {
@@ -195,6 +207,7 @@ function convertToMarkdownFormat(trainingExamples: any[]): string {
     examples.forEach((example, index) => {
       const prompt = extractTaskFromMessages(example.messages);
       const code = example.code.trim()
+        .replace(/set-var "lrn-id" "[^"]*"/g, 'set-var "lrn-id" get-val-public "itemId"')
         .split("\n")
         .map((line: string) => line.trimRight())
         .join("\n");
@@ -267,17 +280,19 @@ async function fetchItemsFromFirestore(lang: string | null, marks: number[], lim
   for (const item of items) {
     if (item.taskId) {
       const source = await fetchCodeFromTask(item.taskId, item.lang);
-      if (source && source.trim().length >= 10) {
+      if (source && source.trim().length >= 2) {
         item.src = source;
         resolved.push(item);
         continue;
+      } else if (source !== null) {
+        console.log(`  ⚠️ ${item.id}: code too short from API (${(source || '').trim().length} chars): "${(source || '').trim()}"`);
       }
     }
     // Fall back to local code/src
-    if ((item.src || item.code || "").trim().length >= 10) {
+    if ((item.src || item.code || "").trim().length >= 2) {
       resolved.push(item);
     } else {
-      console.log(`  ⚠️ Skipped ${item.id}: no code available`);
+      console.log(`  ⚠️ Skipped ${item.id}: no code available (taskId=${item.taskId || 'none'}, code=${(item.code || '').length}chars, src=${(item.src || '').length}chars)`);
     }
   }
   console.log(`Found ${resolved.length} items with code`);
@@ -319,7 +334,7 @@ function processItems(items: any[]): any[] {
 
     // Get code
     const code = item.src || item.code || "";
-    if (!code || code.trim().length < 10) {
+    if (!code || code.trim().length < 2) {
       skippedCount++;
       skipReasons.code_too_short++;
       console.log(`  ⚠️ Skipped item ${item.id}: Code too short (${code.trim().length} chars)`);

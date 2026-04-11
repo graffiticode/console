@@ -1,16 +1,47 @@
-import { ClipboardIcon } from "@heroicons/react/24/outline";
-import React, { useEffect, useRef } from "react";
-import { useCopyToClipboard } from "react-use";
+import { ClipboardDocumentIcon, ClipboardDocumentCheckIcon } from "@heroicons/react/24/outline";
+import React, { useEffect, useRef, useState } from "react";
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = value;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <button onClick={handleCopy} title="Copy to clipboard">
+      {copied ? (
+        <ClipboardDocumentCheckIcon className="h-5 w-5 text-green-600" />
+      ) : (
+        <ClipboardDocumentIcon className="h-5 w-5 text-gray-500 hover:text-gray-700" />
+      )}
+    </button>
+  );
+}
 
 export default function NewAPIKeyDialog({ apiKey }) {
   const ref = useRef<HTMLDialogElement>(null);
-  const [state, copyToClipboard] = useCopyToClipboard();
 
   useEffect(() => {
     if (!ref || !ref.current) {
       return;
     }
-    console.log(apiKey);
     if (apiKey?.token) {
       ref.current.showModal();
     } else {
@@ -24,18 +55,13 @@ export default function NewAPIKeyDialog({ apiKey }) {
       <div className="flex items-center text-gray-800 border border-gray-800 bg-white font-mono text-sm py-3 px-4 mb-1 rounded">
         <span className="font-semibold">ID</span>
         <span className="flex-1 text-slate-500 text-ellipsis overflow-hidden ml-2">{apiKey?.id}</span>
-        <button className="" onClick={() => copyToClipboard(apiKey?.id)}>
-          <ClipboardIcon className="h-6 w-6 text-gray-500" />
-        </button>
+        <CopyButton value={apiKey?.id || ''} />
       </div>
       <div className="flex items-center text-gray-800 border border-gray-800 bg-white font-mono text-sm py-3 px-4 mb-1 rounded">
         <span className="font-semibold">Secret</span>
         <span className="flex-1 text-slate-500 text-ellipsis overflow-hidden ml-2">{apiKey?.token}</span>
-        <button onClick={() => copyToClipboard(apiKey?.token)}>
-          <ClipboardIcon className="h-6 w-6 text-gray-500" />
-        </button>
+        <CopyButton value={apiKey?.token || ''} />
       </div>
-      {state.error && <p className="text-danger">Unable to copy value: {state.error.message}</p>}
       <p className="text-xs text-slate-500">The key&apos;s token will only be shown this once. Copy to a safe place to use later.</p>
       <div className="flex justify-end items-center mt-2">
         <form method="dialog">

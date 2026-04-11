@@ -4,8 +4,7 @@ import { DataPanel } from "./DataPanel";
 import { HelpPanel } from "./HelpPanel";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
-import useSWR from "swr";
-import { postTask, getData } from '../utils/swr/fetchers';
+import { parse, postTask } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
@@ -65,8 +64,11 @@ export default function Editor({
   height,
   onCodeChange,
   onHelpChange,
+  onCompileError,
+  onError,
   initialCode,
   initialHelp,
+  itemId,
 }) {
   const [ code, setCode ] = useState(initialCode || "");
   const [ help, setHelp ] = useState(initialHelp || []);
@@ -76,9 +78,9 @@ export default function Editor({
   const [ view, setView ] = useState();
   const [ mark, setMark ] = useState(initMark);
   const [ isPublic, setIsPublic ] = useState(false);
-  const [ doPostTask, setDoPostTask ] = useState(false);
   const [ isUserEdit, setIsUserEdit ] = useState(false);
-  const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Make");
+  const [ compileErrors, setCompileErrors ] = useState<Array<{message: string, from: number, to: number}> | null>(null);
+  const [ tab, setTab ] = useLocalStorage("graffiticode:editor:tab", "Help");
   const { user } = useGraffiticodeAuth();
   const [ isPostingTask, setIsPostingTask ] = useState(false);
   const dataPanelRef = React.useRef(null);
@@ -114,7 +116,6 @@ export default function Editor({
     // When taskId changes, update the editor with the new initial values
     if (taskId !== currentTaskIdRef.current) {
       setIsUserEdit(false);
-      setDoPostTask(false);
       setIsPostingTask(false);
       if (initialCode !== undefined) {
         setCode(initialCode);
@@ -140,14 +141,35 @@ export default function Editor({
     codeRef.current = code;
   }, [code]);
 
+  // Parse and post task when code changes due to user editing (debounced)
   useEffect(() => {
-    // Only post task if code changes due to user editing
-    if (code && isUserEdit && !isPostingTask) {
-      setDoPostTask(true);
-      setIsUserEdit(false); // Reset flag after posting
-      setIsPostingTask(true); // Prevent duplicate posts
-    }
-  }, [code, isUserEdit, isPostingTask]);
+    if (!code || !isUserEdit || isPostingTask || !user) return;
+
+    const timer = setTimeout(() => {
+      setIsUserEdit(false);
+      setIsPostingTask(true);
+
+      (async () => {
+        try {
+          const result = await parse({ user, lang, src: code, itemId });
+          if (result.errors) {
+            setCompileErrors(result.errors);
+            setIsPostingTask(false);
+            return;
+          }
+          setCompileErrors(null);
+          const newTaskId = await postTask({ user, lang, code: result.code, item: itemId });
+          setTaskId(newTaskId);
+        } catch (err) {
+          console.error("Parse/postTask error:", err);
+        } finally {
+          setIsPostingTask(false);
+        }
+      })();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [code, isUserEdit, isPostingTask, user, lang]);
 
   // Notify parent of code changes (only from user edits, not parent-driven updates)
   useEffect(() => {
@@ -163,19 +185,12 @@ export default function Editor({
     }
   }, [help, onHelpChange]);
 
-  const postTaskResp = useSWR(
-    doPostTask && { user, lang, code } || null,
-    postTask
-  );
-
+  // Notify parent of compile/parse errors
   useEffect(() => {
-    if (postTaskResp.data && isPostingTask) {
-      const taskId = postTaskResp.data;
-      setDoPostTask(false);
-      setIsPostingTask(false); // Reset the flag
-      setTaskId(taskId);
+    if (onCompileError) {
+      onCompileError(compileErrors);
     }
-  }, [postTaskResp.data, isPostingTask, user, lang, code, help, mark.id, isPublic]);
+  }, [compileErrors, onCompileError]);
 
   return (
     <div className="flex items-start h-full">
@@ -199,12 +214,13 @@ export default function Editor({
             height: height === "100%" ? undefined : (height || "calc(100vh - 120px)") // Use flexbox when 100%
           }}
         >
-          <div style={{ display: tab === "Make" ? undefined : "none" }}>
+          <div style={{ display: tab === "Help" ? undefined : "none" }}>
             <HelpPanel
               help={help}
               setHelp={setHelp}
               language={lang}
               code={code}
+              itemId={itemId}
               setCode={(newCode) => {
                 if (isCodeNew(newCode)) {
                   setIsUserEdit(true);
@@ -213,16 +229,35 @@ export default function Editor({
               }}
               setTaskId={setTaskId}
               onLoadTaskFromHelp={onLoadTaskFromHelp}
+              onError={onError}
               taskId={taskId}
             />
           </div>
-          {tab === "Data" && (
+          <div style={{ display: tab === "Data" ? undefined : "none" }}>
             <DataPanel
               ref={dataPanelRef}
               id={taskId}
               user={user}
+              onDataChange={(fetchedData) => {
+                const errors = fetchedData?.errors;
+                if (Array.isArray(errors) && errors.length > 0) {
+                  setCompileErrors(errors.map(e => ({
+                    message: typeof e === 'string' ? e : (e.message || JSON.stringify(e)),
+                    from: e.from ?? -1,
+                    to: e.to ?? -1,
+                  })));
+                } else if (fetchedData?.usageLimitReached) {
+                  setCompileErrors([{
+                    message: 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue.',
+                    from: -1,
+                    to: -1,
+                  }]);
+                } else {
+                  setCompileErrors(null);
+                }
+              }}
             />
-          )}
+          </div>
           {tab === "Code" && (
             <CodePanel
               code={code}
@@ -232,7 +267,7 @@ export default function Editor({
                   setCode(newCode);
                 }
               }}
-              compiledData={data}
+              compiledData={compileErrors ? { errors: compileErrors } : data}
             />
           )}
         </div>

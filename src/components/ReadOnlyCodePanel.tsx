@@ -14,7 +14,7 @@ export const ReadOnlyCodePanel = ({ id, user, onCodeChange }: any) => {
 
   // Notify parent when source changes
   useEffect(() => {
-    if (taskData?.source) {
+    if (taskData?.src) {
       onCodeChange?.(taskData.source);
     } else if (taskData?.code) {
       onCodeChange?.(taskData.code);
@@ -29,7 +29,7 @@ export const ReadOnlyCodePanel = ({ id, user, onCodeChange }: any) => {
     );
   }
 
-  const displayCode = activeTab === 'source' ? (taskData?.source || "") : (taskData?.code || "");
+  const displayCode = activeTab === 'source' ? (taskData?.src || "") : (taskData?.code || "");
 
   return (
     <div className="h-full flex flex-col">

@@ -3,12 +3,37 @@ import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
 import { getFirestore } from "../../utils/db";
 import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } from "../../lib/api";
-import { unparse } from "@graffiticode/parser";
+import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService } from "../../lib/code-generation-service";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 // import { buildDynamicSchema } from "./schemas";
+
+function encrypt(plaintext: string): string {
+  const key = process.env.GRAFFITICODE_SECRET_KEY;
+  if (!key) return plaintext;
+  const keyHash = crypto.createHash('sha256').update(key).digest();
+  const iv = crypto.createHmac('sha256', key).update(plaintext).digest().subarray(0, 16);
+  const cipher = crypto.createCipheriv('aes-256-cbc', keyHash, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+function buildParseCallbacks(systemValues: Record<string, string> = {}) {
+  return {
+    GET_VAL_PRIVATE: (name: string) => {
+      const result = systemValues[name] || "";
+      return encrypt(result);
+    },
+    GET_VAL_PUBLIC: (name: string) => {
+      const result = systemValues[name] || "";
+      console.log("GET_VAL_PUBLIC()", "name:", name, "result:", result);
+      return result;
+    },
+  };
+}
 
 // Global cache for templates to avoid repeated fetches
 const templateCache = new Map<string, string>();
@@ -18,6 +43,43 @@ const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
 const taskDao = getTaskDaoForStore("firestore");
 
 const db = getFirestore();
+
+export async function parseCode({ lang, src, systemValues = {} }: { lang: string; src: string; systemValues?: Record<string, string> }) {
+  try {
+    const lexicon = await getLanguageLexicon(lang);
+    if (!lexicon) {
+      return { code: null, errors: [{ message: `No lexicon found for language ${lang}`, from: -1, to: -1 }] };
+    }
+    const nodePool = await parser.parse(lang, src, lexicon, buildParseCallbacks(systemValues));
+
+    // Scan the AST pool for ERROR nodes
+    const errors: Array<{ message: string; from: number; to: number }> = [];
+    for (const key of Object.keys(nodePool)) {
+      if (key === "root") continue;
+      const node = nodePool[key];
+      if (node && node.tag === "ERROR") {
+        // ERROR node elts: [STR_nid, NUM_nid(from), NUM_nid(to)]
+        const msgNode = nodePool[node.elts[0]];
+        const fromNode = nodePool[node.elts[1]];
+        const toNode = nodePool[node.elts[2]];
+        const message = typeof msgNode === "string" ? msgNode
+          : (msgNode?.tag === "STR" ? msgNode.elts[0] : String(msgNode));
+        const from = typeof fromNode === "number" ? fromNode
+          : (fromNode?.tag === "NUM" ? Number(fromNode.elts[0]) : -1);
+        const to = typeof toNode === "number" ? toNode
+          : (toNode?.tag === "NUM" ? Number(toNode.elts[0]) : -1);
+        errors.push({ message, from, to });
+      }
+    }
+
+    if (errors.length > 0) {
+      return { code: null, errors };
+    }
+    return { code: JSON.stringify(nodePool), errors: null };
+  } catch (err) {
+    return { code: null, errors: [{ message: err.message || "Parse error", from: -1, to: -1 }] };
+  }
+}
 
 export async function logCompile({ auth, units, id, timestamp, status, data }) {
   try {
@@ -41,8 +103,8 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
 
           // Get plan allocation
           const planAllocations = {
-            demo: 100,
-            starter: 2000,
+            demo: 250,
+            starter: 5000,
             pro: 100000,
             teams: 2000000
           };
@@ -127,8 +189,8 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
       const overageUnits = subscription.overageUnits || 0;
 
       const planAllocations = {
-        demo: 100,
-        starter: 2000,
+        demo: 250,
+        starter: 5000,
         pro: 100000,
         teams: 2000000
       };
@@ -177,6 +239,10 @@ export async function getData({ authToken, id }) {
     const baseUrl = getBaseUrlForApi();
     const get = bent(baseUrl, "GET", "json", 200);
     const resp = await get(`/data?id=${id}&access_token=${authToken}`);
+    console.log(
+      "getData()",
+      "resp.data=" + JSON.stringify(resp.data, null, 2),
+    );
     return resp.data;
   } catch (x) {
     console.log("getData()", "ERROR", x);
@@ -214,7 +280,6 @@ export async function getTasks({ auth, lang, mark }) {
             lang: taskData.lang,
             mark: taskData.mark || 1,
             help: taskData.help || "[]",
-            code: taskData.src || "",
             isPublic: taskData.isPublic || false,
             created: taskData.created || Date.now(),
             updated: taskData.updated || taskData.created || Date.now(),
@@ -251,28 +316,9 @@ export async function getTasks({ auth, lang, mark }) {
     // Convert items to tasks format
     const tasks = await Promise.all(
       items.map(async (item) => {
-        // If item has code, use it; otherwise fetch from API
-        let code = item.code;
-        if (!code && item.taskId) {
-          try {
-            const apiTask = await getApiTask({ id: item.taskId, auth });
-            // apiTask.code is already a string, don't stringify it
-            code = (apiTask[0] || apiTask).code;
-          } catch (err) {
-            console.log(
-              "getTasks() failed to get API task for item",
-              item.id,
-              err,
-            );
-            code = "{}";
-          }
-        }
-
         return {
           id: item.taskId || item.id,
           lang: item.lang,
-          code: code || "{}",
-          src: item.code || "",
           help: item.help || "[]",
           isPublic: item.isPublic || false,
           taskId: item.taskId || item.id,
@@ -310,103 +356,48 @@ export async function generateCode({
   prompt,
   language,
   options,
-  currentCode,
+  currentSrc,
   conversationSummary = null,
+  itemId = undefined,
 }) {
-  // TODO add support for calling the compiler to check generated code.
   const rid = generateRequestId();
 
   try {
+    if (!language) {
+      return { src: null, taskId: null, language, description: null, model: null, usage: null, errors: [{ message: "language is required" }] };
+    }
+
     prompt = prompt.trim();
-    let code = null;
-    let taskId = null;
     let description = null;
     let model = null;
-    let usage = {
-      input_tokens: 0,
-      output_tokens: 0,
-    };
+    let usage = { input_tokens: 0, output_tokens: 0 };
 
-    // Log request start
     ragLog(rid, "request.start", {
       promptLength: prompt.length,
-      promptHash: Buffer.from(prompt).toString("base64").substring(0, 16),
       language,
-      hasCurrentCode: !!currentCode,
-      options: {
-        model: options?.model,
-        temperature: options?.temperature,
-        maxTokens: options?.maxTokens,
-      },
+      hasCurrentSrc: !!currentSrc,
     });
 
-    // Check if this is the specific prompt for template generation
+    let src = null;
+
+    // Template generation
     if (prompt === "Create a minimal starting template") {
       const cacheKey = `L${language}`;
-
-      // Check cache first
-      if (templateCache.has(cacheKey)) {
-        code = templateCache.get(cacheKey);
-        description = "Template loaded from cache";
-        model = "template-file";
-        ragLog(rid, "template.loaded", {
-          source: "cache",
-          lang: cacheKey,
-          codeLength: code.length,
-        });
-      } else {
-        try {
-          // Fetch template from language server
-          const templateCode = await getLanguageAsset(`L${language}`, 'template.gc');
-          if (templateCode) {
-            code = templateCode;
-            // Cache the template
-            templateCache.set(cacheKey, templateCode);
-            description = "Template loaded from language server";
-            model = "template-file";
-            ragLog(rid, "template.loaded", {
-              source: "language-server",
-              lang: cacheKey,
-              codeLength: code.length,
-            });
-          }
-        } catch (error) {
-          console.log(
-            "generateCode()",
-            "Template not found on language server, using default template",
-            error.message,
-          );
-          ragLog(rid, "template.error", {
-            error: error.message,
-            source: "language-server",
-          });
-          // Use default template code
-          code = "{}..";
-          description = "Default template (no template.gc found)";
-          model = "default-template";
-          templateCache.set(cacheKey, code);
-          ragLog(rid, "template.loaded", {
-            source: "default",
-            lang: cacheKey,
-            codeLength: code.length,
-          });
+      src = templateCache.get(cacheKey);
+      if (!src) {
+        src = await getLanguageAsset(`L${language}`, 'template.gc');
+        if (src) {
+          templateCache.set(cacheKey, src);
         }
       }
-      // If template.gc returned empty, use default template
-      if (!code) {
-        code = "{}..";
-        description = "Default template (empty template.gc)";
-        model = "default-template";
-        templateCache.set(cacheKey, code);
-        ragLog(rid, "template.loaded", {
-          source: "default",
-          lang: cacheKey,
-          codeLength: code.length,
-        });
+      if (src) {
+        description = "Template";
+        model = "template-file";
       }
     }
-    // If no template was loaded (not a template request), fall back to code generation service
-    if (!code) {
+
+    // Code generation — if no template source
+    if (!src) {
       const result = await codeGenerationService({
         auth,
         prompt,
@@ -416,111 +407,60 @@ export async function generateCode({
           temperature: options?.temperature,
           maxTokens: options?.maxTokens,
         },
-        currentCode,
+        currentCode: currentSrc,
         rid,
         conversationSummary,
       });
 
-      // Handle usage limit errors (returned as errors array)
-      console.log("generateCode() result:", { hasErrors: 'errors' in result, errors: 'errors' in result ? result.errors : null });
       if ('errors' in result && result.errors) {
-        // Create error code as Graffiticode that compiles to the error object
-        // Elaborate the message to help the user resolve the issue
-        const elaboratedErrors = result.errors.map(err => ({
+        const errors = result.errors.map(err => ({
           ...err,
           message: err.message === 'Usage limit reached'
             ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
             : err.message
         }));
-        const errorCode = JSON.stringify({ errors: elaboratedErrors }, null, 2) + "..";
-
-        // Post task to get taskId (same as template/success flow)
-        const taskData = await postTask({
-          auth,
-          task: { lang: language, code: errorCode },
-          ephemeral: true,
-          isPublic: false,
-        });
-
-        return {
-          code: errorCode,
-          taskId: taskData?.id || null,
-          language,
-          description: "Error response",
-          model: null,
-          usage: null,
-          errors: elaboratedErrors,
-        };
+        return { src: null, taskId: null, language, description: null, model: null, usage: null, errors };
       }
 
-      // After error check, result is the success type
-      const successResult = result as { code: any; model: string; usage: any };
-      code = successResult.code;
+      const successResult = result as { code: any; taskId: string; model: string; usage: any };
+      src = successResult.code;
       model = successResult.model;
       usage = successResult.usage;
     }
 
-    // Post the task to get a task ID
+    // Parse with system values, post, and unparse
+    const systemValues: Record<string, string> = {};
+    if (itemId) systemValues.itemId = itemId;
+    const parseResult = await parseCode({ lang: language, src, systemValues });
+    if (parseResult.errors) {
+      return { src: null, taskId: null, language, description: null, model: null, usage: null, errors: parseResult.errors };
+    }
+    const code = JSON.parse(parseResult.code);
     const taskData = await postTask({
       auth,
-      task: {
-        lang: language,
-        code: code,
-      },
-      ephemeral: true, // Make it ephemeral since it's just a template
+      task: { lang: language, code },
+      ephemeral: true,
       isPublic: false,
     });
-    taskId = taskData.id;
+    const taskId = taskData.id;
     if (!taskId) {
-      throw new Error("Failed to get taskId from postTask");
+      throw new Error("Failed to get taskId");
     }
+    const lexicon = await getLanguageLexicon(language);
+    const resolvedSrc = unparse(code, lexicon || {});
 
-    // Log request end
     ragLog(rid, "request.end", {
-      codeLength: code?.length || 0,
       taskId,
       model,
       usage,
       success: true,
     });
 
-    return {
-      code: code,
-      taskId: taskId,
-      language: language,
-      description: description,
-      model: model,
-      usage: usage,
-      errors: null,
-    };
+    return { src: resolvedSrc, taskId, language, description, model, usage, errors: null };
   } catch (error) {
     console.error("generateCode()", "ERROR", error);
-
-    // Log request error
-    ragLog(rid, "request.error", {
-      error: error.message,
-      success: false,
-    });
-
-    // Create error code as Graffiticode that compiles to the error object
-    const errors = [{ message: error.message }];
-    const errorCode = JSON.stringify({ errors }, null, 2) + "..";
-    const taskData = await postTask({
-      auth,
-      task: { lang: language, code: errorCode },
-      ephemeral: true,
-      isPublic: false,
-    });
-
-    return {
-      code: errorCode,
-      taskId: taskData?.id || null,
-      language,
-      description: null,
-      model: null,
-      usage: null,
-      errors,
-    };
+    ragLog(rid, "request.error", { error: error.message });
+    return { src: null, taskId: null, language, description: null, model: null, usage: null, errors: [{ message: error.message }] };
   }
 }
 
@@ -531,7 +471,6 @@ export async function createItem({
   taskId,
   mark,
   help,
-  code,
   isPublic,
   app,
 }) {
@@ -551,19 +490,10 @@ export async function createItem({
         prompt: "Create a minimal starting template",
         language: lang,
         options: {},
-        currentCode: null,
+        currentSrc: null,
+        itemId: id,
       });
       taskId = result.taskId;
-      if (!taskId) {
-        // Fallback: post a minimal task directly
-        const fallbackData = await postTask({
-          auth,
-          task: { lang, code: "{}.." },
-          ephemeral: true,
-          isPublic: false,
-        });
-        taskId = fallbackData?.id;
-      }
       if (!taskId) {
         throw new Error("Failed to generate template task");
       }
@@ -576,7 +506,6 @@ export async function createItem({
       lang,
       mark: mark || 1, // Default to mark 1 if not provided
       help: generatedHelp,
-      code: "", // AST cache - empty until first getTask
       isPublic: isPublic || false,
       app: app || 'console', // Default to 'console' if not provided
       created: timestamp,
@@ -614,7 +543,6 @@ export async function updateItem({
   taskId,
   mark,
   help,
-  code,
   isPublic,
 }) {
   try {
@@ -626,16 +554,9 @@ export async function updateItem({
     const itemData = itemDoc.data();
     const updates: any = {};
     if (name !== undefined) updates.name = name;
-    if (taskId !== undefined) {
-      updates.taskId = taskId;
-      // Clear AST cache when taskId changes
-      if (taskId !== itemData.taskId) {
-        updates.code = "";
-      }
-    }
+    if (taskId !== undefined) updates.taskId = taskId;
     if (mark !== undefined) updates.mark = mark;
     if (help !== undefined) updates.help = help;
-    if (code !== undefined) updates.code = code;
     if (isPublic !== undefined) {
       updates.isPublic = isPublic;
       if (isPublic) {
@@ -645,10 +566,8 @@ export async function updateItem({
           try {
             const apiTask = await getApiTask({ id: itemTaskId, auth });
             const taskData = apiTask[0] || apiTask;
-            const ast = taskData.code;
-            const lexicon = await getLanguageLexicon(taskData.lang);
-            const source = unparse(ast, lexicon || {});
-            await makeApiTaskPublic({ auth, lang: itemData.lang, code: source });
+            const code = taskData.code;
+            await makeApiTaskPublic({ auth, lang: itemData.lang, code });
           } catch (err) {
             console.error("updateItem: failed to fetch source for makeApiTaskPublic", err);
           }
@@ -693,18 +612,17 @@ export async function getItems({ auth, lang, mark, app }) {
     // Process items and fetch legacy data if needed
     for (const doc of itemsSnapshot.docs) {
       const data = doc.data();
-      let code = data.code;
       let help = data.help;
       let taskId = data.taskId;
 
       // If item doesn't have a taskId (e.g., shared item), post the task to create one
-      if (!taskId && code) {
+      if (!taskId && data.code) {
         try {
           const taskData = await postTask({
             auth,
             task: {
               lang: data.lang,
-              code: code,
+              code: data.code,
             },
             ephemeral: false,
             isPublic: false,
@@ -725,19 +643,15 @@ export async function getItems({ auth, lang, mark, app }) {
         }
       }
 
-      // For backward compatibility: if item doesn't have code, fetch from taskIds collection
-      if (!code && taskId) {
+      // For backward compatibility: fetch help from legacy taskIds collection
+      if (!help && taskId) {
         try {
           const taskDoc = await db
             .doc(`users/${auth.uid}/taskIds/${taskId}`)
             .get();
           if (taskDoc.exists) {
             const taskData = taskDoc.data();
-            code = taskData.src || "";
-            // Also get help if not present in item
-            if (!help) {
-              help = taskData.help || "[]";
-            }
+            help = taskData.help || "[]";
           }
         } catch (error) {
           console.log(
@@ -765,7 +679,6 @@ export async function getItems({ auth, lang, mark, app }) {
         lang: data.lang,
         mark: data.mark || 1, // Default to mark 1 if not set
         help: help || "[]",
-        code: code || "",
         isPublic: data.isPublic || false,
         created: String(data.created),
         updated: data.updated ? String(data.updated) : String(data.created),
@@ -789,16 +702,16 @@ export async function getTask({ auth, id }) {
   try {
     const apiTask = await getApiTask({ id, auth });
     const taskData = apiTask[0] || apiTask;
-    const ast = taskData.code;
-    const astStr = JSON.stringify(ast, null, 2);
-    let source = "";
+    const code = taskData.code;
+    const codeStr = JSON.stringify(code, null, 2);
+    let src = "";
     try {
       const lexicon = await getLanguageLexicon(taskData.lang);
-      source = unparse(ast, lexicon || {});
+      src = unparse(code, lexicon || {});
     } catch (err) {
       console.error("getTask: failed to unparse", err);
     }
-    return { id, lang: taskData.lang, code: astStr, source };
+    return { id, lang: taskData.lang, code: codeStr, src };
   } catch (error) {
     console.error("getTask()", "ERROR", error);
     throw new Error(`Failed to get task: ${error.message}`);
@@ -815,20 +728,16 @@ export async function getItem({ auth, id }) {
     }
 
     const data = itemDoc.data();
-    let code = data.code;
     let help = data.help;
     let taskId = data.taskId;
 
-    // For backward compatibility: if item doesn't have code, fetch from taskIds collection
-    if (!code && taskId) {
+    // For backward compatibility: fetch help from legacy taskIds collection
+    if (!help && taskId) {
       try {
         const taskDoc = await db.doc(`users/${auth.uid}/taskIds/${taskId}`).get();
         if (taskDoc.exists) {
           const taskData = taskDoc.data();
-          code = taskData.src || "";
-          if (!help) {
-            help = taskData.help || "[]";
-          }
+          help = taskData.help || "[]";
         }
       } catch (error) {
         console.log("getItem()", "Failed to fetch legacy task data", error);
@@ -842,7 +751,6 @@ export async function getItem({ auth, id }) {
       lang: data.lang,
       mark: data.mark || 1,
       help: help || "[]",
-      code: code || "",
       isPublic: data.isPublic || false,
       created: String(data.created),
       updated: data.updated ? String(data.updated) : String(data.created),

@@ -9,18 +9,15 @@ const args = process.argv.slice(2);
 
 if (args.includes('--help') || !args.includes('--lang')) {
   console.log(`
-Usage: npx tsx scripts/get-task-ids.ts --uid <userId> --lang <language> [--mark <marks>]
+Usage: npx tsx scripts/clear-task-ids.ts --lang <language> [--mark <marks>] [--dry-run]
+
+Clears taskId from items so they will be reposted on next access.
 
 Options:
-  --uid <userId>      User ID [required]
-  --lang <language>   Language code (e.g., "0166") [required]
+  --lang <language>   Language code (e.g., "0158") [required]
   --mark <marks>      Filter by mark value(s), comma-separated (default: all)
+  --dry-run           Show what would be cleared without making changes
   --help              Show this help message
-
-Examples:
-  npx tsx scripts/get-task-ids.ts --uid abc123 --lang 0166
-  npx tsx scripts/get-task-ids.ts --uid abc123 --lang 0166 --mark 4
-  npx tsx scripts/get-task-ids.ts --uid abc123 --lang 0166 --mark 3,4
 `);
   process.exit(args.includes('--help') ? 0 : 1);
 }
@@ -32,6 +29,7 @@ const lang = args[args.indexOf('--lang') + 1];
 const markValues: number[] | null = args.includes('--mark')
   ? args[args.indexOf('--mark') + 1].split(',').map(v => parseInt(v.trim()))
   : null;
+const dryRun = args.includes('--dry-run');
 
 if (process.env.GRAFFITICODE_APP_CREDENTIALS) {
   process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GRAFFITICODE_APP_CREDENTIALS;
@@ -58,19 +56,38 @@ async function main() {
   }
 
   const snapshot = await query.get();
-  const taskIds: string[] = [];
-
-  snapshot.forEach(doc => {
-    const data = doc.data();
-    if (data.taskId) {
-      taskIds.push(data.taskId);
-    }
-  });
-
   const markLabel = markValues ? `mark=${markValues.join(',')}` : 'all marks';
-  console.error(`Found ${taskIds.length} task IDs for L${lang} (${markLabel})`);
+  console.log(`Found ${snapshot.size} items for L${lang} (${markLabel})`);
 
-  taskIds.forEach(id => console.log(id));
+  if (dryRun) {
+    console.log('Dry run - no changes made');
+    let withTaskId = 0;
+    snapshot.forEach(doc => {
+      if (doc.data().taskId) withTaskId++;
+    });
+    console.log(`${withTaskId} items have taskIds that would be cleared`);
+    process.exit(0);
+  }
+
+  let cleared = 0;
+  let skipped = 0;
+  const batchSize = 20;
+  const docs = snapshot.docs;
+
+  for (let i = 0; i < docs.length; i += batchSize) {
+    const batch = docs.slice(i, i + batchSize);
+    await Promise.all(batch.map(async (doc) => {
+      const data = doc.data();
+      if (data.taskId) {
+        await doc.ref.update({ taskId: admin.firestore.FieldValue.delete() });
+        cleared++;
+      } else {
+        skipped++;
+      }
+    }));
+    process.stdout.write(`\r${cleared + skipped}/${docs.length}`);
+  }
+  console.log(`\nDone. Cleared: ${cleared}, Skipped (no taskId): ${skipped}`);
 }
 
 main().catch(err => {

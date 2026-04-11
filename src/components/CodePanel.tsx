@@ -60,7 +60,6 @@ class ErrorMarker extends GutterMarker {
   toDOM() {
     const marker = document.createElement("div");
     marker.className = "cm-gutter-error-marker";
-    marker.setAttribute('data-error', this.message); // Use data attribute instead of title
     marker.textContent = "⚠️";
     return marker;
   }
@@ -287,10 +286,10 @@ export const CodePanel = ({
 
           // Use the from/to properties directly from the error object
           let from = parseInt(error.from, 10);
-          from = isNaN(from) ? 0 : from;
+          if (isNaN(from) || from < 0) return; // Skip errors without valid positions
 
           let to = parseInt(error.to, 10);
-          to = isNaN(to) ? from + 1 : to;
+          to = isNaN(to) || to < 0 ? from + 1 : to;
 
           // Ensure the range is valid - to must be greater than from
           if (to <= from) {
@@ -400,6 +399,7 @@ export const CodePanel = ({
           content: attr(data-error);
           position: absolute;
           left: 0;
+          top: calc(100% + 5px);
           max-height: 300px;
           overflow-y: auto;
           width: max-content;
@@ -409,13 +409,8 @@ export const CodePanel = ({
           padding: 10px 15px;
           border-radius: 6px;
           z-index: 10000;
-          box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-          filter: drop-shadow(0 0 8px rgba(0,0,0,0.5));
-        }
-        /* Position tooltip below for errors at the top of the editor */
-        .cm-error-highlight.tooltip-bottom:hover::after {
-          top: calc(100% + 5px);
-          bottom: auto;
+          box-shadow: none;
+          pointer-events: none;
         }
         /* Position tooltip above for errors at the bottom of the editor */
         .cm-error-highlight.tooltip-top:hover::after {
@@ -430,40 +425,9 @@ export const CodePanel = ({
         .cm-gutter-error-marker {
           color: #f44336;
           cursor: pointer;
-        }
-        .cm-gutter-error-marker {
-          position: relative; /* Ensure relative positioning for absolute children */
-        }
-        .cm-gutter-error-marker:hover::after {
-          content: attr(data-error);
-          position: absolute;
-          left: 20px; /* Position to the right of the gutter */
-          max-height: 300px; /* Limit height */
-          overflow-y: auto; /* Add scrolling for very long error messages */
-          background-color: #f44336;
-          color: white;
-          padding: 10px 15px;
-          border-radius: 6px;
-          z-index: 10000;
-          width: max-content;
-          max-width: 400px;
-          white-space: pre-wrap;
-          min-width: 300px;
-          font-family: sans-serif;
-          font-size: 14px;
-          line-height: 1.5;
-          text-align: left;
-          box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-        }
-        /* Position tooltip below for markers at the top of the editor */
-        .cm-gutter-error-marker.tooltip-bottom:hover::after {
-          top: 0; /* Align with the top of the marker */
-          bottom: auto;
-        }
-        /* Position tooltip above for markers at the bottom of the editor */
-        .cm-gutter-error-marker.tooltip-top:hover::after {
-          bottom: 0; /* Align with the bottom of the marker */
-          top: auto;
+          text-shadow: none;
+          box-shadow: none;
+          filter: none;
         }
       `}</style>
       <div

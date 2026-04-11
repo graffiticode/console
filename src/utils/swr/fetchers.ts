@@ -27,15 +27,28 @@ export const compile = async ({ user, id, data = {} }) => {
   }
 };
 
-export const postTask = async ({ user, lang, code }) => {
-  console.trace(
-    "postTask()",
-    "lang=" + lang,
-    "code=" + code,
-  );
+export const parse = async ({ user, lang, src, itemId }: { user: any; lang: string; src: string; itemId?: string }) => {
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
   const query = gql`
-    mutation post ($lang: String!, $code: String!, $ephemeral: Boolean!) {
-      postTask(lang: $lang, code: $code, ephemeral: $ephemeral)
+    query parse($lang: String!, $src: String!, $itemId: String) {
+      parse(lang: $lang, src: $src, itemId: $itemId) {
+        code
+        errors { message from to }
+      }
+    }
+  `;
+  return client.request(query, { lang, src, itemId }).then(data => data.parse);
+};
+
+export const postTask = async ({ user, lang, code, item }: { user: any, lang: string, code: string, item?: string }) => {
+  const query = gql`
+    mutation post ($lang: String!, $code: String!, $ephemeral: Boolean!, $item: String) {
+      postTask(lang: $lang, code: $code, ephemeral: $ephemeral, item: $item)
     }
   `;
   const token = await user.getToken();
@@ -45,7 +58,7 @@ export const postTask = async ({ user, lang, code }) => {
     }
   });
   const ephemeral = true;
-  return client.request(query, { lang, code, ephemeral }).then(data => data.postTask);
+  return client.request(query, { lang, code, ephemeral, item }).then(data => data.postTask);
 };
 
 
@@ -213,7 +226,6 @@ export const loadItems = async ({ user, lang, mark, app }) => {
         lang
         mark
         help
-        code
         isPublic
         created
         updated
@@ -225,7 +237,7 @@ export const loadItems = async ({ user, lang, mark, app }) => {
   return client.request(query, { lang, mark, app }).then(data => data.items);
 };
 
-export const createItem = async ({ user, lang, name, taskId, mark, help, code, isPublic, app }) => {
+export const createItem = async ({ user, lang, name, taskId, mark, help, isPublic, app }) => {
   if (!user) {
     return null;
   }
@@ -236,15 +248,14 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, code, i
     }
   });
   const mutation = gql`
-    mutation createItem($lang: String!, $name: String, $taskId: String, $mark: Int, $help: String, $code: String, $isPublic: Boolean, $app: String) {
-      createItem(lang: $lang, name: $name, taskId: $taskId, mark: $mark, help: $help, code: $code, isPublic: $isPublic, app: $app) {
+    mutation createItem($lang: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $app: String) {
+      createItem(lang: $lang, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, app: $app) {
         id
         name
         taskId
         lang
         mark
         help
-        code
         isPublic
         created
         updated
@@ -252,7 +263,7 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, code, i
       }
     }
   `;
-  return client.request(mutation, { lang, name, taskId, mark, help, code, isPublic, app }).then(data => data.createItem);
+  return client.request(mutation, { lang, name, taskId, mark, help, isPublic, app }).then(data => data.createItem);
 };
 
 export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic }) => {
@@ -274,7 +285,6 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic 
         lang
         mark
         help
-        code
         isPublic
         created
         updated
@@ -336,7 +346,7 @@ export const getTask = async ({ user, id }) => {
         id
         lang
         code
-        source
+        src
       }
     }
   `;
@@ -362,7 +372,6 @@ export const getItem = async ({ user, id }) => {
         lang
         mark
         help
-        code
         isPublic
         created
         updated
@@ -372,13 +381,7 @@ export const getItem = async ({ user, id }) => {
   return client.request(query, { id }).then(data => data.item);
 };
 
-export const generateCode = async ({ user, prompt, language, options, currentCode, conversationSummary = null }) => {
-  console.log(
-    "fetchers/generateCode()",
-    "language=" + language,
-    "currentCode length=" + (currentCode ? currentCode.length : 0),
-    "conversationSummary=" + (conversationSummary ? JSON.stringify(conversationSummary) : "null")
-  );
+export const generateCode = async ({ user, prompt, language, options, currentSrc, conversationSummary = null, itemId = undefined }) => {
   if (!user) {
     return {};
   }
@@ -389,9 +392,9 @@ export const generateCode = async ({ user, prompt, language, options, currentCod
     }
   });
   const query = gql`
-    mutation GenerateCode($prompt: String!, $language: String, $options: CodeGenerationOptions, $currentCode: String, $conversationSummary: ConversationSummaryInput) {
-      generateCode(prompt: $prompt, language: $language, options: $options, currentCode: $currentCode, conversationSummary: $conversationSummary) {
-        code
+    mutation GenerateCode($prompt: String!, $language: String!, $options: CodeGenerationOptions, $currentSrc: String, $conversationSummary: ConversationSummaryInput, $itemId: String) {
+      generateCode(prompt: $prompt, language: $language, options: $options, currentSrc: $currentSrc, conversationSummary: $conversationSummary, itemId: $itemId) {
+        src
         taskId
         description
         language
@@ -399,6 +402,11 @@ export const generateCode = async ({ user, prompt, language, options, currentCod
         usage {
           input_tokens
           output_tokens
+        }
+        errors {
+          message
+          from
+          to
         }
       }
     }
@@ -409,8 +417,9 @@ export const generateCode = async ({ user, prompt, language, options, currentCod
     prompt,
     language,
     options,
-    currentCode,
-    conversationSummary
+    currentSrc,
+    conversationSummary,
+    itemId,
   };
 
   try {

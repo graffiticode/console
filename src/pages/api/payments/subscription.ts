@@ -71,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const renewalDate = preservedRenewalDate || endOfMonth.toISOString();
 
       // Demo gets 100 units, Starter gets 2000
-      const units = plan === 'demo' ? 100 : 2000;
+      const units = plan === 'demo' ? 250 : 5000;
 
       return res.status(200).json({
         plan,
@@ -102,7 +102,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const now = new Date();
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         const renewalDate = preservedRenewalDate || endOfMonth.toISOString();
-        const units = plan === 'demo' ? 100 : 2000;
+        const units = plan === 'demo' ? 250 : 5000;
 
         return res.status(200).json({
           plan,
@@ -159,7 +159,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const renewalDate = preservedRenewalDate || endOfMonth.toISOString();
 
       // Demo gets 100 units, Starter gets 2000
-      const defaultUnits = plan === 'demo' ? 100 : 2000;
+      const defaultUnits = plan === 'demo' ? 250 : 5000;
 
       return res.status(200).json({
         plan,
@@ -191,7 +191,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get unit allocation based on plan (monthly base)
     const baseUnitAllocation = {
-      starter: 2000,
+      starter: 5000,
       pro: 100000,
       teams: 2000000,
     };

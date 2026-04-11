@@ -8,7 +8,7 @@ import {
 import Editor from './editor';
 import { ImageGallery } from './ImageGallery';
 import SignIn from "./SignIn";
-import { getAccessToken, generateCode, loadItems, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
+import { getAccessToken, loadItems, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'
@@ -56,6 +56,8 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
+  const [ systemAlert, setSystemAlert ] = useState<string | null>(null);
+  const dismissedAlertRef = useRef<string | null>(null);
   const itemsNavRef = useRef<any>(null);
 
   // Save the current taskId to localStorage when it changes so it can be used in Tasks view
@@ -195,18 +197,13 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   }, []);
 
   // Load source code for an item via its taskId
-  const loadItemSource = useCallback(async (itemId: string, itemTaskId: string, cachedAst: string) => {
+  const loadItemSource = useCallback(async (itemId: string, itemTaskId: string) => {
     if (!itemTaskId || !user) {
       setEditorCode("");
       return;
     }
-    // Cache miss — fetch from API
     const taskData = await getTask({ user, id: itemTaskId });
-    setEditorCode(taskData?.source || "");
-    // Write AST to cache
-    if (taskData?.code && itemId) {
-      updateItem({ user, id: itemId, taskId: itemTaskId, help: undefined, name: undefined, mark: undefined, isPublic: undefined });
-    }
+    setEditorCode(taskData?.src || "");
   }, [user]);
 
   // Load items from the API only once on initialization
@@ -258,7 +255,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
       setSelectedItemId(directItem.id);
       setTaskId(directItem.taskId);
       setEditorHelp(typeof directItem.help === "string" ? JSON.parse(directItem.help || "[]") : (directItem.help || []));
-      loadItemSource(directItem.id, directItem.taskId, directItem.code);
+      loadItemSource(directItem.id, directItem.taskId);
     }
   }, [directItem, initialItemId]);
 
@@ -273,12 +270,18 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
       if (savedOrder) {
         try {
           const orderIds: string[] = JSON.parse(savedOrder);
-          const orderMap = new Map(orderIds.map((id, idx) => [id, idx]));
-          orderedItems = [...loadedItems].sort((a, b) => {
-            const aIdx = orderMap.has(a.id) ? orderMap.get(a.id)! : Infinity;
-            const bIdx = orderMap.has(b.id) ? orderMap.get(b.id)! : Infinity;
-            return aIdx - bIdx;
+          const orderSet = new Set(orderIds);
+          const newItems = loadedItems.filter(i => !orderSet.has(i.id));
+          const savedItems = orderIds
+            .map(id => loadedItems.find(i => i.id === id))
+            .filter(Boolean);
+          // New items first (sorted by updated desc), then saved order
+          newItems.sort((a, b) => {
+            const aTime = Number(a.updated || a.created || 0);
+            const bTime = Number(b.updated || b.created || 0);
+            return bTime - aTime;
           });
+          orderedItems = [...newItems, ...savedItems];
         } catch {}
       }
       setItems(orderedItems);
@@ -291,7 +294,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
           setSelectedItemId(matchingItem.id);
           setTaskId(matchingItem.taskId);
           setEditorHelp(typeof matchingItem.help === "string" ? JSON.parse(matchingItem.help || "[]") : (matchingItem.help || []));
-          loadItemSource(matchingItem.id, matchingItem.taskId, matchingItem.code);
+          loadItemSource(matchingItem.id, matchingItem.taskId);
           return;
         }
       }
@@ -300,7 +303,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         setSelectedItemId(orderedItems[0].id);
         setTaskId(orderedItems[0].taskId);
         setEditorHelp(typeof orderedItems[0].help === "string" ? JSON.parse(orderedItems[0].help || "[]") : (orderedItems[0].help || []));
-        loadItemSource(orderedItems[0].id, orderedItems[0].taskId, orderedItems[0].code);
+        loadItemSource(orderedItems[0].id, orderedItems[0].taskId);
       }
     } else if (!initialItemId) {
       setItems([]);
@@ -351,7 +354,6 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         taskId: null,
         mark: mark?.id || 1,
         help: "[]",
-        code: "",
         isPublic: false,
         app
       });
@@ -360,7 +362,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         setSelectedItemId(newItem.id);
         setTaskId(newItem.taskId);
         setEditorHelp(typeof newItem.help === "string" ? JSON.parse(newItem.help || "[]") : (newItem.help || []));
-        loadItemSource(newItem.id, newItem.taskId, newItem.code);
+        loadItemSource(newItem.id, newItem.taskId);
         if (typeof window !== 'undefined') {
           localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
         }
@@ -399,7 +401,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         if (result.help !== undefined) {
           setEditorHelp(typeof result.help === "string" ? JSON.parse(result.help || "[]") : (result.help || []));
         }
-        loadItemSource(itemId, result.taskId, result.code);
+        loadItemSource(itemId, result.taskId);
       }
 
       // Update local state after successful backend update
@@ -430,7 +432,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
           setSelectedItemId(nextItem.id);
           setTaskId(nextItem.taskId);
           setEditorHelp(typeof nextItem.help === "string" ? JSON.parse(nextItem.help || "[]") : (nextItem.help || []));
-          loadItemSource(nextItem.id, nextItem.taskId, nextItem.code);
+          loadItemSource(nextItem.id, nextItem.taskId);
           // Persist so SWR refetch doesn't override
           if (typeof window !== 'undefined') {
             localStorage.setItem(`graffiticode:selected:itemId`, nextItem.id);
@@ -456,7 +458,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
       setSelectedItemId(item.id);
       setTaskId(item.taskId);
       setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
-      loadItemSource(item.id, item.taskId, item.code);
+      loadItemSource(item.id, item.taskId);
       if (typeof window !== 'undefined') {
         localStorage.setItem(`graffiticode:selected:itemId`, item.id);
       }
@@ -472,7 +474,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
 
       if (taskData) {
         setTaskId(taskIdToLoad);
-        setEditorCode(taskData.source || "");
+        setEditorCode(taskData.src || "");
 
         if (taskData.help !== undefined) {
           const helpData = typeof taskData.help === "string" ?
@@ -563,7 +565,19 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full">
+    <div className="flex flex-col h-[calc(100vh-64px)] w-full">
+      {/* System alert banner */}
+      {systemAlert && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-3 flex items-center justify-between flex-none">
+          <span className="text-sm text-red-700">{systemAlert}</span>
+          <button
+            onClick={() => { dismissedAlertRef.current = systemAlert; setSystemAlert(null); }}
+            className="ml-4 text-red-400 hover:text-red-600 flex-none"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+      )}
       {/* Main content area */}
       <div className="flex grow w-full overflow-hidden">
         {/* Assets panel */}
@@ -854,8 +868,11 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
                 height="100%"
                 onCodeChange={setEditorCode}
                 onHelpChange={setEditorHelp}
+                onCompileError={() => {}}
+                onError={(msg) => { dismissedAlertRef.current = null; setSystemAlert(msg); }}
                 initialCode={editorCode}
                 initialHelp={editorHelp}
+                itemId={selectedItemId}
               />
               </div>
             </div>

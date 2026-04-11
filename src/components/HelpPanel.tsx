@@ -10,10 +10,9 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import useSWR from 'swr';
 import { TextEditor } from "./TextEditor";
 import { createState } from "../lib/state";
-import { generateCode } from "../utils/swr/fetchers";
 import { ChatBot } from './ChatBot';
 import { CsvDropzone } from './CsvDropzone';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth, { useToken } from '../hooks/use-graffiticode-auth';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/prism';
@@ -22,7 +21,8 @@ import { useDropzone } from 'react-dropzone';
 import { createPortal } from 'react-dom';
 import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
-import { validateImageFile, uploadImage } from '../lib/image-upload';
+import { validateImageFile, uploadImageDeduped, listUserImages, fetchArchivedImages } from '../lib/image-upload';
+import type { ImageInfo } from '../lib/image-upload';
 import { getLanguageAsset } from "../lib/api";
 import useLocalStorage from '../hooks/use-local-storage';
 import {
@@ -56,11 +56,14 @@ export const HelpPanel = ({
   setCode,
   setTaskId,
   onLoadTaskFromHelp,
-  taskId
+  onError,
+  taskId,
+  itemId,
 }) => {
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
   const { user } = useGraffiticodeAuth();
+  const { data: authToken } = useToken();
   const firebaseApp = useFirebaseApp();
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null);
@@ -767,7 +770,7 @@ export const HelpPanel = ({
     }
   }));
 
-  // Handle image file drop - upload to Firebase Storage
+  // Handle image file drop - upload to Firebase Storage and add to assets
   const handleImageDrop = useCallback(async (file: File) => {
     const error = validateImageFile(file);
     if (error) {
@@ -784,32 +787,44 @@ export const HelpPanel = ({
     setImageUploadProgress(0);
     try {
       const storage = getStorage(firebaseApp);
-      const { promise } = uploadImage(storage, user.uid, file, (percent) => {
+      // Fetch existing images for dedup
+      const archivedNames = authToken ? await fetchArchivedImages(authToken) : [];
+      const existingImages = await listUserImages(storage, user.uid, { archivedNames });
+      let archivedImages: ImageInfo[] = [];
+      if (authToken && archivedNames.length > 0) {
+        const allImages = await listUserImages(storage, user.uid, { includeArchived: true, archivedNames });
+        archivedImages = allImages.filter(img => img.archived);
+      }
+
+      const result = await uploadImageDeduped(storage, user.uid, file, existingImages, (percent) => {
         setImageUploadProgress(percent);
-      });
-      const { downloadURL, fileName } = await promise;
+      }, { token: authToken, archivedImages });
       setImageUploadProgress(null);
 
-      // Insert image markdown into the text editor
-      const label = fileName.replace(/\.[^.]+$/, '');
-      const markdown = `![${label}](${downloadURL})`;
+      // Signal ImageGallery to reload
+      window.dispatchEvent(new Event('gc:assets-reload'));
+
+      // Insert image URL into the text editor
       const editorElement = document.querySelector("[contenteditable=true]") as HTMLElement;
       if (editorElement) {
         editorElement.focus();
-        // Move cursor to end
         const sel = window.getSelection();
         sel?.selectAllChildren(editorElement);
         sel?.collapseToEnd();
-        // Add newline if editor already has content
         const existing = editorElement.innerText?.trim();
         if (existing) {
-          document.execCommand('insertText', false, '\n' + markdown);
+          document.execCommand('insertText', false, '\n' + result.downloadURL);
         } else {
-          document.execCommand('insertText', false, markdown);
+          document.execCommand('insertText', false, result.downloadURL);
         }
       }
 
-      setUploadNotification({ type: 'success', message: `Image "${fileName}" uploaded`, fileName });
+      const fileName = file.name;
+      if (result.skipped) {
+        setUploadNotification({ type: 'success', message: `Image "${fileName}" already exists`, fileName });
+      } else {
+        setUploadNotification({ type: 'success', message: `Image "${fileName}" uploaded`, fileName });
+      }
       setTimeout(() => setUploadNotification(null), 3000);
     } catch (err: any) {
       setImageUploadProgress(null);
@@ -820,7 +835,7 @@ export const HelpPanel = ({
       });
       setTimeout(() => setUploadNotification(null), 3000);
     }
-  }, [firebaseApp, user]);
+  }, [firebaseApp, user, authToken]);
 
   // Insert text content into the editor
   const insertTextIntoEditor = useCallback((content: string) => {
@@ -929,7 +944,8 @@ export const HelpPanel = ({
     user,
     language,
     chatHistory: help, // Pass the current help array as chat history
-    currentCode: code, // Pass the current code from the code panel
+    currentSrc: code, // Pass the current source from the code panel
+    itemId,
   });
 
   // Setup dropzone for the entire panel
@@ -999,8 +1015,14 @@ export const HelpPanel = ({
     const skipUserMessage = botResponse.skipUserMessage;
 
     // If the bot response is code, automatically update the code panel
-    if (botResponse?.type === 'code' && typeof setCode === 'function') {
+    // Skip if text is null/empty (e.g., compile error) to keep current code
+    if (botResponse?.type === 'code' && botResponse.text && typeof setCode === 'function') {
       setCode(botResponse.text);
+    }
+
+    // Propagate errors to parent (gallery alert)
+    if (botResponse?.type === 'error' && botResponse.text) {
+      onError?.(botResponse.text);
     }
 
     // If the bot response includes a taskId or timestamp, update the last user message
@@ -1024,7 +1046,7 @@ export const HelpPanel = ({
         return newHelp;
       });
     }
-  }, [setCode]);
+  }, [setCode, onError]);
 
   // State for the input field
   const [messageText, setMessageText] = useState('');
@@ -1662,10 +1684,9 @@ export const HelpPanel = ({
     return Object.keys(changedValues).length > 0;
   }, [contextProperties, initialProperties]);
 
-  // Handle image markdown dropped from Assets panel
+  // Handle image asset markdown dropped from Assets panel
   const handleAssetDrop = useCallback((e: React.DragEvent) => {
-    const gcImage = e.dataTransfer.types.includes('application/x-gc-image');
-    if (gcImage) {
+    if (e.dataTransfer.types.includes('application/x-gc-image')) {
       e.preventDefault();
       e.stopPropagation();
       const markdown = e.dataTransfer.getData('text/plain');
@@ -1676,14 +1697,20 @@ export const HelpPanel = ({
   }, [insertTextIntoEditor]);
 
   return (
-    <div {...getRootProps()} ref={containerRef} className="flex flex-col h-[calc(100vh-120px)]"
-      onDrop={handleAssetDrop}
-      onDragOver={(e) => {
+    <div {...getRootProps({
+      onDrop: (e) => {
+        // Handle asset drops from Assets panel; let react-dropzone handle file drops
+        if (e.dataTransfer.types.includes('application/x-gc-image')) {
+          handleAssetDrop(e);
+        }
+      },
+      onDragOver: (e) => {
         if (e.dataTransfer.types.includes('application/x-gc-image')) {
           e.preventDefault();
           e.stopPropagation();
         }
-      }}
+      },
+    })} ref={containerRef} className="flex flex-col h-[calc(100vh-120px)]"
     >
 
       <input {...getInputProps()} />

@@ -8,10 +8,11 @@ import { getPageTitle } from '../lib/utils';
 
 function OAuthCard() {
   const { user } = useGraffiticodeAuth();
-  const { linkGoogle, getOAuthLinks, unlinkGoogle } = useOAuth();
+  const { linkEmail, getOAuthLinks, unlinkGoogle } = useOAuth();
   const [oauthLinks, setOauthLinks] = useState<OAuthLink[]>([]);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailInput, setEmailInput] = useState('');
 
   useEffect(() => {
     if (user?.uid) {
@@ -29,18 +30,19 @@ function OAuthCard() {
     }
   };
 
-  const handleLinkGoogle = async () => {
-    try {
-      setOauthLoading(true);
-      setError(null);
-      await linkGoogle();
+  const handleAddEmail = async () => {
+    const email = emailInput.trim().toLowerCase();
+    if (!email) return;
+    setOauthLoading(true);
+    setError(null);
+    const result = await linkEmail(email);
+    if (result.success) {
+      setEmailInput('');
       await fetchOAuthLinks();
-    } catch (err: any) {
-      console.error('Error linking Google:', err);
-      setError(err.message || 'Failed to link Google account');
-    } finally {
-      setOauthLoading(false);
+    } else {
+      setError(result.error || 'Failed to link email');
     }
+    setOauthLoading(false);
   };
 
   const handleUnlinkGoogle = async () => {
@@ -61,7 +63,7 @@ function OAuthCard() {
     <div className="border rounded-none p-4">
       <h3 className="text-lg font-semibold mb-4">OAuth</h3>
       <p className="text-sm text-gray-600 mb-4">
-        Link your Google account to enable sign-in with Google.
+        Add a Google email address to enable sign-in with Google.
       </p>
 
       {error && (
@@ -73,7 +75,7 @@ function OAuthCard() {
       {oauthLinks.length > 0 && (
         <ul className="border border-gray-300 rounded-none mb-4 divide-y">
           {oauthLinks.map((link) => (
-            <li key={link.provider} className="flex items-center justify-between px-3 py-3">
+            <li key={`${link.provider}-${link.email}`} className="flex items-center justify-between px-3 py-3">
               <div className="flex items-center gap-3">
                 {link.provider === 'google' && (
                   <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -108,26 +110,32 @@ function OAuthCard() {
         </ul>
       )}
 
-      {!oauthLinks.some(link => link.provider === 'google') && (
+      <div className="flex gap-2">
+        <input
+          type="email"
+          value={emailInput}
+          onChange={(e) => setEmailInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAddEmail()}
+          placeholder="Google email address"
+          disabled={oauthLoading}
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-none text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-50"
+        />
         <button
           type="button"
-          onClick={handleLinkGoogle}
-          disabled={oauthLoading}
+          onClick={handleAddEmail}
+          disabled={oauthLoading || !emailInput.trim()}
           className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-300 rounded-none text-sm text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {oauthLoading ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700 mr-2"></div>
-              Linking...
-            </>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700"></div>
           ) : (
             <>
               <PlusIcon className="h-4 w-4 mr-1" />
-              Add Google
+              Add
             </>
           )}
         </button>
-      )}
+      </div>
     </div>
   );
 }

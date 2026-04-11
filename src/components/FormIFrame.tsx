@@ -89,10 +89,8 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
         return;
       }
 
-      console.log('[FormIFrame] Received event:', JSON.stringify(event.data, null, 2));
       // Check for focus events first
       if (event.data.focus) {
-        console.log('[FormIFrame] Received focus event:', event.data.focus, 'isTaskChange:', justChangedTaskRef.current);
         hasReceivedFocus.current = true;
         lastFocusDataRef.current = event.data.focus; // Store for re-sending
         onFocus && onFocus(event.data.focus);
@@ -122,12 +120,16 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
       }
 
       // Skip known non-form message types (e.g. from external integrations)
+      if (event.data.type === 'onload') {
+        setIsLoading(false);
+        return;
+      }
+
       if (event.data.type === 'establish-communication' ||
           event.data.type === 'item-created' ||
           event.data.type === 'item-updated' ||
           event.data.type === 'learnosity-ready' ||
-          event.data.type === 'graffiticode-ready' ||
-          event.data.type === 'onload') {
+          event.data.type === 'graffiticode-ready') {
         return;
       }
 

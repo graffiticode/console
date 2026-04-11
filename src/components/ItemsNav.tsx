@@ -94,7 +94,6 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
         taskId,
         mark,
         help,
-        code,
         isPublic: false, // Don't copy public status
         app: 'console'
       });
@@ -193,6 +192,31 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                     }
                   }}
                 />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Item ID</label>
+                <div
+                  className="text-xs font-mono text-gray-600 hover:text-gray-900 cursor-pointer py-1.5 truncate"
+                  onClick={(e) => {
+                    navigator.clipboard.writeText(itemId);
+                    const element = e.currentTarget;
+                    element.innerHTML = `
+                      <span class="text-green-500 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1">
+                          <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
+                        </svg>
+                        Copied!
+                      </span>
+                    `;
+                    setTimeout(() => {
+                      element.textContent = itemId;
+                    }, 1000);
+                  }}
+                  title="Click to copy"
+                >
+                  {itemId}
+                </div>
               </div>
 
               <div className="mb-4">
@@ -371,13 +395,11 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
               if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                 e.preventDefault();
                 const currentIndex = items.findIndex(i => i.id === selectedItemId);
-                const nextIndex = currentIndex + (e.key === 'ArrowUp' ? -1 : 1);
-                if (nextIndex >= 0 && nextIndex < items.length) {
-                  const nextItem = items[nextIndex];
-                  onSelectItem(nextItem.id);
-                  setShowId(nextItem.id);
-                  itemRefs.current[nextItem.id]?.scrollIntoView({ block: 'nearest' });
-                }
+                const nextIndex = (currentIndex + (e.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
+                const nextItem = items[nextIndex];
+                onSelectItem(nextItem.id);
+                setShowId(nextItem.id);
+                itemRefs.current[nextItem.id]?.scrollIntoView({ block: 'nearest' });
               }
             }}
           >
@@ -404,7 +426,7 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
                   }}
                 >
                   <button
-                    onClick={() => onSelectItem(item.id)}
+                    onClick={() => { onSelectItem(item.id); listRef.current?.focus(); }}
                     className="flex items-center rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 truncate text-left focus:outline-none"
                     style={{ maxWidth: panelWidth - 40 }}
                     title={item.name}

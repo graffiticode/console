@@ -78,28 +78,19 @@ export function useOAuth() {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || error.message || 'Failed to sign in with Google');
+      const body = await response.json();
+      throw new Error(body.error?.message || body.message || 'Failed to sign in with Google');
     }
 
     const data = await response.json();
     return { firebaseCustomToken: data.data.firebaseCustomToken };
   }, []);
 
-  // Link Google account to existing Ethereum account (for logged-in users)
-  // Uses a separate Firebase Auth instance to avoid changing the current session
-  const linkGoogle = useCallback(async () => {
+  // Link an email address for Google sign-in (authentication deferred to login time)
+  const linkEmail = useCallback(async (email: string) => {
     if (!user) {
-      throw new Error('Must be logged in to link Google account');
+      throw new Error('Must be logged in to link email');
     }
-
-    const oauthAuth = getOAuthAuth();
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(oauthAuth, provider);
-    const idToken = await result.user.getIdToken();
-
-    // Clean up helper auth session
-    await cleanupOAuthSession(oauthAuth);
 
     const authToken = await user.getToken();
     const response = await fetch(`${authUrl}/oauth-links`, {
@@ -108,16 +99,15 @@ export function useOAuth() {
         'Content-Type': 'application/json',
         'Authorization': authToken,
       },
-      body: JSON.stringify({ provider: 'google', idToken }),
+      body: JSON.stringify({ provider: 'google', email }),
     });
 
+    const body = await response.json();
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || error.message || 'Failed to link Google account');
+      return { success: false, error: body.error?.message || body.message || 'Failed to link email' };
     }
 
-    const data = await response.json();
-    return { success: true, provider: 'google', email: data.data?.email };
+    return { success: true, provider: 'google', email: body.data?.email || email };
   }, [user]);
 
   // Get linked OAuth accounts
@@ -135,8 +125,8 @@ export function useOAuth() {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || error.message || 'Failed to get OAuth links');
+      const body = await response.json();
+      throw new Error(body.error?.message || body.message || 'Failed to get OAuth links');
     }
 
     const data = await response.json();
@@ -158,14 +148,14 @@ export function useOAuth() {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || error.message || 'Failed to unlink Google account');
+      const body = await response.json();
+      throw new Error(body.error?.message || body.message || 'Failed to unlink Google account');
     }
 
     return { success: true };
   }, [user]);
 
-  return { signInWithGoogle, linkGoogle, getOAuthLinks, unlinkGoogle };
+  return { signInWithGoogle, linkEmail, getOAuthLinks, unlinkGoogle };
 }
 
 export default useOAuth;

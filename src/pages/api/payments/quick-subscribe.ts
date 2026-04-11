@@ -109,12 +109,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Check if user already has an active subscription
-    const existingSubscriptions = await stripe.subscriptions.list({
-      customer: stripeCustomerId,
-      status: 'active',
-      limit: 1,
-    });
+    // Check if user already has an active or trialing subscription
+    const [activeSubs, trialingSubs] = await Promise.all([
+      stripe.subscriptions.list({ customer: stripeCustomerId, status: 'active', limit: 1 }),
+      stripe.subscriptions.list({ customer: stripeCustomerId, status: 'trialing', limit: 1 }),
+    ]);
+    const existingSubscriptions = {
+      data: [...activeSubs.data, ...trialingSubs.data],
+    };
 
     let subscription: Stripe.Subscription;
     let isUpgrade = false;

@@ -76,6 +76,7 @@ export default function TasksGallery({ lang }) {
   const [ showId, setShowId ] = useState("");
   const taskItemsRef = useRef({});
   const tasksListRef = useRef(null);
+  const tasksUlRef = useRef<HTMLUListElement>(null);
 
   // Load compiles from the API
   const type = "*";  // { "*" | "persistent" | "ephemeral" }
@@ -170,6 +171,13 @@ export default function TasksGallery({ lang }) {
 
     setTaskIds([...uniqueTaskIds]); // Force update with current flags
   }, [compilesData, router.query.taskId]);
+
+  // Auto-focus the tasks list for arrow key navigation
+  useEffect(() => {
+    if (taskIds.length > 0 && tasksUlRef.current) {
+      tasksUlRef.current.focus();
+    }
+  }, [taskIds.length > 0]);
 
   const toggleTasksPanel = useCallback(() => {
     const newState = !isTasksPanelCollapsed;
@@ -275,7 +283,22 @@ export default function TasksGallery({ lang }) {
                 </div>
               ) : (
                 <nav className="flex flex-1 flex-col bg-gray-100 pt-1 pr-2">
-                  <ul role="list" className="space-y-1 font-mono">
+                  <ul
+                    ref={tasksUlRef}
+                    role="list"
+                    className="space-y-1 font-mono focus:outline-none"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const currentIndex = taskIds.findIndex(t => t.id === selectedTaskId);
+                        const nextIndex = (currentIndex + (e.key === 'ArrowUp' ? -1 : 1) + taskIds.length) % taskIds.length;
+                        const nextTask = taskIds[nextIndex];
+                        handleSelectTask(nextTask.id);
+                        taskItemsRef.current[nextTask.id]?.scrollIntoView({ block: 'nearest' });
+                      }
+                    }}
+                  >
                     {taskIds.map((task) => (
                       <li key={task.id} ref={el => { taskItemsRef.current[task.id] = el; }}>
                         <div
@@ -290,8 +313,8 @@ export default function TasksGallery({ lang }) {
                           }}
                         >
                           <button
-                            onClick={() => handleSelectTask(task.id)}
-                            className="block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 w-full text-left truncate"
+                            onClick={() => { handleSelectTask(task.id); tasksUlRef.current?.focus(); }}
+                            className="block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 w-full text-left truncate focus:outline-none"
                           >
                             {elideCompoundId(task.id)}
                           </button>

@@ -12,7 +12,7 @@
 
 import axios from "axios";
 import { postApiCompile, getLanguageAsset, getLanguageLexicon } from "./api";
-import { postTask, getData } from "../pages/api/resolvers";
+import { postTask, getData, parseCode } from "../pages/api/resolvers";
 import admin from "firebase-admin";
 import { ragLog, generateRequestId } from "./logger";
 import {
@@ -23,6 +23,7 @@ import {
 } from "./embedding-service";
 import { generateCodeWithContinuation } from "./claude-stream-service";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
+import { findBestLanguages } from "./language-router";
 import { getRAGConfig, withRAGFallback } from "./rag-config";
 import { parser } from "@graffiticode/parser";
 import {
@@ -44,9 +45,10 @@ import {
 } from "./prompt-renderer";
 import { checkCompileAllowed } from "./usage-service";
 
-// Global cache for language assets to avoid repeated fetches
+// Global cache for language assets with TTL
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const languageAssetsCache = {
-  instructions: new Map<string, string>(),
+  instructions: new Map<string, { value: string; expires: number }>(),
   templates: new Map<string, string>(),
 };
 
@@ -194,7 +196,7 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
       if (results && results.length > 0) {
         // Filter out low-quality matches — with a specific DSL, bad examples
         // are worse than no examples since the prompt already has detailed instructions.
-        const MIN_COMBINED_SCORE = 0.65;
+        const MIN_COMBINED_SCORE = 0.50;
         const filteredResults = results.filter(doc => (doc.combinedScore || doc.similarity || 0) >= MIN_COMBINED_SCORE);
 
         // Transform the results to match the expected format
@@ -341,30 +343,20 @@ async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
  * @returns {Promise<string>} - The dialect-specific instructions, or empty string if none found
  */
 async function readDialectInstructions(lang) {
-  // Check cache first
   const cacheKey = `L${lang}`;
-  if (languageAssetsCache.instructions.has(cacheKey)) {
-    const cached = languageAssetsCache.instructions.get(cacheKey);
-    return cached;
+  const cached = languageAssetsCache.instructions.get(cacheKey);
+  if (cached && Date.now() < cached.expires) {
+    return cached.value;
   }
 
   try {
-    // Fetch instructions from the language server
     const instructions = await getLanguageAsset(`L${lang}`, 'instructions.md');
-    if (instructions) {
-      const formatted = `\n${instructions}\n`;
-      // Cache the result
-      languageAssetsCache.instructions.set(cacheKey, formatted);
-      return formatted;
-    } else {
-      // Cache empty result to avoid repeated failed fetches
-      languageAssetsCache.instructions.set(cacheKey, "");
-      return "";
-    }
+    const value = instructions ? `\n${instructions}\n` : "";
+    languageAssetsCache.instructions.set(cacheKey, { value, expires: Date.now() + CACHE_TTL_MS });
+    return value;
   } catch (error) {
     console.error(`Error fetching dialect instructions from language server for L${lang}:`, error);
-    // Cache empty result to avoid repeated failed fetches
-    languageAssetsCache.instructions.set(cacheKey, "");
+    languageAssetsCache.instructions.set(cacheKey, { value: "", expires: Date.now() + CACHE_TTL_MS });
     return "";
   }
 }
@@ -390,6 +382,11 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
   }
 
   prompt += `
+## Out-of-Scope Detection
+If the user's request is clearly outside the capabilities of this dialect (L${lang}), do NOT generate code. Instead, respond with ONLY:
+OUT_OF_SCOPE: <one sentence explaining what this dialect does and why the request doesn't fit>
+When in doubt, attempt to generate code. Only use OUT_OF_SCOPE when you are confident the request cannot be fulfilled.
+
 ## Response Requirements
 - **IMPORTANT**: When current code is provided in the context, treat it as the starting point and make only the necessary incremental changes requested by the user. Preserve existing data, formatting, and structure unless specifically asked to modify them.
 
@@ -416,14 +413,15 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
 - **Booleans**: \`true\`, \`false\`; **Null**: \`null\`
 - **Lists**: \`[1 2 3]\`; support pattern matching
 - **Records**: \`{name: "Alice" age: 30}\`; access via \`get\`, support destructuring
-- **Tags**: Unbound identifiers like \`Running\`, \`Error\` used for symbolic values
+- **Tags**: The \`tag\` keyword constructs a tag value: \`tag red\`, \`tag blue\`. Use \`let\` to bind a tag to a name like any other value: \`let x = tag medium..\`
 
 ## Pattern Matching
 Use \`case\` for match expressions:
 \`\`\`
 case x of
-  pattern1: result1
-  _: fallback
+  tag red: "red"
+  tag blue: "blue"
+  _: "unknown"
 end
 \`\`\`
 
@@ -688,7 +686,7 @@ function getFallbackResponse(prompt, options) {
  * @param {string} accessToken - Authentication token for the API
  * @returns {Promise<Object>} - Compilation results including any errors
  */
-async function verifyCode(code, authToken, rid = null) {
+async function verifyCode(code, authToken, lang, rid = null) {
 
   const startTime = Date.now();
 
@@ -699,7 +697,27 @@ async function verifyCode(code, authToken, rid = null) {
   }
 
   try {
-    const task = { lang: "0002", code };
+    // Parse first to catch syntax errors before posting
+    const parseResult = await parseCode({ lang, src: code });
+    if (parseResult.errors) {
+      if (rid) {
+        ragLog(rid, "verification.parse_error", {
+          errors: parseResult.errors,
+          latency: Date.now() - startTime,
+        });
+      }
+      return {
+        status: "error",
+        error: {
+          message: parseResult.errors.map(e => e.message).join("; "),
+        },
+        errors: parseResult.errors,
+        data: null,
+      };
+    }
+
+    // Post the parsed AST
+    const task = { lang, code: JSON.parse(parseResult.code) };
     let id;
     try {
       const result = await postTask({
@@ -711,7 +729,6 @@ async function verifyCode(code, authToken, rid = null) {
       id = result?.id;
     } catch (postError) {
       console.error("postTask() ERROR", postError);
-      // Return error response if postTask fails
       return {
         status: "error",
         error: {
@@ -766,6 +783,7 @@ async function verifyCode(code, authToken, rid = null) {
       });
     }
 
+    compileResponse.taskId = id;
     return compileResponse;
   } catch (error) {
     console.error("Error verifying Graffiticode:", error);
@@ -900,49 +918,58 @@ When fixing code:
 
 
 /**
- * Processes generated code to fix common issues and extract only the code portion
+ * Processes generated source to fix common issues and extract only the src portion
  * @param {string} content - The content returned from Claude API
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
- * @returns {Promise<string>} - The processed and reformatted code with fixes applied
+ * @returns {Promise<string>} - The processed and reformatted src with fixes applied
  */
 async function processGeneratedCode(content, lang = "0002", rid = null) {
   if (!content) return content;
 
   const originalLength = content.length;
 
-  // Try to extract code from between triple backticks
+  // Try to extract src from between triple backticks
   const codeBlockRegex = /```(?:[\w]*\n|\n)?([\s\S]*?)```/;
   const match = content.match(codeBlockRegex);
 
   // If we found a code block, extract it
-  let code = match ? match[1].trim() : content;
-  let processed = code;
+  let src = match ? match[1].trim() : content;
+  let processed = src;
   const codeBlockExtracted = !!match;
 
-  // Try to reformat the code using the parser
+  // Try to reformat the src using the parser
   try {
-    // Get the lexicon for the language
     const lexicon = await getLanguageLexicon(lang);
+    const reformatted = await parser.reformat(lang, processed, lexicon, {});
 
-    // Use parser.reformat with the lang identifier (without L prefix)
-    processed = await parser.reformat(lang, processed, lexicon, {});
-
-    if (rid) {
-      ragLog(rid, "reformat.success", {
-        lang: `L${lang}`,
-        lengthBefore: code.length,
-        lengthAfter: processed.length,
-      });
+    // If reformat produced an error comment, keep the original src
+    if (/^\/\*\s*ERROR:/.test(reformatted)) {
+      if (rid) {
+        ragLog(rid, "reformat.error", {
+          error: "reformat produced error comment",
+          lang: `L${lang}`,
+        });
+      }
+      console.warn(`Failed to reformat src for L${lang}: reformat produced error comment`);
+    } else {
+      processed = reformatted;
+      if (rid) {
+        ragLog(rid, "reformat.success", {
+          lang: `L${lang}`,
+          lengthBefore: src.length,
+          lengthAfter: processed.length,
+        });
+      }
     }
   } catch (reformatError) {
-    // If reformatting fails, log it but continue with the processed code
+    // If reformatting fails, log it but continue with the original src
     if (rid) {
       ragLog(rid, "reformat.error", {
         error: reformatError.message,
         lang: `L${lang}`,
       });
     }
-    console.warn(`Failed to reformat code for L${lang}:`, reformatError.message);
+    console.warn(`Failed to reformat src for L${lang}:`, reformatError.message);
   }
 
   // Replace all double backslashes with single backslashes
@@ -981,7 +1008,7 @@ interface GenerateCodeOptions {
 export async function generateCode({
   auth,
   prompt,
-  lang = "0002",
+  lang,
   options = {},
   currentCode = null,
   rid = null,
@@ -1284,6 +1311,32 @@ export async function generateCode({
       success: true,
     }, streamResult.code);
 
+    // Check for out-of-scope signal before processing
+    const outOfScopeMatch = streamResult.code?.match(/^OUT_OF_SCOPE:\s*(.+)/m);
+    if (outOfScopeMatch) {
+      const reason = outOfScopeMatch[1].trim();
+      console.log(`[code-gen] rid=${rid} lang=${lang} out-of-scope: ${reason}`);
+      const routing = await findBestLanguages({ userRequest: prompt, outOfScopeReason: reason, currentLang: lang });
+
+      let errorMessage = `Out of scope: ${reason}`;
+      if (routing.suggestions.length > 0) {
+        errorMessage += "\n\nSuggested alternatives:\n" +
+          routing.suggestions.map(s => `- L${s.id} (${s.description}): ${s.reason}`).join("\n");
+      }
+
+      return {
+        errors: [{ message: errorMessage }],
+        code: null,
+        taskId: null,
+        lang,
+        model: modelToUse,
+        usage: {
+          input_tokens: streamResult.usage.inputTokens,
+          output_tokens: streamResult.usage.outputTokens,
+        },
+      };
+    }
+
     // Process the generated code to fix any issues
     let generatedCode = await processGeneratedCode(streamResult.code, lang, rid);
     let verificationResult = null;
@@ -1298,7 +1351,7 @@ export async function generateCode({
     // Estimate compile units from initial generation.
     // Skip fix attempts if already expensive (>50 units).
     const MAX_UNITS_FOR_FIXES = 50;
-    const estimatedUnits = Math.ceil(finalUsage.total_tokens / 1000);
+    const estimatedUnits = Math.ceil(finalUsage.total_tokens / 750);
 
     // Verify the code if an access token is provided
     if (accessToken) {
@@ -1306,7 +1359,7 @@ export async function generateCode({
 
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
       while (fixAttempts < MAX_FIX_ATTEMPTS && estimatedUnits <= MAX_UNITS_FOR_FIXES) {
-        verificationResult = await verifyCode(generatedCode, accessToken, requestId);
+        verificationResult = await verifyCode(generatedCode, accessToken, lang, requestId);
 
         // If compilation was successful, break the loop
         if (
@@ -1427,24 +1480,23 @@ export async function generateCode({
             break;
           }
 
-          // Update the generated code with the fixed version and process to fix escaping issues
-          // Only accept the fix if it contains a code block; otherwise keep the original
-          const hasCodeBlock = /```[\s\S]*```/.test(fixResult.code);
-          if (hasCodeBlock) {
-            generatedCode = await processGeneratedCode(fixResult.code, lang, requestId);
-          } else {
-            if (requestId) {
-              ragLog(requestId, "fix.skipped", { reason: "no code block in fix response" });
-            }
-            break;
-          }
-
           // Add fix attempt usage to total
           finalUsage.prompt_tokens += fixResult.usage.inputTokens;
           finalUsage.completion_tokens += fixResult.usage.outputTokens;
           finalUsage.total_tokens += fixResult.usage.inputTokens + fixResult.usage.outputTokens;
 
           fixAttempts++;
+
+          // Update the generated code with the fixed version and process to fix escaping issues
+          // Only accept the fix if it contains a code block; otherwise retry
+          const hasCodeBlock = /```[\s\S]*```/.test(fixResult.code);
+          if (hasCodeBlock) {
+            generatedCode = await processGeneratedCode(fixResult.code, lang, requestId);
+          } else {
+            if (requestId) {
+              ragLog(requestId, "fix.skipped", { reason: "no code block in fix response", attempt: fixAttempts });
+            }
+          }
         } else {
           // No errors found, break the loop
           break;
@@ -1478,8 +1530,8 @@ export async function generateCode({
         const subscription = userData?.subscription || {};
         const plan = subscription.plan || 'demo';
 
-        // Fixed ratio: 1000 tokens = 1 compile unit, capped at 20 units per call
-        const TOKENS_PER_UNIT = 1000;
+        // Fixed ratio: 250 tokens = 1 compile unit, capped at 20 units per call
+        const TOKENS_PER_UNIT = 250;
         const MAX_UNITS_PER_CALL = 20;
         const totalTokenCost = 0; // kept for usage record
         const rawUnits = Math.max(1, Math.ceil(finalUsage.total_tokens / TOKENS_PER_UNIT));
@@ -1494,8 +1546,8 @@ export async function generateCode({
 
           // Get plan allocation
           const planAllocations = {
-            demo: 100,
-            starter: 2000,
+            demo: 250,
+            starter: 5000,
             pro: 100000,
             teams: 2000000
           };
@@ -1590,8 +1642,9 @@ export async function generateCode({
     // Return formatted response with the language name
     const result = {
       code: finalProcessedCode,
+      taskId: verificationResult?.taskId || null,
       lang: lang,
-      model: modelToUse,  // Use the actual model that was used
+      model: modelToUse,
       usage: {
         input_tokens: finalUsage.prompt_tokens,
         output_tokens: finalUsage.completion_tokens,
@@ -1600,16 +1653,10 @@ export async function generateCode({
       fixAttempts,
       streaming: true,
       chunks: streamResult.chunks,
-      requestId: requestId,  // Include for feedback tracking
-      // DSPy telemetry
+      requestId: requestId,
       usedDSPy,
       promptSpecId,
     };
-
-    console.log(
-      "generateCode()",
-      "result=" + JSON.stringify(result, null, 2),
-    );
 
     return result;
   } catch (error) {

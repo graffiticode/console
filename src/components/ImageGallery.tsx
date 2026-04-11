@@ -19,6 +19,13 @@ export function ImageGallery() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Listen for external reload requests (e.g. image uploaded from HelpPanel)
+  useEffect(() => {
+    const handler = () => setReloadKey(k => k + 1);
+    window.addEventListener('gc:assets-reload', handler);
+    return () => window.removeEventListener('gc:assets-reload', handler);
+  }, []);
   const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
   const [dragging, setDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -200,7 +207,7 @@ export function ImageGallery() {
       )}
       {images.length === 0 ? (
         <div className="text-sm text-gray-400 text-center py-8">
-          No images uploaded yet. Drag images here to upload.
+          No assets yet. Drag images here to upload.
         </div>
       ) : (
         <div className="flex flex-wrap gap-3">
@@ -218,8 +225,8 @@ export function ImageGallery() {
                   dragImageRef.current = img.downloadURL;
                   const markdown = buildMarkdown(dragUrls);
                   e.dataTransfer.setData('text/plain', markdown);
-                  e.dataTransfer.setData('application/x-gc-image', 'true');
                   e.dataTransfer.setData('application/x-gc-image-reorder', img.downloadURL);
+                  e.dataTransfer.setData('application/x-gc-image', 'true');
                   e.dataTransfer.effectAllowed = 'copyMove';
                 }}
                 onDragOver={(e) => {

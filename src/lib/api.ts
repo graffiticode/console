@@ -5,17 +5,31 @@ const getApiString = bent(apiUrl, "GET", "string");
 const getApiJSON = bent(apiUrl, "GET", "json");
 
 export const getBaseUrlForApi = () => apiUrl;
-export const getLanguageAsset = (lang, file) => getApiString(`/${lang}/${file}`);
+export const getLanguageAsset = async (lang, file) => {
+  try {
+    return await getApiString(`/${lang}/${file}`);
+  } catch (err) {
+    console.warn(`Failed to fetch ${lang}/${file}:`, err.message);
+    return null;
+  }
+};
+
+// Lexicon cache with 1 hour TTL
+const LEXICON_CACHE_TTL_MS = 60 * 60 * 1000;
+const lexiconCache = new Map<string, { value: any; expires: number }>();
 
 // Get and parse lexicon for a language
 export const getLanguageLexicon = async (lang: string) => {
+  const cached = lexiconCache.get(lang);
+  if (cached && Date.now() < cached.expires) {
+    return cached.value;
+  }
+
   try {
-    // Get the lexicon for the language
     const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.js');
     let lexicon = null;
 
     if (lexiconData) {
-      // Parse the lexicon if it's a string
       if (typeof lexiconData === 'string') {
         const lexiconStr = lexiconData.substring(lexiconData.indexOf("{"));
         try {
@@ -28,6 +42,9 @@ export const getLanguageLexicon = async (lang: string) => {
       }
     }
 
+    if (lexicon) {
+      lexiconCache.set(lang, { value: lexicon, expires: Date.now() + LEXICON_CACHE_TTL_MS });
+    }
     return lexicon;
   } catch (error) {
     console.warn(`Failed to fetch lexicon for L${lang}:`, error.message);

@@ -17,8 +17,8 @@ export const config = {
 
 // Map Stripe price IDs to our plan names
 const PLAN_MAPPING = {
-  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || '']: { name: 'starter', units: 2000 },
-  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || '']: { name: 'starter', units: 2000 },
+  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || '']: { name: 'starter', units: 5000 },
+  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || '']: { name: 'starter', units: 5000 },
   [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: { name: 'pro', units: 100000 },
   [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: { name: 'pro', units: 100000 },
   [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: { name: 'teams', units: 2000000 },
@@ -134,7 +134,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Get plan details
         const priceId = subscription.items.data[0]?.price.id;
-        const planInfo = PLAN_MAPPING[priceId] || { name: 'starter', units: 2000 };
+        const planInfo = PLAN_MAPPING[priceId] || { name: 'starter', units: 5000 };
 
         // Build update object
         const updateData: Record<string, any> = {
@@ -182,7 +182,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await db.collection('users').doc(userId).update({
           'subscription.status': 'canceled',
           'subscription.plan': 'starter',
-          'subscription.units': 2000,
+          'subscription.units': 5000,
           'subscription.stripeSubscriptionId': null,
           'subscription.canceledAt': new Date().toISOString(),
           // DO NOT reset overage units - they roll over and persist until used
@@ -223,8 +223,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             timestamp: new Date(),
           });
 
-          // Reset usage counter for new billing period if this is a subscription invoice
-          if (invoice.subscription) {
+          if (invoice.metadata?.type === 'overage_purchase') {
+            // Overage invoice: credit units
+            const units = parseInt(invoice.metadata.units);
+            const blocks = parseInt(invoice.metadata.blocks || '1');
+            const plan = invoice.metadata.plan;
+            const pricePerUnit = parseFloat(invoice.metadata.pricePerUnit || '0');
+
+            if (units) {
+              const userData = userDoc.data();
+              const currentOverage = userData?.subscription?.overageUnits || 0;
+
+              await db.collection('users').doc(userId).update({
+                'subscription.overageUnits': currentOverage + units,
+                'subscription.lastOveragePurchase': new Date().toISOString(),
+              });
+
+              await db.collection('overage_purchases').add({
+                userId,
+                units,
+                blocks,
+                plan,
+                pricePerUnit,
+                amount: invoice.amount_paid / 100,
+                invoiceId: invoice.id,
+                timestamp: new Date(),
+                status: 'completed',
+                webhookProcessed: true,
+              });
+            }
+          } else if (invoice.subscription) {
+            // Subscription invoice: reset usage counter for new billing period
             await db.collection('usage').doc(userId).set({
               currentMonthTotal: 0,
               lastReset: new Date().toISOString(),
@@ -275,64 +304,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             'subscription.paymentStatus': 'failed',
             'subscription.paymentFailedAt': new Date().toISOString(),
           });
-        }
-
-        break;
-      }
-
-      case 'payment_intent.succeeded': {
-        const paymentIntent = event.data.object as Stripe.PaymentIntent;
-
-        // Handle overage purchases
-        if (paymentIntent.metadata?.type === 'overage_purchase') {
-          const userId = paymentIntent.metadata.userId;
-          const units = parseInt(paymentIntent.metadata.units);
-          const blocks = parseInt(paymentIntent.metadata.blocks || '1');
-          const plan = paymentIntent.metadata.plan;
-          const pricePerUnit = parseFloat(paymentIntent.metadata.pricePerUnit || '0');
-          const isAutoRecharge = paymentIntent.metadata.autoRecharge === 'true';
-
-          if (userId && units) {
-            if (isAutoRecharge) {
-              // Auto-recharge: units already credited immediately — just log payment
-              await db.collection('overage_purchases').doc(paymentIntent.id).set({
-                userId,
-                units,
-                blocks,
-                plan,
-                pricePerUnit,
-                amount: paymentIntent.amount / 100,
-                paymentIntentId: paymentIntent.id,
-                timestamp: new Date(),
-                status: 'completed',
-                autoRecharge: true,
-                webhookProcessed: true,
-              });
-            } else {
-              // Manual purchase: credit units now
-              const userDoc = await db.collection('users').doc(userId).get();
-              const userData = userDoc.data();
-              const currentOverage = userData?.subscription?.overageUnits || 0;
-
-              await db.collection('users').doc(userId).update({
-                'subscription.overageUnits': currentOverage + units,
-                'subscription.lastOveragePurchase': new Date().toISOString(),
-              });
-
-              await db.collection('overage_purchases').add({
-                userId,
-                units,
-                blocks,
-                plan,
-                pricePerUnit,
-                amount: paymentIntent.amount / 100,
-                paymentIntentId: paymentIntent.id,
-                timestamp: new Date(),
-                status: 'completed',
-                webhookProcessed: true,
-              });
-            }
-          }
         }
 
         break;

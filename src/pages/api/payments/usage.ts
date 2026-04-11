@@ -242,8 +242,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Determine plan limits from Stripe subscription
     // Base units are monthly - multiply by 12 for annual plans
     const baseUnitAllocation = {
-      demo: 100,
-      starter: 2000,
+      demo: 250,
+      starter: 5000,
       pro: 100000,
       teams: 2000000,
     };

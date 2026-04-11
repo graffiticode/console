@@ -5,10 +5,10 @@ export const OVERAGE_PRICING: Record<string, {
   description: string;
 }> = {
   starter: {
-    pricePerUnit: 0.005,
+    pricePerUnit: 0.002,
     blockSize: 1000,
     minBlocks: 1,
-    description: '$5 per 1,000 units'
+    description: '$2 per 1,000 units'
   },
   pro: {
     pricePerUnit: 0.001,

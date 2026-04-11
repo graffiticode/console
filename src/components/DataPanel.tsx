@@ -22,7 +22,7 @@ export const DataPanel = forwardRef(function DataPanel({
       setData(fetchedData);
       onDataChange?.(fetchedData);
     }
-  }, [fetchedData, onDataChange]);
+  }, [fetchedData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isLoading) {
     return (

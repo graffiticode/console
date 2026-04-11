@@ -19,6 +19,7 @@ import {
   getItems,
   getItem,
   shareItem,
+  parseCode,
 } from "./resolvers";
 import { checkCompileAllowed } from "../../lib/usage-service";
 import { listLanguages, getLanguageInfo } from "./languages";
@@ -42,10 +43,9 @@ const typeDefs = `
 
   type Task {
     id: String!
-    src: String!
     lang: String!
     code: String!
-    source: String
+    src: String!
     help: String!
     taskId: String!
     isPublic: Boolean
@@ -61,7 +61,6 @@ const typeDefs = `
     lang: String!
     mark: Int
     help: String
-    code: String
     isPublic: Boolean
     created: String!
     updated: String
@@ -70,7 +69,7 @@ const typeDefs = `
   }
 
   type GeneratedCode {
-    code: String
+    src: String
     taskId: String
     description: String
     language: String
@@ -81,8 +80,13 @@ const typeDefs = `
 
   type CodeError {
     message: String!
-    line: Int
-    column: Int
+    from: Int
+    to: Int
+  }
+
+  type ParseResult {
+    code: String
+    errors: [CodeError]
   }
 
   type UsageInfo {
@@ -122,6 +126,7 @@ const typeDefs = `
 
   type Query {
     checkCompileAllowed: CompileAllowedResponse!
+    parse(lang: String!, src: String!, itemId: String): ParseResult!
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
@@ -141,10 +146,10 @@ const typeDefs = `
 
   type Mutation {
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
-    postTask(lang: String!, code: String!, ephemeral: Boolean): String!
-    generateCode(prompt: String!, language: String, options: CodeGenerationOptions, currentCode: String, conversationSummary: ConversationSummaryInput): GeneratedCode!
-    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean, app: String): Item!
-    updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, code: String, isPublic: Boolean): Item!
+    postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
+    generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
+    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, app: String): Item!
+    updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
   }
 
@@ -174,6 +179,12 @@ const resolvers = {
       } catch (error) {
         return { allowed: false, reason: 'Authentication failed' };
       }
+    },
+    parse: async (_, args) => {
+      const { lang, src, itemId } = args;
+      const systemValues: Record<string, string> = {};
+      if (itemId) systemValues.itemId = itemId;
+      return await parseCode({ lang, src, systemValues });
     },
     data: async (_, args, ctx) => {
       const { token } = ctx;
@@ -237,10 +248,9 @@ const resolvers = {
       const { token } = ctx;
       const { uid } = await client.verifyToken(token);
       const auth = {uid, token};
-      const { prompt, language, options, currentCode, conversationSummary } = args;
+      const { prompt, language, options, currentSrc, conversationSummary, itemId } = args;
       try {
-        // No authentication required for code generation
-        return await generateCode({ auth, prompt, language, options, currentCode, conversationSummary });
+        return await generateCode({ auth, prompt, language, options, currentSrc, conversationSummary, itemId });
       } catch (error) {
         console.error("Error in generateCode mutation:", error);
         throw error;
@@ -249,9 +259,13 @@ const resolvers = {
 
     postTask: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, code, ephemeral } = args;
+      const { lang, code: codeStr, ephemeral, item } = args;
       const { uid } = await client.verifyToken(token);
-      const task = { lang, code };
+      const code = JSON.parse(codeStr);
+      const task: Record<string, unknown> = { lang, code };
+      if (item) {
+        task.item = item;
+      }
       const { id } = await postTask({ auth: { uid, token }, task, ephemeral, isPublic: false });
       return id;
     },
@@ -268,15 +282,15 @@ const resolvers = {
     },
     createItem: async (_, args, ctx) => {
       const { token } = ctx;
-      const { lang, name, taskId, mark, help, code, isPublic, app } = args;
+      const { lang, name, taskId, mark, help, isPublic, app } = args;
       const { uid } = await client.verifyToken(token);
-      return await createItem({ auth: { uid, token }, lang, name, taskId, mark, help, code, isPublic, app });
+      return await createItem({ auth: { uid, token }, lang, name, taskId, mark, help, isPublic, app });
     },
     updateItem: async (_, args, ctx) => {
       const { token } = ctx;
-      const { id, name, taskId, mark, help, code, isPublic } = args;
+      const { id, name, taskId, mark, help, isPublic } = args;
       const { uid } = await client.verifyToken(token);
-      return await updateItem({ auth: { uid, token }, id, name, taskId, mark, help, code, isPublic });
+      return await updateItem({ auth: { uid, token }, id, name, taskId, mark, help, isPublic });
     },
     shareItem: async (_, args, ctx) => {
       const { token } = ctx;

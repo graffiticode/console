@@ -1,7 +1,7 @@
 import { ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata } from 'firebase/storage';
 import type { FirebaseStorage, UploadTask } from 'firebase/storage';
 
-const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 async function computeFileHash(file: File): Promise<string> {
@@ -16,7 +16,7 @@ function displayName(storageName: string): string {
 }
 
 export function validateImageFile(file: File): string | null {
-  if (!ALLOWED_TYPES.includes(file.type)) {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
     return `Unsupported image type: ${file.type}. Use PNG, JPEG, GIF, or WebP.`;
   }
   if (file.size > MAX_SIZE) {
@@ -115,8 +115,9 @@ export function uploadImage(
   const sanitized = sanitizeFileName(file.name.replace(/\.[^.]+$/, ''));
   const path = `uploads/${userId}/${uuid}_${sanitized}.${ext}`;
   const storageRef = ref(storage, path);
+  const contentType = file.type || 'application/octet-stream';
   const task: UploadTask = uploadBytesResumable(storageRef, file, {
-    contentType: file.type,
+    contentType,
     customMetadata: fileHash ? { hash: fileHash } : undefined,
   });
 
