@@ -33,6 +33,8 @@ export const LANGUAGES: Language[] = [
   { id: "0166", name: "L0166", description: "Spreadsheets", routingHint: "Interactive spreadsheet authoring with tabular cell data, cell-level formatting, formulas (SUM, AVERAGE, ROUND, IF), parameterized values, and optional assessment validation.", category: "data", domains: ["appliedscoring", "embedsheets", "graffiticode"] },
   { id: "0169", name: "L0169", description: "Concept web assessments", routingHint: "Interactive concept web diagrams with central anchor, radial connections, custom edges, drag-and-drop concepts and relation labels, and node styling.", category: "data", domains: ["appliedscoring", "graffiticode"] },
   { id: "0170", name: "L0170", description: "Data transformations", routingHint: "Data transformation pipelines inspired by dplyr and jq. Fetch JSON/CSV from external URLs, navigate nested data, filter/select/mutate/group/sort/join/flatten/unique datasets.", category: "data", domains: ["graffiticode"] },
+  { id: "0171", name: "L0171", description: "Venn diagrams", routingHint: "Venn diagrams with named sets, intersections, elements, configurable overlap, and styling.", category: "data", domains: ["graffiticode"] },
+  { id: "0172", name: "L0172", description: "FigJam content", routingHint: "FigJam board content authoring.", category: "data", domains: ["graffiticode"] },
 ];
 
 export function findLanguageById(id: string): Language | undefined {

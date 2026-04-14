@@ -166,7 +166,7 @@ export default function ToolsGallery({ language, setLanguage }) {
                   onClick={() => setLanguage({ name: selectedLang })}
                   className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-none"
                 >
-                  Edit Items
+                  Go To Items
                 </Link>
               </div>
               <p className="text-sm text-gray-500 mt-1">
