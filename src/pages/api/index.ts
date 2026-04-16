@@ -107,6 +107,12 @@ const typeDefs = `
     styleImport: String
   }
 
+  type ExamplePrompt {
+    prompt: String!
+    produces: String
+    notes: String
+  }
+
   type LanguageInfo {
     id: String!
     name: String!
@@ -115,6 +121,10 @@ const typeDefs = `
     examples: [String!]
     reactComponent: ReactComponent
     specUrl: String!
+    authoringGuide: String
+    supportedItemTypes: [String!]
+    examplePrompts: [ExamplePrompt!]
+    userGuide: String
   }
 
   type CompileAllowedResponse {
