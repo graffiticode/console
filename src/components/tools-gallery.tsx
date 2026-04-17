@@ -56,6 +56,12 @@ export default function ToolsGallery({ language, setLanguage }) {
     countItems,
   );
 
+  const selectedLangId = selectedLang ? languages.find(l => l.name === selectedLang)?.id : null;
+  const { data: langInfo } = useSWR(
+    selectedLangId ? `https://l${selectedLangId}.graffiticode.org/language-info.json` : null,
+    (url) => fetch(url).then(r => r.ok ? r.json() : null),
+  );
+
   const toggleLangPanel = useCallback(() => {
     const newState = !isLangPanelCollapsed;
     setIsLangPanelCollapsed(newState);
@@ -169,11 +175,8 @@ export default function ToolsGallery({ language, setLanguage }) {
                   Go To Items
                 </Link>
               </div>
-              <p className="text-sm text-gray-500 mt-1">
-                {languages.find(l => l.name === selectedLang)?.longDescription || languages.find(l => l.name === selectedLang)?.description}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                {itemCounts && itemCounts[selectedLang] || "0"} items
+              <p className="text-sm text-gray-500 mt-4 max-w-[600px]">
+                {langInfo?.description || languages.find(l => l.name === selectedLang)?.routingHint || languages.find(l => l.name === selectedLang)?.description}
               </p>
             </div>
           ) : (
