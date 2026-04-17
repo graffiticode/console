@@ -1,7 +1,10 @@
+import { getLanguageServerDoc } from "./language-server-client";
+
 export interface Language {
   id: string;
   name: string;
   description: string;
+  longDescription?: string;
   routingHint?: string;
   category: string;
   domains: string[];
@@ -51,18 +54,32 @@ export function selectLanguages(domain: string): Language[] {
   );
 }
 
-export function listLanguages({ category, search, domain }: { category?: string; search?: string; domain?: string }): Language[] {
+export async function listLanguages({ category, search, domain }: { category?: string; search?: string; domain?: string }): Promise<Language[]> {
   let results = selectLanguages(domain || "graffiticode");
 
   if (category) {
     results = results.filter(lang => lang.category === category);
   }
 
+  // Populate longDescription from each language's language-info.json when
+  // available; getLanguageServerDoc caches with a TTL so repeat calls are
+  // in-memory lookups. The short description stays as the hardcoded value.
+  results = await Promise.all(
+    results.map(async (lang) => {
+      const { envelope } = await getLanguageServerDoc(lang.id);
+      if (envelope?.description) {
+        return { ...lang, longDescription: envelope.description };
+      }
+      return lang;
+    })
+  );
+
   if (search) {
     const searchLower = search.toLowerCase();
     results = results.filter(lang =>
       lang.name.toLowerCase().includes(searchLower) ||
-      lang.description.toLowerCase().includes(searchLower)
+      lang.description.toLowerCase().includes(searchLower) ||
+      (lang.longDescription || "").toLowerCase().includes(searchLower)
     );
   }
 

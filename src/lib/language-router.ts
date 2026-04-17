@@ -23,7 +23,7 @@ export async function findBestLanguages({
   currentLang: string;
 }): Promise<RoutingResult> {
   try {
-    const languages = listLanguages({});
+    const languages = await listLanguages({});
     const candidates = languages.filter((l) => l.id !== currentLang);
 
     if (candidates.length === 0) {

@@ -170,7 +170,7 @@ export default function ToolsGallery({ language, setLanguage }) {
                 </Link>
               </div>
               <p className="text-sm text-gray-500 mt-1">
-                {languages.find(l => l.name === selectedLang)?.description}
+                {languages.find(l => l.name === selectedLang)?.longDescription || languages.find(l => l.name === selectedLang)?.description}
               </p>
               <p className="text-xs text-gray-400 mt-1">
                 {itemCounts && itemCounts[selectedLang] || "0"} items

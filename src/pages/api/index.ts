@@ -235,7 +235,7 @@ const resolvers = {
     },
     languages: async (_, args) => {
       const { category, search, domain } = args;
-      return listLanguages({ category, search, domain });
+      return await listLanguages({ category, search, domain });
     },
     language: async (_, args) => {
       const { id } = args;

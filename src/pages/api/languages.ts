@@ -54,7 +54,7 @@ export async function getLanguageInfo(id: string): Promise<LanguageInfo | null> 
 
   return {
     ...baseLang,
-    description: envelope?.description ?? baseLang.description,
+    longDescription: envelope?.description ?? undefined,
     examples: [],
     reactComponent: {
       package: `@graffiticode/l${langId}`,
