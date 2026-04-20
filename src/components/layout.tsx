@@ -1,8 +1,8 @@
 import Head from 'next/head';
 import Image from 'next/image';
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
 import logo from '@/images/logos/logo.png';
-import { Disclosure } from '@headlessui/react';
+import { Disclosure, Menu, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
@@ -12,6 +12,7 @@ import {
   Bars3Icon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
+import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import SignIn from '../components/SignIn'
 import { getTitle, getPageTitle } from '../lib/utils';
 
@@ -32,7 +33,12 @@ const navigation: NavigationItem[] = [
   { name: 'Tools', href: '/tools', current: false },
   { name: 'Items', href: '/items', current: false },
   { name: 'Tasks', href: '/tasks', current: false },
-  { name: 'Specs', href: '/specs', current: false },
+]
+
+const specsMenu = [
+  { name: 'Language Spec', href: '/specs?view=spec' },
+  { name: 'User Guide', href: '/specs?view=user-guide' },
+  { name: 'Code Gen Instructions', href: '/specs?view=instructions' },
 ]
 
 function classNames(...classes) {
@@ -107,6 +113,48 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                             );
                           })
                         }
+                        <Menu as="div" className="relative inline-block text-left">
+                          <Menu.Button
+                            className={classNames(
+                              pathName === 'specs'
+                                ? 'text-white'
+                                : 'text-gray-300 hover:text-white',
+                              'inline-flex items-center px-3 py-2 rounded-none text-sm tracking-wide font-medium focus:outline-none'
+                            )}
+                          >
+                            Specs
+                            <ChevronDownIcon className="ml-1 -mr-1 h-4 w-4" aria-hidden="true" />
+                          </Menu.Button>
+                          <Transition
+                            as={Fragment}
+                            enter="transition ease-out duration-100"
+                            enterFrom="transform opacity-0 scale-95"
+                            enterTo="transform opacity-100 scale-100"
+                            leave="transition ease-in duration-75"
+                            leaveFrom="transform opacity-100 scale-100"
+                            leaveTo="transform opacity-0 scale-95"
+                          >
+                            <Menu.Items className="absolute left-0 z-10 mt-2 w-56 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                              <div className="py-1">
+                                {specsMenu.map((item) => (
+                                  <Menu.Item key={item.name}>
+                                    {({ active }) => (
+                                      <Link
+                                        href={item.href}
+                                        className={classNames(
+                                          active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                                          'block px-4 py-2 text-sm'
+                                        )}
+                                      >
+                                        {item.name}
+                                      </Link>
+                                    )}
+                                  </Menu.Item>
+                                ))}
+                              </div>
+                            </Menu.Items>
+                          </Transition>
+                        </Menu>
                       </div>
                     </div>
                     { ["items", "tasks", "specs"].includes(pathName) &&
@@ -172,6 +220,16 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                         'block px-3 py-2 rounded-none text-base font-medium'
                       )}
                       aria-current={item.current ? 'page' : undefined}
+                    >
+                      {item.name}
+                    </Disclosure.Button>
+                  ))}
+                  {specsMenu.map((item) => (
+                    <Disclosure.Button
+                      key={item.name}
+                      as="a"
+                      href={item.href}
+                      className="text-gray-300 hover:text-white block px-3 py-2 rounded-none text-base font-medium"
                     >
                       {item.name}
                     </Disclosure.Button>
