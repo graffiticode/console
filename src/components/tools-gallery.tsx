@@ -147,7 +147,12 @@ export default function ToolsGallery({ language, setLanguage }) {
                             "flex flex-col w-full text-left rounded-none py-1 pl-4 pr-2 focus:outline-none"
                           )}
                         >
-                          <span className="text-xs font-bold text-gray-700">{lang.name}</span>
+                          <span className="text-xs font-bold text-gray-700">
+                            {lang.name}
+                            {lang.status && (
+                              <span className="ml-2 font-normal text-gray-500">[{lang.status}]</span>
+                            )}
+                          </span>
                           <span className="text-xs text-gray-500 truncate">{lang.description}</span>
                           <span className="text-xs text-gray-400">{itemCounts && itemCounts[lang.name] || "0"} items</span>
                         </button>
