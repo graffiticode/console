@@ -51,7 +51,7 @@ function getModelCost(model: string, inputTokens: number, outputTokens: number):
   return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
 }
 
-function parseArgs(argv: string[]): { period: string; output: string; lang?: string; from?: string; to?: string; tz?: string } {
+function parseArgs(argv: string[]): { period: string; output: string; lang?: string; from?: string; to?: string; tz?: string; group: 'day' | 'week'; avg: boolean } {
   const args = argv.slice(2);
   let period = 'all';
   let output = 'revenue-vs-cost.html';
@@ -59,6 +59,8 @@ function parseArgs(argv: string[]): { period: string; output: string; lang?: str
   let from: string | undefined;
   let to: string | undefined;
   let tz: string | undefined;
+  let group: 'day' | 'week' = 'day';
+  let avg = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--period' && args[i + 1]) { period = args[i + 1]; i++; }
     else if (args[i] === '--output' && args[i + 1]) { output = args[i + 1]; i++; }
@@ -66,6 +68,16 @@ function parseArgs(argv: string[]): { period: string; output: string; lang?: str
     else if (args[i] === '--from' && args[i + 1]) { from = args[i + 1]; i++; }
     else if (args[i] === '--to' && args[i + 1]) { to = args[i + 1]; i++; }
     else if (args[i] === '--tz' && args[i + 1]) { tz = args[i + 1]; i++; }
+    else if (args[i] === '--group' && args[i + 1]) {
+      const g = args[i + 1];
+      if (g !== 'day' && g !== 'week') {
+        console.error('Error: --group must be "day" or "week"');
+        process.exit(1);
+      }
+      group = g;
+      i++;
+    }
+    else if (args[i] === '--avg') { avg = true; }
   }
   if (from) {
     period = 'custom';
@@ -73,7 +85,42 @@ function parseArgs(argv: string[]): { period: string; output: string; lang?: str
     console.error('Error: --period must be "all", "month", "week", or "day", or use --from/--to YYYY-MM-DD');
     process.exit(1);
   }
-  return { period, output, lang, from, to, tz };
+  return { period, output, lang, from, to, tz, group, avg };
+}
+
+function groupBucketsByWeek(buckets: DailyBucket[], avg: boolean): DailyBucket[] {
+  if (buckets.length === 0) return [];
+  const sorted = [...buckets].sort((a, b) => a.date.localeCompare(b.date));
+  const result: DailyBucket[] = [];
+  for (let i = 0; i < sorted.length; i += 7) {
+    const chunk = sorted.slice(i, i + 7);
+    const n = chunk.length;
+    const start = chunk[0].date;
+    const end = chunk[n - 1].date;
+    const agg: DailyBucket = {
+      date: start === end ? start : `${start}…${end}`,
+      projectedRevenue: 0, projectedCost: 0, estimatedCost: 0,
+      units: 0, actualInputTokens: 0, actualOutputTokens: 0,
+    };
+    for (const b of chunk) {
+      agg.projectedRevenue += b.projectedRevenue;
+      agg.projectedCost += b.projectedCost;
+      agg.estimatedCost += b.estimatedCost;
+      agg.units += b.units;
+      agg.actualInputTokens += b.actualInputTokens;
+      agg.actualOutputTokens += b.actualOutputTokens;
+    }
+    if (avg) {
+      agg.projectedRevenue /= n;
+      agg.projectedCost /= n;
+      agg.estimatedCost /= n;
+      agg.units /= n;
+      agg.actualInputTokens = Math.round(agg.actualInputTokens / n);
+      agg.actualOutputTokens = Math.round(agg.actualOutputTokens / n);
+    }
+    result.push(agg);
+  }
+  return result;
 }
 
 // Convert a UTC ms timestamp to a YYYY-MM-DD string in the given timezone
@@ -480,7 +527,7 @@ if (document.getElementById('tokenChart')) {
 }
 
 async function main() {
-  const { period, output, lang, from, to, tz } = parseArgs(process.argv);
+  const { period, output, lang, from, to, tz, group, avg } = parseArgs(process.argv);
   const periodStart = getPeriodStart(period, from, tz);
   const periodEnd = getPeriodEnd(to, tz);
 
@@ -609,6 +656,10 @@ async function main() {
     }
   }
   const dailyBuckets = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+  const chartBuckets = group === 'week' ? groupBucketsByWeek(dailyBuckets, avg) : dailyBuckets;
+  if (group === 'week') {
+    console.log(`  Grouped into ${chartBuckets.length} week bucket(s)${avg ? ' (per-day averages)' : ''}`);
+  }
 
   const html = generateHtml({
     period, lang, periodStart,
@@ -618,7 +669,7 @@ async function main() {
     actualCostByModel, actualUsageByModel,
     totalActualInputTokens, totalActualOutputTokens, hasActualUsage,
     totalAiUnits, totalCompileUnits, cappedRequests, unitsByPlan, totalProjectedRevenue,
-    dailyBuckets,
+    dailyBuckets: chartBuckets,
   });
 
   writeFileSync(output, html, 'utf-8');
