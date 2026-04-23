@@ -80,7 +80,7 @@ export default function LanguageSelector({ domain, language, setLanguage }: Lang
             {isCustomLanguage && (
               <Combobox.Option
                 key="custom"
-                value={{ id: 'custom', name: normalizedQuery.toUpperCase(), description: "Custom language", category: "general", domains: [] }}
+                value={{ id: 'custom', name: normalizedQuery.toUpperCase(), description: "Custom language", domains: [] }}
                 className={({ active }) =>
                   classNames(
                     'relative cursor-default select-none py-2 pl-8 pr-4',

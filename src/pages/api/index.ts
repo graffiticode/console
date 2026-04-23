@@ -98,7 +98,7 @@ const typeDefs = `
     id: String!
     name: String!
     description: String!
-    category: String
+    domains: [String!]!
   }
 
   type ReactComponent {
@@ -117,7 +117,7 @@ const typeDefs = `
     id: String!
     name: String!
     description: String!
-    category: String
+    domains: [String!]!
     examples: [String!]
     reactComponent: ReactComponent
     specUrl: String!
@@ -143,7 +143,7 @@ const typeDefs = `
     task(id: String!): Task
     items(lang: String!, mark: Int, app: String): [Item!]
     item(id: String!): Item
-    languages(category: String, search: String, domain: String): [Language!]!
+    languages(search: String, domain: String): [Language!]!
     language(id: String!): LanguageInfo
     itemData(id: String!): String!
   }
@@ -234,8 +234,8 @@ const resolvers = {
       return await getItem({ auth: { uid, token }, id });
     },
     languages: async (_, args) => {
-      const { category, search, domain } = args;
-      return await listLanguages({ category, search, domain });
+      const { search, domain } = args;
+      return await listLanguages({ search, domain });
     },
     language: async (_, args) => {
       const { id } = args;
