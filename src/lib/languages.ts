@@ -26,7 +26,7 @@ export const LANGUAGES: Language[] = [
   // { id: "0155", name: "L0155", description: "Stoplight questions", domains: [] },
   // { id: "0156", name: "L0156", description: "Short text scorers", domains: [] },
   // { id: "0157", name: "L0157", description: "Geoboard manipulatives", domains: [] },
-  { id: "0158", name: "L0158", description: "Learnosity assessments", routingHint: "Learnosity assessment items — MCQ, short text, cloze, formula, classification, order list, and choice matrix question types via Learnosity API.", domains: ["questioncompiler"] },
+  { id: "0158", name: "L0158", description: "Learnosity assessments", routingHint: "Learnosity assessment items — MCQ, short text, cloze, formula, classification, order list, and choice matrix question types via Learnosity API.", domains: ["questioncompiler", "learnosity"] },
   { id: "0159", name: "L0159", description: "Flashcards, Match and Memory card games", routingHint: "Flashcard study decks, match games, and memory card games with LaTeX math support. Define fact pairs for card-based learning activities.", domains: ["questioncompiler"] },
   // { id: "0160", name: "L0160", description: "Learnosity QTI Importer", domains: [] },
   // { id: "0161", name: "L0161", description: "Expression translators", domains: [] },
