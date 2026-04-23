@@ -539,7 +539,10 @@ ${retrievedContext}
 When a retrieved example closely matches the user's request, follow its coding patterns and techniques. If there is existing current code, apply the example's patterns to the current code rather than replacing it.
 
 <OUTPUT_FORMAT>
-Return ONLY Graffiticode between triple backticks. Must end with ".."`;
+Emit the Graffiticode between triple backticks, must end with "..". Then on new lines emit two tagged summary blocks:
+
+<DESCRIPTION>One sentence describing what the code does.</DESCRIPTION>
+<CHANGE_SUMMARY>One sentence describing what changed from the previous version — content, scoring, theme, metadata, tags. Skip formatting, whitespace, and internal plumbing. Output exactly "Initial code" when there is no previous version. Output exactly "Saved; no content changes" for save-only operations that write to a backing store without changing the authored content.</CHANGE_SUMMARY>`;
 
   if (rid) {
     ragLog(rid, "prompt.build", {
@@ -923,6 +926,20 @@ When fixing code:
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
  * @returns {Promise<string>} - The processed and reformatted src with fixes applied
  */
+// Extract the <DESCRIPTION> and <CHANGE_SUMMARY> summary blocks the model is
+// asked to emit after the code block. Returns { description, changeSummary }
+// with either field null when the tag is absent — DSPy-rendered prompts don't
+// request these tags today, so null is the expected case on that path.
+function extractSummaryTags(content) {
+  if (!content) return { description: null, changeSummary: null };
+  const descMatch = content.match(/<DESCRIPTION>([\s\S]*?)<\/DESCRIPTION>/);
+  const summaryMatch = content.match(/<CHANGE_SUMMARY>([\s\S]*?)<\/CHANGE_SUMMARY>/);
+  return {
+    description: descMatch ? descMatch[1].trim() : null,
+    changeSummary: summaryMatch ? summaryMatch[1].trim() : null,
+  };
+}
+
 async function processGeneratedCode(content, lang = "0002", rid = null) {
   if (!content) return content;
 
@@ -1516,6 +1533,10 @@ export async function generateCode({
 
     }
 
+    // Extract the model's description + change-summary from the raw output
+    // before we strip the code block. Null when the tags aren't present.
+    const { description, changeSummary } = extractSummaryTags(generatedCode);
+
     // Ensure the code is properly processed one final time before returning
     const finalProcessedCode = await processGeneratedCode(generatedCode, lang, rid);
 
@@ -1642,6 +1663,8 @@ export async function generateCode({
     // Return formatted response with the language name
     const result = {
       code: finalProcessedCode,
+      description,
+      changeSummary,
       taskId: verificationResult?.taskId || null,
       lang: lang,
       model: modelToUse,

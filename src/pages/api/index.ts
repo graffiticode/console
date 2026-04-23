@@ -72,6 +72,7 @@ const typeDefs = `
     src: String
     taskId: String
     description: String
+    changeSummary: String
     language: String
     model: String
     usage: UsageInfo

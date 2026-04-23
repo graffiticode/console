@@ -364,11 +364,12 @@ export async function generateCode({
 
   try {
     if (!language) {
-      return { src: null, taskId: null, language, description: null, model: null, usage: null, errors: [{ message: "language is required" }] };
+      return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: "language is required" }] };
     }
 
     prompt = prompt.trim();
     let description = null;
+    let changeSummary = null;
     let model = null;
     let usage = { input_tokens: 0, output_tokens: 0 };
 
@@ -392,6 +393,7 @@ export async function generateCode({
       }
       if (src) {
         description = "Template";
+        changeSummary = "Initial code";
         model = "template-file";
       }
     }
@@ -419,13 +421,15 @@ export async function generateCode({
             ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
             : err.message
         }));
-        return { src: null, taskId: null, language, description: null, model: null, usage: null, errors };
+        return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors };
       }
 
-      const successResult = result as { code: any; taskId: string; model: string; usage: any };
+      const successResult = result as { code: any; taskId: string; model: string; usage: any; description: string | null; changeSummary: string | null };
       src = successResult.code;
       model = successResult.model;
       usage = successResult.usage;
+      description = successResult.description;
+      changeSummary = successResult.changeSummary;
     }
 
     // Parse with system values, post, and unparse
@@ -433,7 +437,7 @@ export async function generateCode({
     if (itemId) systemValues.itemId = itemId;
     const parseResult = await parseCode({ lang: language, src, systemValues });
     if (parseResult.errors) {
-      return { src: null, taskId: null, language, description: null, model: null, usage: null, errors: parseResult.errors };
+      return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: parseResult.errors };
     }
     const code = JSON.parse(parseResult.code);
     const taskData = await postTask({
@@ -456,11 +460,11 @@ export async function generateCode({
       success: true,
     });
 
-    return { src: resolvedSrc, taskId, language, description, model, usage, errors: null };
+    return { src: resolvedSrc, taskId, language, description, changeSummary, model, usage, errors: null };
   } catch (error) {
     console.error("generateCode()", "ERROR", error);
     ragLog(rid, "request.error", { error: error.message });
-    return { src: null, taskId: null, language, description: null, model: null, usage: null, errors: [{ message: error.message }] };
+    return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: error.message }] };
   }
 }
 
