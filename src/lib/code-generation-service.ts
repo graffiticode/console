@@ -21,7 +21,7 @@ import {
   vectorSearch,
   hybridSearch,
 } from "./embedding-service";
-import { generateCodeWithContinuation } from "./claude-stream-service";
+import { generateCodeWithContinuation, SystemBlock } from "./claude-stream-service";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
 import { findBestLanguages } from "./language-router";
 import { getRAGConfig, withRAGFallback } from "./rag-config";
@@ -361,32 +361,10 @@ async function readDialectInstructions(lang) {
   }
 }
 
-/**
- * Returns the appropriate system prompt for a given dialect
- * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
- * @returns {Promise<string>} - The customized system prompt
- */
-async function getSystemPromptForDialect(lang) {
-  // Start with the base prompt
-  let prompt = `
-You are a programming assistant that translates natural language into code written in a functional DSL called **Graffiticode**, specifically dialect L${lang}.
-
-Graffiticode is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.`;
-
-  // Try to fetch dialect-specific instructions from language server
-  const fileInstructions = await readDialectInstructions(lang);
-
-  if (fileInstructions) {
-    // Use file-based instructions if available
-    prompt += fileInstructions;
-  }
-
-  prompt += `
-## Out-of-Scope Detection
-If the user's request is clearly outside the capabilities of this dialect (L${lang}), do NOT generate code. Instead, respond with ONLY:
-OUT_OF_SCOPE: <one sentence explaining what this dialect does and why the request doesn't fit>
-When in doubt, attempt to generate code. Only use OUT_OF_SCOPE when you are confident the request cannot be fulfilled.
-
+// Static tail of the dialect system prompt — language-independent. Concatenated
+// onto the per-dialect block so a single text section carries everything stable
+// per-language; one cache_control breakpoint then caches the whole prefix.
+const DIALECT_PROMPT_STATIC_TAIL = `
 ## Response Requirements
 - **IMPORTANT**: When current code is provided in the context, treat it as the starting point and make only the necessary incremental changes requested by the user. Preserve existing data, formatting, and structure unless specifically asked to modify them.
 
@@ -457,10 +435,47 @@ Start with \`|\` and extend to the end of the line.
 
 Only return idiomatic, valid Graffiticode. Use readable names. Output **only the code** unless explanation is requested.
 
-CRITICAL REMINDER: Put generated code between \`\`\` (triple backticks) to distinguish code from commentary.
-`;
+CRITICAL REMINDER: Put generated code between \`\`\` (triple backticks) to distinguish code from commentary.`;
 
-  return prompt.trim();
+/**
+ * Returns the appropriate system prompt blocks for a given dialect.
+ *
+ * Returns an array of Anthropic content blocks rather than a single string so
+ * the dialect-specific prefix can carry a `cache_control: ephemeral` marker.
+ * Within a language the entire prefix is stable across requests, so one
+ * breakpoint at the end of the per-dialect block caches the whole thing.
+ *
+ * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
+ * @returns {Promise<SystemBlock[]>} - System content blocks ready for /v1/messages
+ */
+async function getSystemPromptForDialect(lang: string): Promise<SystemBlock[]> {
+  // Preamble: small, lang-interpolated. Combined into the cached block below
+  // since (preamble + dialect + tail) is stable for a given language.
+  const preamble = `
+You are a programming assistant that translates natural language into code written in a functional DSL called **Graffiticode**, specifically dialect L${lang}.
+
+Graffiticode is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.`;
+
+  // Big, lang-stable block fetched from the language server (TTL-cached locally).
+  const fileInstructions = await readDialectInstructions(lang);
+
+  // Out-of-scope clause references the dialect ID so it lives with the
+  // per-language prefix rather than the static tail.
+  const outOfScope = `
+## Out-of-Scope Detection
+If the user's request is clearly outside the capabilities of this dialect (L${lang}), do NOT generate code. Instead, respond with ONLY:
+OUT_OF_SCOPE: <one sentence explaining what this dialect does and why the request doesn't fit>
+When in doubt, attempt to generate code. Only use OUT_OF_SCOPE when you are confident the request cannot be fulfilled.`;
+
+  const dialectBlock = (preamble + (fileInstructions || "") + outOfScope + DIALECT_PROMPT_STATIC_TAIL).trim();
+
+  return [
+    {
+      type: "text",
+      text: dialectBlock,
+      cache_control: { type: "ephemeral" },
+    },
+  ];
 }
 
 /**
@@ -479,10 +494,14 @@ async function createCodeGenerationPrompt(
   rid = null,
   conversationSummary = null,
 ) {
-  // Get the dialect-specific system prompt (matches dspy-service SYSTEM_INSTRUCTIONS_TEMPLATE)
-  const dialectSystemPrompt = await getSystemPromptForDialect(lang);
+  // Dialect-specific blocks (cached per-language). The dialect block already
+  // carries cache_control: ephemeral, so the per-language prefix is reused
+  // across requests within the 5-minute Anthropic cache window.
+  const dialectBlocks = await getSystemPromptForDialect(lang);
 
-  // Developer instructions (matches dspy-service DEVELOPER_INSTRUCTIONS_TEMPLATE)
+  // Developer instructions are static across all languages and all calls.
+  // Adding a second cache breakpoint extends the cached prefix to include
+  // them — both blocks together get reused on subsequent requests.
   const developerInstructions = `
 ## APPROACH
 
@@ -499,10 +518,18 @@ async function createCodeGenerationPrompt(
 - Use meaningful variable names
 - Add comments only where logic isn't self-evident
 - Ensure all \`let\` statements end with \`..\`
-- Ensure the program ends with \`..\``;
+- Ensure the program ends with \`..\``.trim();
 
-  // Build the system prompt with developer instructions
-  const systemPrompt = dialectSystemPrompt + "\n" + developerInstructions;
+  const systemBlocks: SystemBlock[] = [
+    ...dialectBlocks,
+    {
+      type: "text",
+      text: developerInstructions,
+      cache_control: { type: "ephemeral" },
+    },
+  ];
+
+  const systemPromptCharCount = systemBlocks.reduce((sum, b) => sum + b.text.length, 0);
 
   // Format retrieved examples for context
   const retrievedContext = examples.length > 0
@@ -549,17 +576,18 @@ Emit the Graffiticode between triple backticks, must end with "..". Then on new 
       dialect: `L${lang}`,
       examplesIncluded: examples.length,
       tokenEstimate: Math.ceil(
-        (systemPrompt.length + userMessage.length) / 4,
+        (systemPromptCharCount + userMessage.length) / 4,
       ),
-      charCount: systemPrompt.length + userMessage.length,
+      charCount: systemPromptCharCount + userMessage.length,
       hasCurrentCode: !!currentCode,
       hasConversationSummary: !!conversationSummary,
       sectionsIncluded: ["system", "developer", "user"],
+      systemBlockCount: systemBlocks.length,
     });
   }
 
   const promptData = {
-    system: systemPrompt,
+    system: systemBlocks,
     messages: [
       {
         role: "user",
@@ -1167,9 +1195,18 @@ export async function generateCode({
 
           const rendered = renderPromptSpecToMessages(promptSpec, renderContext);
 
-          // Convert to legacy format for compatibility with generateCodeWithContinuation
+          // Convert to legacy format for compatibility with generateCodeWithContinuation.
+          // Wrap the system prompt as a single content-block with cache_control:ephemeral
+          // so the entire DSPy-rendered prefix is cached on the Anthropic side.
+          const dspySystemBlocks: SystemBlock[] = [
+            {
+              type: "text",
+              text: rendered.systemPrompt,
+              cache_control: { type: "ephemeral" },
+            },
+          ];
           formattedPrompt = JSON.stringify({
-            system: rendered.systemPrompt,
+            system: dspySystemBlocks,
             messages: rendered.messages,
           }, null, 2);
 
@@ -1306,6 +1343,29 @@ export async function generateCode({
 
     const generationLatency = Date.now() - generationStartTime;
     safeRAGAnalytics.endStage(requestId, "generation");
+
+    // Surface Anthropic prompt-cache stats so we can confirm Tier-3 caching is
+    // actually firing. cache_read_input_tokens > 0 means the system prefix
+    // hit cache; cache_creation_input_tokens > 0 means we just wrote it.
+    {
+      const u = streamResult.usage || { inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 };
+      console.log(
+        `[code-gen] rid=${rid} lang=L${lang} model=${modelToUse} ` +
+        `input=${u.inputTokens} output=${u.outputTokens} ` +
+        `cache_create=${u.cacheCreationInputTokens || 0} cache_read=${u.cacheReadInputTokens || 0} ` +
+        `latencyMs=${generationLatency}`
+      );
+      if (requestId) {
+        ragLog(requestId, "anthropic.usage", {
+          model: modelToUse,
+          inputTokens: u.inputTokens,
+          outputTokens: u.outputTokens,
+          cacheCreationInputTokens: u.cacheCreationInputTokens || 0,
+          cacheReadInputTokens: u.cacheReadInputTokens || 0,
+          latencyMs: generationLatency,
+        });
+      }
+    }
 
     if (streamResult.error) {
       safeRAGAnalytics.trackError(requestId, "generation", streamResult.error);

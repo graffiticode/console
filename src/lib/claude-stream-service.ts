@@ -18,6 +18,14 @@ interface StreamOptions {
   maxContinuations?: number;
 }
 
+export interface SystemBlock {
+  type: "text";
+  text: string;
+  cache_control?: { type: "ephemeral" };
+}
+
+export type SystemPrompt = string | SystemBlock[];
+
 interface StreamChunk {
   type: "content" | "error" | "usage" | "complete";
   content?: string;
@@ -25,6 +33,8 @@ interface StreamChunk {
   usage?: {
     inputTokens: number;
     outputTokens: number;
+    cacheCreationInputTokens?: number;
+    cacheReadInputTokens?: number;
   };
 }
 
@@ -68,6 +78,22 @@ class ClaudeStreamParser {
               type: "content",
               content: parsed.delta?.text || ""
             });
+          } else if (parsed.type === 'message_start') {
+            // message_start carries the initial usage block, including
+            // cache_creation_input_tokens / cache_read_input_tokens which only
+            // appear here (message_delta only has the per-stream input/output).
+            const u = parsed.message?.usage;
+            if (u) {
+              chunks.push({
+                type: "usage",
+                usage: {
+                  inputTokens: u.input_tokens || 0,
+                  outputTokens: u.output_tokens || 0,
+                  cacheCreationInputTokens: u.cache_creation_input_tokens || 0,
+                  cacheReadInputTokens: u.cache_read_input_tokens || 0,
+                }
+              });
+            }
           } else if (parsed.type === 'message_delta') {
             // Usage information in message_delta
             if (parsed.usage) {
@@ -75,7 +101,9 @@ class ClaudeStreamParser {
                 type: "usage",
                 usage: {
                   inputTokens: parsed.usage.input_tokens || 0,
-                  outputTokens: parsed.usage.output_tokens || 0
+                  outputTokens: parsed.usage.output_tokens || 0,
+                  cacheCreationInputTokens: parsed.usage.cache_creation_input_tokens || 0,
+                  cacheReadInputTokens: parsed.usage.cache_read_input_tokens || 0,
                 }
               });
             }
@@ -111,7 +139,7 @@ export async function* streamClaudeCode({
   onChunk
 }: {
   prompt?: string;
-  systemPrompt?: string;
+  systemPrompt?: SystemPrompt;
   messages?: Array<{ role: string; content: string }>;
   options?: StreamOptions;
   onChunk?: (chunk: string) => void;
@@ -130,7 +158,12 @@ export async function* streamClaudeCode({
   let continuationCount = 0;
   let conversationHistory = [...messages];
   let fullContent = "";
-  let totalUsage = { inputTokens: 0, outputTokens: 0 };
+  let totalUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationInputTokens: 0,
+    cacheReadInputTokens: 0,
+  };
 
   // Add initial user message if prompt provided
   if (prompt) {
@@ -185,6 +218,8 @@ export async function* streamClaudeCode({
           } else if (item.type === "usage" && item.usage) {
             totalUsage.inputTokens += item.usage.inputTokens;
             totalUsage.outputTokens += item.usage.outputTokens;
+            totalUsage.cacheCreationInputTokens += item.usage.cacheCreationInputTokens || 0;
+            totalUsage.cacheReadInputTokens += item.usage.cacheReadInputTokens || 0;
 
           } else if (item.type === "complete") {
             isComplete = true;
@@ -265,17 +300,27 @@ export async function generateLongCode({
   options = {}
 }: {
   prompt?: string;
-  systemPrompt?: string;
+  systemPrompt?: SystemPrompt;
   messages?: Array<{ role: string; content: string }>;
   options?: StreamOptions;
 }): Promise<{
   content: string;
-  usage: { inputTokens: number; outputTokens: number };
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationInputTokens: number;
+    cacheReadInputTokens: number;
+  };
   chunks: number;
   error?: string;
 }> {
   let fullContent = "";
-  let totalUsage = { inputTokens: 0, outputTokens: 0 };
+  let totalUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationInputTokens: 0,
+    cacheReadInputTokens: 0,
+  };
   let chunkCount = 0;
   let error: string | undefined;
 
@@ -298,6 +343,8 @@ export async function generateLongCode({
     } else if (chunk.type === "usage" && chunk.usage) {
       totalUsage.inputTokens = chunk.usage.inputTokens;
       totalUsage.outputTokens = chunk.usage.outputTokens;
+      totalUsage.cacheCreationInputTokens = chunk.usage.cacheCreationInputTokens || 0;
+      totalUsage.cacheReadInputTokens = chunk.usage.cacheReadInputTokens || 0;
       chunkCount++;
 
     } else if (chunk.type === "error" && chunk.error) {
@@ -354,12 +401,20 @@ export async function generateCodeWithContinuation({
   onProgress?: (message: string) => void;
 }): Promise<{
   code: string;
-  usage: { inputTokens: number; outputTokens: number };
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationInputTokens: number;
+    cacheReadInputTokens: number;
+  };
   chunks: number;
   error?: string;
 }> {
-  // Parse formatted prompt if provided, otherwise build from scratch
-  let systemPrompt: string;
+  // Parse formatted prompt if provided, otherwise build from scratch.
+  // `system` may arrive as a plain string (legacy) or as a content-block array
+  // carrying cache_control markers (Anthropic prompt caching). Both shapes are
+  // forwarded to /v1/messages unchanged.
+  let systemPrompt: SystemPrompt;
   let messages: Array<{ role: string; content: string }> = [];
 
   if (formattedPrompt) {
