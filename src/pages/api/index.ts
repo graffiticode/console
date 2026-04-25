@@ -66,6 +66,7 @@ const typeDefs = `
     updated: String
     sharedWith: [String]
     app: String
+    task: Task
   }
 
   type GeneratedCode {
@@ -308,6 +309,14 @@ const resolvers = {
       const { itemId, targetUserId } = args;
       const { uid } = await client.verifyToken(token);
       return await shareItem({ auth: { uid, token }, itemId, targetUserId });
+    },
+  },
+  Item: {
+    task: async (parent, _, ctx) => {
+      const { token } = ctx;
+      if (!parent?.taskId) return null;
+      const { uid } = await client.verifyToken(token);
+      return await getTask({ auth: { uid, token }, id: parent.taskId });
     },
   },
 };
