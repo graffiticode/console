@@ -40,7 +40,8 @@ export default function App({
   const queryDomain = router.query.domain;
   const queryDomainStr = Array.isArray(queryDomain) ? queryDomain[0] : queryDomain;
   const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
-  const domain = queryDomainStr || storedDomain || getTitle();
+  const rawDomain = queryDomainStr || storedDomain || getTitle();
+  const domain = rawDomain.toLowerCase() === 'graffiticode' ? undefined : rawDomain;
   const domainLanguages = selectLanguages(domain);
   const defaultLanguage = domainLanguages.length > 0 ? domainLanguages[0] : {id: 2, name: "L0002"};
 

@@ -29,13 +29,12 @@ export function findLanguageByNumber(num: string): Language | undefined {
 export { selectLangs as selectLanguages };
 
 interface LanguageSelectorProps {
-  domain: string;
+  domain?: string;
   language: Language | null;
   setLanguage: (language: Language | null) => void;
 }
 
 export default function LanguageSelector({ domain, language, setLanguage }: LanguageSelectorProps) {
-  domain = domain.toLowerCase();
   const [query, setQuery] = useState('')
   const domainLanguages = selectLangs(domain);
   // Normalize the query to ensure it has the leading "L" if it's just numbers

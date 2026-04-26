@@ -58,7 +58,8 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
   }
 
   const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
-  const domain = queryDomainStr || storedDomain || getTitle();
+  const rawDomain = queryDomainStr || storedDomain || getTitle();
+  const domain = rawDomain.toLowerCase() === 'graffiticode' ? undefined : rawDomain;
   useEffect(() => {
     document.title = getPageTitle();
   }, []);

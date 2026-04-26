@@ -17,7 +17,8 @@ export default function ToolsGallery({ language, setLanguage }) {
   const queryDomain = router.query.domain;
   const queryDomainStr = Array.isArray(queryDomain) ? queryDomain[0] : queryDomain;
   const storedDomain = typeof window !== 'undefined' ? sessionStorage.getItem('graffiticode:domain') : null;
-  const domain = queryDomainStr || storedDomain || getTitle();
+  const rawDomain = queryDomainStr || storedDomain || getTitle();
+  const domain = rawDomain.toLowerCase() === 'graffiticode' ? undefined : rawDomain;
   const languages = selectLanguages(domain);
 
   const [selectedLang, setSelectedLang] = useState<string | null>(language?.name || null);
