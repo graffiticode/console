@@ -11,7 +11,7 @@ export interface Language {
 }
 
 export const LANGUAGES: Language[] = [
-  // { id: "0001", name: "L0001", description: "Base language", domains: [] },
+  // L0001 is DEPRECATED — retained as a repo for historical reference only. Do not re-enable.
   { id: "0002", name: "L0002", description: "Core language", domains: [] },
   // { id: "0011", name: "L0011", description: "Property editors", domains: [] },
   // { id: "0012", name: "L0012", description: "Object viewers", domains: [] },
