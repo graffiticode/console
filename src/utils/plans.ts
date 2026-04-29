@@ -16,8 +16,8 @@ export interface Plan {
 export const plans: Plan[] = [
   {
     id: 'demo',
-    name: 'Demo',
-    description: 'Try Graffiticode for free',
+    name: 'Free',
+    description: 'Free, no credit card required',
     monthlyPrice: 0,
     annualPrice: 0,
     monthlyUnits: 250,
@@ -111,7 +111,7 @@ export interface ButtonLabelOpts {
 export function getButtonLabel(opts: ButtonLabelOpts): string {
   if (opts.processing) return 'Processing...';
   if (opts.isFree && opts.isCurrentPlan) return 'Current Plan';
-  if (opts.isFree && opts.hasActiveSubscription) return 'Downgrade to Demo';
+  if (opts.isFree && opts.hasActiveSubscription) return 'Downgrade to Free';
   if (opts.cancelAtPeriodEnd && opts.isCurrentPlan) return 'Canceling at Period End';
   if (opts.isCurrentPlan && opts.isSameBillingInterval && !opts.isFree) {
     return opts.pendingCancel ? 'Confirm Cancel' : 'Cancel Plan';

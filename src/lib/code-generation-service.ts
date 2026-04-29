@@ -44,6 +44,33 @@ import {
   RenderContext,
 } from "./prompt-renderer";
 import { checkCompileAllowed } from "./usage-service";
+import { assertNotCappedOrThrow, recordSpend } from "./free-plan-spend";
+import { checkBurstLimit, checkDailyLimit } from "./free-plan-throttle";
+import { FreePlanError } from "./free-plan-context";
+
+const ANTHROPIC_INPUT_USD_PER_TOKEN = 3 / 1_000_000;
+const ANTHROPIC_OUTPUT_USD_PER_TOKEN = 15 / 1_000_000;
+const ANTHROPIC_CACHE_WRITE_USD_PER_TOKEN = 3.75 / 1_000_000;
+const ANTHROPIC_CACHE_READ_USD_PER_TOKEN = 0.3 / 1_000_000;
+
+function estimateUsdCost(usage?: {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
+}): number {
+  if (!usage) return 0;
+  const input = Math.max(0, (usage.inputTokens || 0) - (usage.cacheCreationInputTokens || 0) - (usage.cacheReadInputTokens || 0));
+  return (
+    input * ANTHROPIC_INPUT_USD_PER_TOKEN +
+    (usage.outputTokens || 0) * ANTHROPIC_OUTPUT_USD_PER_TOKEN +
+    (usage.cacheCreationInputTokens || 0) * ANTHROPIC_CACHE_WRITE_USD_PER_TOKEN +
+    (usage.cacheReadInputTokens || 0) * ANTHROPIC_CACHE_READ_USD_PER_TOKEN
+  );
+}
+
+const MIN_FREE_PLAN_PROMPT = 20;
+const MAX_FREE_PLAN_PROMPT = 2000;
 
 // Global cache for language assets with TTL
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -1072,9 +1099,29 @@ export async function generateCode({
   conversationSummary?: ConversationSummary | null;
 }) {
   const accessToken = auth?.token;
+  const isFreePlan = !!auth?.freePlan;
 
-  // Check usage limit before proceeding
-  if (auth?.uid) {
+  if (isFreePlan) {
+    const trimmed = (prompt || "").trim();
+    if (trimmed.length < MIN_FREE_PLAN_PROMPT) {
+      throw new FreePlanError("free_plan_description_too_short", 400, {
+        error: "free_plan_description_too_short",
+        message: `Please describe what you want in at least ${MIN_FREE_PLAN_PROMPT} characters.`,
+      });
+    }
+    if (trimmed.length > MAX_FREE_PLAN_PROMPT) {
+      throw new FreePlanError("free_plan_description_too_long", 400, {
+        error: "free_plan_description_too_long",
+        message: `Free plan descriptions must be ${MAX_FREE_PLAN_PROMPT} characters or fewer.`,
+      });
+    }
+    await assertNotCappedOrThrow();
+    if (auth?.sessionNamespace) {
+      await checkBurstLimit(auth.sessionNamespace);
+      await checkDailyLimit(auth.sessionNamespace);
+    }
+  } else if (auth?.uid) {
+    // Check usage limit before proceeding
     const { allowed, reason, currentUsage, totalAvailable } = await checkCompileAllowed(auth.uid);
     console.log("generateCode() usage check:", { uid: auth.uid, allowed, reason, currentUsage, totalAvailable });
     if (!allowed) {
@@ -1365,6 +1412,13 @@ export async function generateCode({
           latencyMs: generationLatency,
         });
       }
+      if (isFreePlan) {
+        try {
+          await recordSpend(estimateUsdCost(u));
+        } catch (err) {
+          console.error("[free-plan] failed to record spend", err);
+        }
+      }
     }
 
     if (streamResult.error) {
@@ -1561,6 +1615,14 @@ export async function generateCode({
           finalUsage.prompt_tokens += fixResult.usage.inputTokens;
           finalUsage.completion_tokens += fixResult.usage.outputTokens;
           finalUsage.total_tokens += fixResult.usage.inputTokens + fixResult.usage.outputTokens;
+
+          if (isFreePlan) {
+            try {
+              await recordSpend(estimateUsdCost(fixResult.usage));
+            } catch (err) {
+              console.error("[free-plan] failed to record fix spend", err);
+            }
+          }
 
           fixAttempts++;
 

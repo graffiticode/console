@@ -89,7 +89,9 @@ export default function Billing() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Subscription</h1>
             <p className="mt-2 text-sm text-gray-600">
-              Manage your subscription, monitor usage, and update payment methods.
+              Manage your subscription, monitor usage, and update payment methods. New
+              accounts start on the Free plan &mdash; 250 compile units / month, no credit
+              card required. Upgrade to Starter for higher limits and overage.
             </p>
           </div>
 

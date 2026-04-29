@@ -113,8 +113,8 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
     : 'text-gray-600 bg-gray-100';
 
   const getStatusLabel = () => {
-    if (subscription.status === 'none') return 'Free Tier';
-    if (subscription.plan === 'demo') return 'Free Tier';
+    if (subscription.status === 'none') return 'Free';
+    if (subscription.plan === 'demo') return 'Free';
     if (subscription.status === 'active' || subscription.status === 'trialing') return 'Active';
     if (subscription.status === 'past_due') return 'Past Due';
     if (subscription.status === 'canceled') return 'Canceled';
@@ -143,6 +143,11 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
             <dd className="mt-1 text-sm text-gray-600">
               {displayUnits.toLocaleString()} compile units per month
             </dd>
+            {subscription.plan === 'demo' && (
+              <dd className="mt-1 text-xs text-gray-500">
+                No credit card required.
+              </dd>
+            )}
           </div>
 
           <div>

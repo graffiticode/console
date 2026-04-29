@@ -6,9 +6,32 @@ import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } fr
 import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService } from "../../lib/code-generation-service";
 import { ragLog, generateRequestId } from "../../lib/logger";
+import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+
+type AuthArg = {
+  uid: string;
+  token: string;
+  freePlan?: boolean;
+  sessionNamespace?: string;
+};
+
+function isItemVisibleToFreePlan(data: any, auth: AuthArg, now = Date.now()): boolean {
+  if (!auth.freePlan) return true;
+  if (data?.sessionNamespace !== auth.sessionNamespace) return false;
+  if (typeof data?.expiresAt === "number" && data.expiresAt <= now) return false;
+  return true;
+}
+
+function freePlanItemFields(auth: AuthArg, now = Date.now()) {
+  return {
+    freePlan: true,
+    sessionNamespace: auth.sessionNamespace,
+    expiresAt: now + FREE_PLAN_ITEM_TTL_MS,
+  };
+}
 // import { buildDynamicSchema } from "./schemas";
 
 function encrypt(plaintext: string): string {
@@ -503,7 +526,7 @@ export async function createItem({
       }
     }
     const timestamp = Date.now();
-    const item = {
+    const item: Record<string, any> = {
       id,
       name,
       taskId,
@@ -515,6 +538,9 @@ export async function createItem({
       created: timestamp,
       updated: timestamp,
     };
+    if (auth.freePlan) {
+      Object.assign(item, freePlanItemFields(auth, timestamp));
+    }
     await itemRef.set(item);
     return {
       ...item,
@@ -556,6 +582,12 @@ export async function updateItem({
       throw new Error("Item not found");
     }
     const itemData = itemDoc.data();
+    if (!isItemVisibleToFreePlan(itemData, auth)) {
+      throw new Error("Item not found");
+    }
+    if (auth.freePlan && isPublic) {
+      throw new Error("Free plan items cannot be made public.");
+    }
     const updates: any = {};
     if (name !== undefined) updates.name = name;
     if (taskId !== undefined) updates.taskId = taskId;
@@ -579,6 +611,9 @@ export async function updateItem({
       }
     }
     updates.updated = Date.now();
+    if (auth.freePlan) {
+      updates.expiresAt = updates.updated + FREE_PLAN_ITEM_TTL_MS;
+    }
     await itemRef.update(updates);
     const updatedDoc = await itemRef.get();
     const data = updatedDoc.data();
@@ -603,19 +638,28 @@ export async function getItems({ auth, lang, mark, app }) {
     if (mark !== undefined && mark !== null) {
       query = query.where("mark", "==", mark);
     }
-    // Filter by app - default to 'console' if not specified
-    const appFilter = app || 'console';
-    query = query.where("app", "==", appFilter);
+    if (auth.freePlan) {
+      query = query.where("sessionNamespace", "==", auth.sessionNamespace);
+    } else {
+      // Filter by app - default to 'console' if not specified
+      const appFilter = app || 'console';
+      query = query.where("app", "==", appFilter);
+    }
     const itemsSnapshot = await query.get();
     const items = [];
 
-    // Get the user's sharedItems data to add to items
-    const userDoc = await db.doc(`users/${auth.uid}`).get();
-    const sharedItemsData = userDoc.data()?.sharedItems || {};
+    // Get the user's sharedItems data to add to items (skip on free plan — shared
+    // items are not supported there).
+    const sharedItemsData = auth.freePlan
+      ? {}
+      : (await db.doc(`users/${auth.uid}`).get()).data()?.sharedItems || {};
+
+    const now = Date.now();
 
     // Process items and fetch legacy data if needed
     for (const doc of itemsSnapshot.docs) {
       const data = doc.data();
+      if (!isItemVisibleToFreePlan(data, auth, now)) continue;
       let help = data.help;
       let taskId = data.taskId;
 
@@ -732,6 +776,9 @@ export async function getItem({ auth, id }) {
     }
 
     const data = itemDoc.data();
+    if (!isItemVisibleToFreePlan(data, auth)) {
+      return null;
+    }
     let help = data.help;
     let taskId = data.taskId;
 
