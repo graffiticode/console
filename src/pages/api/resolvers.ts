@@ -253,7 +253,11 @@ export async function postTask({ auth, task, ephemeral, isPublic }) {
     const { data } = await postApiJSON("/task", { task }, headers);
     return data;
   } catch (x) {
-    console.log("postTask()", "ERROR", x);
+    console.error("postTask()", "ERROR", x);
+    const message = x && typeof x === "object" && "message" in x
+      ? String((x as { message: unknown }).message)
+      : "task post failed";
+    throw new Error(`postTask: ${message}`);
   }
 }
 
