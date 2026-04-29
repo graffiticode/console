@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import useSWR from 'swr';
 import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
 import { selectLanguages } from './language-selector';
@@ -174,6 +176,13 @@ export default function ToolsGallery({ language, setLanguage }) {
               <p className="text-sm text-gray-500 mt-4 max-w-[600px]">
                 {langInfo?.description || languages.find(l => l.name === selectedLang)?.routingHint || languages.find(l => l.name === selectedLang)?.description}
               </p>
+              <Link
+                href="/items"
+                className="inline-flex items-center gap-1 mt-4 px-3 py-1.5 border border-gray-300 rounded-none text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Go to items
+                <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+              </Link>
             </div>
           ) : (
             <div className="flex items-center justify-center h-full">
