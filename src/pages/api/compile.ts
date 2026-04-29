@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import bent from "bent";
 import { getBaseUrlForApi } from "../../lib/api";
-import { getFreePlanApiKey, isFreePlanRequest } from "../../lib/free-plan-context";
+import { getFreePlanCredentials, isFreePlanRequest } from "../../lib/free-plan-context";
 
 const FREE_PLAN_PREFIX = "free-plan ";
 
@@ -25,9 +25,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (freePlan.freePlan || incomingAuth.startsWith(FREE_PLAN_PREFIX)) {
     try {
-      downstreamAuth = getFreePlanApiKey();
+      const { idToken } = await getFreePlanCredentials();
+      downstreamAuth = idToken;
     } catch (err) {
-      res.status(500).json({ error: "free_plan_misconfigured" });
+      res.status(500).json({ error: "free_plan_misconfigured", message: err instanceof Error ? err.message : String(err) });
       return;
     }
   } else {

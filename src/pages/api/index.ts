@@ -26,8 +26,7 @@ import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
 import {
   FreePlanError,
-  getFreePlanApiKey,
-  getFreePlanUid,
+  getFreePlanCredentials,
   isFreePlanRequest,
 } from "../../lib/free-plan-context";
 
@@ -48,10 +47,10 @@ type AuthContext = {
 
 async function resolveAuth(ctx): Promise<AuthContext> {
   if (ctx.freePlan) {
-    const uid = await getFreePlanUid();
+    const { uid, idToken } = await getFreePlanCredentials();
     return {
       uid,
-      token: getFreePlanApiKey(),
+      token: idToken,
       freePlan: true,
       sessionNamespace: ctx.sessionNamespace,
     };
