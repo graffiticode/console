@@ -24,17 +24,24 @@ import {
 import { checkCompileAllowed } from "../../lib/usage-service";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
+import { getCredentialsForApiKey } from "../../lib/api-credentials";
 import {
   FreePlanError,
   getFreePlanCredentials,
   isFreePlanRequest,
 } from "../../lib/free-plan-context";
 
-async function authenticate(token) {
+// Normalizes any inbound credential into { uid, idToken }, where idToken is
+// always a Firebase ID token (or signed JWT) suitable for forwarding to
+// api.graffiticode.org. Inbound can be either a Firebase ID token or a raw
+// Graffiticode api key — the api-key path exchanges via the auth service.
+async function authenticate(token: string): Promise<{ uid: string; idToken: string }> {
   try {
-    return await client.verifyToken(token);
+    const { uid } = await client.verifyToken(token);
+    return { uid, idToken: token };
   } catch {
-    return await client.apiKeys.authenticate({ token });
+    const { uid, idToken } = await getCredentialsForApiKey(token);
+    return { uid, idToken };
   }
 }
 
@@ -55,8 +62,8 @@ async function resolveAuth(ctx): Promise<AuthContext> {
       sessionNamespace: ctx.sessionNamespace,
     };
   }
-  const { uid } = await authenticate(ctx.token);
-  return { uid, token: ctx.token };
+  const { uid, idToken } = await authenticate(ctx.token);
+  return { uid, token: idToken };
 }
 
 const typeDefs = `
@@ -215,7 +222,7 @@ const resolvers = {
         return { allowed: false, reason: 'Not authenticated' };
       }
       try {
-        const { uid } = await client.verifyToken(token);
+        const { uid } = await authenticate(token);
         return await checkCompileAllowed(uid);
       } catch (error) {
         return { allowed: false, reason: 'Authentication failed' };
@@ -237,15 +244,15 @@ const resolvers = {
       if (ctx.freePlan) return [];
       const { token } = ctx;
       const { lang, type } = args;
-      const { uid } = await client.verifyToken(token);
-      return await compiles({ auth: { uid, token }, lang, type });
+      const { uid, idToken } = await authenticate(token);
+      return await compiles({ auth: { uid, token: idToken }, lang, type });
     },
     tasks: async (_, args, ctx) => {
       if (ctx.freePlan) return [];
       const { token } = ctx;
       const { lang, mark } = args;
-      const { uid } = await client.verifyToken(token);
-      return await getTasks({ auth: { uid, token }, lang, mark });
+      const { uid, idToken } = await authenticate(token);
+      return await getTasks({ auth: { uid, token: idToken }, lang, mark });
     },
     task: async (_, args, ctx) => {
       const { id } = args;
@@ -315,8 +322,8 @@ const resolvers = {
         return JSON.stringify({ success: true });
       }
       const { token } = ctx;
-      const { uid } = await client.verifyToken(token);
-      const resp = await logCompile({ auth: { uid, token }, units, id, timestamp, status, data });
+      const { uid, idToken } = await authenticate(token);
+      const resp = await logCompile({ auth: { uid, token: idToken }, units, id, timestamp, status, data });
       return resp;
     },
     createItem: async (_, args, ctx) => {
@@ -335,8 +342,8 @@ const resolvers = {
       }
       const { token } = ctx;
       const { itemId, targetUserId } = args;
-      const { uid } = await client.verifyToken(token);
-      return await shareItem({ auth: { uid, token }, itemId, targetUserId });
+      const { uid, idToken } = await authenticate(token);
+      return await shareItem({ auth: { uid, token: idToken }, itemId, targetUserId });
     },
   },
   Item: {

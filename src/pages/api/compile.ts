@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import bent from "bent";
 import { getBaseUrlForApi } from "../../lib/api";
+import { client as authClient } from "../../lib/auth";
+import { getCredentialsForApiKey } from "../../lib/api-credentials";
 import { getFreePlanCredentials, isFreePlanRequest } from "../../lib/free-plan-context";
-
-const FREE_PLAN_PREFIX = "free-plan ";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const incomingAuth = (req.headers.authorization as string) || "";
   let downstreamAuth: string;
 
-  if (freePlan.freePlan || incomingAuth.startsWith(FREE_PLAN_PREFIX)) {
+  if (freePlan.freePlan) {
     try {
       const { idToken } = await getFreePlanCredentials();
       downstreamAuth = idToken;
@@ -36,7 +36,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(401).json({ error: "unauthenticated" });
       return;
     }
-    downstreamAuth = incomingAuth;
+    // If incomingAuth is a Firebase ID token / signed JWT, forward as-is.
+    // If it's a raw api key, exchange it for a Firebase ID token first
+    // (api.graffiticode.org's auth middleware doesn't accept raw api keys).
+    try {
+      await authClient.verifyToken(incomingAuth);
+      downstreamAuth = incomingAuth;
+    } catch {
+      try {
+        const { idToken } = await getCredentialsForApiKey(incomingAuth);
+        downstreamAuth = idToken;
+      } catch (err) {
+        res.status(401).json({ error: "invalid_credential", message: err instanceof Error ? err.message : String(err) });
+        return;
+      }
+    }
   }
 
   try {
