@@ -16,7 +16,6 @@ import {
 import SignIn from '../components/SignIn'
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import Gallery from '../components/gallery';
 import useSwr from 'swr';
 import useLocalStorage from '../hooks/use-local-storage';
@@ -26,28 +25,15 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-const VALID_APPS = ['console', 'front', 'mcp'];
-
-export default function Tasks({ language, mark }) {
-  const router = useRouter();
-  const appParam = router.query.app;
-  const app = Array.isArray(appParam) ? appParam[0] : (appParam || 'console');
-
-  // Validate app parameter - redirect if invalid
-  useEffect(() => {
-    if (appParam && !VALID_APPS.includes(app)) {
-      const { app: _, ...rest } = router.query;
-      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
-    }
-  }, [appParam, app, router]);
-
+export default function Tasks({ language, mark, app }) {
   useEffect(() => {
     document.title = getPageTitle();
   }, []);
   const lang = language.name.slice(1);
+  const appId = app?.id || 'console';
   return (
     <div className="max-w-full mx-auto py-0 sm:px-6 lg:px-8">
-      <Gallery lang={lang} mark={mark} app={app} />
+      <Gallery lang={lang} mark={mark} app={appId} />
     </div>
   )
 }

@@ -12,6 +12,7 @@ import Layout from '../components/layout';
 import { useState, useEffect, useRef } from "react";
 import useLocalStorage from '../hooks/use-local-storage';
 import { marks } from "../components/mark-selector";
+import { apps, findAppById } from "../components/app-selector";
 import AuthWrapper from '../components/AuthWrapper';
 import { selectLanguages, findLanguageByNumber } from '../components/language-selector';
 import { getTitle } from '../lib/utils';
@@ -47,6 +48,7 @@ export default function App({
 
   const [language, setLanguage] = useLocalStorage("graffiticode:language", defaultLanguage);
   const [mark, setMark] = useLocalStorage("graffiticode:items:mark", marks[0]);
+  const [app, setApp] = useLocalStorage("graffiticode:items:app", apps[0]);
 
   // Set language/mark from query params or domain defaults on initial load
   useEffect(() => {
@@ -79,8 +81,18 @@ export default function App({
       }
     }
 
+    // Apply ?app= query param (e.g. ?app=mcp)
+    const queryApp = router.query.app;
+    const appStr = Array.isArray(queryApp) ? queryApp[0] : queryApp;
+    if (appStr) {
+      const found = findAppById(appStr);
+      if (found) {
+        setApp(found);
+      }
+    }
+
     languageInitialized.current = true;
-  }, [router.isReady, domainLanguages, language.name, setLanguage, setMark]);
+  }, [router.isReady, domainLanguages, language.name, setLanguage, setMark, setApp]);
 
   return (
     (pathName === "form" || pathName === "editor") &&
@@ -89,7 +101,7 @@ export default function App({
         <WagmiProvider config={config}>
           <QueryClientProvider client={queryClient}>
             <GraffiticodeAuthProvider>
-              <Component {...{...pageProps, language, setLanguage, mark, setMark}} />
+              <Component {...{...pageProps, language, setLanguage, mark, setMark, app, setApp}} />
             </GraffiticodeAuthProvider>
           </QueryClientProvider>
         </WagmiProvider>
@@ -105,9 +117,11 @@ export default function App({
                 setLanguage={setLanguage}
                 mark={mark}
                 setMark={setMark}
+                app={app}
+                setApp={setApp}
               >
                 <AuthWrapper>
-                  <Component {...{...pageProps, language, setLanguage, mark}} />
+                  <Component {...{...pageProps, language, setLanguage, mark, app, setApp}} />
                 </AuthWrapper>
               </Layout>
             </GraffiticodeAuthProvider>
