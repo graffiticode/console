@@ -20,6 +20,8 @@ interface UserData {
   notificationPhone?: string;
   notifyByEmail?: boolean;
   notifyByPhone?: boolean;
+  signInEmail?: string;
+  signInEmailVerifiedAt?: string;
 }
 
 export default function Profile() {
@@ -391,6 +393,13 @@ export default function Profile() {
                     <dt className="text-sm font-medium text-gray-500">User ID</dt>
                     <dd className="mt-1 text-sm text-gray-900 font-mono break-all">
                       {user.uid}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Sign-in Email</dt>
+                    <dd className="mt-1 text-sm text-gray-900 break-all">
+                      {userData?.signInEmail || '—'}
                     </dd>
                   </div>
 

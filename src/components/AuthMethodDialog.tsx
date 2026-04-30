@@ -1,24 +1,81 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 
 interface AuthMethodDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectEthereum: () => void;
-  onSelectGoogle: () => void;
-  googleLoading?: boolean;
-  googleError?: string | null;
+  onSubmitEmail: (email: string) => Promise<void>;
+  onSubmitCode: (code: string) => Promise<void>;
+  emailSending?: boolean;
+  emailError?: string | null;
+  codeVerifying?: boolean;
+  codeError?: string | null;
+  variant?: 'default' | 'claim';
 }
+
+type Step = 'method' | 'email' | 'code';
 
 export default function AuthMethodDialog({
   isOpen,
   onClose,
   onSelectEthereum,
-  onSelectGoogle,
-  googleLoading = false,
-  googleError = null,
+  onSubmitEmail,
+  onSubmitCode,
+  emailSending = false,
+  emailError = null,
+  codeVerifying = false,
+  codeError = null,
+  variant = 'default',
 }: AuthMethodDialogProps) {
+  const [step, setStep] = useState<Step>('method');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [sentToEmail, setSentToEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setStep('method');
+      setEmail('');
+      setCode('');
+      setSentToEmail(null);
+    }
+  }, [isOpen]);
+
+  const isClaim = variant === 'claim';
+  const title = isClaim ? 'Save your items' : 'Sign in to Graffiticode';
+  const leadCopy = isClaim
+    ? 'Sign in to keep these items permanently.'
+    : 'New here? Create a free account by signing in. No blockchain fees. No credit card required.';
+  const ethereumLabel = isClaim ? 'Sign in with Ethereum Wallet' : 'Continue with Ethereum Wallet';
+  const emailCaption = isClaim ? '(creates a new Graffiticode account)' : null;
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    try {
+      await onSubmitEmail(trimmed);
+      setSentToEmail(trimmed);
+      setStep('code');
+    } catch {
+      // emailError surfaces via prop
+    }
+  };
+
+  const handleCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    try {
+      await onSubmitCode(trimmed);
+      onClose();
+    } catch {
+      // codeError surfaces via prop
+    }
+  };
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -50,7 +107,7 @@ export default function AuthMethodDialog({
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900 flex justify-between items-center"
                 >
-                  Sign in
+                  {title}
                   <button
                     type="button"
                     className="text-gray-400 hover:text-gray-500"
@@ -61,73 +118,147 @@ export default function AuthMethodDialog({
                 </Dialog.Title>
 
                 <div className="mt-4 space-y-3">
-                  {googleError && (
-                    <div className="rounded-none bg-red-50 p-3 text-sm text-red-700">
-                      {googleError}
-                    </div>
+                  {step === 'method' && (
+                    <>
+                      <p className="text-sm text-gray-500 text-center">
+                        {leadCopy}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={onSelectEthereum}
+                        className="w-full flex items-center justify-center gap-3 rounded-none border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M12 2L4 12L12 16L20 12L12 2Z" fill="#627EEA" />
+                          <path d="M12 16L4 12L12 22L20 12L12 16Z" fill="#627EEA" opacity="0.6" />
+                          <path d="M12 2L4 12L12 9.5L20 12L12 2Z" fill="#627EEA" opacity="0.3" />
+                        </svg>
+                        <span>{ethereumLabel}</span>
+                      </button>
+
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-300" />
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                          <span className="bg-white px-2 text-gray-500">or</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setStep('email')}
+                        className="w-full flex items-center justify-center gap-3 rounded-none border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <EnvelopeIcon className="h-5 w-5 text-gray-600" />
+                        <span>Continue with Email</span>
+                      </button>
+
+                      {emailCaption && (
+                        <p className="text-xs text-gray-500 text-center">{emailCaption}</p>
+                      )}
+                    </>
                   )}
 
-                  {/* Ethereum Wallet Button */}
-                  <p className="text-sm text-gray-500 text-center">
-                    New here? Create a free account by signing in with an Ethereum wallet.
-                    <br />
-                    No blockchain fees required. No credit card required.
-                  </p>
+                  {step === 'email' && (
+                    <form onSubmit={handleEmailSubmit} className="space-y-3">
+                      <p className="text-sm text-gray-500 text-center">
+                        Enter your email to receive a sign-in code.
+                      </p>
+                      {emailError && (
+                        <div className="rounded-none bg-red-50 p-3 text-sm text-red-700">
+                          {emailError}
+                        </div>
+                      )}
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="email@example.com"
+                        required
+                        autoFocus
+                        disabled={emailSending}
+                        className="w-full rounded-none border border-gray-300 px-4 py-3 text-sm focus:border-gray-500 focus:outline-none focus:ring-0 disabled:opacity-50"
+                      />
+                      <button
+                        type="submit"
+                        disabled={emailSending || !email.trim()}
+                        className="w-full flex items-center justify-center gap-3 rounded-none border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {emailSending ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-700"></div>
+                            <span>Sending...</span>
+                          </>
+                        ) : (
+                          <span>Send code</span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep('method')}
+                        disabled={emailSending}
+                        className="w-full text-center text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                      >
+                        Back
+                      </button>
+                    </form>
+                  )}
 
-                  <button
-                    type="button"
-                    onClick={onSelectEthereum}
-                    disabled={googleLoading}
-                    className="w-full flex items-center justify-center gap-3 rounded-none border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 2L4 12L12 16L20 12L12 2Z" fill="#627EEA" />
-                      <path d="M12 16L4 12L12 22L20 12L12 16Z" fill="#627EEA" opacity="0.6" />
-                      <path d="M12 2L4 12L12 9.5L20 12L12 2Z" fill="#627EEA" opacity="0.3" />
-                    </svg>
-                    <span>Continue with Ethereum Wallet</span>
-                  </button>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300" />
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="bg-white px-2 text-gray-500">or</span>
-                    </div>
-                  </div>
-
-                  {/* Google Sign-in Button */}
-                  <button
-                    type="button"
-                    onClick={onSelectGoogle}
-                    disabled={googleLoading}
-                    className="w-full flex items-center justify-center gap-3 rounded-none border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {googleLoading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-700"></div>
-                        <span>Signing in...</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="h-5 w-5" viewBox="0 0 24 24">
-                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                        </svg>
-                        <span>Continue with Google</span>
-                      </>
-                    )}
-                  </button>
+                  {step === 'code' && (
+                    <form onSubmit={handleCodeSubmit} className="space-y-3">
+                      <p className="text-sm text-gray-500 text-center">
+                        We sent a code to{' '}
+                        <span className="font-medium text-gray-700">{sentToEmail}</span>.
+                        <br />
+                        Enter it below to finish signing in.
+                      </p>
+                      {codeError && (
+                        <div className="rounded-none bg-red-50 p-3 text-sm text-red-700">
+                          {codeError}
+                        </div>
+                      )}
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value.replace(/\s/g, ''))}
+                        placeholder="123456"
+                        required
+                        autoFocus
+                        disabled={codeVerifying}
+                        className="w-full rounded-none border border-gray-300 px-4 py-3 text-center text-lg tracking-widest font-mono focus:border-gray-500 focus:outline-none focus:ring-0 disabled:opacity-50"
+                      />
+                      <button
+                        type="submit"
+                        disabled={codeVerifying || !code.trim()}
+                        className="w-full flex items-center justify-center gap-3 rounded-none border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {codeVerifying ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-700"></div>
+                            <span>Signing in...</span>
+                          </>
+                        ) : (
+                          <span>Sign in</span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCode('');
+                          setStep('email');
+                        }}
+                        disabled={codeVerifying}
+                        className="w-full text-center text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                      >
+                        Use a different email
+                      </button>
+                    </form>
+                  )}
                 </div>
-
-                <p className="mt-4 text-sm text-gray-500 text-center">
-                  Google sign-in requires a linked Ethereum account.
-                  <br />
-                  Link your Google account from the Settings page.
-                </p>
               </Dialog.Panel>
             </Transition.Child>
           </div>

@@ -1,4 +1,4 @@
-import { useState, Fragment, useEffect } from "react";
+import { useState, Fragment } from "react";
 import { Menu, Transition } from "@headlessui/react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -10,9 +10,7 @@ import {
   ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
-import { useOAuth } from "../hooks/use-oauth";
-import { useAuth } from "reactfire";
-import { signInWithCustomToken } from "firebase/auth";
+import { useEmailSignIn } from "../hooks/use-email-signin";
 import WalletSelectionDialog from "./WalletSelectionDialog";
 import AuthMethodDialog from "./AuthMethodDialog";
 
@@ -39,12 +37,17 @@ const fetchUserData = async ({ user }) => {
 
 export default function SignInComponent({ label = "Sign in", className }: SignInComponentProps) {
   const { loading, user, signInWithEthereum, signOut } = useGraffiticodeAuth();
-  const { signInWithGoogle } = useOAuth();
-  const auth = useAuth();
+  const {
+    sendCode,
+    verifyAndSignIn,
+    reset: resetEmailFlow,
+    sending: emailSending,
+    verifying: codeVerifying,
+    emailError,
+    codeError,
+  } = useEmailSignIn();
   const [showAuthMethodDialog, setShowAuthMethodDialog] = useState(false);
   const [showWalletDialog, setShowWalletDialog] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [googleError, setGoogleError] = useState<string | null>(null);
 
   // Fetch user profile data from Firestore
   const { data: userData } = useSWR(
@@ -54,8 +57,13 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
   );
 
   const handleSignInClick = () => {
-    setGoogleError(null);
+    resetEmailFlow();
     setShowAuthMethodDialog(true);
+  };
+
+  const handleCloseAuthDialog = () => {
+    setShowAuthMethodDialog(false);
+    resetEmailFlow();
   };
 
   const handleSelectEthereum = () => {
@@ -63,21 +71,12 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
     setShowWalletDialog(true);
   };
 
-  const handleSelectGoogle = async () => {
-    try {
-      setGoogleLoading(true);
-      setGoogleError(null);
-      const { firebaseCustomToken } = await signInWithGoogle();
-      await signInWithCustomToken(auth, firebaseCustomToken);
-      setShowAuthMethodDialog(false);
-      // Navigate to home to avoid stale Firestore listeners on current page
-      window.location.href = '/';
-    } catch (err: any) {
-      console.error('Google sign-in error:', err);
-      setGoogleError(err.message || 'Failed to sign in with Google');
-    } finally {
-      setGoogleLoading(false);
-    }
+  const handleSubmitEmail = async (email: string) => {
+    await sendCode(email);
+  };
+
+  const handleSubmitCode = async (code: string) => {
+    await verifyAndSignIn(code);
   };
 
   const handleSignIn = async (wallet: Wallet | null) => {
@@ -234,11 +233,14 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
 
         <AuthMethodDialog
           isOpen={showAuthMethodDialog}
-          onClose={() => setShowAuthMethodDialog(false)}
+          onClose={handleCloseAuthDialog}
           onSelectEthereum={handleSelectEthereum}
-          onSelectGoogle={handleSelectGoogle}
-          googleLoading={googleLoading}
-          googleError={googleError}
+          onSubmitEmail={handleSubmitEmail}
+          onSubmitCode={handleSubmitCode}
+          emailSending={emailSending}
+          emailError={emailError}
+          codeVerifying={codeVerifying}
+          codeError={codeError}
         />
 
         <WalletSelectionDialog

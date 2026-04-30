@@ -4,6 +4,7 @@ import { mainnet } from 'viem/chains'
 import { injected } from 'wagmi/connectors'
 import { http } from 'viem'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { PrivyProvider } from '@privy-io/react-auth'
 import { GraffiticodeAuthProvider } from "../hooks/use-graffiticode-auth";
 import "../styles/globals.css";
 import "../styles/prosemirror.css";
@@ -28,6 +29,18 @@ const config = createConfig({
     [mainnet.id]: http(),
   },
 })
+
+const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || '';
+
+const privyConfig = {
+  loginMethods: ['email' as const],
+  embeddedWallets: {
+    createOnLogin: 'users-without-wallets' as const,
+  },
+  appearance: {
+    theme: 'light' as const,
+  },
+};
 
 export default function App({
   Component,
@@ -98,35 +111,39 @@ export default function App({
     (pathName === "form" || pathName === "editor") &&
     <div id="gc-root">
       <GraffiticodeFirebaseProvider>
-        <WagmiProvider config={config}>
-          <QueryClientProvider client={queryClient}>
-            <GraffiticodeAuthProvider>
-              <Component {...{...pageProps, language, setLanguage, mark, setMark, app, setApp}} />
-            </GraffiticodeAuthProvider>
-          </QueryClientProvider>
-        </WagmiProvider>
+        <PrivyProvider appId={PRIVY_APP_ID} config={privyConfig}>
+          <WagmiProvider config={config}>
+            <QueryClientProvider client={queryClient}>
+              <GraffiticodeAuthProvider>
+                <Component {...{...pageProps, language, setLanguage, mark, setMark, app, setApp}} />
+              </GraffiticodeAuthProvider>
+            </QueryClientProvider>
+          </WagmiProvider>
+        </PrivyProvider>
       </GraffiticodeFirebaseProvider>
     </div> ||
     <div id="gc-root">
       <GraffiticodeFirebaseProvider>
-        <WagmiProvider config={config}>
-          <QueryClientProvider client={queryClient}>
-            <GraffiticodeAuthProvider>
-              <Layout
-                language={language}
-                setLanguage={setLanguage}
-                mark={mark}
-                setMark={setMark}
-                app={app}
-                setApp={setApp}
-              >
-                <AuthWrapper>
-                  <Component {...{...pageProps, language, setLanguage, mark, app, setApp}} />
-                </AuthWrapper>
-              </Layout>
-            </GraffiticodeAuthProvider>
-          </QueryClientProvider>
-        </WagmiProvider>
+        <PrivyProvider appId={PRIVY_APP_ID} config={privyConfig}>
+          <WagmiProvider config={config}>
+            <QueryClientProvider client={queryClient}>
+              <GraffiticodeAuthProvider>
+                <Layout
+                  language={language}
+                  setLanguage={setLanguage}
+                  mark={mark}
+                  setMark={setMark}
+                  app={app}
+                  setApp={setApp}
+                >
+                  <AuthWrapper>
+                    <Component {...{...pageProps, language, setLanguage, mark, app, setApp}} />
+                  </AuthWrapper>
+                </Layout>
+              </GraffiticodeAuthProvider>
+            </QueryClientProvider>
+          </WagmiProvider>
+        </PrivyProvider>
       </GraffiticodeFirebaseProvider>
     </div>
   );

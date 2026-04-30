@@ -47,8 +47,25 @@ User prompt → RAG vector search → DSPy prompt compilation (optional) → Cla
 
 **Authentication:**
 - Primary: Ethereum wallet sign-in (via SIWE - Sign-In with Ethereum)
-- Secondary: Google OAuth (requires linked Ethereum account)
+- Email magic-link sign-in via Privy (`@privy-io/react-auth`): user enters email → receives a 6-digit code → Privy generates an embedded Ethereum wallet → that wallet signs the existing SIWE nonce → SIWE pipeline proceeds unchanged. Hook: `src/hooks/use-email-signin.ts`. The verified email is stored on the user doc as `signInEmail` (read-only, shown in Profile under User ID; distinct from `notificationEmail` which is opt-in). `<PrivyProvider>` is mounted in `src/pages/_app.tsx` between Firebase and Wagmi providers. Build-time env: `NEXT_PUBLIC_PRIVY_APP_ID` (set in `.env.production` for prod, `.env.local` for dev).
+- Google OAuth is NOT a sign-in method. It exists only as an account-linking option in `/settings` (`OAuthCard`); existing linked accounts retain access via the Ethereum-wallet path.
 - Auth hook: `useGraffiticodeAuth` in `src/hooks/use-graffiticode-auth.tsx`
+- Server-side `authenticate()` in `src/pages/api/index.ts` accepts either a Firebase ID token OR a raw Graffiticode api key. Both paths return `{uid, idToken}` — the `idToken` is what's forwarded to api.graffiticode.org.
+
+**Auth gotcha — api keys vs Firebase tokens:** api.graffiticode.org's auth middleware (`@graffiticode/auth` `client.verifyToken`) only accepts Firebase ID tokens / signed JWTs; it does NOT fall back to api-key lookup. So when forwarding a request from the console resolver to api.graffiticode.org (e.g., via `postTask`, `postApiCompile`, `getApiTask`), you must send a Firebase ID token. Raw api keys 401. The console centralizes this exchange in `src/lib/api-credentials.ts` `getCredentialsForApiKey(apiKey)` — caches per-key for ~55 min. Use this whenever you need to convert an api key into something api.graffiticode.org will accept. The MCP server intentionally forwards api keys verbatim and relies on this exchange.
+
+**Free-plan tier (no-signin via MCP):**
+- The console GraphQL endpoint also accepts requests with header `X-Free-Plan-Session: <opaque-id>` and no `Authorization`. Detected at `src/pages/api/index.ts` via `isFreePlanRequest`.
+- Free-plan requests resolve to `auth.uid` = the FREE_PLAN_API_KEY's owner uid (decoded from the exchanged ID token). Items written under that account are tagged `freePlan: true`, `sessionNamespace: sha256(SALT + ":" + sessionId)`, and `expiresAt` (48h TTL).
+- Reads filter by `sessionNamespace` so each MCP session only sees its own items.
+- The browser console UI requires real sign-in; free-plan is hosted-only via the MCP server.
+- Env vars: `FREE_PLAN_API_KEY`, `FREE_PLAN_NAMESPACE_SALT`, optional `FREE_PLAN_DAILY_SPEND_CAP_USD`, `FREE_PLAN_BURST_LIMIT`, `FREE_PLAN_DAILY_LIMIT`. Pushed via `scripts/set-free-plan-secrets.sh` from `.env.local` to Secret Manager + mounted on Cloud Run.
+
+**Trial-claim flow (`/claim?token=<jwt>`):** the MCP server mints a 24h HS256 JWT signed with `FREE_PLAN_NAMESPACE_SALT` (audience `graffiticode-claim`, payload `{ sessionNamespace, sessionUuid }`) and returns it as `claim_url` on `create_item`/`update_item`. The console `/claim` page renders `<AuthMethodDialog variant="claim">`; on successful sign-in (email or wallet) it calls the `claimFreePlanSession(token)` GraphQL mutation. The resolver verifies the JWT via `src/lib/claim-token.ts`, queries `users/{trialUid}/items` matching `freePlan==true && sessionNamespace==X && expiresAt>now`, and copies each into the authenticated user's `users/{uid}/items/` collection with `taskId: null`, `code` preserved, free-plan flags cleared, `claimedFrom: sessionUuid` for provenance. Tasks lazily re-post under the new uid on first read via the existing guards in `getItems`/`getItem` (precondition: `createItem` persists the parsed AST as `code` on the Firestore item doc — required because tasks on api.graffiticode.org stay owned by the trial uid; the lazy repost is what relocates them). For local testing, mint a JWT via `npx tsx scripts/mint-claim-token.ts <sessionUuid>`.
+
+**Item `app` tag:** items are tagged with the source surface (`'console'`, `'mcp'`, `'front'`) at write time. The `/items` page filters by this tag — switch via the App selector chip in the header. MCP-created items default to `app: 'mcp'` and are invisible in the default Console view; switch to MCP to see them.
+
+**`/api/compile` proxy:** browser-side compile (`src/utils/swr/fetchers.ts compile()`) goes through a Next.js API route proxy at `src/pages/api/compile.ts` rather than calling api.graffiticode.org directly. The proxy handles api-key → ID-token exchange so the browser never needs to hold a Firebase ID token for downstream calls (and free-plan callers don't need to expose FREE_PLAN_API_KEY).
 
 ## Code Style
 
@@ -80,6 +97,7 @@ export GRAFFITICODE_APP_CREDENTIALS=~/graffiticode-app-key.json # graffiticode-a
   - `--lang 0158 0166` - Only upgrade specific languages
   - `--no-force` - Skip deploy if basis is already up to date
   - `--verbose` - Stream build output to terminal
+- `./scripts/set-free-plan-secrets.sh` - Push `FREE_PLAN_API_KEY` and `FREE_PLAN_NAMESPACE_SALT` from `.env.local` into Secret Manager and remount on the `console` Cloud Run service. Re-running rotates (creates a new secret version) and rolls a new revision. Rotating the salt invalidates active free-plan namespaces.
 
 ## Local Development
 

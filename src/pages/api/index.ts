@@ -20,7 +20,9 @@ import {
   getItem,
   shareItem,
   parseCode,
+  claimFreePlanSession,
 } from "./resolvers";
+import { verifyClaimToken } from "../../lib/claim-token";
 import { checkCompileAllowed } from "../../lib/usage-service";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
@@ -189,6 +191,11 @@ const typeDefs = `
     newItemId: String
   }
 
+  type ClaimResult {
+    transferred: Int!
+    sessionNamespace: String!
+  }
+
   type Mutation {
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
@@ -196,6 +203,7 @@ const typeDefs = `
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, app: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
+    claimFreePlanSession(token: String!): ClaimResult!
   }
 
   input CodeGenerationOptions {
@@ -344,6 +352,31 @@ const resolvers = {
       const { itemId, targetUserId } = args;
       const { uid, idToken } = await authenticate(token);
       return await shareItem({ auth: { uid, token: idToken }, itemId, targetUserId });
+    },
+    claimFreePlanSession: async (_, args, ctx) => {
+      if (ctx.freePlan) {
+        throw new Error("Claim requires a real account, not a free-plan session.");
+      }
+      const { token } = ctx;
+      if (!token) {
+        throw new Error("Authentication required.");
+      }
+      const { uid, idToken } = await authenticate(token);
+
+      let payload;
+      try {
+        payload = await verifyClaimToken(args.token);
+      } catch (err: any) {
+        throw new Error(`Invalid or expired claim link: ${err?.message || "verification failed"}`);
+      }
+
+      const { uid: trialUid } = await getFreePlanCredentials();
+      return await claimFreePlanSession({
+        auth: { uid, token: idToken },
+        trialUid,
+        sessionNamespace: payload.sessionNamespace,
+        sessionUuid: payload.sessionUuid,
+      });
     },
   },
   Item: {

@@ -529,6 +529,18 @@ export async function createItem({
         throw new Error("Failed to generate template task");
       }
     }
+    // Persist the parsed AST on the item doc so that getItem/getItems can
+    // lazily re-post the task under the current uid if the taskId is ever null
+    // (shareItem and the trial-claim flow both rely on this).
+    let code: any = null;
+    try {
+      const apiTask = await getApiTask({ id: taskId, auth });
+      const taskData = apiTask?.[0] || apiTask;
+      code = taskData?.code ?? null;
+    } catch (err) {
+      console.error("createItem(): failed to fetch code for item", id, err);
+    }
+
     const timestamp = Date.now();
     const item: Record<string, any> = {
       id,
@@ -542,6 +554,9 @@ export async function createItem({
       created: timestamp,
       updated: timestamp,
     };
+    if (code !== null) {
+      item.code = code;
+    }
     if (auth.freePlan) {
       Object.assign(item, freePlanItemFields(auth, timestamp));
     }
@@ -786,6 +801,26 @@ export async function getItem({ auth, id }) {
     let help = data.help;
     let taskId = data.taskId;
 
+    // If the item has no taskId (e.g., copied via shareItem or claim flow),
+    // post the task under the current uid to bind it. Mirrors the guard in
+    // getItems().
+    if (!taskId && data.code) {
+      try {
+        const taskData = await postTask({
+          auth,
+          task: { lang: data.lang, code: data.code },
+          ephemeral: false,
+          isPublic: false,
+        });
+        if (taskData?.id) {
+          taskId = taskData.id;
+          await itemRef.update({ taskId });
+        }
+      } catch (error) {
+        console.error("getItem(): failed to create task for item", id, error);
+      }
+    }
+
     // For backward compatibility: fetch help from legacy taskIds collection
     if (!help && taskId) {
       try {
@@ -926,4 +961,58 @@ export async function shareItem({ auth, itemId, targetUserId }) {
       newItemId: null,
     };
   }
+}
+
+export async function claimFreePlanSession({
+  auth,
+  trialUid,
+  sessionNamespace,
+  sessionUuid,
+}: {
+  auth: AuthArg;
+  trialUid: string;
+  sessionNamespace: string;
+  sessionUuid: string;
+}) {
+  const db = getFirestore();
+  const now = Date.now();
+
+  const snapshot = await db
+    .collection(`users/${trialUid}/items`)
+    .where("freePlan", "==", true)
+    .where("sessionNamespace", "==", sessionNamespace)
+    .get();
+
+  let transferred = 0;
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    if (typeof data.expiresAt === "number" && data.expiresAt <= now) continue;
+
+    const targetRef = db.collection(`users/${auth.uid}/items`).doc();
+    const newId = targetRef.id;
+    const timestamp = Date.now();
+
+    const claimedItem: Record<string, any> = {
+      ...data,
+      id: newId,
+      taskId: null, // triggers lazy repost in getItem/getItems under the new uid
+      claimedFrom: sessionUuid,
+      app: data.app || "mcp",
+      created: timestamp,
+      updated: timestamp,
+    };
+    delete claimedItem.freePlan;
+    delete claimedItem.sessionNamespace;
+    delete claimedItem.expiresAt;
+    // Source AST is the only thing the lazy repost needs from the original;
+    // it must be preserved if present.
+    if (data.code !== undefined && data.code !== null) {
+      claimedItem.code = data.code;
+    }
+
+    await targetRef.set(claimedItem);
+    transferred += 1;
+  }
+
+  return { transferred, sessionNamespace };
 }

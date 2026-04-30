@@ -49,6 +49,7 @@
     "@next-auth/firebase-adapter": "^2.0.1",
     "@nytimes/react-prosemirror": "^0.2.3",
     "@observablehq/plot": "^0.5.2",
+    "@privy-io/react-auth": "^1.99.1",
     "@redux-devtools/extension": "^3.3.0",
     "@stripe/react-stripe-js": "^1.10.0",
     "@stripe/stripe-js": "^1.36.0",
