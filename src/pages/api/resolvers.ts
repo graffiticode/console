@@ -1031,7 +1031,9 @@ export async function claimFreePlanSession({
       id: newId,
       taskId: null, // triggers lazy repost in getItem/getItems under the new uid
       claimedFrom: sessionUuid,
-      app: data.app || "mcp",
+      // Surface claimed items in the default /items view (which filters to
+      // app=='console'). Provenance is preserved in `claimedFrom`.
+      app: "console",
       created: timestamp,
       updated: timestamp,
     };
