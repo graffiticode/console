@@ -669,7 +669,9 @@ export async function updateItem({
 
 export async function getItems({ auth, lang, mark, client }) {
   try {
-    // Build the base query (lang + optional mark + free-plan).
+    // Build the base query (lang + optional mark + free-plan). Client filtering
+    // happens in memory below so items without a client/app field are treated
+    // as 'console' (the default).
     let baseQuery = db
       .collection(`users/${auth.uid}/items`)
       .where("lang", "==", lang);
@@ -679,29 +681,21 @@ export async function getItems({ auth, lang, mark, client }) {
     if (auth.freePlan) {
       baseQuery = baseQuery.where("sessionNamespace", "==", auth.sessionNamespace);
     }
-
-    // Resolve the client filter:
-    //   client === 'all'           → no filter (return everything for this lang/mark)
-    //   client === <specific value> → match items with `client === X` OR legacy `app === X`
-    //   client undefined/null       → backwards compat: return console items
+    // Filtering rules:
+    //   client undefined/'all' → no client filter, fetch all.
+    //   client === 'console'   → fetch all and memory-filter, since missing
+    //                            client field implicitly means console.
+    //   client === <other>     → pure server-side `where("client", "==", X)`.
     let docs;
-    if (auth.freePlan || client === 'all') {
+    if (!client || client === 'all') {
       const snap = await baseQuery.get();
       docs = snap.docs;
+    } else if (client === 'console') {
+      const snap = await baseQuery.get();
+      docs = snap.docs.filter(d => (d.data().client ?? 'console') === 'console');
     } else {
-      const filterValue = client || 'console';
-      const [snapClient, snapApp] = await Promise.all([
-        baseQuery.where("client", "==", filterValue).get(),
-        baseQuery.where("app", "==", filterValue).get(),
-      ]);
-      const seen = new Set<string>();
-      docs = [];
-      for (const d of [...snapClient.docs, ...snapApp.docs]) {
-        if (!seen.has(d.id)) {
-          seen.add(d.id);
-          docs.push(d);
-        }
-      }
+      const snap = await baseQuery.where("client", "==", client).get();
+      docs = snap.docs;
     }
     const items = [];
 
@@ -789,7 +783,7 @@ export async function getItems({ auth, lang, mark, client }) {
         updated: data.updated ? String(data.updated) : String(data.created),
         sharedWith: sharedWith,
         sharedFrom: data.sharedFrom || null, // Include sharedFrom field if present
-        client: data.client ?? data.app ?? null,
+        client: data.client ?? 'console',
       };
 
       const timestamp = data.updated || data.created || 0;
@@ -811,14 +805,14 @@ export async function getItemClientTags({ auth, lang }) {
     if (auth.freePlan) {
       query = query.where("sessionNamespace", "==", auth.sessionNamespace);
     }
-    const snapshot = await query.select("client", "app", "expiresAt").get();
+    const snapshot = await query.select("client", "expiresAt").get();
     const now = Date.now();
     const tags = new Set<string>();
     for (const doc of snapshot.docs) {
       const data = doc.data();
       if (auth.freePlan && typeof data.expiresAt === "number" && data.expiresAt <= now) continue;
-      const value = data.client ?? data.app;
-      if (value) tags.add(value);
+      // Items with no client field are considered 'console'.
+      tags.add(data.client ?? 'console');
     }
     return Array.from(tags).sort();
   } catch (error) {
@@ -906,7 +900,7 @@ export async function getItem({ auth, id }) {
       isPublic: data.isPublic || false,
       created: String(data.created),
       updated: data.updated ? String(data.updated) : String(data.created),
-      client: data.client ?? data.app ?? null,
+      client: data.client ?? 'console',
     };
   } catch (error) {
     console.error("getItem()", "ERROR", error);

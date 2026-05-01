@@ -457,7 +457,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     const isMarkChanging = newMark !== undefined && currentItem && currentItem.mark !== newMark;
     const currentFilterMark = mark?.id;
 
-    const isClientChanging = newClient !== undefined && currentItem && (currentItem.client ?? currentItem.app) !== newClient;
+    const isClientChanging = newClient !== undefined && currentItem && (currentItem.client ?? 'console') !== newClient;
 
     // Then update backend
     try {

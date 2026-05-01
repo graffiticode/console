@@ -481,7 +481,7 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
                       code={item.code}
                       created={item.created}
                       updated={item.updated}
-                      client={item.client ?? item.app}
+                      client={item.client}
                       onChange={onUpdateItem}
                       onRefresh={onRefresh}
                       isOpen={openMenuId === item.id}
