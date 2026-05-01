@@ -230,13 +230,20 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
 
   const clientList = (() => {
     const tags = clientTags || [];
-    // With 0 or 1 distinct tag, "All" and that tag select the same items —
-    // collapse to just "All" to avoid a redundant option.
-    if (tags.length <= 1) {
+    // 1 distinct tag: just the solo option (collapsed; "All" is redundant).
+    if (tags.length === 1) {
+      const solo = clientOptionForId(tags[0]);
+      const list: ClientOption[] = [solo];
+      if (clientOption.id !== solo.id) list.push(clientOption);
+      return list;
+    }
+    // 0 tags: just "All".
+    if (tags.length === 0) {
       const list: ClientOption[] = [ALL_CLIENT];
       if (clientOption.id !== ALL_CLIENT.id) list.push(clientOption);
       return list;
     }
+    // 2+ tags: "All" plus each distinct tag.
     const list: ClientOption[] = [ALL_CLIENT];
     const seen = new Set<string>([ALL_CLIENT.id]);
     for (const id of tags) {
