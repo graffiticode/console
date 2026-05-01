@@ -234,6 +234,7 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
         <AuthMethodDialog
           isOpen={showAuthMethodDialog}
           onClose={handleCloseAuthDialog}
+          onAuthSuccess={handleCloseAuthDialog}
           onSelectEthereum={handleSelectEthereum}
           onSubmitEmail={handleSubmitEmail}
           onSubmitCode={handleSubmitCode}

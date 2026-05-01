@@ -8,6 +8,10 @@ interface AuthMethodDialogProps {
   onSelectEthereum: () => void;
   onSubmitEmail: (email: string) => Promise<void>;
   onSubmitCode: (code: string) => Promise<void>;
+  // Fires when the code-verify step succeeds. Distinct from onClose, which is
+  // user-initiated dismissal — on /claim, onClose navigates away, so success
+  // must NOT route through it or the claim mutation never fires.
+  onAuthSuccess?: () => void;
   emailSending?: boolean;
   emailError?: string | null;
   codeVerifying?: boolean;
@@ -23,6 +27,7 @@ export default function AuthMethodDialog({
   onSelectEthereum,
   onSubmitEmail,
   onSubmitCode,
+  onAuthSuccess,
   emailSending = false,
   emailError = null,
   codeVerifying = false,
@@ -70,7 +75,7 @@ export default function AuthMethodDialog({
     if (!trimmed) return;
     try {
       await onSubmitCode(trimmed);
-      onClose();
+      onAuthSuccess?.();
     } catch {
       // codeError surfaces via prop
     }
