@@ -23,7 +23,7 @@ import {
 } from "./embedding-service";
 import { generateCodeWithContinuation, SystemBlock } from "./claude-stream-service";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
-import { findBestLanguages } from "./language-router";
+import { findBestLanguages, planInnerForRequest } from "./language-router";
 import { getRAGConfig, withRAGFallback } from "./rag-config";
 import { parser } from "@graffiticode/parser";
 import {
@@ -492,7 +492,12 @@ Graffiticode is designed for end-user programming. Its syntax is simple, functio
 ## Out-of-Scope Detection
 If the user's request is clearly outside the capabilities of this dialect (L${lang}), do NOT generate code. Instead, respond with ONLY:
 OUT_OF_SCOPE: <one sentence explaining what this dialect does and why the request doesn't fit>
-When in doubt, attempt to generate code. Only use OUT_OF_SCOPE when you are confident the request cannot be fulfilled.`;
+When in doubt, attempt to generate code. Only use OUT_OF_SCOPE when you are confident the request cannot be fulfilled.
+
+## Composition (Inner Content)
+If the user's request requires structured interactive content this dialect cannot author from prose alone (e.g., a spreadsheet table, a flashcard deck, a diagram), do NOT generate code. Instead, respond with ONLY:
+NEEDS_INNER: <one paragraph describing the inner content needed, written as a standalone prompt for whichever Graffiticode language produces that content>
+The inner content will be compiled by another Graffiticode language and bound to the \`data\` keyword in this dialect's program at compile time. Use NEEDS_INNER only when the request clearly involves an interactive content type this dialect describes-but-does-not-author. Skip NEEDS_INNER when the user provides a CONTEXT block telling you that \`data\` is already bound — in that case, generate code that consumes \`data\` directly.`;
 
   const dialectBlock = (preamble + (fileInstructions || "") + outOfScope + DIALECT_PROMPT_STATIC_TAIL).trim();
 
@@ -520,6 +525,7 @@ async function createCodeGenerationPrompt(
   currentCode = null,
   rid = null,
   conversationSummary = null,
+  priorInner: { lang: string; taskId: string } | null = null,
 ) {
   // Dialect-specific blocks (cached per-language). The dialect block already
   // carries cache_control: ephemeral, so the per-language prefix is reused
@@ -577,6 +583,13 @@ async function createCodeGenerationPrompt(
       }`
     : "First turn of conversation.";
 
+  // Composition CONTEXT: when an inner item has been compiled, tell the model
+  // that `data` is bound at compile time so it generates code that consumes
+  // `data` directly instead of re-emitting NEEDS_INNER.
+  const compositionContext = priorInner
+    ? `\n\n<COMPOSITION_CONTEXT>\nAn inner item from L${priorInner.lang} has already been compiled. Its compiled output will be bound to the \`data\` keyword in this program at compile time. Generate code that consumes \`data\` to produce the outer object. Do NOT emit NEEDS_INNER again.`
+    : "";
+
   // Build user message using USER_TEMPLATE format (matches dspy-service)
   const userMessage = `<USER_REQUEST>
 ${userPrompt}
@@ -590,7 +603,7 @@ ${conversationContext}
 <RETRIEVED_CONTEXT>
 ${retrievedContext}
 
-When a retrieved example closely matches the user's request, follow its coding patterns and techniques. If there is existing current code, apply the example's patterns to the current code rather than replacing it.
+When a retrieved example closely matches the user's request, follow its coding patterns and techniques. If there is existing current code, apply the example's patterns to the current code rather than replacing it.${compositionContext}
 
 <OUTPUT_FORMAT>
 Emit the Graffiticode between triple backticks, must end with "..". Then on new lines emit two tagged summary blocks:
@@ -744,7 +757,7 @@ function getFallbackResponse(prompt, options) {
  * @param {string} accessToken - Authentication token for the API
  * @returns {Promise<Object>} - Compilation results including any errors
  */
-async function verifyCode(code, authToken, lang, rid = null) {
+async function verifyCode(code, authToken, lang, rid = null, priorTaskId: string | null = null) {
 
   const startTime = Date.now();
 
@@ -805,7 +818,11 @@ async function verifyCode(code, authToken, lang, rid = null) {
       };
     }
 
-    const compileResponse = await getData({ authToken, id });
+    // Composition: when priorTaskId is set, ask api.graffiticode.org to compile
+    // the chain so the outer's compile receives the inner's compiled output as
+    // `data`. Otherwise compile standalone as today.
+    const compileId = priorTaskId ? `${id}+${priorTaskId}` : id;
+    const compileResponse = await getData({ authToken, id: compileId });
     // Check if the response indicates an error but doesn't have a standardized error format
     if (compileResponse.status === "error" && !compileResponse.error) {
       // Provide a standardized error object
@@ -1087,6 +1104,7 @@ export async function generateCode({
   userId = null,
   sessionId = null,
   conversationSummary = null,
+  priorInner = null,
 }: {
   auth: any;
   prompt: string;
@@ -1097,6 +1115,7 @@ export async function generateCode({
   userId?: string | null;
   sessionId?: string | null;
   conversationSummary?: ConversationSummary | null;
+  priorInner?: { lang: string; taskId: string } | null;
 }) {
   const accessToken = auth?.token;
   const isFreePlan = !!auth?.freePlan;
@@ -1288,6 +1307,7 @@ export async function generateCode({
         currentCode,
         rid,
         conversationSummary,
+        priorInner,
       );
     }
 
@@ -1468,6 +1488,69 @@ export async function generateCode({
       };
     }
 
+    // Check for composition signal: outer dialect declaring it needs an inner
+    // step compiled by another language. Parallel branch to OUT_OF_SCOPE; only
+    // honored when we're not already on the second pass of a composition (the
+    // outer must not recurse into its own NEEDS_INNER signal).
+    const needsInnerMatch = !priorInner && streamResult.code?.match(/^NEEDS_INNER:\s*([\s\S]+)/m);
+    if (needsInnerMatch) {
+      const innerNeed = needsInnerMatch[1].trim();
+      console.log(`[code-gen] rid=${rid} lang=${lang} needs-inner: ${innerNeed.substring(0, 200)}`);
+      const plan = await planInnerForRequest({ userRequest: prompt, innerNeed, outerLang: lang });
+      if (!plan.inner) {
+        return {
+          errors: [{ message: `Composition needed but no Graffiticode language found to produce: ${innerNeed}` }],
+          code: null,
+          taskId: null,
+          lang,
+          model: modelToUse,
+          usage: {
+            input_tokens: streamResult.usage.inputTokens,
+            output_tokens: streamResult.usage.outputTokens,
+          },
+        };
+      }
+
+      // Step 1: generate the inner item via a fresh single-lang pass.
+      const innerResult = await generateCode({
+        auth,
+        prompt: plan.inner.prompt,
+        lang: plan.inner.lang,
+        options,
+        rid,
+        userId,
+        sessionId,
+      });
+      if (!innerResult.taskId) {
+        return {
+          errors: innerResult.errors || [{ message: `Inner step (L${plan.inner.lang}) failed to produce a taskId` }],
+          code: null,
+          taskId: null,
+          lang,
+          model: modelToUse,
+          usage: innerResult.usage || {
+            input_tokens: streamResult.usage.inputTokens,
+            output_tokens: streamResult.usage.outputTokens,
+          },
+        };
+      }
+
+      // Step 2: re-run the outer generation, telling it `data` is bound. The
+      // priorInner guard above prevents infinite recursion on the second pass.
+      return await generateCode({
+        auth,
+        prompt,
+        lang,
+        options,
+        currentCode,
+        rid,
+        userId,
+        sessionId,
+        conversationSummary,
+        priorInner: { lang: plan.inner.lang, taskId: innerResult.taskId },
+      });
+    }
+
     // Process the generated code to fix any issues
     let generatedCode = await processGeneratedCode(streamResult.code, lang, rid);
     let verificationResult = null;
@@ -1490,7 +1573,7 @@ export async function generateCode({
 
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
       while (fixAttempts < MAX_FIX_ATTEMPTS && estimatedUnits <= MAX_UNITS_FOR_FIXES) {
-        verificationResult = await verifyCode(generatedCode, accessToken, lang, requestId);
+        verificationResult = await verifyCode(generatedCode, accessToken, lang, requestId, priorInner?.taskId || null);
 
         // If compilation was successful, break the loop
         if (
@@ -1782,12 +1865,19 @@ export async function generateCode({
     const compilationSucceeded = !verificationResult?.error && verificationResult?.status !== 'error';
     await safeRAGAnalytics.completeRequest(requestId, compilationSucceeded);
 
-    // Return formatted response with the language name
+    // Return formatted response with the language name. When this is a
+    // composition outer pass, the final taskId is the chained id so api.graffiticode.org
+    // composes the inner's compile output as `data` for the outer at compile time.
+    const outerTaskId = verificationResult?.taskId || null;
+    const finalTaskId = outerTaskId && priorInner
+      ? `${outerTaskId}+${priorInner.taskId}`
+      : outerTaskId;
+
     const result = {
       code: finalProcessedCode,
       description,
       changeSummary,
-      taskId: verificationResult?.taskId || null,
+      taskId: finalTaskId,
       lang: lang,
       model: modelToUse,
       usage: {
