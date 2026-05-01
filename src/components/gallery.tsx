@@ -423,6 +423,8 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       });
       if (newItem) {
         setItems(prevItems => [newItem, ...prevItems]);
+        // Keep the SWR cache in sync so subsequent sort/filter changes see the new item.
+        mutate(prev => (prev ? [newItem, ...prev] : prev), { revalidate: false });
         setSelectedItemId(newItem.id);
         setTaskId(newItem.taskId);
         setEditorHelp(typeof newItem.help === "string" ? JSON.parse(newItem.help || "[]") : (newItem.help || []));
@@ -491,6 +493,21 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         );
         return updated;
       });
+
+      // Keep the SWR cache in sync so the client-side sort/filter recompute
+      // (which derives from `loadedItems`) sees the latest values.
+      mutate(prev => {
+        if (!prev) return prev;
+        const shouldEvict =
+          (isMarkChanging && currentFilterMark && newMark !== currentFilterMark) ||
+          (isClientChanging && clientId !== 'all' && newClient !== clientId);
+        if (shouldEvict) {
+          return prev.filter(item => item.id !== itemId);
+        }
+        return prev.map(item =>
+          item.id === itemId ? { ...item, ...result } : item
+        );
+      }, { revalidate: false });
 
       // If we removed the current selected item, select the item at the same index
       if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark && selectedItemId === itemId) {

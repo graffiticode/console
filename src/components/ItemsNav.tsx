@@ -4,7 +4,7 @@ import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { PlusIcon, ShareIcon, UserIcon } from '@heroicons/react/20/solid';
 import { DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import MarkSelector, { marks } from './mark-selector';
-import ClientSelector, { clients, clientOptionForId } from './client-selector';
+import { clientOptionForId } from './client-selector';
 import PublicToggle from './public-toggle';
 import ShareItemDialog from './ShareItemDialog';
 import { createItem } from '../utils/swr/fetchers';
@@ -256,22 +256,24 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                 </div>
               </div>
 
-              {(formatTimestamp(created) || formatTimestamp(updated)) && (
-                <div className="mb-4">
-                  {formatTimestamp(created) && (
-                    <div className="flex justify-between text-xs text-gray-600 py-0.5">
-                      <span className="font-semibold">Created</span>
-                      <span className="font-mono">{formatTimestamp(created)}</span>
-                    </div>
-                  )}
-                  {formatTimestamp(updated) && formatTimestamp(updated) !== formatTimestamp(created) && (
-                    <div className="flex justify-between text-xs text-gray-600 py-0.5">
-                      <span className="font-semibold">Updated</span>
-                      <span className="font-mono">{formatTimestamp(updated)}</span>
-                    </div>
-                  )}
+              <div className="mb-4">
+                {formatTimestamp(created) && (
+                  <div className="flex gap-3 text-xs text-gray-600 py-0.5">
+                    <span className="font-semibold w-16 flex-shrink-0">Created</span>
+                    <span className="font-mono">{formatTimestamp(created)}</span>
+                  </div>
+                )}
+                {formatTimestamp(updated) && formatTimestamp(updated) !== formatTimestamp(created) && (
+                  <div className="flex gap-3 text-xs text-gray-600 py-0.5">
+                    <span className="font-semibold w-16 flex-shrink-0">Updated</span>
+                    <span className="font-mono">{formatTimestamp(updated)}</span>
+                  </div>
+                )}
+                <div className="flex gap-3 text-xs text-gray-600 py-0.5">
+                  <span className="font-semibold w-16 flex-shrink-0">Client</span>
+                  <span className="font-mono">{clientOptionForId(client || 'console').name}</span>
                 </div>
-              )}
+              </div>
 
               <div className="flex gap-4">
                 <div>
@@ -279,15 +281,6 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                   <MarkSelector
                     mark={marks[(mark || 1) - 1]}
                     setMark={newMark => onChange({itemId, mark: newMark.id})}
-                    dropUp={true}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Client</label>
-                  <ClientSelector
-                    client={clientOptionForId(client || 'console')}
-                    setClient={newClient => onChange({itemId, client: newClient.id})}
-                    clientList={clients.filter(c => c.id !== 'all')}
                     dropUp={true}
                   />
                 </div>
