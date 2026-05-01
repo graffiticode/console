@@ -370,10 +370,10 @@ const resolvers = {
         throw new Error(`Invalid or expired claim link: ${err?.message || "verification failed"}`);
       }
 
-      const { uid: trialUid } = await getFreePlanCredentials();
+      const { uid: trialUid, idToken: trialIdToken } = await getFreePlanCredentials();
       return await claimFreePlanSession({
         auth: { uid, token: idToken },
-        trialUid,
+        trialAuth: { uid: trialUid, token: trialIdToken },
         sessionNamespace: payload.sessionNamespace,
         sessionUuid: payload.sessionUuid,
       });

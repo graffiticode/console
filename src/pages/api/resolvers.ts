@@ -609,7 +609,24 @@ export async function updateItem({
     }
     const updates: any = {};
     if (name !== undefined) updates.name = name;
-    if (taskId !== undefined) updates.taskId = taskId;
+    if (taskId !== undefined) {
+      updates.taskId = taskId;
+      // Refresh the persisted AST so the lazy-repost in getItem/getItems can
+      // recreate the task under a new owner (claim, share). createItem already
+      // does this; updateItem must too whenever taskId changes.
+      if (taskId !== itemData.taskId) {
+        try {
+          const apiTask = await getApiTask({ id: taskId, auth });
+          const taskData = apiTask?.[0] || apiTask;
+          const code = taskData?.code;
+          if (code !== undefined && code !== null) {
+            updates.code = code;
+          }
+        } catch (err) {
+          console.error("updateItem(): failed to refresh code for item", id, err);
+        }
+      }
+    }
     if (mark !== undefined) updates.mark = mark;
     if (help !== undefined) updates.help = help;
     if (isPublic !== undefined) {
@@ -965,12 +982,12 @@ export async function shareItem({ auth, itemId, targetUserId }) {
 
 export async function claimFreePlanSession({
   auth,
-  trialUid,
+  trialAuth,
   sessionNamespace,
   sessionUuid,
 }: {
   auth: AuthArg;
-  trialUid: string;
+  trialAuth: AuthArg;
   sessionNamespace: string;
   sessionUuid: string;
 }) {
@@ -978,7 +995,7 @@ export async function claimFreePlanSession({
   const now = Date.now();
 
   const snapshot = await db
-    .collection(`users/${trialUid}/items`)
+    .collection(`users/${trialAuth.uid}/items`)
     .where("freePlan", "==", true)
     .where("sessionNamespace", "==", sessionNamespace)
     .get();
@@ -987,6 +1004,23 @@ export async function claimFreePlanSession({
   for (const doc of snapshot.docs) {
     const data = doc.data();
     if (typeof data.expiresAt === "number" && data.expiresAt <= now) continue;
+
+    // The lazy repost in getItem/getItems needs an accurate AST. The taskId on
+    // the doc is authoritative (api.graffiticode.org owns the canonical task),
+    // so prefer fetching code fresh through trial auth over trusting the
+    // Firestore-stored copy, which can drift if updateItem misses a write.
+    let code: any = data.code ?? null;
+    if (data.taskId) {
+      try {
+        const apiTask = await getApiTask({ id: data.taskId, auth: trialAuth });
+        const taskData = apiTask?.[0] || apiTask;
+        if (taskData?.code !== undefined && taskData?.code !== null) {
+          code = taskData.code;
+        }
+      } catch (err) {
+        console.error("claimFreePlanSession(): failed to fetch task code", doc.id, err);
+      }
+    }
 
     const targetRef = db.collection(`users/${auth.uid}/items`).doc();
     const newId = targetRef.id;
@@ -1004,10 +1038,10 @@ export async function claimFreePlanSession({
     delete claimedItem.freePlan;
     delete claimedItem.sessionNamespace;
     delete claimedItem.expiresAt;
-    // Source AST is the only thing the lazy repost needs from the original;
-    // it must be preserved if present.
-    if (data.code !== undefined && data.code !== null) {
-      claimedItem.code = data.code;
+    if (code !== null) {
+      claimedItem.code = code;
+    } else {
+      delete claimedItem.code;
     }
 
     await targetRef.set(claimedItem);
