@@ -300,13 +300,21 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       return;
     }
 
-    const filteredItems = loadedItems.filter(i => {
-      if (dateFilter.from === null && dateFilter.to === null) return true;
-      const ts = Number(i[dateFilter.field] || 0);
-      if (dateFilter.from !== null && ts < dateFilter.from) return false;
-      if (dateFilter.to !== null && ts > dateFilter.to) return false;
-      return true;
-    });
+    // Defensively coerce dateFilter so a malformed localStorage value can't
+    // silently filter every item out.
+    const dfField = (dateFilter?.field === 'created' || dateFilter?.field === 'updated')
+      ? dateFilter.field
+      : 'updated';
+    const dfFrom = typeof dateFilter?.from === 'number' && Number.isFinite(dateFilter.from) ? dateFilter.from : null;
+    const dfTo = typeof dateFilter?.to === 'number' && Number.isFinite(dateFilter.to) ? dateFilter.to : null;
+    const filteredItems = (dfFrom === null && dfTo === null)
+      ? loadedItems
+      : loadedItems.filter(i => {
+          const ts = Number(i[dfField] || 0);
+          if (dfFrom !== null && ts < dfFrom) return false;
+          if (dfTo !== null && ts > dfTo) return false;
+          return true;
+        });
 
     const isDefaultSort = sort.field === DEFAULT_SORT.field && sort.direction === DEFAULT_SORT.direction;
     let orderedItems = filteredItems;
