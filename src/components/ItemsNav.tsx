@@ -4,6 +4,7 @@ import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { PlusIcon, ShareIcon, UserIcon } from '@heroicons/react/20/solid';
 import { DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import MarkSelector, { marks } from './mark-selector';
+import ClientSelector, { clients, clientOptionForId } from './client-selector';
 import PublicToggle from './public-toggle';
 import ShareItemDialog from './ShareItemDialog';
 import { createItem } from '../utils/swr/fetchers';
@@ -24,7 +25,7 @@ function formatTimestamp(ts) {
   }
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, created, updated, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, created, updated, client, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
   const { user } = useGraffiticodeAuth();
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -106,7 +107,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
         mark,
         help,
         isPublic: false, // Don't copy public status
-        app: 'console'
+        client: 'console'
       });
 
       if (newItem && newItem.id) {
@@ -278,6 +279,15 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                   <MarkSelector
                     mark={marks[(mark || 1) - 1]}
                     setMark={newMark => onChange({itemId, mark: newMark.id})}
+                    dropUp={true}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Client</label>
+                  <ClientSelector
+                    client={clientOptionForId(client || 'console')}
+                    setClient={newClient => onChange({itemId, client: newClient.id})}
+                    clientList={clients.filter(c => c.id !== 'all')}
                     dropUp={true}
                   />
                 </div>
@@ -478,6 +488,7 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
                       code={item.code}
                       created={item.created}
                       updated={item.updated}
+                      client={item.client ?? item.app}
                       onChange={onUpdateItem}
                       onRefresh={onRefresh}
                       isOpen={openMenuId === item.id}

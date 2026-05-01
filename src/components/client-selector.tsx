@@ -2,32 +2,46 @@ import { Fragment } from 'react'
 import { Listbox, Transition } from '@headlessui/react'
 import { ChevronUpDownIcon } from '@heroicons/react/20/solid'
 
-export interface AppOption {
+export interface ClientOption {
   id: string;
   name: string;
 }
 
-export const apps: AppOption[] = [
+export const ALL_CLIENT: ClientOption = { id: 'all', name: 'All' };
+
+export const clients: ClientOption[] = [
+  ALL_CLIENT,
   { id: 'console', name: 'Console' },
   { id: 'mcp', name: 'MCP' },
   { id: 'front', name: 'Front' },
 ];
 
-export const findAppById = (id: string): AppOption | undefined =>
-  apps.find(a => a.id === id);
+const CLIENT_NAMES: Record<string, string> = {
+  all: 'All',
+  console: 'Console',
+  mcp: 'MCP',
+  front: 'Front',
+};
 
-interface AppSelectorProps {
-  app: AppOption;
-  setApp: (app: AppOption) => void;
+export const clientOptionForId = (id: string): ClientOption =>
+  ({ id, name: CLIENT_NAMES[id] || id });
+
+export const findClientById = (id: string): ClientOption | undefined =>
+  clients.find(c => c.id === id);
+
+interface ClientSelectorProps {
+  client: ClientOption;
+  setClient: (client: ClientOption) => void;
   dropUp?: boolean;
+  clientList?: ClientOption[];
 }
 
-export default function AppSelector({ app, setApp, dropUp = false }: AppSelectorProps) {
+export default function ClientSelector({ client, setClient, dropUp = false, clientList = clients }: ClientSelectorProps) {
   return (
-    <Listbox value={app} onChange={setApp}>
+    <Listbox value={client} onChange={setClient}>
       <div className="relative w-28 bg-white">
         <Listbox.Button className="relative w-full cursor-default rounded-none ring-1 ring-gray-300 py-2 pl-3 pr-8 text-left focus:outline-none focus-visible:border-gray-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-300 sm:text-sm hover:ring-2">
-          <span className="block truncate">{app.name}</span>
+          <span className="block truncate">{client.name}</span>
           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
             <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
           </span>
@@ -39,7 +53,7 @@ export default function AppSelector({ app, setApp, dropUp = false }: AppSelector
           leaveTo="opacity-0"
         >
           <Listbox.Options className={`absolute ${dropUp ? 'bottom-full mb-1' : 'mt-1'} max-h-60 w-full overflow-auto rounded-none bg-white py-1 text-base ring-1 ring-black ring-opacity-25 focus:outline-none sm:text-sm z-[1000]`}>
-            {apps.map((option) => (
+            {clientList.map((option) => (
               <Listbox.Option
                 key={option.id}
                 className={({ active }) =>

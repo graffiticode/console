@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
 import MarkSelector from './mark-selector';
-import AppSelector, { AppOption } from './app-selector';
+import ClientSelector, { ClientOption } from './client-selector';
 
 export type SortField = 'updated' | 'created' | 'name';
 export type SortDirection = 'asc' | 'desc';
@@ -59,8 +59,9 @@ function dateInputToEpoch(value: string, endOfDay: boolean): number | null {
 interface Props {
   mark: any;
   setMark: (m: any) => void;
-  app: AppOption;
-  setApp: (a: AppOption) => void;
+  client: ClientOption;
+  setClient: (c: ClientOption) => void;
+  clientList?: ClientOption[];
   sort: Sort;
   setSort: (s: Sort) => void;
   dateFilter: DateFilter;
@@ -70,8 +71,9 @@ interface Props {
 export default function ItemsHeaderMenu({
   mark,
   setMark,
-  app,
-  setApp,
+  client,
+  setClient,
+  clientList,
   sort,
   setSort,
   dateFilter,
@@ -188,8 +190,8 @@ export default function ItemsHeaderMenu({
                 </div>
 
                 <div className="flex items-center gap-3 mb-3">
-                  <label className="block text-xs text-gray-600 w-12">App</label>
-                  <AppSelector app={app} setApp={setApp} />
+                  <label className="block text-xs text-gray-600 w-12">Client</label>
+                  <ClientSelector client={client} setClient={setClient} clientList={clientList} />
                 </div>
 
                 <div>

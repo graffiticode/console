@@ -141,7 +141,7 @@ export const countItems = async ({ user, langs }) => {
     return {};
   }
   const groups = await Promise.all(langs.map(lang => {
-    return loadItems({user, lang: lang.name.slice(1), mark: null, app: 'console'});
+    return loadItems({user, lang: lang.name.slice(1), mark: null, client: 'console'});
   }));
   const counts = {};
   groups.forEach((group, index) => {
@@ -207,7 +207,7 @@ export const loadGraphiQL = async ({ user }) => {
  * @param {Object} [params.options] - Additional generation options
  * @returns {Promise<Object>} - Generated code and metadata
  */
-export const loadItems = async ({ user, lang, mark, app }) => {
+export const loadItems = async ({ user, lang, mark, client: clientId }) => {
   if (!user) {
     return [];
   }
@@ -218,8 +218,8 @@ export const loadItems = async ({ user, lang, mark, app }) => {
     }
   });
   const query = gql`
-    query loadItems($lang: String!, $mark: Int, $app: String) {
-      items(lang: $lang, mark: $mark, app: $app) {
+    query loadItems($lang: String!, $mark: Int, $client: String) {
+      items(lang: $lang, mark: $mark, client: $client) {
         id
         name
         taskId
@@ -230,14 +230,30 @@ export const loadItems = async ({ user, lang, mark, app }) => {
         created
         updated
         sharedWith
-        app
+        client
       }
     }
   `;
-  return client.request(query, { lang, mark, app }).then(data => data.items);
+  return client.request(query, { lang, mark, client: clientId }).then(data => data.items);
 };
 
-export const createItem = async ({ user, lang, name, taskId, mark, help, isPublic, app }) => {
+export const loadItemClientTags = async ({ user, lang }) => {
+  if (!user) return [];
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const query = gql`
+    query loadItemClientTags($lang: String!) {
+      itemClientTags(lang: $lang)
+    }
+  `;
+  return client.request(query, { lang }).then(data => data.itemClientTags || []);
+};
+
+export const createItem = async ({ user, lang, name, taskId, mark, help, isPublic, client: clientId }) => {
   if (!user) {
     return null;
   }
@@ -248,8 +264,8 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, isPubli
     }
   });
   const mutation = gql`
-    mutation createItem($lang: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $app: String) {
-      createItem(lang: $lang, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, app: $app) {
+    mutation createItem($lang: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $client: String) {
+      createItem(lang: $lang, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, client: $client) {
         id
         name
         taskId
@@ -259,14 +275,14 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, isPubli
         isPublic
         created
         updated
-        app
+        client
       }
     }
   `;
-  return client.request(mutation, { lang, name, taskId, mark, help, isPublic, app }).then(data => data.createItem);
+  return client.request(mutation, { lang, name, taskId, mark, help, isPublic, client: clientId }).then(data => data.createItem);
 };
 
-export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic }) => {
+export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic, client: clientId }) => {
   if (!user) {
     return null;
   }
@@ -277,8 +293,8 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic 
     }
   });
   const mutation = gql`
-    mutation updateItem($id: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean) {
-      updateItem(id: $id, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic) {
+    mutation updateItem($id: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $client: String) {
+      updateItem(id: $id, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, client: $client) {
         id
         name
         taskId
@@ -288,10 +304,11 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic 
         isPublic
         created
         updated
+        client
       }
     }
   `;
-  return client.request(mutation, { id, name, taskId, mark, help, isPublic }).then(data => data.updateItem);
+  return client.request(mutation, { id, name, taskId, mark, help, isPublic, client: clientId }).then(data => data.updateItem);
 };
 
 export const shareItem = async ({ user, itemId, targetUserId }) => {

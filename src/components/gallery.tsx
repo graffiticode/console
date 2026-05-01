@@ -8,7 +8,7 @@ import {
 import Editor from './editor';
 import { ImageGallery } from './ImageGallery';
 import SignIn from "./SignIn";
-import { getAccessToken, loadItems, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
+import { getAccessToken, loadItems, loadItemClientTags, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'
@@ -16,7 +16,7 @@ import { ChevronRightIcon } from '@heroicons/react/20/solid'
 import ItemsNav from "./ItemsNav";
 import { PlusIcon } from '@heroicons/react/20/solid';
 import ItemsHeaderMenu, { DEFAULT_SORT, DEFAULT_DATE_FILTER, Sort, DateFilter } from "./items-header-menu";
-import { AppOption, apps } from "./app-selector";
+import { ClientOption, ALL_CLIENT, clientOptionForId } from "./client-selector";
 
 const parseId = id => {
   if (!id) {
@@ -53,9 +53,9 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-export default function Gallery({ lang, mark, setMark, hideItemsNav = false, itemId: initialItemId = null, app, setApp, sort = DEFAULT_SORT, setSort, dateFilter = DEFAULT_DATE_FILTER, setDateFilter }: { lang: any; mark: any; setMark?: (m: any) => void; hideItemsNav?: boolean; itemId?: string | null; app?: AppOption; setApp?: (a: AppOption) => void; sort?: Sort; setSort?: (s: Sort) => void; dateFilter?: DateFilter; setDateFilter?: (d: DateFilter) => void }) {
-  const appOption: AppOption = app || apps[0];
-  const appId = appOption.id;
+export default function Gallery({ lang, mark, setMark, hideItemsNav = false, itemId: initialItemId = null, client, setClient, sort = DEFAULT_SORT, setSort, dateFilter = DEFAULT_DATE_FILTER, setDateFilter }: { lang: any; mark: any; setMark?: (m: any) => void; hideItemsNav?: boolean; itemId?: string | null; client?: ClientOption; setClient?: (c: ClientOption) => void; sort?: Sort; setSort?: (s: Sort) => void; dateFilter?: DateFilter; setDateFilter?: (d: DateFilter) => void }) {
+  const clientOption: ClientOption = client || ALL_CLIENT;
+  const clientId = clientOption.id;
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
@@ -212,14 +212,42 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
 
   // Load items from the API only once on initialization
   const { data: loadedItems, mutate, isLoading: isLoadingItems } = useSWR(
-    user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}-${appId}` : null,
-    () => loadItems({ user, lang, mark: mark.id, app: appId }),
+    user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}-${clientId}` : null,
+    () => loadItems({ user, lang, mark: mark.id, client: clientId }),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       keepPreviousData: true,
     }
   );
+
+  // Load distinct client tags for this user+lang to populate the menu's Client filter.
+  const { data: clientTags } = useSWR(
+    user && lang && !hideItemsNav ? `itemClientTags-${user.uid}-${lang}` : null,
+    () => loadItemClientTags({ user, lang }),
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+
+  const clientList = (() => {
+    const tags = clientTags || [];
+    // With 0 or 1 distinct tag, "All" and that tag select the same items —
+    // collapse to just "All" to avoid a redundant option.
+    if (tags.length <= 1) {
+      const list: ClientOption[] = [ALL_CLIENT];
+      if (clientOption.id !== ALL_CLIENT.id) list.push(clientOption);
+      return list;
+    }
+    const list: ClientOption[] = [ALL_CLIENT];
+    const seen = new Set<string>([ALL_CLIENT.id]);
+    for (const id of tags) {
+      if (!seen.has(id)) {
+        list.push(clientOptionForId(id));
+        seen.add(id);
+      }
+    }
+    if (!seen.has(clientOption.id)) list.push(clientOption);
+    return list;
+  })();
 
   // Listen for item-created messages from editor popup
   useEffect(() => {
@@ -391,7 +419,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         mark: mark?.id || 1,
         help: "[]",
         isPublic: false,
-        app: appId
+        client: clientId === 'all' ? 'console' : clientId
       });
       if (newItem) {
         setItems(prevItems => [newItem, ...prevItems]);
@@ -410,7 +438,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     }
   };
 
-  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, help, isPublic }) => {
+  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, help, isPublic, client: newClient }: { itemId: string; name?: any; taskId?: any; mark?: any; help?: any; isPublic?: any; client?: any }) => {
     // Prevent updates with stale item IDs - check both items array and ensure we have a valid user
     const currentItem = items.find(item => item.id === itemId);
     if (!itemId || !currentItem || !user?.uid) {
@@ -427,9 +455,11 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     const isMarkChanging = newMark !== undefined && currentItem && currentItem.mark !== newMark;
     const currentFilterMark = mark?.id;
 
+    const isClientChanging = newClient !== undefined && currentItem && (currentItem.client ?? currentItem.app) !== newClient;
+
     // Then update backend
     try {
-      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, help, isPublic });
+      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, help, isPublic, client: newClient });
 
       // If mark changed and this is the selected item, we need to reload the task data
       if (isMarkChanging && selectedItemId === itemId && result && result.taskId) {
@@ -444,6 +474,10 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setItems(prevItems => {
         // If mark is changing and we're filtering by mark, remove the item
         if (isMarkChanging && currentFilterMark && newMark !== currentFilterMark) {
+          return prevItems.filter(item => item.id !== itemId);
+        }
+        // If client is changing and we're filtering by a specific client, remove the item
+        if (isClientChanging && clientId !== 'all' && newClient !== clientId) {
           return prevItems.filter(item => item.id !== itemId);
         }
         // Otherwise, update the item in place with the result from backend
@@ -724,12 +758,13 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
               isItemsPanelCollapsed && "hidden"
             )}>
               <span className="text-sm font-medium text-gray-700">Items</span>
-              {setMark && setApp && setSort && setDateFilter && (
+              {setMark && setClient && setSort && setDateFilter && (
                 <ItemsHeaderMenu
                   mark={mark}
                   setMark={setMark}
-                  app={appOption}
-                  setApp={setApp}
+                  client={clientOption}
+                  setClient={setClient}
+                  clientList={clientList}
                   sort={sort}
                   setSort={setSort}
                   dateFilter={dateFilter}

@@ -13,7 +13,7 @@ import Layout from '../components/layout';
 import { useState, useEffect, useRef } from "react";
 import useLocalStorage from '../hooks/use-local-storage';
 import { marks } from "../components/mark-selector";
-import { apps, findAppById } from "../components/app-selector";
+import { clients, findClientById } from "../components/client-selector";
 import { DEFAULT_SORT, DEFAULT_DATE_FILTER } from "../components/items-header-menu";
 import AuthWrapper from '../components/AuthWrapper';
 import { selectLanguages, findLanguageByNumber } from '../components/language-selector';
@@ -62,7 +62,7 @@ export default function App({
 
   const [language, setLanguage] = useLocalStorage("graffiticode:language", defaultLanguage);
   const [mark, setMark] = useLocalStorage("graffiticode:items:mark", marks[0]);
-  const [app, setApp] = useLocalStorage("graffiticode:items:app", apps[0]);
+  const [client, setClient] = useLocalStorage("graffiticode:items:client", clients[0]);
   const [sort, setSort] = useLocalStorage("graffiticode:items:sort", DEFAULT_SORT);
   const [dateFilter, setDateFilter] = useLocalStorage("graffiticode:items:dateFilter", DEFAULT_DATE_FILTER);
 
@@ -97,18 +97,18 @@ export default function App({
       }
     }
 
-    // Apply ?app= query param (e.g. ?app=mcp)
-    const queryApp = router.query.app;
-    const appStr = Array.isArray(queryApp) ? queryApp[0] : queryApp;
-    if (appStr) {
-      const found = findAppById(appStr);
+    // Apply ?client= query param (e.g. ?client=mcp)
+    const queryClientParam = router.query.client;
+    const clientStr = Array.isArray(queryClientParam) ? queryClientParam[0] : queryClientParam;
+    if (clientStr) {
+      const found = findClientById(clientStr);
       if (found) {
-        setApp(found);
+        setClient(found);
       }
     }
 
     languageInitialized.current = true;
-  }, [router.isReady, domainLanguages, language.name, setLanguage, setMark, setApp]);
+  }, [router.isReady, domainLanguages, language.name, setLanguage, setMark, setClient]);
 
   return (
     (pathName === "form" || pathName === "editor") &&
@@ -118,7 +118,7 @@ export default function App({
           <WagmiProvider config={config}>
             <QueryClientProvider client={queryClient}>
               <GraffiticodeAuthProvider>
-                <Component {...{...pageProps, language, setLanguage, mark, setMark, app, setApp, sort, setSort, dateFilter, setDateFilter}} />
+                <Component {...{...pageProps, language, setLanguage, mark, setMark, client, setClient, sort, setSort, dateFilter, setDateFilter}} />
               </GraffiticodeAuthProvider>
             </QueryClientProvider>
           </WagmiProvider>
@@ -136,7 +136,7 @@ export default function App({
                   setLanguage={setLanguage}
                 >
                   <AuthWrapper>
-                    <Component {...{...pageProps, language, setLanguage, mark, setMark, app, setApp, sort, setSort, dateFilter, setDateFilter}} />
+                    <Component {...{...pageProps, language, setLanguage, mark, setMark, client, setClient, sort, setSort, dateFilter, setDateFilter}} />
                   </AuthWrapper>
                 </Layout>
               </GraffiticodeAuthProvider>

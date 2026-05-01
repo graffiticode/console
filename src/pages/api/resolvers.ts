@@ -279,7 +279,7 @@ export async function getData({ authToken, id }) {
 export async function getTasks({ auth, lang, mark }) {
   try {
     // Get items from the items collection (primary source)
-    const items = await getItems({ auth, lang, mark, app: 'console' });
+    const items = await getItems({ auth, lang, mark, client: 'console' });
 
     // Get taskIds from the taskIds collection (for backward compatibility)
     const taskIdsDocs = await db
@@ -503,7 +503,7 @@ export async function createItem({
   mark,
   help,
   isPublic,
-  app,
+  client,
 }) {
   try {
     // Generate a unique ID for the item
@@ -550,7 +550,7 @@ export async function createItem({
       mark: mark || 1, // Default to mark 1 if not provided
       help: generatedHelp,
       isPublic: isPublic || false,
-      app: app || 'console', // Default to 'console' if not provided
+      client: client || 'console', // Default to 'console' if not provided
       created: timestamp,
       updated: timestamp,
     };
@@ -593,6 +593,7 @@ export async function updateItem({
   mark,
   help,
   isPublic,
+  client,
 }) {
   try {
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
@@ -628,6 +629,7 @@ export async function updateItem({
       }
     }
     if (mark !== undefined) updates.mark = mark;
+    if (client !== undefined) updates.client = client;
     if (help !== undefined) updates.help = help;
     if (isPublic !== undefined) {
       updates.isPublic = isPublic;
@@ -665,23 +667,42 @@ export async function updateItem({
   }
 }
 
-export async function getItems({ auth, lang, mark, app }) {
+export async function getItems({ auth, lang, mark, client }) {
   try {
-    let query = db
+    // Build the base query (lang + optional mark + free-plan).
+    let baseQuery = db
       .collection(`users/${auth.uid}/items`)
       .where("lang", "==", lang);
-    // Only filter by mark if it's provided
     if (mark !== undefined && mark !== null) {
-      query = query.where("mark", "==", mark);
+      baseQuery = baseQuery.where("mark", "==", mark);
     }
     if (auth.freePlan) {
-      query = query.where("sessionNamespace", "==", auth.sessionNamespace);
-    } else {
-      // Filter by app - default to 'console' if not specified
-      const appFilter = app || 'console';
-      query = query.where("app", "==", appFilter);
+      baseQuery = baseQuery.where("sessionNamespace", "==", auth.sessionNamespace);
     }
-    const itemsSnapshot = await query.get();
+
+    // Resolve the client filter:
+    //   client === 'all'           → no filter (return everything for this lang/mark)
+    //   client === <specific value> → match items with `client === X` OR legacy `app === X`
+    //   client undefined/null       → backwards compat: return console items
+    let docs;
+    if (auth.freePlan || client === 'all') {
+      const snap = await baseQuery.get();
+      docs = snap.docs;
+    } else {
+      const filterValue = client || 'console';
+      const [snapClient, snapApp] = await Promise.all([
+        baseQuery.where("client", "==", filterValue).get(),
+        baseQuery.where("app", "==", filterValue).get(),
+      ]);
+      const seen = new Set<string>();
+      docs = [];
+      for (const d of [...snapClient.docs, ...snapApp.docs]) {
+        if (!seen.has(d.id)) {
+          seen.add(d.id);
+          docs.push(d);
+        }
+      }
+    }
     const items = [];
 
     // Get the user's sharedItems data to add to items (skip on free plan — shared
@@ -693,7 +714,7 @@ export async function getItems({ auth, lang, mark, app }) {
     const now = Date.now();
 
     // Process items and fetch legacy data if needed
-    for (const doc of itemsSnapshot.docs) {
+    for (const doc of docs) {
       const data = doc.data();
       if (!isItemVisibleToFreePlan(data, auth, now)) continue;
       let help = data.help;
@@ -768,7 +789,7 @@ export async function getItems({ auth, lang, mark, app }) {
         updated: data.updated ? String(data.updated) : String(data.created),
         sharedWith: sharedWith,
         sharedFrom: data.sharedFrom || null, // Include sharedFrom field if present
-        app: data.app || null,
+        client: data.client ?? data.app ?? null,
       };
 
       const timestamp = data.updated || data.created || 0;
@@ -779,6 +800,30 @@ export async function getItems({ auth, lang, mark, app }) {
   } catch (error) {
     console.error("getItems()", "ERROR", error);
     throw new Error(`Failed to get items: ${error.message}`);
+  }
+}
+
+export async function getItemClientTags({ auth, lang }) {
+  try {
+    let query = db
+      .collection(`users/${auth.uid}/items`)
+      .where("lang", "==", lang);
+    if (auth.freePlan) {
+      query = query.where("sessionNamespace", "==", auth.sessionNamespace);
+    }
+    const snapshot = await query.select("client", "app", "expiresAt").get();
+    const now = Date.now();
+    const tags = new Set<string>();
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      if (auth.freePlan && typeof data.expiresAt === "number" && data.expiresAt <= now) continue;
+      const value = data.client ?? data.app;
+      if (value) tags.add(value);
+    }
+    return Array.from(tags).sort();
+  } catch (error) {
+    console.error("getItemClientTags()", "ERROR", error);
+    return [];
   }
 }
 
@@ -861,6 +906,7 @@ export async function getItem({ auth, id }) {
       isPublic: data.isPublic || false,
       created: String(data.created),
       updated: data.updated ? String(data.updated) : String(data.created),
+      client: data.client ?? data.app ?? null,
     };
   } catch (error) {
     console.error("getItem()", "ERROR", error);
@@ -1032,14 +1078,15 @@ export async function claimFreePlanSession({
       taskId: null, // triggers lazy repost in getItem/getItems under the new uid
       claimedFrom: sessionUuid,
       // Surface claimed items in the default /items view (which filters to
-      // app=='console'). Provenance is preserved in `claimedFrom`.
-      app: "console",
+      // client=='console'). Provenance is preserved in `claimedFrom`.
+      client: "console",
       created: timestamp,
       updated: timestamp,
     };
     delete claimedItem.freePlan;
     delete claimedItem.sessionNamespace;
     delete claimedItem.expiresAt;
+    delete claimedItem.app; // legacy field; new items use `client` only
     if (code !== null) {
       claimedItem.code = code;
     } else {

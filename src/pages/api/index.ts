@@ -18,6 +18,7 @@ import {
   updateItem,
   getItems,
   getItem,
+  getItemClientTags,
   shareItem,
   parseCode,
   claimFreePlanSession,
@@ -100,7 +101,7 @@ const typeDefs = `
     created: String!
     updated: String
     sharedWith: [String]
-    app: String
+    client: String
     task: Task
   }
 
@@ -178,8 +179,9 @@ const typeDefs = `
     compiles(lang: String!, type: String!): [Compile!]
     tasks(lang: String!, mark: Int!): [Task!]
     task(id: String!): Task
-    items(lang: String!, mark: Int, app: String): [Item!]
+    items(lang: String!, mark: Int, client: String): [Item!]
     item(id: String!): Item
+    itemClientTags(lang: String!): [String!]!
     languages(search: String, domain: String): [Language!]!
     language(id: String!): LanguageInfo
     itemData(id: String!): String!
@@ -200,8 +202,8 @@ const typeDefs = `
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
     generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
-    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, app: String): Item!
-    updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean): Item!
+    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String): Item!
+    updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
     claimFreePlanSession(token: String!): ClaimResult!
   }
@@ -268,14 +270,19 @@ const resolvers = {
       return await getTask({ auth, id });
     },
     items: async (_, args, ctx) => {
-      const { lang, mark, app } = args;
+      const { lang, mark, client } = args;
       const auth = await resolveAuth(ctx);
-      return await getItems({ auth, lang, mark, app });
+      return await getItems({ auth, lang, mark, client });
     },
     item: async (_, args, ctx) => {
       const { id } = args;
       const auth = await resolveAuth(ctx);
       return await getItem({ auth, id });
+    },
+    itemClientTags: async (_, args, ctx) => {
+      const { lang } = args;
+      const auth = await resolveAuth(ctx);
+      return await getItemClientTags({ auth, lang });
     },
     languages: async (_, args) => {
       const { search, domain } = args;
@@ -335,14 +342,14 @@ const resolvers = {
       return resp;
     },
     createItem: async (_, args, ctx) => {
-      const { lang, name, taskId, mark, help, isPublic, app } = args;
+      const { lang, name, taskId, mark, help, isPublic, client } = args;
       const auth = await resolveAuth(ctx);
-      return await createItem({ auth, lang, name, taskId, mark, help, isPublic, app });
+      return await createItem({ auth, lang, name, taskId, mark, help, isPublic, client });
     },
     updateItem: async (_, args, ctx) => {
-      const { id, name, taskId, mark, help, isPublic } = args;
+      const { id, name, taskId, mark, help, isPublic, client } = args;
       const auth = await resolveAuth(ctx);
-      return await updateItem({ auth, id, name, taskId, mark, help, isPublic });
+      return await updateItem({ auth, id, name, taskId, mark, help, isPublic, client });
     },
     shareItem: async (_, args, ctx) => {
       if (ctx.freePlan) {

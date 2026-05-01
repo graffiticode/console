@@ -25,7 +25,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Tasks({ language, mark, setMark, app, setApp, sort, setSort, dateFilter, setDateFilter }) {
+export default function Tasks({ language, mark, setMark, client, setClient, sort, setSort, dateFilter, setDateFilter }) {
   useEffect(() => {
     document.title = getPageTitle();
   }, []);
@@ -36,8 +36,8 @@ export default function Tasks({ language, mark, setMark, app, setApp, sort, setS
         lang={lang}
         mark={mark}
         setMark={setMark}
-        app={app}
-        setApp={setApp}
+        client={client}
+        setClient={setClient}
         sort={sort}
         setSort={setSort}
         dateFilter={dateFilter}
