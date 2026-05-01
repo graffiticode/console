@@ -12,7 +12,7 @@ export default function AuthWrapper({ children }) {
     } else if (!user && !loading) {
       setIsReady(true);
     }
-  }, [user, loading]);
+  }, [user?.uid, loading]);
 
   const ensureUserExists = async () => {
     setCheckingUser(true);

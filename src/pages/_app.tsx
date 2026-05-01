@@ -14,6 +14,7 @@ import { useState, useEffect, useRef } from "react";
 import useLocalStorage from '../hooks/use-local-storage';
 import { marks } from "../components/mark-selector";
 import { apps, findAppById } from "../components/app-selector";
+import { DEFAULT_SORT, DEFAULT_DATE_FILTER } from "../components/items-header-menu";
 import AuthWrapper from '../components/AuthWrapper';
 import { selectLanguages, findLanguageByNumber } from '../components/language-selector';
 import { getTitle } from '../lib/utils';
@@ -62,6 +63,8 @@ export default function App({
   const [language, setLanguage] = useLocalStorage("graffiticode:language", defaultLanguage);
   const [mark, setMark] = useLocalStorage("graffiticode:items:mark", marks[0]);
   const [app, setApp] = useLocalStorage("graffiticode:items:app", apps[0]);
+  const [sort, setSort] = useLocalStorage("graffiticode:items:sort", DEFAULT_SORT);
+  const [dateFilter, setDateFilter] = useLocalStorage("graffiticode:items:dateFilter", DEFAULT_DATE_FILTER);
 
   // Set language/mark from query params or domain defaults on initial load
   useEffect(() => {
@@ -115,7 +118,7 @@ export default function App({
           <WagmiProvider config={config}>
             <QueryClientProvider client={queryClient}>
               <GraffiticodeAuthProvider>
-                <Component {...{...pageProps, language, setLanguage, mark, setMark, app, setApp}} />
+                <Component {...{...pageProps, language, setLanguage, mark, setMark, app, setApp, sort, setSort, dateFilter, setDateFilter}} />
               </GraffiticodeAuthProvider>
             </QueryClientProvider>
           </WagmiProvider>
@@ -131,13 +134,9 @@ export default function App({
                 <Layout
                   language={language}
                   setLanguage={setLanguage}
-                  mark={mark}
-                  setMark={setMark}
-                  app={app}
-                  setApp={setApp}
                 >
                   <AuthWrapper>
-                    <Component {...{...pageProps, language, setLanguage, mark, app, setApp}} />
+                    <Component {...{...pageProps, language, setLanguage, mark, setMark, app, setApp, sort, setSort, dateFilter, setDateFilter}} />
                   </AuthWrapper>
                 </Layout>
               </GraffiticodeAuthProvider>

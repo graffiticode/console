@@ -25,15 +25,24 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Tasks({ language, mark, app }) {
+export default function Tasks({ language, mark, setMark, app, setApp, sort, setSort, dateFilter, setDateFilter }) {
   useEffect(() => {
     document.title = getPageTitle();
   }, []);
   const lang = language.name.slice(1);
-  const appId = app?.id || 'console';
   return (
     <div className="max-w-full mx-auto py-0 sm:px-6 lg:px-8">
-      <Gallery lang={lang} mark={mark} app={appId} />
+      <Gallery
+        lang={lang}
+        mark={mark}
+        setMark={setMark}
+        app={app}
+        setApp={setApp}
+        sort={sort}
+        setSort={setSort}
+        dateFilter={dateFilter}
+        setDateFilter={setDateFilter}
+      />
     </div>
   )
 }

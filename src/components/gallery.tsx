@@ -15,6 +15,8 @@ import { Disclosure } from '@headlessui/react'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
 import ItemsNav from "./ItemsNav";
 import { PlusIcon } from '@heroicons/react/20/solid';
+import ItemsHeaderMenu, { DEFAULT_SORT, DEFAULT_DATE_FILTER, Sort, DateFilter } from "./items-header-menu";
+import { AppOption, apps } from "./app-selector";
 
 const parseId = id => {
   if (!id) {
@@ -51,7 +53,9 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-export default function Gallery({ lang, mark, hideItemsNav = false, itemId: initialItemId = null, app = 'console' }) {
+export default function Gallery({ lang, mark, setMark, hideItemsNav = false, itemId: initialItemId = null, app, setApp, sort = DEFAULT_SORT, setSort, dateFilter = DEFAULT_DATE_FILTER, setDateFilter }: { lang: any; mark: any; setMark?: (m: any) => void; hideItemsNav?: boolean; itemId?: string | null; app?: AppOption; setApp?: (a: AppOption) => void; sort?: Sort; setSort?: (s: Sort) => void; dateFilter?: DateFilter; setDateFilter?: (d: DateFilter) => void }) {
+  const appOption: AppOption = app || apps[0];
+  const appId = appOption.id;
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
@@ -208,11 +212,12 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
 
   // Load items from the API only once on initialization
   const { data: loadedItems, mutate, isLoading: isLoadingItems } = useSWR(
-    user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}-${app}` : null,
-    () => loadItems({ user, lang, mark: mark.id, app }),
+    user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}-${appId}` : null,
+    () => loadItems({ user, lang, mark: mark.id, app: appId }),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
+      keepPreviousData: true,
     }
   );
 
@@ -259,23 +264,34 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
     }
   }, [directItem, initialItemId]);
 
+  // Recompute ordered/filtered items whenever loadedItems, sort, or dateFilter change.
   useEffect(() => {
-    // Skip if we already loaded a direct item
     if (directItem && initialItemId) return;
+    if (!loadedItems || loadedItems.length === 0) {
+      if (!initialItemId) setItems([]);
+      return;
+    }
 
-    if (loadedItems && loadedItems.length > 0) {
-      // Apply saved item order from localStorage
+    const filteredItems = loadedItems.filter(i => {
+      if (dateFilter.from === null && dateFilter.to === null) return true;
+      const ts = Number(i[dateFilter.field] || 0);
+      if (dateFilter.from !== null && ts < dateFilter.from) return false;
+      if (dateFilter.to !== null && ts > dateFilter.to) return false;
+      return true;
+    });
+
+    const isDefaultSort = sort.field === DEFAULT_SORT.field && sort.direction === DEFAULT_SORT.direction;
+    let orderedItems = filteredItems;
+    if (isDefaultSort) {
       const savedOrder = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:itemOrder') : null;
-      let orderedItems = loadedItems;
       if (savedOrder) {
         try {
           const orderIds: string[] = JSON.parse(savedOrder);
           const orderSet = new Set(orderIds);
-          const newItems = loadedItems.filter(i => !orderSet.has(i.id));
+          const newItems = filteredItems.filter(i => !orderSet.has(i.id));
           const savedItems = orderIds
-            .map(id => loadedItems.find(i => i.id === id))
+            .map(id => filteredItems.find(i => i.id === id))
             .filter(Boolean);
-          // New items first (sorted by updated desc), then saved order
           newItems.sort((a, b) => {
             const aTime = Number(a.updated || a.created || 0);
             const bTime = Number(b.updated || b.created || 0);
@@ -283,32 +299,52 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
           });
           orderedItems = [...newItems, ...savedItems];
         } catch {}
+      } else {
+        orderedItems = [...filteredItems].sort((a, b) => {
+          const aTime = Number(a.updated || a.created || 0);
+          const bTime = Number(b.updated || b.created || 0);
+          return bTime - aTime;
+        });
       }
-      setItems(orderedItems);
-      // Priority: 1) initialItemId prop, 2) localStorage, 3) first item
-      const targetItemId = initialItemId ||
-        (typeof window !== 'undefined' ? localStorage.getItem(`graffiticode:selected:itemId`) : null);
-      if (targetItemId) {
-        const matchingItem = loadedItems.find(item => item.id === targetItemId);
-        if (matchingItem) {
-          setSelectedItemId(matchingItem.id);
-          setTaskId(matchingItem.taskId);
-          setEditorHelp(typeof matchingItem.help === "string" ? JSON.parse(matchingItem.help || "[]") : (matchingItem.help || []));
-          loadItemSource(matchingItem.id, matchingItem.taskId);
-          return;
+    } else {
+      const dir = sort.direction === 'asc' ? 1 : -1;
+      orderedItems = [...filteredItems].sort((a, b) => {
+        if (sort.field === 'name') {
+          return dir * String(a.name || '').localeCompare(String(b.name || ''));
         }
-      }
-      // Default to the first item if no saved selection
-      if (orderedItems[0]) {
-        setSelectedItemId(orderedItems[0].id);
-        setTaskId(orderedItems[0].taskId);
-        setEditorHelp(typeof orderedItems[0].help === "string" ? JSON.parse(orderedItems[0].help || "[]") : (orderedItems[0].help || []));
-        loadItemSource(orderedItems[0].id, orderedItems[0].taskId);
-      }
-    } else if (!initialItemId) {
-      setItems([]);
-      setSelectedItemId("");
+        const aTime = Number(a[sort.field] || 0);
+        const bTime = Number(b[sort.field] || 0);
+        return dir * (aTime - bTime);
+      });
     }
+    setItems(orderedItems);
+  }, [loadedItems, directItem, initialItemId, sort, dateFilter]);
+
+  // Resolve selection (and load its source) only when the source data changes.
+  useEffect(() => {
+    if (directItem && initialItemId) return;
+    if (!loadedItems || loadedItems.length === 0) {
+      if (!initialItemId) setSelectedItemId("");
+      return;
+    }
+    const targetItemId = initialItemId ||
+      (typeof window !== 'undefined' ? localStorage.getItem(`graffiticode:selected:itemId`) : null);
+    const pickItem = (item) => {
+      if (item.id === selectedItemId) return; // selection unchanged → skip reload
+      setSelectedItemId(item.id);
+      setTaskId(item.taskId);
+      setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
+      loadItemSource(item.id, item.taskId);
+    };
+    if (targetItemId) {
+      const matchingItem = loadedItems.find(item => item.id === targetItemId);
+      if (matchingItem) {
+        pickItem(matchingItem);
+        return;
+      }
+    }
+    const first = loadedItems[0];
+    if (first) pickItem(first);
   }, [loadedItems, initialItemId, directItem]);
 
   const toggleItemsPanel = useCallback(() => {
@@ -355,7 +391,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
         mark: mark?.id || 1,
         help: "[]",
         isPublic: false,
-        app
+        app: appId
       });
       if (newItem) {
         setItems(prevItems => [newItem, ...prevItems]);
@@ -683,10 +719,24 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
           style={{ width: isItemsPanelCollapsed ? 40 : itemsPanelWidth }}
         >
           <div className="flex justify-between items-center p-2 border-b border-gray-200">
-            <span className={classNames(
-              "text-sm font-medium text-gray-700",
+            <div className={classNames(
+              "flex items-center gap-2",
               isItemsPanelCollapsed && "hidden"
-            )}>Items</span>
+            )}>
+              <span className="text-sm font-medium text-gray-700">Items</span>
+              {setMark && setApp && setSort && setDateFilter && (
+                <ItemsHeaderMenu
+                  mark={mark}
+                  setMark={setMark}
+                  app={appOption}
+                  setApp={setApp}
+                  sort={sort}
+                  setSort={setSort}
+                  dateFilter={dateFilter}
+                  setDateFilter={setDateFilter}
+                />
+              )}
+            </div>
             <button
               className="text-gray-400 hover:text-gray-500 focus:outline-none"
               title={isItemsPanelCollapsed ? "Expand items panel" : "Collapse items panel"}
@@ -716,7 +766,7 @@ export default function Gallery({ lang, mark, hideItemsNav = false, itemId: init
           )}
           {!isItemsPanelCollapsed && (
             <div className="h-[calc(100%-84px)] overflow-auto">
-              {isLoadingItems ? (
+              {isLoadingItems && items.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
                 </div>
