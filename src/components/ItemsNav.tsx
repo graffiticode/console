@@ -13,7 +13,18 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
+function formatTimestamp(ts) {
+  if (!ts) return null;
+  const n = typeof ts === 'number' ? ts : Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  try {
+    return new Date(n).toLocaleString();
+  } catch {
+    return null;
+  }
+}
+
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, created, updated, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
   const { user } = useGraffiticodeAuth();
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -244,6 +255,23 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                 </div>
               </div>
 
+              {(formatTimestamp(created) || formatTimestamp(updated)) && (
+                <div className="mb-4">
+                  {formatTimestamp(created) && (
+                    <div className="flex justify-between text-xs text-gray-600 py-0.5">
+                      <span className="font-semibold">Created</span>
+                      <span className="font-mono">{formatTimestamp(created)}</span>
+                    </div>
+                  )}
+                  {formatTimestamp(updated) && formatTimestamp(updated) !== formatTimestamp(created) && (
+                    <div className="flex justify-between text-xs text-gray-600 py-0.5">
+                      <span className="font-semibold">Updated</span>
+                      <span className="font-mono">{formatTimestamp(updated)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Mark</label>
@@ -448,6 +476,8 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
                       lang={item.lang}
                       help={item.help}
                       code={item.code}
+                      created={item.created}
+                      updated={item.updated}
                       onChange={onUpdateItem}
                       onRefresh={onRefresh}
                       isOpen={openMenuId === item.id}
