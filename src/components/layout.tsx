@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import LanguageSelector from '../components/language-selector';
+import MarkSelector from '../components/mark-selector';
 import {
   Bars3Icon,
   XMarkIcon,
@@ -44,7 +45,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export default function Layout({ children, language, setLanguage }) {
+export default function Layout({ children, language, setLanguage, mark, setMark }) {
   const { user } = useGraffiticodeAuth();
   const router = useRouter();
   const pathName = router.pathname.slice(1);
@@ -160,6 +161,11 @@ export default function Layout({ children, language, setLanguage }) {
                     { ["items", "tasks", "specs"].includes(pathName) &&
                       <div className="ml-10 flex-shrink-0 w-24 h-24 pt-7">
                         <LanguageSelector domain={domain} language={language} setLanguage={setLanguage} />
+                      </div>
+                    }
+                    { pathName === "items" && mark && setMark &&
+                      <div className="ml-4 flex-shrink-0 w-24 h-24 pt-7">
+                        <MarkSelector mark={mark} setMark={setMark} />
                       </div>
                     }
                   </div>

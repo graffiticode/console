@@ -134,6 +134,8 @@ export default function App({
                 <Layout
                   language={language}
                   setLanguage={setLanguage}
+                  mark={mark}
+                  setMark={setMark}
                 >
                   <AuthWrapper>
                     <Component {...{...pageProps, language, setLanguage, mark, setMark, client, setClient, sort, setSort, dateFilter, setDateFilter}} />
