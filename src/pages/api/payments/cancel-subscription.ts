@@ -83,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         currentAllocation = currentAllocation * 12;
       }
 
-      console.log('Preserving allocation on downgrade to starter:', {
+      console.log('Preserving allocation on downgrade to free:', {
         currentPlan,
         interval,
         preservedAllocation: currentAllocation
@@ -133,20 +133,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         : null,
     };
 
-    // Only update plan if immediately canceling (downgrading to starter)
+    // Only update plan if immediately canceling (downgrading to free)
     if (immediately) {
-      updateData['subscription.plan'] = 'starter';
+      updateData['subscription.plan'] = 'demo';
     }
 
-    // Only set canceledAt for actual cancellations, not downgrades to starter
+    // Only set canceledAt for actual cancellations, not downgrades to free
     if (!immediately) {
       updateData['subscription.canceledAt'] = new Date().toISOString();
     }
 
-    // Preserve the renewal date and allocation when downgrading to starter
+    // Preserve the renewal date and allocation when downgrading to free
     if (immediately && subscription.current_period_end) {
       updateData['subscription.renewalDate'] = new Date(subscription.current_period_end * 1000).toISOString();
-      updateData['subscription.interval'] = null; // Starter plan has no interval
+      updateData['subscription.interval'] = null; // Free plan has no interval
       updateData['subscription.stripeSubscriptionId'] = null; // Clear Stripe subscription ID
       updateData['subscription.preservedAllocation'] = currentAllocation; // Preserve old plan's allocation
       updateData['subscription.preservedUntil'] = new Date(subscription.current_period_end * 1000).toISOString();

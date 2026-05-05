@@ -178,11 +178,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const userDoc = usersQuery.docs[0];
         const userId = userDoc.id;
 
-        // Reset to starter tier but preserve overage units (they're purchased separately)
+        // Reset to free tier but preserve overage units (they're purchased separately)
         await db.collection('users').doc(userId).update({
           'subscription.status': 'canceled',
-          'subscription.plan': 'starter',
-          'subscription.units': 5000,
+          'subscription.plan': 'demo',
+          'subscription.units': 250,
           'subscription.stripeSubscriptionId': null,
           'subscription.canceledAt': new Date().toISOString(),
           // DO NOT reset overage units - they roll over and persist until used
