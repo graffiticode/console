@@ -615,7 +615,7 @@ export default function TasksGallery({ lang }) {
                         <div
                           className={classNames(
                             task.current ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200',
-                            "flex flex-row items-center justify-between pr-1"
+                            "flex flex-row justify-between pr-2"
                           )}
                           onMouseOver={() => {
                             if (showId !== task.id) {
@@ -625,7 +625,7 @@ export default function TasksGallery({ lang }) {
                         >
                           <button
                             onClick={() => { handleSelectTask(task.id); tasksUlRef.current?.focus(); }}
-                            className="block rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 flex-1 min-w-0 text-left truncate focus:outline-none"
+                            className="flex items-center rounded-none py-0 pr-2 pl-4 font-bold leading-6 font-mono text-xs text-gray-700 hover:text-gray-900 flex-1 min-w-0 text-left truncate focus:outline-none"
                           >
                             {elideCompoundId(task.id)}
                           </button>
