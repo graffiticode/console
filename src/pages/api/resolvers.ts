@@ -5,6 +5,7 @@ import { getFirestore } from "../../utils/db";
 import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } from "../../lib/api";
 import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService } from "../../lib/code-generation-service";
+import { classifyComposition, orchestrateComposition } from "../../lib/language-router";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
 import fs from "fs";
@@ -407,6 +408,11 @@ export async function generateCode({
     });
 
     let src = null;
+    // Build-time state layers added by composition. The head's posted taskId
+    // gets these task ids appended with `+` to form the saved chain.
+    let upstreamLangs: string[] = [];
+    let upstreamTaskIds: string[] = [];
+    let headLang = language;
 
     // Template generation
     if (prompt === "Create a minimal starting template") {
@@ -427,71 +433,126 @@ export async function generateCode({
 
     // Code generation — if no template source
     if (!src) {
-      const result = await codeGenerationService({
-        auth,
-        prompt,
-        lang: language,
-        options: {
-          model: options?.model,
-          temperature: options?.temperature,
-          maxTokens: options?.maxTokens,
-        },
-        currentCode: currentSrc,
-        rid,
-        conversationSummary,
+      // Proactive composition planner. Decides head + optional upstream
+      // layers up-front; when upstreams are non-empty we orchestrate per
+      // language and stitch the chain. The single-language path below is
+      // unchanged.
+      const plan = await classifyComposition({ prompt, currentLang: language });
+      const plannedUpstreamLangs = plan.upstreams.map((u) => u.lang);
+      console.log(
+        `[planner] rid=${rid} headLang=${plan.head.lang} upstreams=${
+          plannedUpstreamLangs.length > 0 ? plannedUpstreamLangs.join(",") : "none"
+        }`
+      );
+      ragLog(rid, "composition.plan", {
+        headLang: plan.head.lang,
+        upstreamLangs: plannedUpstreamLangs,
       });
 
-      if ('errors' in result && result.errors) {
-        const errors = result.errors.map(err => ({
-          ...err,
-          message: err.message === 'Usage limit reached'
-            ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
-            : err.message
-        }));
-        return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors };
-      }
+      if (plan.upstreams.length > 0) {
+        const orch = await orchestrateComposition({
+          plan,
+          auth,
+          options: {
+            model: options?.model,
+            temperature: options?.temperature,
+            maxTokens: options?.maxTokens,
+          },
+          currentCode: currentSrc,
+          rid,
+          conversationSummary,
+        });
 
-      const successResult = result as { code: any; taskId: string; model: string; usage: any; description: string | null; changeSummary: string | null };
-      src = successResult.code;
-      model = successResult.model;
-      usage = successResult.usage;
-      description = successResult.description;
-      changeSummary = successResult.changeSummary;
+        if (orch.errors) {
+          const errors = orch.errors.map((err) => ({
+            ...err,
+            message: err.message === 'Usage limit reached'
+              ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
+              : err.message
+          }));
+          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors, upstreamLangs: [] };
+        }
+
+        src = orch.headSrc;
+        model = orch.headModel;
+        usage = orch.headUsage;
+        description = orch.headDescription;
+        changeSummary = orch.headChangeSummary;
+        upstreamLangs = orch.upstreamLangs;
+        upstreamTaskIds = orch.upstreamTaskIds;
+        headLang = orch.headLang;
+      } else {
+        const result = await codeGenerationService({
+          auth,
+          prompt,
+          lang: language,
+          options: {
+            model: options?.model,
+            temperature: options?.temperature,
+            maxTokens: options?.maxTokens,
+          },
+          currentCode: currentSrc,
+          rid,
+          conversationSummary,
+        });
+
+        if ('errors' in result && result.errors) {
+          const errors = result.errors.map(err => ({
+            ...err,
+            message: err.message === 'Usage limit reached'
+              ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
+              : err.message
+          }));
+          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors, upstreamLangs: [] };
+        }
+
+        const successResult = result as { code: any; taskId: string; model: string; usage: any; description: string | null; changeSummary: string | null };
+        src = successResult.code;
+        model = successResult.model;
+        usage = successResult.usage;
+        description = successResult.description;
+        changeSummary = successResult.changeSummary;
+      }
     }
 
-    // Parse with system values, post, and unparse
+    // Parse the head src with system values, post, and unparse. Upstream
+    // taskIds (if any) are appended with `+` to form the chained head.
     const systemValues: Record<string, string> = {};
     if (itemId) systemValues.itemId = itemId;
-    const parseResult = await parseCode({ lang: language, src, systemValues });
+    const parseResult = await parseCode({ lang: headLang, src, systemValues });
     if (parseResult.errors) {
-      return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: parseResult.errors };
+      return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: parseResult.errors, upstreamLangs: [] };
     }
     const code = JSON.parse(parseResult.code);
     const taskData = await postTask({
       auth,
-      task: { lang: language, code },
+      task: { lang: headLang, code },
       ephemeral: true,
       isPublic: false,
     });
-    const taskId = taskData.id;
-    if (!taskId) {
+    const headTaskId = taskData.id;
+    if (!headTaskId) {
       throw new Error("Failed to get taskId");
     }
-    const lexicon = await getLanguageLexicon(language);
+    const taskId = upstreamTaskIds.length > 0
+      ? `${headTaskId}+${upstreamTaskIds.join("+")}`
+      : headTaskId;
+    const lexicon = await getLanguageLexicon(headLang);
     const resolvedSrc = unparse(code, lexicon || {});
 
     ragLog(rid, "request.end", {
       taskId,
       model,
       usage,
+      upstreamLangs,
       success: true,
     });
 
-    return { src: resolvedSrc, taskId, language, description, changeSummary, model, usage, errors: null };
+    return { src: resolvedSrc, taskId, language: headLang, description, changeSummary, model, usage, errors: null, upstreamLangs };
   } catch (error) {
     console.error("generateCode()", "ERROR", error);
     ragLog(rid, "request.error", { error: error.message });
-    return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: error.message }] };
+    return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: error.message }], upstreamLangs: [] };
   }
 }
 
@@ -504,6 +565,7 @@ export async function createItem({
   help,
   isPublic,
   client,
+  upstreamLangs,
 }) {
   try {
     // Generate a unique ID for the item
@@ -551,6 +613,7 @@ export async function createItem({
       help: generatedHelp,
       isPublic: isPublic || false,
       client: client || 'console', // Default to 'console' if not provided
+      upstreamLangs: Array.isArray(upstreamLangs) ? upstreamLangs : [],
       created: timestamp,
       updated: timestamp,
     };
@@ -594,6 +657,7 @@ export async function updateItem({
   help,
   isPublic,
   client,
+  upstreamLangs,
 }) {
   try {
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
@@ -631,6 +695,9 @@ export async function updateItem({
     if (mark !== undefined) updates.mark = mark;
     if (client !== undefined) updates.client = client;
     if (help !== undefined) updates.help = help;
+    if (upstreamLangs !== undefined && Array.isArray(upstreamLangs)) {
+      updates.upstreamLangs = upstreamLangs;
+    }
     if (isPublic !== undefined) {
       updates.isPublic = isPublic;
       if (isPublic) {
@@ -784,6 +851,7 @@ export async function getItems({ auth, lang, mark, client }) {
         sharedWith: sharedWith,
         sharedFrom: data.sharedFrom || null, // Include sharedFrom field if present
         client: data.client ?? 'console',
+        upstreamLangs: Array.isArray(data.upstreamLangs) ? data.upstreamLangs : [],
       };
 
       const timestamp = data.updated || data.created || 0;
@@ -824,7 +892,8 @@ export async function getItemClientTags({ auth, lang }) {
 export async function getTask({ auth, id }) {
   try {
     const apiTask = await getApiTask({ id, auth });
-    const taskData = apiTask[0] || apiTask;
+    const taskList = Array.isArray(apiTask) ? apiTask : [apiTask];
+    const taskData = taskList[0] || apiTask;
     const code = taskData.code;
     const codeStr = JSON.stringify(code, null, 2);
     let src = "";
@@ -834,7 +903,10 @@ export async function getTask({ auth, id }) {
     } catch (err) {
       console.error("getTask: failed to unparse", err);
     }
-    return { id, lang: taskData.lang, code: codeStr, src };
+    const langs = taskList
+      .map(t => t && t.lang)
+      .filter(l => typeof l === "string" && l.length > 0);
+    return { id, lang: taskData.lang, code: codeStr, src, langs };
   } catch (error) {
     console.error("getTask()", "ERROR", error);
     throw new Error(`Failed to get task: ${error.message}`);
@@ -901,6 +973,7 @@ export async function getItem({ auth, id }) {
       created: String(data.created),
       updated: data.updated ? String(data.updated) : String(data.created),
       client: data.client ?? 'console',
+      upstreamLangs: Array.isArray(data.upstreamLangs) ? data.upstreamLangs : [],
     };
   } catch (error) {
     console.error("getItem()", "ERROR", error);

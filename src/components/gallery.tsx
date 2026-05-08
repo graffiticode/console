@@ -95,6 +95,9 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   const [ editorCode, setEditorCode ] = useState("");
   const [ editorHelp, setEditorHelp ] = useState([]);
   const [ formData, setFormData ] = useState({});
+  // Build-time state-layer languages (planner-composed upstreams) for the
+  // currently selected item. Length == number of '+' segments after the head.
+  const [ upstreamLangs, setUpstreamLangs ] = useState<string[]>([]);
   const [ editorPanelWidth, setEditorPanelWidth ] = useState(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:editorPanelWidth') : null;
     return saved ? parseFloat(saved) : 50;
@@ -285,6 +288,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setTaskId(null);
       setEditorCode("");
       setEditorHelp([]);
+      setUpstreamLangs([]);
     }
   }, [user?.uid]);
 
@@ -295,6 +299,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setSelectedItemId(directItem.id);
       setTaskId(directItem.taskId);
       setEditorHelp(typeof directItem.help === "string" ? JSON.parse(directItem.help || "[]") : (directItem.help || []));
+      setUpstreamLangs(Array.isArray(directItem.upstreamLangs) ? directItem.upstreamLangs : []);
       loadItemSource(directItem.id, directItem.taskId);
     }
   }, [directItem, initialItemId]);
@@ -377,6 +382,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setSelectedItemId(item.id);
       setTaskId(item.taskId);
       setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
+      setUpstreamLangs(Array.isArray(item.upstreamLangs) ? item.upstreamLangs : []);
       loadItemSource(item.id, item.taskId);
     };
     if (targetItemId) {
@@ -443,6 +449,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         setSelectedItemId(newItem.id);
         setTaskId(newItem.taskId);
         setEditorHelp(typeof newItem.help === "string" ? JSON.parse(newItem.help || "[]") : (newItem.help || []));
+        setUpstreamLangs(Array.isArray(newItem.upstreamLangs) ? newItem.upstreamLangs : []);
         loadItemSource(newItem.id, newItem.taskId);
         if (typeof window !== 'undefined') {
           localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
@@ -455,7 +462,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     }
   };
 
-  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, help, isPublic, client: newClient }: { itemId: string; name?: any; taskId?: any; mark?: any; help?: any; isPublic?: any; client?: any }) => {
+  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs }: { itemId: string; name?: any; taskId?: any; mark?: any; help?: any; isPublic?: any; client?: any; upstreamLangs?: string[] }) => {
     // Prevent updates with stale item IDs - check both items array and ensure we have a valid user
     const currentItem = items.find(item => item.id === itemId);
     if (!itemId || !currentItem || !user?.uid) {
@@ -476,7 +483,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
 
     // Then update backend
     try {
-      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, help, isPublic, client: newClient });
+      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs });
 
       // If mark changed and this is the selected item, we need to reload the task data
       if (isMarkChanging && selectedItemId === itemId && result && result.taskId) {
@@ -534,6 +541,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
           setSelectedItemId(nextItem.id);
           setTaskId(nextItem.taskId);
           setEditorHelp(typeof nextItem.help === "string" ? JSON.parse(nextItem.help || "[]") : (nextItem.help || []));
+          setUpstreamLangs(Array.isArray(nextItem.upstreamLangs) ? nextItem.upstreamLangs : []);
           loadItemSource(nextItem.id, nextItem.taskId);
           // Persist so SWR refetch doesn't override
           if (typeof window !== 'undefined') {
@@ -544,6 +552,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
           setTaskId("");
           setEditorCode("");
           setEditorHelp([]);
+          setUpstreamLangs([]);
         }
       }
     } catch (error) {
@@ -560,6 +569,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setSelectedItemId(item.id);
       setTaskId(item.taskId);
       setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
+      setUpstreamLangs(Array.isArray(item.upstreamLangs) ? item.upstreamLangs : []);
       loadItemSource(item.id, item.taskId);
       if (typeof window !== 'undefined') {
         localStorage.setItem(`graffiticode:selected:itemId`, item.id);
@@ -601,14 +611,17 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         const hasChanges =
           (taskId && selectedItem.taskId !== taskId) ||
           (editorHelp !== undefined && JSON.stringify(selectedItem.help) !== JSON.stringify(editorHelp));
-        if (hasChanges) {
+        const persistedUpstream = Array.isArray(selectedItem.upstreamLangs) ? selectedItem.upstreamLangs : [];
+        const upstreamChanged = JSON.stringify(persistedUpstream) !== JSON.stringify(upstreamLangs);
+        if (hasChanges || upstreamChanged) {
           handleUpdateItem({
             itemId: selectedItemId,
             name: selectedItem.name,
             taskId: taskId || selectedItem.taskId,
             mark: selectedItem.mark,
             help: JSON.stringify(editorHelp),
-            isPublic: selectedItem.isPublic
+            isPublic: selectedItem.isPublic,
+            upstreamLangs,
           });
         }
       } else {
@@ -616,7 +629,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         setSelectedItemId(null);
       }
     }
-  }, [taskId, editorHelp, selectedItemId, user?.uid]);
+  }, [taskId, editorHelp, selectedItemId, user?.uid, upstreamLangs]);
 
   // Compile form data when taskId or formData changes
   useEffect(() => {
@@ -625,7 +638,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       return;
     }
 
-    compile({ user, id: taskId, data: formData }).then(compiledData => {
+    compile({ user, id: taskId, data: formData, buildLayerCount: upstreamLangs.length }).then(compiledData => {
       console.log(
         "compile()",
         "compiledData=" + JSON.stringify(compiledData, null, 2),
@@ -651,7 +664,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     }).catch(err => {
       console.error('Failed to compile form data:', err);
     });
-  }, [taskId, selectedItemId, user, formData]);
+  }, [taskId, selectedItemId, user, formData, upstreamLangs]);
 
   if (!user) {
     return (
@@ -981,6 +994,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 lang={lang}
                 mark={mark}
                 setTaskId={setTaskId}
+                setUpstreamLangs={setUpstreamLangs}
                 onLoadTaskFromHelp={handleLoadTaskFromHelp}
                 height="100%"
                 onCodeChange={setEditorCode}

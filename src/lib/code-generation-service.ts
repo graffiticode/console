@@ -756,7 +756,12 @@ async function verifyCode(code, authToken, lang, rid = null) {
 
   try {
     // Parse first to catch syntax errors before posting
-    const parseResult = await parseCode({ lang, src: code });
+    // Inject a synthetic itemId so dialects that read `get-val-public
+    // "itemId"` (e.g. L0158's `set-var "lrn-id"`) compile cleanly during
+    // verification. The real itemId is substituted by the resolver's
+    // parseCode call before the saved task is posted, so this placeholder
+    // never reaches storage.
+    const parseResult = await parseCode({ lang, src: code, systemValues: { itemId: "verify-itemid" } });
     if (parseResult.errors) {
       if (rid) {
         ragLog(rid, "verification.parse_error", {

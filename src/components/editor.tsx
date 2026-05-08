@@ -58,6 +58,7 @@ export default function Editor({
   accessToken,
   taskId,
   setTaskId,
+  setUpstreamLangs,
   onLoadTaskFromHelp,
   lang,
   mark: initMark,
@@ -69,7 +70,7 @@ export default function Editor({
   initialCode,
   initialHelp,
   itemId,
-}) {
+}: any) {
   const [ code, setCode ] = useState(initialCode || "");
   const [ help, setHelp ] = useState(initialHelp || []);
   const [ data, setData ] = useState({});
@@ -113,11 +114,16 @@ export default function Editor({
 
 
   useEffect(() => {
-    // When taskId changes, update the editor with the new initial values
+    // When taskId changes, cancel any pending repost and (only when the
+    // parent's initialCode actually differs from what we already have)
+    // sync the editor to the new initial source. The conditional setCode
+    // avoids a race where chat-driven setTaskId(chain) would otherwise
+    // overwrite the freshly-set code with a stale initialCode prop before
+    // gallery's onCodeChange callback propagates the new value.
     if (taskId !== currentTaskIdRef.current) {
       setIsUserEdit(false);
       setIsPostingTask(false);
-      if (initialCode !== undefined) {
+      if (initialCode !== undefined && initialCode !== codeRef.current) {
         setCode(initialCode);
         codeRef.current = initialCode;
       }
@@ -141,7 +147,9 @@ export default function Editor({
     codeRef.current = code;
   }, [code]);
 
-  // Parse and post task when code changes due to user editing (debounced)
+  // Parse and post task when code changes due to user editing (debounced).
+  // Trailing chain segments (build-time upstream layers) are preserved so
+  // edits to the head don't drop composition.
   useEffect(() => {
     if (!code || !isUserEdit || isPostingTask || !user) return;
 
@@ -158,8 +166,12 @@ export default function Editor({
             return;
           }
           setCompileErrors(null);
-          const newTaskId = await postTask({ user, lang, code: result.code, item: itemId });
-          setTaskId(newTaskId);
+          const newHead = await postTask({ user, lang, code: result.code, item: itemId });
+          const upstreamSegments = (taskId || "").split("+").slice(1);
+          const newChain = upstreamSegments.length > 0
+            ? [newHead, ...upstreamSegments].join("+")
+            : newHead;
+          setTaskId(newChain);
         } catch (err) {
           console.error("Parse/postTask error:", err);
         } finally {
@@ -228,6 +240,7 @@ export default function Editor({
                 }
               }}
               setTaskId={setTaskId}
+              setUpstreamLangs={setUpstreamLangs}
               onLoadTaskFromHelp={onLoadTaskFromHelp}
               onError={onError}
               taskId={taskId}

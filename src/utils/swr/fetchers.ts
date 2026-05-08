@@ -11,11 +11,20 @@ const buildRequestClient = async ({ token }) => {
   return client;
 };
 
-export const compile = async ({ user, id, data = {} }) => {
+export const compile = async ({ user, id, data = {}, buildLayerCount = 0 }: { user: any; id: string; data?: any; buildLayerCount?: number }) => {
   try {
-    const token = await user.getToken();
-    const index = Object.keys(data).length > 0 && 1 || 2; // Empty data so use full id.
-    id = id.split("+").slice(0, index).join("+");  // Re-compile state with code id.
+    // Preserve the head segment plus any build-time state layers
+    // (planner-built upstreams). Runtime form state is the trailing
+    // segment that gets stripped/replaced on each compile.
+    const keep = 1 + Math.max(0, buildLayerCount);
+    const segments = id.split("+");
+    const hasFormData = Object.keys(data).length > 0;
+    // When there's runtime formData, drop any trailing runtime-state
+    // segment so the api server reposts the new state cleanly.
+    // Otherwise preserve the full chain so a standalone compile uses
+    // the build-time layers as `data`.
+    const sliceTo = hasFormData ? Math.min(keep, segments.length) : segments.length;
+    id = segments.slice(0, sliceTo).join("+");
     const accessToken = await user.getToken();
     const resp = await postApiCompile({ accessToken, id, data });
     return resp;
@@ -231,6 +240,7 @@ export const loadItems = async ({ user, lang, mark, client: clientId }) => {
         updated
         sharedWith
         client
+        upstreamLangs
       }
     }
   `;
@@ -253,7 +263,7 @@ export const loadItemClientTags = async ({ user, lang }) => {
   return client.request(query, { lang }).then(data => data.itemClientTags || []);
 };
 
-export const createItem = async ({ user, lang, name, taskId, mark, help, isPublic, client: clientId }) => {
+export const createItem = async ({ user, lang, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs }: { user: any; lang: string; name?: string; taskId?: string; mark?: number; help?: string; isPublic?: boolean; client?: string; upstreamLangs?: string[] }) => {
   if (!user) {
     return null;
   }
@@ -264,8 +274,8 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, isPubli
     }
   });
   const mutation = gql`
-    mutation createItem($lang: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $client: String) {
-      createItem(lang: $lang, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, client: $client) {
+    mutation createItem($lang: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $client: String, $upstreamLangs: [String!]) {
+      createItem(lang: $lang, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, client: $client, upstreamLangs: $upstreamLangs) {
         id
         name
         taskId
@@ -276,13 +286,14 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, isPubli
         created
         updated
         client
+        upstreamLangs
       }
     }
   `;
-  return client.request(mutation, { lang, name, taskId, mark, help, isPublic, client: clientId }).then(data => data.createItem);
+  return client.request(mutation, { lang, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs }).then(data => data.createItem);
 };
 
-export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic, client: clientId }) => {
+export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs }: { user: any; id: string; name?: string; taskId?: string; mark?: number; help?: string; isPublic?: boolean; client?: string; upstreamLangs?: string[] }) => {
   if (!user) {
     return null;
   }
@@ -293,8 +304,8 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
     }
   });
   const mutation = gql`
-    mutation updateItem($id: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $client: String) {
-      updateItem(id: $id, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, client: $client) {
+    mutation updateItem($id: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $client: String, $upstreamLangs: [String!]) {
+      updateItem(id: $id, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, client: $client, upstreamLangs: $upstreamLangs) {
         id
         name
         taskId
@@ -305,10 +316,11 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
         created
         updated
         client
+        upstreamLangs
       }
     }
   `;
-  return client.request(mutation, { id, name, taskId, mark, help, isPublic, client: clientId }).then(data => data.updateItem);
+  return client.request(mutation, { id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs }).then(data => data.updateItem);
 };
 
 export const shareItem = async ({ user, itemId, targetUserId }) => {
@@ -362,8 +374,31 @@ export const getTask = async ({ user, id }) => {
       task(id: $id) {
         id
         lang
+        langs
         code
         src
+      }
+    }
+  `;
+  return client.request(query, { id }).then(data => data.task);
+};
+
+export const getTaskLangs = async ({ user, id }) => {
+  if (!user || !id) {
+    return null;
+  }
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const query = gql`
+    query getTaskLangs($id: String!) {
+      task(id: $id) {
+        id
+        lang
+        langs
       }
     }
   `;
@@ -392,6 +427,8 @@ export const getItem = async ({ user, id }) => {
         isPublic
         created
         updated
+        client
+        upstreamLangs
       }
     }
   `;
@@ -425,6 +462,7 @@ export const generateCode = async ({ user, prompt, language, options, currentSrc
           from
           to
         }
+        upstreamLangs
       }
     }
   `;

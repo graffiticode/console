@@ -112,6 +112,7 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       model: result.model,
       usage: result.usage,
       taskId: result.taskId,
+      upstreamLangs: result.upstreamLangs || [],
       timestamp: new Date().toISOString()
     };
   } catch (error) {

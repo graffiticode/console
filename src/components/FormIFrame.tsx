@@ -133,18 +133,19 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
         return;
       }
 
-      // Check if this is form data (has title, instructions, validation, interaction)
-      let data = null;
-
-      // First check if data is keyed by ID
-      if (event.data[id]) {
-        data = event.data[id];
+      // Treat as runtime form state ONLY when the iframe explicitly keys the
+      // payload by the current taskId (e.g. `{ "<id>": <state> }`).
+      // The previous blanket fallthrough — "any non-empty object event is
+      // form data" — was catching Learnosity's nested iframe init/ready
+      // messages and feeding the signed Learnosity body back into compile
+      // as state, which on a planner-built chain (head + upstream) made the
+      // upstream language compile against a Learnosity-shaped payload and
+      // throw "Language server error". Explicit data-updated messages
+      // (handled above) remain the canonical path for runtime state.
+      if (!event.data[id]) {
+        return;
       }
-      // Accept any non-empty object as form data
-      else if (event.data && typeof event.data === 'object' && Object.keys(event.data).length > 0) {
-        data = event.data;
-      }
-
+      const data = event.data[id];
       if (!data) {
         return;
       }

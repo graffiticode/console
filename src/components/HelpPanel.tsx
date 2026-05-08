@@ -55,6 +55,7 @@ export const HelpPanel = ({
   code,
   setCode,
   setTaskId,
+  setUpstreamLangs,
   onLoadTaskFromHelp,
   onError,
   taskId,
@@ -1025,6 +1026,17 @@ export const HelpPanel = ({
       onError?.(botResponse.text);
     }
 
+    // The bot response carries a chained taskId when the planner composed
+    // multiple languages. Surface it (and the upstream langs) to gallery so
+    // the form preview compiles the chain and the saved item retains the
+    // composition.
+    if (botResponse?.type === 'code' && botResponse.taskId && typeof setTaskId === 'function') {
+      setTaskId(botResponse.taskId);
+    }
+    if (botResponse?.type === 'code' && Array.isArray(botResponse.upstreamLangs) && typeof setUpstreamLangs === 'function') {
+      setUpstreamLangs(botResponse.upstreamLangs);
+    }
+
     // If the bot response includes a taskId or timestamp, update the last user message
     if (botResponse?.taskId || botResponse?.timestamp) {
       setHelp(prev => {
@@ -1046,7 +1058,7 @@ export const HelpPanel = ({
         return newHelp;
       });
     }
-  }, [setCode, onError]);
+  }, [setCode, setTaskId, setUpstreamLangs, onError]);
 
   // State for the input field
   const [messageText, setMessageText] = useState('');

@@ -80,6 +80,7 @@ const typeDefs = `
   type Task {
     id: String!
     lang: String!
+    langs: [String!]
     code: String!
     src: String!
     help: String!
@@ -102,6 +103,7 @@ const typeDefs = `
     updated: String
     sharedWith: [String]
     client: String
+    upstreamLangs: [String!]
     task: Task
   }
 
@@ -114,6 +116,7 @@ const typeDefs = `
     model: String
     usage: UsageInfo
     errors: [CodeError]
+    upstreamLangs: [String!]
   }
 
   type CodeError {
@@ -202,8 +205,8 @@ const typeDefs = `
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
     generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
-    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String): Item!
-    updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String): Item!
+    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!]): Item!
+    updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!]): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
     claimFreePlanSession(token: String!): ClaimResult!
   }
@@ -342,14 +345,14 @@ const resolvers = {
       return resp;
     },
     createItem: async (_, args, ctx) => {
-      const { lang, name, taskId, mark, help, isPublic, client } = args;
+      const { lang, name, taskId, mark, help, isPublic, client, upstreamLangs } = args;
       const auth = await resolveAuth(ctx);
-      return await createItem({ auth, lang, name, taskId, mark, help, isPublic, client });
+      return await createItem({ auth, lang, name, taskId, mark, help, isPublic, client, upstreamLangs });
     },
     updateItem: async (_, args, ctx) => {
-      const { id, name, taskId, mark, help, isPublic, client } = args;
+      const { id, name, taskId, mark, help, isPublic, client, upstreamLangs } = args;
       const auth = await resolveAuth(ctx);
-      return await updateItem({ auth, id, name, taskId, mark, help, isPublic, client });
+      return await updateItem({ auth, id, name, taskId, mark, help, isPublic, client, upstreamLangs });
     },
     shareItem: async (_, args, ctx) => {
       if (ctx.freePlan) {
