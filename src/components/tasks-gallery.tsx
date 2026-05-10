@@ -786,7 +786,7 @@ export default function TasksGallery({ lang }) {
               {/* Vertical resize bar between data and preview panels (desktop) */}
               {!isDataPanelCollapsed && !isFormPanelCollapsed && (
                 <div
-                  className="hidden lg:block w-1 bg-gray-300 hover:bg-gray-400 cursor-col-resize transition-colors lg:order-2 mx-1"
+                  className="hidden lg:block w-1 bg-gray-300 hover:bg-gray-400 cursor-col-resize transition-colors lg:order-2 mx-px relative"
                   onPointerDown={(e) => {
                   e.preventDefault();
                   let isDragging = false;
@@ -841,12 +841,16 @@ export default function TasksGallery({ lang }) {
                     }, 200);
                   }}
                   title="Drag to resize horizontally"
-                />
+                >
+                  <div className="absolute inset-y-0 -left-1 -right-1 flex items-center justify-center">
+                    <div className="h-16 w-1 bg-gray-400 rounded-full opacity-50"></div>
+                  </div>
+                </div>
               )}
             </div>
             {/* Spacer to maintain gap when drag bar is hidden */}
             {(isDataPanelCollapsed || isFormPanelCollapsed) && (
-              <div className="hidden lg:block w-1 lg:order-2 mx-1" />
+              <div className="hidden lg:block w-1 lg:order-2 mx-px" />
             )}
             <div
               ref={previewPanelRef}

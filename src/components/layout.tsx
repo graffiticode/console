@@ -103,8 +103,8 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                                 target={item.target}
                                 className={classNames(
                                   currentName === pathName
-                                    ? 'text-white'
-                                    : 'text-gray-300 hover:text-white',
+                                    ? 'bg-gray-700 text-white font-semibold ring-1 ring-gray-500'
+                                    : 'text-gray-300 hover:text-white hover:bg-gray-700/50',
                                   'px-3 py-2 rounded-none text-sm tracking-wide font-medium'
                                 )}
                                 aria-current={item.current ? 'page' : undefined}
@@ -118,8 +118,8 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                           <Menu.Button
                             className={classNames(
                               pathName === 'specs'
-                                ? 'text-white'
-                                : 'text-gray-300 hover:text-white',
+                                ? 'bg-gray-700 text-white font-semibold ring-1 ring-gray-500'
+                                : 'text-gray-300 hover:text-white hover:bg-gray-700/50',
                               'inline-flex items-center px-3 py-2 rounded-none text-sm tracking-wide font-medium focus:outline-none'
                             )}
                           >
@@ -217,7 +217,9 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                       as="a"
                       href={item.href}
                       className={classNames(
-                        item.current ? 'text-white' : 'text-gray-300 hover:text-white',
+                        item.current
+                          ? 'bg-gray-700 text-white font-semibold ring-1 ring-gray-500'
+                          : 'text-gray-300 hover:text-white hover:bg-gray-700/50',
                         'block px-3 py-2 rounded-none text-base font-medium'
                       )}
                       aria-current={item.current ? 'page' : undefined}
