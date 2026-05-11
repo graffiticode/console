@@ -16,7 +16,7 @@ export interface DateFilter {
   to: number | null;
 }
 
-export const DEFAULT_SORT: Sort = { field: 'updated', direction: 'desc' };
+export const DEFAULT_SORT: Sort = { field: 'created', direction: 'desc' };
 export const DEFAULT_DATE_FILTER: DateFilter = { field: 'updated', from: null, to: null };
 
 const SORT_OPTIONS: { label: string; sort: Sort }[] = [
