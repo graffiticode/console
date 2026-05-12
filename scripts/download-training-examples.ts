@@ -288,11 +288,12 @@ async function fetchItemsFromFirestore(lang: string | null, marks: number[], lim
         console.log(`  ⚠️ ${item.id}: code too short from API (${(source || '').trim().length} chars): "${(source || '').trim()}"`);
       }
     }
-    // Fall back to local code/src
-    if ((item.src || item.code || "").trim().length >= 2) {
+    // Fall back to local src (item.code is the parsed AST object, not a string)
+    const fallback = typeof item.src === "string" ? item.src : "";
+    if (fallback.trim().length >= 2) {
       resolved.push(item);
     } else {
-      console.log(`  ⚠️ Skipped ${item.id}: no code available (taskId=${item.taskId || 'none'}, code=${(item.code || '').length}chars, src=${(item.src || '').length}chars)`);
+      console.log(`  ⚠️ Skipped ${item.id}: no code available (taskId=${item.taskId || 'none'}, src=${fallback.length}chars)`);
     }
   }
   console.log(`Found ${resolved.length} items with code`);

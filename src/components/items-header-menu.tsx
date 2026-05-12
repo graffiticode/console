@@ -20,10 +20,10 @@ export const DEFAULT_SORT: Sort = { field: 'created', direction: 'desc' };
 export const DEFAULT_DATE_FILTER: DateFilter = { field: 'updated', from: null, to: null };
 
 const SORT_OPTIONS: { label: string; sort: Sort }[] = [
-  { label: 'Updated ↓', sort: { field: 'updated', direction: 'desc' } },
-  { label: 'Updated ↑', sort: { field: 'updated', direction: 'asc' } },
   { label: 'Created ↓', sort: { field: 'created', direction: 'desc' } },
   { label: 'Created ↑', sort: { field: 'created', direction: 'asc' } },
+  { label: 'Updated ↓', sort: { field: 'updated', direction: 'desc' } },
+  { label: 'Updated ↑', sort: { field: 'updated', direction: 'asc' } },
   { label: 'Name A→Z', sort: { field: 'name', direction: 'asc' } },
   { label: 'Name Z→A', sort: { field: 'name', direction: 'desc' } },
 ];

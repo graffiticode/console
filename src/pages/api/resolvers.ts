@@ -6,6 +6,7 @@ import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } fr
 import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService } from "../../lib/code-generation-service";
 import { classifyComposition, orchestrateComposition } from "../../lib/language-router";
+import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
 import fs from "fs";
@@ -431,99 +432,98 @@ export async function generateCode({
       }
     }
 
-    // Code generation — if no template source
+    // Code generation — if no template source. Single-language head
+    // generation; composition (if any) is discovered reactively below from
+    // the head's parsed AST via `data use "<lang>"` annotations.
     if (!src) {
-      // Proactive composition planner. Decides head + optional upstream
-      // layers up-front; when upstreams are non-empty we orchestrate per
-      // language and stitch the chain. The single-language path below is
-      // unchanged.
-      const plan = await classifyComposition({ prompt, currentLang: language });
-      const plannedUpstreamLangs = plan.upstreams.map((u) => u.lang);
-      console.log(
-        `[planner] rid=${rid} headLang=${plan.head.lang} upstreams=${
-          plannedUpstreamLangs.length > 0 ? plannedUpstreamLangs.join(",") : "none"
-        }`
-      );
-      ragLog(rid, "composition.plan", {
-        headLang: plan.head.lang,
-        upstreamLangs: plannedUpstreamLangs,
+      const result = await codeGenerationService({
+        auth,
+        prompt,
+        lang: language,
+        options: {
+          model: options?.model,
+          temperature: options?.temperature,
+          maxTokens: options?.maxTokens,
+        },
+        currentCode: currentSrc,
+        rid,
+        conversationSummary,
       });
 
-      if (plan.upstreams.length > 0) {
-        const orch = await orchestrateComposition({
-          plan,
-          auth,
-          options: {
-            model: options?.model,
-            temperature: options?.temperature,
-            maxTokens: options?.maxTokens,
-          },
-          currentCode: currentSrc,
-          rid,
-          conversationSummary,
-        });
-
-        if (orch.errors) {
-          const errors = orch.errors.map((err) => ({
-            ...err,
-            message: err.message === 'Usage limit reached'
-              ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
-              : err.message
-          }));
-          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors, upstreamLangs: [] };
-        }
-
-        src = orch.headSrc;
-        model = orch.headModel;
-        usage = orch.headUsage;
-        description = orch.headDescription;
-        changeSummary = orch.headChangeSummary;
-        upstreamLangs = orch.upstreamLangs;
-        upstreamTaskIds = orch.upstreamTaskIds;
-        headLang = orch.headLang;
-      } else {
-        const result = await codeGenerationService({
-          auth,
-          prompt,
-          lang: language,
-          options: {
-            model: options?.model,
-            temperature: options?.temperature,
-            maxTokens: options?.maxTokens,
-          },
-          currentCode: currentSrc,
-          rid,
-          conversationSummary,
-        });
-
-        if ('errors' in result && result.errors) {
-          const errors = result.errors.map(err => ({
-            ...err,
-            message: err.message === 'Usage limit reached'
-              ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
-              : err.message
-          }));
-          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors, upstreamLangs: [] };
-        }
-
-        const successResult = result as { code: any; taskId: string; model: string; usage: any; description: string | null; changeSummary: string | null };
-        src = successResult.code;
-        model = successResult.model;
-        usage = successResult.usage;
-        description = successResult.description;
-        changeSummary = successResult.changeSummary;
+      if ('errors' in result && result.errors) {
+        const errors = result.errors.map(err => ({
+          ...err,
+          message: err.message === 'Usage limit reached'
+            ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
+            : err.message
+        }));
+        return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors, upstreamLangs: [] };
       }
+
+      const successResult = result as { code: any; taskId: string; model: string; usage: any; description: string | null; changeSummary: string | null };
+      src = successResult.code;
+      model = successResult.model;
+      usage = successResult.usage;
+      description = successResult.description;
+      changeSummary = successResult.changeSummary;
     }
 
-    // Parse the head src with system values, post, and unparse. Upstream
-    // taskIds (if any) are appended with `+` to form the chained head.
+    // Parse the head src with system values. Walk the AST for
+    // `data use "<lang>"` annotations to discover any upstream composition
+    // reactively; for each one, fetch the upstream's schema, inline it on
+    // the USE node, and generate the upstream task in parallel. Then post
+    // the (possibly rewritten) head AST and chain upstream taskIds.
     const systemValues: Record<string, string> = {};
     if (itemId) systemValues.itemId = itemId;
     const parseResult = await parseCode({ lang: headLang, src, systemValues });
     if (parseResult.errors) {
       return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: parseResult.errors, upstreamLangs: [] };
     }
-    const code = JSON.parse(parseResult.code);
+    let code = JSON.parse(parseResult.code);
+
+    try {
+      const resolved = await resolveUpstreams(code);
+      if (resolved.upstreams.length > 0) {
+        code = resolved.ast;
+        upstreamLangs = resolved.upstreams;
+        console.log(`[composition] rid=${rid} headLang=${headLang} reactive upstreams=${upstreamLangs.join(",")}`);
+        ragLog(rid, "composition.reactive", { headLang, upstreamLangs });
+
+        // Generate each upstream in parallel, using the user's original
+        // prompt verbatim. Each upstream's own RAG scopes the work.
+        const upstreamResults = await Promise.all(
+          upstreamLangs.map((uLang) =>
+            codeGenerationService({
+              auth,
+              prompt,
+              lang: uLang,
+              options: {
+                model: options?.model,
+                temperature: options?.temperature,
+                maxTokens: options?.maxTokens,
+              },
+              rid,
+            })
+          )
+        );
+        const upstreamErrors = upstreamResults.flatMap((r: any, i: number) => {
+          if (r && 'errors' in r && r.errors) return r.errors;
+          if (!r?.taskId) return [{ message: `Upstream L${upstreamLangs[i]} failed to produce a taskId` }];
+          return [];
+        });
+        if (upstreamErrors.length > 0) {
+          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: upstreamErrors, upstreamLangs: [] };
+        }
+        upstreamTaskIds = upstreamResults.map((r: any) => r.taskId as string);
+      }
+    } catch (err: any) {
+      return {
+        src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null,
+        errors: [{ message: err?.message || "Composition discovery failed", from: -1, to: -1 }],
+        upstreamLangs: [],
+      };
+    }
+
     const taskData = await postTask({
       auth,
       task: { lang: headLang, code },
