@@ -1,5 +1,6 @@
 // Verifies the AST-walk logic in src/lib/composition-discovery.ts using
-// hand-built nodePools. Schema fetch is mocked via the injectable fetcher.
+// hand-built nodePools. The walker is pure scan-only now — schema fetching
+// happens in the basis runtime at compile time.
 // Run: npx tsx scripts/test-composition-discovery.ts
 
 import { resolveUpstreams } from "../src/lib/composition-discovery";
@@ -31,22 +32,12 @@ async function assertThrows(label: string, fn: () => Promise<any>, messageSubstr
   }
 }
 
-function makeFetcher(responses: Record<string, string | null>) {
-  return async (lang: string, file: string) => {
-    const key = `${lang}/${file}`;
-    return key in responses ? responses[key] : null;
-  };
-}
-
 async function main() {
   console.log("\nresolveUpstreams");
 
   // 1: empty pool
   {
-    const result = await resolveUpstreams(
-      { root: 1, "1": { tag: "PROG", elts: [] } },
-      makeFetcher({})
-    );
+    const result = await resolveUpstreams({ root: 1, "1": { tag: "PROG", elts: [] } });
     assertEqual("empty pool returns no upstreams", result.upstreams, []);
   }
 
@@ -58,14 +49,13 @@ async function main() {
       "2": { tag: "DATA", elts: [1] },
       "5": { tag: "EXPRS", elts: [2] },
     };
-    const result = await resolveUpstreams(pool, makeFetcher({}));
+    const result = await resolveUpstreams(pool);
     assertEqual("data {} produces no upstream", result.upstreams, []);
     assertEqual("data {} ast unchanged", result.ast["2"], pool["2"]);
   }
 
   // 3: single data use "0166"
   {
-    const fetcher = makeFetcher({ "L0166/schema.json": JSON.stringify({ type: "spreadsheet" }) });
     const pool = {
       root: 10,
       "3": { tag: "STR", elts: ["0166"] },
@@ -74,24 +64,15 @@ async function main() {
       "9": { tag: "EXPRS", elts: [7] },
       "10": { tag: "PROG", elts: [9] },
     };
-    const result = await resolveUpstreams(pool, fetcher);
+    const result = await resolveUpstreams(pool);
     assertEqual("single use → ['0166']", result.upstreams, ["0166"]);
-    assertEqual(
-      "USE's STR child holds JSON-stringified schema",
-      result.ast["3"].elts[0],
-      JSON.stringify({ type: "spreadsheet" })
-    );
-    assertEqual("USE node itself is unchanged", result.ast["5"], pool["5"]);
-    assertEqual("non-USE nodes are passed through", result.ast["7"], pool["7"]);
+    assertEqual("STR child untouched (still lang id)", result.ast["3"].elts[0], "0166");
+    assertEqual("USE node untouched", result.ast["5"], pool["5"]);
+    assertEqual("DATA node untouched", result.ast["7"], pool["7"]);
   }
 
-  // 4: two data use calls preserve scan order (use disjoint langs to avoid
-  // cache hits from test 3)
+  // 4: two data use calls preserve scan order
   {
-    const fetcher = makeFetcher({
-      "L0167/schema.json": JSON.stringify({ type: "ss" }),
-      "L0159/schema.json": JSON.stringify({ type: "fc" }),
-    });
     const pool: any = {
       root: 20,
       "1": { tag: "STR", elts: ["0167"] },
@@ -102,37 +83,13 @@ async function main() {
       "6": { tag: "DATA", elts: [5] },
       "20": { tag: "EXPRS", elts: [3, 6] },
     };
-    const result = await resolveUpstreams(pool, fetcher);
+    const result = await resolveUpstreams(pool);
     assertEqual("two uses → ['0167','0159']", result.upstreams, ["0167", "0159"]);
-    assertEqual(
-      "first STR rewritten with schema JSON",
-      result.ast["1"].elts[0],
-      JSON.stringify({ type: "ss" })
-    );
-    assertEqual(
-      "second STR rewritten with schema JSON",
-      result.ast["4"].elts[0],
-      JSON.stringify({ type: "fc" })
-    );
+    assertEqual("first STR untouched", result.ast["1"].elts[0], "0167");
+    assertEqual("second STR untouched", result.ast["4"].elts[0], "0159");
   }
 
-  // 5: missing schema → error
-  {
-    const pool = {
-      root: 10,
-      "3": { tag: "STR", elts: ["9999"] },
-      "5": { tag: "USE", elts: [3] },
-      "7": { tag: "DATA", elts: [5] },
-      "10": { tag: "EXPRS", elts: [7] },
-    };
-    await assertThrows(
-      "missing schema → error",
-      () => resolveUpstreams(pool, makeFetcher({})),
-      "L9999 has no accessible schema.json"
-    );
-  }
-
-  // 6: invalid lang id → error
+  // 5: invalid lang id → error
   {
     const pool = {
       root: 10,
@@ -143,12 +100,12 @@ async function main() {
     };
     await assertThrows(
       "invalid lang id → error",
-      () => resolveUpstreams(pool, makeFetcher({})),
+      () => resolveUpstreams(pool),
       "must be a language id"
     );
   }
 
-  // 7: use without surrounding data → ignored
+  // 6: use without surrounding data → ignored
   {
     const pool = {
       root: 10,
@@ -156,7 +113,7 @@ async function main() {
       "5": { tag: "USE", elts: [3] },
       "10": { tag: "EXPRS", elts: [5] },
     };
-    const result = await resolveUpstreams(pool, makeFetcher({}));
+    const result = await resolveUpstreams(pool);
     assertEqual("USE without DATA parent is ignored", result.upstreams, []);
   }
 

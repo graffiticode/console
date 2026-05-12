@@ -1,50 +1,17 @@
-import { getLanguageAsset } from "./api";
-
 type NodePool = Record<string, any>;
-type AssetFetcher = (lang: string, file: string) => Promise<string | null>;
-
-const SCHEMA_CACHE_TTL_MS = 60 * 60 * 1000;
-const schemaCache = new Map<string, { value: any; expires: number }>();
-
-async function getLanguageSchema(lang: string, fetcher: AssetFetcher): Promise<any> {
-  const cached = schemaCache.get(lang);
-  if (cached && Date.now() < cached.expires) {
-    return cached.value;
-  }
-  const text = await fetcher(`L${lang}`, "schema.json");
-  if (!text) return null;
-  let schema: any;
-  if (typeof text === "string") {
-    try {
-      schema = JSON.parse(text);
-    } catch (e: any) {
-      throw new Error(`L${lang}/schema.json is not valid JSON: ${e.message}`);
-    }
-  } else {
-    schema = text;
-  }
-  schemaCache.set(lang, { value: schema, expires: Date.now() + SCHEMA_CACHE_TTL_MS });
-  return schema;
-}
 
 export interface ResolveResult {
   upstreams: string[];
   ast: NodePool;
 }
 
-// Walks a parsed nodePool for DATA(USE(STR("<lang>"))) patterns. For each one,
-// fetches L<lang>/schema.json and rewrites the STR child to hold the
-// JSON-stringified schema (replacing the lang id). The schema then travels
-// in-band as the USE node's argument; the basis runtime reads and validates
-// against it. Returns the ordered list of upstream langs (scan order) and the
-// rewritten nodePool. Throws if any referenced lang has no accessible
-// schema.json. `fetcher` is injectable for tests.
-export async function resolveUpstreams(
-  nodePool: NodePool,
-  fetcher: AssetFetcher = getLanguageAsset
-): Promise<ResolveResult> {
+// Walks a parsed nodePool for `DATA(USE(STR("<lang>")))` patterns and returns
+// the ordered list of upstream language ids found (scan order). The AST is
+// returned untouched — the basis runtime fetches each language's schema at
+// compile time and validates against it. This keeps the AST simple and lets
+// any consumer of api.graffiticode.org validate, not just the console pipeline.
+export async function resolveUpstreams(nodePool: NodePool): Promise<ResolveResult> {
   const upstreams: string[] = [];
-  const useRewrites: { strNid: string; lang: string }[] = [];
 
   for (const nid of Object.keys(nodePool)) {
     if (nid === "root") continue;
@@ -60,35 +27,8 @@ export async function resolveUpstreams(
     if (!/^\d{3,5}$/.test(lang)) {
       throw new Error(`Composition error: \`use\` argument must be a language id, got "${lang}"`);
     }
-    useRewrites.push({ strNid: String(strNid), lang });
     upstreams.push(lang);
   }
 
-  if (useRewrites.length === 0) {
-    return { upstreams: [], ast: nodePool };
-  }
-
-  // Fetch all required schemas in parallel.
-  const schemas = await Promise.all(
-    useRewrites.map(async ({ lang }) => {
-      const schema = await getLanguageSchema(lang, fetcher);
-      if (schema == null) {
-        throw new Error(`Composition error: language L${lang} has no accessible schema.json`);
-      }
-      return schema;
-    })
-  );
-
-  // Replace each USE node's STR child with the JSON-stringified schema. The
-  // AST hasn't been interned yet — the pipeline owns this nodePool exclusively
-  // between parseCode and postTask — so mutation is safe and avoids a deep
-  // clone. We shallow-clone the pool object and the affected STR nodes so
-  // callers can compare references if needed.
-  const rewritten: NodePool = { ...nodePool };
-  for (let i = 0; i < useRewrites.length; i++) {
-    const { strNid } = useRewrites[i];
-    rewritten[strNid] = { ...nodePool[strNid], elts: [JSON.stringify(schemas[i])] };
-  }
-
-  return { upstreams, ast: rewritten };
+  return { upstreams, ast: nodePool };
 }
