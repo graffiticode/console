@@ -145,7 +145,11 @@ async function fetchCodeFromTask(taskId: string, lang: string): Promise<string |
     return null;
   }
   try {
-    const decoded = JSON.parse(Buffer.from(taskId, 'base64').toString());
+    // Compound/chained taskIds use `+` to glue head with upstream segments.
+    // For training, we only need the head — the upstream IDs would just
+    // resolve to other languages' tasks.
+    const headSegment = taskId.split('+')[0];
+    const decoded = JSON.parse(Buffer.from(headSegment, 'base64').toString());
     const innerIds = decoded.taskIds || [];
     if (innerIds.length === 0) {
       console.log(`    fetchCode: no innerIds in taskId=${taskId}`);

@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2026-05-11T21:39:55.739Z*
+*Downloaded on 2026-05-12T16:23:12.006Z*
 
 ## Language L0158
 
@@ -929,6 +929,32 @@ learnosity items [
 ### Example 28
 
 #### Prompt
+"Create a custom spreadsheet question with the stem "Fill in the 3 by 3 multiplication table." Embed an L0166 spreadsheet containing a 3 by 3 grid of assessed input cells whose expected values are 1 through 9, reading left to right, top to bottom."
+
+#### Chat Transcript
+
+**User**: Create a custom spreadsheet question with the stem "Fill in the 3 by 3 multiplication table." Embed an L0166 spreadsheet containing a 3 by 3 grid of assessed input cells whose expected values are 1 through 9, reading left to right, top to bottom.
+
+#### Code
+
+```
+set-var "lrn-id" get-val-public "itemId"
+learnosity items [
+  item questions [
+    custom lang "0166"
+      stimulus "Fill in the 3 by 3 multiplication table."
+      model data use "0166" {}
+  ] {}
+] {
+  v: 1
+}..
+```
+
+---
+
+### Example 29
+
+#### Prompt
 "Create a multiple choice question asking "What is the boiling point of water?" with options "50°C", "100°C", "150°C", "200°C" where 100°C is correct."
 
 #### Chat Transcript
@@ -956,7 +982,7 @@ learnosity items [
 
 ---
 
-### Example 29
+### Example 30
 
 #### Prompt
 "Create a multiple choice question asking "What is the square root of 144?" with options "10", "11", "12", "13" where 12 is correct, with instant feedback."
@@ -986,7 +1012,7 @@ learnosity items [
 
 ---
 
-### Example 30
+### Example 31
 
 #### Prompt
 "Create a short text question asking "What is 7 × 8?" with the correct answer "56"."
@@ -1009,7 +1035,7 @@ learnosity items [
 
 ---
 
-### Example 31
+### Example 32
 
 #### Prompt
 "Create an items assessment with an order list: "Order these numbers" with items "5", "2", "8", "1" where the correct order is 1, 2, 5, 8."
@@ -1042,7 +1068,7 @@ learnosity items [
 
 ---
 
-### Example 32
+### Example 33
 
 #### Prompt
 "Create a short text question asking "What is the abbreviation for Doctor?" with the correct answer "Dr.", case sensitive."
@@ -1066,7 +1092,7 @@ learnosity items [
 
 ---
 
-### Example 33
+### Example 34
 
 #### Prompt
 "Create an items assessment with a cloze formula: "Solve for y: 2y = 10. y = {{response}}" with the correct answer "5"."
@@ -1091,7 +1117,7 @@ learnosity items [
 
 ---
 
-### Example 34
+### Example 35
 
 #### Prompt
 "Create an order list question asking "Arrange the planets by distance from the Sun" with items "Mercury", "Venus", "Earth", "Mars", tag with difficulty easy and DOK 1, and store it in the item bank."
@@ -1129,7 +1155,7 @@ learnosity items [
 
 ---
 
-### Example 35
+### Example 36
 
 #### Prompt
 "Create an order list question asking "Arrange in chronological order" with items "World War II", "World War I", "Moon Landing", "Internet" where the correct order is WWI, WWII, Moon Landing, Internet."
@@ -1162,7 +1188,7 @@ learnosity items [
 
 ---
 
-### Example 36
+### Example 37
 
 #### Prompt
 "Create an order list asking "Arrange the steps of the scientific method" with items "Hypothesis", "Experiment", "Observation", "Conclusion" where the correct order is Observation, Hypothesis, Experiment, Conclusion."
@@ -1195,7 +1221,7 @@ learnosity items [
 
 ---
 
-### Example 37
+### Example 38
 
 #### Prompt
 "Create a cloze text question with the template "The speed of {{response}} is approximately 300,000 km/s" with the correct answer "light"."
@@ -1220,7 +1246,7 @@ learnosity items [
 
 ---
 
-### Example 38
+### Example 39
 
 #### Prompt
 "Create a plain text essay question asking "List three things you learned today" with a 100-word limit."
@@ -1244,7 +1270,7 @@ learnosity items [
 
 ---
 
-### Example 39
+### Example 40
 
 #### Prompt
 "Create an items assessment with a plain text essay asking "Reflect on what you learned" with a 200-word limit, and an MCQ asking "How confident are you?" with options "Very", "Somewhat", "Not at all" where Very is correct."
@@ -1276,7 +1302,7 @@ learnosity items [
 
 ---
 
-### Example 40
+### Example 41
 
 #### Prompt
 "Create a cloze association question with two blanks: "{{response}} is to hot as {{response}} is to cold" with possible responses "fire", "ice", "water" where fire and ice are correct.
@@ -1309,7 +1335,7 @@ learnosity items [
 
 ---
 
-### Example 41
+### Example 42
 
 #### Prompt
 "Create a classification asking "Sort instruments" with categories "String", "Wind", "Percussion" and items "Guitar", "Flute", "Drum", "Violin", "Trumpet", "Cymbal" where Guitar and Violin are String, Flute and Trumpet are Wind, and Drum and Cymbal are Percussion."
@@ -1356,7 +1382,7 @@ learnosity items [
 
 ---
 
-### Example 42
+### Example 43
 
 #### Prompt
 "Create a long text essay question asking "Write about your favorite book" with placeholder text "Start writing here..."."
@@ -1379,7 +1405,7 @@ learnosity items [
 
 ---
 
-### Example 43
+### Example 44
 
 #### Prompt
 "Create an items assessment with a long text essay asking "Describe photosynthesis" with a 300-word limit, and an MCQ asking "What gas do plants produce?" with options "CO2", "O2", "N2" where O2 is correct."
@@ -1411,7 +1437,7 @@ learnosity items [
 
 ---
 
-### Example 44
+### Example 45
 
 #### Prompt
 "Update the existing item with id <ITEM_ID>: change the stem to be shorter and clearer, but keep all the existing tags, difficulty, DOK, and per-option distractor rationale unchanged."
@@ -1453,7 +1479,7 @@ learnosity items [
 
 ---
 
-### Example 45
+### Example 46
 
 #### Prompt
 "Create a cloze association: "{{response}} is the capital of {{response}}" with possible responses "Paris", "France", "Germany", "Berlin" where Paris and France are correct."
@@ -1484,7 +1510,7 @@ learnosity items [
 
 ---
 
-### Example 46
+### Example 47
 
 #### Prompt
 "Create a cloze formula question with instant feedback asking "√16 = {{response}}" with the correct answer "4" using equivLiteral method."
@@ -1510,7 +1536,7 @@ learnosity items [
 
 ---
 
-### Example 47
+### Example 48
 
 #### Prompt
 "Create an items assessment with a classification: "Sort by type" with categories "Even", "Odd" and items "1", "2", "3", "4" where 2 and 4 are Even and 1 and 3 are Odd."
@@ -1550,7 +1576,7 @@ learnosity items [
 
 ---
 
-### Example 48
+### Example 49
 
 #### Prompt
 "Create a multiple choice question asking "What is the function of the cell membrane?" with four options where "control what enters and exits" is correct, and add a one-line distractor rationale per option explaining each misconception."
@@ -1587,7 +1613,7 @@ learnosity items [
 
 ---
 
-### Example 49
+### Example 50
 
 #### Prompt
 "Create a long text essay question asking "Discuss the causes of climate change" with a 500-word limit and placeholder "Begin your essay..."."
@@ -1611,7 +1637,7 @@ learnosity items [
 
 ---
 
-### Example 50
+### Example 51
 
 #### Prompt
 "Create a cloze text question with the template "DNA stands for {{response}} acid" with the correct answer "deoxyribonucleic", case insensitive."
@@ -1636,7 +1662,7 @@ learnosity items [
 
 ---
 
-### Example 51
+### Example 52
 
 #### Prompt
 "Create a bow-tie question with the scenario "A 65-year-old male presents with chest pain and diaphoresis". Columns are "Actions to Take", "Condition Most Likely", "Parameters to Monitor". Actions options: "give aspirin", "give nitro", "call cardiology", "obtain 12-lead ECG". Condition options: "myocardial infarction", "pulmonary embolism", "pericarditis". Monitor options: "ST segment changes", "blood pressure", "troponin", "respiratory rate". Correct actions: "give aspirin" and "obtain 12-lead ECG". Correct condition: "myocardial infarction". Correct monitors: "ST segment changes" and "troponin"."
@@ -1693,7 +1719,7 @@ learnosity items [
 
 ---
 
-### Example 52
+### Example 53
 
 #### Prompt
 "Create a bow-tie question for a patient with dyspnea and lower-extremity edema. Columns: "Actions", "Condition", "Monitor". Actions: "administer furosemide", "elevate head of bed", "start CPR", "place in Trendelenburg". Condition: "acute heart failure", "pneumothorax", "sepsis". Monitor: "daily weight", "oxygen saturation", "blood glucose", "urine output". Correct actions: "administer furosemide", "elevate head of bed". Correct condition: "acute heart failure". Correct monitors: "daily weight", "urine output"."
@@ -1750,7 +1776,7 @@ learnosity items [
 
 ---
 
-### Example 53
+### Example 54
 
 #### Prompt
 "Create a multiple choice question asking "Which language is L0158 built for?" with options "Learnosity", "Canvas", "Moodle", "Blackboard" where Learnosity is correct."
@@ -1780,7 +1806,7 @@ learnosity items [
 
 ---
 
-### Example 54
+### Example 55
 
 #### Prompt
 "Create an items assessment with a cloze text "The {{response}} is the largest organ" with correct answer "skin", and an MCQ asking "Which system does it belong to?" with options "Nervous", "Digestive", "Integumentary" where Integumentary is correct."
@@ -1813,7 +1839,7 @@ learnosity items [
 
 ---
 
-### Example 55
+### Example 56
 
 #### Prompt
 "Create an items assessment combining all question types: an MCQ, a short text, a cloze text, and an order list, all related to basic math facts."
@@ -1864,7 +1890,7 @@ learnosity items [
 
 ---
 
-### Example 56
+### Example 57
 
 #### Prompt
 "Create a cloze dropdown question with the template "The {{response}} is the powerhouse of the cell" with options "mitochondria", "nucleus", "ribosome" where mitochondria is correct, tagged with difficulty medium and DOK 2."
@@ -1900,7 +1926,7 @@ learnosity items [
 
 ---
 
-### Example 57
+### Example 58
 
 #### Prompt
 "Create a cloze association with instant feedback: "{{response}} discovered gravity" with possible responses "Newton", "Einstein", "Galileo" where Newton is correct."
@@ -1929,7 +1955,7 @@ learnosity items [
 
 ---
 
-### Example 58
+### Example 59
 
 #### Prompt
 "Create a cloze formula question asking "Solve: x + 3 = 7. x = {{response}}" with the correct answer "4" using equivLiteral method."
@@ -1954,7 +1980,7 @@ learnosity items [
 
 ---
 
-### Example 59
+### Example 60
 
 #### Prompt
 "Create a short text question asking "What is the opposite of hot?" with the correct answer "cold", case insensitive."
@@ -1978,7 +2004,7 @@ learnosity items [
 
 ---
 
-### Example 60
+### Example 61
 
 #### Prompt
 "Create a multiple choice question with instant feedback asking "What is 2 + 2?" with options "3", "4", "5", "6" where 4 is correct."
@@ -2008,7 +2034,7 @@ learnosity items [
 
 ---
 
-### Example 61
+### Example 62
 
 #### Prompt
 "Create an items assessment with an MCQ asking "What is 2+2?" with options "3", "4", "5" where 4 is correct, and a short text question asking "Spell the answer" with correct answer "four"."
@@ -2039,7 +2065,7 @@ learnosity items [
 
 ---
 
-### Example 62
+### Example 63
 
 #### Prompt
 "Create a bow-tie for a diabetic patient found confused and diaphoretic. Columns: "Actions", "Condition", "Monitor". Actions: "give 15 g oral glucose", "check finger-stick glucose", "administer insulin", "start normal saline". Condition: "hypoglycemia", "diabetic ketoacidosis", "stroke". Monitor: "blood glucose", "level of consciousness", "weight", "urine ketones". Correct actions: "give 15 g oral glucose", "check finger-stick glucose". Correct condition: "hypoglycemia". Correct monitors: "blood glucose", "level of consciousness"."
@@ -2096,7 +2122,7 @@ learnosity items [
 
 ---
 
-### Example 63
+### Example 64
 
 #### Prompt
 "Create a multiple choice question asking "Which element has atomic number 1?" with options "Helium", "Hydrogen", "Lithium", "Carbon" where Hydrogen is correct, with shuffled options."
@@ -2126,7 +2152,31 @@ learnosity items [
 
 ---
 
-### Example 64
+### Example 65
+
+#### Prompt
+"Create a custom spreadsheet question that embeds the L0166 interaction. Stem: "Use the spreadsheet below to compute the column totals for the first quarter." Read the spreadsheet model from the upstream pipeline task using data {}."
+
+#### Chat Transcript
+
+**User**: Create a custom spreadsheet question that embeds the L0166 interaction. Stem: "Use the spreadsheet below to compute the column totals for the first quarter." Read the spreadsheet model from the upstream pipeline task using data {}.
+
+#### Code
+
+```
+set-var "lrn-id" get-val-public "itemId"
+learnosity items [
+  item questions [
+    custom lang "0166"
+      stimulus "Use the spreadsheet below to compute the column totals for the first quarter."
+      model data use "0166" {}
+  ] {}
+] {}..
+```
+
+---
+
+### Example 66
 
 #### Prompt
 "Create a multiple choice question asking "Select all even numbers" with options "1", "2", "3", "4" where 2 and 4 are correct, allowing multiple responses."
@@ -2157,7 +2207,7 @@ learnosity items [
 
 ---
 
-### Example 65
+### Example 67
 
 #### Prompt
 "Create a bow-tie for a toddler with a high fever and stiff neck. Columns: "Actions to Take", "Condition Most Likely", "Parameters to Monitor". Actions: "draw blood cultures", "give ibuprofen", "isolate the patient", "consult neurology". Condition: "bacterial meningitis", "febrile seizure", "viral URI". Monitor: "level of consciousness", "temperature", "weight", "skin turgor". Correct actions: "draw blood cultures", "isolate the patient". Correct condition: "bacterial meningitis". Correct monitors: "level of consciousness", "temperature"."
@@ -2214,7 +2264,7 @@ learnosity items [
 
 ---
 
-### Example 66
+### Example 68
 
 #### Prompt
 "Create an items assessment with three MCQ questions about geography: capital of France (Paris), capital of Japan (Tokyo), and capital of Australia (Canberra)."
@@ -2262,7 +2312,7 @@ learnosity items [
 
 ---
 
-### Example 67
+### Example 69
 
 #### Prompt
 "Create a multiple choice question asking "What is the primary function of the mitochondria?" with four options where "ATP production" is correct, tagged with NGSS MS-LS1-2 and difficulty medium."
@@ -2297,7 +2347,7 @@ learnosity items [
 
 ---
 
-### Example 68
+### Example 70
 
 #### Prompt
 "Create a cloze formula question asking "Factor: x² - 4 = {{response}}" with the correct answer "(x-2)(x+2)" using equivSymbolic method."
@@ -2322,7 +2372,7 @@ learnosity items [
 
 ---
 
-### Example 69
+### Example 71
 
 #### Prompt
 "Create an items assessment with a cloze text question: "The {{response}} War ended in {{response}}" with correct answers "Civil" and "1865"."
@@ -2348,7 +2398,7 @@ learnosity items [
 
 ---
 
-### Example 70
+### Example 72
 
 #### Prompt
 "Create a plain text question asking "Write a brief biography" with a 250-word limit and placeholder "Name, birth date, achievements..."."
@@ -2372,7 +2422,7 @@ learnosity items [
 
 ---
 
-### Example 71
+### Example 73
 
 #### Prompt
 "Create an order list question asking "Arrange the planets by distance from the Sun" with items "Mercury", "Venus", "Earth", "Mars", tag with difficulty easy and DOK 1, and store it in the item bank."
@@ -2410,7 +2460,7 @@ learnosity items [
 
 ---
 
-### Example 72
+### Example 74
 
 #### Prompt
 "Create a multiple choice question asking "Who painted the Mona Lisa?" with four options where "Leonardo da Vinci" is correct, with question-level acknowledgements "Image courtesy Louvre Museum, public domain"."
@@ -2442,7 +2492,7 @@ learnosity items [
 
 ---
 
-### Example 73
+### Example 75
 
 #### Prompt
 "Create an items assessment with a long text essay asking "Compare and contrast two historical events" with a 400-word limit."
@@ -2466,7 +2516,7 @@ learnosity items [
 
 ---
 
-### Example 74
+### Example 76
 
 #### Prompt
 "Create an items assessment with a short text question asking "What year did World War II end?" with the correct answer "1945"."
@@ -2489,7 +2539,7 @@ learnosity items [
 
 ---
 
-### Example 75
+### Example 77
 
 #### Prompt
 "Create a cloze formula question asking "Simplify: {{response}}" with the correct answer "x" for the expression "x²/x" using isSimplified method."
@@ -2514,7 +2564,7 @@ learnosity items [
 
 ---
 
-### Example 76
+### Example 78
 
 #### Prompt
 "Create a short text question asking "What is the chemical symbol for water?" with the correct answer "H2O"."
@@ -2537,7 +2587,7 @@ learnosity items [
 
 ---
 
-### Example 77
+### Example 79
 
 #### Prompt
 "Create an items assessment with a choice matrix: "Is each number even or odd?" with rows "2", "3", "4", "5" and columns "Even", "Odd" where answers are Even, Odd, Even, Odd."
@@ -2581,7 +2631,7 @@ learnosity items [
 
 ---
 
-### Example 78
+### Example 80
 
 #### Prompt
 "Create a long text essay asking "Analyze the themes in the poem" with a 600-word limit."
@@ -2605,7 +2655,36 @@ learnosity items [
 
 ---
 
-### Example 79
+### Example 81
+
+#### Prompt
+"Create a custom spreadsheet question with the stem "Solve each arithmetic problem in column B." Embed an L0166 spreadsheet where column A has display-only labels "2+3=", "7-4=", and "3×2=" and column B has blank assessed cells expecting the values 5, 3, and 6 respectively. Tag the item with difficulty easy and DOK 1."
+
+#### Chat Transcript
+
+**User**: Create a custom spreadsheet question with the stem "Solve each arithmetic problem in column B." Embed an L0166 spreadsheet where column A has display-only labels "2+3=", "7-4=", and "3×2=" and column B has blank assessed cells expecting the values 5, 3, and 6 respectively. Tag the item with difficulty easy and DOK 1.
+
+#### Code
+
+```
+set-var "lrn-id" get-val-public "itemId"
+learnosity items [
+  item metadata [
+    tags {
+      Difficulty: "easy"
+      DOK: 1
+    }
+  ] questions [
+    custom lang "0166"
+      stimulus "Solve each arithmetic problem in column B."
+      model data use "0166" {}
+  ] {}
+] {}..
+```
+
+---
+
+### Example 82
 
 #### Prompt
 "Create an items assessment with a single MCQ asking "What is 3 × 4?" with options "7", "10", "12", "15" where 12 is correct."
@@ -2635,7 +2714,7 @@ learnosity items [
 
 ---
 
-### Example 80
+### Example 83
 
 #### Prompt
 "Create a long text essay question asking "Explain how gravity works" with a 400-word limit and placeholder "Begin your explanation..."."
@@ -2659,7 +2738,7 @@ learnosity items [
 
 ---
 
-### Example 81
+### Example 84
 
 #### Prompt
 "Create a short text question asking "Spell the number 4" with the correct answer "four", case insensitive."
@@ -2683,7 +2762,7 @@ learnosity items [
 
 ---
 
-### Example 82
+### Example 85
 
 #### Prompt
 "Create a short text question asking "What gas do plants absorb?" with the correct answer "carbon dioxide", case insensitive."
@@ -2707,7 +2786,7 @@ learnosity items [
 
 ---
 
-### Example 83
+### Example 86
 
 #### Prompt
 "Create a multiple choice question asking "Which is a mammal?" with options "Shark", "Eagle", "Dolphin", "Lizard" where Dolphin is correct, with instant feedback enabled."
@@ -2737,7 +2816,7 @@ learnosity items [
 
 ---
 
-### Example 84
+### Example 87
 
 #### Prompt
 "Create a cloze dropdown question with the template "The sky is {{response}}" with dropdown options "blue", "red", "green" where blue is correct."
@@ -2768,7 +2847,7 @@ learnosity items [
 
 ---
 
-### Example 85
+### Example 88
 
 #### Prompt
 "Create a short text question asking "Type the missing word: The quick brown ___" with the correct answer "fox", with a maximum length of 20 characters.
@@ -2795,7 +2874,7 @@ learnosity items [
 
 ---
 
-### Example 86
+### Example 89
 
 #### Prompt
 "Create a short text question asking "What is the capital of Japan?" with the correct answer "Tokyo"."
@@ -2818,7 +2897,7 @@ learnosity items [
 
 ---
 
-### Example 87
+### Example 90
 
 #### Prompt
 "Create a cloze text question with the template "The {{response}} is the powerhouse of the cell" with the correct answer "mitochondria"."
@@ -2843,7 +2922,7 @@ learnosity items [
 
 ---
 
-### Example 88
+### Example 91
 
 #### Prompt
 "Create a cloze text with instant feedback and the template "Plants convert {{response}} into oxygen" with the correct answer "carbon dioxide"."
@@ -2868,7 +2947,7 @@ learnosity items [
 
 ---
 
-### Example 89
+### Example 92
 
 #### Prompt
 "Create a cloze dropdown: "Water boils at {{response}} degrees Celsius" with options "50", "100", "150" where 100 is correct."
@@ -2899,7 +2978,7 @@ learnosity items [
 
 ---
 
-### Example 90
+### Example 93
 
 #### Prompt
 "Create a short text question with a placeholder "Enter your answer here" asking "Name the largest ocean" with the correct answer "Pacific"."
@@ -2923,7 +3002,7 @@ learnosity items [
 
 ---
 
-### Example 91
+### Example 94
 
 #### Prompt
 "Update the existing item with id <ITEM_ID>: keep the stem and options unchanged, but change the difficulty tag from medium to hard and update DOK from 2 to 3 — leave the distractor rationale alone."
@@ -2950,7 +3029,7 @@ learnosity items [
 
 ---
 
-### Example 92
+### Example 95
 
 #### Prompt
 "Create a short text question asking "What is the chemical symbol for water?" with the correct answer "H2O", tagged with CCSS 5-PS1-1, difficulty easy, DOK 1."
@@ -2979,7 +3058,7 @@ learnosity items [
 
 ---
 
-### Example 93
+### Example 96
 
 #### Prompt
 "Create a choice matrix asking "Identify the part of speech" with rows "run", "beautiful", "quickly" and columns "Noun", "Verb", "Adjective", "Adverb" where answers are Verb, Adjective, and Adverb."
@@ -3021,7 +3100,31 @@ learnosity items [
 
 ---
 
-### Example 94
+### Example 97
+
+#### Prompt
+"Create a custom spreadsheet question backed by L0166 with the stem "Complete the SUM formula in cell A6." The embedded spreadsheet has the values 10, 20, 30, 40, 50 in cells A1 through A5, and an assessed cell A6 expecting the student to enter =SUM(A1:A5) using the formula method."
+
+#### Chat Transcript
+
+**User**: Create a custom spreadsheet question backed by L0166 with the stem "Complete the SUM formula in cell A6." The embedded spreadsheet has the values 10, 20, 30, 40, 50 in cells A1 through A5, and an assessed cell A6 expecting the student to enter =SUM(A1:A5) using the formula method.
+
+#### Code
+
+```
+set-var "lrn-id" get-val-public "itemId"
+learnosity items [
+  item questions [
+    custom lang "0166"
+      stimulus "Complete the SUM formula in cell A6."
+      model data use "0166" {}
+  ] {}
+] {}..
+```
+
+---
+
+### Example 98
 
 #### Prompt
 "Create a cloze formula question asking "Evaluate: 2³ = {{response}}" with the correct answer "8" using equivValue method."
@@ -3046,7 +3149,7 @@ learnosity items [
 
 ---
 
-### Example 95
+### Example 99
 
 #### Prompt
 "Create a cloze formula question asking "What is the derivative of x²? {{response}}" with the correct answer "2x" using equivSymbolic method."
@@ -3071,7 +3174,7 @@ learnosity items [
 
 ---
 
-### Example 96
+### Example 100
 
 #### Prompt
 "Create a choice matrix asking "Classify each animal" with rows "Whale", "Cobra", "Eagle" and columns "Mammal", "Reptile", "Bird" where each matches respectively."
@@ -3112,7 +3215,7 @@ learnosity items [
 
 ---
 
-### Example 97
+### Example 101
 
 #### Prompt
 "Create an items assessment with an order list asking "Order the planets from the Sun" with items "Earth", "Mars", "Venus", "Mercury" in correct order Mercury, Venus, Earth, Mars, and a classification sorting them into "Inner" and "Outer" categories."
@@ -3164,7 +3267,7 @@ learnosity items [
 
 ---
 
-### Example 98
+### Example 102
 
 #### Prompt
 "Create a cloze text question with the template "{{response}} is the chemical symbol for gold" with the correct answer "Au"."
@@ -3189,7 +3292,7 @@ learnosity items [
 
 ---
 
-### Example 99
+### Example 103
 
 #### Prompt
 "Create a cloze dropdown with instant feedback: "HTML stands for {{response}}" with options "HyperText Markup Language", "High Tech Modern Language", "Home Tool Markup Language" where the first is correct."
@@ -3220,7 +3323,7 @@ learnosity items [
 
 ---
 
-### Example 100
+### Example 104
 
 #### Prompt
 "Create an order list with instant feedback asking "Arrange alphabetically" with items "Cherry", "Apple", "Banana", "Date" where the correct order is Apple, Banana, Cherry, Date."
@@ -3253,7 +3356,7 @@ learnosity items [
 
 ---
 
-### Example 101
+### Example 105
 
 #### Prompt
 "Create a plain text essay question asking "Explain your reasoning" with a 200-word limit."
@@ -3276,7 +3379,7 @@ learnosity items [
 
 ---
 
-### Example 102
+### Example 106
 
 #### Prompt
 "Create a cloze text question with the template "Photosynthesis occurs in the {{response}} of plant cells" with the correct answer "chloroplast", case insensitive."
@@ -3301,7 +3404,7 @@ learnosity items [
 
 ---
 
-### Example 103
+### Example 107
 
 #### Prompt
 "Create an items assessment with a cloze dropdown "Water is {{response}}" with options "solid", "liquid", "gas" where liquid is correct, and a cloze association "Ice is {{response}}" with possible responses "solid", "liquid", "gas" where solid is correct."
@@ -3340,7 +3443,7 @@ learnosity items [
 
 ---
 
-### Example 104
+### Example 108
 
 #### Prompt
 "Create a classification question asking "Sort animals by class" with categories "Mammals" and "Reptiles" and items "dog, snake, cat, lizard", tagged with NGSS MS-LS4-2 and difficulty medium, with an item-level note "Variant for the genetics unit; pair with the inheritance MCQ"."
@@ -3386,7 +3489,7 @@ learnosity items [
 
 ---
 
-### Example 105
+### Example 109
 
 #### Prompt
 "Create an items assessment with a cloze formula "Solve: 2x = 10. x = {{response}}" with correct answer "5", and a short text question asking "Is this equation linear?" with correct answer "yes"."
@@ -3415,7 +3518,7 @@ learnosity items [
 
 ---
 
-### Example 106
+### Example 110
 
 #### Prompt
 "Create a classification with instant feedback asking "Sort by era" with categories "Ancient", "Modern" and items "Pyramids", "Internet", "Roman Empire", "Space Station" where Pyramids and Roman Empire are Ancient and Internet and Space Station are Modern."
@@ -3455,7 +3558,7 @@ learnosity items [
 
 ---
 
-### Example 107
+### Example 111
 
 #### Prompt
 "Create a cloze dropdown question with the template "The largest mammal is the {{response}}" with options "blue whale", "elephant", "giraffe" where blue whale is correct."
@@ -3486,7 +3589,7 @@ learnosity items [
 
 ---
 
-### Example 108
+### Example 112
 
 #### Prompt
 "Create a multiple choice question allowing multiple responses asking "Which are prime numbers?" with options "2", "4", "7", "9" where 2 and 7 are correct."
@@ -3517,7 +3620,7 @@ learnosity items [
 
 ---
 
-### Example 109
+### Example 113
 
 #### Prompt
 "Create a bow-tie for a post-op patient with sudden tachycardia and low oxygen saturation. Columns: "Actions", "Condition", "Monitor". Actions: "administer oxygen", "notify provider", "encourage oral fluids", "ambulate the patient". Condition: "pulmonary embolism", "myocardial infarction", "atelectasis". Monitor: "oxygen saturation", "respiratory rate", "dietary intake", "capillary refill". Correct actions: "administer oxygen", "notify provider". Correct condition: "pulmonary embolism". Correct monitors: "oxygen saturation", "respiratory rate"."
@@ -3574,7 +3677,7 @@ learnosity items [
 
 ---
 
-### Example 110
+### Example 114
 
 #### Prompt
 "Create a cloze association question with the template "{{response}} wrote Romeo and Juliet" with possible responses "Shakespeare", "Dickens", "Austen" where Shakespeare is correct."
@@ -3603,7 +3706,7 @@ learnosity items [
 
 ---
 
-### Example 111
+### Example 115
 
 #### Prompt
 "Create an items assessment with a cloze dropdown: "The Earth revolves around the {{response}}" with options "Sun", "Moon", "Mars" where Sun is correct."
@@ -3634,7 +3737,63 @@ learnosity items [
 
 ---
 
-### Example 112
+### Example 116
+
+#### Prompt
+"Create a custom spreadsheet question with the stem "Use the monthly budget worksheet to compute the total in cell B7." The embedded L0166 spreadsheet has category labels in column A (Rent, Groceries, Utilities, Transportation, Other), dollar amounts in column B right-aligned with two decimal places, and an assessed =SUM(B2:B6) cell in B7. Tag the item with difficulty medium, DOK 2, and CCSS 6.RP.A.3c."
+
+#### Chat Transcript
+
+**User**: Create a custom spreadsheet question with the stem "Use the monthly budget worksheet to compute the total in cell B7." The embedded L0166 spreadsheet has category labels in column A (Rent, Groceries, Utilities, Transportation, Other), dollar amounts in column B right-aligned with two decimal places, and an assessed =SUM(B2:B6) cell in B7. Tag the item with difficulty medium, DOK 2, and CCSS 6.RP.A.3c.
+
+#### Code
+
+```
+set-var "lrn-id" get-val-public "itemId"
+learnosity items [
+  item metadata [
+    tags {
+      Difficulty: "medium"
+      DOK: 2
+      CCSS: "6.RP.A.3c"
+    }
+  ] questions [
+    custom lang "0166"
+      stimulus "Use the monthly budget worksheet to compute the total in cell B7."
+      model data use "0166" {}
+  ] {}
+] {}..
+```
+
+---
+
+### Example 117
+
+#### Prompt
+"Create a custom spreadsheet question that embeds a parameterized L0166 sheet. Stem: "Add the two values shown and enter the total in A3." The spreadsheet uses params to populate A1 and A2 and assesses cell A3 with the formula method expecting the correct SUM formula across the param values."
+
+#### Chat Transcript
+
+**User**: Create a custom spreadsheet question that embeds a parameterized L0166 sheet. Stem: "Add the two values shown and enter the total in A3." The spreadsheet uses params to populate A1 and A2 and assesses cell A3 with the formula method expecting the correct SUM formula across the param values.
+
+#### Code
+
+```
+set-var "lrn-id" get-val-public "itemId"
+learnosity items [
+  item questions [
+    custom lang "0166"
+      stimulus "Add the two values shown and enter the total in A3."
+      model data use "0166" {}
+  ] {}
+] {
+  v: 1
+}..
+```
+
+---
+
+### Example 118
 
 #### Prompt
 "Create a cloze formula question asking "What is 5 × 6? {{response}}" with the correct answer "30" using equivLiteral method."
@@ -3659,7 +3818,7 @@ learnosity items [
 
 ---
 
-### Example 113
+### Example 119
 
 #### Prompt
 "Create a cloze text question with the template "The {{response}} of the United States is Washington, D.C." with the correct answers "capital" or "Capital"."
@@ -3685,7 +3844,7 @@ learnosity items [
 
 ---
 
-### Example 114
+### Example 120
 
 #### Prompt
 "Create a choice matrix question asking "Rate your agreement" with rows "Exercise is important", "Sleep is optional" and columns "Agree", "Disagree" where answers are Agree and Disagree."
@@ -3721,7 +3880,31 @@ learnosity items [
 
 ---
 
-### Example 115
+### Example 121
+
+#### Prompt
+"Create a custom spreadsheet question that reads its model from the upstream pipeline task. Stem: "Use the supplied worksheet to enter the missing values in column B." Save the item to the item bank — the snapshot freezes the upstream payload at compile time."
+
+#### Chat Transcript
+
+**User**: Create a custom spreadsheet question that reads its model from the upstream pipeline task. Stem: "Use the supplied worksheet to enter the missing values in column B." Save the item to the item bank — the snapshot freezes the upstream payload at compile time.
+
+#### Code
+
+```
+set-var "lrn-id" get-val-public "itemId"
+learnosity items [
+  item questions [
+    custom lang "0166"
+      stimulus "Use the supplied worksheet to enter the missing values in column B."
+      model data use "0166" {}
+  ] {}
+] save-to-itembank true {}..
+```
+
+---
+
+### Example 122
 
 #### Prompt
 "Create a multiple choice question asking "Which season comes after spring?" with options "Summer", "Fall", "Winter" where Summer is correct."
@@ -3750,7 +3933,7 @@ learnosity items [
 
 ---
 
-### Example 116
+### Example 123
 
 #### Prompt
 "Create a multiple choice question asking "Which planet is largest?" with options "Earth", "Jupiter", "Mars", "Saturn" where Jupiter is correct."
@@ -3780,7 +3963,31 @@ learnosity items [
 
 ---
 
-### Example 117
+### Example 124
+
+#### Prompt
+"Create a custom spreadsheet question with the stem "Label each row in column B as Positive or Negative based on the value in column A." Embed an L0166 spreadsheet with 5 numeric values in column A (mix of positive and negative numbers) and 5 assessed blank cells in column B expecting the labels Positive or Negative reading top to bottom."
+
+#### Chat Transcript
+
+**User**: Create a custom spreadsheet question with the stem "Label each row in column B as Positive or Negative based on the value in column A." Embed an L0166 spreadsheet with 5 numeric values in column A (mix of positive and negative numbers) and 5 assessed blank cells in column B expecting the labels Positive or Negative reading top to bottom.
+
+#### Code
+
+```
+set-var "lrn-id" get-val-public "itemId"
+learnosity items [
+  item questions [
+    custom lang "0166"
+      stimulus "Label each row in column B as Positive or Negative based on the value in column A."
+      model data use "0166" {}
+  ] {}
+] {}..
+```
+
+---
+
+### Example 125
 
 #### Prompt
 "Create a short text question asking "What is the opposite of hot?" with the correct answer "cold", case insensitive."
@@ -3804,7 +4011,33 @@ learnosity items [
 
 ---
 
-### Example 118
+### Example 126
+
+#### Prompt
+"Create a custom spreadsheet question with the stem "Compute the line totals and grand total for the order below." The embedded L0166 spreadsheet has a header row (Product, Qty, Unit Price, Line Total), 3 data rows with =B*C line-total formulas in column D, and a SUM grand total in D5. Bold the header row and right-align the numeric columns."
+
+#### Chat Transcript
+
+**User**: Create a custom spreadsheet question with the stem "Compute the line totals and grand total for the order below." The embedded L0166 spreadsheet has a header row (Product, Qty, Unit Price, Line Total), 3 data rows with =B*C line-total formulas in column D, and a SUM grand total in D5. Bold the header row and right-align the numeric columns.
+
+#### Code
+
+```
+set-var "lrn-id" get-val-public "itemId"
+learnosity items [
+  item questions [
+    custom lang "0166"
+      stimulus "Compute the line totals and grand total for the order below."
+      model data use "0166" {}
+  ] {}
+] {
+  v: 1
+}..
+```
+
+---
+
+### Example 127
 
 #### Prompt
 "Create a classification question asking "Sort by state of matter" with categories "Solid", "Liquid", "Gas" and items "Ice", "Water", "Steam", "Rock", "Juice", "Helium" where Ice and Rock are Solid, Water and Juice are Liquid, and Steam and Helium are Gas."
@@ -3851,7 +4084,7 @@ learnosity items [
 
 ---
 
-### Example 119
+### Example 128
 
 #### Prompt
 "Create a classification question asking "Sort the animals" with categories "Mammals" and "Reptiles" and items "Dog", "Snake", "Cat", "Lizard" where Dog and Cat are Mammals and Snake and Lizard are Reptiles."
@@ -3891,7 +4124,7 @@ learnosity items [
 
 ---
 
-### Example 120
+### Example 129
 
 #### Prompt
 "Create an items assessment with a cloze association: "The {{response}} is the closest star to Earth" with possible responses "Sun", "Moon", "Mars" where Sun is correct."
@@ -3920,7 +4153,7 @@ learnosity items [
 
 ---
 
-### Example 121
+### Example 130
 
 #### Prompt
 "Create an order list asking "Order from coldest to hottest" with items "Boiling water", "Room temperature", "Ice", "Body temperature" where the correct order is Ice, Room temperature, Body temperature, Boiling water."
@@ -3947,6 +4180,33 @@ learnosity items [
       3
       0
     ] {}
+  ] {}
+] {}..
+```
+
+---
+
+### Example 131
+
+#### Prompt
+"Create an items assessment with two questions. First, a custom L0166 spreadsheet with stem "Enter the average of the listed test scores in cell B7." The embedded sheet has scores 85, 92, 78, 95, 88 in B2 through B6 and an assessed cell B7 expecting =AVERAGE(B2:B6). Second, a short text question asking "Which spreadsheet function did you use?" with the correct answer "AVERAGE", case insensitive."
+
+#### Chat Transcript
+
+**User**: Create an items assessment with two questions. First, a custom L0166 spreadsheet with stem "Enter the average of the listed test scores in cell B7." The embedded sheet has scores 85, 92, 78, 95, 88 in B2 through B6 and an assessed cell B7 expecting =AVERAGE(B2:B6). Second, a short text question asking "Which spreadsheet function did you use?" with the correct answer "AVERAGE", case insensitive.
+
+#### Code
+
+```
+set-var "lrn-id" get-val-public "itemId"
+learnosity items [
+  item questions [
+    custom lang "0166"
+      stimulus "Use the spreadsheet to calculate the average of the test scores."
+      model data use "0166" {}
+    shorttext stimulus "Which spreadsheet function did you use to calculate the average?"
+      valid-response "AVERAGE"
+      case-sensitive false {}
   ] {}
 ] {}..
 ```
