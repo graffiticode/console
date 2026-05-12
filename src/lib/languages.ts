@@ -1,4 +1,4 @@
-import { getLanguageServerDoc } from "./language-server-client";
+import { getLanguageScope, getLanguageServerDoc } from "./language-server-client";
 
 export interface Language {
   id: string;
@@ -8,6 +8,13 @@ export interface Language {
   routingHint?: string;
   domains: string[];
   status?: string;
+  // Populated at runtime by listLanguages() from each lang server's
+  // scope.json. The static `description` and `routingHint` above remain as
+  // cold-start / unreachable-server fallbacks; once scope.json is universal
+  // they'll be trimmed.
+  summary?: string;
+  inScope?: string[];
+  outOfScope?: string[];
 }
 
 export const LANGUAGES: Language[] = [
@@ -54,16 +61,26 @@ export function selectLanguages(domain?: string): Language[] {
 export async function listLanguages({ search, domain }: { search?: string; domain?: string }): Promise<Language[]> {
   let results = selectLanguages(domain);
 
-  // Populate longDescription from each language's language-info.json when
-  // available; getLanguageServerDoc caches with a TTL so repeat calls are
-  // in-memory lookups. The short description stays as the hardcoded value.
+  // Enrich each entry from the lang server in parallel:
+  //   - scope.json → summary / inScope / outOfScope (routing-only descriptor)
+  //   - language-info.json → longDescription
+  // Both fetchers cache with a TTL; repeated calls are in-memory.
   results = await Promise.all(
     results.map(async (lang) => {
-      const { envelope } = await getLanguageServerDoc(lang.id);
-      if (envelope?.description) {
-        return { ...lang, longDescription: envelope.description };
+      const [scope, doc] = await Promise.all([
+        getLanguageScope(lang.id),
+        getLanguageServerDoc(lang.id),
+      ]);
+      const enriched: Language = { ...lang };
+      if (scope) {
+        enriched.summary = scope.summary;
+        enriched.inScope = scope.in_scope;
+        enriched.outOfScope = scope.out_of_scope;
       }
-      return lang;
+      if (doc.envelope?.description) {
+        enriched.longDescription = doc.envelope.description;
+      }
+      return enriched;
     })
   );
 
@@ -72,7 +89,9 @@ export async function listLanguages({ search, domain }: { search?: string; domai
     results = results.filter(lang =>
       lang.name.toLowerCase().includes(searchLower) ||
       lang.description.toLowerCase().includes(searchLower) ||
-      (lang.longDescription || "").toLowerCase().includes(searchLower)
+      (lang.longDescription || "").toLowerCase().includes(searchLower) ||
+      (lang.summary || "").toLowerCase().includes(searchLower) ||
+      (lang.inScope || []).some(s => s.toLowerCase().includes(searchLower))
     );
   }
 

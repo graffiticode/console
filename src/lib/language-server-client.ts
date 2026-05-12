@@ -22,6 +22,13 @@ export interface LanguageServerDoc {
   usageGuide: string | null;
 }
 
+export interface LanguageScope {
+  id: string;
+  summary: string;
+  in_scope: string[];
+  out_of_scope: string[];
+}
+
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 const FAILURE_TTL_MS = 30 * 1000;
 
@@ -33,6 +40,7 @@ const cacheTtlMs = (() => {
 })();
 
 const cache = new Map<string, { doc: LanguageServerDoc; expires: number }>();
+const scopeCache = new Map<string, { value: LanguageScope | null; expires: number }>();
 
 function baseUrlFor(langId: string): string {
   const override = process.env.LANGUAGE_SERVER_BASE_URL;
@@ -92,6 +100,50 @@ export async function getLanguageServerDoc(langId: string): Promise<LanguageServ
 }
 
 export function clearLanguageServerCache(langId?: string): void {
-  if (langId) cache.delete(langId);
-  else cache.clear();
+  if (langId) {
+    cache.delete(langId);
+    scopeCache.delete(langId);
+  } else {
+    cache.clear();
+    scopeCache.clear();
+  }
+}
+
+// Fetches a language's scope.json — the routing-only descriptor served at
+// ${base}/scope.json. Cached separately from the heavier envelope+guide so
+// the router and catalog can poll it cheaply. Returns null when the file
+// is unavailable or malformed; callers should fall back to a static seed.
+export async function getLanguageScope(langId: string): Promise<LanguageScope | null> {
+  const now = Date.now();
+  const cached = scopeCache.get(langId);
+  if (cached && now < cached.expires) {
+    return cached.value;
+  }
+
+  const base = baseUrlFor(langId);
+  const raw = await fetchText(`${base}/scope.json`);
+
+  let scope: LanguageScope | null = null;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && typeof parsed.summary === "string") {
+        scope = {
+          id: String(parsed.id ?? langId),
+          summary: String(parsed.summary),
+          in_scope: Array.isArray(parsed.in_scope) ? parsed.in_scope.map(String) : [],
+          out_of_scope: Array.isArray(parsed.out_of_scope) ? parsed.out_of_scope.map(String) : [],
+        };
+      } else {
+        console.warn(`language-server-client: ${base}/scope.json missing required fields`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`language-server-client: invalid JSON from ${base}/scope.json: ${message}`);
+    }
+  }
+
+  const ttl = scope !== null ? cacheTtlMs : FAILURE_TTL_MS;
+  scopeCache.set(langId, { value: scope, expires: now + ttl });
+  return scope;
 }

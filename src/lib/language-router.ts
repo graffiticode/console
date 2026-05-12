@@ -17,13 +17,28 @@ interface RoutingResult {
 // proactive (classifyComposition) planners. excludeLang lets the reactive
 // path filter out the current language; the proactive path passes none so
 // every language is in scope.
+//
+// Each entry uses scope.json fields (summary / in_scope / out_of_scope) when
+// they're available from the lang server, falling back to routingHint or
+// description otherwise. The richer block helps Haiku make a better routing
+// suggestion than a single one-liner can.
 async function buildLanguageCatalog(opts?: { excludeLang?: string }) {
   const languages = await listLanguages({});
   const candidates = opts?.excludeLang
     ? languages.filter((l) => l.id !== opts.excludeLang)
     : languages;
   const catalog = candidates
-    .map((l) => `- L${l.id}: ${l.routingHint || l.description}`)
+    .map((l) => {
+      const head = l.summary || l.routingHint || l.description;
+      const lines = [`- L${l.id}: ${head}`];
+      if (l.inScope && l.inScope.length > 0) {
+        lines.push(`    in scope: ${l.inScope.join("; ")}`);
+      }
+      if (l.outOfScope && l.outOfScope.length > 0) {
+        lines.push(`    out of scope: ${l.outOfScope.join("; ")}`);
+      }
+      return lines.join("\n");
+    })
     .join("\n");
   return { candidates, catalog };
 }

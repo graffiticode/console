@@ -8,7 +8,7 @@
  */
 
 import { LANGUAGES, listLanguages as listLangs, type Language } from "../../lib/languages";
-import { getLanguageServerDoc } from "../../lib/language-server-client";
+import { getLanguageScope, getLanguageServerDoc } from "../../lib/language-server-client";
 
 export type { Language };
 
@@ -16,6 +16,12 @@ export interface ExamplePrompt {
   prompt: string;
   produces?: string;
   notes?: string;
+}
+
+export interface LanguageScopeInfo {
+  summary: string;
+  inScope: string[];
+  outOfScope: string[];
 }
 
 export interface LanguageInfo extends Language {
@@ -30,6 +36,7 @@ export interface LanguageInfo extends Language {
   supportedItemTypes: string[];
   examplePrompts: ExamplePrompt[];
   usageGuide: string | null;
+  scope: LanguageScopeInfo | null;
 }
 
 export { listLangs as listLanguages };
@@ -50,7 +57,10 @@ export async function getLanguageInfo(id: string): Promise<LanguageInfo | null> 
 
   const specUrl = `https://l${langId}.graffiticode.org/spec.html`;
 
-  const { envelope, usageGuide } = await getLanguageServerDoc(langId);
+  const [{ envelope, usageGuide }, scope] = await Promise.all([
+    getLanguageServerDoc(langId),
+    getLanguageScope(langId),
+  ]);
 
   return {
     ...baseLang,
@@ -66,5 +76,8 @@ export async function getLanguageInfo(id: string): Promise<LanguageInfo | null> 
     supportedItemTypes: envelope?.supported_item_types ?? [],
     examplePrompts: envelope?.example_prompts ?? [],
     usageGuide: usageGuide ?? null,
+    scope: scope
+      ? { summary: scope.summary, inScope: scope.in_scope, outOfScope: scope.out_of_scope }
+      : null,
   };
 }

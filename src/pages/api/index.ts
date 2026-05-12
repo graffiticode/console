@@ -154,6 +154,12 @@ const typeDefs = `
     notes: String
   }
 
+  type LanguageScope {
+    summary: String!
+    inScope: [String!]!
+    outOfScope: [String!]!
+  }
+
   type LanguageInfo {
     id: String!
     name: String!
@@ -166,6 +172,7 @@ const typeDefs = `
     supportedItemTypes: [String!]
     examplePrompts: [ExamplePrompt!]
     usageGuide: String
+    scope: LanguageScope
   }
 
   type CompileAllowedResponse {
