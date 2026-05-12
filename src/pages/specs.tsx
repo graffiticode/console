@@ -5,16 +5,18 @@ import remarkGfm from 'remark-gfm';
 import { getPageTitle } from '../lib/utils';
 import { getBaseUrlForApi, getLanguageAsset } from "../lib/api";
 
-type View = 'spec' | 'user-guide' | 'instructions';
+type View = 'spec' | 'usage-guide' | 'instructions';
 
 const VIEW_FILES: Record<Exclude<View, 'spec'>, string> = {
-  'user-guide': 'user-guide.md',
+  'usage-guide': 'usage-guide.md',
   'instructions': 'instructions.md',
 };
 
 function parseView(raw: unknown): View {
   const v = Array.isArray(raw) ? raw[0] : raw;
-  if (v === 'user-guide' || v === 'instructions') return v;
+  // Accept `user-guide` as a legacy alias so existing bookmarks still resolve.
+  if (v === 'usage-guide' || v === 'user-guide') return 'usage-guide';
+  if (v === 'instructions') return 'instructions';
   return 'spec';
 }
 
@@ -39,11 +41,16 @@ export default function Spec({ language }) {
     let cancelled = false;
     setMarkdown(null);
     setLoading(true);
-    getLanguageAsset(`L${langId}`, VIEW_FILES[view]).then((text) => {
+    (async () => {
+      let text = await getLanguageAsset(`L${langId}`, VIEW_FILES[view]);
+      // Languages mid-migration may still serve `user-guide.md`; fall back.
+      if (text === null && view === 'usage-guide') {
+        text = await getLanguageAsset(`L${langId}`, 'user-guide.md');
+      }
       if (cancelled) return;
       setMarkdown(text === null ? null : stripHtmlComments(text));
       setLoading(false);
-    });
+    })();
     return () => { cancelled = true; };
   }, [langId, view]);
 

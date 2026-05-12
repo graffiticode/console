@@ -37,7 +37,7 @@ const navigation: NavigationItem[] = [
 
 const specsMenu = [
   { name: 'Language Spec', href: '/specs?view=spec' },
-  { name: 'User Guide', href: '/specs?view=user-guide' },
+  { name: 'Usage Guide', href: '/specs?view=usage-guide' },
   { name: 'Code Gen Instructions', href: '/specs?view=instructions' },
 ]
 

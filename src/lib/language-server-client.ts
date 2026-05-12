@@ -1,7 +1,7 @@
 /**
  * Language server client
  *
- * Fetches per-language documentation (language-info.json + user-guide.md)
+ * Fetches per-language documentation (language-info.json + usage-guide.md)
  * from each language's Express server (e.g. l0158.graffiticode.org) and
  * caches the result in-memory with a TTL.
  *
@@ -19,7 +19,7 @@ export interface LanguageInfoEnvelope {
 
 export interface LanguageServerDoc {
   envelope: LanguageInfoEnvelope | null;
-  userGuide: string | null;
+  usageGuide: string | null;
 }
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
@@ -60,9 +60,11 @@ export async function getLanguageServerDoc(langId: string): Promise<LanguageServ
   }
 
   const base = baseUrlFor(langId);
-  const [envelopeRaw, userGuideRaw] = await Promise.all([
+  // Prefer the canonical `usage-guide.md`; fall back to the legacy
+  // `user-guide.md` name for languages that haven't been renamed yet.
+  const [envelopeRaw, usageGuideRaw] = await Promise.all([
     fetchText(`${base}/language-info.json`),
-    fetchText(`${base}/user-guide.md`),
+    fetchText(`${base}/usage-guide.md`).then((s) => s ?? fetchText(`${base}/user-guide.md`)),
   ]);
 
   let envelope: LanguageInfoEnvelope | null = null;
@@ -76,9 +78,9 @@ export async function getLanguageServerDoc(langId: string): Promise<LanguageServ
     }
   }
 
-  const doc: LanguageServerDoc = { envelope, userGuide: userGuideRaw };
+  const doc: LanguageServerDoc = { envelope, usageGuide: usageGuideRaw };
 
-  const success = envelope !== null || userGuideRaw !== null;
+  const success = envelope !== null || usageGuideRaw !== null;
   const ttl = success ? cacheTtlMs : FAILURE_TTL_MS;
   cache.set(langId, { doc, expires: now + ttl });
 

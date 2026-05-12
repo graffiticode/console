@@ -3,7 +3,7 @@
  *
  * Language specs are fetched dynamically from l{langId}.graffiticode.org/spec.html.
  * Agent-facing authoring envelope (authoringGuide, supportedItemTypes,
- * examplePrompts) and the full user-guide markdown are fetched from the
+ * examplePrompts) and the full usage-guide markdown are fetched from the
  * language server by getLanguageServerDoc().
  */
 
@@ -29,7 +29,7 @@ export interface LanguageInfo extends Language {
   authoringGuide: string | null;
   supportedItemTypes: string[];
   examplePrompts: ExamplePrompt[];
-  userGuide: string | null;
+  usageGuide: string | null;
 }
 
 export { listLangs as listLanguages };
@@ -50,7 +50,7 @@ export async function getLanguageInfo(id: string): Promise<LanguageInfo | null> 
 
   const specUrl = `https://l${langId}.graffiticode.org/spec.html`;
 
-  const { envelope, userGuide } = await getLanguageServerDoc(langId);
+  const { envelope, usageGuide } = await getLanguageServerDoc(langId);
 
   return {
     ...baseLang,
@@ -65,6 +65,6 @@ export async function getLanguageInfo(id: string): Promise<LanguageInfo | null> 
     authoringGuide: envelope?.authoring_guide ?? null,
     supportedItemTypes: envelope?.supported_item_types ?? [],
     examplePrompts: envelope?.example_prompts ?? [],
-    userGuide: userGuide ?? null,
+    usageGuide: usageGuide ?? null,
   };
 }

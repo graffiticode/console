@@ -165,7 +165,7 @@ const typeDefs = `
     authoringGuide: String
     supportedItemTypes: [String!]
     examplePrompts: [ExamplePrompt!]
-    userGuide: String
+    usageGuide: String
   }
 
   type CompileAllowedResponse {
