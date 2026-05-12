@@ -33,16 +33,18 @@ export interface ResolveResult {
 }
 
 // Walks a parsed nodePool for DATA(USE(STR("<lang>"))) patterns. For each one,
-// fetches L<lang>/schema.json and inlines it on the USE node as `.schema`. Returns
-// the ordered list of upstream langs (scan order) and the rewritten nodePool.
-// Throws if any referenced lang has no accessible schema.json.
-// `fetcher` is injectable for tests; defaults to getLanguageAsset.
+// fetches L<lang>/schema.json and rewrites the STR child to hold the
+// JSON-stringified schema (replacing the lang id). The schema then travels
+// in-band as the USE node's argument; the basis runtime reads and validates
+// against it. Returns the ordered list of upstream langs (scan order) and the
+// rewritten nodePool. Throws if any referenced lang has no accessible
+// schema.json. `fetcher` is injectable for tests.
 export async function resolveUpstreams(
   nodePool: NodePool,
   fetcher: AssetFetcher = getLanguageAsset
 ): Promise<ResolveResult> {
   const upstreams: string[] = [];
-  const useRewrites: { nid: string; lang: string }[] = [];
+  const useRewrites: { strNid: string; lang: string }[] = [];
 
   for (const nid of Object.keys(nodePool)) {
     if (nid === "root") continue;
@@ -58,7 +60,7 @@ export async function resolveUpstreams(
     if (!/^\d{3,5}$/.test(lang)) {
       throw new Error(`Composition error: \`use\` argument must be a language id, got "${lang}"`);
     }
-    useRewrites.push({ nid: String(useNid), lang });
+    useRewrites.push({ strNid: String(strNid), lang });
     upstreams.push(lang);
   }
 
@@ -77,10 +79,15 @@ export async function resolveUpstreams(
     })
   );
 
+  // Replace each USE node's STR child with the JSON-stringified schema. The
+  // AST hasn't been interned yet — the pipeline owns this nodePool exclusively
+  // between parseCode and postTask — so mutation is safe and avoids a deep
+  // clone. We shallow-clone the pool object and the affected STR nodes so
+  // callers can compare references if needed.
   const rewritten: NodePool = { ...nodePool };
   for (let i = 0; i < useRewrites.length; i++) {
-    const { nid } = useRewrites[i];
-    rewritten[nid] = { ...nodePool[nid], schema: schemas[i] };
+    const { strNid } = useRewrites[i];
+    rewritten[strNid] = { ...nodePool[strNid], elts: [JSON.stringify(schemas[i])] };
   }
 
   return { upstreams, ast: rewritten };

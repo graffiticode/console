@@ -76,7 +76,12 @@ async function main() {
     };
     const result = await resolveUpstreams(pool, fetcher);
     assertEqual("single use → ['0166']", result.upstreams, ["0166"]);
-    assertEqual("USE node carries inlined schema", result.ast["5"].schema, { type: "spreadsheet" });
+    assertEqual(
+      "USE's STR child holds JSON-stringified schema",
+      result.ast["3"].elts[0],
+      JSON.stringify({ type: "spreadsheet" })
+    );
+    assertEqual("USE node itself is unchanged", result.ast["5"], pool["5"]);
     assertEqual("non-USE nodes are passed through", result.ast["7"], pool["7"]);
   }
 
@@ -99,8 +104,16 @@ async function main() {
     };
     const result = await resolveUpstreams(pool, fetcher);
     assertEqual("two uses → ['0167','0159']", result.upstreams, ["0167", "0159"]);
-    assertEqual("first USE inlined", result.ast["2"].schema, { type: "ss" });
-    assertEqual("second USE inlined", result.ast["5"].schema, { type: "fc" });
+    assertEqual(
+      "first STR rewritten with schema JSON",
+      result.ast["1"].elts[0],
+      JSON.stringify({ type: "ss" })
+    );
+    assertEqual(
+      "second STR rewritten with schema JSON",
+      result.ast["4"].elts[0],
+      JSON.stringify({ type: "fc" })
+    );
   }
 
   // 5: missing schema → error
