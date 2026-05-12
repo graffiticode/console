@@ -406,7 +406,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
   )
 }
 
-const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh, onReorderItems, panelWidth = 210 }: any, ref) {
+const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectItem, onUpdateItem, onRefresh, panelWidth = 210 }: any, ref) {
   const [ showId, setShowId ] = useState("");
   const [ openMenuId, setOpenMenuId ] = useState<string | null>(null);
   const itemRefs = useRef<Record<string, HTMLLIElement | null>>({});
@@ -435,49 +435,6 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
     get hasOpenMenu() { return !!openMenuId; },
     navigate: navigateItems,
   }));
-  const dragItemRef = useRef<string | null>(null);
-  const dragOverItemRef = useRef<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
-
-  const handleDragStart = (e: React.DragEvent, itemId: string) => {
-    dragItemRef.current = itemId;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('application/x-gc-item-reorder', itemId);
-  };
-
-  const handleDragOver = (e: React.DragEvent, itemId: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverItemRef.current !== itemId) {
-      dragOverItemRef.current = itemId;
-      setDragOverId(itemId);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const fromId = dragItemRef.current;
-    const toId = dragOverItemRef.current;
-    if (fromId && toId && fromId !== toId && onReorderItems) {
-      const fromIndex = items.findIndex(i => i.id === fromId);
-      const toIndex = items.findIndex(i => i.id === toId);
-      if (fromIndex !== -1 && toIndex !== -1) {
-        const reordered = [...items];
-        const [moved] = reordered.splice(fromIndex, 1);
-        reordered.splice(toIndex, 0, moved);
-        onReorderItems(reordered);
-      }
-    }
-    dragItemRef.current = null;
-    dragOverItemRef.current = null;
-    setDragOverId(null);
-  };
-
-  const handleDragEnd = () => {
-    dragItemRef.current = null;
-    dragOverItemRef.current = null;
-    setDragOverId(null);
-  };
 
   return (
     <div className="w-full flex flex-col gap-y-1 bg-gray-100 pt-1 pr-2">
@@ -507,12 +464,6 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
               <li
                 key={item.id}
                 ref={(el) => { itemRefs.current[item.id] = el; }}
-                draggable
-                onDragStart={(e) => handleDragStart(e, item.id)}
-                onDragOver={(e) => handleDragOver(e, item.id)}
-                onDrop={handleDrop}
-                onDragEnd={handleDragEnd}
-                className={dragOverId === item.id && dragItemRef.current !== item.id ? 'border-t-2 border-blue-400' : ''}
               >
                 <div
                   className={classNames(

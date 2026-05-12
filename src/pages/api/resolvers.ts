@@ -715,9 +715,17 @@ export async function updateItem({
         }
       }
     }
-    updates.updated = Date.now();
+    // Only bump the `updated` timestamp when the taskId actually changes —
+    // that's the canonical "content changed" signal. Metadata edits (mark,
+    // name, isPublic, etc.) and selection-driven no-op writes shouldn't
+    // make an item look freshly modified.
+    const taskIdChanged = taskId !== undefined && taskId !== itemData.taskId;
+    if (taskIdChanged) {
+      updates.updated = Date.now();
+    }
     if (auth.freePlan) {
-      updates.expiresAt = updates.updated + FREE_PLAN_ITEM_TTL_MS;
+      const ttlBase = updates.updated || itemData.updated || Date.now();
+      updates.expiresAt = ttlBase + FREE_PLAN_ITEM_TTL_MS;
     }
     await itemRef.update(updates);
     const updatedDoc = await itemRef.get();

@@ -328,43 +328,15 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
           return true;
         });
 
-    const isDefaultSort = sort.field === DEFAULT_SORT.field && sort.direction === DEFAULT_SORT.direction;
-    let orderedItems = filteredItems;
-    if (isDefaultSort) {
-      const savedOrder = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:itemOrder') : null;
-      if (savedOrder) {
-        try {
-          const orderIds: string[] = JSON.parse(savedOrder);
-          const orderSet = new Set(orderIds);
-          const newItems = filteredItems.filter(i => !orderSet.has(i.id));
-          const savedItems = orderIds
-            .map(id => filteredItems.find(i => i.id === id))
-            .filter(Boolean);
-          newItems.sort((a, b) => {
-            const aTime = Number(a.updated || a.created || 0);
-            const bTime = Number(b.updated || b.created || 0);
-            return bTime - aTime;
-          });
-          orderedItems = [...newItems, ...savedItems];
-        } catch {}
-      } else {
-        orderedItems = [...filteredItems].sort((a, b) => {
-          const aTime = Number(a.updated || a.created || 0);
-          const bTime = Number(b.updated || b.created || 0);
-          return bTime - aTime;
-        });
+    const dir = sort.direction === 'asc' ? 1 : -1;
+    const orderedItems = [...filteredItems].sort((a, b) => {
+      if (sort.field === 'name') {
+        return dir * String(a.name || '').localeCompare(String(b.name || ''));
       }
-    } else {
-      const dir = sort.direction === 'asc' ? 1 : -1;
-      orderedItems = [...filteredItems].sort((a, b) => {
-        if (sort.field === 'name') {
-          return dir * String(a.name || '').localeCompare(String(b.name || ''));
-        }
-        const aTime = Number(a[sort.field] || 0);
-        const bTime = Number(b[sort.field] || 0);
-        return dir * (aTime - bTime);
-      });
-    }
+      const aTime = Number(a[sort.field] || 0);
+      const bTime = Number(b[sort.field] || 0);
+      return dir * (aTime - bTime);
+    });
     setItems(orderedItems);
   }, [loadedItems, directItem, initialItemId, sort, dateFilter]);
 
@@ -858,11 +830,6 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                   onSelectItem={handleSelectItem}
                   onUpdateItem={handleUpdateItem}
                   onRefresh={() => mutate()}
-                  onReorderItems={(reordered) => {
-                    setItems(reordered);
-                    const orderIds = reordered.map(i => i.id);
-                    localStorage.setItem('graffiticode:itemOrder', JSON.stringify(orderIds));
-                  }}
                   panelWidth={itemsPanelWidth}
                 />
               )}
