@@ -5,6 +5,7 @@ import {
   usePrivy,
   useCreateWallet,
   useToken,
+  useSignMessage,
   getEmbeddedConnectedWallet,
   type ConnectedWallet,
   type User as PrivyUser,
@@ -43,6 +44,7 @@ export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
   const { createWallet } = useCreateWallet();
   const { wallets } = useWallets();
   const { getAccessToken } = useToken();
+  const { signMessage: privySignMessage } = useSignMessage();
 
   // Privy fires `onComplete` after the OTP is verified (and after wallet
   // creation if createOnLogin is enabled). Awaiting it is more reliable than
@@ -216,7 +218,15 @@ export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
     const accountAddress = wallet.address;
     const address = stripHexPrefix(accountAddress);
     const nonce = await client.ethereum.getNonce({ address });
-    const sigRaw = await wallet.sign(`Nonce: ${nonce}`);
+    // `showWalletUIs: false` bypasses Privy's "sign-in to continue" modal and
+    // signs directly via the walletProxy. The embedded wallet was already
+    // created by an explicit createWallet() call, so the extra confirmation
+    // step is redundant noise.
+    const sigRaw = await privySignMessage(
+      `Nonce: ${nonce}`,
+      { showWalletUIs: false },
+      accountAddress,
+    );
     const signature = stripHexPrefix(sigRaw);
     const { firebaseCustomToken } = await client.ethereum.authenticate({
       address,
@@ -233,7 +243,7 @@ export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
     } catch {
       // Privy session no longer needed once Firebase has taken over.
     }
-  }, [auth, createEmbeddedWallet, persistSignInEmail, logout]);
+  }, [auth, createEmbeddedWallet, privySignMessage, persistSignInEmail, logout]);
 
   const verifyAndSignIn = useCallback(async (code: string): Promise<'signed-in' | 'needs-confirm'> => {
     setVerifying(true);
