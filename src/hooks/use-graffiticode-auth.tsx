@@ -4,17 +4,36 @@ import { useSignInWithEthereum } from "./use-ethereum";
 import { useAuth, useUser } from "reactfire";
 import { signInWithCustomToken, signOut } from "firebase/auth";
 
+type PendingEthereumSignup = {
+  needsSignupConfirm: true;
+  address: string;
+  accountAddress: string;
+};
+
 const GraffiticodeAuthContext = createContext({
   loading: true,
   user: null as any,
   signInWithEthereum: async (selectedWallet?: any): Promise<any> => {},
+  // Connects a wallet and signs in iff the address already has an account.
+  // For unknown addresses, returns { needsSignupConfirm, address } so the
+  // caller can prompt before creating a new account.
+  beginEthereumSignIn: async (
+    _selectedWallet?: any,
+  ): Promise<PendingEthereumSignup | undefined> => undefined,
+  // Completes sign-in after the user has confirmed they want to create a new
+  // account for the address returned by beginEthereumSignIn.
+  confirmEthereumSignIn: async (_pending: PendingEthereumSignup): Promise<void> => {},
   signOut: () => {}
 });
 
 export function GraffiticodeAuthProvider({ children }) {
   const auth = useAuth();
   const { status: firebaseUserStatus, data: firebaseUser } = useUser();
-  const { signInWithEthereum: siwe } = useSignInWithEthereum();
+  const {
+    signInWithEthereum: siwe,
+    connectAndCheck,
+    signInForAddress,
+  } = useSignInWithEthereum();
 
   const signInWithEthereum = useCallback(async (selectedWallet?: any) => {
     if (firebaseUser) {
@@ -25,6 +44,25 @@ export function GraffiticodeAuthProvider({ children }) {
     await signInWithCustomToken(auth, firebaseCustomToken);
 
   }, [firebaseUser, siwe]);
+
+  const beginEthereumSignIn = useCallback(async (selectedWallet?: any): Promise<PendingEthereumSignup | undefined> => {
+    if (firebaseUser) {
+      console.warn(`User ${firebaseUser.uid} is already signed in`);
+      return undefined;
+    }
+    const { accountAddress, address, exists } = await connectAndCheck(selectedWallet);
+    if (exists) {
+      const { firebaseCustomToken } = await signInForAddress(address, accountAddress);
+      await signInWithCustomToken(auth, firebaseCustomToken);
+      return undefined;
+    }
+    return { needsSignupConfirm: true, address, accountAddress };
+  }, [firebaseUser, auth, connectAndCheck, signInForAddress]);
+
+  const confirmEthereumSignIn = useCallback(async (pending: PendingEthereumSignup) => {
+    const { firebaseCustomToken } = await signInForAddress(pending.address, pending.accountAddress);
+    await signInWithCustomToken(auth, firebaseCustomToken);
+  }, [auth, signInForAddress]);
 
   let user = null;
   if (firebaseUser) {
@@ -55,6 +93,8 @@ export function GraffiticodeAuthProvider({ children }) {
     loading: firebaseUserStatus === "loading",
     user,
     signInWithEthereum,
+    beginEthereumSignIn,
+    confirmEthereumSignIn,
     signOut: handleSignOut,
   };
 

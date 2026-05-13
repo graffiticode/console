@@ -36,7 +36,7 @@ const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || '';
 const privyConfig = {
   loginMethods: ['email' as const],
   embeddedWallets: {
-    createOnLogin: 'users-without-wallets' as const,
+    createOnLogin: 'off' as const,
   },
   appearance: {
     theme: 'light' as const,

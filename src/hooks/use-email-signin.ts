@@ -4,6 +4,7 @@ import {
   useWallets,
   usePrivy,
   useCreateWallet,
+  useToken,
   getEmbeddedConnectedWallet,
   type ConnectedWallet,
   type User as PrivyUser,
@@ -22,15 +23,30 @@ type LoginCompleteWaiter = {
   reject: (err: Error) => void;
 };
 
-export function useEmailSignIn() {
+interface UseEmailSignInOptions {
+  // When true, an unmatched email is treated as a sign-up: a new account is
+  // created without first prompting the user. Used by /claim where account
+  // creation is the explicit point of the flow. Defaults to false everywhere
+  // else so unknown emails surface a confirmation dialog before any state is
+  // written.
+  allowSignup?: boolean;
+}
+
+type ResolveResponse =
+  | { matched: true; customToken: string }
+  | { matched: false; email?: string };
+
+export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
+  const { allowSignup = false } = options;
   const auth = useAuth();
   const { logout, user } = usePrivy();
   const { createWallet } = useCreateWallet();
   const { wallets } = useWallets();
+  const { getAccessToken } = useToken();
 
-  // The Privy `onComplete` callback fires AFTER the user is authenticated and
-  // their embedded wallet has been created (when `embeddedWallets.createOnLogin`
-  // is enabled). Awaiting it is more reliable than polling `useWallets()`.
+  // Privy fires `onComplete` after the OTP is verified (and after wallet
+  // creation if createOnLogin is enabled). Awaiting it is more reliable than
+  // polling other Privy state for "auth is settled".
   const loginCompleteWaiterRef = useRef<LoginCompleteWaiter | null>(null);
   const { sendCode: privySendCode, loginWithCode: privyLoginWithCode } = useLoginWithEmail({
     onComplete: (privyUser) => {
@@ -44,7 +60,6 @@ export function useEmailSignIn() {
     },
   });
 
-  // Keep refs to the latest wallets/user so the polling loop sees fresh values.
   const walletsRef = useRef(wallets);
   useEffect(() => {
     walletsRef.current = wallets;
@@ -59,6 +74,12 @@ export function useEmailSignIn() {
   const [verifying, setVerifying] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
+  // After a successful Privy login on an unknown email, we keep the Privy
+  // session alive so the eventual createWallet() + SIWE handshake doesn't
+  // require a second OTP. The pending email is stored in state so Fast Refresh
+  // doesn't clear it mid-flow.
+  const [pendingSignupEmail, setPendingSignupEmail] = useState<string | null>(null);
+  const awaitingSignupConfirm = pendingSignupEmail !== null;
 
   const sendCode = useCallback(async (email: string) => {
     setSending(true);
@@ -87,24 +108,30 @@ export function useEmailSignIn() {
     });
   }, []);
 
-  const waitForConnectedWallet = useCallback(async (address: string): Promise<ConnectedWallet | null> => {
-    const target = address.toLowerCase();
-    const start = Date.now();
-    while (Date.now() - start < CONNECTED_WALLET_TIMEOUT_MS) {
-      const list = walletsRef.current;
-      const match = list.find(
-        (w) => w.walletClientType === 'privy' && w.address.toLowerCase() === target,
-      );
-      if (match) return match;
-      const fallback = getEmbeddedConnectedWallet(list);
-      if (fallback) return fallback;
-      await new Promise((r) => setTimeout(r, POLL_MS));
-    }
-    return null;
-  }, []);
+  const waitForConnectedWallet = useCallback(
+    async (address: string): Promise<ConnectedWallet | null> => {
+      const target = address.toLowerCase();
+      const start = Date.now();
+      while (Date.now() - start < CONNECTED_WALLET_TIMEOUT_MS) {
+        const list = walletsRef.current;
+        const match = list.find(
+          (w) => w.walletClientType === 'privy' && w.address.toLowerCase() === target,
+        );
+        if (match) return match;
+        const fallback = getEmbeddedConnectedWallet(list);
+        if (fallback) return fallback;
+        await new Promise((r) => setTimeout(r, POLL_MS));
+      }
+      return null;
+    },
+    [],
+  );
 
-  const ensureEmbeddedWallet = useCallback(async (privyUser: PrivyUser): Promise<ConnectedWallet> => {
-    let address = privyUser.wallet?.address ?? userRef.current?.wallet?.address;
+  // Creates the embedded wallet if needed and returns the ConnectedWallet that
+  // can sign the SIWE nonce. PrivyProvider.embeddedWallets.createOnLogin is
+  // 'off' so wallet creation is always explicit here.
+  const createEmbeddedWallet = useCallback(async (): Promise<ConnectedWallet> => {
+    let address = userRef.current?.wallet?.address;
     if (!address) {
       try {
         const created = await createWallet();
@@ -117,7 +144,7 @@ export function useEmailSignIn() {
       }
     }
     if (!address) {
-      throw new Error('Embedded wallet address unavailable after login.');
+      throw new Error('Embedded wallet address unavailable after creation.');
     }
     const connected = await waitForConnectedWallet(address);
     if (!connected) {
@@ -126,69 +153,114 @@ export function useEmailSignIn() {
     return connected;
   }, [createWallet, waitForConnectedWallet]);
 
-  const persistSignInEmail = useCallback(async (uid: string, idToken: string, email: string) => {
-    try {
-      const getResp = await fetch(`/api/user/${uid}`, {
-        headers: { Authorization: idToken },
-      });
-      let alreadySet = false;
-      if (getResp.ok) {
-        const userData = await getResp.json();
-        alreadySet = !!userData?.signInEmail;
+  const persistSignInEmail = useCallback(
+    async (uid: string, idToken: string, email: string) => {
+      try {
+        const getResp = await fetch(`/api/user/${uid}`, {
+          headers: { Authorization: idToken },
+        });
+        let alreadySet = false;
+        if (getResp.ok) {
+          const userData = await getResp.json();
+          alreadySet = !!userData?.signInEmail;
+        }
+        if (alreadySet) return;
+        await fetch(`/api/user/${uid}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: idToken,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            signInEmail: email,
+            signInEmailVerifiedAt: new Date().toISOString(),
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to persist signInEmail:', err);
       }
-      if (alreadySet) return;
-      await fetch(`/api/user/${uid}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: idToken,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          signInEmail: email,
-          signInEmailVerifiedAt: new Date().toISOString(),
-        }),
-      });
-    } catch (err) {
-      // Non-fatal — user is still signed in. Surface in console for debugging.
-      console.error('Failed to persist signInEmail:', err);
+    },
+    [],
+  );
+
+  // Calls the resolver to see if this verified email already belongs to an
+  // existing account. Phase 1 stub returns matched=false; Phase 2 wires the
+  // real auth-service /linked-emails lookup.
+  const resolveEmail = useCallback(async (privyAccessToken: string): Promise<ResolveResponse> => {
+    const res = await fetch('/api/email-signin/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ privyAccessToken }),
+    });
+    if (!res.ok) {
+      return { matched: false };
     }
+    return res.json();
   }, []);
 
-  const verifyAndSignIn = useCallback(async (code: string) => {
+  // Runs the embedded-wallet + SIWE tail used both by the auto-create path
+  // (when allowSignup is true) and the user-confirmed signup path.
+  const createAccountFromCurrentPrivySession = useCallback(async (email: string) => {
+    const wallet = await createEmbeddedWallet();
+
+    const accountAddress = wallet.address;
+    const address = stripHexPrefix(accountAddress);
+    const nonce = await client.ethereum.getNonce({ address });
+    const sigRaw = await wallet.sign(`Nonce: ${nonce}`);
+    const signature = stripHexPrefix(sigRaw);
+    const { firebaseCustomToken } = await client.ethereum.authenticate({
+      address,
+      nonce,
+      signature,
+    });
+    const credential = await signInWithCustomToken(auth, firebaseCustomToken);
+    const uid = credential.user.uid;
+    const idToken = await credential.user.getIdToken();
+    await persistSignInEmail(uid, idToken, email);
+
+    try {
+      await logout();
+    } catch {
+      // Privy session no longer needed once Firebase has taken over.
+    }
+  }, [auth, createEmbeddedWallet, persistSignInEmail, logout]);
+
+  const verifyAndSignIn = useCallback(async (code: string): Promise<'signed-in' | 'needs-confirm'> => {
     setVerifying(true);
     setCodeError(null);
     try {
-      // Register the onComplete waiter BEFORE login so we don't miss the callback.
       const loginCompletePromise = armLoginCompleteWaiter();
       await privyLoginWithCode({ code });
-      const privyUser = await loginCompletePromise;
+      await loginCompletePromise;
 
-      const wallet = await ensureEmbeddedWallet(privyUser);
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error('Privy access token unavailable.');
+      }
+      const resolved = await resolveEmail(accessToken);
 
-      const accountAddress = wallet.address;
-      const address = stripHexPrefix(accountAddress);
-      const nonce = await client.ethereum.getNonce({ address });
-      const sigRaw = await wallet.sign(`Nonce: ${nonce}`);
-      const signature = stripHexPrefix(sigRaw);
-      const { firebaseCustomToken } = await client.ethereum.authenticate({
-        address,
-        nonce,
-        signature,
-      });
-      const credential = await signInWithCustomToken(auth, firebaseCustomToken);
-      const uid = credential.user.uid;
-      const idToken = await credential.user.getIdToken();
-
-      if (pendingEmail) {
-        await persistSignInEmail(uid, idToken, pendingEmail);
+      if (resolved.matched === true) {
+        await signInWithCustomToken(auth, resolved.customToken);
+        try {
+          await logout();
+        } catch {
+          // ignore
+        }
+        return 'signed-in';
       }
 
-      // Privy session is no longer needed once Firebase auth has taken over.
-      try {
-        await logout();
-      } catch {
-        // ignore
+      const resolvedEmail: string | undefined = resolved.matched === false ? resolved.email : undefined;
+      const email = pendingEmail || resolvedEmail || '';
+      if (!allowSignup) {
+        // Pause here. The Privy session stays alive so confirmAndCreateAccount
+        // can resume without re-OTP. User cancellation is wired through reset()
+        // which clears Privy state too.
+        setPendingSignupEmail(email);
+        return 'needs-confirm';
       }
+
+      await createAccountFromCurrentPrivySession(email);
+      return 'signed-in';
     } catch (err: any) {
       const msg = err?.message || 'Failed to verify code';
       setCodeError(msg);
@@ -196,7 +268,45 @@ export function useEmailSignIn() {
     } finally {
       setVerifying(false);
     }
-  }, [armLoginCompleteWaiter, privyLoginWithCode, ensureEmbeddedWallet, auth, pendingEmail, persistSignInEmail, logout]);
+  }, [
+    allowSignup,
+    armLoginCompleteWaiter,
+    privyLoginWithCode,
+    getAccessToken,
+    resolveEmail,
+    auth,
+    logout,
+    pendingEmail,
+    createAccountFromCurrentPrivySession,
+  ]);
+
+  const confirmAndCreateAccount = useCallback(async () => {
+    if (!pendingSignupEmail) {
+      setCodeError('Sign-up session expired. Please try again.');
+      return;
+    }
+    setVerifying(true);
+    setCodeError(null);
+    try {
+      await createAccountFromCurrentPrivySession(pendingSignupEmail);
+      setPendingSignupEmail(null);
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to create account';
+      setCodeError(msg);
+      throw err;
+    } finally {
+      setVerifying(false);
+    }
+  }, [pendingSignupEmail, createAccountFromCurrentPrivySession]);
+
+  const cancelSignup = useCallback(async () => {
+    setPendingSignupEmail(null);
+    try {
+      await logout();
+    } catch {
+      // ignore
+    }
+  }, [logout]);
 
   const reset = useCallback(() => {
     setPendingEmail(null);
@@ -204,16 +314,20 @@ export function useEmailSignIn() {
     setCodeError(null);
     setSending(false);
     setVerifying(false);
+    setPendingSignupEmail(null);
   }, []);
 
   return {
     sendCode,
     verifyAndSignIn,
+    confirmAndCreateAccount,
+    cancelSignup,
     reset,
     pendingEmail,
     sending,
     verifying,
     emailError,
     codeError,
+    awaitingSignupConfirm,
   };
 }

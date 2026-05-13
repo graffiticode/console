@@ -15,6 +15,8 @@ interface Wallet {
 export default function Claim() {
   const router = useRouter();
   const { user, loading, signInWithEthereum } = useGraffiticodeAuth();
+  // /claim is the explicit "convert trial to account" surface, so unmatched
+  // emails should create new accounts without prompting.
   const {
     sendCode,
     verifyAndSignIn,
@@ -22,7 +24,7 @@ export default function Claim() {
     verifying: codeVerifying,
     emailError,
     codeError,
-  } = useEmailSignIn();
+  } = useEmailSignIn({ allowSignup: true });
 
   const tokenParam = router.query.token;
   const token = typeof tokenParam === 'string' ? tokenParam : null;

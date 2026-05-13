@@ -13,6 +13,7 @@ import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
 import { useEmailSignIn } from "../hooks/use-email-signin";
 import WalletSelectionDialog from "./WalletSelectionDialog";
 import AuthMethodDialog from "./AuthMethodDialog";
+import NewAccountConfirmDialog from "./NewAccountConfirmDialog";
 
 interface SignInComponentProps {
   label?: string | React.ReactNode;
@@ -35,19 +36,30 @@ const fetchUserData = async ({ user }) => {
   return null;
 };
 
+interface PendingWalletSignup {
+  address: string;
+  accountAddress: string;
+}
+
 export default function SignInComponent({ label = "Sign in", className }: SignInComponentProps) {
-  const { loading, user, signInWithEthereum, signOut } = useGraffiticodeAuth();
+  const { loading, user, beginEthereumSignIn, confirmEthereumSignIn, signOut } = useGraffiticodeAuth();
   const {
     sendCode,
     verifyAndSignIn,
+    confirmAndCreateAccount,
+    cancelSignup,
     reset: resetEmailFlow,
     sending: emailSending,
     verifying: codeVerifying,
     emailError,
     codeError,
+    awaitingSignupConfirm,
+    pendingEmail,
   } = useEmailSignIn();
   const [showAuthMethodDialog, setShowAuthMethodDialog] = useState(false);
   const [showWalletDialog, setShowWalletDialog] = useState(false);
+  const [pendingWalletSignup, setPendingWalletSignup] = useState<PendingWalletSignup | null>(null);
+  const [confirmingWalletSignup, setConfirmingWalletSignup] = useState(false);
 
   // Fetch user profile data from Firestore
   const { data: userData } = useSWR(
@@ -76,12 +88,40 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
   };
 
   const handleSubmitCode = async (code: string) => {
-    await verifyAndSignIn(code);
+    const result = await verifyAndSignIn(code);
+    // The confirm dialog and the auth-method dialog can't co-exist — having
+    // both Headless UI Dialogs open at the same z-index causes the underlying
+    // one to fire its onClose handler, which would call resetEmailFlow and
+    // wipe the pending sign-up state. Close it ourselves without routing
+    // through that reset handler.
+    if (result === 'needs-confirm') {
+      setShowAuthMethodDialog(false);
+    }
+    return result;
+  };
+
+  const handleConfirmEmailSignup = async () => {
+    try {
+      await confirmAndCreateAccount();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCancelEmailSignup = async () => {
+    try {
+      await cancelSignup();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleSignIn = async (wallet: Wallet | null) => {
     try {
-      await signInWithEthereum(wallet);
+      const pending = await beginEthereumSignIn(wallet);
+      if (pending && pending.needsSignupConfirm) {
+        setPendingWalletSignup({ address: pending.address, accountAddress: pending.accountAddress });
+      }
     } catch (err) {
       console.error(err);
     }
@@ -89,6 +129,23 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
 
   const handleWalletSelect = (wallet: Wallet) => {
     handleSignIn(wallet);
+  };
+
+  const handleConfirmWalletSignup = async () => {
+    if (!pendingWalletSignup) return;
+    setConfirmingWalletSignup(true);
+    try {
+      await confirmEthereumSignIn({ ...pendingWalletSignup, needsSignupConfirm: true });
+      setPendingWalletSignup(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setConfirmingWalletSignup(false);
+    }
+  };
+
+  const handleCancelWalletSignup = () => {
+    setPendingWalletSignup(null);
   };
 
   // Get display name for the user menu button
@@ -248,6 +305,25 @@ export default function SignInComponent({ label = "Sign in", className }: SignIn
           isOpen={showWalletDialog}
           onClose={() => setShowWalletDialog(false)}
           onSelectWallet={handleWalletSelect}
+        />
+
+        <NewAccountConfirmDialog
+          isOpen={!!pendingWalletSignup}
+          identifier={pendingWalletSignup?.address ?? ''}
+          kind="wallet"
+          onConfirm={handleConfirmWalletSignup}
+          onCancel={handleCancelWalletSignup}
+          confirming={confirmingWalletSignup}
+        />
+
+        <NewAccountConfirmDialog
+          isOpen={awaitingSignupConfirm}
+          identifier={pendingEmail ?? ''}
+          kind="email"
+          onConfirm={handleConfirmEmailSignup}
+          onCancel={handleCancelEmailSignup}
+          confirming={codeVerifying}
+          error={codeError}
         />
       </>
     );

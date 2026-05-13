@@ -7,7 +7,11 @@ interface AuthMethodDialogProps {
   onClose: () => void;
   onSelectEthereum: () => void;
   onSubmitEmail: (email: string) => Promise<void>;
-  onSubmitCode: (code: string) => Promise<void>;
+  // Returns 'signed-in' if the user is now authenticated, or 'needs-confirm'
+  // if the email isn't linked to any account and the parent should now render
+  // a create-new-account confirmation. Existing callers can return undefined
+  // (treated as 'signed-in').
+  onSubmitCode: (code: string) => Promise<'signed-in' | 'needs-confirm' | void>;
   // Fires when the code-verify step succeeds. Distinct from onClose, which is
   // user-initiated dismissal — on /claim, onClose navigates away, so success
   // must NOT route through it or the claim mutation never fires.
@@ -74,8 +78,10 @@ export default function AuthMethodDialog({
     const trimmed = code.trim();
     if (!trimmed) return;
     try {
-      await onSubmitCode(trimmed);
-      onAuthSuccess?.();
+      const result = await onSubmitCode(trimmed);
+      if (result !== 'needs-confirm') {
+        onAuthSuccess?.();
+      }
     } catch {
       // codeError surfaces via prop
     }
