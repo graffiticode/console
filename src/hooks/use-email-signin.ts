@@ -85,6 +85,16 @@ export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
     setSending(true);
     setEmailError(null);
     try {
+      // Drop any stale Privy session before sending a fresh OTP. Without this,
+      // an aborted previous attempt leaves Privy authenticated, and the next
+      // loginWithCode tries to *link* the new email to that existing user —
+      // which fails with `cannot_link_more_of_type` since Privy embedded-wallet
+      // users are capped at one email.
+      try {
+        await logout();
+      } catch {
+        // ignore — clean-slate is best-effort
+      }
       await privySendCode({ email });
       setPendingEmail(email);
     } catch (err: any) {
@@ -94,7 +104,7 @@ export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
     } finally {
       setSending(false);
     }
-  }, [privySendCode]);
+  }, [privySendCode, logout]);
 
   const armLoginCompleteWaiter = useCallback((): Promise<PrivyUser> => {
     return new Promise((resolve, reject) => {
