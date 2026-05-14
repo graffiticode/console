@@ -4,7 +4,7 @@ import {
   useWallets,
   usePrivy,
   useCreateWallet,
-  useToken,
+  useIdentityToken,
   useSignMessage,
   getEmbeddedConnectedWallet,
   type ConnectedWallet,
@@ -43,8 +43,12 @@ export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
   const { logout, user } = usePrivy();
   const { createWallet } = useCreateWallet();
   const { wallets } = useWallets();
-  const { getAccessToken } = useToken();
+  const { identityToken } = useIdentityToken();
   const { signMessage: privySignMessage } = useSignMessage();
+  const identityTokenRef = useRef(identityToken);
+  useEffect(() => {
+    identityTokenRef.current = identityToken;
+  }, [identityToken]);
 
   // Privy fires `onComplete` after the OTP is verified (and after wallet
   // creation if createOnLogin is enabled). Awaiting it is more reliable than
@@ -107,6 +111,16 @@ export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
       setSending(false);
     }
   }, [privySendCode, logout]);
+
+  const waitForIdentityToken = useCallback(async (): Promise<string | null> => {
+    const start = Date.now();
+    while (Date.now() - start < CONNECTED_WALLET_TIMEOUT_MS) {
+      const token = identityTokenRef.current;
+      if (token) return token;
+      await new Promise((r) => setTimeout(r, POLL_MS));
+    }
+    return identityTokenRef.current;
+  }, []);
 
   const armLoginCompleteWaiter = useCallback((): Promise<PrivyUser> => {
     return new Promise((resolve, reject) => {
@@ -196,13 +210,14 @@ export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
   );
 
   // Calls the resolver to see if this verified email already belongs to an
-  // existing account. Phase 1 stub returns matched=false; Phase 2 wires the
-  // real auth-service /linked-emails lookup.
-  const resolveEmail = useCallback(async (privyAccessToken: string): Promise<ResolveResponse> => {
+  // existing account. The Privy identity token carries the verified email; the
+  // server verifies the token, extracts the email, and looks it up in the
+  // auth-service linked-emails registry.
+  const resolveEmail = useCallback(async (privyIdentityToken: string): Promise<ResolveResponse> => {
     const res = await fetch('/api/email-signin/resolve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ privyAccessToken }),
+      body: JSON.stringify({ privyIdentityToken }),
     });
     if (!res.ok) {
       return { matched: false };
@@ -253,11 +268,12 @@ export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
       await privyLoginWithCode({ code });
       await loginCompletePromise;
 
-      const accessToken = await getAccessToken();
-      if (!accessToken) {
-        throw new Error('Privy access token unavailable.');
+      // Identity token populates a render or two after onComplete fires.
+      const idToken = await waitForIdentityToken();
+      if (!idToken) {
+        throw new Error('Privy identity token unavailable.');
       }
-      const resolved = await resolveEmail(accessToken);
+      const resolved = await resolveEmail(idToken);
 
       if (resolved.matched === true) {
         await signInWithCustomToken(auth, resolved.customToken);
@@ -292,7 +308,7 @@ export function useEmailSignIn(options: UseEmailSignInOptions = {}) {
     allowSignup,
     armLoginCompleteWaiter,
     privyLoginWithCode,
-    getAccessToken,
+    waitForIdentityToken,
     resolveEmail,
     auth,
     logout,
