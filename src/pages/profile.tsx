@@ -396,13 +396,6 @@ export default function Profile() {
                     </dd>
                   </div>
 
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Sign-in Email</dt>
-                    <dd className="mt-1 text-sm text-gray-900 break-all">
-                      {userData?.signInEmail || '—'}
-                    </dd>
-                  </div>
-
                   {userData?.phone && (
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Phone</dt>
