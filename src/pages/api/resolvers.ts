@@ -1122,6 +1122,7 @@ export async function claimFreePlanSession({
     .get();
 
   let transferred = 0;
+  const items: { id: string; lang: string; created: number }[] = [];
   for (const doc of snapshot.docs) {
     const data = doc.data();
     if (typeof data.expiresAt === "number" && data.expiresAt <= now) continue;
@@ -1170,7 +1171,13 @@ export async function claimFreePlanSession({
 
     await targetRef.set(claimedItem);
     transferred += 1;
+    items.push({ id: newId, lang: String(data.lang || ""), created: timestamp });
   }
 
-  return { transferred, sessionNamespace };
+  items.sort((a, b) => b.created - a.created);
+  return {
+    transferred,
+    sessionNamespace,
+    items: items.map(({ id, lang }) => ({ id, lang })),
+  };
 }

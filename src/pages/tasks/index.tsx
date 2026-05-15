@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import { useEffect } from 'react';
-import { getPageTitle } from '../lib/utils';
-import TasksGallery from '../components/tasks-gallery';
+import { getPageTitle } from '../../lib/utils';
+import TasksGallery from '../../components/tasks-gallery';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')

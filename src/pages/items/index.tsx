@@ -13,13 +13,13 @@ import {
   XMarkIcon,
   BellIcon,
 } from '@heroicons/react/24/outline'
-import SignIn from '../components/SignIn'
+import SignIn from '../../components/SignIn'
 import { useEffect } from 'react';
 import Link from 'next/link';
-import Gallery from '../components/gallery';
+import Gallery from '../../components/gallery';
 import useSwr from 'swr';
-import useLocalStorage from '../hooks/use-local-storage';
-import { getPageTitle } from '../lib/utils';
+import useLocalStorage from '../../hooks/use-local-storage';
+import { getPageTitle } from '../../lib/utils';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')

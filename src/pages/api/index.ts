@@ -203,9 +203,15 @@ const typeDefs = `
     newItemId: String
   }
 
+  type ClaimedItem {
+    id: String!
+    lang: String!
+  }
+
   type ClaimResult {
     transferred: Int!
     sessionNamespace: String!
+    items: [ClaimedItem!]!
   }
 
   type Mutation {

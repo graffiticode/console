@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
 import useSWR from "swr";
+import { useRouter } from 'next/router';
 import { Dialog, Transition, Menu } from '@headlessui/react'
 import {
   XMarkIcon,
@@ -17,6 +18,14 @@ import ItemsNav from "./ItemsNav";
 import { PlusIcon } from '@heroicons/react/20/solid';
 import ItemsHeaderMenu, { DEFAULT_SORT, DEFAULT_DATE_FILTER, Sort, DateFilter } from "./items-header-menu";
 import { ClientOption, ALL_CLIENT, clientOptionForId } from "./client-selector";
+import { findLanguageByNumber } from "./language-selector";
+
+const normalizeLangId = (raw: any): string | null => {
+  if (raw === null || raw === undefined) return null;
+  const s = String(raw).replace(/^L/i, '').trim();
+  if (!s) return null;
+  return s.padStart(4, '0');
+};
 
 const parseId = id => {
   if (!id) {
@@ -53,7 +62,9 @@ const useTaskIdFormUrl = ({ lang, id }) => {
   return src;
 };
 
-export default function Gallery({ lang, mark, setMark, hideItemsNav = false, itemId: initialItemId = null, client, setClient, sort = DEFAULT_SORT, setSort, dateFilter = DEFAULT_DATE_FILTER, setDateFilter }: { lang: any; mark: any; setMark?: (m: any) => void; hideItemsNav?: boolean; itemId?: string | null; client?: ClientOption; setClient?: (c: ClientOption) => void; sort?: Sort; setSort?: (s: Sort) => void; dateFilter?: DateFilter; setDateFilter?: (d: DateFilter) => void }) {
+export default function Gallery({ lang, mark, setMark, hideItemsNav = false, itemId: initialItemId = null, client, setClient, sort = DEFAULT_SORT, setSort, dateFilter = DEFAULT_DATE_FILTER, setDateFilter, setLanguage }: { lang: any; mark: any; setMark?: (m: any) => void; hideItemsNav?: boolean; itemId?: string | null; client?: ClientOption; setClient?: (c: ClientOption) => void; sort?: Sort; setSort?: (s: Sort) => void; dateFilter?: DateFilter; setDateFilter?: (d: DateFilter) => void; setLanguage?: (lang: any) => void }) {
+  const router = useRouter();
+  const isItemDetailRoute = router.pathname === '/items/[id]';
   const clientOption: ClientOption = client || ALL_CLIENT;
   const clientId = clientOption.id;
   const [ hideEditor, setHideEditor ] = useState(false);
@@ -292,8 +303,11 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     }
   }, [user?.uid]);
 
-  // Handle directly loaded item (from URL initialItemId)
+  // Popup editor (hideItemsNav) collapses the gallery to just the deep-linked
+  // item. The in-app /items/[id] view should NOT collapse the list — the user
+  // expects to see all their items with the URL one preselected.
   useEffect(() => {
+    if (!hideItemsNav) return;
     if (directItem && initialItemId) {
       setItems([directItem]);
       setSelectedItemId(directItem.id);
@@ -302,11 +316,25 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setUpstreamLangs(Array.isArray(directItem.upstreamLangs) ? directItem.upstreamLangs : []);
       loadItemSource(directItem.id, directItem.taskId);
     }
-  }, [directItem, initialItemId]);
+  }, [directItem, initialItemId, hideItemsNav]);
+
+  // Sync the language selector to the deep-linked item's lang. Runs in both
+  // modes (popup editor + in-app /items/[id]) so the surrounding chrome (form,
+  // compile, items-list filter) matches the loaded item.
+  useEffect(() => {
+    if (!directItem || !initialItemId) return;
+    if (!setLanguage) return;
+    const targetLang = normalizeLangId((directItem as any).lang);
+    const currentLang = normalizeLangId(lang);
+    if (targetLang && targetLang !== currentLang) {
+      const next = findLanguageByNumber(targetLang);
+      if (next) setLanguage(next);
+    }
+  }, [directItem, initialItemId, setLanguage, lang]);
 
   // Recompute ordered/filtered items whenever loadedItems, sort, or dateFilter change.
   useEffect(() => {
-    if (directItem && initialItemId) return;
+    if (hideItemsNav && directItem && initialItemId) return;
     if (!loadedItems || loadedItems.length === 0) {
       if (!initialItemId) setItems([]);
       return;
@@ -342,7 +370,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
 
   // Resolve selection (and load its source) only when the source data changes.
   useEffect(() => {
-    if (directItem && initialItemId) return;
+    if (hideItemsNav && directItem && initialItemId) return;
     if (!loadedItems || loadedItems.length === 0) {
       if (!initialItemId) setSelectedItemId("");
       return;
@@ -545,6 +573,12 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       loadItemSource(item.id, item.taskId);
       if (typeof window !== 'undefined') {
         localStorage.setItem(`graffiticode:selected:itemId`, item.id);
+      }
+      if (router.pathname === '/items' || router.pathname === '/items/') {
+        // From index → first selection promotes URL to detail; preserve back to /items.
+        router.push(`/items/${item.id}`, undefined, { shallow: true });
+      } else if (isItemDetailRoute && router.query.id !== item.id) {
+        router.replace(`/items/${item.id}`, undefined, { shallow: true });
       }
     }
   };

@@ -32,6 +32,7 @@ export default function Claim() {
   const [showWalletDialog, setShowWalletDialog] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [claimEmpty, setClaimEmpty] = useState(false);
   const claimedOnce = useRef(false);
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function Claim() {
     claimedOnce.current = true;
     setClaiming(true);
     setClaimError(null);
+    setClaimEmpty(false);
     (async () => {
       try {
         const idToken = await user.getToken();
@@ -52,7 +54,11 @@ export default function Claim() {
           },
           body: JSON.stringify({
             query: `mutation ClaimFreePlanSession($token: String!) {
-              claimFreePlanSession(token: $token) { transferred sessionNamespace }
+              claimFreePlanSession(token: $token) {
+                transferred
+                sessionNamespace
+                items { id lang }
+              }
             }`,
             variables: { token },
           }),
@@ -61,7 +67,13 @@ export default function Claim() {
         if (json.errors?.length) {
           throw new Error(json.errors[0].message);
         }
-        router.replace('/items');
+        const result = json.data?.claimFreePlanSession;
+        const items: { id: string; lang: string }[] = Array.isArray(result?.items) ? result.items : [];
+        if (items.length === 0) {
+          setClaimEmpty(true);
+          return;
+        }
+        router.replace(`/items/${items[0].id}`);
       } catch (err: any) {
         setClaimError(err?.message || 'Failed to claim items');
         claimedOnce.current = false;
@@ -131,6 +143,21 @@ export default function Claim() {
                 }}
               >
                 Try again
+              </button>
+            </>
+          )}
+          {!claiming && !claimError && claimEmpty && (
+            <>
+              <h1 className="text-xl font-semibold text-gray-900 mb-2">Nothing to claim</h1>
+              <p className="text-sm text-gray-600 text-center max-w-sm mb-4">
+                This trial session has expired or never contained any items.
+              </p>
+              <button
+                type="button"
+                className="rounded-none border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => router.replace('/items')}
+              >
+                Go to items
               </button>
             </>
           )}

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getPageTitle } from '../lib/utils';
-import { getBaseUrlForApi, getLanguageAsset } from "../lib/api";
+import { getPageTitle } from '../../lib/utils';
+import { getBaseUrlForApi, getLanguageAsset } from "../../lib/api";
 
 type View = 'spec' | 'usage-guide' | 'instructions';
 
@@ -35,6 +35,15 @@ export default function Spec({ language }) {
   useEffect(() => {
     document.title = getPageTitle();
   }, []);
+
+  // Canonicalize /specs → /specs/<langId> so subsequent language changes are
+  // handled by the bidirectional URL↔selector sync in /specs/[id].
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!langId) return;
+    router.replace({ pathname: `/specs/${langId}`, query: router.query }, undefined, { shallow: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, langId]);
 
   useEffect(() => {
     if (view === 'spec') return;

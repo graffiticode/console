@@ -48,7 +48,7 @@ export default function App({
   pageProps: { session, ...pageProps },
 }) {
   const router = useRouter();
-  const pathName = router.pathname.slice(1);
+  const pathName = router.pathname.split('/').filter(Boolean)[0] || '';
   const languageInitialized = useRef(false);
 
   // Get domain from query params or sessionStorage

@@ -243,8 +243,9 @@ function TaskMenu({ task, user, isOpen, onOpen, onClose }) {
   );
 }
 
-export default function TasksGallery({ lang }) {
+export default function TasksGallery({ lang, initialTaskId = null }: { lang: any; initialTaskId?: string | null }) {
   const router = useRouter();
+  const isTaskDetailRoute = router.pathname === '/tasks/[id]';
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ dataHeight, setDataHeight ] = useState(350);
@@ -351,12 +352,12 @@ export default function TasksGallery({ lang }) {
     let taskIdFound = false;
     if (uniqueTaskIds.length > 0) {
       try {
-        // First check URL query parameter
+        // URL segment (/tasks/[id]) wins, then ?taskId= query param, then
+        // saved cross-section selection from localStorage.
         const queryTaskId = router.query.taskId as string;
-        // Then check localStorage for saved taskId from Items view
         const savedTaskId = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:selected:taskId') : null;
 
-        const taskIdToSelect = queryTaskId || savedTaskId;
+        const taskIdToSelect = initialTaskId || queryTaskId || savedTaskId;
 
         if (taskIdToSelect) {
           // Find matching task ID (handle both full ID and partial matches)
@@ -403,7 +404,7 @@ export default function TasksGallery({ lang }) {
     }
 
     setTaskIds([...uniqueTaskIds]); // Force update with current flags
-  }, [compilesData, router.query.taskId]);
+  }, [compilesData, router.query.taskId, initialTaskId]);
 
   // Auto-focus the tasks list for arrow key navigation
   useEffect(() => {
@@ -521,6 +522,12 @@ export default function TasksGallery({ lang }) {
 
   if (typeof window !== 'undefined') {
   localStorage.setItem('graffiticode:selected:taskId', taskId);
+  }
+
+  if (router.pathname === '/tasks' || router.pathname === '/tasks/') {
+    router.push(`/tasks/${taskId}`, undefined, { shallow: true });
+  } else if (isTaskDetailRoute && router.query.id !== taskId) {
+    router.replace(`/tasks/${taskId}`, undefined, { shallow: true });
   }
   };
 

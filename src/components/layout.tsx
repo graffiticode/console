@@ -48,7 +48,7 @@ function classNames(...classes) {
 export default function Layout({ children, language, setLanguage, mark, setMark }) {
   const { user } = useGraffiticodeAuth();
   const router = useRouter();
-  const pathName = router.pathname.slice(1);
+  const pathName = router.pathname.split('/').filter(Boolean)[0] || '';
   const queryDomain = router.query.domain;
   const queryDomainStr = Array.isArray(queryDomain) ? queryDomain[0] : queryDomain;
 
