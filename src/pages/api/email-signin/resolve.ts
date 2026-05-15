@@ -49,14 +49,16 @@ const handler = async (req, res) => {
     res.setHeader('Allow', 'POST');
     return res.status(405).end();
   }
-  const { privyIdentityToken } = req.body || {};
-  if (typeof privyIdentityToken !== 'string' || !privyIdentityToken) {
-    return res.status(400).json({ matched: false, error: 'privyIdentityToken required' });
+  const { privyAccessToken } = req.body || {};
+  if (typeof privyAccessToken !== 'string' || !privyAccessToken) {
+    return res.status(400).json({ matched: false, error: 'privyAccessToken required' });
   }
 
   let email: string | null = null;
   try {
-    const user = await getPrivyClient().getUser({ idToken: privyIdentityToken });
+    const privy = getPrivyClient();
+    const claims = await privy.verifyAuthToken(privyAccessToken);
+    const user = await privy.getUser(claims.userId);
     email = extractEmail(user);
   } catch (err: any) {
     console.warn('[email-signin/resolve] Privy token verification failed:', err?.message);
