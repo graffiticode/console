@@ -521,7 +521,10 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
   setTaskIds([...taskIds]);
 
   if (typeof window !== 'undefined') {
-  localStorage.setItem('graffiticode:selected:taskId', taskId);
+    const taskLang = String(lang || '').replace(/^L/i, '').padStart(4, '0') || null;
+    localStorage.setItem('graffiticode:selected:taskId', taskId);
+    if (taskLang) localStorage.setItem('graffiticode:selected:taskId:lang', taskLang);
+    window.dispatchEvent(new CustomEvent('gc:selected-taskId', { detail: { id: taskId, lang: taskLang } }));
   }
 
   if (router.pathname === '/tasks' || router.pathname === '/tasks/') {

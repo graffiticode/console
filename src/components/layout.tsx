@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Image from 'next/image';
-import { Fragment, useEffect } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import logo from '@/images/logos/logo.png';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
 import Link from 'next/link';
@@ -63,6 +63,40 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
   useEffect(() => {
     document.title = getPageTitle();
   }, []);
+
+  // Track the last-selected item / task so the top-nav Items + Tasks links
+  // jump straight to their detail URLs instead of bouncing through the index.
+  // We also persist the lang of the selection so a stale item from a different
+  // language can't hijack the link after the user switches the selector.
+  type NavSel = { id: string | null; lang: string | null };
+  const [navItem, setNavItem] = useState<NavSel>({ id: null, lang: null });
+  const [navTask, setNavTask] = useState<NavSel>({ id: null, lang: null });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setNavItem({
+      id: localStorage.getItem('graffiticode:selected:itemId'),
+      lang: localStorage.getItem('graffiticode:selected:itemId:lang'),
+    });
+    setNavTask({
+      id: localStorage.getItem('graffiticode:selected:taskId'),
+      lang: localStorage.getItem('graffiticode:selected:taskId:lang'),
+    });
+    const onItem = (e: any) => setNavItem({ id: e.detail?.id || null, lang: e.detail?.lang || null });
+    const onTask = (e: any) => setNavTask({ id: e.detail?.id || null, lang: e.detail?.lang || null });
+    window.addEventListener('gc:selected-itemId', onItem);
+    window.addEventListener('gc:selected-taskId', onTask);
+    return () => {
+      window.removeEventListener('gc:selected-itemId', onItem);
+      window.removeEventListener('gc:selected-taskId', onTask);
+    };
+  }, []);
+
+  const currentLangId = (language?.name || '').replace(/^L/i, '').padStart(4, '0') || null;
+  const resolveNavHref = (item: NavigationItem): string => {
+    if (item.name === 'Items' && navItem.id && navItem.lang === currentLangId) return `/items/${navItem.id}`;
+    if (item.name === 'Tasks' && navTask.id && navTask.lang === currentLangId) return `/tasks/${navTask.id}`;
+    return item.href;
+  };
   return (
     <>
       {/*
@@ -99,7 +133,7 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                             return (
                               <Link
                                 key={item.name}
-                                href={item.href}
+                                href={resolveNavHref(item)}
                                 target={item.target}
                                 className={classNames(
                                   currentName === pathName

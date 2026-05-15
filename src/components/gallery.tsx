@@ -27,6 +27,20 @@ const normalizeLangId = (raw: any): string | null => {
   return s.padStart(4, '0');
 };
 
+// Broadcasts a selection change so the top nav can rebuild its hrefs (e.g.
+// /tasks → /tasks/<currentTaskId>) without polling localStorage. The lang
+// lets the nav gate the detail URL: if the user later switches languages on
+// another page, a stale item from a different language shouldn't hijack the
+// Items/Tasks links.
+const broadcastSelection = (kind: 'itemId' | 'taskId', id: string | null, lang: string | null) => {
+  if (typeof window === 'undefined') return;
+  if (id) {
+    localStorage.setItem(`graffiticode:selected:${kind}`, id);
+    if (lang) localStorage.setItem(`graffiticode:selected:${kind}:lang`, lang);
+  }
+  window.dispatchEvent(new CustomEvent(`gc:selected-${kind}`, { detail: { id: id || null, lang: lang || null } }));
+};
+
 const parseId = id => {
   if (!id) {
     return {taskId: ""};
@@ -77,10 +91,8 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
 
   // Save the current taskId to localStorage when it changes so it can be used in Tasks view
   useEffect(() => {
-    if (taskId && typeof window !== 'undefined') {
-      localStorage.setItem('graffiticode:selected:taskId', taskId);
-    }
-  }, [taskId]);
+    if (taskId) broadcastSelection('taskId', taskId, normalizeLangId(lang));
+  }, [taskId, lang]);
   const [ isItemsPanelCollapsed, setIsItemsPanelCollapsed ] = useState(
     typeof window !== 'undefined' && localStorage.getItem('graffiticode:itemsPanelCollapsed') === 'true'
   );
@@ -451,9 +463,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         setEditorHelp(typeof newItem.help === "string" ? JSON.parse(newItem.help || "[]") : (newItem.help || []));
         setUpstreamLangs(Array.isArray(newItem.upstreamLangs) ? newItem.upstreamLangs : []);
         loadItemSource(newItem.id, newItem.taskId);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(`graffiticode:selected:itemId`, newItem.id);
-        }
+        broadcastSelection('itemId', newItem.id, normalizeLangId((newItem as any).lang ?? lang));
       }
     } catch (error) {
       console.error("Failed to create item:", error);
@@ -544,9 +554,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
           setUpstreamLangs(Array.isArray(nextItem.upstreamLangs) ? nextItem.upstreamLangs : []);
           loadItemSource(nextItem.id, nextItem.taskId);
           // Persist so SWR refetch doesn't override
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(`graffiticode:selected:itemId`, nextItem.id);
-          }
+          broadcastSelection('itemId', nextItem.id, normalizeLangId((nextItem as any).lang ?? lang));
         } else {
           setSelectedItemId("");
           setTaskId("");
@@ -571,9 +579,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
       setUpstreamLangs(Array.isArray(item.upstreamLangs) ? item.upstreamLangs : []);
       loadItemSource(item.id, item.taskId);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`graffiticode:selected:itemId`, item.id);
-      }
+      broadcastSelection('itemId', item.id, normalizeLangId((item as any).lang ?? lang));
       if (router.pathname === '/items' || router.pathname === '/items/') {
         // From index → first selection promotes URL to detail; preserve back to /items.
         router.push(`/items/${item.id}`, undefined, { shallow: true });
