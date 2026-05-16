@@ -11,15 +11,18 @@ interface AddEmailDialogProps {
 }
 
 type Step = 'email' | 'code' | 'conflict';
+type ConflictReason = 'self' | 'other';
 
 export default function AddEmailDialog({ isOpen, onClose, onAdded }: AddEmailDialogProps) {
   const verify = useVerifyEmail();
-  const { addEmail } = useLinkedEmails();
+  const { checkEmail, addEmail } = useLinkedEmails();
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [adding, setAdding] = useState(false);
-  const [conflictUid, setConflictUid] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [conflictReason, setConflictReason] = useState<ConflictReason | null>(null);
+  const [conflictEmail, setConflictEmail] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,7 +32,9 @@ export default function AddEmailDialog({ isOpen, onClose, onAdded }: AddEmailDia
       setEmail('');
       setCode('');
       setAdding(false);
-      setConflictUid(null);
+      setChecking(false);
+      setConflictReason(null);
+      setConflictEmail(null);
       setErrorMsg(null);
     }
   }, [isOpen, verify]);
@@ -39,11 +44,21 @@ export default function AddEmailDialog({ isOpen, onClose, onAdded }: AddEmailDia
     const trimmed = email.trim();
     if (!trimmed) return;
     setErrorMsg(null);
+    setChecking(true);
     try {
+      const check = await checkEmail(trimmed);
+      if (check.available === false) {
+        setConflictEmail(trimmed);
+        setConflictReason(check.ownedBy);
+        setStep('conflict');
+        return;
+      }
       await verify.sendCode(trimmed);
       setStep('code');
-    } catch {
-      // emailError surfaces via prop
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to send code');
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -61,8 +76,9 @@ export default function AddEmailDialog({ isOpen, onClose, onAdded }: AddEmailDia
         onAdded(result.email || verify.pendingEmail || email);
         return;
       }
-      if (result.conflictUid) {
-        setConflictUid(result.conflictUid);
+      if (result.conflict) {
+        setConflictEmail(verify.pendingEmail || email);
+        setConflictReason(result.conflict);
         setStep('conflict');
       } else {
         setErrorMsg(result.error || 'Failed to add email');
@@ -127,9 +143,9 @@ export default function AddEmailDialog({ isOpen, onClose, onAdded }: AddEmailDia
                         Enter the email you want to add. We&apos;ll send a 6-digit code
                         to verify ownership.
                       </p>
-                      {verify.emailError && (
+                      {(verify.emailError || errorMsg) && (
                         <div className="rounded-none bg-red-50 p-3 text-sm text-red-700">
-                          {verify.emailError}
+                          {verify.emailError || errorMsg}
                         </div>
                       )}
                       <input
@@ -139,18 +155,18 @@ export default function AddEmailDialog({ isOpen, onClose, onAdded }: AddEmailDia
                         placeholder="email@example.com"
                         required
                         autoFocus
-                        disabled={verify.sending}
+                        disabled={verify.sending || checking}
                         className="w-full rounded-none border border-gray-300 px-4 py-3 text-sm focus:border-gray-500 focus:outline-none focus:ring-0 disabled:opacity-50"
                       />
                       <button
                         type="submit"
-                        disabled={verify.sending || !email.trim()}
+                        disabled={verify.sending || checking || !email.trim()}
                         className="w-full flex items-center justify-center gap-3 rounded-none border border-gray-300 bg-white px-4 py-3 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        {verify.sending ? (
+                        {verify.sending || checking ? (
                           <>
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-700"></div>
-                            <span>Sending...</span>
+                            <span>{checking ? 'Checking…' : 'Sending…'}</span>
                           </>
                         ) : (
                           <span>Send code</span>
@@ -212,17 +228,24 @@ export default function AddEmailDialog({ isOpen, onClose, onAdded }: AddEmailDia
 
                   {step === 'conflict' && (
                     <div className="space-y-3 text-sm text-gray-600">
-                      <p>
-                        <span className="font-medium">{verify.pendingEmail}</span> is
-                        already linked to another account:
-                      </p>
-                      <p className="rounded-none bg-gray-50 px-3 py-2 font-mono text-xs break-all text-gray-800">
-                        {conflictUid}
-                      </p>
-                      <p>
-                        Only one account can use a given email. To move it here, remove
-                        it from the other account first.
-                      </p>
+                      {conflictReason === 'self' ? (
+                        <p>
+                          <span className="font-medium">{conflictEmail}</span> is already
+                          linked to this account. No need to add it again.
+                        </p>
+                      ) : (
+                        <>
+                          <p>
+                            <span className="font-medium">{conflictEmail}</span> is already
+                            in use on another Graffiticode account.
+                          </p>
+                          <p>
+                            Only one account can use a given email. Sign in to the other
+                            account to remove it first, or contact support if you can&apos;t
+                            access it.
+                          </p>
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={handleClose}

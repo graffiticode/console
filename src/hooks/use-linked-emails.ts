@@ -14,8 +14,12 @@ export interface AddEmailResult {
   success: boolean;
   email?: string;
   error?: string;
-  conflictUid?: string;
+  conflict?: 'self' | 'other';
 }
+
+export type EmailCheck =
+  | { available: true }
+  | { available: false; ownedBy: 'self' | 'other' };
 
 export function useLinkedEmails() {
   const { user } = useGraffiticodeAuth();
@@ -32,6 +36,28 @@ export function useLinkedEmails() {
     }
     const body = await res.json();
     return body.data?.emails || [];
+  }, [user]);
+
+  // Pre-OTP availability check. Returns { available: true } if the email is
+  // unused, or { available: false, ownedBy } so the caller can show the right
+  // message without burning a Privy OTP first.
+  const checkEmail = useCallback(async (email: string): Promise<EmailCheck> => {
+    if (!user) throw new Error('Must be logged in');
+    const token = await user.getToken();
+    const res = await fetch('/api/linked-emails/check', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: token,
+      },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error?.message || 'Failed to check email');
+    }
+    const body = await res.json();
+    return body.data as EmailCheck;
   }, [user]);
 
   // Add an email after the caller has verified ownership via a Privy OTP. The
@@ -51,10 +77,12 @@ export function useLinkedEmails() {
     });
     const body = await res.json().catch(() => ({}));
     if (res.status === 409) {
+      // Race: pre-check passed but another writer linked the email before we
+      // got here. We don't know which account; treat as generic conflict.
       return {
         success: false,
         error: body?.error?.message || 'Email already linked to another account',
-        conflictUid: body?.error?.details?.conflictUid,
+        conflict: 'other',
       };
     }
     if (!res.ok) {
@@ -76,7 +104,7 @@ export function useLinkedEmails() {
     }
   }, [user]);
 
-  return { listEmails, addEmail, removeEmail };
+  return { listEmails, checkEmail, addEmail, removeEmail };
 }
 
 export default useLinkedEmails;

@@ -77,10 +77,13 @@ const handler = async (req, res) => {
   const upstreamBody = await upstream.json().catch(() => ({}));
 
   if (upstream.status === 409) {
+    // Strip details.conflictUid — owning-account uid isn't actionable in the
+    // UI and we don't want to leak it. The pre-check at /linked-emails/check
+    // is what guides the user pre-OTP; this branch only fires on the rare
+    // race where someone else linked the email between check and add.
     return res.status(409).json({
       error: {
         message: upstreamBody?.error?.message || 'Email already linked to another account',
-        details: upstreamBody?.error?.details || {},
       },
     });
   }
