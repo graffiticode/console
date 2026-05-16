@@ -54,8 +54,8 @@ export default function AddEmailDialog({ isOpen, onClose, onAdded }: AddEmailDia
     setErrorMsg(null);
     setAdding(true);
     try {
-      const idToken = await verify.verifyCode(trimmed);
-      const result = await addEmail(idToken);
+      const accessToken = await verify.verifyCode(trimmed);
+      const result = await addEmail(accessToken);
       if (result.success) {
         await verify.cleanup();
         onAdded(result.email || verify.pendingEmail || email);

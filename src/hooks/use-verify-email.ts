@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   useLoginWithEmail,
   usePrivy,
-  useIdentityToken,
   type User as PrivyUser,
 } from '@privy-io/react-auth';
 
@@ -11,8 +10,6 @@ import {
 // hooks don't share state when a signed-in user adds another email.
 
 const LOGIN_TIMEOUT_MS = 30_000;
-const TOKEN_TIMEOUT_MS = 20_000;
-const POLL_MS = 150;
 
 type LoginWaiter = {
   resolve: (user: PrivyUser) => void;
@@ -20,12 +17,7 @@ type LoginWaiter = {
 };
 
 export function useVerifyEmail() {
-  const { logout } = usePrivy();
-  const { identityToken } = useIdentityToken();
-  const identityTokenRef = useRef(identityToken);
-  useEffect(() => {
-    identityTokenRef.current = identityToken;
-  }, [identityToken]);
+  const { logout, getAccessToken } = usePrivy();
 
   const loginWaiterRef = useRef<LoginWaiter | null>(null);
   const { sendCode: privySendCode, loginWithCode: privyLoginWithCode } = useLoginWithEmail({
@@ -80,17 +72,11 @@ export function useVerifyEmail() {
     });
   }, []);
 
-  const waitForToken = useCallback(async (): Promise<string | null> => {
-    const start = Date.now();
-    while (Date.now() - start < TOKEN_TIMEOUT_MS) {
-      if (identityTokenRef.current) return identityTokenRef.current;
-      await new Promise((r) => setTimeout(r, POLL_MS));
-    }
-    return identityTokenRef.current;
-  }, []);
-
-  // Returns the Privy identity token after the OTP verifies. Caller passes
+  // Returns the Privy access token after the OTP verifies. Caller passes
   // this to the server, which re-verifies the token and extracts the email.
+  // We use the access token rather than the identity token because the
+  // identity token doesn't reliably populate after loginWithCode for newly
+  // added emails (see commit c0fcb2d for the parallel fix in use-email-signin).
   const verifyCode = useCallback(async (code: string): Promise<string> => {
     setVerifying(true);
     setCodeError(null);
@@ -98,9 +84,9 @@ export function useVerifyEmail() {
       const complete = armWaiter();
       await privyLoginWithCode({ code });
       await complete;
-      const token = await waitForToken();
+      const token = await getAccessToken();
       if (!token) {
-        throw new Error('Privy identity token unavailable.');
+        throw new Error('Privy access token unavailable.');
       }
       return token;
     } catch (err: any) {
@@ -110,7 +96,7 @@ export function useVerifyEmail() {
     } finally {
       setVerifying(false);
     }
-  }, [armWaiter, privyLoginWithCode, waitForToken]);
+  }, [armWaiter, privyLoginWithCode, getAccessToken]);
 
   const cleanup = useCallback(async () => {
     try {

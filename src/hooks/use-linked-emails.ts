@@ -35,10 +35,10 @@ export function useLinkedEmails() {
   }, [user]);
 
   // Add an email after the caller has verified ownership via a Privy OTP. The
-  // browser hands the resulting Privy identity token to the console, which
+  // browser hands the resulting Privy access token to the console, which
   // verifies it server-side, extracts the email, and writes a linked_emails
   // row for the current uid.
-  const addEmail = useCallback(async (privyIdentityToken: string): Promise<AddEmailResult> => {
+  const addEmail = useCallback(async (privyAccessToken: string): Promise<AddEmailResult> => {
     if (!user) throw new Error('Must be logged in');
     const token = await user.getToken();
     const res = await fetch('/api/linked-emails/add', {
@@ -47,7 +47,7 @@ export function useLinkedEmails() {
         'Content-Type': 'application/json',
         Authorization: token,
       },
-      body: JSON.stringify({ privyIdentityToken }),
+      body: JSON.stringify({ privyAccessToken }),
     });
     const body = await res.json().catch(() => ({}));
     if (res.status === 409) {

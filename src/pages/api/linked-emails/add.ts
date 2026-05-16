@@ -42,14 +42,16 @@ const handler = async (req, res) => {
     return res.status(401).json({ error: { message: 'Invalid auth token' } });
   }
 
-  const { privyIdentityToken } = req.body || {};
-  if (typeof privyIdentityToken !== 'string' || !privyIdentityToken) {
-    return res.status(400).json({ error: { message: 'privyIdentityToken required' } });
+  const { privyAccessToken } = req.body || {};
+  if (typeof privyAccessToken !== 'string' || !privyAccessToken) {
+    return res.status(400).json({ error: { message: 'privyAccessToken required' } });
   }
 
   let email: string | null = null;
   try {
-    const privyUser = await getPrivyClient().getUser({ idToken: privyIdentityToken });
+    const privy = getPrivyClient();
+    const claims = await privy.verifyAuthToken(privyAccessToken);
+    const privyUser = await privy.getUser(claims.userId);
     email = extractEmail(privyUser);
   } catch (err: any) {
     return res.status(400).json({
