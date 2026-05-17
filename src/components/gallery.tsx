@@ -332,16 +332,20 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
 
   // Sync the language selector to the deep-linked item's lang. Runs in both
   // modes (popup editor + in-app /items/[id]) so the surrounding chrome (form,
-  // compile, items-list filter) matches the loaded item.
+  // compile, items-list filter) matches the loaded item. Gated by item id so a
+  // later manual change to the nav picker isn't snapped back by this effect.
+  const lastSyncedItemIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!directItem || !initialItemId) return;
     if (!setLanguage) return;
+    if (lastSyncedItemIdRef.current === initialItemId) return;
     const targetLang = normalizeLangId((directItem as any).lang);
+    if (!targetLang) return;
+    lastSyncedItemIdRef.current = initialItemId;
     const currentLang = normalizeLangId(lang);
-    if (targetLang && targetLang !== currentLang) {
-      const next = findLanguageByNumber(targetLang);
-      if (next) setLanguage(next);
-    }
+    if (targetLang === currentLang) return;
+    const next = findLanguageByNumber(targetLang);
+    if (next) setLanguage(next);
   }, [directItem, initialItemId, setLanguage, lang]);
 
   // Recompute ordered/filtered items whenever loadedItems, sort, or dateFilter change.
