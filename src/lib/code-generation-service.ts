@@ -1747,33 +1747,35 @@ export async function generateCode({
         const usageDocRef = db.collection('usage').doc(auth.uid);
         const usageDoc = await usageDocRef.get();
 
+        // Reset on billing-period rollover (not calendar month). lastReset is
+        // pinned to the period start so subsequent compiles in the same period
+        // take the increment branch.
+        const periodStart = subscription.currentPeriodStart
+          ? new Date(subscription.currentPeriodStart)
+          : new Date(now.getFullYear(), now.getMonth(), 1);
         if (usageDoc.exists) {
           const currentData = usageDoc.data();
-          // Check if we need to reset monthly usage (new month)
           const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
-          const isNewMonth = !lastReset ||
-            lastReset.getMonth() !== now.getMonth() ||
-            lastReset.getFullYear() !== now.getFullYear();
+          const isNewBillingPeriod = !lastReset || lastReset < periodStart;
 
-          if (isNewMonth) {
-            // Reset for new month
+          if (isNewBillingPeriod) {
             await usageDocRef.set({
               currentMonthTotal: compileUnits,
-              lastReset: now.toISOString(),
+              lastReset: periodStart.toISOString(),
               lastUpdated: now.toISOString()
             });
           } else {
-            // Increment existing month total
+            // Atomic increment — Firestore applies the delta server-side so
+            // concurrent compiles can't lose updates via read-then-write.
             await usageDocRef.update({
-              currentMonthTotal: (currentData.currentMonthTotal || 0) + compileUnits,
+              currentMonthTotal: admin.firestore.FieldValue.increment(compileUnits),
               lastUpdated: now.toISOString()
             });
           }
         } else {
-          // Create new usage document
           await usageDocRef.set({
             currentMonthTotal: compileUnits,
-            lastReset: now.toISOString(),
+            lastReset: periodStart.toISOString(),
             lastUpdated: now.toISOString()
           });
         }

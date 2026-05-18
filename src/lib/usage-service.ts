@@ -56,10 +56,9 @@ export async function checkCompileAllowed(uid: string): Promise<CompileAllowedRe
       usageRecords.docs.forEach(doc => {
         calculatedTotal += doc.data().units || 0;
       });
-      if (calculatedTotal > currentUsage) {
-        console.log(`checkCompileAllowed: using calculated total (${calculatedTotal}) instead of stored (${currentUsage})`);
+      if (calculatedTotal !== currentUsage) {
+        console.log(`checkCompileAllowed: syncing stored (${currentUsage}) → calculated (${calculatedTotal})`);
         currentUsage = calculatedTotal;
-        // Fix the stored total
         await db.collection('usage').doc(uid).update({ currentMonthTotal: calculatedTotal });
       }
     } catch (err) {
