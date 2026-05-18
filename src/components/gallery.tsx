@@ -468,6 +468,14 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         setUpstreamLangs(Array.isArray(newItem.upstreamLangs) ? newItem.upstreamLangs : []);
         loadItemSource(newItem.id, newItem.taskId);
         broadcastSelection('itemId', newItem.id, normalizeLangId((newItem as any).lang ?? lang));
+        // Mirror handleSelectItem URL handling so initialItemId follows the
+        // new item; otherwise the selection-resolution effect snaps back to
+        // the previously deep-linked item.
+        if (router.pathname === '/items' || router.pathname === '/items/') {
+          router.push(`/items/${newItem.id}`, undefined, { shallow: true });
+        } else if (isItemDetailRoute && router.query.id !== newItem.id) {
+          router.replace(`/items/${newItem.id}`, undefined, { shallow: true });
+        }
       }
     } catch (error) {
       console.error("Failed to create item:", error);
