@@ -477,7 +477,10 @@ export async function generateCode({
     if (itemId) systemValues.itemId = itemId;
     const parseResult = await parseCode({ lang: headLang, src, systemValues });
     if (parseResult.errors) {
-      return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: parseResult.errors, upstreamLangs: [] };
+      // Preserve the generated source alongside the parse errors so the
+      // editor can render it with inline compile-error decorations, matching
+      // the user-typed flow.
+      return { src, taskId: null, language, description, changeSummary, model, usage, errors: parseResult.errors, upstreamLangs: [] };
     }
     let code = JSON.parse(parseResult.code);
 

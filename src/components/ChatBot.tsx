@@ -96,8 +96,23 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       conversationSummary
     });
 
-    // Transform the response to match our expected format
-    // If there are errors, return as error type to preserve current code
+    // Code + errors: head code was generated but didn't parse. Route into the
+    // editor so the user sees the failing source with inline compile-error
+    // decorations, same as if they had typed it themselves.
+    if (result.src && result.errors && result.errors.length > 0) {
+      return {
+        text: result.src,
+        type: 'code',
+        errors: result.errors,
+        language: result.language || 'graffiticode',
+        model: result.model,
+        usage: result.usage,
+        taskId: null,
+        upstreamLangs: [],
+        timestamp: new Date().toISOString()
+      };
+    }
+    // Errors only (no src): out-of-scope, usage cap, upstream failure, etc.
     if (result.errors && result.errors.length > 0) {
       return {
         text: result.errors.map(e => e.message).join('\n'),
