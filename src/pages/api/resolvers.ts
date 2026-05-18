@@ -1,3 +1,4 @@
+import admin from "firebase-admin";
 import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
@@ -167,51 +168,52 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
         wasOverLimit: wasOverLimit
       });
 
-      // Update monthly usage total
-      const usageDocRef = db.collection('usage').doc(auth.uid);
-      const usageDoc = await usageDocRef.get();
-
-      let newTotal = units;
-      if (usageDoc.exists) {
-        const currentData = usageDoc.data();
-        // Check if we need to reset monthly usage (new month)
-        const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
-        const isNewMonth = !lastReset ||
-          lastReset.getMonth() !== now.getMonth() ||
-          lastReset.getFullYear() !== now.getFullYear();
-
-        if (isNewMonth) {
-          // Reset for new month
-          await usageDocRef.set({
-            currentMonthTotal: units,
-            lastReset: now.toISOString(),
-            lastUpdated: now.toISOString()
-          });
-          newTotal = units;
-        } else {
-          // Increment existing month total
-          newTotal = (currentData.currentMonthTotal || 0) + units;
-          await usageDocRef.update({
-            currentMonthTotal: newTotal,
-            lastUpdated: now.toISOString()
-          });
-        }
-      } else {
-        // Create new usage document
-        await usageDocRef.set({
-          currentMonthTotal: units,
-          lastReset: now.toISOString(),
-          lastUpdated: now.toISOString()
-        });
-        newTotal = units;
-      }
-
-      // Calculate if now over limit (after adding these new units)
+      // Read subscription once for periodStart (reset boundary) and the
+      // post-increment usageLimitReached check.
       const userDoc = await db.collection('users').doc(auth.uid).get();
       const userData = userDoc.exists ? userDoc.data() : {};
       const subscription = userData?.subscription || {};
       const plan = subscription.plan || 'demo';
       const overageUnits = subscription.overageUnits || 0;
+
+      // Update monthly usage total
+      const usageDocRef = db.collection('usage').doc(auth.uid);
+      const usageDoc = await usageDocRef.get();
+
+      const periodStart = subscription.currentPeriodStart
+        ? new Date(subscription.currentPeriodStart)
+        : new Date(now.getFullYear(), now.getMonth(), 1);
+      let newTotal = units;
+      if (usageDoc.exists) {
+        const currentData = usageDoc.data();
+        const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
+        const isNewBillingPeriod = !lastReset || lastReset < periodStart;
+
+        if (isNewBillingPeriod) {
+          await usageDocRef.set({
+            currentMonthTotal: units,
+            lastReset: periodStart.toISOString(),
+            lastUpdated: now.toISOString()
+          });
+          newTotal = units;
+        } else {
+          // Atomic increment — concurrent compiles can't lose updates via
+          // read-then-write.
+          await usageDocRef.update({
+            currentMonthTotal: admin.firestore.FieldValue.increment(units),
+            lastUpdated: now.toISOString()
+          });
+          newTotal = (currentData.currentMonthTotal || 0) + units;
+        }
+      } else {
+        await usageDocRef.set({
+          currentMonthTotal: units,
+          lastReset: periodStart.toISOString(),
+          lastUpdated: now.toISOString()
+        });
+        newTotal = units;
+      }
+
 
       const planAllocations = {
         demo: 250,

@@ -200,9 +200,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         });
 
-        // Use the calculated total from actual records if it's higher than stored total
-        // This handles cases where the stored total might be out of sync
-        if (calculatedTotal > totalUsage) {
+        // Records are the source of truth; sync both ways so an inflated
+        // stored total doesn't mask the real number on the Settings page.
+        if (calculatedTotal !== totalUsage) {
           console.log(`Using calculated total (${calculatedTotal}) instead of stored total (${totalUsage})`);
           totalUsage = calculatedTotal;
         }
