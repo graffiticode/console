@@ -1,6 +1,6 @@
 # Graffiticode Training Examples
 
-*Downloaded on 2026-05-18T23:21:17.695Z*
+*Downloaded on 2026-05-19T00:04:41.774Z*
 
 ## Language L0173
 
@@ -328,6 +328,48 @@ pie title "Revenue mix"
 ### Example 10
 
 #### Prompt
+"Two bar series side-by-side: 2024 vs 2025 revenue by quarter."
+
+#### Chat Transcript
+
+**User**: Two bar series side-by-side: 2024 vs 2025 revenue by quarter.
+
+#### Code
+
+```
+chart title "2024 vs 2025 Revenue by Quarter"
+  x-axis type category
+    categories [
+      "Q1"
+      "Q2"
+      "Q3"
+      "Q4"
+    ] {}
+  y-axis type value
+    name "Revenue (USD)" {}
+  series [
+    bar name "2024"
+      data [
+        320
+        450
+        380
+        510
+      ] color "blue-500" {}
+    bar name "2025"
+      data [
+        370
+        490
+        420
+        560
+      ] color "emerald-500" {}
+  ] {}..
+```
+
+---
+
+### Example 11
+
+#### Prompt
 "Compare two bar series side-by-side: Revenue [320, 450, 380, 510] and Costs [200, 280, 240, 320] over Q1–Q4. Use chart wrapper with series list."
 
 #### Chat Transcript
@@ -366,7 +408,7 @@ chart title "Revenue vs Costs"
 
 ---
 
-### Example 11
+### Example 12
 
 #### Prompt
 "Rose chart (rose-type radius) showing monthly precipitation across 12 months."
@@ -434,7 +476,7 @@ pie title "Monthly Precipitation"
 
 ---
 
-### Example 12
+### Example 13
 
 #### Prompt
 "Smooth line chart of monthly revenue (in thousands) Jan–Jun: 320, 410, 380, 510, 470, 590. Title "Revenue"."
@@ -471,7 +513,211 @@ line name "Revenue"
 
 ---
 
-### Example 13
+### Example 14
+
+#### Prompt
+"Dual-axis chart: bars for Sales (USD) on left axis, line for Growth% on right axis."
+
+#### Chat Transcript
+
+**User**: Dual-axis chart: bars for Sales (USD) on left axis, line for Growth% on right axis.
+
+#### Code
+
+```
+chart title "Weekly performance"
+  x-axis type category
+    categories [
+      "Mon"
+      "Tue"
+      "Wed"
+      "Thu"
+      "Fri"
+      "Sat"
+      "Sun"
+    ] {}
+  y-axis type value
+    name "Sales (USD)" {}
+  y-axis-right type value
+    name "Growth %" {}
+  series [
+    bar name "Sales"
+      data [
+        120
+        200
+        150
+        80
+        70
+        110
+        130
+      ] color "blue-500" {}
+    line name "Growth %"
+      data [
+        5
+        12
+        8
+        -3
+        -2
+        7
+        10
+      ] color "emerald-500"
+      axis right
+      smooth true {}
+  ] {}..
+```
+
+---
+
+### Example 15
+
+#### Prompt
+"Stacked bar chart with three series: Free, Pro, Enterprise sign-ups by week."
+
+#### Chat Transcript
+
+**User**: Stacked bar chart with three series: Free, Pro, Enterprise sign-ups by week.
+
+#### Code
+
+```
+chart title "Weekly Sign-ups by Plan"
+  x-axis type category
+    categories [
+      "Week 1"
+      "Week 2"
+      "Week 3"
+      "Week 4"
+      "Week 5"
+      "Week 6"
+      "Week 7"
+      "Week 8"
+    ] {}
+  y-axis type value
+    name "Sign-ups" {}
+  series [
+    bar name "Free"
+      stack "total"
+      data [
+        320
+        410
+        390
+        450
+        480
+        520
+        500
+        560
+      ] color "sky-400" {}
+    bar name "Pro"
+      stack "total"
+      data [
+        80
+        95
+        110
+        130
+        120
+        145
+        160
+        175
+      ] color "blue-600" {}
+    bar name "Enterprise"
+      stack "total"
+      data [
+        12
+        15
+        18
+        20
+        22
+        25
+        28
+        30
+      ] color "indigo-700" {}
+  ] {}..
+```
+
+---
+
+### Example 16
+
+#### Prompt
+"Multi-series line chart with three lines: Actual, Budget, Forecast over months Jan–Dec."
+
+#### Chat Transcript
+
+**User**: Multi-series line chart with three lines: Actual, Budget, Forecast over months Jan–Dec.
+
+#### Code
+
+```
+chart title "Actual vs Budget vs Forecast"
+  x-axis type category
+    categories [
+      "Jan"
+      "Feb"
+      "Mar"
+      "Apr"
+      "May"
+      "Jun"
+      "Jul"
+      "Aug"
+      "Sep"
+      "Oct"
+      "Nov"
+      "Dec"
+    ] {}
+  y-axis type value {}
+  series [
+    line name "Actual"
+      data [
+        210
+        230
+        220
+        250
+        270
+        260
+        280
+        290
+        275
+        300
+        310
+        320
+      ] color "blue-500" {}
+    line name "Budget"
+      data [
+        200
+        220
+        240
+        260
+        260
+        270
+        280
+        285
+        290
+        295
+        305
+        315
+      ] color "emerald-500" {}
+    line name "Forecast"
+      data [
+        210
+        230
+        220
+        250
+        270
+        265
+        275
+        288
+        280
+        305
+        312
+        325
+      ] color "amber-500"
+      smooth true {}
+  ] {}..
+```
+
+---
+
+### Example 17
 
 #### Prompt
 "Bar + line combo where the line is bound to a right-side y-axis (different scale)."
@@ -526,7 +772,7 @@ chart title "Weekly performance"
 
 ---
 
-### Example 14
+### Example 18
 
 #### Prompt
 "Line chart of stock-style closing prices [120.5, 122.3, 121.8, 124.1, 125.0] for five days. Tooltip enabled."
@@ -561,7 +807,7 @@ line title "Closing Prices"
 
 ---
 
-### Example 15
+### Example 19
 
 #### Prompt
 "Donut with inner-radius "70%" showing portfolio allocation in dark theme."
@@ -606,7 +852,7 @@ pie title "Portfolio Allocation"
 
 ---
 
-### Example 16
+### Example 20
 
 #### Prompt
 "Line chart with axis labels: x-axis name "Day", y-axis name "Visitors", categories Mon–Sun."
@@ -648,7 +894,7 @@ chart title "Weekly performance"
 
 ---
 
-### Example 17
+### Example 21
 
 #### Prompt
 "Donut chart showing operating system share: Windows 45, macOS 30, Linux 15, Other 10."
@@ -685,7 +931,7 @@ pie title "Operating System Market Share"
 
 ---
 
-### Example 18
+### Example 22
 
 #### Prompt
 "Rose chart with rose-type area for budget allocation by department."
@@ -729,7 +975,7 @@ pie title "Budget Allocation by Department"
 
 ---
 
-### Example 19
+### Example 23
 
 #### Prompt
 "Combo chart with bars for Revenue and a line for Forecast on the same axes over Q1–Q4."
@@ -772,7 +1018,7 @@ chart title "Revenue vs Forecast"
 
 ---
 
-### Example 20
+### Example 24
 
 #### Prompt
 "Pie chart with legend on the right side, showing browser share."
@@ -812,7 +1058,7 @@ pie title "Browser Market Share"
 
 ---
 
-### Example 21
+### Example 25
 
 #### Prompt
 "Line chart with legend at the top: Revenue series [320, 450, 380, 510], color sky-500."
@@ -853,7 +1099,7 @@ chart title "Weekly performance"
 
 ---
 
-### Example 22
+### Example 26
 
 #### Prompt
 "Donut with inner-radius "55%" and outer radius "85%" for survey results."
@@ -894,7 +1140,68 @@ pie title "Survey Results"
 
 ---
 
-### Example 23
+### Example 27
+
+#### Prompt
+"Chart wrapper with title, subtitle, and series list of two bars and one line."
+
+#### Chat Transcript
+
+**User**: Chart wrapper with title, subtitle, and series list of two bars and one line.
+
+#### Code
+
+```
+chart title "Weekly performance"
+  x-axis type category
+    categories [
+      "Mon"
+      "Tue"
+      "Wed"
+      "Thu"
+      "Fri"
+      "Sat"
+      "Sun"
+    ] {}
+  y-axis type value
+    name "USD (thousands)" {}
+  series [
+    bar name "Revenue"
+      data [
+        120
+        200
+        150
+        80
+        70
+        110
+        130
+      ] color "blue-500" {}
+    bar name "Expenses"
+      data [
+        80
+        140
+        100
+        60
+        50
+        90
+        95
+      ] color "rose-400" {}
+    line name "Profit"
+      data [
+        40
+        60
+        50
+        20
+        20
+        20
+        35
+      ] color "emerald-500" {}
+  ] {}..
+```
+
+---
+
+### Example 28
 
 #### Prompt
 "Create a horizontal-feeling bar chart of top five products by units sold: A 540, B 410, C 380, D 290, E 220. Use color emerald-500."
@@ -927,7 +1234,51 @@ bar name "Top 5 Products by Units Sold"
 
 ---
 
-### Example 24
+### Example 29
+
+#### Prompt
+"Combo chart titled "Q4 Performance" with dual y-axis named "USD" and "% growth", legend at the top."
+
+#### Chat Transcript
+
+**User**: Combo chart titled "Q4 Performance" with dual y-axis named "USD" and "% growth", legend at the top.
+
+#### Code
+
+```
+chart title "Q4 Performance"
+  legend top
+  x-axis type category
+    categories [
+      "Oct"
+      "Nov"
+      "Dec"
+    ] {}
+  y-axis type value
+    name "USD" {}
+  y-axis-right type value
+    name "% growth" {}
+  series [
+    bar name "Revenue"
+      data [
+        320
+        450
+        510
+      ] color "blue-500" {}
+    line name "Growth"
+      axis right
+      data [
+        12
+        18
+        24
+      ] color "emerald-500"
+      smooth true {}
+  ] {}..
+```
+
+---
+
+### Example 30
 
 #### Prompt
 "Multi-series line: cost vs price over months Jan–Jun. Cost [200, 210, 220, 230, 240, 250], Price [320, 330, 325, 340, 360, 380]."
@@ -975,7 +1326,7 @@ chart title "Cost vs Price (Jan–Jun)"
 
 ---
 
-### Example 25
+### Example 31
 
 #### Prompt
 "Nightingale rose chart (rose-type radius) for weekday visits: Mon 120, Tue 200, Wed 150, Thu 80, Fri 70, Sat 110, Sun 130."
@@ -1023,7 +1374,7 @@ pie title "Weekday Visits"
 
 ---
 
-### Example 26
+### Example 32
 
 #### Prompt
 "Create a bar chart where each bar's color is amber-500 and the legend is shown at the bottom."
@@ -1065,7 +1416,7 @@ chart title "Weekly performance"
 
 ---
 
-### Example 27
+### Example 33
 
 #### Prompt
 "Donut chart with caption-style label (use label-show true) for each slice."
@@ -1115,7 +1466,7 @@ pie title "Weekly Performance"
 
 ---
 
-### Example 28
+### Example 34
 
 #### Prompt
 "Bar chart with data labels visible above each bar: [10, 20, 30, 40], categories ["A","B","C","D"]."
@@ -1148,7 +1499,7 @@ bar title "Bar Chart"
 
 ---
 
-### Example 29
+### Example 35
 
 #### Prompt
 "Pie chart with start-angle 90 degrees so the largest slice begins at the top."
@@ -1196,7 +1547,62 @@ pie title "Weekly performance"
 
 ---
 
-### Example 30
+### Example 36
+
+#### Prompt
+"Bar + line dual-axis: Revenue bars on left in blue-500, Conversion line on right in amber-500, with legend top."
+
+#### Chat Transcript
+
+**User**: Bar + line dual-axis: Revenue bars on left in blue-500, Conversion line on right in amber-500, with legend top.
+
+#### Code
+
+```
+chart title "Weekly performance"
+  legend top
+  x-axis type category
+    categories [
+      "Mon"
+      "Tue"
+      "Wed"
+      "Thu"
+      "Fri"
+      "Sat"
+      "Sun"
+    ] {}
+  y-axis type value
+    name "USD (thousands)" {}
+  y-axis-right type value
+    name "Conversion (%)" {}
+  series [
+    bar name "Revenue"
+      data [
+        120
+        200
+        150
+        80
+        70
+        110
+        130
+      ] color "blue-500" {}
+    line name "Conversion"
+      data [
+        12
+        18
+        15
+        9
+        8
+        14
+        16
+      ] color "amber-500"
+      axis right {}
+  ] {}..
+```
+
+---
+
+### Example 37
 
 #### Prompt
 "Bar chart showing quarterly net new customers: Q1 120, Q2 165, Q3 140, Q4 210. Title "New Customers", color rose-500."
@@ -1227,7 +1633,7 @@ bar title "New Customers"
 
 ---
 
-### Example 31
+### Example 38
 
 #### Prompt
 "Make a bar chart of website visits per day for a week, smoothed style isn't applicable — use vertical bars in indigo-600."
@@ -1266,7 +1672,7 @@ bar name "Website Visits"
 
 ---
 
-### Example 32
+### Example 39
 
 #### Prompt
 "Two-series line chart: Predicted vs Actual sales over the year. Use color blue-500 for Predicted and amber-500 for Actual."
@@ -1332,7 +1738,7 @@ chart title "Sales: Predicted vs Actual"
 
 ---
 
-### Example 33
+### Example 40
 
 #### Prompt
 "Bar chart with dark theme: weekday active users [1200, 1340, 1500, 1450, 1700]."
@@ -1370,7 +1776,7 @@ chart title "Weekday Active Users"
 
 ---
 
-### Example 34
+### Example 41
 
 #### Prompt
 "Step line chart with step middle for usage tiers across weeks 1–8."
@@ -1438,7 +1844,7 @@ chart title "Usage Tiers by Week"
 
 ---
 
-### Example 35
+### Example 42
 
 #### Prompt
 "Create a line chart of daily visits for the past week: 1200, 1340, 1500, 1450, 1700, 1850, 1900."
@@ -1479,7 +1885,7 @@ chart title "Daily Visits"
 
 ---
 
-### Example 36
+### Example 43
 
 #### Prompt
 "Create a pie chart of market share: A 40, B 35, C 25."
@@ -1510,7 +1916,7 @@ pie title "Market Share"
 
 ---
 
-### Example 37
+### Example 44
 
 #### Prompt
 "Connect-nulls line chart for sparse data: [10, null, null, 25, 30, null, 50] across seven points. (Pass connect-nulls true once supported; for v1, fill the nulls in.)"
@@ -1551,7 +1957,7 @@ chart title "Sparse Data – Connect Nulls"
 
 ---
 
-### Example 38
+### Example 45
 
 #### Prompt
 "Line chart with diamond symbols at each data point, size 10. Data [50, 80, 65, 90, 110]."
@@ -1590,7 +1996,7 @@ chart title "Weekly performance"
 
 ---
 
-### Example 39
+### Example 46
 
 #### Prompt
 "Create a bar chart titled "Sales" with values [320, 450, 380, 510] for quarters Q1 through Q4, colored blue-500."
@@ -1621,7 +2027,7 @@ bar title "Sales"
 
 ---
 
-### Example 40
+### Example 47
 
 #### Prompt
 "Bar chart with category labels rotated 45 degrees: categories ["very long label one", "very long label two"], data [100, 200]. Use rotate 45 inside the x-axis chain."
@@ -1655,7 +2061,7 @@ chart title "Weekly performance"
 
 ---
 
-### Example 41
+### Example 48
 
 #### Prompt
 "Donut chart for vote distribution: Option A 42, Option B 31, Option C 27."
@@ -1693,7 +2099,7 @@ pie title "Vote Distribution"
 
 ---
 
-### Example 42
+### Example 49
 
 #### Prompt
 "Line chart with area-style under the curve, blue-500 color, for engagement rate Mon–Sun: 0.12, 0.18, 0.22, 0.20, 0.25, 0.28, 0.30."
@@ -1736,7 +2142,7 @@ chart title "Weekly Engagement Rate"
 
 ---
 
-### Example 43
+### Example 50
 
 #### Prompt
 "Smooth line in emerald-500 color showing recovery curve [10, 25, 40, 60, 78, 92] over six weeks. Title "Recovery"."
@@ -1772,7 +2178,7 @@ line title "Recovery"
 
 ---
 
-### Example 44
+### Example 51
 
 #### Prompt
 "Create a bar chart of weekly sign-ups: Mon 120, Tue 200, Wed 150, Thu 80, Fri 70, Sat 110, Sun 130."
@@ -1811,7 +2217,7 @@ bar name "Weekly Sign-ups"
 
 ---
 
-### Example 45
+### Example 52
 
 #### Prompt
 "Multi-series line chart with Revenue [320, 450, 380, 510] and Forecast [310, 460, 400, 500] over Q1–Q4. Forecast is amber-500 and smoothed."
@@ -1853,7 +2259,7 @@ chart title "Revenue vs Forecast"
 
 ---
 
-### Example 46
+### Example 53
 
 #### Prompt
 "Pie chart of customer segments: Enterprise 50, SMB 35, Individual 15. Each slice gets a distinct Tailwind color."
@@ -1890,7 +2296,60 @@ pie title "Customer Segments"
 
 ---
 
-### Example 47
+### Example 54
+
+#### Prompt
+"Line chart with smooth=true for Predicted and step start for Actual."
+
+#### Chat Transcript
+
+**User**: Line chart with smooth=true for Predicted and step start for Actual.
+
+#### Code
+
+```
+chart title "Weekly performance"
+  x-axis type category
+    categories [
+      "Mon"
+      "Tue"
+      "Wed"
+      "Thu"
+      "Fri"
+      "Sat"
+      "Sun"
+    ] {}
+  y-axis type value
+    name "USD (thousands)" {}
+  series [
+    line name "Predicted"
+      smooth true
+      data [
+        120
+        200
+        150
+        80
+        70
+        110
+        130
+      ] color "blue-500" {}
+    line name "Actual"
+      step start
+      data [
+        120
+        200
+        150
+        80
+        70
+        110
+        130
+      ] color "amber-500" {}
+  ] {}..
+```
+
+---
+
+### Example 55
 
 #### Prompt
 "Line chart titled "Visitors per Day" with symbol circle, no smoothing. Data [1000, 1200, 1100, 1300, 1500, 1700, 1600]."
@@ -1931,7 +2390,7 @@ line title "Visitors per Day"
 
 ---
 
-### Example 48
+### Example 56
 
 #### Prompt
 "Bar chart with the title "Active Users" and subtitle "by region": Americas 1200, EMEA 980, APAC 1450."
