@@ -101,6 +101,7 @@ function groupBucketsByWeek(buckets: DailyBucket[], avg: boolean): DailyBucket[]
       date: start === end ? start : `${start}…${end}`,
       projectedRevenue: 0, projectedCost: 0, estimatedCost: 0,
       units: 0, actualInputTokens: 0, actualOutputTokens: 0,
+      actualCachedInputTokens: 0, actualUncachedInputTokens: 0,
     };
     for (const b of chunk) {
       agg.projectedRevenue += b.projectedRevenue;
@@ -109,6 +110,8 @@ function groupBucketsByWeek(buckets: DailyBucket[], avg: boolean): DailyBucket[]
       agg.units += b.units;
       agg.actualInputTokens += b.actualInputTokens;
       agg.actualOutputTokens += b.actualOutputTokens;
+      agg.actualCachedInputTokens += b.actualCachedInputTokens;
+      agg.actualUncachedInputTokens += b.actualUncachedInputTokens;
     }
     if (avg) {
       agg.projectedRevenue /= n;
@@ -117,6 +120,8 @@ function groupBucketsByWeek(buckets: DailyBucket[], avg: boolean): DailyBucket[]
       agg.units /= n;
       agg.actualInputTokens = Math.round(agg.actualInputTokens / n);
       agg.actualOutputTokens = Math.round(agg.actualOutputTokens / n);
+      agg.actualCachedInputTokens = Math.round(agg.actualCachedInputTokens / n);
+      agg.actualUncachedInputTokens = Math.round(agg.actualUncachedInputTokens / n);
     }
     result.push(agg);
   }
@@ -183,6 +188,8 @@ interface DailyBucket {
   units: number;
   actualInputTokens: number;
   actualOutputTokens: number;
+  actualCachedInputTokens: number;
+  actualUncachedInputTokens: number;
 }
 
 // Plan price per unit (monthly price / monthly units)
@@ -274,6 +281,8 @@ function generateHtml(data: {
   actualUsageByModel: Record<string, { input: number; cached_input: number; output: number }>;
   totalActualInputTokens: number;
   totalActualOutputTokens: number;
+  totalActualCachedInputTokens: number;
+  totalActualUncachedInputTokens: number;
   hasActualUsage: boolean;
   totalAiUnits: number;
   totalCompileUnits: number;
@@ -333,6 +342,15 @@ function generateHtml(data: {
 
   const chartActualInput = JSON.stringify(data.dailyBuckets.map(b => b.actualInputTokens));
   const chartActualOutput = JSON.stringify(data.dailyBuckets.map(b => b.actualOutputTokens));
+  const chartCacheHitRatio = JSON.stringify(data.dailyBuckets.map(b => {
+    const denom = b.actualCachedInputTokens + b.actualUncachedInputTokens;
+    return denom > 0 ? +((b.actualCachedInputTokens / denom) * 100).toFixed(1) : null;
+  }));
+
+  const totalCacheDenom = data.totalActualCachedInputTokens + data.totalActualUncachedInputTokens;
+  const overallCacheHitPct = totalCacheDenom > 0
+    ? ((data.totalActualCachedInputTokens / totalCacheDenom) * 100).toFixed(1)
+    : null;
 
   const chartEstimatedCost = JSON.stringify(data.dailyBuckets.map(b => +b.estimatedCost.toFixed(2)));
   const hasEstimatedCost = data.totalEstimatedCost != null;
@@ -380,6 +398,7 @@ function generateHtml(data: {
   <div class="card"><div class="label">Cost</div><div class="value cost">${estimatedCostValue}</div><div class="sub">Tokens x pricing</div></div>
   <div class="card"><div class="label">Margin</div><div class="value ${margin >= 0 ? 'positive' : 'negative'}">$${margin.toFixed(2)}</div><div class="sub">${marginPct}%</div></div>
   <div class="card"><div class="label">Total Units</div><div class="value">${totalUnits.toLocaleString()}</div></div>
+  ${overallCacheHitPct != null ? `<div class="card"><div class="label">Cache Hit Ratio</div><div class="value">${overallCacheHitPct}%</div><div class="sub">Cached / total input tokens</div></div>` : ''}
 </div>
 
 <div class="chart-container">
@@ -464,6 +483,9 @@ ${data.hasActualUsage ? `
     <thead><tr><th>Metric</th><th>Projected</th>${data.hasActualUsage ? '<th>Actual</th>' : ''}</tr></thead>
     <tbody>
       <tr><td>Input tokens</td><td>${data.totalInputTokens.toLocaleString()}</td>${data.hasActualUsage ? `<td>${data.totalActualInputTokens.toLocaleString()}</td>` : ''}</tr>
+      ${data.hasActualUsage ? `<tr><td>&nbsp;&nbsp;Uncached</td><td></td><td>${data.totalActualUncachedInputTokens.toLocaleString()}</td></tr>
+      <tr><td>&nbsp;&nbsp;Cached</td><td></td><td>${data.totalActualCachedInputTokens.toLocaleString()}</td></tr>
+      <tr><td>&nbsp;&nbsp;Cache hit ratio</td><td></td><td>${overallCacheHitPct != null ? overallCacheHitPct + '%' : '—'}</td></tr>` : ''}
       <tr><td>Output tokens</td><td>${data.totalOutputTokens.toLocaleString()}</td>${data.hasActualUsage ? `<td>${data.totalActualOutputTokens.toLocaleString()}</td>` : ''}</tr>
       <tr><td>Total tokens</td><td>${(data.totalInputTokens + data.totalOutputTokens).toLocaleString()}</td>${data.hasActualUsage ? `<td>${(data.totalActualInputTokens + data.totalActualOutputTokens).toLocaleString()}</td>` : ''}</tr>
       <tr><td>AI generation units</td><td>${data.totalAiUnits.toLocaleString()}</td>${data.hasActualUsage ? '<td></td>' : ''}</tr>
@@ -481,6 +503,7 @@ const estimatedCostData = ${chartEstimatedCost};
 
 const actualInputData = ${chartActualInput};
 const actualOutputData = ${chartActualOutput};
+const cacheHitRatioData = ${chartCacheHitRatio};
 
 new Chart(document.getElementById('revenueChart'), {
   type: 'bar',
@@ -503,12 +526,12 @@ new Chart(document.getElementById('revenueChart'), {
 
 if (document.getElementById('tokenChart')) {
   new Chart(document.getElementById('tokenChart'), {
-    type: 'bar',
     data: {
       labels,
       datasets: [
-        { label: 'Input Tokens', data: actualInputData, backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 4 },
-        { label: 'Output Tokens', data: actualOutputData, backgroundColor: 'rgba(168,85,247,0.7)', borderRadius: 4 },
+        { type: 'bar', label: 'Input Tokens', data: actualInputData, backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 4, yAxisID: 'y', stack: 'tokens' },
+        { type: 'bar', label: 'Output Tokens', data: actualOutputData, backgroundColor: 'rgba(168,85,247,0.7)', borderRadius: 4, yAxisID: 'y', stack: 'tokens' },
+        { type: 'line', label: 'Cache Hit %', data: cacheHitRatioData, borderColor: 'rgba(234,88,12,1)', backgroundColor: 'rgba(234,88,12,0.2)', yAxisID: 'y1', tension: 0.2, spanGaps: true, pointRadius: 3 },
       ]
     },
     options: {
@@ -516,7 +539,8 @@ if (document.getElementById('tokenChart')) {
       plugins: { legend: { position: 'top' } },
       scales: {
         x: { stacked: true },
-        y: { stacked: true, beginAtZero: true, ticks: { callback: v => v.toLocaleString() } }
+        y: { stacked: true, beginAtZero: true, ticks: { callback: v => v.toLocaleString() } },
+        y1: { position: 'right', beginAtZero: true, max: 100, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } }
       }
     }
   });
@@ -608,11 +632,15 @@ async function main() {
   const actualUsageByModel: Record<string, { input: number; cached_input: number; output: number }> = {};
   let totalActualInputTokens = 0;
   let totalActualOutputTokens = 0;
+  let totalActualCachedInputTokens = 0;
+  let totalActualUncachedInputTokens = 0;
 
   for (const d of dailyData) {
     if (d.usage) {
       totalActualInputTokens += d.usage.uncached_input_tokens + d.usage.cached_input_tokens;
       totalActualOutputTokens += d.usage.output_tokens;
+      totalActualCachedInputTokens += d.usage.cached_input_tokens;
+      totalActualUncachedInputTokens += d.usage.uncached_input_tokens;
     }
     for (const [model, stats] of Object.entries(d.usageByModel)) {
       if (!actualUsageByModel[model]) actualUsageByModel[model] = { input: 0, cached_input: 0, output: 0 };
@@ -627,7 +655,7 @@ async function main() {
   }
 
   // Build daily buckets for charts
-  const emptyBucket = (date: string): DailyBucket => ({ date, projectedRevenue: 0, projectedCost: 0, estimatedCost: 0, units: 0, actualInputTokens: 0, actualOutputTokens: 0 });
+  const emptyBucket = (date: string): DailyBucket => ({ date, projectedRevenue: 0, projectedCost: 0, estimatedCost: 0, units: 0, actualInputTokens: 0, actualOutputTokens: 0, actualCachedInputTokens: 0, actualUncachedInputTokens: 0 });
   const dailyMap: Record<string, DailyBucket> = {};
   // Add all records (ai + compile) for projected revenue, excluding today
   for (const r of records) {
@@ -653,6 +681,8 @@ async function main() {
     if (d.usage) {
       dailyMap[d.date].actualInputTokens = d.usage.uncached_input_tokens + d.usage.cached_input_tokens;
       dailyMap[d.date].actualOutputTokens = d.usage.output_tokens;
+      dailyMap[d.date].actualCachedInputTokens = d.usage.cached_input_tokens;
+      dailyMap[d.date].actualUncachedInputTokens = d.usage.uncached_input_tokens;
     }
   }
   const dailyBuckets = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
@@ -667,7 +697,9 @@ async function main() {
     totalProjectedCost, totalEstimatedCost,
     totalInputTokens, totalOutputTokens, costByModel,
     actualCostByModel, actualUsageByModel,
-    totalActualInputTokens, totalActualOutputTokens, hasActualUsage,
+    totalActualInputTokens, totalActualOutputTokens,
+    totalActualCachedInputTokens, totalActualUncachedInputTokens,
+    hasActualUsage,
     totalAiUnits, totalCompileUnits, cappedRequests, unitsByPlan, totalProjectedRevenue,
     dailyBuckets: chartBuckets,
   });
