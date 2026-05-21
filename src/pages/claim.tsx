@@ -238,8 +238,12 @@ export default function Claim() {
   return (
     <>
       <Head><title>{getPageTitle('Claim')}</title></Head>
+      {/* Only one Headless UI Dialog may be open at a time: two open at the same
+          z-index make the underlying one fire onClose (which here navigates to
+          '/'). Closing the auth dialog when the wallet picker opens avoids that
+          and lets the wallet picker show. Mirrors SignIn.tsx's handleSelectEthereum. */}
       <AuthMethodDialog
-        isOpen={true}
+        isOpen={!showWalletDialog}
         onClose={() => router.push('/')}
         onSelectEthereum={handleSelectEthereum}
         onSubmitEmail={sendCode}
