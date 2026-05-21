@@ -350,6 +350,20 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
 
     // Try to restore the selected task ID from URL query or localStorage
     let taskIdFound = false;
+    // Keep nav/localStorage + URL in sync when the resolved task changes (e.g.
+    // after a language switch auto-opens a different task), like
+    // handleSelectTask does — but without promoting the /tasks index to detail.
+    const syncTaskSelection = (taskId) => {
+      if (typeof window !== 'undefined') {
+        const taskLang = String(lang || '').replace(/^L/i, '').padStart(4, '0') || null;
+        localStorage.setItem('graffiticode:selected:taskId', taskId);
+        if (taskLang) localStorage.setItem('graffiticode:selected:taskId:lang', taskLang);
+        window.dispatchEvent(new CustomEvent('gc:selected-taskId', { detail: { id: taskId, lang: taskLang } }));
+      }
+      if (isTaskDetailRoute && router.query.id !== taskId) {
+        router.replace(`/tasks/${taskId}`, undefined, { shallow: true });
+      }
+    };
     if (uniqueTaskIds.length > 0) {
       try {
         // URL segment (/tasks/[id]) wins, then ?taskId= query param, then
@@ -368,6 +382,7 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
             setSelectedTaskId(matchingTask.id);
             matchingTask.current = true;
             taskIdFound = true;
+            syncTaskSelection(matchingTask.id);
 
             // Scroll the selected task into view in the middle of the viewport
             setTimeout(() => {
@@ -400,6 +415,7 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
       if (!taskIdFound && uniqueTaskIds.length > 0) {
         setSelectedTaskId(uniqueTaskIds[0].id);
         uniqueTaskIds[0].current = true;
+        syncTaskSelection(uniqueTaskIds[0].id);
       }
     }
 
@@ -886,10 +902,10 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
                 <span className={classNames(
                   "text-sm font-medium text-gray-700",
                   isFormPanelCollapsed && "hidden"
-                )}>Preview</span>
+                )}>Form view</span>
                 <button
                   className="text-gray-400 hover:text-gray-500 focus:outline-none"
-                  title={isFormPanelCollapsed ? "Expand preview panel" : "Collapse preview panel"}
+                  title={isFormPanelCollapsed ? "Expand form view panel" : "Collapse form view panel"}
                   onClick={toggleFormPanel}>
                   {isFormPanelCollapsed ? (
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">

@@ -400,6 +400,13 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
       setUpstreamLangs(Array.isArray(item.upstreamLangs) ? item.upstreamLangs : []);
       loadItemSource(item.id, item.taskId);
+      // Keep nav/localStorage + URL in sync when the resolved item changes (e.g.
+      // after a language switch auto-opens a different item), like
+      // handleSelectItem does — but without promoting the /items index to detail.
+      broadcastSelection('itemId', item.id, normalizeLangId((item as any).lang ?? lang));
+      if (isItemDetailRoute && router.query.id !== item.id) {
+        router.replace(`/items/${item.id}`, undefined, { shallow: true });
+      }
     };
     if (targetItemId) {
       const matchingItem = loadedItems.find(item => item.id === targetItemId);
@@ -1124,10 +1131,10 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 <span className={classNames(
                   "text-sm font-medium text-gray-700",
                   isFormPanelCollapsed && "hidden"
-                )}>Preview</span>
+                )}>Form view</span>
                 <button
                   className="text-gray-400 hover:text-gray-500 focus:outline-none"
-                  title={isFormPanelCollapsed ? "Expand preview panel" : "Collapse preview panel"}
+                  title={isFormPanelCollapsed ? "Expand form view panel" : "Collapse form view panel"}
                   onClick={toggleFormPanel}>
                   {isFormPanelCollapsed ? (
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
