@@ -45,7 +45,7 @@ export const LANGUAGES: Language[] = [
   { id: "0170", name: "L0170", description: "Data transformations", routingHint: "Data transformation pipelines inspired by dplyr and jq. Fetch JSON/CSV from external URLs, navigate nested data, filter/select/mutate/group/sort/join/flatten/unique datasets.", domains: [] },
   { id: "0171", name: "L0171", description: "Venn diagrams", routingHint: "Venn diagrams with named sets, intersections, elements, configurable overlap, and styling.", domains: ["diagrams"], status: "Beta" },
   { id: "0172", name: "L0172", description: "FigJam content", routingHint: "FigJam board content authoring.", domains: [] },
-  { id: "0173", name: "L0173", description: "Charts, tables, and KPI cards", routingHint: "Apache ECharts visualizations (bar, line, pie/donut/nightingale rose) plus static HTML tables and KPI cards. Supports multi-series and dual-axis compositions; programs evaluate against a fixed inline dataset.", domains: [] },
+  { id: "0173", name: "L0173", description: "Charts", routingHint: "Apache ECharts visualizations (bar, line, pie/donut/nightingale rose). Supports multi-series and dual-axis compositions; programs evaluate against a fixed inline dataset.", domains: [] },
 ];
 
 export function findLanguageById(id: string): Language | undefined {
