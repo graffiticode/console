@@ -53,5 +53,8 @@ rag-analytics-report*.html
 revenue-vs-cost.html
 user-report.html
 
+# generated training data
+*-training-examples.md
+
 # claude code
 .claude/

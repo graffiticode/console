@@ -1,2 +1,0 @@
-# Graffiticode Training Examples
-
