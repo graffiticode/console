@@ -117,6 +117,18 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
     setNameValue(name);
   }, [name]);
 
+  // Commit the in-progress name edit. Called on blur and before arrow-key
+  // navigation, since navigating unmounts this menu before onBlur can fire.
+  const commitName = () => {
+    const newName = nameValue.trim();
+    if (newName && newName !== name) {
+      onChange({ itemId, name: newName });
+    } else if (!newName) {
+      onChange({ itemId, name: "unnamed" });
+      setNameValue("unnamed");
+    }
+  };
+
   // Handle copying the item
   const handleCopyItem = async (e) => {
     e.stopPropagation();
@@ -215,19 +227,11 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                   onKeyDown={(e) => {
                     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                       e.preventDefault();
+                      commitName();
                       onArrowKey(e.key === 'ArrowUp' ? -1 : 1);
                     }
                   }}
-                  onBlur={(e) => {
-                    const newName = e.target.value.trim();
-                    if (newName && newName !== name) {
-                      onChange({itemId, name: newName});
-                    } else if (!newName) {
-                      // Set to "unnamed" if field is cleared
-                      onChange({itemId, name: "unnamed"});
-                      setNameValue("unnamed");
-                    }
-                  }}
+                  onBlur={commitName}
                 />
               </div>
 
