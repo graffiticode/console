@@ -121,6 +121,14 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   // Build-time state-layer languages (planner-composed upstreams) for the
   // currently selected item. Length == number of '+' segments after the head.
   const [ upstreamLangs, setUpstreamLangs ] = useState<string[]>([]);
+  // Live-sync: true while the open editor holds unsaved local edits. Gates the
+  // write-back effect so a poll/adopt never pushes stale local state back, and
+  // distinguishes a local edit from a remote one. Baselines track the server
+  // snapshot we're synced to so a stale poll can't revert our own save.
+  const editorDirtyRef = useRef(false);
+  const baselineTaskIdRef = useRef<string | null>(null);
+  const baselineUpdatedRef = useRef(0);
+  const [ remoteUpdateAvailable, setRemoteUpdateAvailable ] = useState(false);
   const [ editorPanelWidth, setEditorPanelWidth ] = useState(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('graffiticode:editorPanelWidth') : null;
     return saved ? parseFloat(saved) : 50;
@@ -178,17 +186,14 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   }, [currentViewport, editorPanelWidth, previewPanelHeight]);
 
   useEffect(() => {
-    console.log('[Gallery] Checking editor mode: window.opener=', !!window.opener);
     // Check if we were opened from editor (has opener and sessionStorage flag)
     if (typeof window !== 'undefined' && window.opener) {
       const editorData = sessionStorage.getItem('graffiticode:editor');
-      console.log('[Gallery] sessionStorage editor data:', editorData);
       if (editorData) {
         try {
           const data = JSON.parse(editorData);
           isEditorMode.current = true;
           editorOrigin.current = data.origin;
-          console.log('[Gallery] Editor mode from sessionStorage, origin:', data.origin);
         } catch (e) {
           console.error('Failed to parse editor data:', e);
         }
@@ -199,10 +204,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       if (urlParams.get('editorMode') === 'true' && urlParams.get('editorOrigin')) {
         isEditorMode.current = true;
         editorOrigin.current = urlParams.get('editorOrigin');
-        console.log('[Gallery] Editor mode from URL params, origin:', editorOrigin.current);
       }
-    } else {
-      console.log('[Gallery] No window.opener - not in editor mode');
     }
   }, []);
 
@@ -210,7 +212,6 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.data?.type === 'establish-communication' && event.source) {
-        console.log('[Gallery] Received establish-communication from', event.origin);
         openerWindowRef.current = event.source;
         editorOrigin.current = event.origin;
         isEditorMode.current = true;
@@ -236,13 +237,43 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     setEditorCode(taskData?.src || "");
   }, [user]);
 
+  // Record the server snapshot the open editor is synced to, and clear the
+  // dirty flag. Called whenever an item is loaded/selected (a clean load).
+  const syncOpenBaseline = useCallback((item: any) => {
+    baselineTaskIdRef.current = item?.taskId ?? null;
+    baselineUpdatedRef.current = Number(item?.updated) || 0;
+    editorDirtyRef.current = false;
+    setRemoteUpdateAvailable(false);
+  }, []);
+
+  // Editor change callbacks that also mark the open editor dirty. Only real
+  // user edits reach these (Editor fires onCodeChange/onHelpChange only when
+  // the value diverges from initialCode/initialHelp), so this is a reliable
+  // "the user changed something" signal that gates the write-back effect.
+  const handleEditorCodeChange = useCallback((code: string) => {
+    editorDirtyRef.current = true;
+    setEditorCode(code);
+  }, []);
+  const handleEditorHelpChange = useCallback((help: any) => {
+    editorDirtyRef.current = true;
+    setEditorHelp(help);
+  }, []);
+  const handleEditorUpstreamChange = useCallback((next: any) => {
+    editorDirtyRef.current = true;
+    setUpstreamLangs(next);
+  }, []);
+
   // Load items from the API only once on initialization
   const { data: loadedItems, mutate, isLoading: isLoadingItems } = useSWR(
     user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}-${clientId}` : null,
     () => loadItems({ user, lang, mark: mark.id, client: clientId }),
     {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
+      // Poll so edits made by other clients (e.g. the MCP server) surface here.
+      // SWR's default deep compare avoids re-renders when nothing changed, and
+      // refreshWhenHidden defaults false so a backgrounded tab doesn't poll.
+      refreshInterval: 8000,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
       keepPreviousData: true,
     }
   );
@@ -251,7 +282,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   const { data: clientTags } = useSWR(
     user && lang && !hideItemsNav ? `itemClientTags-${user.uid}-${lang}` : null,
     () => loadItemClientTags({ user, lang }),
-    { revalidateOnFocus: false, revalidateOnReconnect: false }
+    { revalidateOnFocus: true, revalidateOnReconnect: false }
   );
 
   const clientList = (() => {
@@ -298,8 +329,9 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     user && initialItemId ? `item-${user.uid}-${initialItemId}` : null,
     () => getItem({ user, id: initialItemId }),
     {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
+      refreshInterval: 8000,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
     }
   );
 
@@ -312,8 +344,9 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setEditorCode("");
       setEditorHelp([]);
       setUpstreamLangs([]);
+      syncOpenBaseline(null);
     }
-  }, [user?.uid]);
+  }, [user?.uid, syncOpenBaseline]);
 
   // Popup editor (hideItemsNav) collapses the gallery to just the deep-linked
   // item. The in-app /items/[id] view should NOT collapse the list — the user
@@ -322,13 +355,19 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     if (!hideItemsNav) return;
     if (directItem && initialItemId) {
       setItems([directItem]);
-      setSelectedItemId(directItem.id);
-      setTaskId(directItem.taskId);
-      setEditorHelp(typeof directItem.help === "string" ? JSON.parse(directItem.help || "[]") : (directItem.help || []));
-      setUpstreamLangs(Array.isArray(directItem.upstreamLangs) ? directItem.upstreamLangs : []);
-      loadItemSource(directItem.id, directItem.taskId);
+      // Only do the full editor populate on the initial load of this item.
+      // Subsequent polled changes to the SAME item are handled by the adopt
+      // effect, so we don't clobber in-progress edits on every poll.
+      if (selectedItemId !== directItem.id) {
+        setSelectedItemId(directItem.id);
+        setTaskId(directItem.taskId);
+        setEditorHelp(typeof directItem.help === "string" ? JSON.parse(directItem.help || "[]") : (directItem.help || []));
+        setUpstreamLangs(Array.isArray(directItem.upstreamLangs) ? directItem.upstreamLangs : []);
+        loadItemSource(directItem.id, directItem.taskId);
+        syncOpenBaseline(directItem);
+      }
     }
-  }, [directItem, initialItemId, hideItemsNav]);
+  }, [directItem, initialItemId, hideItemsNav, selectedItemId, loadItemSource, syncOpenBaseline]);
 
   // Sync the language selector to the deep-linked item's lang. Runs in both
   // modes (popup editor + in-app /items/[id]) so the surrounding chrome (form,
@@ -400,6 +439,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
       setUpstreamLangs(Array.isArray(item.upstreamLangs) ? item.upstreamLangs : []);
       loadItemSource(item.id, item.taskId);
+      syncOpenBaseline(item);
       // Keep nav/localStorage + URL in sync when the resolved item changes (e.g.
       // after a language switch auto-opens a different item), like
       // handleSelectItem does — but without promoting the /items index to detail.
@@ -474,6 +514,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         setEditorHelp(typeof newItem.help === "string" ? JSON.parse(newItem.help || "[]") : (newItem.help || []));
         setUpstreamLangs(Array.isArray(newItem.upstreamLangs) ? newItem.upstreamLangs : []);
         loadItemSource(newItem.id, newItem.taskId);
+        syncOpenBaseline(newItem);
         broadcastSelection('itemId', newItem.id, normalizeLangId((newItem as any).lang ?? lang));
         // Mirror handleSelectItem URL handling so initialItemId follows the
         // new item; otherwise the selection-resolution effect snaps back to
@@ -513,6 +554,13 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     // Then update backend
     try {
       const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs });
+
+      // Advance the open-editor baseline so the adopt effect treats this write as
+      // our own (not a remote change) even before the next poll lands.
+      if (selectedItemId === itemId && result) {
+        if (result.taskId) baselineTaskIdRef.current = result.taskId;
+        baselineUpdatedRef.current = Number(result.updated) || baselineUpdatedRef.current;
+      }
 
       // If mark changed and this is the selected item, we need to reload the task data
       if (isMarkChanging && selectedItemId === itemId && result && result.taskId) {
@@ -572,6 +620,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
           setEditorHelp(typeof nextItem.help === "string" ? JSON.parse(nextItem.help || "[]") : (nextItem.help || []));
           setUpstreamLangs(Array.isArray(nextItem.upstreamLangs) ? nextItem.upstreamLangs : []);
           loadItemSource(nextItem.id, nextItem.taskId);
+          syncOpenBaseline(nextItem);
           // Persist so SWR refetch doesn't override
           broadcastSelection('itemId', nextItem.id, normalizeLangId((nextItem as any).lang ?? lang));
         } else {
@@ -580,8 +629,10 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
           setEditorCode("");
           setEditorHelp([]);
           setUpstreamLangs([]);
+          syncOpenBaseline(null);
         }
       }
+      return result;
     } catch (error) {
       console.error("Failed to update item:", error);
       // Optionally revert local state on error
@@ -590,7 +641,6 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   };
 
   const handleSelectItem = (itemId) => {
-    console.log('[Gallery] handleSelectItem', { itemId, found: !!items.find(i => i.id === itemId) });
     const item = items.find(i => i.id === itemId);
     if (item) {
       setSelectedItemId(item.id);
@@ -598,6 +648,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       setEditorHelp(typeof item.help === "string" ? JSON.parse(item.help || "[]") : (item.help || []));
       setUpstreamLangs(Array.isArray(item.upstreamLangs) ? item.upstreamLangs : []);
       loadItemSource(item.id, item.taskId);
+      syncOpenBaseline(item);
       broadcastSelection('itemId', item.id, normalizeLangId((item as any).lang ?? lang));
       if (router.pathname === '/items' || router.pathname === '/items/') {
         // From index → first selection promotes URL to detail; preserve back to /items.
@@ -616,6 +667,8 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       const taskData = await getTask({ user, id: taskIdToLoad });
 
       if (taskData) {
+        // Loading a prior task makes it the item's current state → persist it.
+        editorDirtyRef.current = true;
         setTaskId(taskIdToLoad);
         setEditorCode(taskData.src || "");
 
@@ -638,6 +691,11 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       const selectedItem = items.find(item => item.id === selectedItemId);
       // Double-check the item exists and hasn't been loaded from a different user
       if (selectedItem) {
+        // Only persist when the editor holds genuine local edits. Without this
+        // gate, a poll/adopt that advances the server taskId would make the
+        // local taskId look "changed" and push the stale value back, clobbering
+        // the other client's edit.
+        if (!editorDirtyRef.current) return;
         // Check if any values have changed
         const hasChanges =
           (taskId && selectedItem.taskId !== taskId) ||
@@ -645,6 +703,11 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         const persistedUpstream = Array.isArray(selectedItem.upstreamLangs) ? selectedItem.upstreamLangs : [];
         const upstreamChanged = JSON.stringify(persistedUpstream) !== JSON.stringify(upstreamLangs);
         if (hasChanges || upstreamChanged) {
+          // Clear before the async save so edits made during the save re-mark
+          // dirty and trigger a follow-up persist. The local edit is being
+          // saved (last-write-wins), so any pending remote-update prompt is moot.
+          editorDirtyRef.current = false;
+          setRemoteUpdateAvailable(false);
           handleUpdateItem({
             itemId: selectedItemId,
             name: selectedItem.name,
@@ -662,21 +725,66 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     }
   }, [taskId, editorHelp, selectedItemId, user?.uid, upstreamLangs]);
 
+  // Live-sync the open item: when a poll reveals that another client (e.g. the
+  // MCP server) advanced the selected item's task, adopt it if the editor is
+  // clean, or surface a non-destructive reload prompt if it's dirty.
+  // Freshness is gated on `updated` (which updateItem bumps on every taskId
+  // change) so a stale poll arriving after our own save can't revert it.
+  useEffect(() => {
+    if (!selectedItemId || !user?.uid) return;
+    const serverItem =
+      (Array.isArray(loadedItems) && loadedItems.find((i: any) => i.id === selectedItemId)) ||
+      (directItem && (directItem as any).id === selectedItemId ? directItem : null);
+    if (!serverItem) return;
+    const serverUpdated = Number((serverItem as any).updated) || 0;
+    if (serverUpdated <= baselineUpdatedRef.current) return; // not newer (incl. stale polls)
+    if ((serverItem as any).taskId === taskId) {
+      // Already in sync (e.g. our own optimistic state) — just advance baseline.
+      baselineTaskIdRef.current = (serverItem as any).taskId;
+      baselineUpdatedRef.current = serverUpdated;
+      return;
+    }
+    if (editorDirtyRef.current) {
+      // Local unsaved edits — don't overwrite; let the user choose to reload.
+      setRemoteUpdateAvailable(true);
+      return;
+    }
+    // Clean editor — adopt the remote version silently.
+    const si: any = serverItem;
+    setTaskId(si.taskId);
+    setEditorHelp(typeof si.help === "string" ? JSON.parse(si.help || "[]") : (si.help || []));
+    setUpstreamLangs(Array.isArray(si.upstreamLangs) ? si.upstreamLangs : []);
+    loadItemSource(si.id, si.taskId);
+    baselineTaskIdRef.current = si.taskId;
+    baselineUpdatedRef.current = serverUpdated;
+  }, [loadedItems, directItem, selectedItemId, taskId, user?.uid, loadItemSource]);
+
+  // Adopt the freshest server version of the open item (used by the reload
+  // prompt and when the user accepts a remote update).
+  const reloadOpenItem = useCallback(() => {
+    const serverItem: any =
+      (Array.isArray(loadedItems) && loadedItems.find((i: any) => i.id === selectedItemId)) ||
+      (directItem && (directItem as any).id === selectedItemId ? directItem : null);
+    if (!serverItem) return;
+    editorDirtyRef.current = false;
+    setTaskId(serverItem.taskId);
+    setEditorHelp(typeof serverItem.help === "string" ? JSON.parse(serverItem.help || "[]") : (serverItem.help || []));
+    setUpstreamLangs(Array.isArray(serverItem.upstreamLangs) ? serverItem.upstreamLangs : []);
+    loadItemSource(serverItem.id, serverItem.taskId);
+    baselineTaskIdRef.current = serverItem.taskId;
+    baselineUpdatedRef.current = Number(serverItem.updated) || 0;
+    setRemoteUpdateAvailable(false);
+  }, [loadedItems, directItem, selectedItemId, loadItemSource]);
+
   // Compile form data when taskId or formData changes
   useEffect(() => {
     if (!user || !taskId || Object.keys(formData).length === 0) {
-      console.log('[Gallery] Compile skipped: user=', !!user, 'taskId=', taskId, 'formData keys=', Object.keys(formData).length);
       return;
     }
 
     compile({ user, id: taskId, data: formData, buildLayerCount: upstreamLangs.length }).then(compiledData => {
-      console.log(
-        "compile()",
-        "compiledData=" + JSON.stringify(compiledData, null, 2),
-      );
       // Send to opener window if we have one
       const targetWindow = openerWindowRef.current || window.opener;
-      console.log('[Gallery] data-updated: targetWindow=', !!targetWindow, 'editorOrigin=', editorOrigin.current);
       if (targetWindow && editorOrigin.current) {
         const message = {
           type: 'data-updated',
@@ -685,12 +793,9 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         };
         try {
           targetWindow.postMessage(message, editorOrigin.current);
-          console.log('[Gallery] data-updated postMessage sent to', editorOrigin.current);
         } catch (e) {
           console.error('[Gallery] data-updated postMessage failed:', e);
         }
-      } else {
-        console.warn('[Gallery] Cannot send data-updated: targetWindow=', !!targetWindow, 'editorOrigin=', editorOrigin.current);
       }
     }).catch(err => {
       console.error('Failed to compile form data:', err);
@@ -1006,6 +1111,18 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                   )}
                 </button>
               </div>
+              {remoteUpdateAvailable && !isEditorPanelCollapsed && (
+                <div className="flex items-center justify-between gap-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+                  <span>This item was updated elsewhere.</span>
+                  <button
+                    type="button"
+                    onClick={reloadOpenItem}
+                    className="rounded-none border border-amber-400 bg-white px-2 py-0.5 font-semibold text-amber-800 hover:bg-amber-100"
+                  >
+                    Reload
+                  </button>
+                </div>
+              )}
               <div
                 ref={editorRef}
                 className={classNames(
@@ -1020,11 +1137,11 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 lang={lang}
                 mark={mark}
                 setTaskId={setTaskId}
-                setUpstreamLangs={setUpstreamLangs}
+                setUpstreamLangs={handleEditorUpstreamChange}
                 onLoadTaskFromHelp={handleLoadTaskFromHelp}
                 height="100%"
-                onCodeChange={setEditorCode}
-                onHelpChange={setEditorHelp}
+                onCodeChange={handleEditorCodeChange}
+                onHelpChange={handleEditorHelpChange}
                 onCompileError={() => {}}
                 onError={(msg) => { dismissedAlertRef.current = null; setSystemAlert(msg); }}
                 initialCode={editorCode}

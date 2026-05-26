@@ -112,9 +112,13 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
     }
   };
 
-  // Update nameValue when name prop changes
+  // Adopt the name from the server (e.g. a poll picked up a rename elsewhere),
+  // but never while the user is mid-edit in this field, or their keystrokes
+  // would be clobbered.
   useEffect(() => {
-    setNameValue(name);
+    if (document.activeElement !== nameInputRef.current) {
+      setNameValue(name);
+    }
   }, [name]);
 
   // Commit the in-progress name edit. Called on blur and before arrow-key
