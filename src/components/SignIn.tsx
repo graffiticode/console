@@ -9,8 +9,8 @@ import {
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
-import { useEmailSignIn } from "../hooks/use-email-signin";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
+import { useEmailSignIn } from "@graffiticode/auth-react";
 import WalletSelectionDialog from "./WalletSelectionDialog";
 import AuthMethodDialog from "./AuthMethodDialog";
 import NewAccountConfirmDialog from "./NewAccountConfirmDialog";

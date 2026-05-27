@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import useSWR from 'swr';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { selectLanguages } from './language-selector';
 import { countItems } from '../utils/swr/fetchers';
 import SignIn from './SignIn';

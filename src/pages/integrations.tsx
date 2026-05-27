@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import IntegrationsCard from '../components/IntegrationsCard';
 import SignIn from '../components/SignIn';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { getPageTitle } from '../lib/utils';
 
 export default function Integrations() {

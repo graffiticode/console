@@ -6,10 +6,10 @@ import {
   ChevronDoubleLeftIcon,
 } from '@heroicons/react/24/outline'
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
-import { DocumentDuplicateIcon } from '@heroicons/react/24/outline';
+import { DocumentDuplicateIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import SignIn from "./SignIn";
 import { getAccessToken, loadCompiles, getData, getTaskLangs } from '../utils/swr/fetchers';
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
 import TasksHeaderMenu, {
   TasksDateFilter,
   TasksLangFilter,
@@ -234,6 +234,23 @@ function TaskMenu({ task, user, isOpen, onOpen, onClose }) {
                   <span className="font-semibold w-20 flex-shrink-0">Lang</span>
                   <span className="font-mono">{langDisplay}</span>
                 </div>
+              </div>
+
+              <div className="mt-4 border-t pt-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const base = process.env.NEXT_PUBLIC_FORM_APP_URL || "https://app.graffiticode.org";
+                    const w = window.open(`${base}/form/${encodeURIComponent(task.id)}`, '_blank');
+                    if (w) w.focus();
+                    onClose();
+                  }}
+                  className="flex items-center w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-none"
+                  title="Open this task in the form view in a new tab"
+                >
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4 mr-2" />
+                  <span>Open in form view</span>
+                </button>
               </div>
             </div>
           </div>

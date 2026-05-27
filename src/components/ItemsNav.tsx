@@ -2,13 +2,13 @@ import { Menu, Transition } from '@headlessui/react'
 import { Fragment, useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { PlusIcon, ShareIcon, UserIcon } from '@heroicons/react/20/solid';
-import { DocumentDuplicateIcon } from '@heroicons/react/24/outline';
+import { DocumentDuplicateIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import MarkSelector, { marks } from './mark-selector';
 import { clientOptionForId } from './client-selector';
 import PublicToggle from './public-toggle';
 import ShareItemDialog from './ShareItemDialog';
 import { createItem } from '../utils/swr/fetchers';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -395,6 +395,20 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                       ({sharedWith.length})
                     </span>
                   )}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const base = process.env.NEXT_PUBLIC_FORM_APP_URL || "https://app.graffiticode.org";
+                    const w = window.open(`${base}/form/${itemId}`, '_blank');
+                    if (w) w.focus();
+                    onClose();
+                  }}
+                  className="flex items-center w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-none"
+                  title="Open this item in the form view in a new tab"
+                >
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4 mr-2" />
+                  <span>Open in form view</span>
                 </button>
               </div>
             </div>

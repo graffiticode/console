@@ -7,7 +7,7 @@ import {
 import Editor from './editor';
 import SignIn from "./SignIn";
 import { isNonEmptyString } from "../utils";
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
 
 const useTaskIdFormUrl = ({ accessToken, lang, id, origin }) => {
   if (!id) {

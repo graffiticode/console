@@ -5,7 +5,7 @@ import logo from '@/images/logos/logo.png';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
 import LanguageSelector from '../components/language-selector';
 import MarkSelector from '../components/mark-selector';
 import {

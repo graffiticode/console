@@ -1,5 +1,5 @@
 import Link from "next/link";
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
 
 export default function Home() {
   const { user } = useGraffiticodeAuth();

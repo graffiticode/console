@@ -23,7 +23,7 @@ import LanguageSelector from '../components/language-selector';
 import MarkSelector, { marks } from '../components/mark-selector';
 import useSwr from 'swr';
 import useLocalStorage from '../hooks/use-local-storage';
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
 import { getPageTitle } from '../lib/utils';
 
 const parseQuery =

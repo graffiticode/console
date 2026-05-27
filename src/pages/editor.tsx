@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from 'reactfire';
 import { signInWithCustomToken } from 'firebase/auth';
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
 import { createItem } from '../utils/swr/fetchers';
 import { getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';

@@ -4,7 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { ShareIcon, CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import UserSearchCombobox from './UserSearchCombobox';
 import { shareItem } from '../utils/swr/fetchers';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 
 interface ShareItemDialogProps {
   isOpen: boolean;

@@ -3,7 +3,7 @@ import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js'
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import axios from 'axios';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 
 const SetupForm = () => {
   const stripe = useStripe();

@@ -5,7 +5,7 @@ import { injected } from 'wagmi/connectors'
 import { http } from 'viem'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PrivyProvider } from '@privy-io/react-auth'
-import { GraffiticodeAuthProvider } from "../hooks/use-graffiticode-auth";
+import { GraffiticodeAuthProvider } from "@graffiticode/auth-react";
 import "../styles/globals.css";
 import "../styles/prosemirror.css";
 import GraffiticodeFirebaseProvider from '../components/GraffiticodeFirebaseProvider';

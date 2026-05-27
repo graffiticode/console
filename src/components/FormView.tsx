@@ -9,7 +9,7 @@ import Editor from './editor';
 import SignIn from "./SignIn";
 import { loadTasks, getAccessToken } from '../utils/swr/fetchers';
 import { isNonEmptyString } from "../utils";
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
 import { FormIFrame } from "./FormIFrame";
 import { FormReact } from "./FormReact";
 //const reactForms = ["0002"];

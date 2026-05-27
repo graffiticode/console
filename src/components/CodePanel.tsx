@@ -4,7 +4,7 @@ import { Decoration, ViewPlugin } from "@codemirror/view";
 import { StateField, StateEffect, RangeSet } from "@codemirror/state";
 import useCodeMirror from "../utils/cm/use-codemirror";
 import { debounce } from "lodash";
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 
 const getCode = view => {
   if (view === undefined) {

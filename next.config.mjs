@@ -19,6 +19,9 @@ const cspDirectives = [
 const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
+  // @graffiticode/auth-react ships raw TS (main → src/index.ts), so Next must
+  // transpile it like first-party code.
+  transpilePackages: ["@graffiticode/auth-react"],
   async rewrites() {
     return [{
       source: "/docs",

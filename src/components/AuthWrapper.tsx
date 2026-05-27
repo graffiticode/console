@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 
 export default function AuthWrapper({ children }) {
   const { user, loading } = useGraffiticodeAuth();
@@ -10,6 +10,13 @@ export default function AuthWrapper({ children }) {
     if (user && !loading && !checkingUser) {
       ensureUserExists();
     } else if (!user && !loading) {
+      // Signed out (SSO bootstrap already resolved by now): drop the per-user
+      // selection so a different user signing in on this browser doesn't inherit
+      // the previous user's selected item/task.
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('graffiticode:selected:itemId');
+        localStorage.removeItem('graffiticode:selected:taskId');
+      }
       setIsReady(true);
     }
   }, [user?.uid, loading]);

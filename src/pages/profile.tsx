@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { mutate } from 'swr';
 import { UserCircleIcon, CameraIcon } from '@heroicons/react/24/outline';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { getTitle, getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
 

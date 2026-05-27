@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TrashIcon, PlusIcon, PencilIcon } from "@heroicons/react/24/outline";
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { client } from '../lib/auth';
 import axios from 'axios';
 

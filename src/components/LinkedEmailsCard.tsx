@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { useLinkedEmails, type LinkedEmail } from '../hooks/use-linked-emails';
 import AddEmailDialog from './AddEmailDialog';
 

@@ -1,4 +1,4 @@
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
 import { useEffect } from "react";
 import useSWR from "swr";
 import { loadGraphiQL } from '../utils/swr/fetchers';

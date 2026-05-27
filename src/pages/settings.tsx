@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import SignIn from '../components/SignIn';
 import APIKeysCard from '../components/APIKeysCard';
 import LinkedEmailsCard from '../components/LinkedEmailsCard';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { getPageTitle } from '../lib/utils';
 
 export default function Settings() {

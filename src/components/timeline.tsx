@@ -2,7 +2,7 @@ import useSWR from "swr";
 import { useState, useEffect } from 'react';
 import { loadCompiles } from '../utils/swr/fetchers';
 import { CheckIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/20/solid'
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
 import SignIn from '../components/SignIn'
 
 function classNames(...classes) {

@@ -33,6 +33,9 @@ steps:
       - '--min-instances=0'
       - '--max-instances=10'
       - '--port=8080'
+      # Cross-app SSO: scope the shared refresh-token cookie to the parent domain
+      # so console.graffiticode.org and app.graffiticode.org share one sign-in.
+      - '--set-env-vars=SSO_COOKIE_DOMAIN=.graffiticode.org'
     id: Deploy
     entrypoint: gcloud
 

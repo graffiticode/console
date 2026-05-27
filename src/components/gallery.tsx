@@ -10,7 +10,7 @@ import Editor from './editor';
 import { ImageGallery } from './ImageGallery';
 import SignIn from "./SignIn";
 import { getAccessToken, loadItems, loadItemClientTags, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
-import useGraffiticodeAuth from "../hooks/use-graffiticode-auth";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'
 import { ChevronRightIcon } from '@heroicons/react/20/solid'

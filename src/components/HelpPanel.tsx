@@ -12,7 +12,7 @@ import { TextEditor } from "./TextEditor";
 import { createState } from "../lib/state";
 import { ChatBot } from './ChatBot';
 import { CsvDropzone } from './CsvDropzone';
-import useGraffiticodeAuth, { useToken } from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth, { useToken } from '@graffiticode/auth-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/prism';

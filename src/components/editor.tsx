@@ -5,7 +5,7 @@ import { HelpPanel } from "./HelpPanel";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
 import { parse, postTask } from '../utils/swr/fetchers';
-import useGraffiticodeAuth from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
 import { isNonNullNonEmptyObject } from "../utils";

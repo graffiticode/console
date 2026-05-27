@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getStorage } from 'firebase/storage';
 import { useFirebaseApp } from 'reactfire';
-import useGraffiticodeAuth, { useToken } from '../hooks/use-graffiticode-auth';
+import useGraffiticodeAuth, { useToken } from '@graffiticode/auth-react';
 import { listUserImages, validateImageFile, uploadImageDeduped, archiveUserImage, fetchArchivedImages } from '../lib/image-upload';
 import type { ImageInfo } from '../lib/image-upload';
 

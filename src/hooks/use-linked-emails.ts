@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import useGraffiticodeAuth from './use-graffiticode-auth';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
 
 const authUrl = process.env.NEXT_PUBLIC_GC_AUTH_URL || 'https://auth.graffiticode.org';
 
