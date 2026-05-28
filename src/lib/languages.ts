@@ -18,8 +18,10 @@ export interface Language {
 }
 
 export const LANGUAGES: Language[] = [
+  { id: "0000", name: "L0000", description: "Root language", domains: [] },
   // L0001 is DEPRECATED — retained as a repo for historical reference only. Do not re-enable.
-  { id: "0002", name: "L0002", description: "Core language", domains: [] },
+  // { id: "0002", name: "L0002", description: "Core language", domains: [] },
+  { id: "0003", name: "L0003", description: "Hello, image, theme, and print", domains: [] },
   // { id: "0011", name: "L0011", description: "Property editors", domains: [] },
   // { id: "0012", name: "L0012", description: "Object viewers", domains: [] },
   // { id: "0137", name: "L0137", description: "Data transformers", domains: [] },

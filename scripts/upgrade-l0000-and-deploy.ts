@@ -2,6 +2,13 @@ import { spawn } from 'child_process';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { basename, resolve } from 'path';
 
+const PKG_NAME = '@graffiticode/l0000';
+const COMMIT_MSG = 'Upgrade l0000 to latest';
+// Which package within the repo owns the dependency we upgrade. The l0000 core
+// is inherited by language-specific cores, so the dep lives in packages/core
+// (basis lives in packages/api — that's why the two scripts differ).
+const TARGET_PKG = 'packages/core';
+
 const BATCH_SIZE = 5;
 const FORCE_DEPLOY = !process.argv.includes('--no-force');
 const VERBOSE = process.argv.includes('--verbose');
@@ -48,14 +55,19 @@ function findRepos(): string[] {
     .filter(name => !LANGS || LANGS.includes(name.slice(1)))
     .map(name => resolve(BASE_DIR, name))
     .filter(dir => {
-      if (!existsSync(resolve(dir, 'packages/api/package.json'))) return false;
+      if (!existsSync(resolve(dir, `${TARGET_PKG}/package.json`))) return false;
       if (!existsSync(resolve(dir, 'package.json'))) return false;
       const pkg = readFileSync(resolve(dir, 'package.json'), 'utf-8');
       if (!pkg.includes('"gcp:build"')) return false;
-      // Skip repos that don't depend on @graffiticode/basis — nothing to upgrade
-      // and `npm i basis@latest` would just add an unwanted dep.
-      const apiPkg = readFileSync(resolve(dir, 'packages/api/package.json'), 'utf-8');
-      return apiPkg.includes('"@graffiticode/basis"');
+      // Only upgrade repos that actually depend on PKG_NAME, and skip the
+      // package itself (would be self-referential).
+      const targetPkg = readFileSync(resolve(dir, `${TARGET_PKG}/package.json`), 'utf-8');
+      try {
+        if (JSON.parse(targetPkg).name === PKG_NAME) return false;
+      } catch {
+        // fall through; treat unparseable as not-self
+      }
+      return targetPkg.includes(`"${PKG_NAME}"`);
     })
     .sort();
 }
@@ -64,16 +76,11 @@ async function upgradeAndDeploy(dir: string): Promise<{ name: string; ok: boolea
   const name = basename(dir);
   try {
     console.log(`[${name}] Starting upgrade + deploy...`);
-    const apiDir = resolve(dir, 'packages/api');
-    await run('npm i @graffiticode/basis@latest', apiDir);
-    // Ensure graphql peer dep is present if graphql-request is used
-    const apiPkg = readFileSync(resolve(apiDir, 'package.json'), 'utf-8');
-    if (apiPkg.includes('graphql-request') && !apiPkg.includes('"graphql"')) {
-      await run('npm i graphql', apiDir);
-    }
+    const targetDir = resolve(dir, TARGET_PKG);
+    await run(`npm i ${PKG_NAME}@latest`, targetDir);
     const status = await run('git status --porcelain', dir);
     if (status.trim()) {
-      await run('git add -A && git commit -m "Upgrade basis to latest"', dir);
+      await run(`git add -A && git commit -m "${COMMIT_MSG}"`, dir);
       await run('git push', dir);
       await run('npm run gcp:build', dir, 20 * 60 * 1000);
       console.log(`[${name}] Done`);
@@ -95,7 +102,7 @@ async function upgradeAndDeploy(dir: string): Promise<{ name: string; ok: boolea
 
 async function main() {
   const repos = findRepos();
-  console.log(`Found ${repos.length} repos to upgrade`);
+  console.log(`Found ${repos.length} repos to upgrade (depend on ${PKG_NAME})`);
   repos.forEach(r => console.log(`  ${basename(r)}`));
   console.log('');
 

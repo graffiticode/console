@@ -516,7 +516,7 @@ When in doubt, attempt to generate code. Only use OUT_OF_SCOPE when you are conf
 async function createCodeGenerationPrompt(
   userPrompt,
   examples = [],
-  lang = "0002",
+  lang = "0000",
   currentCode = null,
   rid = null,
   conversationSummary = null,
@@ -1000,7 +1000,7 @@ function extractSummaryTags(content) {
   };
 }
 
-async function processGeneratedCode(content, lang = "0002", rid = null) {
+async function processGeneratedCode(content, lang = "0000", rid = null) {
   if (!content) return content;
 
   const originalLength = content.length;

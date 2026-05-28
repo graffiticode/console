@@ -58,7 +58,7 @@ export default function App({
   const rawDomain = queryDomainStr || storedDomain || getTitle();
   const domain = rawDomain.toLowerCase() === 'graffiticode' ? undefined : rawDomain;
   const domainLanguages = selectLanguages(domain);
-  const defaultLanguage = domainLanguages.length > 0 ? domainLanguages[0] : {id: 2, name: "L0002"};
+  const defaultLanguage = domainLanguages.length > 0 ? domainLanguages[0] : {id: "0000", name: "L0000"};
 
   const [language, setLanguage] = useLocalStorage("graffiticode:language", defaultLanguage);
   const [mark, setMark] = useLocalStorage("graffiticode:items:mark", marks[0]);

@@ -388,7 +388,7 @@ export function extractCodeBlocks(content: string): string[] {
 export async function generateCodeWithContinuation({
   prompt,
   formattedPrompt,  // Accept pre-formatted prompt with examples
-  lang = "0002",
+  lang = "0000",
   currentCode = null,
   options = {},
   onProgress
