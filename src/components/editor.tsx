@@ -87,6 +87,10 @@ export default function Editor({
   const dataPanelRef = React.useRef(null);
   const currentTaskIdRef = React.useRef(null);
   const codeRef = React.useRef(initialCode || "");
+  // Source most recently applied from chat generation. The resolver already
+  // posted that task (its taskId is set via the chat path), so the debounced
+  // re-post effect skips this source to avoid creating a duplicate task.
+  const generatedSrcRef = React.useRef<string | null>(null);
 
   // Function to check if new code is different from current code
   // Uses ref to avoid closure issues with stale state
@@ -166,6 +170,14 @@ export default function Editor({
             return;
           }
           setCompileErrors(null);
+          // Skip re-posting code that came from chat generation: the resolver
+          // already posted it and the authoritative taskId is set. Only
+          // genuine user edits should create a new task.
+          if (generatedSrcRef.current !== null && isCodeEquivalent(code, generatedSrcRef.current)) {
+            generatedSrcRef.current = null;
+            setIsPostingTask(false);
+            return;
+          }
           const newHead = await postTask({ user, lang, code: result.code, item: itemId });
           const upstreamSegments = (taskId || "").split("+").slice(1);
           const newChain = upstreamSegments.length > 0
@@ -235,6 +247,11 @@ export default function Editor({
               itemId={itemId}
               setCode={(newCode) => {
                 if (isCodeNew(newCode)) {
+                  // Code applied from chat generation. The resolver already
+                  // posted the task and the chat sets the authoritative taskId
+                  // via setTaskId, so the debounced re-post must not duplicate
+                  // it; mark this source so the effect skips posting it.
+                  generatedSrcRef.current = newCode;
                   setIsUserEdit(true);
                   setCode(newCode);
                 }
@@ -276,6 +293,9 @@ export default function Editor({
               code={code}
               setCode={(newCode) => {
                 if (isCodeNew(newCode)) {
+                  // Genuine user edit in the code panel — clear any generated
+                  // marker so the debounced re-post persists this change.
+                  generatedSrcRef.current = null;
                   setIsUserEdit(true);
                   setCode(newCode);
                 }

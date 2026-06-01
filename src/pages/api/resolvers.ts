@@ -5,8 +5,8 @@ import { buildGetTaskDaoForStorageType } from "./utils";
 import { getFirestore } from "../../utils/db";
 import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } from "../../lib/api";
 import { parser, unparse } from "@graffiticode/parser";
-import { generateCode as codeGenerationService } from "../../lib/code-generation-service";
-import { classifyComposition, orchestrateComposition } from "../../lib/language-router";
+import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
+import { planSequence, detectComposeTrigger, orchestrateComposition } from "../../lib/language-router";
 import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
@@ -434,47 +434,99 @@ export async function generateCode({
       }
     }
 
-    // Code generation — if no template source. Single-language head
-    // generation; composition (if any) is discovered reactively below from
-    // the head's parsed AST via `data use "<lang>"` annotations.
+    // Code generation — if no template source.
+    //
+    // Composition cascade:
+    //   1. ATOMIC GUARD (free): retrieve head-lang examples once; if none above
+    //      threshold authors `data use "<id>"`, the request is atomic — go
+    //      straight to single-language code gen, reusing that retrieval.
+    //   2. Otherwise PLAN: planSequence() (L0010 planning-RAG hit, else Haiku);
+    //      a length>1 sequence runs the tail-first executor.
     if (!src) {
-      const result = await codeGenerationService({
-        auth,
-        prompt,
-        lang: language,
-        options: {
-          model: options?.model,
-          temperature: options?.temperature,
-          maxTokens: options?.maxTokens,
-        },
-        currentCode: currentSrc,
-        rid,
-        conversationSummary,
-      });
+      const codegenOptions = {
+        model: options?.model,
+        temperature: options?.temperature,
+        maxTokens: options?.maxTokens,
+      };
+      const mapUsageLimit = (errs: any[]) => errs.map(err => ({
+        ...err,
+        message: err.message === 'Usage limit reached'
+          ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
+          : err.message
+      }));
 
-      if ('errors' in result && result.errors) {
-        const errors = result.errors.map(err => ({
-          ...err,
-          message: err.message === 'Usage limit reached'
-            ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
-            : err.message
-        }));
-        return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors, upstreamLangs: [] };
+      // 1. Atomic guard — reuse this head-lang retrieval for both the trigger
+      //    and the head code gen (one embed/search). Never fail generation if
+      //    retrieval errors; just treat it as atomic.
+      let headExamples: any[] = [];
+      try {
+        headExamples = await getRelevantExamples({ prompt, lang: language, rid }) || [];
+      } catch (err: any) {
+        console.warn(`[composition] rid=${rid} head retrieval failed: ${err?.message}`);
+      }
+      const composeTrigger = detectComposeTrigger(headExamples);
+
+      // 2. Plan only when triggered; planSequence may still return atomic.
+      let sequence: string[] = [language];
+      if (composeTrigger.length > 0) {
+        console.log(`[composition] rid=${rid} compose trigger=${composeTrigger.map(l => `L${l}`).join(",")}`);
+        sequence = await planSequence({ prompt, headLang: language, rid });
       }
 
-      const successResult = result as { code: any; taskId: string; model: string; usage: any; description: string | null; changeSummary: string | null };
-      src = successResult.code;
-      model = successResult.model;
-      usage = successResult.usage;
-      description = successResult.description;
-      changeSummary = successResult.changeSummary;
+      if (sequence.length > 1) {
+        headLang = sequence[0];
+        console.log(`[composition] rid=${rid} sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
+        ragLog(rid, "composition.plan", { sequence });
+
+        const orch = await orchestrateComposition({
+          sequence,
+          prompt,
+          auth,
+          options: codegenOptions,
+          currentCode: currentSrc,
+          rid,
+          conversationSummary,
+          headExamples: headLang === language ? headExamples : null,
+        });
+
+        if (orch.errors) {
+          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: mapUsageLimit(orch.errors), upstreamLangs: [] };
+        }
+
+        src = orch.headSrc;
+        model = orch.headModel;
+        usage = orch.headUsage;
+        description = orch.headDescription;
+        changeSummary = orch.headChangeSummary;
+        upstreamLangs = orch.upstreamLangs;
+        upstreamTaskIds = orch.upstreamTaskIds;
+      } else {
+        // Atomic — single-language code gen, reusing the head retrieval.
+        const result = await codeGenerationService({
+          auth,
+          prompt,
+          lang: language,
+          options: codegenOptions,
+          currentCode: currentSrc,
+          rid,
+          conversationSummary,
+          precomputedExamples: headExamples,
+        });
+
+        if ('errors' in result && result.errors) {
+          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: mapUsageLimit(result.errors), upstreamLangs: [] };
+        }
+
+        const successResult = result as { code: any; taskId: string; model: string; usage: any; description: string | null; changeSummary: string | null };
+        src = successResult.code;
+        model = successResult.model;
+        usage = successResult.usage;
+        description = successResult.description;
+        changeSummary = successResult.changeSummary;
+      }
     }
 
-    // Parse the head src with system values. Walk the AST for
-    // `data use "<lang>"` annotations to discover any upstream composition
-    // reactively; for each one, fetch the upstream's schema, inline it on
-    // the USE node, and generate the upstream task in parallel. Then post
-    // the (possibly rewritten) head AST and chain upstream taskIds.
+    // Parse the head src with system values, then post it.
     const systemValues: Record<string, string> = {};
     if (itemId) systemValues.itemId = itemId;
     const parseResult = await parseCode({ lang: headLang, src, systemValues });
@@ -487,39 +539,51 @@ export async function generateCode({
     let code = JSON.parse(parseResult.code);
 
     try {
-      const resolved = await resolveUpstreams(code);
-      if (resolved.upstreams.length > 0) {
-        code = resolved.ast;
-        upstreamLangs = resolved.upstreams;
-        console.log(`[composition] rid=${rid} headLang=${headLang} reactive upstreams=${upstreamLangs.join(",")}`);
-        ragLog(rid, "composition.reactive", { headLang, upstreamLangs });
+      if (upstreamTaskIds.length === 0) {
+        // No planner-driven composition. Honor any hand-written
+        // `data use "<lang>"` in the generated/edited head (reactive path),
+        // generating each upstream with the user's prompt verbatim.
+        const resolved = await resolveUpstreams(code);
+        if (resolved.upstreams.length > 0) {
+          code = resolved.ast;
+          upstreamLangs = resolved.upstreams;
+          console.log(`[composition] rid=${rid} headLang=${headLang} reactive upstreams=${upstreamLangs.join(",")}`);
+          ragLog(rid, "composition.reactive", { headLang, upstreamLangs });
 
-        // Generate each upstream in parallel, using the user's original
-        // prompt verbatim. Each upstream's own RAG scopes the work.
-        const upstreamResults = await Promise.all(
-          upstreamLangs.map((uLang) =>
-            codeGenerationService({
-              auth,
-              prompt,
-              lang: uLang,
-              options: {
-                model: options?.model,
-                temperature: options?.temperature,
-                maxTokens: options?.maxTokens,
-              },
-              rid,
-            })
-          )
-        );
-        const upstreamErrors = upstreamResults.flatMap((r: any, i: number) => {
-          if (r && 'errors' in r && r.errors) return r.errors;
-          if (!r?.taskId) return [{ message: `Upstream L${upstreamLangs[i]} failed to produce a taskId` }];
-          return [];
-        });
-        if (upstreamErrors.length > 0) {
-          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: upstreamErrors, upstreamLangs: [] };
+          const upstreamResults = await Promise.all(
+            upstreamLangs.map((uLang) =>
+              codeGenerationService({
+                auth,
+                prompt,
+                lang: uLang,
+                options: {
+                  model: options?.model,
+                  temperature: options?.temperature,
+                  maxTokens: options?.maxTokens,
+                },
+                rid,
+              })
+            )
+          );
+          const upstreamErrors = upstreamResults.flatMap((r: any, i: number) => {
+            if (r && 'errors' in r && r.errors) return r.errors;
+            if (!r?.taskId) return [{ message: `Upstream L${upstreamLangs[i]} failed to produce a taskId` }];
+            return [];
+          });
+          if (upstreamErrors.length > 0) {
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: upstreamErrors, upstreamLangs: [] };
+          }
+          upstreamTaskIds = upstreamResults.map((r: any) => r.taskId as string);
         }
-        upstreamTaskIds = upstreamResults.map((r: any) => r.taskId as string);
+      } else {
+        // Planner-driven composition already generated the tail. Safety-net:
+        // confirm the head actually emitted `data use "<nextStageLang>"` so the
+        // chained upstream data will flow; warn (don't fail) if it's missing.
+        const resolved = await resolveUpstreams(code);
+        const expected = upstreamLangs[0];
+        if (expected && !resolved.upstreams.includes(expected)) {
+          console.warn(`[composition] rid=${rid} head L${headLang} did not emit \`data use "${expected}"\`; upstream data may not flow`);
+        }
       }
     } catch (err: any) {
       return {
@@ -542,6 +606,7 @@ export async function generateCode({
     const taskId = upstreamTaskIds.length > 0
       ? `${headTaskId}+${upstreamTaskIds.join("+")}`
       : headTaskId;
+    console.log(`[composition] rid=${rid} final taskId=${taskId} upstreamLangs=${upstreamLangs.length ? upstreamLangs.join(",") : "none"}`);
     const lexicon = await getLanguageLexicon(headLang);
     const resolvedSrc = unparse(code, lexicon || {});
 

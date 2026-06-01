@@ -189,7 +189,7 @@ function extractSearchQuery(prompt: string): string {
   return prompt;
 }
 
-async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
+export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
   // Extract just the latest user request for retrieval so conversation
   // context doesn't dilute the embedding similarity.
   const searchQuery = extractSearchQuery(prompt);
@@ -520,6 +520,7 @@ async function createCodeGenerationPrompt(
   currentCode = null,
   rid = null,
   conversationSummary = null,
+  upstreamContext: { lang: string; sample: unknown } | null = null,
 ) {
   // Dialect-specific blocks (cached per-language). The dialect block already
   // carries cache_control: ephemeral, so the per-language prefix is reused
@@ -577,6 +578,19 @@ async function createCodeGenerationPrompt(
       }`
     : "First turn of conversation.";
 
+  // Composition: when this program sits above an upstream stage in a pipeline,
+  // tell the model the upstream's dialect and a concrete sample of the data
+  // model it produces, so the head authors `data use "<lang>"` against real
+  // fields rather than guessing the shape.
+  const upstreamSection = upstreamContext
+    ? `\n<UPSTREAM_DATA_MODEL>
+This program is one stage of a composition pipeline. At runtime it receives a data model produced by an upstream Graffiticode program written in dialect L${upstreamContext.lang}. Bind to that upstream with \`data use "${upstreamContext.lang}"\` and read its fields from the merged data. The upstream produces data shaped like:
+\`\`\`json
+${JSON.stringify(upstreamContext.sample, null, 2).slice(0, 2000)}
+\`\`\`
+`
+    : "";
+
   // Build user message using USER_TEMPLATE format (matches dspy-service)
   const userMessage = `<USER_REQUEST>
 ${userPrompt}
@@ -591,7 +605,7 @@ ${conversationContext}
 ${retrievedContext}
 
 When a retrieved example closely matches the user's request, follow its coding patterns and techniques. If there is existing current code, apply the example's patterns to the current code rather than replacing it.
-
+${upstreamSection}
 <OUTPUT_FORMAT>
 Emit the Graffiticode between triple backticks, must end with "..". Then on new lines emit two tagged summary blocks:
 
@@ -1092,6 +1106,8 @@ export async function generateCode({
   userId = null,
   sessionId = null,
   conversationSummary = null,
+  upstreamContext = null,
+  precomputedExamples = null,
 }: {
   auth: any;
   prompt: string;
@@ -1102,6 +1118,8 @@ export async function generateCode({
   userId?: string | null;
   sessionId?: string | null;
   conversationSummary?: ConversationSummary | null;
+  upstreamContext?: { lang: string; sample: unknown } | null;
+  precomputedExamples?: any[] | null;
 }) {
   const accessToken = auth?.token;
   const isFreePlan = !!auth?.freePlan;
@@ -1161,8 +1179,12 @@ export async function generateCode({
     const config = getRAGConfig();
     let relevantExamples = [];
 
-    // Only attempt retrieval if enabled
-    if (config.enableVectorSearch || config.fallbackToKeywordSearch) {
+    // Reuse a retrieval the caller already performed (the resolver runs the
+    // head-lang retrieval once for the compose-trigger gate, then hands it back
+    // here so the head code gen doesn't embed+search a second time).
+    if (Array.isArray(precomputedExamples)) {
+      relevantExamples = precomputedExamples;
+    } else if (config.enableVectorSearch || config.fallbackToKeywordSearch) {
       // Start retrieval stage
       safeRAGAnalytics.startStage(requestId, "retrieval");
 
@@ -1293,6 +1315,7 @@ export async function generateCode({
         currentCode,
         rid,
         conversationSummary,
+        upstreamContext,
       );
     }
 
