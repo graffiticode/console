@@ -11,7 +11,7 @@ const MAX_STAGES = 4;
 
 // Composition planning is its own Graffiticode dialect, L0010: a program maps a
 // prompt to an ordered language sequence (and nothing else). Plans are written
-// as mark-2 (yellow) items under the generating user's account; a human promotes
+// as mark-1 items under the generating user's account; a human promotes
 // good ones to mark 3/4, then `download-training-examples --lang 0010` (sourced
 // from the admin uid) + `update-embeddings` move them into the `training_examples`
 // corpus that the runtime planning-RAG (`lookupPlanRAG`) consults.
@@ -432,7 +432,7 @@ export async function orchestrateComposition({
 // ── Planning: prompt → language sequence ────────────────────────────────────
 // The fast path is L0010 planning RAG (a vector lookup over curated, promoted
 // L0010 examples); a miss falls back to the Haiku planner, whose result is
-// captured as a mark-2 L0010 item for human curation. Returns the ordered
+// captured as a mark-1 L0010 item for human curation. Returns the ordered
 // sequence (length 1 ⇒ atomic).
 
 // Planning-RAG lookup over promoted L0010 examples. Returns the stored sequence
@@ -477,7 +477,7 @@ export async function lookupPlanRAG({
   }
 }
 
-// Persist a generated plan as a mark-2 (yellow) L0010 item under the
+// Persist a generated plan as a mark-1 L0010 item under the
 // generating user's account, in the shape `download-training-examples` reads
 // (help dialog + `plan [...]` source). Writing under the requesting user keeps
 // item-owner == task-owner (the L0010 task was posted under their auth), so
@@ -512,7 +512,7 @@ export async function capturePlanForCuration(auth: any, prompt: string, sequence
       id: ref.id,
       name: `plan: ${key.slice(0, 60)}`,
       lang: PLAN_LANG,
-      mark: 2, // yellow — pending human review; promote to 3/4 to enter the fast path
+      mark: 1, // uncurated auto-capture; a human promotes to 3/4 to enter the fast path
       help,
       src: planSrc,
       isPublic: false,
@@ -523,7 +523,7 @@ export async function capturePlanForCuration(auth: any, prompt: string, sequence
     };
     if (code) item.code = code;
     await ref.set(item);
-    console.log(`[language-router] captured mark-2 L${PLAN_LANG} plan ${ref.id} sequence=${sequence.map((l) => `L${l}`).join(" -> ")}`);
+    console.log(`[language-router] captured mark-1 L${PLAN_LANG} plan ${ref.id} sequence=${sequence.map((l) => `L${l}`).join(" -> ")}`);
   } catch (err) {
     console.warn("[language-router] capturePlanForCuration failed:", (err as Error)?.message);
   }
