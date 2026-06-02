@@ -470,7 +470,7 @@ export async function generateCode({
       let sequence: string[] = [language];
       if (composeTrigger.length > 0) {
         console.log(`[composition] rid=${rid} compose trigger=${composeTrigger.map(l => `L${l}`).join(",")}`);
-        sequence = await planSequence({ prompt, headLang: language, rid });
+        sequence = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid });
       }
 
       if (sequence.length > 1) {

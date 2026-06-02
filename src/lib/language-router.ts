@@ -523,27 +523,47 @@ async function capturePlanForCuration(prompt: string, sequence: string[]): Promi
   }
 }
 
-// Resolve the language sequence for a composable request: planning-RAG hit
-// (fast, no LLM) → else Haiku planner (captured as a mark-2 L0010 item for
-// curation). Returns [headLang] when the request is actually atomic.
+// Resolve the language sequence for a composable request:
+//   1. planning-RAG hit (fast, no LLM) → return the stored sequence;
+//   2. miss → generate an L0010 `plan` item (the planner dialect), parse its
+//      sequence, and capture it as a mark-2 L0010 item for curation;
+//   3. if L0010 is unreachable/unusable → fall back to the Haiku planner.
+// Returns [headLang] when the request is atomic.
 export async function planSequence({
   prompt,
   headLang,
+  auth,
+  options,
   rid,
 }: {
   prompt: string;
   headLang: string;
+  auth?: any;
+  options?: any;
   rid?: string | null;
 }): Promise<string[]> {
   const hit = await lookupPlanRAG({ prompt, rid });
   if (hit && hit.length > 0) return hit;
 
-  // Miss → Haiku planner. (When the L0010 dialect is deployed this becomes
-  // generateCode({lang:"0010"}); the captured examples seed that corpus today.)
+  // Miss → generate an L0010 plan. This is a direct service call (it does NOT
+  // re-enter the resolver's composition cascade, so no recursion). The L0010
+  // program is `plan ["<id>" ...]`; read the sequence straight from its source.
+  try {
+    const r: any = await generateCodeService({ auth, prompt, lang: PLAN_LANG, options, rid });
+    if (!r?.errors && typeof r?.code === "string" && /\bplan\b/.test(r.code)) {
+      const seq = [...new Set(extractLangIds(r.code, false))].slice(0, MAX_STAGES);
+      if (seq.length > 1) void capturePlanForCuration(prompt, seq);
+      console.log(`[language-router] L${PLAN_LANG} plan: ${seq.length ? seq.map((l) => `L${l}`).join(" -> ") : "atomic"}`);
+      return seq.length > 0 ? seq : [headLang];
+    }
+    console.warn(`[language-router] L${PLAN_LANG} codegen returned no usable plan; falling back to Haiku planner`);
+  } catch (err) {
+    console.warn(`[language-router] L${PLAN_LANG} codegen failed (${(err as Error)?.message}); falling back to Haiku planner`);
+  }
+
+  // Fallback → Haiku planner (also captured for curation).
   const plan = await planComposition({ prompt, currentLang: headLang });
   const sequence = plan.map((s) => s.lang);
-  if (sequence.length > 1) {
-    void capturePlanForCuration(prompt, sequence);
-  }
+  if (sequence.length > 1) void capturePlanForCuration(prompt, sequence);
   return sequence;
 }
