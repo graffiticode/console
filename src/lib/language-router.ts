@@ -3,7 +3,7 @@ import admin from "firebase-admin";
 import { CLAUDE_MODELS, generateCode as generateCodeService } from "./code-generation-service";
 import { listLanguages } from "./languages";
 import { vectorSearch } from "./embedding-service";
-import { getData } from "../pages/api/resolvers";
+import { getData, parseCode } from "../pages/api/resolvers";
 
 // Hard bound on composition depth: head + at most (MAX_STAGES-1) upstream
 // stages. Keeps planning cost and chain length sane.
@@ -503,12 +503,21 @@ async function capturePlanForCuration(prompt: string, sequence: string[]): Promi
       { type: "user", user: prompt, timestamp: "" },
       { type: "bot", help: { type: "code", language: "graffiticode", text: planSrc }, timestamp: "" },
     ]);
+    // Parse to AST so it's a first-class item: getItems can lazily post a task
+    // and the editor renders it. `src` is also kept for download-training-examples.
+    let code: any = null;
+    try {
+      const parsed = await parseCode({ lang: PLAN_LANG, src: planSrc });
+      if (!parsed.errors) code = JSON.parse(parsed.code);
+    } catch (err) {
+      console.warn("[language-router] capture: parse failed:", (err as Error)?.message);
+    }
     const db = getDb();
     const ref = db.collection(`users/${TRAINING_UID}/items`).doc();
     const now = Date.now();
-    await ref.set({
+    const item: Record<string, any> = {
       id: ref.id,
-      name: "composition plan",
+      name: `plan: ${prompt.slice(0, 60)}`,
       lang: PLAN_LANG,
       mark: 2, // yellow — pending human review; promote to 3/4 to enter the fast path
       help,
@@ -518,7 +527,9 @@ async function capturePlanForCuration(prompt: string, sequence: string[]): Promi
       upstreamLangs: [],
       created: now,
       updated: now,
-    });
+    };
+    if (code) item.code = code;
+    await ref.set(item);
     console.log(`[language-router] captured mark-2 L${PLAN_LANG} plan ${ref.id} sequence=${sequence.map((l) => `L${l}`).join(" -> ")}`);
   } catch (err) {
     console.warn("[language-router] capturePlanForCuration failed:", (err as Error)?.message);
@@ -554,7 +565,7 @@ export async function planSequence({
     const r: any = await generateCodeService({ auth, prompt, lang: PLAN_LANG, options, rid });
     if (!r?.errors && typeof r?.code === "string" && /\bplan\b/.test(r.code)) {
       const seq = [...new Set(extractLangIds(r.code, false))].slice(0, MAX_STAGES);
-      if (seq.length > 1) void capturePlanForCuration(prompt, seq);
+      if (seq.length > 1) await capturePlanForCuration(prompt, seq);
       console.log(`[language-router] L${PLAN_LANG} plan: ${seq.length ? seq.map((l) => `L${l}`).join(" -> ") : "atomic"}`);
       return seq.length > 0 ? seq : [headLang];
     }
@@ -566,6 +577,6 @@ export async function planSequence({
   // Fallback → Haiku planner (also captured for curation).
   const plan = await planComposition({ prompt, currentLang: headLang });
   const sequence = plan.map((s) => s.lang);
-  if (sequence.length > 1) void capturePlanForCuration(prompt, sequence);
+  if (sequence.length > 1) await capturePlanForCuration(prompt, sequence);
   return sequence;
 }
