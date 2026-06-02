@@ -3,7 +3,7 @@ import admin from "firebase-admin";
 import { CLAUDE_MODELS, generateCode as generateCodeService, extractSearchQuery } from "./code-generation-service";
 import { listLanguages } from "./languages";
 import { hybridSearch } from "./embedding-service";
-import { getData, parseCode } from "../pages/api/resolvers";
+import { parseCode } from "../pages/api/resolvers";
 
 // Hard bound on composition depth: head + at most (MAX_STAGES-1) upstream
 // stages. Keeps planning cost and chain length sane.
@@ -370,59 +370,38 @@ export async function orchestrateComposition({
   const headLang = sequence[0];
   const tail = sequence.slice(1); // langs consumed downstream, head→deepest order
 
-  // Generate the tail deepest-first so each stage is authored knowing the real
-  // data model produced by the stage it consumes. Content always comes from the
-  // original prompt (the dialect + its own RAG take the right slice); the
-  // sequence only fixes which languages run and in what order.
-  const taskIdByIndex: Record<number, string> = {};
-  let downstream: { lang: string; sample: unknown } | null = null;
+  // Generate ALL stages CONCURRENTLY. No stage needs another's compiled output
+  // at gen time — each just emits `data use "<next>"` (its dialect knows how) and
+  // api merges the upstream data at runtime via depth-first chain eval. So each
+  // stage gets only a wiring hint (the next lang id), never a fetched sample —
+  // avoiding the serial tail-first wait + the redundant compile/getData. Content
+  // always comes from the original prompt; the sequence only fixes order.
+  const gens = sequence.map((lang, i) => {
+    const next = sequence[i + 1];
+    const upstreamContext = next ? { lang: next } : null;
+    if (i === 0) {
+      // Head: carries currentCode/conversation + reuses the head retrieval;
+      // returned unposted for the resolver to post with systemValues.
+      return generateCodeService({
+        auth, prompt, lang, options, currentCode, rid, conversationSummary,
+        upstreamContext, precomputedExamples: headExamples ?? null,
+      });
+    }
+    return generateCodeService({ auth, prompt, lang, options, rid, upstreamContext });
+  });
 
-  for (let i = sequence.length - 1; i >= 1; i--) {
-    const lang = sequence[i];
-    const r: any = await generateCodeService({
-      auth,
-      prompt,
-      lang,
-      options,
-      rid,
-      upstreamContext: downstream,
-    });
+  const results: any[] = await Promise.all(gens);
+  const headResult = results[0];
+
+  for (let i = 1; i < results.length; i++) {
+    const r = results[i];
     if (r?.errors || !r?.taskId) {
       return failedOrchestration(
         headLang,
-        r?.errors || [{ message: `Upstream L${lang} failed to produce a taskId` }],
+        r?.errors || [{ message: `Upstream L${sequence[i]} failed to produce a taskId` }],
       );
-    }
-    taskIdByIndex[i] = r.taskId;
-
-    // Fetch this stage's compiled data model to feed the next stage up.
-    try {
-      const compiled: any = await getData({ authToken: auth?.token, id: r.taskId });
-      const sample = compiled && typeof compiled === "object" && "data" in compiled ? compiled.data : compiled;
-      downstream = { lang, sample };
-    } catch (err) {
-      console.warn(
-        `[language-router] orchestrateComposition: failed to fetch upstream L${lang} data:`,
-        (err as Error)?.message,
-      );
-      downstream = { lang, sample: null };
     }
   }
-
-  // Generate the head last — with currentCode (for edits), the data model of the
-  // stage directly beneath it, and the reused head-lang retrieval. Hand back
-  // src + metadata, not a posted task (the resolver re-parses+posts it).
-  const headResult: any = await generateCodeService({
-    auth,
-    prompt,
-    lang: headLang,
-    options,
-    currentCode,
-    rid,
-    conversationSummary,
-    upstreamContext: downstream,
-    precomputedExamples: headExamples ?? null,
-  });
 
   if (headResult?.errors) {
     return failedOrchestration(headLang, headResult.errors, headResult.model || "", {
@@ -433,7 +412,7 @@ export async function orchestrateComposition({
 
   // Chain order: head + s2 + s3 + … (api evaluates depth-first).
   const upstreamTaskIds: string[] = [];
-  for (let i = 1; i < sequence.length; i++) upstreamTaskIds.push(taskIdByIndex[i]);
+  for (let i = 1; i < results.length; i++) upstreamTaskIds.push(results[i].taskId as string);
 
   return {
     headSrc: headResult.code || null,

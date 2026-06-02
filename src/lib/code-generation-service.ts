@@ -520,7 +520,7 @@ async function createCodeGenerationPrompt(
   currentCode = null,
   rid = null,
   conversationSummary = null,
-  upstreamContext: { lang: string; sample: unknown } | null = null,
+  upstreamContext: { lang: string; sample?: unknown } | null = null,
 ) {
   // Dialect-specific blocks (cached per-language). The dialect block already
   // carries cache_control: ephemeral, so the per-language prefix is reused
@@ -584,10 +584,11 @@ async function createCodeGenerationPrompt(
   // fields rather than guessing the shape.
   const upstreamSection = upstreamContext
     ? `\n<UPSTREAM_DATA_MODEL>
-This program is one stage of a composition pipeline. At runtime it receives a data model produced by an upstream Graffiticode program written in dialect L${upstreamContext.lang}. Bind to that upstream with \`data use "${upstreamContext.lang}"\` and read its fields from the merged data. The upstream produces data shaped like:
-\`\`\`json
-${JSON.stringify(upstreamContext.sample, null, 2).slice(0, 2000)}
-\`\`\`
+This program is one stage of a composition pipeline. At runtime it consumes a data model produced by an upstream Graffiticode program written in dialect L${upstreamContext.lang}. Bind to that upstream with \`data use "${upstreamContext.lang}"\`.${
+        upstreamContext.sample != null
+          ? ` The upstream produces data shaped like:\n\`\`\`json\n${JSON.stringify(upstreamContext.sample, null, 2).slice(0, 2000)}\n\`\`\``
+          : ""
+      }
 `
     : "";
 
@@ -1118,7 +1119,7 @@ export async function generateCode({
   userId?: string | null;
   sessionId?: string | null;
   conversationSummary?: ConversationSummary | null;
-  upstreamContext?: { lang: string; sample: unknown } | null;
+  upstreamContext?: { lang: string; sample?: unknown } | null;
   precomputedExamples?: any[] | null;
 }) {
   const accessToken = auth?.token;
