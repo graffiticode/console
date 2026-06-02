@@ -79,9 +79,11 @@ interface RoutingResult {
 // suggestion than a single one-liner can.
 async function buildLanguageCatalog(opts?: { excludeLang?: string }) {
   const languages = await listLanguages({});
-  const candidates = opts?.excludeLang
-    ? languages.filter((l) => l.id !== opts.excludeLang)
-    : languages;
+  // Exclude internal dialects (e.g. the L0010 planner itself) so the planner
+  // never proposes itself as a composition stage; also honor excludeLang.
+  const candidates = languages.filter(
+    (l) => !l.internal && (!opts?.excludeLang || l.id !== opts.excludeLang),
+  );
   const catalog = candidates
     .map((l) => {
       const head = l.summary || l.routingHint || l.description;
