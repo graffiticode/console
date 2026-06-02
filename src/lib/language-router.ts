@@ -10,12 +10,12 @@ import { getData, parseCode } from "../pages/api/resolvers";
 const MAX_STAGES = 4;
 
 // Composition planning is its own Graffiticode dialect, L0010: a program maps a
-// prompt to an ordered language sequence (and nothing else). Plans are learned
-// from the Haiku planner, written as mark-2 (yellow) items under the training
-// uid, promoted to mark 3/4 by a human, then embedded into `training_examples`
-// (lang 0010) — the same curation workflow every dialect uses.
+// prompt to an ordered language sequence (and nothing else). Plans are written
+// as mark-2 (yellow) items under the generating user's account; a human promotes
+// good ones to mark 3/4, then `download-training-examples --lang 0010` (sourced
+// from the admin uid) + `update-embeddings` move them into the `training_examples`
+// corpus that the runtime planning-RAG (`lookupPlanRAG`) consults.
 const PLAN_LANG = "0010";
-const TRAINING_UID = "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1";
 // A retrieved head-lang example containing `data use "<id>"` triggers planning;
 // only examples this relevant count. A planning-RAG hit must be at least this
 // similar to be trusted (no compile / no LLM on a hit).
@@ -492,11 +492,16 @@ export async function lookupPlanRAG({
   }
 }
 
-// Persist a Haiku-produced plan as a mark-2 (yellow) L0010 item under the
-// training uid, in the shape `download-training-examples` reads (help dialog +
-// `plan [...]` source). A human promotes good ones to mark 3/4, after which
-// `update-embeddings` moves them into the L0010 planning-RAG corpus. Best-effort.
-async function capturePlanForCuration(prompt: string, sequence: string[]): Promise<void> {
+// Persist a generated plan as a mark-2 (yellow) L0010 item under the
+// generating user's account, in the shape `download-training-examples` reads
+// (help dialog + `plan [...]` source). Writing under the requesting user keeps
+// item-owner == task-owner (the L0010 task was posted under their auth), so
+// there's no cross-uid ACL mismatch. A human promotes good ones to mark 3/4,
+// after which `update-embeddings` moves them into the L0010 planning-RAG corpus.
+// The RAG itself stays curated from the admin uid via the curation scripts.
+// Best-effort; skipped for free-plan / anonymous sessions.
+async function capturePlanForCuration(auth: any, prompt: string, sequence: string[]): Promise<void> {
+  if (!auth?.uid || auth.freePlan) return;
   try {
     const planSrc = `plan [${sequence.map((l) => `"${l}"`).join(" ")}]..`;
     const help = JSON.stringify([
@@ -513,7 +518,7 @@ async function capturePlanForCuration(prompt: string, sequence: string[]): Promi
       console.warn("[language-router] capture: parse failed:", (err as Error)?.message);
     }
     const db = getDb();
-    const ref = db.collection(`users/${TRAINING_UID}/items`).doc();
+    const ref = db.collection(`users/${auth.uid}/items`).doc();
     const now = Date.now();
     const item: Record<string, any> = {
       id: ref.id,
@@ -565,7 +570,7 @@ export async function planSequence({
     const r: any = await generateCodeService({ auth, prompt, lang: PLAN_LANG, options, rid });
     if (!r?.errors && typeof r?.code === "string" && /\bplan\b/.test(r.code)) {
       const seq = [...new Set(extractLangIds(r.code, false))].slice(0, MAX_STAGES);
-      if (seq.length > 1) await capturePlanForCuration(prompt, seq);
+      if (seq.length > 1) await capturePlanForCuration(auth, prompt, seq);
       console.log(`[language-router] L${PLAN_LANG} plan: ${seq.length ? seq.map((l) => `L${l}`).join(" -> ") : "atomic"}`);
       return seq.length > 0 ? seq : [headLang];
     }
@@ -577,6 +582,6 @@ export async function planSequence({
   // Fallback → Haiku planner (also captured for curation).
   const plan = await planComposition({ prompt, currentLang: headLang });
   const sequence = plan.map((s) => s.lang);
-  if (sequence.length > 1) await capturePlanForCuration(prompt, sequence);
+  if (sequence.length > 1) await capturePlanForCuration(auth, prompt, sequence);
   return sequence;
 }
