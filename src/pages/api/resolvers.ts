@@ -416,6 +416,9 @@ export async function generateCode({
     let upstreamLangs: string[] = [];
     let upstreamTaskIds: string[] = [];
     let headLang = language;
+    // True only when the sequence came from a planning-RAG hit (already curated),
+    // so we don't re-capture a duplicate mark-2 plan for it.
+    let fromRagHit = false;
 
     // Template generation
     if (prompt === "Create a minimal starting template") {
@@ -470,7 +473,9 @@ export async function generateCode({
       let sequence: string[] = [language];
       if (composeTrigger.length > 0) {
         console.log(`[composition] rid=${rid} compose trigger=${composeTrigger.map(l => `L${l}`).join(",")}`);
-        sequence = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid });
+        const planResult = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid });
+        sequence = planResult.sequence;
+        fromRagHit = planResult.fromRag;
       }
 
       if (sequence.length > 1) {
@@ -609,8 +614,9 @@ export async function generateCode({
     console.log(`[composition] rid=${rid} final taskId=${taskId} upstreamLangs=${upstreamLangs.length ? upstreamLangs.join(",") : "none"}`);
     // Capture the realized composition sequence as a mark-2 L0010 plan item for
     // curation — covers BOTH the planner and the reactive paths (the planner's
-    // RAG trigger can miss, so capture here, not inside planSequence).
-    if (upstreamLangs.length > 0) {
+    // RAG trigger can miss, so capture here, not inside planSequence). Skip when
+    // the sequence came from a planning-RAG hit: that plan is already curated.
+    if (upstreamLangs.length > 0 && !fromRagHit) {
       await capturePlanForCuration(auth, prompt, [headLang, ...upstreamLangs]);
     }
     const lexicon = await getLanguageLexicon(headLang);

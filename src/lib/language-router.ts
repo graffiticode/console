@@ -553,9 +553,16 @@ export async function capturePlanForCuration(auth: any, prompt: string, sequence
 // Resolve the language sequence for a composable request:
 //   1. planning-RAG hit (fast, no LLM) → return the stored sequence;
 //   2. miss → generate an L0010 `plan` item (the planner dialect), parse its
-//      sequence, and capture it as a mark-2 L0010 item for curation;
+//      sequence;
 //   3. if L0010 is unreachable/unusable → fall back to the Haiku planner.
-// Returns [headLang] when the request is atomic.
+// Returns [headLang] when the request is atomic. `fromRag` is true only on a
+// planning-RAG hit, so the resolver can skip re-capturing an already-curated
+// plan.
+export interface PlanResult {
+  sequence: string[];
+  fromRag: boolean;
+}
+
 export async function planSequence({
   prompt,
   headLang,
@@ -568,9 +575,9 @@ export async function planSequence({
   auth?: any;
   options?: any;
   rid?: string | null;
-}): Promise<string[]> {
+}): Promise<PlanResult> {
   const hit = await lookupPlanRAG({ prompt, rid });
-  if (hit && hit.length > 0) return hit;
+  if (hit && hit.length > 0) return { sequence: hit, fromRag: true };
 
   // Miss → generate an L0010 plan. This is a direct service call (it does NOT
   // re-enter the resolver's composition cascade, so no recursion). The L0010
@@ -580,15 +587,14 @@ export async function planSequence({
     if (!r?.errors && typeof r?.code === "string" && /\bplan\b/.test(r.code)) {
       const seq = [...new Set(extractLangIds(r.code, false))].slice(0, MAX_STAGES);
       console.log(`[language-router] L${PLAN_LANG} plan: ${seq.length ? seq.map((l) => `L${l}`).join(" -> ") : "atomic"}`);
-      return seq.length > 0 ? seq : [headLang];
+      return { sequence: seq.length > 0 ? seq : [headLang], fromRag: false };
     }
     console.warn(`[language-router] L${PLAN_LANG} codegen returned no usable plan; falling back to Haiku planner`);
   } catch (err) {
     console.warn(`[language-router] L${PLAN_LANG} codegen failed (${(err as Error)?.message}); falling back to Haiku planner`);
   }
 
-  // Fallback → Haiku planner. (Capture happens at the resolver's success point,
-  // covering both the planner and the reactive paths.)
+  // Fallback → Haiku planner. (Capture happens at the resolver's success point.)
   const plan = await planComposition({ prompt, currentLang: headLang });
-  return plan.map((s) => s.lang);
+  return { sequence: plan.map((s) => s.lang), fromRag: false };
 }
