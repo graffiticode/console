@@ -1,8 +1,8 @@
 import axios from "axios";
 import admin from "firebase-admin";
-import { CLAUDE_MODELS, generateCode as generateCodeService } from "./code-generation-service";
+import { CLAUDE_MODELS, generateCode as generateCodeService, extractSearchQuery } from "./code-generation-service";
 import { listLanguages } from "./languages";
-import { vectorSearch } from "./embedding-service";
+import { hybridSearch } from "./embedding-service";
 import { getData, parseCode } from "../pages/api/resolvers";
 
 // Hard bound on composition depth: head + at most (MAX_STAGES-1) upstream
@@ -20,7 +20,7 @@ const PLAN_LANG = "0010";
 // only examples this relevant count. A planning-RAG hit must be at least this
 // similar to be trusted (no compile / no LLM on a hit).
 const USE_TRIGGER_THRESHOLD = Number(process.env.COMPOSE_USE_TRIGGER_THRESHOLD ?? 0.6);
-const PLAN_RAG_THRESHOLD = Number(process.env.COMPOSE_PLAN_RAG_THRESHOLD ?? 0.85);
+const PLAN_RAG_THRESHOLD = Number(process.env.COMPOSE_PLAN_RAG_THRESHOLD ?? 0.7);
 
 function getDb() {
   try {
@@ -467,24 +467,30 @@ export async function lookupPlanRAG({
   rid?: string | null;
 }): Promise<string[] | null> {
   try {
-    const results = await vectorSearch({
+    // Use the SAME query path as the main code-gen RAG (extractSearchQuery +
+    // hybridSearch) so the lookup is symmetric with how L0010 keys are stored —
+    // an identical prompt scores ~1.0. allowExact keeps a perfect (distance 0)
+    // match from being dropped as degenerate.
+    const query = extractSearchQuery(prompt);
+    const results = await hybridSearch({
       collection: "training_examples",
-      query: prompt,
+      query,
       limit: 1,
       lang: PLAN_LANG,
       db: getDb(),
       rid: rid ?? null,
+      allowExact: true,
     });
     const top = results?.[0];
     if (!top) return null;
-    const sim = top.similarity ?? 0;
-    if (sim < PLAN_RAG_THRESHOLD) {
-      console.log(`[language-router] planRAG: best sim=${sim.toFixed(3)} < ${PLAN_RAG_THRESHOLD}, miss`);
+    const score = top.combinedScore ?? top.similarity ?? 0;
+    if (score < PLAN_RAG_THRESHOLD) {
+      console.log(`[language-router] planRAG: best score=${score.toFixed(3)} < ${PLAN_RAG_THRESHOLD}, miss`);
       return null;
     }
     const sequence = extractLangIds(top.code || "", false);
     if (sequence.length === 0) return null;
-    console.log(`[language-router] planRAG: HIT id=${top.id} sim=${sim.toFixed(3)} sequence=${sequence.map((l) => `L${l}`).join(" -> ")}`);
+    console.log(`[language-router] planRAG: HIT id=${top.id} score=${score.toFixed(3)} sequence=${sequence.map((l) => `L${l}`).join(" -> ")}`);
     return sequence;
   } catch (err) {
     console.warn("[language-router] planRAG lookup failed:", (err as Error)?.message);
@@ -503,9 +509,12 @@ export async function lookupPlanRAG({
 export async function capturePlanForCuration(auth: any, prompt: string, sequence: string[]): Promise<void> {
   if (!auth?.uid || auth.freePlan) return;
   try {
+    // Key the item on the canonical request (context-stripped) — the same text
+    // the planning-RAG lookup queries with — so an identical prompt re-hits.
+    const key = extractSearchQuery(prompt);
     const planSrc = `plan [${sequence.map((l) => `"${l}"`).join(" ")}]..`;
     const help = JSON.stringify([
-      { type: "user", user: prompt, timestamp: "" },
+      { type: "user", user: key, timestamp: "" },
       { type: "bot", help: { type: "code", language: "graffiticode", text: planSrc }, timestamp: "" },
     ]);
     // Parse to AST so it's a first-class item: getItems can lazily post a task
@@ -522,7 +531,7 @@ export async function capturePlanForCuration(auth: any, prompt: string, sequence
     const now = Date.now();
     const item: Record<string, any> = {
       id: ref.id,
-      name: `plan: ${prompt.slice(0, 60)}`,
+      name: `plan: ${key.slice(0, 60)}`,
       lang: PLAN_LANG,
       mark: 2, // yellow — pending human review; promote to 3/4 to enter the fast path
       help,

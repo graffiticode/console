@@ -291,6 +291,7 @@ export async function vectorSearch({
   lang,
   db,
   rid = null,
+  allowExact = false,
 }) {
   const startTime = Date.now();
 
@@ -354,10 +355,11 @@ export async function vectorSearch({
     results.forEach((doc) => {
       const data = doc.data();
       // Firebase returns distance, convert to similarity score.
-      // Cosine distance of exactly 0 (similarity 1.0) for different texts is impossible
-      // with real embeddings — it indicates a zero/degenerate vector in the index.
+      // Cosine distance of exactly 0 (similarity 1.0) usually indicates a
+      // zero/degenerate vector — skip it, UNLESS the caller wants exact matches
+      // (e.g. the planning-RAG, where an identical prompt is a legitimate 1.0 hit).
       const distance = doc.get("_distance");
-      if (distance == null || distance === 0) {
+      if (distance == null || (distance === 0 && !allowExact)) {
         return;
       }
       const similarity = 1 - distance; // For cosine distance
@@ -440,6 +442,7 @@ export async function hybridSearch({
   db,
   vectorWeight = 0.7,
   rid = null,
+  allowExact = false,
 }) {
   const startTime = Date.now();
 
@@ -463,6 +466,7 @@ export async function hybridSearch({
       lang,
       db,
       rid,
+      allowExact,
     });
 
     // Extract keywords from query

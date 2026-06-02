@@ -179,7 +179,7 @@ function parseMarkdownExamples(markdownContent) {
   }
 }
 
-function extractSearchQuery(prompt: string): string {
+export function extractSearchQuery(prompt: string): string {
   const marker = "Now, please address this new request:\n";
   const idx = prompt.lastIndexOf(marker);
   if (idx !== -1) {
