@@ -881,6 +881,21 @@ async function verifyCode(code, authToken, lang, rid = null) {
   }
 }
 
+// A verification result is a success when there's no error object, the status
+// isn't "error", and the errors field is empty. Critically, `getData` returns
+// `{ data, errors: [] }` with NO `status` field on success — so checking
+// `status === "success"` never matched, and an empty `errors: []` array is
+// truthy, which made the fix loop run wasted repair rounds on already-compiled
+// code. Treat an empty errors array (or none) as success.
+function verificationSucceeded(vr: any): boolean {
+  if (!vr) return false;
+  if (vr.error) return false;
+  if (vr.status === "error") return false;
+  const e = vr.errors;
+  if (Array.isArray(e)) return e.length === 0;
+  return !e;
+}
+
 /**
  * Parse error information from Graffiticode compilation results
  * @param {Object} errorInfo - Error information from the API
@@ -1521,11 +1536,9 @@ export async function generateCode({
       while (fixAttempts < MAX_FIX_ATTEMPTS && estimatedUnits <= MAX_UNITS_FOR_FIXES) {
         verificationResult = await verifyCode(generatedCode, accessToken, lang, requestId);
 
-        // If compilation was successful, break the loop
-        if (
-          verificationResult.status === "success" &&
-          !verificationResult.error
-        ) {
+        // If compilation was successful, break the loop. (Success = no real
+        // errors; getData returns no `status` field and `errors: []` on success.)
+        if (verificationSucceeded(verificationResult)) {
           safeRAGAnalytics.endStage(requestId, "compilation");
           safeRAGAnalytics.trackCompilation(requestId, {
             success: true,
@@ -1536,11 +1549,8 @@ export async function generateCode({
           break;
         }
 
-        // If there were errors, try to fix them
-        if (
-          verificationResult.errors ||
-          verificationResult.status === "error"
-        ) {
+        // Otherwise there were real errors — try to fix them.
+        if (!verificationSucceeded(verificationResult)) {
           // Classify the error type
           const errorType = classifyCompilerError(verificationResult);
           const structuredErrors = parseStructuredErrors(verificationResult);
@@ -1810,7 +1820,7 @@ export async function generateCode({
     }
 
     // Complete analytics tracking — mark as failed if compilation had errors
-    const compilationSucceeded = !verificationResult?.error && verificationResult?.status !== 'error';
+    const compilationSucceeded = verificationResult ? verificationSucceeded(verificationResult) : true;
     await safeRAGAnalytics.completeRequest(requestId, compilationSucceeded);
 
     // Return formatted response with the language name
