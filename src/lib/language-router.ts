@@ -500,7 +500,7 @@ export async function lookupPlanRAG({
 // after which `update-embeddings` moves them into the L0010 planning-RAG corpus.
 // The RAG itself stays curated from the admin uid via the curation scripts.
 // Best-effort; skipped for free-plan / anonymous sessions.
-async function capturePlanForCuration(auth: any, prompt: string, sequence: string[]): Promise<void> {
+export async function capturePlanForCuration(auth: any, prompt: string, sequence: string[]): Promise<void> {
   if (!auth?.uid || auth.freePlan) return;
   try {
     const planSrc = `plan [${sequence.map((l) => `"${l}"`).join(" ")}]..`;
@@ -570,7 +570,6 @@ export async function planSequence({
     const r: any = await generateCodeService({ auth, prompt, lang: PLAN_LANG, options, rid });
     if (!r?.errors && typeof r?.code === "string" && /\bplan\b/.test(r.code)) {
       const seq = [...new Set(extractLangIds(r.code, false))].slice(0, MAX_STAGES);
-      if (seq.length > 1) await capturePlanForCuration(auth, prompt, seq);
       console.log(`[language-router] L${PLAN_LANG} plan: ${seq.length ? seq.map((l) => `L${l}`).join(" -> ") : "atomic"}`);
       return seq.length > 0 ? seq : [headLang];
     }
@@ -579,9 +578,8 @@ export async function planSequence({
     console.warn(`[language-router] L${PLAN_LANG} codegen failed (${(err as Error)?.message}); falling back to Haiku planner`);
   }
 
-  // Fallback → Haiku planner (also captured for curation).
+  // Fallback → Haiku planner. (Capture happens at the resolver's success point,
+  // covering both the planner and the reactive paths.)
   const plan = await planComposition({ prompt, currentLang: headLang });
-  const sequence = plan.map((s) => s.lang);
-  if (sequence.length > 1) await capturePlanForCuration(auth, prompt, sequence);
-  return sequence;
+  return plan.map((s) => s.lang);
 }

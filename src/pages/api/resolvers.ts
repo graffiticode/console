@@ -6,7 +6,7 @@ import { getFirestore } from "../../utils/db";
 import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } from "../../lib/api";
 import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
-import { planSequence, detectComposeTrigger, orchestrateComposition } from "../../lib/language-router";
+import { planSequence, detectComposeTrigger, orchestrateComposition, capturePlanForCuration } from "../../lib/language-router";
 import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
@@ -607,6 +607,12 @@ export async function generateCode({
       ? `${headTaskId}+${upstreamTaskIds.join("+")}`
       : headTaskId;
     console.log(`[composition] rid=${rid} final taskId=${taskId} upstreamLangs=${upstreamLangs.length ? upstreamLangs.join(",") : "none"}`);
+    // Capture the realized composition sequence as a mark-2 L0010 plan item for
+    // curation — covers BOTH the planner and the reactive paths (the planner's
+    // RAG trigger can miss, so capture here, not inside planSequence).
+    if (upstreamLangs.length > 0) {
+      await capturePlanForCuration(auth, prompt, [headLang, ...upstreamLangs]);
+    }
     const lexicon = await getLanguageLexicon(headLang);
     const resolvedSrc = unparse(code, lexicon || {});
 
