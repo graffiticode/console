@@ -27,6 +27,7 @@ export const LANGUAGES: Language[] = [
   // { id: "0002", name: "L0002", description: "Core language", domains: [] },
   { id: "0003", name: "L0003", description: "Hello, image, theme, and print", domains: [] },
   { id: "0010", name: "L0010", description: "Composition planner (internal)", routingHint: "Internal composition-planning dialect: maps a request to an ordered language sequence (`plan [...]` → { langs }). Not a content-authoring target.", domains: [], status: "Internal", internal: true },
+  { id: "0013", name: "L0013", description: "Screenshot thumbnails (internal)", routingHint: "Internal utility dialect: renders an existing item's form view to a cropped PNG thumbnail and uploads it (`snap item \"<id>\" {}`). Not a content-authoring target.", domains: [], status: "Internal", internal: true },
   // { id: "0011", name: "L0011", description: "Property editors", domains: [] },
   // { id: "0012", name: "L0012", description: "Object viewers", domains: [] },
   // { id: "0137", name: "L0137", description: "Data transformers", domains: [] },
