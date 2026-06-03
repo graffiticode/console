@@ -1,11 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import useSWR from 'swr';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { selectLanguages } from './language-selector';
-import { countItems } from '../utils/swr/fetchers';
+import { countItems, loadItems } from '../utils/swr/fetchers';
+import ToolsThumbnailGrid from './tools-thumbnail-grid';
 import SignIn from './SignIn';
 import { getTitle } from '../lib/utils';
 
@@ -62,6 +61,12 @@ export default function ToolsGallery({ language, setLanguage }) {
   const { data: langInfo } = useSWR(
     selectedLangId ? `https://l${selectedLangId}.graffiticode.org/language-info.json` : null,
     (url) => fetch(url).then(r => r.ok ? r.json() : null),
+  );
+
+  // The selected language's items (current user) — each renders as a thumbnail if an image exists.
+  const { data: toolItems } = useSWR(
+    user && selectedLangId ? { user, lang: selectedLangId, mark: null, client: 'console' } : null,
+    loadItems,
   );
 
   const toggleLangPanel = useCallback(() => {
@@ -171,18 +176,18 @@ export default function ToolsGallery({ language, setLanguage }) {
         {/* Main content area */}
         <div className="flex flex-col grow border border-gray-200 rounded-none h-[calc(100vh-90px)]">
           {selectedLang ? (
-            <div className="p-4">
-              <h2 className="text-lg font-medium text-gray-800">{selectedLang}</h2>
-              <p className="text-sm text-gray-500 mt-4 max-w-[600px]">
-                {langInfo?.description || languages.find(l => l.name === selectedLang)?.routingHint || languages.find(l => l.name === selectedLang)?.description}
-              </p>
-              <Link
-                href="/items"
-                className="inline-flex items-center gap-1 mt-4 px-3 py-1.5 border border-gray-300 rounded-none text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Go to items
-                <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-              </Link>
+            <div className="flex flex-col h-full min-h-0">
+              {/* Fixed header: language title + description */}
+              <div className="flex-none p-4">
+                <h2 className="text-lg font-medium text-gray-800">{selectedLang}</h2>
+                <p className="text-sm text-gray-500 mt-4 max-w-[600px]">
+                  {langInfo?.description || languages.find(l => l.name === selectedLang)?.routingHint || languages.find(l => l.name === selectedLang)?.description}
+                </p>
+              </div>
+              {/* Scrolling thumbnail grid */}
+              <div className="flex-1 min-h-0 overflow-auto px-4 pb-4">
+                <ToolsThumbnailGrid items={toolItems} />
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-full">
