@@ -21,7 +21,7 @@ function Tile({ item, onResolve }: { item: any; onResolve: (id: string, ok: bool
       <img
         src={`${THUMBS}/${item.id}.png`}
         alt={item.name || item.id}
-        className="block h-[100px] w-auto"
+        className="block h-[200px] w-auto"
         onLoad={() => { setState('ok'); onResolve(item.id, true); }}
         onError={() => { setState('fail'); onResolve(item.id, false); }}
       />
