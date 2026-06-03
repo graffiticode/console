@@ -16,10 +16,11 @@ function Tile({ item, onResolve }: { item: any; onResolve: (id: string, ok: bool
       className="mb-2 block break-inside-avoid border border-gray-200 hover:border-gray-400"
       style={{ display: state === 'ok' ? 'block' : 'none' }}
     >
+      {/* No loading="lazy": a lazy image inside a display:none tile never enters the viewport,
+          so it would never load (and never reveal). display:none still loads eagerly. */}
       <img
         src={`${THUMBS}/${item.id}.png`}
         alt={item.name || item.id}
-        loading="lazy"
         className="block w-full"
         onLoad={() => { setState('ok'); onResolve(item.id, true); }}
         onError={() => { setState('fail'); onResolve(item.id, false); }}
