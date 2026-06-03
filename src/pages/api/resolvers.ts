@@ -717,19 +717,6 @@ export async function createItem({
   }
 }
 
-async function makeApiTaskPublic({ auth, lang, code }) {
-  try {
-    const task = { lang, code };
-    // Let the api know this item is now public by sending with empty
-    // Authorization header. This can't be undone!
-    const headers = {};
-    const { data } = await postApiJSON("/task", { task }, headers);
-    return data;
-  } catch (x) {
-    console.error("updateTask()", "ERROR", x.stack);
-  }
-}
-
 export async function updateItem({
   auth,
   id,
@@ -781,21 +768,23 @@ export async function updateItem({
       updates.upstreamLangs = upstreamLangs;
     }
     if (isPublic !== undefined) {
-      updates.isPublic = isPublic;
       if (isPublic) {
-        // Fetch source from API task for making public
+        // Make every task segment public BEFORE marking the item public, so a
+        // failure leaves the item private (no local/API drift). A composition's
+        // taskId is `head+up1+up2…`; getApiTask returns one entry per segment.
+        // Re-posting each segment's {lang, code} with isPublic flips acls.public
+        // on the existing task (postTask deletes Authorization but keeps the
+        // persistent storage-type header). Each segment has its own lang.
         const itemTaskId = taskId || itemData.taskId;
         if (itemTaskId) {
-          try {
-            const apiTask = await getApiTask({ id: itemTaskId, auth });
-            const taskData = apiTask[0] || apiTask;
-            const code = taskData.code;
-            await makeApiTaskPublic({ auth, lang: itemData.lang, code });
-          } catch (err) {
-            console.error("updateItem: failed to fetch source for makeApiTaskPublic", err);
-          }
+          const apiTask = await getApiTask({ id: itemTaskId, auth });
+          const segments = Array.isArray(apiTask) ? apiTask : [apiTask];
+          await Promise.all(segments.map(({ lang, code }) =>
+            postTask({ auth, task: { lang, code }, ephemeral: false, isPublic: true })
+          ));
         }
       }
+      updates.isPublic = isPublic;
     }
     // Only bump the `updated` timestamp when the taskId actually changes —
     // that's the canonical "content changed" signal. Metadata edits (mark,
