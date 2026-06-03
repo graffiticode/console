@@ -13,7 +13,7 @@ function Tile({ item, onResolve }: { item: any; onResolve: (id: string, ok: bool
     <Link
       href={`/items/${item.id}`}
       title={item.name || item.id}
-      className="mb-2 block break-inside-avoid border border-gray-200 hover:border-gray-400"
+      className="block border border-gray-200 hover:border-gray-400"
       style={{ display: state === 'ok' ? 'block' : 'none' }}
     >
       {/* No loading="lazy": a lazy image inside a display:none tile never enters the viewport,
@@ -21,7 +21,7 @@ function Tile({ item, onResolve }: { item: any; onResolve: (id: string, ok: bool
       <img
         src={`${THUMBS}/${item.id}.png`}
         alt={item.name || item.id}
-        className="block w-full"
+        className="block h-[100px] w-auto"
         onLoad={() => { setState('ok'); onResolve(item.id, true); }}
         onError={() => { setState('fail'); onResolve(item.id, false); }}
       />
@@ -43,7 +43,7 @@ export default function ToolsThumbnailGrid({ items }: { items?: any[] }) {
 
   return (
     <>
-      <div className="columns-2 gap-2 md:columns-3">
+      <div className="flex flex-wrap gap-2">
         {items.map((item) => (
           <Tile key={item.id} item={item} onResolve={onResolve} />
         ))}

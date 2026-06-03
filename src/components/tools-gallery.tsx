@@ -23,21 +23,6 @@ export default function ToolsGallery({ language, setLanguage }) {
   const languages = selectLanguages(domain);
 
   const [selectedLang, setSelectedLang] = useState<string | null>(language?.name || null);
-  const selectedLangRef = useRef(selectedLang);
-  selectedLangRef.current = selectedLang;
-
-  // Sync tool selection to global language when navigating away
-  useEffect(() => {
-    const handleRouteChange = () => {
-      if (selectedLangRef.current) {
-        setLanguage({ name: selectedLangRef.current });
-      }
-    };
-    router.events.on('routeChangeStart', handleRouteChange);
-    return () => {
-      router.events.off('routeChangeStart', handleRouteChange);
-    };
-  }, [router.events, setLanguage]);
 
   const langItemRefs = useRef<Record<string, HTMLLIElement | null>>({});
   const langListRef = useRef<HTMLUListElement>(null);
@@ -79,6 +64,8 @@ export default function ToolsGallery({ language, setLanguage }) {
 
   const handleSelectLanguage = (lang) => {
     setSelectedLang(lang.name);
+    // Make this the app-wide selected language so the Items page shows its items.
+    setLanguage(lang);
   };
 
   if (!user) {
