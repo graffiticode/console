@@ -154,7 +154,8 @@ export const countItems = async ({ user, langs }) => {
   }));
   const counts = {};
   groups.forEach((group, index) => {
-    counts[langs[index].name] = group.length;
+    // Exclude mark 5 (black) from the Tools view count.
+    counts[langs[index].name] = group.filter(it => it.mark !== 5).length;
   });
   return counts;
 };

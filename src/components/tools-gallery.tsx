@@ -173,7 +173,7 @@ export default function ToolsGallery({ language, setLanguage }) {
               </div>
               {/* Scrolling thumbnail grid */}
               <div className="flex-1 min-h-0 overflow-auto px-4 pb-4">
-                <ToolsThumbnailGrid items={toolItems} />
+                <ToolsThumbnailGrid items={(toolItems || []).filter(it => it.mark !== 5)} />
               </div>
             </div>
           ) : (
