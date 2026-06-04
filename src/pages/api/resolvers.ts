@@ -843,8 +843,6 @@ export async function getItems({ auth, lang, mark, client }) {
       const snap = await baseQuery.where("client", "==", client).get();
       docs = snap.docs;
     }
-    const items = [];
-
     // Get the user's sharedItems data to add to items (skip on free plan — shared
     // items are not supported there).
     const sharedItemsData = auth.freePlan
@@ -853,10 +851,12 @@ export async function getItems({ auth, lang, mark, client }) {
 
     const now = Date.now();
 
-    // Process items and fetch legacy data if needed
-    for (const doc of docs) {
+    // Process items in parallel and fetch legacy data if needed. Each doc may make
+    // its own postTask HTTP call and/or legacy-help read; running them concurrently
+    // avoids an N-item network waterfall. Order is restored by the sort below.
+    const settled = await Promise.all(docs.map(async (doc) => {
       const data = doc.data();
-      if (!isItemVisibleToFreePlan(data, auth, now)) continue;
+      if (!isItemVisibleToFreePlan(data, auth, now)) return null;
       let help = data.help;
       let taskId = data.taskId;
 
@@ -914,7 +914,7 @@ export async function getItems({ auth, lang, mark, client }) {
       // Skip items without a valid taskId
       if (!taskId) {
         console.log("getItems()", "Skipping item with null taskId", doc.id);
-        continue;
+        return null;
       }
 
       const item = {
@@ -934,8 +934,10 @@ export async function getItems({ auth, lang, mark, client }) {
       };
 
       const timestamp = data.updated || data.created || 0;
-      items.push({ ...item, _sortKey: timestamp });
-    }
+      return { ...item, _sortKey: timestamp };
+    }));
+
+    const items = settled.filter(Boolean);
     items.sort((a, b) => b._sortKey - a._sortKey);
     return items.map(({ _sortKey, ...item }) => item);
   } catch (error) {

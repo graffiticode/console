@@ -10,6 +10,7 @@ import Editor from './editor';
 import { ImageGallery } from './ImageGallery';
 import SignIn from "./SignIn";
 import { getAccessToken, loadItems, loadItemClientTags, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
+import { readItemsCache, writeItemsCache } from '../utils/items-cache';
 import useGraffiticodeAuth from "@graffiticode/auth-react";
 import FormView from "./FormView";
 import { Disclosure } from '@headlessui/react'
@@ -263,11 +264,19 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     setUpstreamLangs(next);
   }, []);
 
-  // Load items from the API only once on initialization
+  // Load items from the API. Seed from localStorage so the nav paints instantly
+  // on reload, then revalidate in the background.
+  const itemsKey = user && lang && mark && !hideItemsNav
+    ? `items-${user.uid}-${lang}-${mark.id}-${clientId}`
+    : null;
   const { data: loadedItems, mutate, isLoading: isLoadingItems } = useSWR(
-    user && lang && mark && !hideItemsNav ? `items-${user.uid}-${lang}-${mark.id}-${clientId}` : null,
+    itemsKey,
     () => loadItems({ user, lang, mark: mark.id, client: clientId }),
     {
+      // Show last-known items immediately, before any network call.
+      fallbackData: readItemsCache(itemsKey),
+      // Refresh the cache on every successful fetch.
+      onSuccess: (data) => writeItemsCache(itemsKey, data),
       // Poll so edits made by other clients (e.g. the MCP server) surface here.
       // SWR's default deep compare avoids re-renders when nothing changed, and
       // refreshWhenHidden defaults false so a backgrounded tab doesn't poll.
