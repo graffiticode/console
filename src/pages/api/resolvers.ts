@@ -3,7 +3,7 @@ import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
 import { getFirestore } from "../../utils/db";
-import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } from "../../lib/api";
+import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon, languageOfflineMessage, isLanguageOfflineError } from "../../lib/api";
 import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
 import { planSequence, detectComposeTrigger, orchestrateComposition, capturePlanForCuration } from "../../lib/language-router";
@@ -74,7 +74,8 @@ export async function parseCode({ lang, src, systemValues = {} }: { lang: string
   try {
     const lexicon = await getLanguageLexicon(lang);
     if (!lexicon) {
-      return { code: null, errors: [{ message: `No lexicon found for language ${lang}`, from: -1, to: -1 }] };
+      // lexicon.js couldn't be fetched — treat the language service as offline.
+      return { code: null, errors: [{ message: languageOfflineMessage(lang), from: -1, to: -1 }] };
     }
     const nodePool = await parser.parse(lang, src, lexicon, buildParseCallbacks(systemValues));
 
@@ -103,6 +104,9 @@ export async function parseCode({ lang, src, systemValues = {} }: { lang: string
     }
     return { code: JSON.stringify(nodePool), errors: null };
   } catch (err) {
+    if (isLanguageOfflineError(err)) {
+      return { code: null, errors: [{ message: languageOfflineMessage(lang), from: -1, to: -1 }] };
+    }
     return { code: null, errors: [{ message: err.message || "Parse error", from: -1, to: -1 }] };
   }
 }

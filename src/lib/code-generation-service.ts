@@ -11,7 +11,7 @@
  */
 
 import axios from "axios";
-import { postApiCompile, getLanguageAsset, getLanguageLexicon } from "./api";
+import { postApiCompile, getLanguageAsset, getLanguageLexicon, languageOfflineMessage, isLanguageOfflineError } from "./api";
 import { postTask, getData, parseCode } from "../pages/api/resolvers";
 import admin from "firebase-admin";
 import { ragLog, generateRequestId } from "./logger";
@@ -807,6 +807,13 @@ async function verifyCode(code, authToken, lang, rid = null) {
       id = result?.id;
     } catch (postError) {
       console.error("postTask() ERROR", postError);
+      if (isLanguageOfflineError(postError)) {
+        return {
+          status: "error",
+          error: { message: languageOfflineMessage(lang), statusCode: postError.statusCode || 503 },
+          data: null,
+        };
+      }
       return {
         status: "error",
         error: {
@@ -875,7 +882,7 @@ async function verifyCode(code, authToken, lang, rid = null) {
 
     return {
       status: "error",
-      error: { message: error.message },
+      error: { message: isLanguageOfflineError(error) ? languageOfflineMessage(lang) : error.message },
       data: null,
     };
   }
