@@ -40,6 +40,9 @@ export default function ToolsGallery({ language, setLanguage }) {
   const { data: itemCounts } = useSWR(
     user ? { user, langs: languages } : null,
     countItems,
+    // Selecting a tool re-renders the tree and revalidates; keep the prior
+    // counts on screen instead of flashing "0" while the refetch is in flight.
+    { keepPreviousData: true, revalidateIfStale: false },
   );
 
   const selectedLangId = selectedLang ? languages.find(l => l.name === selectedLang)?.id : null;
