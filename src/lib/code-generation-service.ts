@@ -759,7 +759,7 @@ function getFallbackResponse(prompt, options) {
  * @param {string} accessToken - Authentication token for the API
  * @returns {Promise<Object>} - Compilation results including any errors
  */
-async function verifyCode(code, authToken, lang, rid = null) {
+async function verifyCode(code, authToken, lang, rid = null, isPublic = false) {
 
   const startTime = Date.now();
 
@@ -802,7 +802,9 @@ async function verifyCode(code, authToken, lang, rid = null) {
         auth: { token: authToken },
         task,
         ephemeral: true,
-        isPublic: false,
+        // Free-plan tasks (head + composition upstream segments) are posted
+        // public so the auth-less MCP widget iframe can render them by taskId.
+        isPublic,
       });
       id = result?.id;
     } catch (postError) {
@@ -1541,7 +1543,7 @@ export async function generateCode({
 
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
       while (fixAttempts < MAX_FIX_ATTEMPTS && estimatedUnits <= MAX_UNITS_FOR_FIXES) {
-        verificationResult = await verifyCode(generatedCode, accessToken, lang, requestId);
+        verificationResult = await verifyCode(generatedCode, accessToken, lang, requestId, isFreePlan);
 
         // If compilation was successful, break the loop. (Success = no real
         // errors; getData returns no `status` field and `errors: []` on success.)

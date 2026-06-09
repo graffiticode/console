@@ -74,7 +74,7 @@ export async function parseCode({ lang, src, systemValues = {} }: { lang: string
   try {
     const lexicon = await getLanguageLexicon(lang);
     if (!lexicon) {
-      // lexicon.js couldn't be fetched — treat the language service as offline.
+      // lexicon.json couldn't be fetched — treat the language service as offline.
       return { code: null, errors: [{ message: languageOfflineMessage(lang), from: -1, to: -1 }] };
     }
     const nodePool = await parser.parse(lang, src, lexicon, buildParseCallbacks(systemValues));
@@ -606,7 +606,10 @@ export async function generateCode({
       auth,
       task: { lang: headLang, code },
       ephemeral: true,
-      isPublic: false,
+      // Free-plan compiled tasks are owned by a shared service uid, so an
+      // auth-less inline render (MCP widget iframe) can't read them. Post them
+      // public so /form?id=<taskId> renders by their unguessable taskId.
+      isPublic: auth.freePlan === true,
     });
     const headTaskId = taskData.id;
     if (!headTaskId) {
