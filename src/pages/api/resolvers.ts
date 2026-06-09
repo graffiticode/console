@@ -3,7 +3,7 @@ import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
 import { getFirestore } from "../../utils/db";
-import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon } from "../../lib/api";
+import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon, languageOfflineMessage, isLanguageOfflineError } from "../../lib/api";
 import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
 import { planSequence, detectComposeTrigger, orchestrateComposition, capturePlanForCuration } from "../../lib/language-router";
@@ -74,7 +74,8 @@ export async function parseCode({ lang, src, systemValues = {} }: { lang: string
   try {
     const lexicon = await getLanguageLexicon(lang);
     if (!lexicon) {
-      return { code: null, errors: [{ message: `No lexicon found for language ${lang}`, from: -1, to: -1 }] };
+      // lexicon.json couldn't be fetched — treat the language service as offline.
+      return { code: null, errors: [{ message: languageOfflineMessage(lang), from: -1, to: -1 }] };
     }
     const nodePool = await parser.parse(lang, src, lexicon, buildParseCallbacks(systemValues));
 
@@ -103,6 +104,9 @@ export async function parseCode({ lang, src, systemValues = {} }: { lang: string
     }
     return { code: JSON.stringify(nodePool), errors: null };
   } catch (err) {
+    if (isLanguageOfflineError(err)) {
+      return { code: null, errors: [{ message: languageOfflineMessage(lang), from: -1, to: -1 }] };
+    }
     return { code: null, errors: [{ message: err.message || "Parse error", from: -1, to: -1 }] };
   }
 }
@@ -602,7 +606,10 @@ export async function generateCode({
       auth,
       task: { lang: headLang, code },
       ephemeral: true,
-      isPublic: false,
+      // Free-plan compiled tasks are owned by a shared service uid, so an
+      // auth-less inline render (MCP widget iframe) can't read them. Post them
+      // public so /form?id=<taskId> renders by their unguessable taskId.
+      isPublic: auth.freePlan === true,
     });
     const headTaskId = taskData.id;
     if (!headTaskId) {
@@ -717,19 +724,6 @@ export async function createItem({
   }
 }
 
-async function makeApiTaskPublic({ auth, lang, code }) {
-  try {
-    const task = { lang, code };
-    // Let the api know this item is now public by sending with empty
-    // Authorization header. This can't be undone!
-    const headers = {};
-    const { data } = await postApiJSON("/task", { task }, headers);
-    return data;
-  } catch (x) {
-    console.error("updateTask()", "ERROR", x.stack);
-  }
-}
-
 export async function updateItem({
   auth,
   id,
@@ -781,21 +775,23 @@ export async function updateItem({
       updates.upstreamLangs = upstreamLangs;
     }
     if (isPublic !== undefined) {
-      updates.isPublic = isPublic;
       if (isPublic) {
-        // Fetch source from API task for making public
+        // Make every task segment public BEFORE marking the item public, so a
+        // failure leaves the item private (no local/API drift). A composition's
+        // taskId is `head+up1+up2…`; getApiTask returns one entry per segment.
+        // Re-posting each segment's {lang, code} with isPublic flips acls.public
+        // on the existing task (postTask deletes Authorization but keeps the
+        // persistent storage-type header). Each segment has its own lang.
         const itemTaskId = taskId || itemData.taskId;
         if (itemTaskId) {
-          try {
-            const apiTask = await getApiTask({ id: itemTaskId, auth });
-            const taskData = apiTask[0] || apiTask;
-            const code = taskData.code;
-            await makeApiTaskPublic({ auth, lang: itemData.lang, code });
-          } catch (err) {
-            console.error("updateItem: failed to fetch source for makeApiTaskPublic", err);
-          }
+          const apiTask = await getApiTask({ id: itemTaskId, auth });
+          const segments = Array.isArray(apiTask) ? apiTask : [apiTask];
+          await Promise.all(segments.map(({ lang, code }) =>
+            postTask({ auth, task: { lang, code }, ephemeral: false, isPublic: true })
+          ));
         }
       }
+      updates.isPublic = isPublic;
     }
     // Only bump the `updated` timestamp when the taskId actually changes —
     // that's the canonical "content changed" signal. Metadata edits (mark,
@@ -854,8 +850,6 @@ export async function getItems({ auth, lang, mark, client }) {
       const snap = await baseQuery.where("client", "==", client).get();
       docs = snap.docs;
     }
-    const items = [];
-
     // Get the user's sharedItems data to add to items (skip on free plan — shared
     // items are not supported there).
     const sharedItemsData = auth.freePlan
@@ -864,10 +858,12 @@ export async function getItems({ auth, lang, mark, client }) {
 
     const now = Date.now();
 
-    // Process items and fetch legacy data if needed
-    for (const doc of docs) {
+    // Process items in parallel and fetch legacy data if needed. Each doc may make
+    // its own postTask HTTP call and/or legacy-help read; running them concurrently
+    // avoids an N-item network waterfall. Order is restored by the sort below.
+    const settled = await Promise.all(docs.map(async (doc) => {
       const data = doc.data();
-      if (!isItemVisibleToFreePlan(data, auth, now)) continue;
+      if (!isItemVisibleToFreePlan(data, auth, now)) return null;
       let help = data.help;
       let taskId = data.taskId;
 
@@ -925,7 +921,7 @@ export async function getItems({ auth, lang, mark, client }) {
       // Skip items without a valid taskId
       if (!taskId) {
         console.log("getItems()", "Skipping item with null taskId", doc.id);
-        continue;
+        return null;
       }
 
       const item = {
@@ -945,8 +941,10 @@ export async function getItems({ auth, lang, mark, client }) {
       };
 
       const timestamp = data.updated || data.created || 0;
-      items.push({ ...item, _sortKey: timestamp });
-    }
+      return { ...item, _sortKey: timestamp };
+    }));
+
+    const items = settled.filter(Boolean);
     items.sort((a, b) => b._sortKey - a._sortKey);
     return items.map(({ _sortKey, ...item }) => item);
   } catch (error) {

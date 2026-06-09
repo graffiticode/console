@@ -26,7 +26,7 @@ export const getLanguageLexicon = async (lang: string) => {
   }
 
   try {
-    const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.js');
+    const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.json');
     let lexicon = null;
 
     if (lexiconData) {
@@ -50,6 +50,27 @@ export const getLanguageLexicon = async (lang: string) => {
     console.warn(`Failed to fetch lexicon for L${lang}:`, error.message);
     return null;
   }
+};
+
+// Standardized message shown when a language service can't be reached.
+export const languageOfflineMessage = (lang: string) =>
+  `Language L${lang} is offline. Try again later.`;
+
+// Detect exceptions thrown when a language service is unavailable: the
+// lexicon.json asset can't be fetched/parsed, or the API connection fails.
+export const isLanguageOfflineError = (err: any): boolean => {
+  if (!err) return false;
+  const message = typeof err === "string" ? err : (err.message || "");
+  if (/lexicon|unable to use lexicon|malformed lexicon|offline/i.test(message)) {
+    return true;
+  }
+  const netCodes = /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNRESET|EAI_AGAIN|ECONNABORTED/i;
+  if (netCodes.test(String(err.code || "")) || netCodes.test(message)) {
+    return true;
+  }
+  const status = typeof err.statusCode === "number" ? err.statusCode
+    : (typeof err.status === "number" ? err.status : 0);
+  return status >= 500;
 };
 
 export const getApiTask = async ({ auth, id }) => {

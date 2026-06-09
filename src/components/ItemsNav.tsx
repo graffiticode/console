@@ -2,12 +2,14 @@ import { Menu, Transition } from '@headlessui/react'
 import { Fragment, useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { PlusIcon, ShareIcon, UserIcon } from '@heroicons/react/20/solid';
-import { DocumentDuplicateIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { DocumentDuplicateIcon, ArrowTopRightOnSquareIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import MarkSelector, { marks } from './mark-selector';
 import { clientOptionForId } from './client-selector';
 import PublicToggle from './public-toggle';
 import ShareItemDialog from './ShareItemDialog';
 import { createItem } from '../utils/swr/fetchers';
+import { generateThumbnail } from '../lib/generate-thumbnail';
+import { useThumbnailJob } from '../lib/thumbnail-jobs';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 
 function classNames(...classes) {
@@ -38,6 +40,11 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+  // Snapshot generation is tracked in a shared store keyed by item id, so the spinner survives
+  // closing/reopening the menu (and shows on other surfaces) while the ~10s render runs.
+  const isSnapping = useThumbnailJob(itemId);
+  // The snapshot dialect itself isn't a thumbnail target — hide the action on L0013 items.
+  const isSnapLang = String(lang ?? '').replace(/^L/i, '').padStart(4, '0') === '0013';
   const [taskIdValue, setTaskIdValue] = useState(taskId || "");
   const [taskIdCopied, setTaskIdCopied] = useState(false);
   const [taskIdFocused, setTaskIdFocused] = useState(false);
@@ -161,6 +168,19 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
       console.error('Failed to copy item:', error);
     } finally {
       setIsCopying(false);
+    }
+  };
+
+  // Generate (or refresh) this item's gallery thumbnail via the L0013 snap dialect. Runs in the
+  // background (~10s); the shared job store drives the spinner here and on other surfaces.
+  const handleGenerateThumbnail = async (e) => {
+    e.stopPropagation();
+    if (!user || isSnapping) return;
+    try {
+      await generateThumbnail({ user, itemId });
+      onRefresh();
+    } catch (error) {
+      console.error('Failed to generate thumbnail:', error);
     }
   };
 
@@ -380,6 +400,21 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                   <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
                   <span>{isCopying ? 'Copying...' : 'Make a copy'}</span>
                 </button>
+                {!isSnapLang && (
+                  <button
+                    onClick={handleGenerateThumbnail}
+                    disabled={isSnapping}
+                    className="flex items-center w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-none disabled:cursor-not-allowed"
+                    title="Generate a gallery thumbnail of this item (runs in the background)"
+                  >
+                    {isSnapping ? (
+                      <span className="h-4 w-4 mr-2 inline-block animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+                    ) : (
+                      <PhotoIcon className="h-4 w-4 mr-2" />
+                    )}
+                    <span>{isSnapping ? 'Generating thumbnail…' : 'Generate thumbnail'}</span>
+                  </button>
+                )}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

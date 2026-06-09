@@ -91,6 +91,16 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
     };
   }, []);
 
+  // Remember the last top-level tab the user was on so the root page can route
+  // them back here. Unlike the item/task selection keys (cleared on logout), this
+  // survives sign-out so a logged-out visitor still lands on their last tab.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (pathName === 'tools' || pathName === 'items' || pathName === 'tasks') {
+      localStorage.setItem('graffiticode:selected:lastTab', pathName);
+    }
+  }, [pathName]);
+
   const currentLangId = (language?.name || '').replace(/^L/i, '').padStart(4, '0') || null;
   const resolveNavHref = (item: NavigationItem): string => {
     if (item.name === 'Items' && navItem.id && navItem.lang === currentLangId) return `/items/${navItem.id}`;
