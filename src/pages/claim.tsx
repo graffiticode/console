@@ -102,7 +102,17 @@ export default function Claim() {
       }
       // Clear before navigating so a remount or re-visit can't re-run the copy.
       sessionStorage.removeItem(CLAIM_TOKEN_KEY);
-      router.replace(`/items/${items[0].id}`);
+      // Hard navigation (not router.replace): /claim has just been through the
+      // auth provider's sign-in remount, and the SPA route change silently
+      // no-ops in that state — the URL never changes. window.location.assign
+      // forces a real navigation. The ?lang= param (honored by _app.tsx) makes
+      // the claimed item's language active from first paint, so the items
+      // sidebar lists the claimed items immediately instead of the previously
+      // selected language's list.
+      const target = items[0].lang
+        ? `/items/${items[0].id}?lang=${items[0].lang}`
+        : `/items/${items[0].id}`;
+      window.location.assign(target);
     } catch (err: any) {
       // Leave the token in place so "Try again" can retry.
       setClaimError(err?.message || 'Failed to claim items');
