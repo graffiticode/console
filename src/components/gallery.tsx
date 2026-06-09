@@ -399,7 +399,16 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   // Recompute ordered/filtered items whenever loadedItems, sort, or dateFilter change.
   useEffect(() => {
     if (hideItemsNav && directItem && initialItemId) return;
-    if (!loadedItems || loadedItems.length === 0) {
+
+    // Merge the directly-loaded deep-link item (e.g. a just-claimed item) into
+    // the list when the list query hasn't caught up yet, so it appears in the
+    // nav immediately instead of after the next revalidation. Dedup by id.
+    const base = Array.isArray(loadedItems) ? loadedItems : [];
+    const sourceItems = (directItem && initialItemId && !base.some(i => i.id === (directItem as any).id))
+      ? [directItem, ...base]
+      : base;
+
+    if (sourceItems.length === 0) {
       if (!initialItemId) setItems([]);
       return;
     }
@@ -412,8 +421,10 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     const dfFrom = typeof dateFilter?.from === 'number' && Number.isFinite(dateFilter.from) ? dateFilter.from : null;
     const dfTo = typeof dateFilter?.to === 'number' && Number.isFinite(dateFilter.to) ? dateFilter.to : null;
     const filteredItems = (dfFrom === null && dfTo === null)
-      ? loadedItems
-      : loadedItems.filter(i => {
+      ? sourceItems
+      : sourceItems.filter(i => {
+          // Never hide the open deep-linked item, regardless of date filter.
+          if (initialItemId && i.id === initialItemId) return true;
           const ts = Number(i[dfField] || 0);
           if (dfFrom !== null && ts < dfFrom) return false;
           if (dfTo !== null && ts > dfTo) return false;
