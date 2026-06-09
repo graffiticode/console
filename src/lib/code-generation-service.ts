@@ -46,7 +46,7 @@ import {
 import { checkCompileAllowed } from "./usage-service";
 import { assertNotCappedOrThrow, recordSpend } from "./free-plan-spend";
 import { checkBurstLimit, checkDailyLimit } from "./free-plan-throttle";
-import { FreePlanError } from "./free-plan-context";
+import { FreePlanError, buildSignupUrl } from "./free-plan-context";
 
 const ANTHROPIC_INPUT_USD_PER_TOKEN = 3 / 1_000_000;
 const ANTHROPIC_OUTPUT_USD_PER_TOKEN = 15 / 1_000_000;
@@ -70,7 +70,10 @@ function estimateUsdCost(usage?: {
 }
 
 const MIN_FREE_PLAN_PROMPT = 20;
-const MAX_FREE_PLAN_PROMPT = 2000;
+// Caps the prompt the MCP server sends — a windowed dialog (last ~6 user turns +
+// the new request), with the current source and system instructions excluded.
+// It is NOT a cap on a single description: an iterating session accumulates here.
+const MAX_FREE_PLAN_PROMPT = 10000;
 
 // Global cache for language assets with TTL
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -1158,9 +1161,18 @@ export async function generateCode({
       });
     }
     if (trimmed.length > MAX_FREE_PLAN_PROMPT) {
+      const signupUrl = buildSignupUrl("prompt_too_long");
+      // Self-contained message: only the string propagates back through the MCP
+      // tool result, so the recovery paths and URL must live in the text itself.
       throw new FreePlanError("free_plan_description_too_long", 400, {
         error: "free_plan_description_too_long",
-        message: `Free plan descriptions must be ${MAX_FREE_PLAN_PROMPT} characters or fewer.`,
+        message:
+          `This request plus the recent conversation is ${trimmed.length} characters, over the ` +
+          `${MAX_FREE_PLAN_PROMPT}-character free-plan limit. To continue: send a shorter request, ` +
+          `or create a new item to reset the conversation, or sign in to remove the limit — ${signupUrl}`,
+        limit: MAX_FREE_PLAN_PROMPT,
+        length: trimmed.length,
+        signup_url: signupUrl,
       });
     }
     await assertNotCappedOrThrow();
