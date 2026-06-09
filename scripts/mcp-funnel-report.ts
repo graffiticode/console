@@ -114,6 +114,17 @@ function deriveSessionNamespace(uuid: string): string {
   return crypto.createHash('sha256').update(`${salt}:${uuid}`).digest('hex');
 }
 
+// `help` is the conversation log — one entry per user turn. It is persisted as
+// a JSON *string* (not an array), so parse before counting. The first turn is
+// the create; length > 1 means the user came back and revised → iterated.
+function helpLen(h: any): number {
+  if (Array.isArray(h)) return h.length;
+  if (typeof h === 'string') {
+    try { const p = JSON.parse(h); return Array.isArray(p) ? p.length : 0; } catch { return 0; }
+  }
+  return 0;
+}
+
 function inWindow(ms: number | null, start: Date | null, end: Date): boolean {
   if (ms == null) return false;
   if (start && ms < start.getTime()) return false;
@@ -225,8 +236,10 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date): Log
 
 // --- B. Firestore conversion tail -------------------------------------------
 interface FsStats {
+  freePlanSessions: number;    // distinct namespaces among free-plan items
   freePlanItems: number;
   iteratedItems: number;
+  anonSessions: number;        // distinct anon namespaces ever seen (free-plan ∪ claimed)
   claimedSessions: number;     // distinct namespaces with a claimed item
   accounts: number;            // distinct owner uids of claimed items
   paidGlobal: number;          // all users on a paid plan
@@ -236,17 +249,17 @@ interface FsStats {
 }
 
 async function fetchFirestore(start: Date | null, end: Date): Promise<FsStats> {
-  // Free-plan items (bounded by 48h TTL → small); filter window client-side.
+  // Free-plan items (one Firestore account, namespaced per session); filter window client-side.
   const freeSnap = await db.collectionGroup('items').where('freePlan', '==', true).get();
   let freePlanItems = 0, iteratedItems = 0;
+  const freePlanSessionSet = new Set<string>();
   freeSnap.forEach((doc) => {
     const d = doc.data();
     const created = toMillis(d.created);
     if (!inWindow(created, start, end)) return;
     freePlanItems++;
-    const updated = toMillis(d.updated);
-    const helpLen = Array.isArray(d.help) ? d.help.length : 0;
-    if (helpLen > 1 || (updated && created && updated > created + 1000)) iteratedItems++;
+    if (typeof d.sessionNamespace === 'string') freePlanSessionSet.add(d.sessionNamespace);
+    if (helpLen(d.help) > 1) iteratedItems++;
   });
 
   // Claimed items → sessions + accounts.
@@ -282,9 +295,15 @@ async function fetchFirestore(start: Date | null, end: Date): Promise<FsStats> {
     if (snap.exists) { const usd = Number(snap.data()?.usd); if (Number.isFinite(usd)) spendUsd += usd; }
   }
 
+  // Claimed sessions left the free-plan pool, so union both for the true
+  // "distinct anonymous sessions ever seen" denominator.
+  const anonSessions = new Set([...freePlanSessionSet, ...claimedNamespaces]).size;
+
   return {
+    freePlanSessions: freePlanSessionSet.size,
     freePlanItems,
     iteratedItems,
+    anonSessions,
     claimedSessions: claimedNamespaces.size,
     accounts: accountUids.size,
     paidGlobal,
@@ -312,7 +331,7 @@ function generateHtml(data: {
   const now = new Date().toISOString();
   const { log, fs } = data;
 
-  const northAccount = pct(fs.accounts, log.distinctSessions);
+  const northAccount = pct(fs.accounts, fs.anonSessions);
   const northFirstTry = pct(log.firstTrySuccess, log.sessionsWithCreate);
   const overallSuccess = pct(log.toolOk, log.toolTotal);
   const callsPerSession = log.distinctSessions
@@ -351,32 +370,44 @@ function generateHtml(data: {
 <p class="subtitle">Period: ${data.periodLabel} · logs freshness: ${data.freshness} · generated ${now}</p>
 
 <div class="banner">
-  North-star ratios join Cloud Logging (top of funnel) with Firestore (claims/accounts).
-  Sessions and claims may straddle the window edge (a claim can land up to 24h after the session),
-  so treat conversion as directional until volume is higher.
+  <b>Two views, two sources, two time-coverages.</b> The <b>Engagement</b> table is the live MCP
+  event stream (Cloud Logging) and only covers traffic <b>since the instrumented server deployed</b>.
+  The <b>Items &amp; conversion</b> table is Firestore state and includes <b>historical</b> items
+  that predate instrumentation. So the two tables won't reconcile yet — that's expected during the
+  fill-in window, not a bug. North-star ratios are computed within whichever source has the data.
 </div>
 
 <h2>North-star metrics</h2>
 <div class="cards">
-  ${card('① Anon → Account', northAccount, `${fs.accounts} accounts / ${log.distinctSessions} sessions`)}
-  ${card('② First-try success', northFirstTry, `${log.firstTrySuccess} ok / ${log.sessionsWithCreate} first creates`)}
+  ${card('① Anon → Account', northAccount, `${fs.accounts} accounts / ${fs.anonSessions} anon sessions (Firestore)`)}
+  ${card('② First-try success', northFirstTry, `${log.firstTrySuccess} ok / ${log.sessionsWithCreate} first creates (logs)`)}
 </div>
 <div class="cards" style="margin-top:16px;">
-  ${card('Overall tool success', overallSuccess, `${log.toolOk}/${log.toolTotal} calls`)}
-  ${card('Calls / session', callsPerSession, 'engagement depth')}
+  ${card('Overall tool success', overallSuccess, `${log.toolOk}/${log.toolTotal} calls (logs)`)}
+  ${card('Calls / session', callsPerSession, 'engagement depth (logs)')}
   ${card('Free-plan spend', `$${fs.spendUsd.toFixed(2)}`, costPerAccount + ' / account')}
   ${card('Paid (from claim)', `${fs.paidFromClaim}`, `${fs.paidGlobal} paid overall`)}
 </div>
 
-<h2>Funnel</h2>
+<h2>Engagement — MCP event logs <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(since instrumentation deployed)</span></h2>
 <table>
-  <thead><tr><th>Stage</th><th class="num">Count</th><th class="num">Conv. from prev</th><th>Source / note</th></tr></thead>
+  <thead><tr><th>Stage</th><th class="num">Count</th><th class="num">Conv. from prev</th><th>Note</th></tr></thead>
   <tbody>
-    ${funnelRow('Connected (sessions)', log.distinctSessions, '—', 'MCP connect events')}
-    ${funnelRow('Browsed (read routes)', log.browseCalls, '—', 'list_languages · get_language_info · get_item')}
-    ${funnelRow('Created an item', log.createCalls, pct(log.sessionsWithCreate, log.distinctSessions) + ' of sessions', `${log.sessionsWithCreate} sessions created`)}
-    ${funnelRow('Iterated (update)', fs.iteratedItems, pct(fs.iteratedItems, fs.freePlanItems) + ' of items', `${log.updateCalls} update calls · ${fs.freePlanItems} free-plan items`)}
-    ${funnelRow('Claimed', fs.claimedSessions, pct(fs.claimedSessions, log.distinctSessions) + ' of sessions', 'distinct claimed namespaces')}
+    ${funnelRow('Connected (sessions)', log.distinctSessions, '—', 'mcp_connect events')}
+    ${funnelRow('Browsed (read-route calls)', log.browseCalls, '—', 'list_languages · get_language_info · get_item')}
+    ${funnelRow('Create calls', log.createCalls, pct(log.sessionsWithCreate, log.distinctSessions) + ' of sessions', `${log.sessionsWithCreate} sessions created an item`)}
+    ${funnelRow('Update calls (iterate)', log.updateCalls, pct(log.updateCalls, log.createCalls) + ' of creates', 'create → revisit')}
+  </tbody>
+</table>
+
+<h2>Items &amp; conversion — Firestore <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(includes pre-instrumentation history)</span></h2>
+<table>
+  <thead><tr><th>Stage</th><th class="num">Count</th><th class="num">Conv. from prev</th><th>Note</th></tr></thead>
+  <tbody>
+    ${funnelRow('Anonymous sessions', fs.anonSessions, '—', 'distinct namespaces, free-plan ∪ claimed')}
+    ${funnelRow('Free-plan items created', fs.freePlanItems, pct(fs.freePlanItems, fs.anonSessions) + ' items/session', `${fs.freePlanSessions} sessions still hold free-plan items`)}
+    ${funnelRow('Iterated (≥2 turns)', fs.iteratedItems, pct(fs.iteratedItems, fs.freePlanItems) + ' of items', 'help has more than the create turn')}
+    ${funnelRow('Claimed', fs.claimedSessions, pct(fs.claimedSessions, fs.anonSessions) + ' of anon sessions', 'distinct claimed namespaces')}
     ${funnelRow('Account created', fs.accounts, pct(fs.accounts, fs.claimedSessions) + ' of claims', 'distinct owner uids')}
     ${funnelRow('Paid', fs.paidFromClaim, pct(fs.paidFromClaim, fs.accounts) + ' of accounts', 'paid plan & active')}
   </tbody>
@@ -423,16 +454,20 @@ async function main() {
   const html = generateHtml({ periodLabel, freshness, log, fs });
   writeFileSync(opts.output, html);
 
-  // Terminal summary (handy even though the artifact is HTML).
+  // Terminal summary (handy even though the artifact is HTML). Two sources kept
+  // visually separate — they cover different time windows during fill-in.
   console.log('\n=== MCP Funnel — ' + periodLabel + ' ===');
+  console.log('-- Engagement (event logs, since deploy) --');
   console.log(`Sessions connected     : ${log.distinctSessions}`);
   console.log(`Browse (read) calls    : ${log.browseCalls}`);
-  console.log(`Create calls / sessions: ${log.createCalls} / ${log.sessionsWithCreate}`);
+  console.log(`Create / update calls  : ${log.createCalls} / ${log.updateCalls}`);
   console.log(`North#2 first-try succ : ${pct(log.firstTrySuccess, log.sessionsWithCreate)} (${log.firstTrySuccess}/${log.sessionsWithCreate})`);
   console.log(`Overall tool success   : ${pct(log.toolOk, log.toolTotal)} (${log.toolOk}/${log.toolTotal})`);
-  console.log(`Free-plan items/iter   : ${fs.freePlanItems} / ${fs.iteratedItems}`);
+  console.log('-- Items & conversion (Firestore, incl. history) --');
+  console.log(`Anon sessions          : ${fs.anonSessions}`);
+  console.log(`Free-plan items / iter : ${fs.freePlanItems} / ${fs.iteratedItems}`);
   console.log(`Claimed → accounts     : ${fs.claimedSessions} → ${fs.accounts}`);
-  console.log(`North#1 anon→account   : ${pct(fs.accounts, log.distinctSessions)}`);
+  console.log(`North#1 anon→account   : ${pct(fs.accounts, fs.anonSessions)} (${fs.accounts}/${fs.anonSessions})`);
   console.log(`Paid (from claim/all)  : ${fs.paidFromClaim} / ${fs.paidGlobal}`);
   console.log(`Free-plan spend        : $${fs.spendUsd.toFixed(2)}`);
   console.log(`\nWrote ${opts.output}`);
