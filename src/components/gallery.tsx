@@ -463,6 +463,17 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         pickItem(matchingItem);
         return;
       }
+      // A deep-linked item (e.g. just-claimed) may not be in the list query yet
+      // due to read-after-write lag, even though a direct getItem already has it.
+      // Select the directly-loaded item and DO NOT fall back to loadedItems[0] —
+      // that would hijack the selection (and rewrite the URL via pickItem) to a
+      // different, older item. Wait for directItem / list revalidation instead.
+      if (initialItemId) {
+        if (directItem && directItem.id === initialItemId) {
+          pickItem(directItem);
+        }
+        return;
+      }
     }
     const first = loadedItems[0];
     if (first) pickItem(first);
