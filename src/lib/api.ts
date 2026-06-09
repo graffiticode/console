@@ -26,7 +26,7 @@ export const getLanguageLexicon = async (lang: string) => {
   }
 
   try {
-    const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.js');
+    const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.json');
     let lexicon = null;
 
     if (lexiconData) {
@@ -57,7 +57,7 @@ export const languageOfflineMessage = (lang: string) =>
   `Language L${lang} is offline. Try again later.`;
 
 // Detect exceptions thrown when a language service is unavailable: the
-// lexicon.js asset can't be fetched/parsed, or the API connection fails.
+// lexicon.json asset can't be fetched/parsed, or the API connection fails.
 export const isLanguageOfflineError = (err: any): boolean => {
   if (!err) return false;
   const message = typeof err === "string" ? err : (err.message || "");
