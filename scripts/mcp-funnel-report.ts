@@ -65,18 +65,24 @@ function parseArgs(argv: string[]) {
   let freshness = '';
   let from = '';
   let to = '';
+  let slowMs = 60000; // errors slower than this are flagged as likely timeouts
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--period' && args[i + 1]) { period = args[++i]; }
     else if (args[i] === '--output' && args[i + 1]) { output = args[++i]; }
     else if (args[i] === '--freshness' && args[i + 1]) { freshness = args[++i]; }
     else if (args[i] === '--from' && args[i + 1]) { from = args[++i]; }
     else if (args[i] === '--to' && args[i + 1]) { to = args[++i]; }
+    else if (args[i] === '--slow-ms' && args[i + 1]) { slowMs = parseInt(args[++i], 10); }
   }
   if (!['all', 'month', 'week', 'day'].includes(period)) {
     console.error('Error: --period must be "all", "month", "week", or "day"');
     process.exit(1);
   }
-  return { period, output, freshness, from, to };
+  if (!Number.isFinite(slowMs) || slowMs <= 0) {
+    console.error('Error: --slow-ms must be a positive number of milliseconds');
+    process.exit(1);
+  }
+  return { period, output, freshness, from, to, slowMs };
 }
 
 function windowBounds(opts: { period: string; from: string; to: string }) {
@@ -174,6 +180,14 @@ function fetchEvents(freshness: string): McpEvent[] {
     .filter((p) => p && (p.ev === 'mcp_connect' || p.ev === 'mcp_tool'));
 }
 
+interface SlowError {
+  tool: string;
+  ms: number;
+  t: string;
+  session: string;
+  lang?: string;
+}
+
 interface LogStats {
   connects: number;
   distinctSessions: number;
@@ -186,16 +200,22 @@ interface LogStats {
   toolOk: number;
   toolGenFailed: number;
   toolError: number;
+  slowMs: number;            // threshold used
+  slowErrors: number;        // errors with ms >= slowMs (likely timeouts)
+  maxErrorMs: number;        // slowest error seen (0 if none)
+  slowErrorSamples: SlowError[];
   langCounts: Record<string, number>;
 }
 
-function summarizeEvents(events: McpEvent[], start: Date | null, end: Date): LogStats {
+function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slowMs: number): LogStats {
   const inWin = events.filter((e) => inWindow(toMillis(e.t), start, end));
   const sessions = new Set<string>();
   const firstCreateBySession: Record<string, McpEvent> = {};
   const langCounts: Record<string, number> = {};
   let connects = 0, browseCalls = 0, createCalls = 0, updateCalls = 0;
   let toolTotal = 0, toolOk = 0, toolGenFailed = 0, toolError = 0;
+  let slowErrors = 0, maxErrorMs = 0;
+  const slowErrorSamples: SlowError[] = [];
 
   for (const e of inWin) {
     if (e.session) sessions.add(e.session);
@@ -204,7 +224,17 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date): Log
     toolTotal++;
     if (e.outcome === 'ok') toolOk++;
     else if (e.outcome === 'generation_failed') toolGenFailed++;
-    else if (e.outcome === 'error') toolError++;
+    else if (e.outcome === 'error') {
+      toolError++;
+      const ms = typeof e.ms === 'number' ? e.ms : 0;
+      if (ms > maxErrorMs) maxErrorMs = ms;
+      // A slow error is almost always an upstream timeout, not a validation
+      // failure (cap/short-input errors return in 1-5s before any model call).
+      if (ms >= slowMs) {
+        slowErrors++;
+        slowErrorSamples.push({ tool: e.tool ?? '?', ms, t: e.t, session: e.session, lang: e.lang });
+      }
+    }
     if (e.tool && READ_TOOLS.has(e.tool)) browseCalls++;
     if (e.tool === 'create_item') {
       createCalls++;
@@ -217,6 +247,7 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date): Log
 
   const createSessions = Object.values(firstCreateBySession);
   const firstTrySuccess = createSessions.filter((e) => e.outcome === 'ok').length;
+  slowErrorSamples.sort((a, b) => b.ms - a.ms);
 
   return {
     connects,
@@ -230,6 +261,10 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date): Log
     toolOk,
     toolGenFailed,
     toolError,
+    slowMs,
+    slowErrors,
+    maxErrorMs,
+    slowErrorSamples,
     langCounts,
   };
 }
@@ -415,13 +450,22 @@ function generateHtml(data: {
 
 <h2>Tool-call outcomes</h2>
 <table>
-  <thead><tr><th>Outcome</th><th class="num">Count</th><th class="num">Share</th></tr></thead>
+  <thead><tr><th>Outcome</th><th class="num">Count</th><th class="num">Share</th><th>Note</th></tr></thead>
   <tbody>
-    <tr><td>ok</td><td class="num">${log.toolOk}</td><td class="num">${pct(log.toolOk, log.toolTotal)}</td></tr>
-    <tr><td>generation_failed</td><td class="num">${log.toolGenFailed}</td><td class="num">${pct(log.toolGenFailed, log.toolTotal)}</td></tr>
-    <tr><td>error</td><td class="num">${log.toolError}</td><td class="num">${pct(log.toolError, log.toolTotal)}</td></tr>
+    <tr><td>ok</td><td class="num">${log.toolOk}</td><td class="num">${pct(log.toolOk, log.toolTotal)}</td><td class="note"></td></tr>
+    <tr><td>generation_failed</td><td class="num">${log.toolGenFailed}</td><td class="num">${pct(log.toolGenFailed, log.toolTotal)}</td><td class="note">backend rejected (e.g. free-plan cap, invalid input) — fast</td></tr>
+    <tr><td>error</td><td class="num">${log.toolError}</td><td class="num">${pct(log.toolError, log.toolTotal)}</td><td class="note">${log.slowErrors} slow (&ge;${(log.slowMs / 1000).toFixed(0)}s) → likely timeouts${log.maxErrorMs ? `; slowest ${(log.maxErrorMs / 1000).toFixed(0)}s` : ''}</td></tr>
   </tbody>
 </table>
+
+<h2>Likely timeouts <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(error outcomes ≥ ${(log.slowMs / 1000).toFixed(0)}s — full-sheet regen / upstream timeout, not a validation reject)</span></h2>
+${log.slowErrorSamples.length ? `<table>
+  <thead><tr><th>Time (UTC)</th><th>Tool</th><th>Lang</th><th class="num">Latency</th><th>Session</th></tr></thead>
+  <tbody>
+    ${log.slowErrorSamples.slice(0, 30).map((s) => `<tr><td>${s.t.slice(0, 19).replace('T', ' ')}</td><td>${s.tool}</td><td>${s.lang ?? ''}</td><td class="num">${(s.ms / 1000).toFixed(1)}s</td><td class="note">${s.session.slice(0, 12)}…</td></tr>`).join('\n    ')}
+  </tbody>
+</table>
+${log.slowErrors > 30 ? `<p class="note">… and ${log.slowErrors - 30} more.</p>` : ''}` : `<p class="note">None in window. (Adjust the threshold with <code>--slow-ms</code>; default 60000.)</p>`}
 
 <h2>Language distribution (interest signal)</h2>
 <table>
@@ -446,7 +490,7 @@ async function main() {
 
   console.log(`Reading MCP events (gcloud logging, freshness=${freshness})...`);
   const events = fetchEvents(freshness);
-  const log = summarizeEvents(events, start, end);
+  const log = summarizeEvents(events, start, end, opts.slowMs);
 
   console.log('Reading Firestore conversion tail...');
   const fs = await fetchFirestore(start, end);
@@ -463,6 +507,7 @@ async function main() {
   console.log(`Create / update calls  : ${log.createCalls} / ${log.updateCalls}`);
   console.log(`North#2 first-try succ : ${pct(log.firstTrySuccess, log.sessionsWithCreate)} (${log.firstTrySuccess}/${log.sessionsWithCreate})`);
   console.log(`Overall tool success   : ${pct(log.toolOk, log.toolTotal)} (${log.toolOk}/${log.toolTotal})`);
+  console.log(`Errors / slow (timeouts): ${log.toolError} / ${log.slowErrors} (≥${(log.slowMs / 1000).toFixed(0)}s${log.maxErrorMs ? `, slowest ${(log.maxErrorMs / 1000).toFixed(0)}s` : ''})`);
   console.log('-- Items & conversion (Firestore, incl. history) --');
   console.log(`Anon sessions          : ${fs.anonSessions}`);
   console.log(`Free-plan items / iter : ${fs.freePlanItems} / ${fs.iteratedItems}`);
