@@ -340,7 +340,16 @@ const resolvers = {
       if (item) {
         task.item = item;
       }
-      const { id } = await postTask({ auth, task, ephemeral: ephemeral || auth.freePlan, isPublic: false });
+      // A task backing a public item must itself be public, else anonymous
+      // viewers can't load edits. Visibility follows the item; free-plan items
+      // are never public. (isPublic posts anonymously, so the task is created
+      // public — no owner uid needed: public reads bypass the acl uid check.)
+      let isPublic = false;
+      if (item && !auth.freePlan) {
+        const existing = await getItem({ auth, id: item });
+        isPublic = !!existing?.isPublic;
+      }
+      const { id } = await postTask({ auth, task, ephemeral: ephemeral || auth.freePlan, isPublic });
       return id;
     },
     logCompile: async (_, args, ctx) => {
