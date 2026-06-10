@@ -232,7 +232,7 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                         rel="noopener noreferrer"
                         className="text-gray-300 hover:text-white text-sm tracking-wide font-medium"
                       >
-                        Community
+                        Forum
                       </a>
                       <div className="flex items-center gap-2 text-gray-400 hover:text-white">
                         <SignIn />
@@ -295,7 +295,7 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                     rel="noopener noreferrer"
                     className="text-gray-300 hover:text-white block px-3 py-2 rounded-none text-base font-medium"
                   >
-                    Community
+                    Forum
                   </Disclosure.Button>
                 </div>
                 <div className="pt-4 pb-3 border-t border-gray-700">
