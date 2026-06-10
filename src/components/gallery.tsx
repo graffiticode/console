@@ -404,12 +404,19 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     // the list when the list query hasn't caught up yet, so it appears in the
     // nav immediately instead of after the next revalidation. Dedup by id.
     const base = Array.isArray(loadedItems) ? loadedItems : [];
-    const sourceItems = (directItem && initialItemId && !base.some(i => i.id === (directItem as any).id))
+    // Only merge the deep-linked item when it actually belongs to the active
+    // filter — otherwise switching mark/lang would leak the open item into a
+    // list it doesn't match (and keep a stale list from clearing).
+    const directMatchesFilter = !!directItem && !!initialItemId &&
+      normalizeLangId((directItem as any).lang) === normalizeLangId(lang) &&
+      Number((directItem as any).mark) === mark?.id &&
+      (clientId === 'all' || ((directItem as any).client ?? 'console') === clientId);
+    const sourceItems = (directMatchesFilter && !base.some(i => i.id === (directItem as any).id))
       ? [directItem, ...base]
       : base;
 
     if (sourceItems.length === 0) {
-      if (!initialItemId) setItems([]);
+      setItems([]);
       return;
     }
 
@@ -441,7 +448,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       return dir * (aTime - bTime);
     });
     setItems(orderedItems);
-  }, [loadedItems, directItem, initialItemId, sort, dateFilter]);
+  }, [loadedItems, directItem, initialItemId, sort, dateFilter, lang, mark?.id, clientId]);
 
   // Resolve selection (and load its source) only when the source data changes.
   useEffect(() => {
