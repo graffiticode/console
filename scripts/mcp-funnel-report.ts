@@ -269,6 +269,63 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
   };
 }
 
+// --- A2. Claim events (console-side; anon→account) --------------------------
+// Claims run in the console resolver, not the MCP server, so failures never
+// reach the mcp_tool stream and Firestore only records successes. This reads
+// the structured `claim` events emitted by claimFreePlanSession.
+interface ClaimEvent {
+  ev: 'claim';
+  t: string;
+  outcome: 'ok' | 'error';
+  session: string;
+  transferred?: number;
+  err?: string;
+}
+
+function fetchClaimEvents(freshness: string): ClaimEvent[] {
+  let raw: string;
+  try {
+    raw = execFileSync('gcloud', [
+      'logging', 'read', 'jsonPayload.ev="claim"',
+      '--project', PROJECT,
+      '--format', 'json',
+      '--freshness', freshness,
+      '--limit', '50000',
+    ], { encoding: 'utf-8', maxBuffer: 256 * 1024 * 1024 });
+  } catch {
+    return [];
+  }
+  let entries: any[];
+  try { entries = JSON.parse(raw); } catch { return []; }
+  return entries.map((e) => e.jsonPayload as ClaimEvent).filter((p) => p && p.ev === 'claim');
+}
+
+interface ClaimStats {
+  attempts: number;
+  ok: number;
+  errors: number;
+  transferred: number;
+  errorSamples: { t: string; session: string; err?: string }[];
+}
+
+function summarizeClaims(events: ClaimEvent[], start: Date | null, end: Date): ClaimStats {
+  const inWin = events.filter((e) => inWindow(toMillis(e.t), start, end));
+  let attempts = 0, ok = 0, errors = 0, transferred = 0;
+  const errorSamples: ClaimStats['errorSamples'] = [];
+  for (const e of inWin) {
+    attempts++;
+    if (e.outcome === 'ok') {
+      ok++;
+      transferred += typeof e.transferred === 'number' ? e.transferred : 0;
+    } else if (e.outcome === 'error') {
+      errors++;
+      errorSamples.push({ t: e.t, session: e.session, err: e.err });
+    }
+  }
+  errorSamples.sort((a, b) => (toMillis(b.t) ?? 0) - (toMillis(a.t) ?? 0));
+  return { attempts, ok, errors, transferred, errorSamples };
+}
+
 // --- B. Firestore conversion tail -------------------------------------------
 interface FsStats {
   freePlanSessions: number;    // distinct namespaces among free-plan items
@@ -362,9 +419,10 @@ function generateHtml(data: {
   freshness: string;
   log: LogStats;
   fs: FsStats;
+  claims: ClaimStats;
 }): string {
   const now = new Date().toISOString();
-  const { log, fs } = data;
+  const { log, fs, claims } = data;
 
   const northAccount = pct(fs.accounts, fs.anonSessions);
   const northFirstTry = pct(log.firstTrySuccess, log.sessionsWithCreate);
@@ -448,6 +506,22 @@ function generateHtml(data: {
   </tbody>
 </table>
 
+<h2>Claim attempts <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(anon→account — console claimFreePlanSession events)</span></h2>
+${claims.attempts ? `<div class="cards">
+  ${card('Claim success', pct(claims.ok, claims.attempts), `${claims.ok}/${claims.attempts} attempts`)}
+  ${card('Failed claims', `${claims.errors}`, claims.errors ? 'broken claim path — investigate' : 'none')}
+  ${card('Items transferred', `${claims.transferred}`, 'across successful claims')}
+</div>
+${claims.errors ? `<div class="banner" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;">
+  <b>${claims.errors} claim(s) FAILED in window</b> — the anonymous→account step is dropping conversions. These never appear in the tool-call stream (claims run console-side). Most recent:
+</div>
+<table>
+  <thead><tr><th>Time (UTC)</th><th>Session</th><th>Error</th></tr></thead>
+  <tbody>
+    ${claims.errorSamples.slice(0, 20).map((s) => `<tr><td>${s.t.slice(0, 19).replace('T', ' ')}</td><td class="note">${s.session.slice(0, 12)}…</td><td class="note">${(s.err ?? '').replace(/</g, '&lt;').slice(0, 200)}</td></tr>`).join('\n    ')}
+  </tbody>
+</table>` : ''}` : `<p class="note">No claim events in window. (Requires the console deploy that emits <code>claim</code> events — until then this stays empty even if claims occur.)</p>`}
+
 <h2>Tool-call outcomes</h2>
 <table>
   <thead><tr><th>Outcome</th><th class="num">Count</th><th class="num">Share</th><th>Note</th></tr></thead>
@@ -492,10 +566,12 @@ async function main() {
   const events = fetchEvents(freshness);
   const log = summarizeEvents(events, start, end, opts.slowMs);
 
+  const claims = summarizeClaims(fetchClaimEvents(freshness), start, end);
+
   console.log('Reading Firestore conversion tail...');
   const fs = await fetchFirestore(start, end);
 
-  const html = generateHtml({ periodLabel, freshness, log, fs });
+  const html = generateHtml({ periodLabel, freshness, log, fs, claims });
   writeFileSync(opts.output, html);
 
   // Terminal summary (handy even though the artifact is HTML). Two sources kept
@@ -512,6 +588,7 @@ async function main() {
   console.log(`Anon sessions          : ${fs.anonSessions}`);
   console.log(`Free-plan items / iter : ${fs.freePlanItems} / ${fs.iteratedItems}`);
   console.log(`Claimed → accounts     : ${fs.claimedSessions} → ${fs.accounts}`);
+  console.log(`Claim attempts ok/err  : ${claims.ok}/${claims.errors}${claims.attempts ? ` (${pct(claims.ok, claims.attempts)} success, ${claims.transferred} items)` : ' (no claim events — deploy resolver instrumentation)'}`);
   console.log(`North#1 anon→account   : ${pct(fs.accounts, fs.anonSessions)} (${fs.accounts}/${fs.anonSessions})`);
   console.log(`Paid (from claim/all)  : ${fs.paidFromClaim} / ${fs.paidGlobal}`);
   console.log(`Free-plan spend        : $${fs.spendUsd.toFixed(2)}`);

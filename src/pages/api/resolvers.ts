@@ -1181,6 +1181,25 @@ export async function shareItem({ auth, itemId, targetUserId }) {
   }
 }
 
+// Structured claim funnel event → Cloud Logging. Claims run in the console (not
+// the MCP server), so failures never reach the mcp_tool stream and Firestore only
+// records successes — this is the only signal the funnel report has for the
+// anonymous→account (north-star #1) step. Best-effort; never breaks a claim.
+function logClaimEvent(fields: { outcome: "ok" | "error"; transferred?: number; session: string; err?: string }) {
+  try {
+    console.log(JSON.stringify({
+      ev: "claim",
+      t: new Date().toISOString(),
+      outcome: fields.outcome,
+      session: fields.session,
+      transferred: fields.transferred,
+      err: fields.err ? fields.err.slice(0, 300) : undefined,
+    }));
+  } catch {
+    // ignore
+  }
+}
+
 export async function claimFreePlanSession({
   auth,
   trialAuth,
@@ -1195,6 +1214,7 @@ export async function claimFreePlanSession({
   const db = getFirestore();
   const now = Date.now();
 
+  try {
   const snapshot = await db
     .collection(`users/${trialAuth.uid}/items`)
     .where("freePlan", "==", true)
@@ -1255,9 +1275,14 @@ export async function claimFreePlanSession({
   }
 
   items.sort((a, b) => b.created - a.created);
+  logClaimEvent({ outcome: "ok", transferred, session: sessionNamespace });
   return {
     transferred,
     sessionNamespace,
     items: items.map(({ id, lang }) => ({ id, lang })),
   };
+  } catch (err: any) {
+    logClaimEvent({ outcome: "error", session: sessionNamespace, err: String(err?.message ?? err) });
+    throw err;
+  }
 }
