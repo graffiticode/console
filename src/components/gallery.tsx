@@ -383,6 +383,12 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   // compile, items-list filter) matches the loaded item. Gated by item id so a
   // later manual change to the nav picker isn't snapped back by this effect.
   const lastSyncedItemIdRef = useRef<string | null>(null);
+  // Track the active filter so a user-initiated mark/lang/client change can
+  // select the new list's first item. `suppress` marks the programmatic
+  // lang-sync below so it isn't mistaken for a user change.
+  const prevFilterKeyRef = useRef<string | null>(null);
+  const selectFirstPendingRef = useRef(false);
+  const suppressFilterSelectRef = useRef(false);
   useEffect(() => {
     if (!directItem || !initialItemId) return;
     if (!setLanguage) return;
@@ -393,7 +399,10 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     const currentLang = normalizeLangId(lang);
     if (targetLang === currentLang) return;
     const next = findLanguageByNumber(targetLang);
-    if (next) setLanguage(next);
+    if (next) {
+      suppressFilterSelectRef.current = true;
+      setLanguage(next);
+    }
   }, [directItem, initialItemId, setLanguage, lang]);
 
   // Recompute ordered/filtered items whenever loadedItems, sort, or dateFilter change.
@@ -453,10 +462,42 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   // Resolve selection (and load its source) only when the source data changes.
   useEffect(() => {
     if (hideItemsNav && directItem && initialItemId) return;
+
+    // Detect a user-initiated mark/lang filter change so we can select the new
+    // list's first item. The programmatic lang-sync (deep-link) sets `suppress`,
+    // so it isn't treated as a user change. Client-only changes are excluded:
+    // the server filters by lang+mark, so we can't tell a fresh client-filtered
+    // list from the stale one by its head — those fall through to keep-or-first.
+    const filterKey = `${normalizeLangId(lang)}|${mark?.id}`;
+    if (prevFilterKeyRef.current !== null && prevFilterKeyRef.current !== filterKey) {
+      if (suppressFilterSelectRef.current) {
+        suppressFilterSelectRef.current = false;
+      } else {
+        selectFirstPendingRef.current = true;
+      }
+    }
+    prevFilterKeyRef.current = filterKey;
+
+    const clearOpenItem = () => {
+      setSelectedItemId("");
+      setTaskId("");
+      setEditorCode("");
+      setEditorHelp([]);
+      setUpstreamLangs([]);
+      syncOpenBaseline(null);
+    };
+
     if (!loadedItems || loadedItems.length === 0) {
-      if (!initialItemId) setSelectedItemId("");
+      // Empty list: clear the code/form views when there's nothing to preserve
+      // (no deep-link) or the user filtered into an empty list. Read-after-write
+      // lag on a deep-link keeps the open item until the list catches up.
+      if (!initialItemId || selectFirstPendingRef.current) {
+        selectFirstPendingRef.current = false;
+        clearOpenItem();
+      }
       return;
     }
+
     const targetItemId = initialItemId ||
       (typeof window !== 'undefined' ? localStorage.getItem(`graffiticode:selected:itemId`) : null);
     const pickItem = (item) => {
@@ -475,6 +516,21 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         router.replace(`/items/${item.id}`, undefined, { shallow: true });
       }
     };
+
+    // User changed the mark/lang/client filter → select the first item of the
+    // new list. Wait until loadedItems reflects the new filter: keepPreviousData
+    // shows the prior list briefly, and the server filters by lang+mark, so the
+    // head item matches the active filter once the fresh list arrives.
+    if (selectFirstPendingRef.current) {
+      const head = loadedItems[0];
+      const listIsFresh = normalizeLangId((head as any).lang) === normalizeLangId(lang)
+        && Number((head as any).mark) === mark?.id;
+      if (!listIsFresh) return;
+      selectFirstPendingRef.current = false;
+      pickItem(head);
+      return;
+    }
+
     if (targetItemId) {
       const matchingItem = loadedItems.find(item => item.id === targetItemId);
       if (matchingItem) {
@@ -495,7 +551,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     }
     const first = loadedItems[0];
     if (first) pickItem(first);
-  }, [loadedItems, initialItemId, directItem]);
+  }, [loadedItems, initialItemId, directItem, lang, mark?.id, clientId]);
 
   const toggleItemsPanel = useCallback(() => {
     const newState = !isItemsPanelCollapsed;
@@ -1169,6 +1225,11 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 )}
                 style={{ height: 'calc(100% - 42px)' }}
               >
+              {items.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-gray-400 select-none">
+                  No item selected
+                </div>
+              ) : (
               <Editor
                 accessToken={accessToken}
                 taskId={taskId}
@@ -1186,6 +1247,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 initialHelp={editorHelp}
                 itemId={selectedItemId}
               />
+              )}
               </div>
             </div>
             {/* Vertical resize bar between editor and preview (desktop) */}
@@ -1308,6 +1370,11 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 "overflow-auto",
                 "flex-1"
               )}>
+              {items.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-gray-400 select-none">
+                  No item selected
+                </div>
+              ) : (
               <FormView
                 key="form"
                 id={taskId}
@@ -1317,6 +1384,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 setData={setFormData}
                 setNewTask={() => {}}
               />
+              )}
               </div>
             </div>
           </div>
