@@ -22,6 +22,7 @@ import {
   shareItem,
   parseCode,
   claimFreePlanSession,
+  logClaimEvent,
 } from "./resolvers";
 import { verifyClaimToken } from "../../lib/claim-token";
 import { checkCompileAllowed } from "../../lib/usage-service";
@@ -386,29 +387,47 @@ const resolvers = {
       return await shareItem({ auth: { uid, token: idToken }, itemId, targetUserId });
     },
     claimFreePlanSession: async (_, args, ctx) => {
-      if (ctx.freePlan) {
-        throw new Error("Claim requires a real account, not a free-plan session.");
-      }
-      const { token } = ctx;
-      if (!token) {
-        throw new Error("Authentication required.");
-      }
-      const { uid, idToken } = await authenticate(token);
-
-      let payload;
+      // Instrument failures that happen BEFORE the transfer runs (auth, token
+      // verification, credentials) — claimFreePlanSession logs its own ok/error,
+      // so `enteredInner` prevents double-logging transfer-phase failures.
+      let sessionNamespace: string | undefined;
+      let enteredInner = false;
       try {
-        payload = await verifyClaimToken(args.token);
-      } catch (err: any) {
-        throw new Error(`Invalid or expired claim link: ${err?.message || "verification failed"}`);
-      }
+        if (ctx.freePlan) {
+          throw new Error("Claim requires a real account, not a free-plan session.");
+        }
+        const { token } = ctx;
+        if (!token) {
+          throw new Error("Authentication required.");
+        }
+        const { uid, idToken } = await authenticate(token);
 
-      const { uid: trialUid, idToken: trialIdToken } = await getFreePlanCredentials();
-      return await claimFreePlanSession({
-        auth: { uid, token: idToken },
-        trialAuth: { uid: trialUid, token: trialIdToken },
-        sessionNamespace: payload.sessionNamespace,
-        sessionUuid: payload.sessionUuid,
-      });
+        let payload;
+        try {
+          payload = await verifyClaimToken(args.token);
+        } catch (err: any) {
+          throw new Error(`Invalid or expired claim link: ${err?.message || "verification failed"}`);
+        }
+        sessionNamespace = payload.sessionNamespace;
+
+        const { uid: trialUid, idToken: trialIdToken } = await getFreePlanCredentials();
+        enteredInner = true;
+        return await claimFreePlanSession({
+          auth: { uid, token: idToken },
+          trialAuth: { uid: trialUid, token: trialIdToken },
+          sessionNamespace: payload.sessionNamespace,
+          sessionUuid: payload.sessionUuid,
+        });
+      } catch (err: any) {
+        if (!enteredInner) {
+          logClaimEvent({
+            outcome: "error",
+            session: sessionNamespace ?? "unverified",
+            err: String(err?.message ?? err),
+          });
+        }
+        throw err;
+      }
     },
   },
   Item: {

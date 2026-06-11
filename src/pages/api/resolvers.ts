@@ -1185,7 +1185,7 @@ export async function shareItem({ auth, itemId, targetUserId }) {
 // the MCP server), so failures never reach the mcp_tool stream and Firestore only
 // records successes — this is the only signal the funnel report has for the
 // anonymous→account (north-star #1) step. Best-effort; never breaks a claim.
-function logClaimEvent(fields: { outcome: "ok" | "error"; transferred?: number; session: string; err?: string }) {
+export function logClaimEvent(fields: { outcome: "ok" | "error"; transferred?: number; session: string; err?: string }) {
   try {
     console.log(JSON.stringify({
       ev: "claim",
