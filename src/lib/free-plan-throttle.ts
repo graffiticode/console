@@ -31,15 +31,72 @@ function buildLimitError(retryAfterSeconds: number, brand?: string): FreePlanErr
   });
 }
 
-// Stub for the burst limiter. Today this is a no-op so the wire-up is in place
-// without standing up Redis. When Redis lands, replace this with a sliding-window
-// counter keyed by namespace.
+function buildBurstError(
+  retryAfterSeconds: number,
+  limit: number,
+  windowSeconds: number,
+  brand?: string,
+): FreePlanError {
+  return new FreePlanError("free_plan_rate_limit_exceeded", 429, {
+    error: "free_plan_rate_limit_exceeded",
+    message:
+      `The Graffiticode free plan allows ${limit} requests every ${windowSeconds} seconds. ` +
+      `Please retry in ${retryAfterSeconds}s, or create a free account at graffiticode.org/signup ` +
+      `to remove this limit.`,
+    retry_after_seconds: retryAfterSeconds,
+    signup_url: buildSignupUrl("rate_limit", brand),
+  });
+}
+
+// Sliding-window burst limiter: a Firestore doc holding the recent hit
+// timestamps (epoch ms) for a namespace, pruned to the window on every call.
+// Same correctness/abuse trade-off as checkDailyLimit — a client minting a fresh
+// namespace gets a fresh window, so the global daily spend cap remains the real
+// backstop. This bounds the in-flight call count, which both stops runaway agent
+// loops and limits how far concurrent calls can overshoot the spend cap. Swap for
+// a Redis sliding window if per-namespace write volume ever warrants it.
 export async function checkBurstLimit(
-  _namespace: string,
-  _brand?: string,
+  namespace: string,
+  brand?: string,
+  now = new Date(),
 ): Promise<void> {
-  void intEnv("FREE_PLAN_BURST_LIMIT", DEFAULT_BURST_LIMIT);
-  void intEnv("FREE_PLAN_BURST_WINDOW_SECONDS", DEFAULT_BURST_WINDOW_SECONDS);
+  const limit = intEnv("FREE_PLAN_BURST_LIMIT", DEFAULT_BURST_LIMIT);
+  const windowSeconds = intEnv("FREE_PLAN_BURST_WINDOW_SECONDS", DEFAULT_BURST_WINDOW_SECONDS);
+  const windowMs = windowSeconds * 1000;
+  const nowMs = now.getTime();
+  const cutoff = nowMs - windowMs;
+
+  const ref = db
+    .collection("free-plan-state")
+    .doc("sessions")
+    .collection(namespace)
+    .doc("burst");
+
+  const retryAfterSeconds = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const raw = snap.exists ? snap.data()?.hits : undefined;
+    // Keep only hits still inside the window; this prunes the array each call so
+    // it stays bounded by `limit` rather than growing unbounded.
+    const recent = (Array.isArray(raw) ? raw : [])
+      .map(Number)
+      .filter((t) => Number.isFinite(t) && t > cutoff);
+
+    if (recent.length >= limit) {
+      // Over the limit: persist the pruned window but do NOT record this hit.
+      // The caller may retry once the oldest in-window hit ages out a slot.
+      const oldest = Math.min(...recent);
+      tx.set(ref, { hits: recent, updated: now.toISOString() }, { merge: true });
+      return Math.max(1, Math.ceil((oldest + windowMs - nowMs) / 1000));
+    }
+
+    recent.push(nowMs);
+    tx.set(ref, { hits: recent, updated: now.toISOString() }, { merge: true });
+    return 0;
+  });
+
+  if (retryAfterSeconds > 0) {
+    throw buildBurstError(retryAfterSeconds, limit, windowSeconds, brand);
+  }
 }
 
 // Per-session daily limit. Trivially correct (a Firestore counter), not
