@@ -326,6 +326,73 @@ function summarizeClaims(events: ClaimEvent[], start: Date | null, end: Date): C
   return { attempts, ok, errors, transferred, errorSamples };
 }
 
+// --- A3. Artifact-view events (app render host; P5-09) ----------------------
+// app.graffiticode.org/form/<id> emits one `artifact_view` per page load (the
+// resolve route). The app has no salt and the console doesn't forward the
+// session, so the event carries the item id; we join it to a session via the
+// free-plan items' doc id → sessionNamespace map below. The render-host page
+// polls resolve ~every 8s, so raw views over-count — we dedup by session.
+interface ArtifactViewEvent {
+  ev: 'artifact_view';
+  t: string;
+  item: string;
+  authed: boolean;
+  allowed: boolean;
+}
+
+function fetchArtifactViewEvents(freshness: string): ArtifactViewEvent[] {
+  let raw: string;
+  try {
+    raw = execFileSync('gcloud', [
+      'logging', 'read', 'jsonPayload.ev="artifact_view"',
+      '--project', PROJECT,
+      '--format', 'json',
+      '--freshness', freshness,
+      '--limit', '50000',
+    ], { encoding: 'utf-8', maxBuffer: 256 * 1024 * 1024 });
+  } catch {
+    return [];
+  }
+  let entries: any[];
+  try { entries = JSON.parse(raw); } catch { return []; }
+  return entries.map((e) => e.jsonPayload as ArtifactViewEvent).filter((p) => p && p.ev === 'artifact_view');
+}
+
+interface ArtifactViewStats {
+  viewEvents: number;            // raw allowed views in window (pre-dedup)
+  distinctItemsViewed: number;   // distinct free-plan items whose page was opened
+  viewedSessions: number;        // distinct free-plan sessions with a viewed item
+  viewedAndClaimed: number;      // of those sessions, how many went on to claim
+}
+
+function summarizeArtifactViews(
+  events: ArtifactViewEvent[],
+  itemToNamespace: Map<string, string>,
+  claimedNamespaces: Set<string>,
+  start: Date | null,
+  end: Date,
+): ArtifactViewStats {
+  const inWin = events.filter((e) => e.allowed && inWindow(toMillis(e.t), start, end));
+  const viewedItems = new Set<string>();
+  const viewedSessions = new Set<string>();
+  for (const e of inWin) {
+    // Join the item to a free-plan session. Items not in the map are either
+    // authed/already-claimed (out of the north-star funnel) or TTL-expired —
+    // both intentionally excluded from the conversion view.
+    const ns = itemToNamespace.get(e.item);
+    if (!ns) continue;
+    viewedItems.add(e.item);
+    viewedSessions.add(ns);
+  }
+  const viewedAndClaimed = [...viewedSessions].filter((ns) => claimedNamespaces.has(ns)).length;
+  return {
+    viewEvents: inWin.length,
+    distinctItemsViewed: viewedItems.size,
+    viewedSessions: viewedSessions.size,
+    viewedAndClaimed,
+  };
+}
+
 // --- B. Firestore conversion tail -------------------------------------------
 interface FsStats {
   freePlanSessions: number;    // distinct namespaces among free-plan items
@@ -338,6 +405,7 @@ interface FsStats {
   paidFromClaim: number;       // claimed-account owners on a paid plan
   spendUsd: number;
   claimedNamespaces: Set<string>;
+  itemToNamespace: Map<string, string>;  // free-plan item doc id → sessionNamespace (artifact-view join)
 }
 
 async function fetchFirestore(start: Date | null, end: Date): Promise<FsStats> {
@@ -345,8 +413,13 @@ async function fetchFirestore(start: Date | null, end: Date): Promise<FsStats> {
   const freeSnap = await db.collectionGroup('items').where('freePlan', '==', true).get();
   let freePlanItems = 0, iteratedItems = 0;
   const freePlanSessionSet = new Set<string>();
+  const itemToNamespace = new Map<string, string>();
   freeSnap.forEach((doc) => {
     const d = doc.data();
+    // The artifact-view join uses the item doc id, which view_url embeds. Map it
+    // regardless of the window so a view of an item created just before the
+    // window still resolves to its session.
+    if (typeof d.sessionNamespace === 'string') itemToNamespace.set(doc.id, d.sessionNamespace);
     const created = toMillis(d.created);
     if (!inWindow(created, start, end)) return;
     freePlanItems++;
@@ -402,6 +475,7 @@ async function fetchFirestore(start: Date | null, end: Date): Promise<FsStats> {
     paidFromClaim,
     spendUsd,
     claimedNamespaces,
+    itemToNamespace,
   };
 }
 
@@ -420,9 +494,10 @@ function generateHtml(data: {
   log: LogStats;
   fs: FsStats;
   claims: ClaimStats;
+  av: ArtifactViewStats;
 }): string {
   const now = new Date().toISOString();
-  const { log, fs, claims } = data;
+  const { log, fs, claims, av } = data;
 
   const northAccount = pct(fs.accounts, fs.anonSessions);
   const northFirstTry = pct(log.firstTrySuccess, log.sessionsWithCreate);
@@ -500,11 +575,14 @@ function generateHtml(data: {
     ${funnelRow('Anonymous sessions', fs.anonSessions, '—', 'distinct namespaces, free-plan ∪ claimed')}
     ${funnelRow('Free-plan items created', fs.freePlanItems, pct(fs.freePlanItems, fs.anonSessions) + ' items/session', `${fs.freePlanSessions} sessions still hold free-plan items`)}
     ${funnelRow('Iterated (≥2 turns)', fs.iteratedItems, pct(fs.iteratedItems, fs.freePlanItems) + ' of items', 'help has more than the create turn')}
+    ${funnelRow('Artifact viewed (free-plan)', av.viewedSessions, pct(av.viewedSessions, fs.freePlanSessions) + ' of free-plan sessions', `${av.distinctItemsViewed} items · ${av.viewEvents} raw views (P5-09; logs ∩ Firestore)`)}
     ${funnelRow('Claimed', fs.claimedSessions, pct(fs.claimedSessions, fs.anonSessions) + ' of anon sessions', 'distinct claimed namespaces')}
+    ${funnelRow('↳ Artifact-view → claim', av.viewedAndClaimed, pct(av.viewedAndClaimed, av.viewedSessions) + ' of viewed sessions', 'viewed free-plan sessions that went on to claim')}
     ${funnelRow('Account created', fs.accounts, pct(fs.accounts, fs.claimedSessions) + ' of claims', 'distinct owner uids')}
     ${funnelRow('Paid', fs.paidFromClaim, pct(fs.paidFromClaim, fs.accounts) + ' of accounts', 'paid plan & active')}
   </tbody>
 </table>
+<p class="note" style="margin-top:8px;">Artifact-view rows count only free-plan items still in Firestore (TTL 48h) whose <code>artifact_view</code> events resolve to a session; views of already-claimed/authed items and expired free-plan items are excluded by design. A low count can mean little render-host traffic <em>or</em> events not yet flowing (the app deploy that emits <code>artifact_view</code> must be live).</p>
 
 <h2>Claim attempts <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(anon→account — console claimFreePlanSession events)</span></h2>
 ${claims.attempts ? `<div class="cards">
@@ -571,7 +649,13 @@ async function main() {
   console.log('Reading Firestore conversion tail...');
   const fs = await fetchFirestore(start, end);
 
-  const html = generateHtml({ periodLabel, freshness, log, fs, claims });
+  // Artifact views join the app render-host logs to the Firestore tail, so they
+  // need fs (item→namespace map + claimed namespaces) computed first.
+  const av = summarizeArtifactViews(
+    fetchArtifactViewEvents(freshness), fs.itemToNamespace, fs.claimedNamespaces, start, end,
+  );
+
+  const html = generateHtml({ periodLabel, freshness, log, fs, claims, av });
   writeFileSync(opts.output, html);
 
   // Terminal summary (handy even though the artifact is HTML). Two sources kept
@@ -587,6 +671,8 @@ async function main() {
   console.log('-- Items & conversion (Firestore, incl. history) --');
   console.log(`Anon sessions          : ${fs.anonSessions}`);
   console.log(`Free-plan items / iter : ${fs.freePlanItems} / ${fs.iteratedItems}`);
+  console.log(`Artifact views (sess)  : ${av.viewedSessions} (${av.distinctItemsViewed} items, ${av.viewEvents} raw)${av.viewEvents ? '' : ' — no artifact_view events (app deploy pending?)'}`);
+  console.log(`Artifact-view → claim  : ${pct(av.viewedAndClaimed, av.viewedSessions)} (${av.viewedAndClaimed}/${av.viewedSessions})`);
   console.log(`Claimed → accounts     : ${fs.claimedSessions} → ${fs.accounts}`);
   console.log(`Claim attempts ok/err  : ${claims.ok}/${claims.errors}${claims.attempts ? ` (${pct(claims.ok, claims.attempts)} success, ${claims.transferred} items)` : ' (no claim events — deploy resolver instrumentation)'}`);
   console.log(`North#1 anon→account   : ${pct(fs.accounts, fs.anonSessions)} (${fs.accounts}/${fs.anonSessions})`);
