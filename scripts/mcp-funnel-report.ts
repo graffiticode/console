@@ -155,6 +155,9 @@ interface McpEvent {
   lang?: string;
   desc_len?: number;
   ms?: number;
+  client_kind?: string; // MCP clientInfo.name (e.g. "claude-ai"); on tool events
+  geo_country?: string; // ISO-3166 alpha-2, coarse (no IP); on connect + tool
+  geo_region?: string;
 }
 
 function fetchEvents(freshness: string): McpEvent[] {
@@ -205,6 +208,12 @@ interface LogStats {
   maxErrorMs: number;        // slowest error seen (0 if none)
   slowErrorSamples: SlowError[];
   langCounts: Record<string, number>;
+  // Distinct sessions attributed to each agent kind / country. Attributed
+  // per session (one session = many events) from the first event that carries
+  // the field; "unknown" buckets sessions with no value yet (e.g. connect-only
+  // sessions, which don't carry client_kind).
+  clientKindSessions: Record<string, number>;
+  geoCountrySessions: Record<string, number>;
 }
 
 function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slowMs: number): LogStats {
@@ -212,6 +221,9 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
   const sessions = new Set<string>();
   const firstCreateBySession: Record<string, McpEvent> = {};
   const langCounts: Record<string, number> = {};
+  // session → first-seen client kind / country (attribute per session, not per event)
+  const sessionKind: Record<string, string> = {};
+  const sessionCountry: Record<string, string> = {};
   let connects = 0, browseCalls = 0, createCalls = 0, updateCalls = 0;
   let toolTotal = 0, toolOk = 0, toolGenFailed = 0, toolError = 0;
   let slowErrors = 0, maxErrorMs = 0;
@@ -219,6 +231,8 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
 
   for (const e of inWin) {
     if (e.session) sessions.add(e.session);
+    if (e.session && e.client_kind && !sessionKind[e.session]) sessionKind[e.session] = e.client_kind;
+    if (e.session && e.geo_country && !sessionCountry[e.session]) sessionCountry[e.session] = e.geo_country;
     if (e.ev === 'mcp_connect') { connects++; continue; }
     // mcp_tool
     toolTotal++;
@@ -249,6 +263,16 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
   const firstTrySuccess = createSessions.filter((e) => e.outcome === 'ok').length;
   slowErrorSamples.sort((a, b) => b.ms - a.ms);
 
+  // Tally distinct sessions per kind/country; bucket the rest as "unknown".
+  const clientKindSessions: Record<string, number> = {};
+  const geoCountrySessions: Record<string, number> = {};
+  for (const s of sessions) {
+    const k = sessionKind[s] || 'unknown';
+    clientKindSessions[k] = (clientKindSessions[k] || 0) + 1;
+    const c = sessionCountry[s] || 'unknown';
+    geoCountrySessions[c] = (geoCountrySessions[c] || 0) + 1;
+  }
+
   return {
     connects,
     distinctSessions: sessions.size,
@@ -266,6 +290,8 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
     maxErrorMs,
     slowErrorSamples,
     langCounts,
+    clientKindSessions,
+    geoCountrySessions,
   };
 }
 
@@ -511,6 +537,17 @@ function generateHtml(data: {
     .map(([lang, n]) => `<tr><td>${lang}</td><td class="num">${n}</td></tr>`)
     .join('\n') || '<tr><td colspan="2" class="note">no language activity in window</td></tr>';
 
+  // Distinct-session breakdowns by agent kind and country. "unknown" buckets
+  // sessions with no value (connect-only sessions lack client_kind; pre-deploy
+  // events lack both) — expected during the instrumentation fill-in window.
+  const breakdownRows = (counts: Record<string, number>, emptyLabel: string) =>
+    Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `<tr><td>${k}</td><td class="num">${n}</td><td class="num">${pct(n, log.distinctSessions)}</td></tr>`)
+      .join('\n') || `<tr><td colspan="3" class="note">${emptyLabel}</td></tr>`;
+  const kindRows = breakdownRows(log.clientKindSessions, 'no client-kind data in window (deploy pending?)');
+  const geoRows = breakdownRows(log.geoCountrySessions, 'no geo data in window (deploy pending?)');
+
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -624,6 +661,19 @@ ${log.slowErrors > 30 ? `<p class="note">… and ${log.slowErrors - 30} more.</p
   <thead><tr><th>Language</th><th class="num">Calls</th></tr></thead>
   <tbody>${langRows}</tbody>
 </table>
+
+<h2>Agent kind <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(MCP client software, by distinct session)</span></h2>
+<table>
+  <thead><tr><th>Client kind</th><th class="num">Sessions</th><th class="num">Share</th></tr></thead>
+  <tbody>${kindRows}</tbody>
+</table>
+<p class="note" style="margin-top:8px;"><code>unknown</code> = sessions with no <code>client_kind</code> yet: connect-only sessions (the field rides tool events, not <code>mcp_connect</code>) and any pre-instrumentation traffic.</p>
+
+<h2>Geography <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(coarse country, by distinct session — no IP collected)</span></h2>
+<table>
+  <thead><tr><th>Country</th><th class="num">Sessions</th><th class="num">Share</th></tr></thead>
+  <tbody>${geoRows}</tbody>
+</table>
 </body></html>`;
 }
 
@@ -668,6 +718,10 @@ async function main() {
   console.log(`North#2 first-try succ : ${pct(log.firstTrySuccess, log.sessionsWithCreate)} (${log.firstTrySuccess}/${log.sessionsWithCreate})`);
   console.log(`Overall tool success   : ${pct(log.toolOk, log.toolTotal)} (${log.toolOk}/${log.toolTotal})`);
   console.log(`Errors / slow (timeouts): ${log.toolError} / ${log.slowErrors} (≥${(log.slowMs / 1000).toFixed(0)}s${log.maxErrorMs ? `, slowest ${(log.maxErrorMs / 1000).toFixed(0)}s` : ''})`);
+  const topN = (counts: Record<string, number>) => Object.entries(counts)
+    .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ') || '—';
+  console.log(`Agent kind (sessions)  : ${topN(log.clientKindSessions)}`);
+  console.log(`Geo country (sessions) : ${topN(log.geoCountrySessions)}`);
   console.log('-- Items & conversion (Firestore, incl. history) --');
   console.log(`Anon sessions          : ${fs.anonSessions}`);
   console.log(`Free-plan items / iter : ${fs.freePlanItems} / ${fs.iteratedItems}`);
