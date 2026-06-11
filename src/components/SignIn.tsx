@@ -11,6 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 import useGraffiticodeAuth from "@graffiticode/auth-react";
 import { useEmailSignIn } from "@graffiticode/auth-react";
+import { useConsoleSignOut } from "../hooks/use-console-sign-out";
 import WalletSelectionDialog from "./WalletSelectionDialog";
 import AuthMethodDialog from "./AuthMethodDialog";
 import NewAccountConfirmDialog from "./NewAccountConfirmDialog";
@@ -42,7 +43,8 @@ interface PendingWalletSignup {
 }
 
 export default function SignInComponent({ label = "Sign in", className }: SignInComponentProps) {
-  const { loading, user, beginEthereumSignIn, confirmEthereumSignIn, signOut } = useGraffiticodeAuth();
+  const { loading, user, beginEthereumSignIn, confirmEthereumSignIn } = useGraffiticodeAuth();
+  const signOut = useConsoleSignOut();
   const {
     sendCode,
     verifyAndSignIn,
