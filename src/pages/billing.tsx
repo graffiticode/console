@@ -91,7 +91,7 @@ export default function Billing() {
             <p className="mt-2 text-sm text-gray-600">
               Manage your subscription, monitor usage, and update payment methods. New
               accounts start on the Free plan &mdash; 250 compile units / month, no credit
-              card required. Upgrade to Starter for higher limits and overage.
+              card required. Upgrade to Pro for higher limits and overage.
             </p>
           </div>
 

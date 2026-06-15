@@ -30,7 +30,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [highlightedPlan, setHighlightedPlan] = useState<string>('starter');
+  const [highlightedPlan, setHighlightedPlan] = useState<string>('pro');
   const [pendingCancelPlan, setPendingCancelPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sub, setSub] = useState<SubscriptionState>(defaultSubState);
@@ -62,7 +62,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
       setBillingInterval(effectiveInterval);
       setHighlightedPlan(
-        subscription.hasActiveSubscription && plan !== 'demo' ? plan : 'starter'
+        subscription.hasActiveSubscription && plan !== 'demo' ? plan : 'pro'
       );
     } catch (error) {
       console.error('Error fetching user data:', error);

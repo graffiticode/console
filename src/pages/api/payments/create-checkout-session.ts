@@ -12,10 +12,6 @@ if (process.env.STRIPE_SECRET_KEY) {
 
 // Map our plan IDs to Stripe price IDs
 const STRIPE_PRICE_IDS = {
-  starter: {
-    monthly: process.env.STRIPE_STARTER_MONTHLY_PRICE_ID,
-    annual: process.env.STRIPE_STARTER_ANNUAL_PRICE_ID,
-  },
   pro: {
     monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
     annual: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
@@ -143,9 +139,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       defaultPaymentMethod = customer.invoice_settings?.default_payment_method;
     }
 
-    // Check if user has already used a trial
-    const hasUsedTrial = !!userData?.trialUsedAt;
-
     // Create checkout session for NEW subscriptions only
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
@@ -169,12 +162,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         planId,
         interval,
       },
-      // Add 30-day free trial for Starter plan (only if user hasn't used a trial before)
-      ...(planId === 'starter' && !hasUsedTrial && {
-        subscription_data: {
-          trial_period_days: 30,
-        },
-      }),
     };
 
     // If customer has a saved payment method, configure to use it

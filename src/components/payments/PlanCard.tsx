@@ -27,18 +27,19 @@ export default function PlanCard({
 }: PlanCardProps) {
   const price = billingInterval === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
   const isFree = !!plan.isFree;
+  const isContactSales = !!plan.contactSales;
   const isCurrentPlan = isFree
     ? !hasActiveSubscription && currentUserPlan === 'demo'
     : hasActiveSubscription && plan.id === currentUserPlan;
   const isSameBillingInterval = billingInterval === currentBillingInterval;
   const isChangingBilling = isCurrentPlan && !isSameBillingInterval && !isFree;
 
-  const wouldBeUpgrade = !isFree && (
+  const wouldBeUpgrade = !isFree && !isContactSales && (
     isUpgrade(currentUserPlan, plan.id) ||
     (isCurrentPlan && currentBillingInterval === 'monthly' && billingInterval === 'annual')
   );
 
-  const wouldBeDowngrade = !isFree && hasActiveSubscription && (
+  const wouldBeDowngrade = !isFree && !isContactSales && hasActiveSubscription && (
     isDowngrade(currentUserPlan, plan.id) ||
     (isCurrentPlan && currentBillingInterval === 'annual' && billingInterval === 'monthly')
   );
@@ -86,7 +87,7 @@ export default function PlanCard({
         }
       }}
     >
-      {isHighlighted && !(isFree && !isCurrentPlan) && (
+      {isHighlighted && !isContactSales && !(isFree && !isCurrentPlan) && (
         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
           <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
             {badgeLabel}
@@ -100,7 +101,9 @@ export default function PlanCard({
       </div>
 
       <div className="mb-6">
-        {isFree ? (
+        {isContactSales ? (
+          <span className="text-4xl font-bold text-gray-900">{plan.priceLabel || 'Custom'}</span>
+        ) : isFree ? (
           <span className="text-4xl font-bold text-gray-900">Free</span>
         ) : (
           <>
@@ -121,40 +124,48 @@ export default function PlanCard({
         ))}
       </ul>
 
-      <button
-        onClick={() => {
-          if (isFree && isCurrentPlan) return;
-          if (isCurrentPlan && isSameBillingInterval && !cancelAtPeriodEnd && !isFree) {
-            onCancelClick(plan.id);
-          } else {
-            onSubscribe(plan.id);
-          }
-        }}
-        disabled={processing || cancelAtPeriodEnd || (isFree && !hasActiveSubscription)}
-        className={`w-full py-2 px-4 rounded-none text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-          isPendingCancel
-            ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
-            : isFree && isCurrentPlan
-            ? 'bg-gray-200 text-gray-600 cursor-default'
-            : isHighlighted
-            ? 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500'
-            : 'bg-gray-50 text-gray-900 hover:bg-gray-100 focus:ring-gray-500'
-        } ${
-          (processing || cancelAtPeriodEnd) ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
-      >
-        {buttonLabel}
-      </button>
+      {isContactSales ? (
+        <a
+          href={plan.contactHref || '#'}
+          onClick={(e) => e.stopPropagation()}
+          className={`block w-full py-2 px-4 rounded-none text-sm font-medium text-center focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+            isHighlighted
+              ? 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500'
+              : 'bg-gray-50 text-gray-900 hover:bg-gray-100 focus:ring-gray-500'
+          }`}
+        >
+          {plan.cta}
+        </a>
+      ) : (
+        <button
+          onClick={() => {
+            if (isFree && isCurrentPlan) return;
+            if (isCurrentPlan && isSameBillingInterval && !cancelAtPeriodEnd && !isFree) {
+              onCancelClick(plan.id);
+            } else {
+              onSubscribe(plan.id);
+            }
+          }}
+          disabled={processing || cancelAtPeriodEnd || (isFree && !hasActiveSubscription)}
+          className={`w-full py-2 px-4 rounded-none text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+            isPendingCancel
+              ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
+              : isFree && isCurrentPlan
+              ? 'bg-gray-200 text-gray-600 cursor-default'
+              : isHighlighted
+              ? 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500'
+              : 'bg-gray-50 text-gray-900 hover:bg-gray-100 focus:ring-gray-500'
+          } ${
+            (processing || cancelAtPeriodEnd) ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+        >
+          {buttonLabel}
+        </button>
+      )}
 
       {isChangingBilling && !wouldBeUpgrade && !wouldBeDowngrade && (
         <p className="mt-2 text-xs text-gray-500 text-center">
           Billing change applies immediately current credits retained
-        </p>
-      )}
-
-      {wouldBeUpgrade && (
-        <p className="mt-2 text-xs text-green-600 text-center font-medium">
-          Upgrade applies immediately with credit for unused time
         </p>
       )}
 

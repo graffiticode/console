@@ -1,4 +1,4 @@
-export type PlanId = 'demo' | 'starter' | 'pro' | 'teams';
+export type PlanId = 'demo' | 'starter' | 'pro' | 'teams' | 'enterprise';
 export type BillingInterval = 'monthly' | 'annual';
 
 export interface Plan {
@@ -11,6 +11,12 @@ export interface Plan {
   features: string[];
   cta: string;
   isFree?: boolean;
+  // Non-self-serve plan: custom pricing, sold via "Contact Sales" rather than Stripe checkout.
+  contactSales?: boolean;
+  // Price text shown in place of a dollar amount for contactSales plans (e.g. "Custom").
+  priceLabel?: string;
+  // Where the Contact Sales CTA points (mailto: or URL).
+  contactHref?: string;
 }
 
 export const plans: Plan[] = [
@@ -30,22 +36,6 @@ export const plans: Plan[] = [
     ],
     cta: 'Current Plan',
     isFree: true
-  },
-  {
-    id: 'starter',
-    name: 'Starter',
-    description: 'Perfect for getting started',
-    monthlyPrice: 10,
-    annualPrice: 100,
-    monthlyUnits: 5000,
-    features: [
-      '5,000 compile units per month',
-      'Additional compiles at $0.002 each',
-      'Community support',
-      'Email support',
-      'Cancel anytime'
-    ],
-    cta: 'Get Started'
   },
   {
     id: 'pro',
@@ -79,10 +69,50 @@ export const plans: Plan[] = [
       'Cancel anytime'
     ],
     cta: 'Go Team'
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    description: 'For mission-critical, high-volume deployments',
+    monthlyPrice: 0,
+    annualPrice: 0,
+    monthlyUnits: 0,
+    features: [
+      'Everything in Team',
+      'Custom compile-unit pricing',
+      '99.9% uptime SLA',
+      'Dedicated support & onboarding',
+      'Custom language development',
+      'SSO, GDPR & CCPA compliance'
+    ],
+    cta: 'Contact Sales',
+    contactSales: true,
+    priceLabel: 'Custom',
+    contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Enterprise%20plan%20inquiry'
   }
 ];
 
-const PLAN_TIER: Record<PlanId, number> = { demo: 0, starter: 1, pro: 2, teams: 3 };
+// Starter is discontinued and no longer offered (removed from `plans` above), but its
+// definition is retained so legacy/straggler subscribers and historical data still
+// resolve via `planDetails`, `PLAN_TIER`, and the `PlanId` type.
+const starterPlan: Plan = {
+  id: 'starter',
+  name: 'Starter',
+  description: 'Perfect for getting started',
+  monthlyPrice: 10,
+  annualPrice: 100,
+  monthlyUnits: 5000,
+  features: [
+    '5,000 compile units per month',
+    'Additional compiles at $0.002 each',
+    'Community support',
+    'Email support',
+    'Cancel anytime'
+  ],
+  cta: 'Get Started'
+};
+
+const PLAN_TIER: Record<PlanId, number> = { demo: 0, starter: 1, pro: 2, teams: 3, enterprise: 4 };
 
 export function isUpgrade(from: PlanId, to: PlanId): boolean {
   return PLAN_TIER[to] > PLAN_TIER[from];
@@ -126,5 +156,5 @@ export function getButtonLabel(opts: ButtonLabelOpts): string {
 
 export const planDetails: Record<PlanId, { name: string; monthlyUnits: number; price: { monthly: number; annual: number } }> =
   Object.fromEntries(
-    plans.map(p => [p.id, { name: p.name, monthlyUnits: p.monthlyUnits, price: { monthly: p.monthlyPrice, annual: p.annualPrice } }])
+    [...plans, starterPlan].map(p => [p.id, { name: p.name, monthlyUnits: p.monthlyUnits, price: { monthly: p.monthlyPrice, annual: p.annualPrice } }])
   ) as Record<PlanId, { name: string; monthlyUnits: number; price: { monthly: number; annual: number } }>;
