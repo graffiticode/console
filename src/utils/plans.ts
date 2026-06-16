@@ -56,7 +56,7 @@ export const plans: Plan[] = [
   {
     id: 'teams',
     name: 'Team',
-    description: 'For teams and high volume',
+    description: 'For teams and high volume compiles',
     monthlyPrice: 1000,
     annualPrice: 10000,
     monthlyUnits: 2000000,
