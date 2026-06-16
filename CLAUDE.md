@@ -98,6 +98,16 @@ export GRAFFITICODE_APP_CREDENTIALS=~/graffiticode-app-key.json # graffiticode-a
   - `--no-force` - Skip deploy if basis is already up to date
   - `--verbose` - Stream build output to terminal
 - `./scripts/set-free-plan-secrets.sh` - Push `FREE_PLAN_API_KEY` and `FREE_PLAN_NAMESPACE_SALT` from `.env.local` into Secret Manager and remount on the `console` Cloud Run service. Re-running rotates (creates a new secret version) and rolls a new revision. Rotating the salt invalidates active free-plan namespaces.
+- `./scripts/set-compiler-secret.sh <lang>` - Propagate `GRAFFITICODE_SECRET_KEY` from the console secret (Secret Manager, project `graffiticode-app`) to a language/compiler Cloud Run service (e.g. `l0166`) in project `graffiticode`, mounting the identical key. Accepts `l0166`/`L0166`/`0166`. **The key MUST NEVER CHANGE** — the script refuses to overwrite an existing target key with a different value.
+
+**Shared secret encryption (`get-val-private` / account Secrets):** values are encrypted at parse time (console, `src/lib/secret-crypto.ts`, used by `src/pages/api/resolvers.ts`) and decrypted at compile time (basis, `src/compiler.js`). The two `decrypt` implementations must stay in lockstep. The **identical keyring** must be present on the console runtime AND every `l0NNN` compiler service (the console encrypts; the compiler services decrypt). If no usable key is configured, `encrypt()`/`decrypt()` fall back to passthrough and `setSecret` refuses to store.
+
+Two ciphertext formats are understood: legacy `<iv>:<enc>` (AES-256-CBC, deterministic IV) and versioned `v<N>:<iv>:<ct>:<tag>` (AES-256-GCM, random IV, authenticated). Env vars:
+- `GRAFFITICODE_SECRET_KEY` — the canonical key; this is key **version 1** and the key for all legacy ciphertext. Created once; see the error output of `set-compiler-secret.sh`.
+- `GRAFFITICODE_SECRET_KEYS` — optional JSON keyring for versions ≥2, e.g. `{"2":"<secret2>"}`. Needed (for decrypt) on every service before any value is written under that version.
+- `GRAFFITICODE_SECRET_KEY_VERSION` — the version **new** writes use. Unset/`0` ⇒ legacy CBC (default, backward-compatible). Set to `N` (on the **console** only) to start writing GCM under key N.
+
+**Rotation procedure** (the reason versioning exists — old ciphertext persists forever and only decrypts with the key that wrote it): (1) add key `N` to `GRAFFITICODE_SECRET_KEYS` on **all** services and redeploy so everything can *decrypt* it; (2) set `GRAFFITICODE_SECRET_KEY_VERSION=N` on the console so new writes use it; (3) lazily/backfill re-encrypt old values via `reencryptToCurrent()` in `secret-crypto.ts`; (4) once nothing references the old key, retire it. Never change the value of an existing key version. For local dev, set the same vars in `.env.local` and in the local API/compile server's env.
 
 ## Local Development
 

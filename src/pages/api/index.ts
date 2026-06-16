@@ -21,6 +21,10 @@ import {
   getItemClientTags,
   shareItem,
   parseCode,
+  getSecretsForUser,
+  listSecrets,
+  setSecret,
+  deleteSecret,
   claimFreePlanSession,
   logClaimEvent,
 } from "./resolvers";
@@ -183,8 +187,15 @@ const typeDefs = `
     totalAvailable: Int
   }
 
+  type SecretInfo {
+    name: String!
+    masked: String!
+    updatedAt: String!
+  }
+
   type Query {
     checkCompileAllowed: CompileAllowedResponse!
+    secrets: [SecretInfo!]!
     parse(lang: String!, src: String!, itemId: String): ParseResult!
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
@@ -223,6 +234,8 @@ const typeDefs = `
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!]): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
     claimFreePlanSession(token: String!): ClaimResult!
+    setSecret(name: String!, value: String!): SecretInfo!
+    deleteSecret(name: String!): Boolean!
   }
 
   input CodeGenerationOptions {
@@ -255,11 +268,24 @@ const resolvers = {
         return { allowed: false, reason: 'Authentication failed' };
       }
     },
-    parse: async (_, args) => {
+    parse: async (_, args, ctx) => {
       const { lang, src, itemId } = args;
-      const systemValues: Record<string, string> = {};
+      // User secrets are merged first so system keys (e.g. itemId) take
+      // precedence. Auth is best-effort: anonymous/free-plan parse still works,
+      // just without secrets.
+      let systemValues: Record<string, string> = {};
+      try {
+        const auth = await resolveAuth(ctx);
+        systemValues = await getSecretsForUser(auth.uid);
+      } catch {
+        // not authenticated — proceed without secrets
+      }
       if (itemId) systemValues.itemId = itemId;
       return await parseCode({ lang, src, systemValues });
+    },
+    secrets: async (_, __, ctx) => {
+      const auth = await resolveAuth(ctx);
+      return await listSecrets({ auth });
     },
     data: async (_, args, ctx) => {
       const { id } = args;
@@ -428,6 +454,20 @@ const resolvers = {
         }
         throw err;
       }
+    },
+    setSecret: async (_, args, ctx) => {
+      if (ctx.freePlan) {
+        throw new Error("Secrets require a full account.");
+      }
+      const auth = await resolveAuth(ctx);
+      return await setSecret({ auth, name: args.name, value: args.value });
+    },
+    deleteSecret: async (_, args, ctx) => {
+      if (ctx.freePlan) {
+        throw new Error("Secrets require a full account.");
+      }
+      const auth = await resolveAuth(ctx);
+      return await deleteSecret({ auth, name: args.name });
     },
   },
   Item: {

@@ -294,6 +294,42 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, isPubli
   return client.request(mutation, { lang, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs }).then(data => data.createItem);
 };
 
+const secretsClient = async (user: any) => {
+  const token = await user.getToken();
+  return new GraphQLClient("/api", { headers: { authorization: token } });
+};
+
+export const getSecrets = async ({ user }: { user: any }) => {
+  if (!user) return [];
+  const client = await secretsClient(user);
+  const query = gql`
+    query secrets {
+      secrets { name masked updatedAt }
+    }
+  `;
+  return client.request(query).then(data => data.secrets);
+};
+
+export const setSecret = async ({ user, name, value }: { user: any; name: string; value: string }) => {
+  const client = await secretsClient(user);
+  const mutation = gql`
+    mutation setSecret($name: String!, $value: String!) {
+      setSecret(name: $name, value: $value) { name masked updatedAt }
+    }
+  `;
+  return client.request(mutation, { name, value }).then(data => data.setSecret);
+};
+
+export const deleteSecret = async ({ user, name }: { user: any; name: string }) => {
+  const client = await secretsClient(user);
+  const mutation = gql`
+    mutation deleteSecret($name: String!) {
+      deleteSecret(name: $name)
+    }
+  `;
+  return client.request(mutation, { name }).then(data => data.deleteSecret);
+};
+
 export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs }: { user: any; id: string; name?: string; taskId?: string; mark?: number; help?: string; isPublic?: boolean; client?: string; upstreamLangs?: string[] }) => {
   if (!user) {
     return null;

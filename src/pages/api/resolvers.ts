@@ -13,7 +13,7 @@ import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
 import { chargeAutoOverage } from "../../lib/auto-overage-service";
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
+import { encrypt, decrypt, isConfigured as isSecretCryptoConfigured } from "../../lib/secret-crypto";
 
 type AuthArg = {
   uid: string;
@@ -38,14 +38,76 @@ function freePlanItemFields(auth: AuthArg, now = Date.now()) {
 }
 // import { buildDynamicSchema } from "./schemas";
 
-function encrypt(plaintext: string): string {
-  const key = process.env.GRAFFITICODE_SECRET_KEY;
-  if (!key) return plaintext;
-  const keyHash = crypto.createHash('sha256').update(key).digest();
-  const iv = crypto.createHmac('sha256', key).update(plaintext).digest().subarray(0, 16);
-  const cipher = crypto.createCipheriv('aes-256-cbc', keyHash, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  return iv.toString('hex') + ':' + encrypted.toString('hex');
+const SECRET_NAME_RE = /^[a-z0-9-]+$/;
+
+type StoredSecret = { value: string; updatedAt: string };
+
+function secretsDocRef(uid: string) {
+  return db.collection('users').doc(uid).collection('settings').doc('secrets');
+}
+
+// Loads the user's named secrets as a plaintext name->value map for injection
+// into systemValues. Never throws into the parse path — returns {} on any failure.
+export async function getSecretsForUser(uid: string): Promise<Record<string, string>> {
+  try {
+    if (!uid) return {};
+    const doc = await secretsDocRef(uid).get();
+    if (!doc.exists) return {};
+    const stored = (doc.data()?.secrets || {}) as Record<string, StoredSecret>;
+    const out: Record<string, string> = {};
+    for (const [name, entry] of Object.entries(stored)) {
+      if (entry?.value != null) out[name] = decrypt(entry.value);
+    }
+    return out;
+  } catch (err) {
+    console.error("getSecretsForUser failed:", err);
+    return {};
+  }
+}
+
+function maskSecret(plaintext: string): string {
+  return plaintext.length > 4
+    ? '••••••••' + plaintext.slice(-4)
+    : plaintext.length > 0 ? '••••' : '';
+}
+
+export async function listSecrets({ auth }: { auth: AuthArg }) {
+  const doc = await secretsDocRef(auth.uid).get();
+  if (!doc.exists) return [];
+  const stored = (doc.data()?.secrets || {}) as Record<string, StoredSecret>;
+  return Object.entries(stored)
+    .map(([name, entry]) => ({
+      name,
+      masked: maskSecret(decrypt(entry.value)),
+      updatedAt: entry.updatedAt || "",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function setSecret({ auth, name, value }: { auth: AuthArg; name: string; value: string }) {
+  if (!isSecretCryptoConfigured()) {
+    // Without a usable key, encrypt() is a no-op and we'd store plaintext under
+    // a "Secrets" label. Fail loud instead. See scripts/set-compiler-secret.sh.
+    throw new Error("Secrets are unavailable: GRAFFITICODE_SECRET_KEY is not configured on the server.");
+  }
+  if (!SECRET_NAME_RE.test(name)) {
+    throw new Error("Secret name must contain only lowercase letters, digits and hyphens.");
+  }
+  if (!value) {
+    throw new Error("Secret value is required.");
+  }
+  const ref = secretsDocRef(auth.uid);
+  const updatedAt = new Date().toISOString();
+  await ref.set({ secrets: { [name]: { value: encrypt(value), updatedAt } } }, { merge: true });
+  return { name, masked: maskSecret(value), updatedAt };
+}
+
+export async function deleteSecret({ auth, name }: { auth: AuthArg; name: string }) {
+  await secretsDocRef(auth.uid).set(
+    { secrets: { [name]: admin.firestore.FieldValue.delete() } },
+    { merge: true },
+  );
+  return true;
 }
 
 function buildParseCallbacks(systemValues: Record<string, string> = {}) {
@@ -543,8 +605,9 @@ export async function generateCode({
       }
     }
 
-    // Parse the head src with system values, then post it.
-    const systemValues: Record<string, string> = {};
+    // Parse the head src with system values, then post it. User secrets are
+    // merged first so system keys (e.g. itemId) always take precedence.
+    const systemValues: Record<string, string> = await getSecretsForUser(auth?.uid);
     if (itemId) systemValues.itemId = itemId;
     const parseResult = await parseCode({ lang: headLang, src, systemValues });
     if (parseResult.errors) {

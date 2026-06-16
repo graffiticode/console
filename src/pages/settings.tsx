@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import SignIn from '../components/SignIn';
 import APIKeysCard from '../components/APIKeysCard';
+import SecretsCard from '../components/SecretsCard';
 import LinkedEmailsCard from '../components/LinkedEmailsCard';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { getPageTitle } from '../lib/utils';
@@ -34,6 +35,10 @@ export default function Settings() {
             <div className="border rounded-none p-4">
               <h3 className="text-lg font-semibold mb-4">API Keys</h3>
               <APIKeysCard />
+            </div>
+            <div className="border rounded-none p-4">
+              <h3 className="text-lg font-semibold mb-4">Secrets</h3>
+              <SecretsCard />
             </div>
             <LinkedEmailsCard />
           </div>
