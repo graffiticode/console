@@ -129,8 +129,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const currentPrice = await stripe.prices.retrieve(existingPriceId);
       const currentInterval = currentPrice.recurring?.interval === 'year' ? 'annual' : 'monthly';
 
+      // Starter is discontinued; let stragglers upgrade out of it cleanly.
+      // Treat Starter -> any paid plan as an upgrade so we don't write a
+      // preserved-allocation cap (which would limit them to Starter's units).
+      const isStarterUpgrade = existingPlan === 'starter' && planId !== 'starter';
+
       // Determine if this is an upgrade or downgrade
       isUpgrade =
+        isStarterUpgrade || // Starter -> Pro/Team
         (existingPlan === 'pro' && planId === 'teams') || // Pro -> Max
         (currentInterval === 'monthly' && interval === 'annual'); // Monthly -> Annual
 
@@ -146,7 +152,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             id: existingSub.items.data[0].id,
             price: priceId,
           }],
-          proration_behavior: 'create_prorations', // Credit unused time and charge for upgrade
+          // Starter migrations switch with no immediate charge (billed at next
+          // renewal); other upgrades prorate the difference immediately.
+          proration_behavior: isStarterUpgrade ? 'none' : 'create_prorations',
+          ...(isStarterUpgrade ? { billing_cycle_anchor: 'unchanged' as const } : {}),
           metadata: {
             userId,
             planId,

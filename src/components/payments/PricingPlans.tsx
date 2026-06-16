@@ -125,10 +125,18 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
   const quickSubscribe = async (planId: string, wouldBeUpgrade: boolean) => {
     if (wouldBeUpgrade) {
-      const upgradeType = sub.currentUserPlan === 'pro' && planId === 'teams'
-        ? 'Team plan'
-        : 'annual billing';
-      if (!confirm(`Upgrade to ${upgradeType}? You'll receive credit for the unused portion of your current plan and be charged immediately.`)) {
+      const isPlanUpgrade = isUpgrade(sub.currentUserPlan, planId as PlanId);
+      const targetName = plans.find((p) => p.id === planId)?.name || planId;
+      let message: string;
+      if (sub.currentUserPlan === 'starter' && isPlanUpgrade) {
+        // Starter migration: switch now, no immediate charge, billed at renewal.
+        message = `Upgrade to ${targetName}? Your plan changes immediately at no extra charge now — you'll be billed the ${targetName} price at your next renewal.`;
+      } else if (isPlanUpgrade) {
+        message = `Upgrade to ${targetName}? You'll receive credit for the unused portion of your current plan and be charged immediately.`;
+      } else {
+        message = `Switch to annual billing? You'll receive credit for the unused portion of your current plan and be charged immediately.`;
+      }
+      if (!confirm(message)) {
         setProcessing(false);
         setSelectedPlan(null);
         return true; // handled
@@ -194,7 +202,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
       (isChangingInterval && sub.currentBillingInterval === 'monthly' && billingInterval === 'annual');
 
     try {
-      if (sub.hasActiveSubscription && sub.currentUserPlan !== 'demo' && (isChangingInterval || sub.currentUserPlan !== 'starter')) {
+      if (sub.hasActiveSubscription && sub.currentUserPlan !== 'demo') {
         console.log('Attempting quick subscribe:', { isChangingInterval, wouldBeUpgrade, planId, interval: billingInterval });
         const handled = await quickSubscribe(planId, wouldBeUpgrade);
         if (handled) return;
