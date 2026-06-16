@@ -25,6 +25,56 @@ const PLAN_MAPPING = {
   [process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID || '']: { name: 'teams', units: 2000000 },
 };
 
+// Detach duplicate cards (same fingerprint) for a customer, keeping exactly one.
+// Runs on payment_method.attached, so it covers every entry point: Checkout,
+// SetupIntent, and the manual add endpoint. Exported for the one-off cleanup
+// script (scripts/dedupe-payment-methods.ts).
+export async function dedupePaymentMethods(
+  stripeClient: Stripe,
+  customerId: string,
+  attachedPmId: string,
+): Promise<{ keepId: string; detached: string[] } | undefined> {
+  const attached = await stripeClient.paymentMethods.retrieve(attachedPmId);
+  const fingerprint = attached.card?.fingerprint;
+  if (!fingerprint) return;
+
+  // All card PMs sharing this fingerprint = the same physical card.
+  const all = await stripeClient.paymentMethods.list({ customer: customerId, type: 'card' });
+  const dupes = all.data.filter((pm) => pm.card?.fingerprint === fingerprint);
+  if (dupes.length < 2) return; // nothing to collapse
+
+  const customer = (await stripeClient.customers.retrieve(customerId)) as Stripe.Customer;
+  const customerDefault = customer.invoice_settings?.default_payment_method as string | undefined;
+
+  // Protect any PM an in-use subscription points at (covers the Checkout race
+  // where the new card was just wired up as the subscription's default).
+  const subs = await stripeClient.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
+  const protectedIds = new Set<string>(
+    subs.data
+      .filter((s) => ['active', 'trialing', 'past_due', 'incomplete'].includes(s.status))
+      .map((s) => s.default_payment_method as string)
+      .filter(Boolean),
+  );
+
+  // Keep the customer's current default if it's one of the dupes; otherwise keep
+  // the newest (the just-attached card) and promote it to default.
+  let keepId = dupes.find((pm) => pm.id === customerDefault)?.id;
+  if (!keepId) {
+    keepId = dupes.reduce((a, b) => (a.created > b.created ? a : b)).id;
+    await stripeClient.customers.update(customerId, {
+      invoice_settings: { default_payment_method: keepId },
+    });
+  }
+
+  const detached: string[] = [];
+  for (const pm of dupes) {
+    if (pm.id === keepId || protectedIds.has(pm.id)) continue;
+    await stripeClient.paymentMethods.detach(pm.id);
+    detached.push(pm.id);
+  }
+  return { keepId, detached };
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -333,6 +383,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             last4: paymentMethod.card?.last4,
             timestamp: new Date(),
           });
+        }
+
+        // Collapse duplicate cards (same fingerprint). Isolated so a failure
+        // here never fails the webhook (which would trigger Stripe retries).
+        try {
+          const result = await dedupePaymentMethods(stripe, customerId, paymentMethod.id);
+          if (result?.detached.length) {
+            console.log('Deduped payment methods', { customerId, ...result });
+          }
+        } catch (e) {
+          console.error('Payment method dedup failed:', e);
         }
 
         break;
