@@ -26,7 +26,7 @@ const SetupForm = () => {
       //`Elements` instance that was used to create the Payment Element
       elements,
       confirmParams: {
-        return_url: 'https://console.graffiticode.com',
+        return_url: 'https://console.graffiticode.org',
       },
     });
 
