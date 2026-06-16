@@ -150,7 +150,8 @@ export const countItems = async ({ user, langs }) => {
     return {};
   }
   const groups = await Promise.all(langs.map(lang => {
-    return loadItems({user, lang: lang.name.slice(1), mark: null, client: 'console'});
+    // Count items across all surfaces (console/mcp/front), not just console.
+    return loadItems({user, lang: lang.name.slice(1), mark: null, client: 'all'});
   }));
   const counts = {};
   groups.forEach((group, index) => {

@@ -53,7 +53,7 @@ export default function ToolsGallery({ language, setLanguage }) {
 
   // The selected language's items (current user) — each renders as a thumbnail if an image exists.
   const { data: toolItems } = useSWR(
-    user && selectedLangId ? { user, lang: selectedLangId, mark: null, client: 'console' } : null,
+    user && selectedLangId ? { user, lang: selectedLangId, mark: null, client: 'all' } : null,
     loadItems,
   );
 
