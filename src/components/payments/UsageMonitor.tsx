@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { BoltIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 
 interface UsageData {
@@ -11,18 +11,10 @@ interface UsageData {
   overageUnits: number;
   lastResetDate: string;
   currentPeriodEnd: string;
-}
-
-interface PricingInfo {
-  plan: string;
-  overageAvailable: boolean;
-  currentOverageBalance: number;
-  blockSize: number;
-  pricePerBlock: number;
-  pricePerUnit: number;
-  minBlocks: number;
-  description: string;
-  suggestedBlocks: number[];
+  autoOverageEnabled: boolean;
+  autoOverageAvailable: boolean;
+  autoOverageAmountUsd: number | null;
+  autoOverageUnits: number | null;
 }
 
 interface UsageMonitorProps {
@@ -31,10 +23,8 @@ interface UsageMonitorProps {
 
 export default function UsageMonitor({ userId }: UsageMonitorProps) {
   const [usage, setUsage] = useState<UsageData | null>(null);
-  const [pricing, setPricing] = useState<PricingInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [purchasing, setPurchasing] = useState(false);
-  const [selectedBlocks, setSelectedBlocks] = useState(1);
+  const [savingToggle, setSavingToggle] = useState(false);
 
   useEffect(() => {
     fetchUsageData();
@@ -42,12 +32,8 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
   const fetchUsageData = async () => {
     try {
-      const [usageResponse, pricingResponse] = await Promise.all([
-        axios.get(`/api/payments/usage?userId=${userId}`),
-        axios.get(`/api/payments/purchase-overage?userId=${userId}`)
-      ]);
+      const usageResponse = await axios.get(`/api/payments/usage?userId=${userId}`);
       setUsage(usageResponse.data);
-      setPricing(pricingResponse.data);
     } catch (error) {
       console.error('Error fetching usage data:', error);
     } finally {
@@ -55,28 +41,19 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
     }
   };
 
-  const handlePurchaseOverage = async () => {
-    setPurchasing(true);
+  const handleToggleAutoOverage = async () => {
+    if (!usage || savingToggle) return;
+    const next = !usage.autoOverageEnabled;
+    setSavingToggle(true);
+    setUsage({ ...usage, autoOverageEnabled: next }); // optimistic
     try {
-      const result = await axios.post('/api/payments/purchase-overage', {
-        userId,
-        blocks: selectedBlocks
-      });
-
-      if (result.data.success) {
-        const units = result.data.units || (selectedBlocks * (pricing?.blockSize || 1000));
-        alert(`Successfully purchased ${units.toLocaleString()} additional compile units!`);
-
-        // Refresh after webhook has processed the payment
-        setTimeout(() => {
-          fetchUsageData();
-        }, 3000);
-      }
+      await axios.post('/api/payments/auto-overage', { userId, enabled: next });
     } catch (error) {
-      console.error('Error purchasing overage:', error);
-      alert('Failed to purchase overage units. Please try again.');
+      console.error('Error updating auto-overage:', error);
+      setUsage({ ...usage, autoOverageEnabled: !next }); // revert
+      alert('Failed to update automatic overage setting. Please try again.');
     } finally {
-      setPurchasing(false);
+      setSavingToggle(false);
     }
   };
 
@@ -133,7 +110,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg leading-6 font-medium text-gray-900">
-              {pricing?.plan === 'starter' ? 'Usage Overview' : 'Current Period Usage'}
+              Current Period Usage
             </h3>
             {isNearLimit && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
@@ -250,84 +227,55 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
         </div>
       </div>
 
-      {/* Overage Settings - Show for all plans */}
-      {pricing && (
-        <div className="bg-white overflow-hidden shadow rounded-none">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-              Overage Settings
-            </h3>
+      {/* Automatic Overage */}
+      <div className="bg-white overflow-hidden shadow rounded-none">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+            Automatic Overage
+          </h3>
 
-            <div className="space-y-4">
-            {pricing && pricing.overageAvailable && (
-              <div className="pt-4">
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-900 mb-2">Purchase Overage Blocks</p>
-                  <p className="text-sm text-gray-500 mb-3">
-                    {pricing.description} • {pricing.blockSize.toLocaleString()} units per block
-                  </p>
-
-                  <div className="flex items-center space-x-4">
-                    <select
-                      value={selectedBlocks}
-                      onChange={(e) => setSelectedBlocks(Number(e.target.value))}
-                      className="block w-40 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-none"
-                    >
-                      {pricing.suggestedBlocks?.map(blocks => (
-                        <option key={blocks} value={blocks}>
-                          {blocks} {blocks === 1 ? 'block' : 'blocks'}
-                        </option>
-                      )) || [1, 3, 5].map(blocks => (
-                        <option key={blocks} value={blocks}>
-                          {blocks} {blocks === 1 ? 'block' : 'blocks'}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {(selectedBlocks * pricing.blockSize).toLocaleString()} units
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Total: ${(selectedBlocks * pricing.pricePerBlock).toFixed(2)}
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={handlePurchaseOverage}
-                      disabled={purchasing}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-none shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50"
-                    >
-                      <BoltIcon className="w-4 h-4 mr-2" />
-                      {purchasing ? 'Processing...' : 'Purchase'}
-                    </button>
-                  </div>
-
-                  {pricing.currentOverageBalance > 0 && (
-                    <p className="mt-2 text-xs text-gray-500">
-                      Current overage balance: {pricing.currentOverageBalance.toLocaleString()} units
-                    </p>
-                  )}
-                </div>
+          {usage.autoOverageAvailable ? (
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Charge automatically when I run out of units
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  When your included units are used up, we&apos;ll automatically add{' '}
+                  {usage.autoOverageUnits?.toLocaleString()} compile units for $
+                  {usage.autoOverageAmountUsd} so your work never stops. Billed each time a
+                  top-up is needed.
+                </p>
               </div>
-            )}
-
-            {pricing && !pricing.overageAvailable && (
-              <div className="pt-4">
-                <div className="bg-gray-50 border border-gray-200 rounded-none p-4">
-                  <p className="text-sm text-gray-600">
-                    Overage purchases are not available for your plan.{' '}
-                    <Link href="/billing" className="text-gray-600 hover:text-gray-800 font-medium">
-                      Upgrade to get more compiles.
-                    </Link>
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={usage.autoOverageEnabled}
+                onClick={handleToggleAutoOverage}
+                disabled={savingToggle}
+                className={`${
+                  usage.autoOverageEnabled ? 'bg-gray-700' : 'bg-gray-300'
+                } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50`}
+              >
+                <span
+                  className={`${
+                    usage.autoOverageEnabled ? 'translate-x-6' : 'translate-x-1'
+                  } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                />
+              </button>
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-none p-4">
+              <p className="text-sm text-gray-600">
+                Automatic overage is not available for your plan.{' '}
+                <Link href="/billing" className="text-gray-600 hover:text-gray-800 font-medium">
+                  Upgrade to get more compiles.
+                </Link>
+              </p>
+            </div>
+          )}
         </div>
       </div>
-      )}
     </div>
   );
 }

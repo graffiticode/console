@@ -10,6 +10,7 @@ import { planSequence, detectComposeTrigger, orchestrateComposition, capturePlan
 import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
+import { chargeAutoOverage } from "../../lib/auto-overage-service";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -235,7 +236,14 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
       }
 
       const totalAvailable = allocatedUnits + overageUnits;
-      const usageLimitReached = newTotal > totalAvailable;
+      let usageLimitReached = newTotal > totalAvailable;
+
+      // Auto-overage: top up as soon as usage crosses the limit so subsequent
+      // requests aren't blocked. Safe/deduped via the in-flight lock.
+      if (usageLimitReached && subscription.autoOverageEnabled) {
+        const { charged } = await chargeAutoOverage(auth.uid);
+        if (charged) usageLimitReached = false;
+      }
 
       return JSON.stringify({ success: true, usageLimitReached });
     }

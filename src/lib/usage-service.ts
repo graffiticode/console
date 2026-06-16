@@ -1,4 +1,5 @@
 import { getFirestore } from "../utils/db";
+import { chargeAutoOverage } from "./auto-overage-service";
 
 const PLAN_ALLOCATIONS = {
   demo: 250,
@@ -65,8 +66,18 @@ export async function checkCompileAllowed(uid: string): Promise<CompileAllowedRe
       console.error('checkCompileAllowed: error calculating actual usage', err);
     }
 
-    const totalAvailable = allocatedUnits + overageUnits;
-    const allowed = currentUsage <= totalAvailable;
+    let totalAvailable = allocatedUnits + overageUnits;
+    let allowed = currentUsage <= totalAvailable;
+
+    // Auto-overage: if blocked but the user opted into automatic top-ups,
+    // charge an increment and let the request through.
+    if (!allowed && subscription.autoOverageEnabled) {
+      const { charged, unitsAdded } = await chargeAutoOverage(uid);
+      if (charged) {
+        totalAvailable += unitsAdded;
+        allowed = currentUsage <= totalAvailable;
+      }
+    }
 
     return {
       allowed,

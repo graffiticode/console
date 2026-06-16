@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '../../../utils/db';
 import admin from '../../../utils/db';
 import Stripe from 'stripe';
+import { AUTO_OVERAGE_INCREMENTS } from '../../../lib/overage-pricing';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -271,6 +272,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const overageUnits = userData?.subscription?.overageUnits || 0;
+    const autoOverageIncrement = currentPlan ? AUTO_OVERAGE_INCREMENTS[currentPlan] : undefined;
 
     const totalUnits = planUnits + overageUnits;
     const remainingUnits = Math.max(0, totalUnits - totalUsage);
@@ -316,6 +318,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       overageUnits: overageUnits,
       lastResetDate: firstDayOfPeriod.toISOString(),
       currentPeriodEnd: lastDayOfPeriod.toISOString(),
+      autoOverageEnabled: userData?.subscription?.autoOverageEnabled || false,
+      autoOverageAvailable: !!autoOverageIncrement,
+      autoOverageAmountUsd: autoOverageIncrement?.amountUsd || null,
+      autoOverageUnits: autoOverageIncrement?.units || null,
       // Additional data for potential future use
       extended: {
         currentPeriod: {
