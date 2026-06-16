@@ -116,6 +116,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             amount: payment.amount / 100,
             status: 'paid',
             description: payment.description || 'Overage units purchase',
+            // Legacy PaymentIntent overage charges have no Stripe invoice/PDF,
+            // but the charge has a hosted receipt — surface it so Download works.
+            invoicePdf: payment.charges?.data?.[0]?.receipt_url || undefined,
             type: 'overage',
             plan: payment.metadata.plan,
           });
