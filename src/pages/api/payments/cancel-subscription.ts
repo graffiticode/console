@@ -59,34 +59,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const subscription = subscriptions.data[0];
 
     // Calculate current plan's allocation to preserve on immediate cancellation
+    // (downgrade to Free), so the user keeps what they paid for until period end.
+    // Derive the allocation from the LIVE Stripe price — NOT from the Firestore
+    // `subscription.plan`, which can be stale if a prior webhook didn't land
+    // (that staleness is what previously fell back to the bogus Starter 2,000).
     let currentAllocation = 0;
     if (immediately) {
-      // Get the current plan details
       const priceId = subscription.items.data[0]?.price.id;
-      const priceDetails = subscription.items.data[0]?.price;
-      const interval = priceDetails?.recurring?.interval;
-
-      // Determine current plan from userData or price metadata
-      const currentPlan = userData?.subscription?.plan || 'pro'; // Default to pro if unknown
-
-      // Calculate allocation based on plan
-      if (currentPlan === 'teams') {
-        currentAllocation = 2000000; // Teams monthly allocation
-      } else if (currentPlan === 'pro') {
-        currentAllocation = 100000; // Pro monthly allocation
-      } else {
-        currentAllocation = 2000; // Starter allocation (shouldn't happen for cancel)
-      }
-
-      // Multiply by 12 if annual
-      if (interval === 'year') {
-        currentAllocation = currentAllocation * 12;
-      }
+      const PLAN_UNITS_BY_PRICE: Record<string, number> = {
+        [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: 100000,
+        [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: 100000,
+        [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: 2000000,
+        [process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID || '']: 2000000,
+      };
+      // Monthly allocation, matching the webhook PLAN_MAPPING and usage display.
+      currentAllocation = PLAN_UNITS_BY_PRICE[priceId] ?? 250; // unknown price → Free
 
       console.log('Preserving allocation on downgrade to free:', {
-        currentPlan,
-        interval,
-        preservedAllocation: currentAllocation
+        priceId,
+        preservedAllocation: currentAllocation,
       });
     }
 
