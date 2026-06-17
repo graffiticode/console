@@ -55,6 +55,7 @@ export const LANGUAGES: Language[] = [
   { id: "0172", name: "L0172", description: "FigJam content", routingHint: "FigJam board content authoring.", domains: [] },
   { id: "0173", name: "L0173", description: "Charts", routingHint: "Apache ECharts visualizations (bar, line, pie/donut/nightingale rose, scatter). Supports multi-series and dual-axis compositions. Plots data given inline, or binds external data from an upstream data task via `data` — compose with an upstream data-providing language when the values must be fetched or transformed before plotting.", domains: [] },
   { id: "0174", name: "L0174", description: "Web forms", routingHint: "Single-page web forms — ordered fields (text, email, number, tel, url, textarea, select, radio, checkbox, date), per-field validation (min/max, length, pattern, required), light/dark theming, and a submit affordance with thank-you/redirect. Submissions deliver to a bound webhook.", domains: [], status: "Beta" },
+  { id: "0175", name: "L0175", description: "Grade 5 ELA assessments", routingHint: "Composes 5th-grade English Language Arts assessment items (Smarter Balanced · Grade 5 · Claim 1 Reading · Target 4: Reasoning & Evidence): authors, inline, candidate inference claims and evidence sources for a literary passage.", domains: [], status: "Beta" },
 ];
 
 export function findLanguageById(id: string): Language | undefined {
