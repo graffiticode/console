@@ -68,6 +68,8 @@ function getTimestampMs(data: any): number | null {
 
 interface UserInfo {
   uid: string;
+  name: string;
+  created: string;
   email: string;
   plan: string;
   aiUnits: number;
@@ -104,8 +106,9 @@ function generateHtml(data: {
   const userRows = sorted
     .map((u, i) => {
       const total = u.aiUnits + u.compileUnits;
-      return `<tr class="user-row" data-uid="${u.uid}" data-idx="${i}"><td>${u.uid}</td><td>${u.email}</td><td>${u.plan}</td><td>${u.aiUnits.toLocaleString()}</td><td>${u.compileUnits.toLocaleString()}</td><td>${total.toLocaleString()}</td></tr>
-<tr class="chart-row" id="chart-row-${i}"><td colspan="6"><div class="toggle-bar" id="toggles-${i}"></div><div class="chart-cell"><canvas id="chart-${i}"></canvas></div><div class="chart-label">Compiles by Language</div><div class="toggle-bar" id="lang-toggles-${i}"></div><div class="chart-cell"><canvas id="lang-chart-${i}"></canvas></div></td></tr>`;
+      const created = u.created ? u.created.split('T')[0] : '';
+      return `<tr class="user-row" data-uid="${u.uid}" data-idx="${i}"><td>${u.uid}</td><td>${u.name}</td><td>${u.email}</td><td>${u.plan}</td><td>${created}</td><td>${u.aiUnits.toLocaleString()}</td><td>${u.compileUnits.toLocaleString()}</td><td>${total.toLocaleString()}</td></tr>
+<tr class="chart-row" id="chart-row-${i}"><td colspan="8"><div class="toggle-bar" id="toggles-${i}"></div><div class="chart-cell"><canvas id="chart-${i}"></canvas></div><div class="chart-label">Compiles by Language</div><div class="toggle-bar" id="lang-toggles-${i}"></div><div class="chart-cell"><canvas id="lang-chart-${i}"></canvas></div></td></tr>`;
     })
     .join('\n');
 
@@ -138,7 +141,7 @@ function generateHtml(data: {
   table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.85rem; }
   th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
   th { background: #f1f5f9; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
-  td:nth-child(n+4), th:nth-child(n+4) { text-align: right; }
+  td:nth-child(n+6), th:nth-child(n+6) { text-align: right; }
   .user-row { cursor: pointer; }
   .user-row:hover { background: #f1f5f9; }
   .user-row.selected { background: #e0e7ff; }
@@ -174,9 +177,9 @@ ${plans.map(([plan, count]) => `  <div class="card"><div class="label">${plan}</
 <div class="section">
   <h2>Per-User Usage</h2>
   <table>
-    <thead><tr><th>User</th><th>Email</th><th>Plan</th><th>AI Units</th><th>Compile Units</th><th>Total Units</th></tr></thead>
+    <thead><tr><th>User</th><th>Screen Name</th><th>Email</th><th>Plan</th><th>Created</th><th>AI Units</th><th>Compile Units</th><th>Total Units</th></tr></thead>
     <tbody>${userRows}
-      <tr style="font-weight:600"><td colspan="3">Total</td><td>${totalAi.toLocaleString()}</td><td>${totalCompile.toLocaleString()}</td><td>${totalUnits.toLocaleString()}</td></tr>
+      <tr style="font-weight:600"><td colspan="5">Total</td><td>${totalAi.toLocaleString()}</td><td>${totalCompile.toLocaleString()}</td><td>${totalUnits.toLocaleString()}</td></tr>
     </tbody>
   </table>
 </div>
@@ -311,6 +314,8 @@ async function main() {
     const data = doc.data();
     userMap[doc.id] = {
       uid: doc.id,
+      name: data.name || '',
+      created: data.created || '',
       email: data.email || '',
       plan: data.subscription?.plan || 'demo',
       aiUnits: 0,
@@ -333,7 +338,7 @@ async function main() {
     const uid = data.userId;
     if (!uid) return;
     if (!userMap[uid]) {
-      userMap[uid] = { uid, email: '', plan: 'demo', aiUnits: 0, compileUnits: 0 };
+      userMap[uid] = { uid, name: '', created: '', email: '', plan: 'demo', aiUnits: 0, compileUnits: 0 };
     }
     const units = data.units || 0;
     if (data.type === 'ai_generation') {
