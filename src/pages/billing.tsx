@@ -23,7 +23,7 @@ function classNames(...classes: string[]) {
 }
 
 const tabs = [
-  { name: 'Subscription', icon: CurrencyDollarIcon },
+  { name: 'Billing', icon: CurrencyDollarIcon },
   { name: 'Usage', icon: ChartBarIcon },
   { name: 'Billing History', icon: DocumentTextIcon },
   { name: 'Payment Methods', icon: CreditCardIcon },
@@ -81,13 +81,13 @@ export default function Billing() {
   return (
     <>
       <Head>
-        <title>{getPageTitle('Subscription')}</title>
+        <title>{getPageTitle('Billing')}</title>
       </Head>
 
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Subscription</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Billing</h1>
             <p className="mt-2 text-sm text-gray-600">
               Manage your subscription, monitor usage, and update payment methods. New
               accounts start on the Free plan &mdash; 250 compile units / month, no credit
