@@ -30,6 +30,9 @@ interface StreamChunk {
   type: "content" | "error" | "usage" | "complete";
   content?: string;
   error?: string;
+  // Anthropic stop_reason on a "complete" chunk: "end_turn" | "max_tokens"
+  // | "stop_sequence" | "tool_use" | null. Drives continuation decisions.
+  stopReason?: string;
   usage?: {
     inputTokens: number;
     outputTokens: number;
@@ -107,6 +110,12 @@ class ClaudeStreamParser {
                 }
               });
             }
+            // message_delta carries the stop_reason. Surface it so the
+            // continuation loop can tell "cut off at max_tokens" (must
+            // continue) from "model finished on its own" (must stop).
+            if (parsed.delta?.stop_reason) {
+              chunks.push({ type: "complete", stopReason: parsed.delta.stop_reason });
+            }
           } else if (parsed.type === 'message_stop' || parsed.type === 'content_block_stop') {
             // Claude API sends these events when content is complete
             chunks.push({ type: "complete" });
@@ -173,7 +182,7 @@ export async function* streamClaudeCode({
   while (continuationCount < maxContinuations) {
     const parser = new ClaudeStreamParser();
     let chunkContent = "";
-    let isComplete = false;
+    let stopReason: string | undefined;
 
     try {
       // Make streaming API call
@@ -222,7 +231,11 @@ export async function* streamClaudeCode({
             totalUsage.cacheReadInputTokens += item.usage.cacheReadInputTokens || 0;
 
           } else if (item.type === "complete") {
-            isComplete = true;
+            // Remember the stop_reason if this complete chunk carried one
+            // (message_delta does; the bare message_stop/[DONE] does not).
+            if (item.stopReason) {
+              stopReason = item.stopReason;
+            }
 
           } else if (item.type === "error") {
             yield item;
@@ -239,46 +252,49 @@ export async function* streamClaudeCode({
       return;
     }
 
-    // Check for truncation:
-    // 1. Odd number of ``` (unclosed block) OR
-    // 2. No .. anywhere in the code
-    let isTruncated = false;
+    // Decide whether to continue. Drive this off the API stop_reason rather
+    // than counting backticks: a `max_tokens` stop means the model was cut off
+    // and must continue; any other stop (`end_turn`, `stop_sequence`, …) means
+    // the model finished on its own — trust it and stop, so the loop can't
+    // over-run a turn that already completed (which previously re-emitted and
+    // corrupted the program).
+    const hitTokenLimit = stopReason === "max_tokens";
 
-    const codeBlockCount = (fullContent.match(/```/g) || []).length;
+    // A complete Graffiticode program ends with `..`. Check the *trailing*
+    // code block specifically, so a stray `..` mid-stream or a re-opened fence
+    // can't masquerade as completion.
+    const blocks = extractCodeBlocks(fullContent);
+    const lastBlock = blocks.length ? blocks[blocks.length - 1] : fullContent;
+    const programTerminated = lastBlock.trimEnd().endsWith("..");
 
-    if (codeBlockCount % 2 !== 0) {
-      // Odd number of ``` means unclosed code block - definitely truncated
-      isTruncated = true;
-    } else if (codeBlockCount > 0) {
-      // Even number of ``` - check if any code contains ..
-      isTruncated = !fullContent.includes('..');
-    }
-
-    // If API says complete AND code ends with .., we're done
-    if (isComplete && !isTruncated) {
-      break;
-    }
-
-    // Continue if API says not complete OR if code doesn't end with ..
-    const needsContinuation = !isComplete || isTruncated;
-
-    if (needsContinuation) {
-      console.log(`Continuing generation (chunk ${continuationCount + 2}/${maxContinuations})`);
-
-      // Add the assistant's response to conversation history
-      conversationHistory.push({ role: "assistant", content: chunkContent });
-
-      // Add continuation prompt
-      conversationHistory.push({
-        role: "user",
-        content: "Continue exactly where you left off. Do not repeat any content."
-      });
-
-      continuationCount++;
+    let needsContinuation: boolean;
+    if (stopReason) {
+      // Continue only when cut off by the token limit before terminating.
+      needsContinuation = hitTokenLimit && !programTerminated;
     } else {
-      // Response completed naturally or is too short to warrant continuation
+      // Defensive fallback when stop_reason is unavailable: continue on an
+      // unclosed fence or an unterminated program that contains code.
+      const codeBlockCount = (fullContent.match(/```/g) || []).length;
+      const fenceOpen = codeBlockCount % 2 !== 0;
+      needsContinuation = fenceOpen || (codeBlockCount > 0 && !programTerminated);
+    }
+
+    if (!needsContinuation) {
       break;
     }
+
+    console.log(`Continuing generation (chunk ${continuationCount + 2}/${maxContinuations})`);
+
+    // Add the assistant's response to conversation history
+    conversationHistory.push({ role: "assistant", content: chunkContent });
+
+    // Add continuation prompt
+    conversationHistory.push({
+      role: "user",
+      content: "Continue exactly where you left off. Do not repeat any content."
+    });
+
+    continuationCount++;
   }
 
   // Yield final usage information
@@ -482,9 +498,47 @@ Do not include any explanatory text outside the code blocks unless specifically 
     };
   }
 
-  // Extract code blocks from the generated content
+  // Assemble the program from the streamed code block(s).
+  //
+  // Continuation can split one program across several fenced blocks (when a
+  // chunk hits max_tokens mid-code). Concatenate blocks with NO separator —
+  // joining with "\n\n" used to insert a blank line exactly where a token was
+  // cut across the max_tokens boundary, corrupting the code (e.g. a half-string
+  // producing parse errors). Stop as soon as the program terminates with `..`,
+  // so spurious re-emitted trailing blocks are dropped.
+  //
+  // A continuation can also *restart* the program instead of continuing it
+  // (the model re-emits from the top). When a block restarts — its opening
+  // matches the opening of the program we're already accumulating — discard the
+  // abandoned fragment and begin again from the restart, so we never splice an
+  // orphaned prefix onto the front of the finished program.
   const codeBlocks = extractCodeBlocks(result.content);
-  const finalCode = codeBlocks.join('\n\n');
+  // First non-empty line, whitespace-normalized — the program's opening
+  // statement (e.g. `passage "<heading>"`). On a restart the model regenerates
+  // from scratch, so the body diverges almost immediately but this opening line
+  // is reproduced; it's the only reliable restart signal.
+  const firstLine = (s: string) =>
+    (s.split("\n").find(l => l.trim()) || "").replace(/\s+/g, " ").trim();
+  // A later block restarts the program when its opening line matches the
+  // opening line of the block we started from. Match in both directions so it
+  // holds whether the abandoned fragment was cut mid-line (shorter) or ran past
+  // it (longer). A genuine continuation begins mid-content, never re-emitting
+  // the opening, so it won't match.
+  const isRestart = (a: string, b: string) =>
+    a.length >= 8 && b.length >= 8 && (a.startsWith(b) || b.startsWith(a));
+  let finalCode = "";
+  let firstBlockLine = "";
+  for (const block of codeBlocks) {
+    if (!block.trim()) continue;
+    if (firstBlockLine && isRestart(firstBlockLine, firstLine(block))) {
+      // Restart detected: drop the abandoned fragment and begin from here.
+      finalCode = "";
+    }
+    if (!finalCode) firstBlockLine = firstLine(block);
+    finalCode += block;
+    if (finalCode.trimEnd().endsWith("..")) break;
+  }
+  finalCode = finalCode.trim();
 
   if (onProgress) {
     onProgress(`Generation complete. Processed ${result.chunks} chunk(s).`);

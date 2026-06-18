@@ -87,8 +87,11 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       user,
       prompt: contextualPrompt,
       options: {
-        temperature: 0.2,
-        maxTokens: 2000
+        temperature: 0.2
+        // maxTokens omitted: the server applies DEFAULT_MAX_TOKENS (large
+        // enough that most programs finish in one chunk, avoiding the
+        // continuation loop). A 2000 cap here used to chop large assessments
+        // into chunks, and the model would restart mid-generation.
       },
       language,
       currentSrc,

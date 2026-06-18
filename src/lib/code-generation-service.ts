@@ -90,6 +90,11 @@ export const CLAUDE_MODELS = {
   DEFAULT: "claude-sonnet-4-6",
 };
 
+// Default max output tokens per generation chunk. Large enough that most
+// programs (incl. multi-page L0175 assessments) complete in a single chunk
+// rather than relying on the continuation loop. Sonnet 4.6 supports far more.
+export const DEFAULT_MAX_TOKENS = 16384;
+
 /**
  * Always returns Graffiticode as the language
  * @param {string} prompt - User's input prompt (ignored)
@@ -1196,6 +1201,15 @@ export async function generateCode({
   // Generate request ID if not provided
   const requestId = rid || generateRequestId();
 
+  // Floor max output tokens at the server default. A client must not be able to
+  // request a cap so small it forces large programs to chunk — continuation can
+  // corrupt or restart a long program (see claude-stream-service). Clients may
+  // still request MORE than the default; they just can't go below it.
+  options = {
+    ...options,
+    maxTokens: Math.max(options.maxTokens ?? 0, DEFAULT_MAX_TOKENS),
+  };
+
   // Initial model selection (may be overridden later based on formatted prompt)
   let modelToUse = options.model || CLAUDE_MODELS.DEFAULT;
 
@@ -1284,7 +1298,7 @@ export async function generateCode({
       retrievedChunks,
       constraints: {
         dialect: lang,
-        maxOutputTokens: options.maxTokens || 4096,
+        maxOutputTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
       },
       taskType: "codegen",
     });
@@ -1447,7 +1461,7 @@ export async function generateCode({
       options: {
         model: modelToUse,
         temperature: options.temperature || 0.2,
-        maxTokens: options.maxTokens || 4096,
+        maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         maxContinuations: options.maxContinuations || 10  // Conservative default
       },
       onProgress: requestId ? (message) => ragLog(requestId, "streaming.progress", { message }) : undefined
@@ -1503,7 +1517,7 @@ export async function generateCode({
       totalTokens: (streamResult.usage.inputTokens + streamResult.usage.outputTokens) || 0,
       latencyMs: generationLatency,
       temperature: options.temperature || 0.2,
-      maxTokens: options.maxTokens || 4096,
+      maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
       success: true,
     }, streamResult.code);
 
@@ -1660,7 +1674,7 @@ export async function generateCode({
             options: {
               model: fixModel,
               temperature: 0.1, // Lower temperature for more deterministic fixes
-              maxTokens: options.maxTokens || 4096,
+              maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
               maxContinuations: 10
             },
             onProgress: requestId ? (message) => ragLog(requestId, "fix.progress", { message }) : undefined
