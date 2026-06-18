@@ -24,8 +24,8 @@ function classNames(...classes: string[]) {
 
 const tabs = [
   { name: 'Billing', icon: CurrencyDollarIcon },
-  { name: 'Usage', icon: ChartBarIcon },
   { name: 'Billing History', icon: DocumentTextIcon },
+  { name: 'Usage', icon: ChartBarIcon },
   { name: 'Payment Methods', icon: CreditCardIcon },
 ];
 
@@ -129,11 +129,11 @@ export default function Billing() {
               </Tab.Panel>
 
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
-                <UsageMonitor userId={user.uid} />
+                <BillingHistory userId={user.uid} />
               </Tab.Panel>
 
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
-                <BillingHistory userId={user.uid} />
+                <UsageMonitor userId={user.uid} />
               </Tab.Panel>
 
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
