@@ -7,15 +7,19 @@ const getApiJSON = bent(apiUrl, "GET", "json");
 export const getBaseUrlForApi = () => apiUrl;
 export const getLanguageAsset = async (lang, file) => {
   try {
-    return await getApiString(`/${lang}/${file}`);
+    // Bypass the CDN edge cache (api.graffiticode.org serves these with `max-age=3600`) so a
+    // language deploy propagates without a manual cache purge. A unique query string forces a
+    // cache MISS → fresh origin fetch; the in-memory caches below dedupe so origin load stays low.
+    return await getApiString(`/${lang}/${file}?_cb=${Date.now()}`);
   } catch (err) {
     console.warn(`Failed to fetch ${lang}/${file}:`, err.message);
     return null;
   }
 };
 
-// Lexicon cache with 1 hour TTL
-const LEXICON_CACHE_TTL_MS = 60 * 60 * 1000;
+// Lexicon cache: short TTL so a language deploy (new dimensions/standards/tags) is picked up
+// within minutes rather than up to an hour. Origin fetches bypass the CDN (see getLanguageAsset).
+const LEXICON_CACHE_TTL_MS = 5 * 60 * 1000;
 const lexiconCache = new Map<string, { value: any; expires: number }>();
 
 // Get and parse lexicon for a language
