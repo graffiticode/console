@@ -255,6 +255,9 @@ const IFrame = ({ id, src, setData, className, width, height, onFocus }) => {
         className={className}
         style={{ width: "100%", height: height || "100vh", border: "none" }}
         onLoad={handleIframeLoad}
+        // Lets the embedded view's "Copy" button reach the async Clipboard API from this
+        // cross-origin iframe (the standalone /form page, being top-level, doesn't need this).
+        allow="clipboard-write"
       />
     </div>
   );
