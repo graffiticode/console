@@ -24,7 +24,7 @@ function classNames(...classes: string[]) {
 
 const tabs = [
   { name: 'Usage', icon: ChartBarIcon },
-  { name: 'Billing', icon: CurrencyDollarIcon },
+  { name: 'Plan', icon: CurrencyDollarIcon },
   { name: 'Payment History', icon: DocumentTextIcon },
   { name: 'Payment Methods', icon: CreditCardIcon },
 ];
