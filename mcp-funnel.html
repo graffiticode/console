@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP Funnel Report</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f8fafc; color:#1e293b; padding:24px; max-width:1000px; margin:0 auto; }
+  h1 { font-size:1.5rem; margin-bottom:4px; }
+  h2 { font-size:1.1rem; margin:28px 0 12px; }
+  .subtitle { color:#64748b; font-size:.875rem; margin-bottom:24px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:8px; }
+  .card { background:#fff; border-radius:8px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .card.north { border-left:4px solid #6366f1; }
+  .card .label { font-size:.7rem; color:#64748b; text-transform:uppercase; letter-spacing:.05em; }
+  .card .value { font-size:1.6rem; font-weight:600; margin-top:4px; }
+  .card .sub { font-size:.72rem; color:#94a3b8; margin-top:2px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.1); font-size:.85rem; }
+  th,td { padding:9px 12px; text-align:left; border-bottom:1px solid #e2e8f0; }
+  th { background:#f1f5f9; font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#475569; }
+  td.num,th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  td.note { color:#94a3b8; font-size:.78rem; }
+  .banner { background:#fffbeb; border:1px solid #fde68a; color:#92400e; padding:10px 14px; border-radius:8px; font-size:.8rem; margin-bottom:20px; }
+</style></head><body>
+<h1>MCP Funnel Report</h1>
+<p class="subtitle">Period: 2026-06-04 → 2026-06-11 · logs freshness: 9d · generated 2026-06-11T20:00:37.908Z</p>
+
+<div class="banner">
+  <b>Two views, two sources, two time-coverages.</b> The <b>Engagement</b> table is the live MCP
+  event stream (Cloud Logging) and only covers traffic <b>since the instrumented server deployed</b>.
+  The <b>Items &amp; conversion</b> table is Firestore state and includes <b>historical</b> items
+  that predate instrumentation. So the two tables won't reconcile yet — that's expected during the
+  fill-in window, not a bug. North-star ratios are computed within whichever source has the data.
+</div>
+
+<h2>North-star metrics</h2>
+<div class="cards">
+  <div class="card"><div class="label">① Anon → Account</div><div class="value">13.3%</div><div class="sub">2 accounts / 15 anon sessions (Firestore)</div></div>
+  <div class="card"><div class="label">② First-try success</div><div class="value">71.4%</div><div class="sub">5 ok / 7 first creates (logs)</div></div>
+</div>
+<div class="cards" style="margin-top:16px;">
+  <div class="card"><div class="label">Overall tool success</div><div class="value">85.5%</div><div class="sub">47/55 calls (logs)</div></div>
+  <div class="card"><div class="label">Calls / session</div><div class="value">0.6</div><div class="sub">engagement depth (logs)</div></div>
+  <div class="card"><div class="label">Free-plan spend</div><div class="value">$2.42</div><div class="sub">$1.208 / account</div></div>
+  <div class="card"><div class="label">Paid (from claim)</div><div class="value">1</div><div class="sub">1 paid overall</div></div>
+</div>
+
+<h2>Engagement — MCP event logs <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(since instrumentation deployed)</span></h2>
+<table>
+  <thead><tr><th>Stage</th><th class="num">Count</th><th class="num">Conv. from prev</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td>Connected (sessions)</td><td class="num">93</td><td class="num">—</td><td class="note">mcp_connect events</td></tr>
+    <tr><td>Browsed (read-route calls)</td><td class="num">23</td><td class="num">—</td><td class="note">list_languages · get_language_info · get_item</td></tr>
+    <tr><td>Create calls</td><td class="num">11</td><td class="num">7.5% of sessions</td><td class="note">7 sessions created an item</td></tr>
+    <tr><td>Update calls (iterate)</td><td class="num">21</td><td class="num">190.9% of creates</td><td class="note">create → revisit</td></tr>
+  </tbody>
+</table>
+
+<h2>Items &amp; conversion — Firestore <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(includes pre-instrumentation history)</span></h2>
+<table>
+  <thead><tr><th>Stage</th><th class="num">Count</th><th class="num">Conv. from prev</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td>Anonymous sessions</td><td class="num">15</td><td class="num">—</td><td class="note">distinct namespaces, free-plan ∪ claimed</td></tr>
+    <tr><td>Free-plan items created</td><td class="num">21</td><td class="num">140.0% items/session</td><td class="note">14 sessions still hold free-plan items</td></tr>
+    <tr><td>Iterated (≥2 turns)</td><td class="num">7</td><td class="num">33.3% of items</td><td class="note">help has more than the create turn</td></tr>
+    <tr><td>Artifact viewed (free-plan)</td><td class="num">3</td><td class="num">21.4% of free-plan sessions</td><td class="note">3 items · 65 raw views (P5-09; logs ∩ Firestore)</td></tr>
+    <tr><td>Claimed</td><td class="num">9</td><td class="num">60.0% of anon sessions</td><td class="note">distinct claimed namespaces</td></tr>
+    <tr><td>↳ Artifact-view → claim</td><td class="num">3</td><td class="num">100.0% of viewed sessions</td><td class="note">viewed free-plan sessions that went on to claim</td></tr>
+    <tr><td>Account created</td><td class="num">2</td><td class="num">22.2% of claims</td><td class="note">distinct owner uids</td></tr>
+    <tr><td>Paid</td><td class="num">1</td><td class="num">50.0% of accounts</td><td class="note">paid plan & active</td></tr>
+  </tbody>
+</table>
+<p class="note" style="margin-top:8px;">Artifact-view rows count only free-plan items still in Firestore (TTL 48h) whose <code>artifact_view</code> events resolve to a session; views of already-claimed/authed items and expired free-plan items are excluded by design. A low count can mean little render-host traffic <em>or</em> events not yet flowing (the app deploy that emits <code>artifact_view</code> must be live).</p>
+
+<h2>Claim attempts <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(anon→account — console claimFreePlanSession events)</span></h2>
+<div class="cards">
+  <div class="card"><div class="label">Claim success</div><div class="value">100.0%</div><div class="sub">5/5 attempts</div></div>
+  <div class="card"><div class="label">Failed claims</div><div class="value">0</div><div class="sub">none</div></div>
+  <div class="card"><div class="label">Items transferred</div><div class="value">5</div><div class="sub">across successful claims</div></div>
+</div>
+
+
+<h2>Tool-call outcomes</h2>
+<table>
+  <thead><tr><th>Outcome</th><th class="num">Count</th><th class="num">Share</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td>ok</td><td class="num">47</td><td class="num">85.5%</td><td class="note"></td></tr>
+    <tr><td>generation_failed</td><td class="num">4</td><td class="num">7.3%</td><td class="note">backend rejected (e.g. free-plan cap, invalid input) — fast</td></tr>
+    <tr><td>error</td><td class="num">4</td><td class="num">7.3%</td><td class="note">2 slow (&ge;60s) → likely timeouts; slowest 126s</td></tr>
+  </tbody>
+</table>
+
+<h2>Likely timeouts <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(error outcomes ≥ 60s — full-sheet regen / upstream timeout, not a validation reject)</span></h2>
+<table>
+  <thead><tr><th>Time (UTC)</th><th>Tool</th><th>Lang</th><th class="num">Latency</th><th>Session</th></tr></thead>
+  <tbody>
+    <tr><td>2026-06-10 00:14:51</td><td>update_item</td><td></td><td class="num">125.7s</td><td class="note">4d447cfccea4…</td></tr>
+    <tr><td>2026-06-10 00:13:19</td><td>update_item</td><td></td><td class="num">125.6s</td><td class="note">4d447cfccea4…</td></tr>
+  </tbody>
+</table>
+
+
+<h2>Language distribution (interest signal)</h2>
+<table>
+  <thead><tr><th>Language</th><th class="num">Calls</th></tr></thead>
+  <tbody><tr><td>L0173</td><td class="num">9</td></tr>
+<tr><td>L0166</td><td class="num">8</td></tr>
+<tr><td>L0151</td><td class="num">1</td></tr></tbody>
+</table>
+
+<h2>Agent kind <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(MCP client software, by distinct session)</span></h2>
+<table>
+  <thead><tr><th>Client kind</th><th class="num">Sessions</th><th class="num">Share</th></tr></thead>
+  <tbody><tr><td>unknown</td><td class="num">85</td><td class="num">91.4%</td></tr>
+<tr><td>codex</td><td class="num">4</td><td class="num">4.3%</td></tr>
+<tr><td>claude-code</td><td class="num">2</td><td class="num">2.2%</td></tr>
+<tr><td>local-agent-mode-graffiticode (via mcp-remote 0.1.37)</td><td class="num">1</td><td class="num">1.1%</td></tr>
+<tr><td>codex-mcp-client</td><td class="num">1</td><td class="num">1.1%</td></tr></tbody>
+</table>
+<p class="note" style="margin-top:8px;"><code>unknown</code> = sessions with no <code>client_kind</code> yet: connect-only sessions (the field rides tool events, not <code>mcp_connect</code>) and any pre-instrumentation traffic.</p>
+
+<h2>Geography <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(coarse country, by distinct session — no IP collected)</span></h2>
+<table>
+  <thead><tr><th>Country</th><th class="num">Sessions</th><th class="num">Share</th></tr></thead>
+  <tbody><tr><td>unknown</td><td class="num">69</td><td class="num">74.2%</td></tr>
+<tr><td>US</td><td class="num">24</td><td class="num">25.8%</td></tr></tbody>
+</table>
+</body></html>

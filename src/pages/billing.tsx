@@ -23,8 +23,8 @@ function classNames(...classes: string[]) {
 }
 
 const tabs = [
-  { name: 'Billing', icon: CurrencyDollarIcon },
   { name: 'Usage', icon: ChartBarIcon },
+  { name: 'Billing', icon: CurrencyDollarIcon },
   { name: 'Payment History', icon: DocumentTextIcon },
   { name: 'Payment Methods', icon: CreditCardIcon },
 ];
@@ -120,16 +120,16 @@ export default function Billing() {
 
             <Tab.Panels className="mt-6">
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
+                <UsageMonitor userId={user.uid} />
+              </Tab.Panel>
+
+              <Tab.Panel className="rounded-none bg-white p-6 shadow">
                 <div className="space-y-6">
                   <SubscriptionCard key={subscriptionKey} userId={user.uid} />
                   <div className="border-t pt-6">
                     <PricingPlans userId={user.uid} onSubscriptionChange={refreshSubscription} />
                   </div>
                 </div>
-              </Tab.Panel>
-
-              <Tab.Panel className="rounded-none bg-white p-6 shadow">
-                <UsageMonitor userId={user.uid} />
               </Tab.Panel>
 
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
