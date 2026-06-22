@@ -726,6 +726,22 @@ export async function createItem({
   isPublic,
   client,
   upstreamLangs,
+  deferGeneration,
+}: {
+  auth: AuthArg;
+  lang: string;
+  name?: string;
+  taskId?: string;
+  mark?: number;
+  help?: string;
+  isPublic?: boolean;
+  client?: string;
+  upstreamLangs?: string[];
+  // When true, create a fast "shell" item with no task and
+  // generationStatus="generating" — the caller (startCodeGeneration) runs the
+  // real generation asynchronously and fills in the taskId later. Skips the
+  // synchronous template generateCode below.
+  deferGeneration?: boolean;
 }) {
   try {
     // Generate a unique ID for the item
@@ -737,7 +753,7 @@ export async function createItem({
     }
     // If no taskId provided, create a minimal template task
     let generatedHelp = help || "[]";
-    if (!taskId) {
+    if (!taskId && !deferGeneration) {
       const result = await generateCode({
         auth,
         prompt: "Create a minimal starting template",
@@ -755,19 +771,20 @@ export async function createItem({
     // lazily re-post the task under the current uid if the taskId is ever null
     // (shareItem and the trial-claim flow both rely on this).
     let code: any = null;
-    try {
-      const apiTask = await getApiTask({ id: taskId, auth });
-      const taskData = apiTask?.[0] || apiTask;
-      code = taskData?.code ?? null;
-    } catch (err) {
-      console.error("createItem(): failed to fetch code for item", id, err);
+    if (taskId) {
+      try {
+        const apiTask = await getApiTask({ id: taskId, auth });
+        const taskData = apiTask?.[0] || apiTask;
+        code = taskData?.code ?? null;
+      } catch (err) {
+        console.error("createItem(): failed to fetch code for item", id, err);
+      }
     }
 
     const timestamp = Date.now();
     const item: Record<string, any> = {
       id,
       name,
-      taskId,
       lang,
       mark: mark || 1, // Default to mark 1 if not provided
       help: generatedHelp,
@@ -777,6 +794,13 @@ export async function createItem({
       created: timestamp,
       updated: timestamp,
     };
+    if (taskId) {
+      item.taskId = taskId;
+    }
+    if (deferGeneration) {
+      item.generationStatus = "generating";
+      item.generationStartedAt = timestamp;
+    }
     if (code !== null) {
       item.code = code;
     }
@@ -805,6 +829,16 @@ export async function updateItem({
   isPublic,
   client,
   upstreamLangs,
+}: {
+  auth: AuthArg;
+  id: string;
+  name?: string;
+  taskId?: string;
+  mark?: number;
+  help?: string;
+  isPublic?: boolean;
+  client?: string;
+  upstreamLangs?: string[];
 }) {
   try {
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
@@ -889,6 +923,34 @@ export async function updateItem({
     console.error("updateItem()", "ERROR", error);
     throw new Error(`Failed to update item: ${error.message}`);
   }
+}
+
+// Set the async-generation status on an item. Used by startCodeGeneration
+// (status="generating") and the /api/generate-job worker (status="ready" on
+// success, "failed"+error otherwise). Clears generationStartedAt on a terminal
+// status so the staleness guard only fires while genuinely in-flight.
+export async function setItemGenerationStatus({
+  auth,
+  id,
+  status,
+  error = null,
+}: {
+  auth: AuthArg;
+  id: string;
+  status: "generating" | "ready" | "failed";
+  error?: string | null;
+}) {
+  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+  const updates: Record<string, any> = {
+    generationStatus: status,
+    generationError: status === "failed" ? error : null,
+  };
+  if (status === "generating") {
+    updates.generationStartedAt = Date.now();
+  } else {
+    updates.generationStartedAt = null;
+  }
+  await itemRef.update(updates);
 }
 
 export async function getItems({ auth, lang, mark, client }) {
@@ -1009,6 +1071,9 @@ export async function getItems({ auth, lang, mark, client }) {
         sharedFrom: data.sharedFrom || null, // Include sharedFrom field if present
         client: data.client ?? 'console',
         upstreamLangs: Array.isArray(data.upstreamLangs) ? data.upstreamLangs : [],
+        generationStatus: data.generationStatus ?? null,
+        generationError: data.generationError ?? null,
+        generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
       };
 
       const timestamp = data.updated || data.created || 0;
@@ -1133,6 +1198,10 @@ export async function getItem({ auth, id }) {
       updated: data.updated ? String(data.updated) : String(data.created),
       client: data.client ?? 'console',
       upstreamLangs: Array.isArray(data.upstreamLangs) ? data.upstreamLangs : [],
+      // Absent status ⇒ legacy/synchronous item, treated as ready by clients.
+      generationStatus: data.generationStatus ?? null,
+      generationError: data.generationError ?? null,
+      generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
     };
   } catch (error) {
     console.error("getItem()", "ERROR", error);

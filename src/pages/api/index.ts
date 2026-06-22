@@ -18,6 +18,7 @@ import {
   updateItem,
   getItems,
   getItem,
+  setItemGenerationStatus,
   getItemClientTags,
   shareItem,
   parseCode,
@@ -33,6 +34,7 @@ import { checkCompileAllowed } from "../../lib/usage-service";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
+import { enqueueGenerationJob } from "../../lib/generation-queue";
 import {
   FreePlanError,
   getFreePlanCredentials,
@@ -99,7 +101,7 @@ const typeDefs = `
   type Item {
     id: String!
     name: String!
-    taskId: String!
+    taskId: String
     lang: String!
     mark: Int
     help: String
@@ -110,6 +112,14 @@ const typeDefs = `
     client: String
     upstreamLangs: [String!]
     task: Task
+    generationStatus: String
+    generationError: String
+    generationStartedAt: String
+  }
+
+  type GenerationJob {
+    itemId: String!
+    status: String!
   }
 
   type GeneratedCode {
@@ -230,6 +240,7 @@ const typeDefs = `
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
     generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
+    startCodeGeneration(itemId: String, lang: String!, name: String, client: String, prompt: String!, modification: String!, currentSrc: String): GenerationJob!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!]): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!]): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
@@ -357,6 +368,40 @@ const resolvers = {
         console.error("Error in generateCode mutation:", error);
         throw error;
       }
+    },
+
+    // Async generation: mark the item "generating" and enqueue a Cloud Task that
+    // runs the (60-110s) generation in /api/generate-job, then return immediately.
+    // Lets MCP clients with short tool-call timeouts poll get_item for completion
+    // instead of holding one long call. See src/lib/generation-queue.ts.
+    startCodeGeneration: async (_, args, ctx) => {
+      const auth = await resolveAuth(ctx);
+      const { itemId, lang, name, client, prompt, modification, currentSrc } = args;
+      // Credential the worker replays to act as this caller. For free-plan we
+      // re-derive fresh credentials in the worker (idTokens are short-lived and
+      // dispatch can lag), so carry the session, not a baked idToken.
+      const authReplay = ctx.freePlan
+        ? { kind: "freePlan" as const, sessionNamespace: ctx.sessionNamespace, sessionUuid: ctx.sessionUuid }
+        : { kind: "bearer" as const, token: ctx.token };
+
+      let id = itemId;
+      if (!id) {
+        const shell = await createItem({ auth, lang, name, client, deferGeneration: true }) as unknown as { id: string };
+        id = shell.id;
+      } else {
+        await setItemGenerationStatus({ auth, id, status: "generating" });
+      }
+
+      await enqueueGenerationJob({
+        itemId: id,
+        lang,
+        prompt,
+        modification,
+        currentSrc,
+        authReplay,
+      });
+
+      return { itemId: id, status: "generating" };
     },
 
     postTask: async (_, args, ctx) => {

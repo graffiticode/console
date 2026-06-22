@@ -37,7 +37,10 @@ steps:
       # so console.graffiticode.org and app.graffiticode.org share one sign-in.
       # Use --update-env-vars (additive); --set-env-vars would wipe everything
       # else (ANTHROPIC/OPENAI/Stripe/DSPY/OTEL/... set out-of-band on the service).
-      - '--update-env-vars=SSO_COOKIE_DOMAIN=.graffiticode.org'
+      # Append async-generation config (Cloud Tasks → /api/generate-job).
+      # INTERNAL_JOB_SECRET is mounted out-of-band via Secret Manager (like the
+      # FREE_PLAN_* secrets), so it isn't listed here.
+      - '--update-env-vars=SSO_COOKIE_DOMAIN=.graffiticode.org,GENERATION_QUEUE_NAME=generation-jobs,GENERATION_QUEUE_LOCATION=us-central1,CONSOLE_URL=https://console.graffiticode.org'
     id: Deploy
     entrypoint: gcloud
 
