@@ -37,6 +37,8 @@ Next.js 15 + React 18 app with GraphQL API, Claude AI code generation, and Fires
 **Code generation flow:**
 User prompt → RAG vector search → DSPy prompt compilation (optional) → Claude streaming → Graffiticode API verification → error correction if needed
 
+**Per-language Opus opt-in:** code generation defaults to Sonnet (`CLAUDE_MODELS.DEFAULT`), with Haiku for small property-only edits. A language whose generation is more subtle can opt its **initial** generation into Opus by placing `<!-- gc:model=opus -->` anywhere in its `instructions.md` (served by its l0NNN service). The directive is parsed + stripped during the instructions fetch in `src/lib/code-generation-service.ts` (`dialectOptsIntoOpus`), so it never reaches the LLM. Only the initial generation uses Opus; the error-correction/fix pass and all non-opted languages stay on the current Sonnet/Haiku scheme. An explicit caller `options.model` still overrides everything.
+
 **External services:**
 - Graffiticode API (api.graffiticode.org) - language compilation
 - Claude API - code generation

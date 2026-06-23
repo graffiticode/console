@@ -78,17 +78,26 @@ const MAX_FREE_PLAN_PROMPT = 10000;
 // Global cache for language assets with TTL
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const languageAssetsCache = {
-  instructions: new Map<string, { value: string; expires: number }>(),
+  instructions: new Map<string, { value: string; optInOpus: boolean; expires: number }>(),
   templates: new Map<string, string>(),
 };
 
 // Define available Claude models with best practices
 export const CLAUDE_MODELS = {
-  OPUS: "claude-opus-4-6",
+  OPUS: "claude-opus-4-8",
   SONNET: "claude-sonnet-4-6",
   HAIKU: "claude-haiku-4-5-20251001",
   DEFAULT: "claude-sonnet-4-6",
 };
+
+// A language opts into Opus for its INITIAL code generation by placing this
+// directive anywhere in its instructions.md (served by its l0NNN service):
+//   <!-- gc:model=opus -->
+// It's parsed + stripped during the instructions fetch (so it never reaches the
+// LLM) and only affects the first generation call; fixes stay on the default.
+const OPUS_OPT_IN_RE = /<!--\s*gc:model\s*[:=]\s*opus\s*-->/i;
+// Broader matcher used only to strip any gc:model directive from the prompt text.
+const MODEL_DIRECTIVE_STRIP_RE = /<!--\s*gc:model\s*[:=]\s*\w+\s*-->/gi;
 
 // Default max output tokens per generation chunk. Large enough that most
 // programs (incl. multi-page L0175 assessments) complete in a single chunk
@@ -377,23 +386,40 @@ export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null 
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
  * @returns {Promise<string>} - The dialect-specific instructions, or empty string if none found
  */
-async function readDialectInstructions(lang) {
+async function readDialectAssets(lang): Promise<{ value: string; optInOpus: boolean }> {
   const cacheKey = `L${lang}`;
   const cached = languageAssetsCache.instructions.get(cacheKey);
   if (cached && Date.now() < cached.expires) {
-    return cached.value;
+    return cached;
   }
 
   try {
     const instructions = await getLanguageAsset(`L${lang}`, 'instructions.md');
-    const value = instructions ? `\n${instructions}\n` : "";
-    languageAssetsCache.instructions.set(cacheKey, { value, expires: Date.now() + CACHE_TTL_MS });
-    return value;
+    // Parse the Opus opt-in from the raw instructions, then strip any gc:model
+    // directive so it never reaches the LLM.
+    const optInOpus = instructions ? OPUS_OPT_IN_RE.test(instructions) : false;
+    const cleaned = instructions ? instructions.replace(MODEL_DIRECTIVE_STRIP_RE, "") : "";
+    const value = cleaned ? `\n${cleaned}\n` : "";
+    const entry = { value, optInOpus, expires: Date.now() + CACHE_TTL_MS };
+    languageAssetsCache.instructions.set(cacheKey, entry);
+    return entry;
   } catch (error) {
     console.error(`Error fetching dialect instructions from language server for L${lang}:`, error);
-    languageAssetsCache.instructions.set(cacheKey, { value: "", expires: Date.now() + CACHE_TTL_MS });
-    return "";
+    const entry = { value: "", optInOpus: false, expires: Date.now() + CACHE_TTL_MS };
+    languageAssetsCache.instructions.set(cacheKey, entry);
+    return entry;
   }
+}
+
+async function readDialectInstructions(lang): Promise<string> {
+  return (await readDialectAssets(lang)).value;
+}
+
+// Whether this dialect opted into Opus for initial code generation (via the
+// <!-- gc:model=opus --> directive in its instructions.md). Shares the cached
+// instructions fetch, so this adds no extra network call.
+async function dialectOptsIntoOpus(lang): Promise<boolean> {
+  return (await readDialectAssets(lang)).optInOpus;
 }
 
 // Static tail of the dialect system prompt — language-independent. Concatenated
@@ -1213,6 +1239,19 @@ export async function generateCode({
   // Initial model selection (may be overridden later based on formatted prompt)
   let modelToUse = options.model || CLAUDE_MODELS.DEFAULT;
 
+  // Per-language Opus opt-in: a language can request Opus for its INITIAL
+  // generation via <!-- gc:model=opus --> in its instructions.md. Honored only
+  // when the caller didn't pin a model. When opted in, the initial gen is Opus
+  // unconditionally (it wins over the Haiku small-edit downgrade below); the
+  // fix/repair pass still runs on the default (current scheme thereafter).
+  let opusOptIn = false;
+  if (!options.model) {
+    opusOptIn = await dialectOptsIntoOpus(lang);
+    if (opusOptIn) {
+      modelToUse = CLAUDE_MODELS.OPUS;
+    }
+  }
+
   // Start analytics tracking with the user's latest message (not full conversation context)
   const userQuery = extractSearchQuery(prompt);
   safeRAGAnalytics.startRequest(requestId, userQuery, userId, sessionId, {
@@ -1371,7 +1410,7 @@ export async function generateCode({
     }
 
     // Check formatted prompt for property update pattern and adjust model if needed
-    if (!options.model) {
+    if (!options.model && !opusOptIn) {
       try {
         // Parse the JSON formatted prompt to check the actual user content
         const promptData = JSON.parse(formattedPrompt);
