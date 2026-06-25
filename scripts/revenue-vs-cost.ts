@@ -33,6 +33,7 @@ const db = admin.firestore();
 
 // Claude API pricing (per million tokens)
 const CLAUDE_PRICING: Record<string, { input: number; output: number }> = {
+  'claude-opus-4-8':           { input: 5.00, output: 25.00 },
   'claude-opus-4-6':           { input: 5.00, output: 25.00 },
   'claude-opus-4-20250115':    { input: 15.00, output: 75.00 },
   'claude-sonnet-4-6':         { input: 3.00, output: 15.00 },
@@ -194,7 +195,14 @@ interface DailyBucket {
 
 // Plan price per unit (monthly price / monthly units)
 const PLAN_PRICE_PER_UNIT: Record<string, number> = {
-  demo: 0, starter: 10 / 5000, pro: 100 / 100000, teams: 1000 / 2000000,
+  free: 0, pro: 100 / 100000, teams: 1000 / 2000000,
+};
+
+// Legacy plan names are folded into current ones for attribution.
+const PLAN_ALIASES: Record<string, string> = { demo: 'free', starter: 'pro' };
+const normalizePlan = (plan?: string): string => {
+  const p = plan || 'free';
+  return PLAN_ALIASES[p] || p;
 };
 
 // Actual daily data loaded from data/daily-usage/ files (populated by fetch-daily-usage.ts)
@@ -604,7 +612,7 @@ async function main() {
 
   const unitsByPlan: Record<string, number> = {};
   for (const r of records) {
-    const plan = r.plan || 'demo';
+    const plan = normalizePlan(r.plan);
     unitsByPlan[plan] = (unitsByPlan[plan] || 0) + (r.units || 0);
   }
 
@@ -663,7 +671,7 @@ async function main() {
     if (!ms) continue;
     const date = msToDateStr(ms, tz);
     if (!dailyMap[date]) dailyMap[date] = emptyBucket(date);
-    const plan = r.plan || 'demo';
+    const plan = normalizePlan(r.plan);
     dailyMap[date].projectedRevenue += (r.units || 0) * (PLAN_PRICE_PER_UNIT[plan] || 0);
     dailyMap[date].units += r.units || 0;
   }

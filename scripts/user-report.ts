@@ -31,6 +31,9 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
+// Legacy "demo" plan is displayed as "free".
+const normalizePlan = (plan?: string): string => (!plan || plan === 'demo' ? 'free' : plan);
+
 function parseArgs(argv: string[]): { period: string; output: string } {
   const args = argv.slice(2);
   let period = 'all';
@@ -317,7 +320,7 @@ async function main() {
       name: data.name || '',
       created: data.created || '',
       email: data.email || '',
-      plan: data.subscription?.plan || 'demo',
+      plan: normalizePlan(data.subscription?.plan),
       aiUnits: 0,
       compileUnits: 0,
     };
@@ -338,7 +341,7 @@ async function main() {
     const uid = data.userId;
     if (!uid) return;
     if (!userMap[uid]) {
-      userMap[uid] = { uid, name: '', created: '', email: '', plan: 'demo', aiUnits: 0, compileUnits: 0 };
+      userMap[uid] = { uid, name: '', created: '', email: '', plan: 'free', aiUnits: 0, compileUnits: 0 };
     }
     const units = data.units || 0;
     if (data.type === 'ai_generation') {
