@@ -18,6 +18,7 @@ import {
   updateItem,
   getItems,
   getItem,
+  getSpec,
   setItemGenerationStatus,
   getItemClientTags,
   shareItem,
@@ -213,6 +214,7 @@ const typeDefs = `
     task(id: String!): Task
     items(lang: String!, mark: Int, client: String): [Item!]
     item(id: String!): Item
+    spec(id: String!): ItemSpec!
     itemClientTags(lang: String!): [String!]!
     languages(search: String, domain: String): [Language!]!
     language(id: String!): LanguageInfo
@@ -223,6 +225,18 @@ const typeDefs = `
     success: Boolean!
     message: String
     newItemId: String
+  }
+
+  type SpecCoverage {
+    checked: Int!
+    missing: [String!]!
+  }
+
+  type ItemSpec {
+    spec: String!
+    lang: String!
+    itemId: String!
+    coverage: SpecCoverage!
   }
 
   type ClaimedItem {
@@ -332,6 +346,11 @@ const resolvers = {
       const { id } = args;
       const auth = await resolveAuth(ctx);
       return await getItem({ auth, id });
+    },
+    spec: async (_, args, ctx) => {
+      const { id } = args;
+      const auth = await resolveAuth(ctx);
+      return await getSpec({ auth, id });
     },
     itemClientTags: async (_, args, ctx) => {
       const { lang } = args;

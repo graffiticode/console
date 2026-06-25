@@ -6,6 +6,7 @@ import { getFirestore } from "../../utils/db";
 import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon, languageOfflineMessage, isLanguageOfflineError } from "../../lib/api";
 import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
+import { generateSpec } from "../../lib/spec-generation-service";
 import { planSequence, detectComposeTrigger, orchestrateComposition, capturePlanForCuration } from "../../lib/language-router";
 import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
@@ -1135,6 +1136,21 @@ export async function getTask({ auth, id }) {
     console.error("getTask()", "ERROR", error);
     throw new Error(`Failed to get task: ${error.message}`);
   }
+}
+
+// Produce a platform-neutral English spec of an item's content, for handing across languages.
+// Resolves the item -> head taskId, then delegates to the spec generator. The item id is an
+// opaque handle here; the returned spec (English) is the only cross-language exchange unit.
+export async function getSpec({ auth, id }) {
+  const item = await getItem({ auth, id });
+  if (!item) {
+    throw new Error(`Item not found: ${id}`);
+  }
+  if (!item.taskId) {
+    throw new Error(`Item ${id} has no compiled task yet`);
+  }
+  const { spec, lang, coverage } = await generateSpec({ auth, taskId: item.taskId });
+  return { spec, lang, itemId: id, coverage };
 }
 
 export async function getItem({ auth, id }) {

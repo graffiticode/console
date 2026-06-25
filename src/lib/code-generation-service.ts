@@ -411,7 +411,7 @@ async function readDialectAssets(lang): Promise<{ value: string; optInOpus: bool
   }
 }
 
-async function readDialectInstructions(lang): Promise<string> {
+export async function readDialectInstructions(lang): Promise<string> {
   return (await readDialectAssets(lang)).value;
 }
 

@@ -56,6 +56,38 @@ export const getLanguageLexicon = async (lang: string) => {
   }
 };
 
+// Unparse-hints cache: same short TTL/serving channel as the lexicon (see getLanguageAsset).
+const HINTS_CACHE_TTL_MS = 5 * 60 * 1000;
+const hintsCache = new Map<string, { value: Record<string, any>; expires: number }>();
+
+// Per-language unparse hints: a map of node tag -> comment (string, or {before,after})
+// that the unparser injects as /* */ annotations to orient the spec generator. The asset
+// is optional; an absent or unparseable file yields an empty map (plain unparse output).
+export const getLanguageHints = async (lang: string): Promise<Record<string, any>> => {
+  const cached = hintsCache.get(lang);
+  if (cached && Date.now() < cached.expires) {
+    return cached.value;
+  }
+
+  let hints: Record<string, any> = {};
+  try {
+    const data = await getLanguageAsset(`L${lang}`, 'unparse-hints.json');
+    if (data) {
+      const parsed = typeof data === 'string'
+        ? JSON.parse(data.substring(data.indexOf("{")))
+        : data;
+      if (parsed && typeof parsed === 'object') {
+        hints = parsed;
+      }
+    }
+  } catch (error) {
+    console.warn(`Failed to fetch unparse-hints for L${lang}:`, (error as any).message);
+  }
+
+  hintsCache.set(lang, { value: hints, expires: Date.now() + HINTS_CACHE_TTL_MS });
+  return hints;
+};
+
 // Standardized message shown when a language service can't be reached.
 export const languageOfflineMessage = (lang: string) =>
   `Language L${lang} is offline. Try again later.`;
