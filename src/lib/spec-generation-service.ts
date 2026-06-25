@@ -13,8 +13,10 @@ import { unparse } from "@graffiticode/parser";
 import { getApiTask, getLanguageLexicon, getLanguageHints } from "./api";
 import { readDialectInstructions } from "./code-generation-service";
 
-// Translation is faithfulness-critical, not creative — a capable, deterministic model.
-const SPEC_MODEL = process.env.SPEC_MODEL || "claude-sonnet-4-6";
+// Translation is faithfulness-critical and constrained (annotated src + instructions + the
+// completeness contract fully determine the output), and get_spec sits in the hot path — so a
+// small, fast model is the right fit. assertCoverage is the elision guard. Override via SPEC_MODEL.
+const SPEC_MODEL = process.env.SPEC_MODEL || "claude-haiku-4-5-20251001";
 const SPEC_MAX_TOKENS = 8192;
 
 // A completeness contract, NOT a style example. A checklist enforces structure without biasing
