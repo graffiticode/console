@@ -1,7 +1,7 @@
 import axios from "axios";
 import admin from "firebase-admin";
 import { CLAUDE_MODELS, generateCode as generateCodeService, extractSearchQuery } from "./code-generation-service";
-import { listLanguages } from "./languages";
+import { listLanguages, findLanguageById } from "./languages";
 import { hybridSearch } from "./embedding-service";
 import { parseCode } from "../pages/api/resolvers";
 
@@ -46,15 +46,34 @@ function extractLangIds(text: string, requireUse: boolean): string[] {
 // The compose trigger: do any sufficiently-relevant head-lang examples author a
 // `data use "<id>"`? Returns the distinct upstream ids found (a hint only — the
 // actual sequence comes from planning), or [] when the request looks atomic.
-export function detectComposeTrigger(examples: any[]): string[] {
-  if (!Array.isArray(examples)) return [];
+// `bestScore` is the max example score seen REGARDLESS of threshold, so the gate
+// can log "best=0.41 < 0.6 → atomic" and distinguish a correct atomic from a
+// missed composition (cold RAG). The score is for observability only — never injected.
+export function detectComposeTriggerDetail(examples: any[]): { ids: string[]; bestScore: number } {
+  if (!Array.isArray(examples)) return { ids: [], bestScore: 0 };
   const hint = new Set<string>();
+  let bestScore = 0;
   for (const ex of examples) {
     const score = ex?.combinedScore ?? ex?.similarity ?? 0;
+    if (score > bestScore) bestScore = score;
     if (score < USE_TRIGGER_THRESHOLD) continue;
     for (const id of extractLangIds(ex?.code || "", true)) hint.add(id);
   }
-  return [...hint];
+  return { ids: [...hint], bestScore };
+}
+
+export function detectComposeTrigger(examples: any[]): string[] {
+  return detectComposeTriggerDetail(examples).ids;
+}
+
+// The capability trigger: does the head language DECLARE it can embed a live widget
+// dialect (e.g. L0158 embeds L0166)? Returns those embed-target ids. This opens the
+// gate independent of RAG coverage — the fix for silently-missed compositions when the
+// head-lang corpus lacks a `data use` exemplar. It is a HINT only: planSequence still
+// makes the real compose-vs-atomic call and may return a single-stage (atomic) sequence.
+// Sourced from the static LANGUAGES array (sync, in-memory) because the gate is hot-path.
+export function detectCapabilityTrigger(headLang: string): string[] {
+  return findLanguageById(headLang)?.embeds ?? [];
 }
 
 interface LanguageSuggestion {
@@ -235,6 +254,7 @@ Heuristics:
 - A "spreadsheet question", "spreadsheet assessment", or "use the spreadsheet" prompt under an embedding host (e.g. L0158) ⇒ next stage is the spreadsheet dialect (L0166).
 - A pure question-form prompt (MCQ, short text, fill-in-the-blank) under L0158 ⇒ single stage, no upstream.
 - If the user is already in the dialect that authors the content directly (e.g. currentLang=0166 asking for a spreadsheet) ⇒ single stage.
+- If the data or content a downstream stage would supply is ALREADY present inline in the prompt (the user pasted the actual numbers, rows, or values), do NOT add that upstream stage — the request is self-contained. Only add a data-providing upstream when the values must be FETCHED or TRANSFORMED from a source not in the prompt.
 
 Return JSON only:
 {
@@ -548,15 +568,29 @@ export async function planSequence({
   auth,
   options,
   rid,
+  preferHaiku = false,
 }: {
   prompt: string;
   headLang: string;
   auth?: any;
   options?: any;
   rid?: string | null;
+  // Skip the L0010 (Sonnet) codegen on a planRAG miss and go straight to the cheap
+  // Haiku planner. Set when the gate was opened ONLY by capability (no RAG signal):
+  // such requests are usually atomic (an agent inlined the data, or it's a plain
+  // question), atomic plans are never curated so they ALWAYS miss planRAG, and we
+  // don't want a ~4s Sonnet call on that hot atomic path. Haiku's prompt fast-returns
+  // a single stage for those cases.
+  preferHaiku?: boolean;
 }): Promise<PlanResult> {
   const hit = await lookupPlanRAG({ prompt, rid });
   if (hit && hit.length > 0) return { sequence: hit, fromRag: true };
+
+  // Capability-only trigger → skip the Sonnet L0010 codegen entirely.
+  if (preferHaiku) {
+    const plan = await planComposition({ prompt, currentLang: headLang });
+    return { sequence: plan.map((s) => s.lang), fromRag: false };
+  }
 
   // Miss → generate an L0010 plan. This is a direct service call (it does NOT
   // re-enter the resolver's composition cascade, so no recursion). The L0010

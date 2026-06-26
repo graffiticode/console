@@ -7,7 +7,7 @@ import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon, lan
 import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
 import { generateSpec } from "../../lib/spec-generation-service";
-import { planSequence, detectComposeTrigger, orchestrateComposition, capturePlanForCuration } from "../../lib/language-router";
+import { planSequence, detectCapabilityTrigger, detectComposeTriggerDetail, orchestrateComposition, capturePlanForCuration } from "../../lib/language-router";
 import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
@@ -457,6 +457,20 @@ export async function compiles({ auth, lang, type }) {
   }
 }
 
+// Provenance marker emitted by get_spec: `<!-- gc:content-source=0166 -->`. Carries the
+// source dialect of pasted spec content so the create_item forward path can resolve the
+// composition by capability lookup instead of an LLM planner call. Parsed AND stripped before
+// any LLM sees it, mirroring the gc:model opus-opt-in handling in code-generation-service.
+const CONTENT_SOURCE_RE = /<!--\s*gc:content-source\s*[:=]\s*(\d{3,5})\s*-->/i;
+const CONTENT_SOURCE_STRIP_RE = /<!--\s*gc:content-source\s*[:=]\s*\d{3,5}\s*-->/gi;
+
+function parseContentSource(prompt: string): { sourceLang: string | null; prompt: string } {
+  const m = prompt.match(CONTENT_SOURCE_RE);
+  const sourceLang = m ? m[1] : null;
+  const cleaned = sourceLang ? prompt.replace(CONTENT_SOURCE_STRIP_RE, "").trim() : prompt;
+  return { sourceLang, prompt: cleaned };
+}
+
 export async function generateCode({
   auth,
   prompt,
@@ -474,6 +488,12 @@ export async function generateCode({
     }
 
     prompt = prompt.trim();
+    // Provenance fast-path input: pull the gc:content-source marker (emitted by get_spec)
+    // out of the prompt and strip it so it never reaches an LLM. `contentSource` is the
+    // dialect that authored the pasted content; it lets the gate resolve composition by
+    // capability lookup instead of a planner call. Absent marker → cleanedPrompt === prompt.
+    const { sourceLang: contentSource, prompt: cleanedPrompt } = parseContentSource(prompt);
+    prompt = cleanedPrompt;
     let description = null;
     let changeSummary = null;
     let model = null;
@@ -494,6 +514,25 @@ export async function generateCode({
     // True only when the sequence came from a planning-RAG hit (already curated),
     // so we don't re-capture a duplicate mark-2 plan for it.
     let fromRagHit = false;
+    // Provenance fast-path produced the sequence by declaration (not learned) — skip
+    // capturePlanForCuration for it too.
+    let fromProvenance = false;
+
+    // Hoisted out of the `if (!src)` block below so the post-parse repair (which lives in
+    // the outer scope) can reuse them: codegen options, the usage-limit message mapper, and
+    // the head-lang retrieval (reused for the compose trigger, the head gen, and the repair).
+    const codegenOptions = {
+      model: options?.model,
+      temperature: options?.temperature,
+      maxTokens: options?.maxTokens,
+    };
+    const mapUsageLimit = (errs: any[]) => errs.map(err => ({
+      ...err,
+      message: err.message === 'Usage limit reached'
+        ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
+        : err.message
+    }));
+    let headExamples: any[] = [];
 
     // Template generation
     if (prompt === "Create a minimal starting template") {
@@ -521,37 +560,46 @@ export async function generateCode({
     //   2. Otherwise PLAN: planSequence() (L0010 planning-RAG hit, else Haiku);
     //      a length>1 sequence runs the tail-first executor.
     if (!src) {
-      const codegenOptions = {
-        model: options?.model,
-        temperature: options?.temperature,
-        maxTokens: options?.maxTokens,
-      };
-      const mapUsageLimit = (errs: any[]) => errs.map(err => ({
-        ...err,
-        message: err.message === 'Usage limit reached'
-          ? 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue. Your usage will reset to zero on the next billing cycle.'
-          : err.message
-      }));
-
       // 1. Atomic guard — reuse this head-lang retrieval for both the trigger
       //    and the head code gen (one embed/search). Never fail generation if
       //    retrieval errors; just treat it as atomic.
-      let headExamples: any[] = [];
       try {
         headExamples = await getRelevantExamples({ prompt, lang: language, rid }) || [];
       } catch (err: any) {
         console.warn(`[composition] rid=${rid} head retrieval failed: ${err?.message}`);
       }
-      const composeTrigger = detectComposeTrigger(headExamples);
+      const { ids: composeTrigger, bestScore } = detectComposeTriggerDetail(headExamples);
+      // Capability trigger is RAG-independent: it opens the gate whenever the head language
+      // declares it embeds a live widget dialect, fixing silently-missed compositions when
+      // the head-lang corpus lacks a `data use` exemplar. Env flag for instant rollback.
+      const capabilityTrigger =
+        process.env.COMPOSE_CAPABILITY_GATE === "false" ? [] : detectCapabilityTrigger(language);
 
-      // 2. Plan only when triggered; planSequence may still return atomic.
+      // 2. Resolve the sequence. Priority: declared provenance (gc:content-source) →
+      //    planner (RAG or capability trigger) → atomic. planSequence may still return atomic.
       let sequence: string[] = [language];
-      if (composeTrigger.length > 0) {
-        console.log(`[composition] rid=${rid} compose trigger=${composeTrigger.map(l => `L${l}`).join(",")}`);
-        const planResult = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid });
+      let gateSource = "none";
+      if (contentSource && contentSource !== language && capabilityTrigger.includes(contentSource)) {
+        // Provenance fast-path: the pasted content was authored by a dialect THIS head
+        // embeds as a live widget → compose deterministically, no planner LLM. Same-lang
+        // respec, cross-language ports, and data-bind provenance all fall through to the
+        // planner/atomic branch (contentSource is not in the head's embeds list).
+        sequence = [language, contentSource];
+        gateSource = "provenance";
+        fromProvenance = true;
+      } else if (composeTrigger.length > 0 || capabilityTrigger.length > 0) {
+        gateSource = composeTrigger.length > 0 ? "rag" : "capability";
+        const planResult = await planSequence({
+          prompt, headLang: language, auth, options: codegenOptions, rid,
+          // Capability-only (no RAG signal): skip the Sonnet L0010 codegen on the hot atomic
+          // path; the cheap Haiku planner fast-returns atomic for self-contained prompts.
+          preferHaiku: composeTrigger.length === 0,
+        });
         sequence = planResult.sequence;
         fromRagHit = planResult.fromRag;
       }
+      console.log(`[composition] rid=${rid} gate source=${gateSource} rag=[${composeTrigger.join(",")}] cap=[${capabilityTrigger.join(",")}] bestRagScore=${bestScore.toFixed(3)} sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
+      ragLog(rid, "composition.gate", { source: gateSource, rag: composeTrigger, capability: capabilityTrigger, bestRagScore: bestScore, sequence });
 
       if (sequence.length > 1) {
         headLang = sequence[0];
@@ -657,13 +705,54 @@ export async function generateCode({
           upstreamTaskIds = upstreamResults.map((r: any) => r.taskId as string);
         }
       } else {
-        // Planner-driven composition already generated the tail. Safety-net:
-        // confirm the head actually emitted `data use "<nextStageLang>"` so the
-        // chained upstream data will flow; warn (don't fail) if it's missing.
-        const resolved = await resolveUpstreams(code);
+        // Planner/provenance-driven composition already generated the tail. Verify the head
+        // actually emitted `data use "<nextStageLang>"` so the chained upstream data will
+        // flow. Linear pipeline → the head only binds upstreamLangs[0] (deeper stages bind
+        // each other). If the binding is missing, regenerate the head ONCE with a
+        // strengthened directive; if it still won't bind, fail with an actionable error
+        // rather than silently posting a `+`-chain whose upstream data never flows.
         const expected = upstreamLangs[0];
+        let resolved = await resolveUpstreams(code);
         if (expected && !resolved.upstreams.includes(expected)) {
-          console.warn(`[composition] rid=${rid} head L${headLang} did not emit \`data use "${expected}"\`; upstream data may not flow`);
+          console.log(`[composition] rid=${rid} repair.start head=L${headLang} expected=L${expected}`);
+          ragLog(rid, "composition.repair.start", { headLang, expected });
+          const repair: any = await codeGenerationService({
+            auth,
+            lang: headLang,
+            options: codegenOptions,
+            currentCode: currentSrc,
+            rid,
+            conversationSummary,
+            precomputedExamples: headLang === language ? headExamples : null,
+            upstreamContext: { lang: expected },
+            prompt: `${prompt}\n\nIMPORTANT: This program is the HEAD of a composition pipeline and MUST bind its upstream by emitting a top-level \`data use "${expected}"\` so the upstream data flows at runtime. Do not omit it.`,
+          });
+          if (repair?.errors) {
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: mapUsageLimit(repair.errors), upstreamLangs: [] };
+          }
+          const reparsed = await parseCode({ lang: headLang, src: repair.code, systemValues });
+          if (reparsed.errors) {
+            return { src: repair.code, taskId: null, language, description, changeSummary, model, usage, errors: reparsed.errors, upstreamLangs: [] };
+          }
+          code = JSON.parse(reparsed.code);
+          resolved = await resolveUpstreams(code);
+          if (resolved.upstreams.includes(expected)) {
+            src = repair.code;
+            model = repair.model;
+            usage = repair.usage;
+            description = repair.description ?? description;
+            changeSummary = repair.changeSummary ?? changeSummary;
+            console.log(`[composition] rid=${rid} repair.ok head=L${headLang} bound=L${expected}`);
+            ragLog(rid, "composition.repair.ok", { headLang, expected });
+          } else {
+            console.warn(`[composition] rid=${rid} repair.failed head=L${headLang} expected=L${expected}`);
+            ragLog(rid, "composition.repair.failed", { headLang, expected });
+            return {
+              src: repair.code, taskId: null, language, description, changeSummary, model, usage,
+              errors: [{ message: `Composition failed: head L${headLang} could not bind upstream L${expected}. Try rephrasing the request.` }],
+              upstreamLangs: [],
+            };
+          }
         }
       }
     } catch (err: any) {
@@ -695,7 +784,7 @@ export async function generateCode({
     // curation — covers BOTH the planner and the reactive paths (the planner's
     // RAG trigger can miss, so capture here, not inside planSequence). Skip when
     // the sequence came from a planning-RAG hit: that plan is already curated.
-    if (upstreamLangs.length > 0 && !fromRagHit) {
+    if (upstreamLangs.length > 0 && !fromRagHit && !fromProvenance) {
       await capturePlanForCuration(auth, prompt, [headLang, ...upstreamLangs]);
     }
     const lexicon = await getLanguageLexicon(headLang);
