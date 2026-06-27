@@ -102,7 +102,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // the code-refresh + (free-plan) expiry bump on taskId change.
     const existing = await getItem({ auth, id: itemId });
     const updatedHelp = appendHelpEntry(existing?.help ?? "[]", modification, result.taskId);
-    await updateItem({ auth, id: itemId, taskId: result.taskId, help: updatedHelp });
+    // If the pre-flight scope gate re-routed away from the client's pick, persist the corrected
+    // language (and any composition upstreams) so MCP get_item reflects what was actually built.
+    const rerouted = result.language && result.language !== lang;
+    await updateItem({
+      auth,
+      id: itemId,
+      taskId: result.taskId,
+      help: updatedHelp,
+      ...(rerouted ? { lang: result.language } : {}),
+      ...(Array.isArray(result.upstreamLangs) ? { upstreamLangs: result.upstreamLangs } : {}),
+    });
     await setItemGenerationStatus({ auth, id: itemId, status: "ready" });
 
     return res.status(200).json({ status: "ready", taskId: result.taskId });

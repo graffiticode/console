@@ -19,14 +19,15 @@ export interface Language {
   summary?: string;
   inScope?: string[];
   outOfScope?: string[];
-  // Dialects this language embeds as a LIVE INTERACTIVE sub-item (e.g. L0158 hosts an L0166
-  // spreadsheet as a Learnosity `custom` question). Scoped DELIBERATELY to widget-embedding,
-  // NOT data-binding: L0173 consuming L0170 data is a different relationship and must NOT
-  // appear here. The reason is the get_spec round-trip — a spec is a frozen snapshot, so
-  // re-authoring an embedded *widget* yields a live interaction worth composing, whereas
-  // re-authoring *data* that's already inline just duplicates a fetch. Drives the composition
-  // gate and the gc:content-source provenance fast-path (see language-router/resolvers).
-  embeds?: string[];
+  // Composition permission allowlist: the upstream dialects this language is ALLOWED to
+  // compose with (consume/embed). This is the hard fence — the server's planner may only
+  // propose edges within it; the client can never create an undeclared edge.
+  //   - explicit list (e.g. ["0166"]) — may compose ONLY with those upstreams
+  //   - ["*"] — may compose with any non-internal authoring language (e.g. a chart consuming
+  //     any data provider)
+  //   - absent / empty — ATOMIC ONLY (no composition)
+  // See composesWithFor / fenceComposition in language-router.ts.
+  composesWith?: string[];
 }
 
 export const LANGUAGES: Language[] = [
@@ -49,7 +50,7 @@ export const LANGUAGES: Language[] = [
   // { id: "0155", name: "L0155", description: "Stoplight questions", domains: [] },
   // { id: "0156", name: "L0156", description: "Short text scorers", domains: [] },
   // { id: "0157", name: "L0157", description: "Geoboard manipulatives", domains: [] },
-  { id: "0158", name: "L0158", description: "Learnosity assessments", routingHint: "Learnosity assessment items — MCQ, short text, cloze, formula, classification, order list, and choice matrix question types via Learnosity API. Embeds another Graffiticode dialect (e.g. L0166 spreadsheets) as a `custom` question for spreadsheet-based, table-based, or worksheet-style assessments.", domains: ["assessments", "learnosity"], embeds: ["0166"] },
+  { id: "0158", name: "L0158", description: "Learnosity assessments", routingHint: "Learnosity assessment items — MCQ, short text, cloze, formula, classification, order list, and choice matrix question types via Learnosity API. Embeds another Graffiticode dialect (e.g. L0166 spreadsheets) as a `custom` question for spreadsheet-based, table-based, or worksheet-style assessments.", domains: ["assessments", "learnosity"], composesWith: ["0166"] },
   { id: "0159", name: "L0159", description: "Flashcards, Match and Memory card games", routingHint: "Flashcard study decks, match games, and memory card games with LaTeX math support. Define fact pairs for card-based learning activities.", domains: ["assessments"] },
   // { id: "0160", name: "L0160", description: "Learnosity QTI Importer", domains: [] },
   // { id: "0161", name: "L0161", description: "Expression translators", domains: [] },
@@ -61,7 +62,7 @@ export const LANGUAGES: Language[] = [
   { id: "0170", name: "L0170", description: "Fetch & transform data", routingHint: "The go-to provider for data acquisition and transformation. Fetches JSON/CSV from external/public web URLs (or accepts inline data) and transforms it (dplyr/jq-style): navigate nested data, filter/select/mutate/group/sort/take(top-N)/join/flatten/unique. Use as the upstream data source whenever another language (e.g. a chart) needs data fetched from the web or filtered/sorted/aggregated before use.", domains: [] },
   { id: "0171", name: "L0171", description: "Venn diagrams", routingHint: "Venn diagrams with named sets, intersections, elements, configurable overlap, and styling.", domains: ["diagrams"], status: "Beta" },
   { id: "0172", name: "L0172", description: "FigJam content", routingHint: "FigJam board content authoring.", domains: [] },
-  { id: "0173", name: "L0173", description: "Charts", routingHint: "Apache ECharts visualizations (bar, line, pie/donut/nightingale rose, scatter). Supports multi-series and dual-axis compositions. Plots data given inline, or binds external data from an upstream data task via `data` — compose with an upstream data-providing language when the values must be fetched or transformed before plotting.", domains: [] },
+  { id: "0173", name: "L0173", description: "Charts", routingHint: "Apache ECharts visualizations (bar, line, pie/donut/nightingale rose, scatter). Supports multi-series and dual-axis compositions. Plots data given inline, or binds external data from an upstream data task via `data` — compose with an upstream data-providing language when the values must be fetched or transformed before plotting.", domains: [], composesWith: ["*"] },
   { id: "0174", name: "L0174", description: "Web forms", routingHint: "Single-page web forms — ordered fields (text, email, number, tel, url, textarea, select, radio, checkbox, date), per-field validation (min/max, length, pattern, required), light/dark theming, and a submit affordance with thank-you/redirect. Submissions deliver to a bound webhook.", domains: [], status: "Beta" },
   { id: "0175", name: "L0175", description: "Grade 5 ELA assessments (SBAC Claim 1, Reasoning & Evidence): Target 4 literary texts and Target 11 informational texts", routingHint: "Composes 5th-grade English Language Arts assessment items (Smarter Balanced · Grade 5 · Claim 1 · Reasoning & Evidence) as EBSR, Hot Text, or Short Text. Supports two learning targets, selected by a top-level `target`: Target 4 (c1-t4) over LITERARY passages — character, setting, event, point of view, theme, narrator's feelings, character relationships (RL standards); and Target 11 (c1-t11) over INFORMATIONAL passages — relationships/interactions between ideas, the author's use of information and evidence, point of view, purpose, the author's opinion (RI standards). Authors, inline, candidate inference claims and evidence sources for a single passage (literary or informational).", domains: ["assessments"], status: "Beta" },
 ];

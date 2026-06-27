@@ -11,7 +11,7 @@
 import axios from "axios";
 import { unparse } from "@graffiticode/parser";
 import { getApiTask, getLanguageLexicon, getLanguageHints } from "./api";
-import { readDialectInstructions } from "./code-generation-service";
+import { readDialectInstructions, modelRejectsTemperature } from "./code-generation-service";
 
 // Translation is faithfulness-critical and constrained (annotated src + instructions + the
 // completeness contract fully determine the output), and get_spec sits in the hot path — so a
@@ -62,7 +62,8 @@ async function callClaudeForSpec({ system, user, apiKey }: ClaudeCallArgs): Prom
       system,
       messages: [{ role: "user", content: user }],
       max_tokens: SPEC_MAX_TOKENS,
-      temperature: 0,
+      // Opus deprecated `temperature` — omit it there or the API 400s.
+      ...(modelRejectsTemperature(SPEC_MODEL) ? {} : { temperature: 0 }),
     },
     {
       headers: {
@@ -138,17 +139,8 @@ export async function generateSpec({ auth, taskId }: { auth: any; taskId: string
   }
 
   const system = `${instructions}\n\n${SPEC_DIRECTIVE}`;
-  const body = (await callClaudeForSpec({ system, user: annSrc, apiKey })).trim();
-  const coverage = assertCoverage(body, task.code);
+  const spec = (await callClaudeForSpec({ system, user: annSrc, apiKey })).trim();
+  const coverage = assertCoverage(spec, task.code);
 
-  // Stamp the spec with its source dialect as a stripped directive comment, symmetric with
-  // the <!-- gc:model=opus --> convention. This is provenance the platform already knows (we
-  // just spec'd a `lang` item) but would otherwise discard, forcing a downstream create_item
-  // to re-infer the composition with an LLM planner call. When an agent pastes the spec
-  // verbatim into create_item, the marker rides along; the forward path
-  // (resolvers.ts parseContentSource) parses + strips it before any LLM sees it, so the spec
-  // prose stays platform-neutral. It is a HINT that accelerates, never one that changes the
-  // answer — the same spec with or without it must converge.
-  const spec = `<!-- gc:content-source=${lang} -->\n${body}`;
   return { spec, lang, itemId: taskId, coverage };
 }

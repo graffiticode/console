@@ -7,7 +7,7 @@ import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon, lan
 import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
 import { generateSpec } from "../../lib/spec-generation-service";
-import { planSequence, detectCapabilityTrigger, detectComposeTriggerDetail, orchestrateComposition, capturePlanForCuration } from "../../lib/language-router";
+import { planSequence, classifyAndRoute, composesWithFor, fenceComposition, orchestrateComposition, capturePlanForCuration } from "../../lib/language-router";
 import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
@@ -457,20 +457,6 @@ export async function compiles({ auth, lang, type }) {
   }
 }
 
-// Provenance marker emitted by get_spec: `<!-- gc:content-source=0166 -->`. Carries the
-// source dialect of pasted spec content so the create_item forward path can resolve the
-// composition by capability lookup instead of an LLM planner call. Parsed AND stripped before
-// any LLM sees it, mirroring the gc:model opus-opt-in handling in code-generation-service.
-const CONTENT_SOURCE_RE = /<!--\s*gc:content-source\s*[:=]\s*(\d{3,5})\s*-->/i;
-const CONTENT_SOURCE_STRIP_RE = /<!--\s*gc:content-source\s*[:=]\s*\d{3,5}\s*-->/gi;
-
-function parseContentSource(prompt: string): { sourceLang: string | null; prompt: string } {
-  const m = prompt.match(CONTENT_SOURCE_RE);
-  const sourceLang = m ? m[1] : null;
-  const cleaned = sourceLang ? prompt.replace(CONTENT_SOURCE_STRIP_RE, "").trim() : prompt;
-  return { sourceLang, prompt: cleaned };
-}
-
 export async function generateCode({
   auth,
   prompt,
@@ -488,12 +474,6 @@ export async function generateCode({
     }
 
     prompt = prompt.trim();
-    // Provenance fast-path input: pull the gc:content-source marker (emitted by get_spec)
-    // out of the prompt and strip it so it never reaches an LLM. `contentSource` is the
-    // dialect that authored the pasted content; it lets the gate resolve composition by
-    // capability lookup instead of a planner call. Absent marker → cleanedPrompt === prompt.
-    const { sourceLang: contentSource, prompt: cleanedPrompt } = parseContentSource(prompt);
-    prompt = cleanedPrompt;
     let description = null;
     let changeSummary = null;
     let model = null;
@@ -514,9 +494,6 @@ export async function generateCode({
     // True only when the sequence came from a planning-RAG hit (already curated),
     // so we don't re-capture a duplicate mark-2 plan for it.
     let fromRagHit = false;
-    // Provenance fast-path produced the sequence by declaration (not learned) — skip
-    // capturePlanForCuration for it too.
-    let fromProvenance = false;
 
     // Hoisted out of the `if (!src)` block below so the post-parse repair (which lives in
     // the outer scope) can reuse them: codegen options, the usage-limit message mapper, and
@@ -560,46 +537,51 @@ export async function generateCode({
     //   2. Otherwise PLAN: planSequence() (L0010 planning-RAG hit, else Haiku);
     //      a length>1 sequence runs the tail-first executor.
     if (!src) {
-      // 1. Atomic guard — reuse this head-lang retrieval for both the trigger
-      //    and the head code gen (one embed/search). Never fail generation if
-      //    retrieval errors; just treat it as atomic.
+      // GUARDRAIL 1 — authoritative pre-flight head routing. The server validates the request
+      // against the chosen language's scope and re-routes to the correct language if the client
+      // picked wrong (clients freelance). Fresh creates only — never relabel an edit. Independent
+      // of client cooperation and of the generation LLM volunteering OUT_OF_SCOPE.
+      if (process.env.SCOPE_GATE_ENABLED !== "false" && !currentSrc) {
+        const route = await classifyAndRoute({ userRequest: prompt, currentLang: language });
+        if (route.inScope === false) {
+          if (route.routedLang && route.routedLang !== language) {
+            console.log(`[routing] rid=${rid} preflight.reroute from=L${language} to=L${route.routedLang} reason=${route.reason}`);
+            ragLog(rid, "preflight.reroute", { from: language, to: route.routedLang, reason: route.reason });
+            language = route.routedLang;
+            headLang = route.routedLang;
+          } else if (!route.routedLang) {
+            const reason = route.reason || `Request is out of scope for L${language}.`;
+            console.log(`[routing] rid=${rid} preflight.reject lang=L${language} reason=${reason}`);
+            ragLog(rid, "preflight.reject", { lang: language, reason });
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: `This request doesn't fit any available Graffiticode language. ${reason}` }], upstreamLangs: [] };
+          }
+        }
+      }
+
+      // Head-lang retrieval (for the routed language), reused by the atomic gen and the
+      // composition head. Never fail generation if retrieval errors; just treat it as atomic.
       try {
         headExamples = await getRelevantExamples({ prompt, lang: language, rid }) || [];
       } catch (err: any) {
         console.warn(`[composition] rid=${rid} head retrieval failed: ${err?.message}`);
       }
-      const { ids: composeTrigger, bestScore } = detectComposeTriggerDetail(headExamples);
-      // Capability trigger is RAG-independent: it opens the gate whenever the head language
-      // declares it embeds a live widget dialect, fixing silently-missed compositions when
-      // the head-lang corpus lacks a `data use` exemplar. Env flag for instant rollback.
-      const capabilityTrigger =
-        process.env.COMPOSE_CAPABILITY_GATE === "false" ? [] : detectCapabilityTrigger(language);
 
-      // 2. Resolve the sequence. Priority: declared provenance (gc:content-source) →
-      //    planner (RAG or capability trigger) → atomic. planSequence may still return atomic.
+      // GUARDRAIL 2 — permission-governed composition. `composesWith` is the HARD FENCE: the
+      // planner may only propose edges within it (fenceComposition drops the rest). An empty
+      // allowlist ⇒ atomic. The whole path is also globally disable-able via COMPOSITION_ENABLED.
       let sequence: string[] = [language];
-      let gateSource = "none";
-      if (contentSource && contentSource !== language && capabilityTrigger.includes(contentSource)) {
-        // Provenance fast-path: the pasted content was authored by a dialect THIS head
-        // embeds as a live widget → compose deterministically, no planner LLM. Same-lang
-        // respec, cross-language ports, and data-bind provenance all fall through to the
-        // planner/atomic branch (contentSource is not in the head's embeds list).
-        sequence = [language, contentSource];
-        gateSource = "provenance";
-        fromProvenance = true;
-      } else if (composeTrigger.length > 0 || capabilityTrigger.length > 0) {
-        gateSource = composeTrigger.length > 0 ? "rag" : "capability";
-        const planResult = await planSequence({
-          prompt, headLang: language, auth, options: codegenOptions, rid,
-          // Capability-only (no RAG signal): skip the Sonnet L0010 codegen on the hot atomic
-          // path; the cheap Haiku planner fast-returns atomic for self-contained prompts.
-          preferHaiku: composeTrigger.length === 0,
-        });
-        sequence = planResult.sequence;
+      const permits = process.env.COMPOSITION_ENABLED === "false" ? [] : composesWithFor(language);
+      if (permits.length > 0) {
+        const planResult = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid, preferHaiku: true });
+        const fenced = fenceComposition(planResult.sequence, permits);
+        if (fenced.dropped.length > 0) {
+          console.warn(`[composition] rid=${rid} fenced unpermitted upstreams=[${fenced.dropped.join(",")}] permits=[${permits.join(",")}]`);
+        }
+        sequence = fenced.sequence;
         fromRagHit = planResult.fromRag;
       }
-      console.log(`[composition] rid=${rid} gate source=${gateSource} rag=[${composeTrigger.join(",")}] cap=[${capabilityTrigger.join(",")}] bestRagScore=${bestScore.toFixed(3)} sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
-      ragLog(rid, "composition.gate", { source: gateSource, rag: composeTrigger, capability: capabilityTrigger, bestRagScore: bestScore, sequence });
+      console.log(`[composition] rid=${rid} head=L${language} permits=[${permits.join(",")}] sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
+      ragLog(rid, "composition.gate", { head: language, permits, sequence });
 
       if (sequence.length > 1) {
         headLang = sequence[0];
@@ -784,7 +766,7 @@ export async function generateCode({
     // curation — covers BOTH the planner and the reactive paths (the planner's
     // RAG trigger can miss, so capture here, not inside planSequence). Skip when
     // the sequence came from a planning-RAG hit: that plan is already curated.
-    if (upstreamLangs.length > 0 && !fromRagHit && !fromProvenance) {
+    if (upstreamLangs.length > 0 && !fromRagHit) {
       await capturePlanForCuration(auth, prompt, [headLang, ...upstreamLangs]);
     }
     const lexicon = await getLanguageLexicon(headLang);
@@ -919,6 +901,7 @@ export async function updateItem({
   isPublic,
   client,
   upstreamLangs,
+  lang,
 }: {
   auth: AuthArg;
   id: string;
@@ -929,6 +912,9 @@ export async function updateItem({
   isPublic?: boolean;
   client?: string;
   upstreamLangs?: string[];
+  // Server/worker-internal: the corrected head language when the pre-flight scope gate
+  // re-routed away from the client's pick. NOT a client-facing relabel.
+  lang?: string;
 }) {
   try {
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
@@ -965,6 +951,7 @@ export async function updateItem({
     }
     if (mark !== undefined) updates.mark = mark;
     if (client !== undefined) updates.client = client;
+    if (lang !== undefined) updates.lang = lang;
     if (help !== undefined) updates.help = help;
     if (upstreamLangs !== undefined && Array.isArray(upstreamLangs)) {
       updates.upstreamLangs = upstreamLangs;

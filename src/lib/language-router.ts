@@ -16,10 +16,7 @@ const MAX_STAGES = 4;
 // from the admin uid) + `update-embeddings` move them into the `training_examples`
 // corpus that the runtime planning-RAG (`lookupPlanRAG`) consults.
 const PLAN_LANG = "0010";
-// A retrieved head-lang example containing `data use "<id>"` triggers planning;
-// only examples this relevant count. A planning-RAG hit must be at least this
-// similar to be trusted (no compile / no LLM on a hit).
-const USE_TRIGGER_THRESHOLD = Number(process.env.COMPOSE_USE_TRIGGER_THRESHOLD ?? 0.6);
+// A planning-RAG hit must be at least this similar to be trusted (no compile / no LLM on a hit).
 const PLAN_RAG_THRESHOLD = Number(process.env.COMPOSE_PLAN_RAG_THRESHOLD ?? 0.7);
 
 function getDb() {
@@ -43,37 +40,30 @@ function extractLangIds(text: string, requireUse: boolean): string[] {
   return out;
 }
 
-// The compose trigger: do any sufficiently-relevant head-lang examples author a
-// `data use "<id>"`? Returns the distinct upstream ids found (a hint only — the
-// actual sequence comes from planning), or [] when the request looks atomic.
-// `bestScore` is the max example score seen REGARDLESS of threshold, so the gate
-// can log "best=0.41 < 0.6 → atomic" and distinguish a correct atomic from a
-// missed composition (cold RAG). The score is for observability only — never injected.
-export function detectComposeTriggerDetail(examples: any[]): { ids: string[]; bestScore: number } {
-  if (!Array.isArray(examples)) return { ids: [], bestScore: 0 };
-  const hint = new Set<string>();
-  let bestScore = 0;
-  for (const ex of examples) {
-    const score = ex?.combinedScore ?? ex?.similarity ?? 0;
-    if (score > bestScore) bestScore = score;
-    if (score < USE_TRIGGER_THRESHOLD) continue;
-    for (const id of extractLangIds(ex?.code || "", true)) hint.add(id);
-  }
-  return { ids: [...hint], bestScore };
+// Composition permission helpers. Each language's `composesWith` allowlist is the HARD FENCE
+// for composition: the server's planner may only propose edges within it, and the client can
+// never create an undeclared edge.
+
+// The upstreams a head language is permitted to compose with (["*"] = any non-internal).
+// Empty ⇒ atomic only. Sourced from the static LANGUAGES array (sync, in-memory; hot-path).
+export function composesWithFor(headLang: string): string[] {
+  return findLanguageById(headLang)?.composesWith ?? [];
 }
 
-export function detectComposeTrigger(examples: any[]): string[] {
-  return detectComposeTriggerDetail(examples).ids;
-}
-
-// The capability trigger: does the head language DECLARE it can embed a live widget
-// dialect (e.g. L0158 embeds L0166)? Returns those embed-target ids. This opens the
-// gate independent of RAG coverage — the fix for silently-missed compositions when the
-// head-lang corpus lacks a `data use` exemplar. It is a HINT only: planSequence still
-// makes the real compose-vs-atomic call and may return a single-stage (atomic) sequence.
-// Sourced from the static LANGUAGES array (sync, in-memory) because the gate is hot-path.
-export function detectCapabilityTrigger(headLang: string): string[] {
-  return findLanguageById(headLang)?.embeds ?? [];
+// Enforce the allowlist on a planner-proposed sequence ([head, up1, up2, ...]). If ANY upstream
+// is not permitted, drop to atomic [head] rather than post a partially-broken chain. Returns the
+// fenced sequence plus any dropped (unpermitted) upstream ids for logging.
+export function fenceComposition(
+  sequence: string[],
+  permits: string[],
+): { sequence: string[]; dropped: string[] } {
+  if (sequence.length <= 1) return { sequence, dropped: [] };
+  const allowAny = permits.includes("*");
+  const dropped = sequence.slice(1).filter((up) =>
+    allowAny ? findLanguageById(up)?.internal === true : !permits.includes(up),
+  );
+  if (dropped.length > 0) return { sequence: [sequence[0]], dropped };
+  return { sequence, dropped: [] };
 }
 
 interface LanguageSuggestion {
@@ -197,6 +187,93 @@ If none fit, return {"suggestions": []}`,
   } catch (error) {
     console.error("[language-router] Error:", error.message);
     return { suggestions: [] };
+  }
+}
+
+export interface RouteResult {
+  inScope: boolean;
+  routedLang: string | null;
+  reason: string;
+}
+
+// Authoritative pre-flight head router. Given a request and the language the client picked,
+// decide whether the request is in-scope for that language; if not, name the best-fit language
+// from the catalog. The SERVER uses this to honor or override the client's pick — the guardrail
+// against clients (e.g. Codex/ChatGPT) freelancing the head language.
+//
+// FAIL-OPEN: any classifier error / missing key / unparseable response returns inScope:true
+// (proceed with the client pick), logged. Availability beats blocking a valid request on an LLM
+// hiccup; divergence is observable via logs. (This is the honest hole in "no exception".)
+export async function classifyAndRoute({
+  userRequest,
+  currentLang,
+}: {
+  userRequest: string;
+  currentLang: string;
+}): Promise<RouteResult> {
+  const FAIL_OPEN: RouteResult = { inScope: true, routedLang: null, reason: "" };
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      console.warn("[routing] ANTHROPIC_API_KEY not set; fail-open (in-scope)");
+      return FAIL_OPEN;
+    }
+    const all = await listLanguages({});
+    const current = all.find((l) => l.id === currentLang);
+    const { candidates, catalog } = await buildLanguageCatalog({ excludeLang: currentLang });
+    const curScope = [
+      current?.summary || current?.routingHint || current?.description || `L${currentLang}`,
+      current?.inScope?.length ? `in scope: ${current.inScope.join("; ")}` : "",
+      current?.outOfScope?.length ? `out of scope: ${current.outOfScope.join("; ")}` : "",
+    ].filter(Boolean).join("\n");
+
+    const response = await axios.post(
+      "https://api.anthropic.com/v1/messages",
+      {
+        model: CLAUDE_MODELS.HAIKU,
+        max_tokens: 300,
+        temperature: 0,
+        messages: [
+          {
+            role: "user",
+            content: `A user asked language L${currentLang} to create this:
+"${userRequest}"
+
+L${currentLang} scope:
+${curScope}
+
+Decide whether this request is IN SCOPE for L${currentLang}.
+- If it clearly belongs in L${currentLang}, return {"inScope": true}.
+- If it does NOT belong in L${currentLang}, pick the single best-fit language id from the catalog below (or null if none fits): {"inScope": false, "routedLang": "<id or null>", "reason": "<one sentence>"}.
+
+Catalog of other languages:
+${catalog}
+
+Be conservative: only route away when the request clearly belongs to a different language. Return JSON only.`,
+          },
+        ],
+      },
+      {
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+      },
+    );
+
+    const text = response.data?.content?.[0]?.text || "";
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return FAIL_OPEN;
+    const parsed = JSON.parse(m[0]);
+    if (parsed.inScope === true) return { inScope: true, routedLang: null, reason: "" };
+    let routedLang: string | null = parsed.routedLang ? String(parsed.routedLang).replace(/^L/i, "") : null;
+    // Validate against the real, non-internal catalog (buildLanguageCatalog already excludes internal).
+    if (routedLang && !candidates.some((c) => c.id === routedLang)) routedLang = null;
+    return { inScope: false, routedLang, reason: String(parsed.reason || "") };
+  } catch (err) {
+    console.warn(`[routing] classifyAndRoute failed; fail-open (in-scope): ${(err as Error)?.message}`);
+    return FAIL_OPEN;
   }
 }
 
