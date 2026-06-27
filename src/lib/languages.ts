@@ -50,7 +50,7 @@ export const LANGUAGES: Language[] = [
   // { id: "0155", name: "L0155", description: "Stoplight questions", domains: [] },
   // { id: "0156", name: "L0156", description: "Short text scorers", domains: [] },
   // { id: "0157", name: "L0157", description: "Geoboard manipulatives", domains: [] },
-  { id: "0158", name: "L0158", description: "Learnosity assessments", routingHint: "Learnosity assessment items — MCQ, short text, cloze, formula, classification, order list, and choice matrix question types via Learnosity API. Embeds another Graffiticode dialect (e.g. L0166 spreadsheets) as a `custom` question for spreadsheet-based, table-based, or worksheet-style assessments.", domains: ["assessments", "learnosity"], composesWith: ["0166"] },
+  { id: "0158", name: "L0158", description: "Learnosity-format assessment items (general question types; use a subject/grade specialist when one fits)", routingHint: "Learnosity assessment items — MCQ, short text, cloze, formula, classification, order list, and choice matrix question types via Learnosity API. Embeds another Graffiticode dialect (e.g. L0166 spreadsheets) as a `custom` question for spreadsheet-based, table-based, or worksheet-style assessments.", domains: ["assessments", "learnosity"], composesWith: ["0166"] },
   { id: "0159", name: "L0159", description: "Flashcards, Match and Memory card games", routingHint: "Flashcard study decks, match games, and memory card games with LaTeX math support. Define fact pairs for card-based learning activities.", domains: ["assessments"] },
   // { id: "0160", name: "L0160", description: "Learnosity QTI Importer", domains: [] },
   // { id: "0161", name: "L0161", description: "Expression translators", domains: [] },
