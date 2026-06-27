@@ -543,6 +543,10 @@ export async function generateCode({
       // of client cooperation and of the generation LLM volunteering OUT_OF_SCOPE.
       if (process.env.SCOPE_GATE_ENABLED !== "false" && !currentSrc) {
         const route = await classifyAndRoute({ userRequest: prompt, currentLang: language });
+        // Log EVERY decision (in-scope included) so routing is observable — an in-scope verdict
+        // is otherwise silent, which masks scope.json contracts that are too permissive.
+        console.log(`[routing] rid=${rid} scope-gate lang=L${language} inScope=${route.inScope} routedLang=${route.routedLang ? "L" + route.routedLang : "none"}${route.reason ? ` reason=${route.reason}` : ""}`);
+        ragLog(rid, "preflight.classify", { lang: language, inScope: route.inScope, routedLang: route.routedLang, reason: route.reason });
         if (route.inScope === false) {
           if (route.routedLang && route.routedLang !== language) {
             console.log(`[routing] rid=${rid} preflight.reroute from=L${language} to=L${route.routedLang} reason=${route.reason}`);
