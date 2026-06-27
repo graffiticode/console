@@ -90,6 +90,14 @@ export const CLAUDE_MODELS = {
   DEFAULT: "claude-sonnet-4-6",
 };
 
+// Opus 4.x models deprecated the `temperature` parameter: sending it makes the
+// Anthropic API reject the request with a 400 ("`temperature` is deprecated for
+// this model.") before any tokens are generated. Callers must omit temperature
+// for these models. Regex on "opus" so future Opus ids are covered automatically.
+export function modelRejectsTemperature(model?: string): boolean {
+  return !!model && /opus/i.test(model);
+}
+
 // A language opts into Opus for its INITIAL code generation by placing this
 // directive anywhere in its instructions.md (served by its l0NNN service):
 //   <!-- gc:model=opus -->
@@ -717,7 +725,8 @@ async function callClaudeAPI(prompt, options, rid = null) {
         },
       ],
       max_tokens: options.max_tokens,
-      temperature: options.temperature,
+      // Opus deprecated `temperature` — omit it there or the API 400s.
+      ...(modelRejectsTemperature(options.model) ? {} : { temperature: options.temperature }),
     };
 
     // Make the API call

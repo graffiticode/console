@@ -9,7 +9,7 @@
  */
 
 import axios from "axios";
-import { CLAUDE_MODELS } from "./code-generation-service";
+import { CLAUDE_MODELS, modelRejectsTemperature } from "./code-generation-service";
 
 interface StreamOptions {
   model?: string;
@@ -186,14 +186,16 @@ export async function* streamClaudeCode({
 
     try {
       // Make streaming API call
+      const model = options.model || CLAUDE_MODELS.DEFAULT;
       const response = await axios.post(
         "https://api.anthropic.com/v1/messages",
         {
-          model: options.model || CLAUDE_MODELS.DEFAULT,
+          model,
           system: systemPrompt,
           messages: conversationHistory,
           max_tokens: options.maxTokens || 4096,
-          temperature: options.temperature || 0.2,
+          // Opus deprecated `temperature` — omit it there or the API 400s.
+          ...(modelRejectsTemperature(model) ? {} : { temperature: options.temperature || 0.2 }),
           stream: true
         },
         {
@@ -245,9 +247,33 @@ export async function* streamClaudeCode({
       }
 
     } catch (error: any) {
+      // With responseType:"stream", a non-2xx leaves the real Anthropic error
+      // JSON in error.response.data as an *unread stream* — error.message is only
+      // the generic "Request failed with status code 400". Drain the body so the
+      // actual reason (e.g. max_tokens too high for the model, model access) is
+      // visible in logs and surfaced to the caller.
+      const status = error.response?.status;
+      const data = error.response?.data;
+      let body = "";
+      try {
+        if (data && typeof data[Symbol.asyncIterator] === "function") {
+          for await (const chunk of data) body += chunk.toString();
+        } else if (typeof data === "string") {
+          body = data;
+        } else if (data) {
+          body = JSON.stringify(data);
+        }
+      } catch {
+        // ignore body-read failures; fall back to error.message below
+      }
+      console.error(
+        `[claude-stream] API call failed (status=${status ?? "?"}, ` +
+          `model=${options.model || CLAUDE_MODELS.DEFAULT}, ` +
+          `max_tokens=${options.maxTokens || 4096}): ${body || error.message}`,
+      );
       yield {
         type: "error",
-        error: `API call failed: ${error.message}`
+        error: `API call failed: ${error.message}${status ? ` (status ${status})` : ""}${body ? ` - ${body}` : ""}`
       };
       return;
     }
