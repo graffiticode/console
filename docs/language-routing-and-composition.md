@@ -76,8 +76,12 @@ Set `composesWith` on the language's `LANGUAGES` entry (`src/lib/languages.ts`).
 - **Explicit list** (`composesWith: ["0166"]`) — may compose ONLY with those upstreams. Use for
   widget-embedding hosts (e.g. L0158 embeds the L0166 spreadsheet as a Learnosity `custom`
   question).
-- **`["*"]`** — may compose with any non-internal authoring language. Use for general data
-  consumers (e.g. L0173 charts can plot data from any provider).
+- **Explicit data-consumer list** (e.g. L0173 charts → `composesWith: ["0170"]`) — a consumer that
+  binds upstream data names exactly the provider(s) it pulls from. (L0173 is deliberately
+  over-constrained to the one data-sourcing dialect, L0170, for now, rather than `["*"]`.)
+- **`["*"]`** — *may* compose with any non-internal authoring language; the broad wildcard. Use
+  only when a host genuinely consumes from anything. Prefer an explicit list — `["*"]` is a wide
+  trust grant.
 - **Absent / empty** — **atomic only.** No composition. This is the default and correct for most
   languages (e.g. L0175 ELA — it never composes; it authors complete items itself).
 
@@ -149,7 +153,7 @@ in another language. For this to be faithful, your language must provide:
 | **Routing in** | sharp `scope.json` `summary` + `in_scope`; accurate `domains`/`routingHint` |
 | **Routing out** | `out_of_scope` naming the adjacent things you'd be mis-sent (domain boundaries) |
 | **Backstop** | `OUT_OF_SCOPE:` sentinel in `instructions.md` |
-| **Compose: allowed?** | `composesWith` on the `LANGUAGES` entry (`["0166"]` / `["*"]` / omit) |
+| **Compose: allowed?** | `composesWith` on the `LANGUAGES` entry (explicit list e.g. `["0166"]` / `["0170"]` / `["*"]` wildcard / omit ⇒ atomic) |
 | **Compose: as head** | `instructions.md` makes `data use "<lang>"` a REQUIRED binding + self-check |
 | **Compose: as upstream** | stable data model + `schema.json`; renders standalone with empty `data {}` |
 | **Cross-language** | lexicon + unparse-hints + `instructions.md` for `get_spec` |
