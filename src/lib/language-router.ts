@@ -352,7 +352,8 @@ Examples:
   { "stages": [ { "lang": "0166", "prompt": "Author a budget-tracker spreadsheet." } ] }
 
 Rules:
-- stages[0].lang should remain "${currentLang}" unless the request is entirely outside that dialect.
+- stages[0].lang MUST be "${currentLang}". You decide ONLY the upstream chain it consumes; never
+  replace the head — head/language selection is handled before planning, not here.
 - At most ${MAX_STAGES} stages.
 - No language repeats in the sequence.
 - Each "prompt" is a complete, standalone description of what that stage should produce.`,
@@ -393,14 +394,17 @@ Rules:
       if (stages.length >= MAX_STAGES) break;
     }
 
-    // The head must survive validation; otherwise fall back to single-language.
-    if (stages.length === 0) return fallback;
+    // Head pinning: head selection is the scope gate's job, not the planner's. Guarantee the
+    // head is currentLang; if the model proposed a different head, reinstate currentLang and
+    // demote the rest to upstream candidates (the composesWith fence drops any not allowed).
+    const headStage = stages.find((s) => s.lang === currentLang) ?? { lang: currentLang, prompt };
+    const upstreamStages = stages.filter((s) => s.lang !== currentLang);
+    const pinned: CompositionPlan = [headStage, ...upstreamStages].slice(0, MAX_STAGES);
 
     console.log(
-      `[language-router] planComposition: sequence=${stages.map((s) => `L${s.lang}`).join(" -> ")}`
+      `[language-router] planComposition: sequence=${pinned.map((s) => `L${s.lang}`).join(" -> ")}`
     );
-
-    return stages;
+    return pinned;
   } catch (error) {
     console.error("[language-router] planComposition error:", (error as Error)?.message);
     return fallback;
@@ -660,13 +664,19 @@ export async function planSequence({
   // a single stage for those cases.
   preferHaiku?: boolean;
 }): Promise<PlanResult> {
+  // Head pinning: head selection is the scope gate's job, never a planner's. Whatever any
+  // planner returns, the head stays headLang; stray langs become upstream candidates (the
+  // composesWith fence vets them downstream).
+  const pin = (seq: string[]) =>
+    seq[0] === headLang ? seq : [headLang, ...seq.filter((l) => l !== headLang)];
+
   const hit = await lookupPlanRAG({ prompt, rid });
-  if (hit && hit.length > 0) return { sequence: hit, fromRag: true };
+  if (hit && hit.length > 0) return { sequence: pin(hit), fromRag: true };
 
   // Capability-only trigger → skip the Sonnet L0010 codegen entirely.
   if (preferHaiku) {
     const plan = await planComposition({ prompt, currentLang: headLang });
-    return { sequence: plan.map((s) => s.lang), fromRag: false };
+    return { sequence: pin(plan.map((s) => s.lang)), fromRag: false };
   }
 
   // Miss → generate an L0010 plan. This is a direct service call (it does NOT
@@ -677,7 +687,7 @@ export async function planSequence({
     if (!r?.errors && typeof r?.code === "string" && /\bplan\b/.test(r.code)) {
       const seq = [...new Set(extractLangIds(r.code, false))].slice(0, MAX_STAGES);
       console.log(`[language-router] L${PLAN_LANG} plan: ${seq.length ? seq.map((l) => `L${l}`).join(" -> ") : "atomic"}`);
-      return { sequence: seq.length > 0 ? seq : [headLang], fromRag: false };
+      return { sequence: pin(seq.length > 0 ? seq : [headLang]), fromRag: false };
     }
     console.warn(`[language-router] L${PLAN_LANG} codegen returned no usable plan; falling back to Haiku planner`);
   } catch (err) {
@@ -686,5 +696,5 @@ export async function planSequence({
 
   // Fallback → Haiku planner. (Capture happens at the resolver's success point.)
   const plan = await planComposition({ prompt, currentLang: headLang });
-  return { sequence: plan.map((s) => s.lang), fromRag: false };
+  return { sequence: pin(plan.map((s) => s.lang)), fromRag: false };
 }
