@@ -58,8 +58,8 @@ export function currentVersion(): number {
   return Number.isFinite(v) && v > 0 ? v : 0;
 }
 
-// True when encrypt() will actually encrypt (vs. passthrough). Used to refuse
-// storing secrets when no usable key is configured.
+// True when encrypt() can actually encrypt. Lets callers refuse a request up
+// front (with a friendly message) before encrypt() throws.
 export function isConfigured(): boolean {
   const v = currentVersion();
   return v === 0 ? !!keyForVersion(1) : !!keyForVersion(v);
@@ -83,10 +83,14 @@ function encryptGcm(plaintext: string, version: number, secret: string): string 
 export function encrypt(plaintext: string): string {
   const version = currentVersion();
   if (version === 0) {
-    // Legacy mode (default). Passthrough when no key — preserves prior behavior
-    // for local dev / unconfigured environments.
+    // Legacy mode (default), AES-256-CBC under the canonical key. Never fall back
+    // to passthrough — returning plaintext would silently store/transport an
+    // unencrypted secret. Fail loud instead.
     const secret = keyForVersion(1);
-    return secret ? encryptLegacy(plaintext, secret) : plaintext;
+    if (!secret) {
+      throw new Error("Cannot encrypt: GRAFFITICODE_SECRET_KEY is not configured on the server.");
+    }
+    return encryptLegacy(plaintext, secret);
   }
   const secret = keyForVersion(version);
   if (!secret) {

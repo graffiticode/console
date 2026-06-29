@@ -24,9 +24,10 @@ import {
   shareItem,
   parseCode,
   getSecretsForUser,
-  listSecrets,
-  setSecret,
-  deleteSecret,
+  getPublicValuesForUser,
+  listCredentials,
+  setCredential,
+  deleteCredential,
   claimFreePlanSession,
   logClaimEvent,
 } from "./resolvers";
@@ -198,15 +199,18 @@ const typeDefs = `
     totalAvailable: Int
   }
 
-  type SecretInfo {
+  type CredentialInfo {
     name: String!
+    backend: String
+    isPublic: Boolean!
+    value: String
     masked: String!
     updatedAt: String!
   }
 
   type Query {
     checkCompileAllowed: CompileAllowedResponse!
-    secrets: [SecretInfo!]!
+    credentials: [CredentialInfo!]!
     parse(lang: String!, src: String!, itemId: String): ParseResult!
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
@@ -259,8 +263,8 @@ const typeDefs = `
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!]): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
     claimFreePlanSession(token: String!): ClaimResult!
-    setSecret(name: String!, value: String!): SecretInfo!
-    deleteSecret(name: String!): Boolean!
+    setCredential(name: String!, value: String!, backend: String, isPublic: Boolean): CredentialInfo!
+    deleteCredential(name: String!): Boolean!
   }
 
   input CodeGenerationOptions {
@@ -295,22 +299,26 @@ const resolvers = {
     },
     parse: async (_, args, ctx) => {
       const { lang, src, itemId } = args;
-      // User secrets are merged first so system keys (e.g. itemId) take
-      // precedence. Auth is best-effort: anonymous/free-plan parse still works,
-      // just without secrets.
-      let systemValues: Record<string, string> = {};
+      // Private secrets and public credential ids come from separate stores;
+      // itemId is a system-injected public value. Auth is best-effort:
+      // anonymous/free-plan parse still works, just without credentials.
+      let privateValues: Record<string, string> = {};
+      let publicValues: Record<string, string> = {};
       try {
         const auth = await resolveAuth(ctx);
-        systemValues = await getSecretsForUser(auth.uid);
+        [privateValues, publicValues] = await Promise.all([
+          getSecretsForUser(auth.uid),
+          getPublicValuesForUser(auth.uid),
+        ]);
       } catch {
-        // not authenticated — proceed without secrets
+        // not authenticated — proceed without credentials
       }
-      if (itemId) systemValues.itemId = itemId;
-      return await parseCode({ lang, src, systemValues });
+      if (itemId) publicValues.itemId = itemId;
+      return await parseCode({ lang, src, privateValues, publicValues });
     },
-    secrets: async (_, __, ctx) => {
+    credentials: async (_, __, ctx) => {
       const auth = await resolveAuth(ctx);
-      return await listSecrets({ auth });
+      return await listCredentials({ auth });
     },
     data: async (_, args, ctx) => {
       const { id } = args;
@@ -519,19 +527,19 @@ const resolvers = {
         throw err;
       }
     },
-    setSecret: async (_, args, ctx) => {
+    setCredential: async (_, args, ctx) => {
       if (ctx.freePlan) {
-        throw new Error("Secrets require a full account.");
+        throw new Error("Credentials require a full account.");
       }
       const auth = await resolveAuth(ctx);
-      return await setSecret({ auth, name: args.name, value: args.value });
+      return await setCredential({ auth, name: args.name, value: args.value, backend: args.backend, isPublic: args.isPublic });
     },
-    deleteSecret: async (_, args, ctx) => {
+    deleteCredential: async (_, args, ctx) => {
       if (ctx.freePlan) {
-        throw new Error("Secrets require a full account.");
+        throw new Error("Credentials require a full account.");
       }
       const auth = await resolveAuth(ctx);
-      return await deleteSecret({ auth, name: args.name });
+      return await deleteCredential({ auth, name: args.name });
     },
   },
   Item: {

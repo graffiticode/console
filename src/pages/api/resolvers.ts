@@ -15,6 +15,7 @@ import { chargeAutoOverage } from "../../lib/auto-overage-service";
 import fs from "fs";
 import path from "path";
 import { encrypt, decrypt, isConfigured as isSecretCryptoConfigured } from "../../lib/secret-crypto";
+import { getCredentialBackend, fieldVisibilityFor } from "../../lib/credential-backends";
 
 type AuthArg = {
   uid: string;
@@ -41,20 +42,32 @@ function freePlanItemFields(auth: AuthArg, now = Date.now()) {
 
 const SECRET_NAME_RE = /^[a-z0-9-]+$/;
 
-type StoredSecret = { value: string; updatedAt: string };
+// Credential fields are stored as individual variables, keyed by their binding
+// name `<backend>-<field>`, split across two physically separate stores by
+// visibility:
+//   - secrets doc:     { <name>: { backend?, value: <ciphertext>, updatedAt } } -> get-val-private
+//   - credentials doc: { <name>: { backend?, value: <plaintext>,  updatedAt } } -> get-val-public
+// The public read path never opens the secrets doc, so a secret value cannot be
+// returned in cleartext through get-val-public.
+type StoredVar = { backend?: string; value: string; updatedAt: string };
 
 function secretsDocRef(uid: string) {
   return db.collection('users').doc(uid).collection('settings').doc('secrets');
 }
 
-// Loads the user's named secrets as a plaintext name->value map for injection
-// into systemValues. Never throws into the parse path — returns {} on any failure.
+function credentialsDocRef(uid: string) {
+  return db.collection('users').doc(uid).collection('settings').doc('credentials');
+}
+
+// Loads the user's private credential fields as a plaintext name->value map for
+// the private parse callback. Never throws into the parse path — returns {} on
+// any failure. Reads ONLY the secrets doc.
 export async function getSecretsForUser(uid: string): Promise<Record<string, string>> {
   try {
     if (!uid) return {};
     const doc = await secretsDocRef(uid).get();
     if (!doc.exists) return {};
-    const stored = (doc.data()?.secrets || {}) as Record<string, StoredSecret>;
+    const stored = (doc.data()?.secrets || {}) as Record<string, StoredVar>;
     const out: Record<string, string> = {};
     for (const [name, entry] of Object.entries(stored)) {
       if (entry?.value != null) out[name] = decrypt(entry.value);
@@ -66,59 +79,140 @@ export async function getSecretsForUser(uid: string): Promise<Record<string, str
   }
 }
 
+// Loads the user's public credential fields as a plaintext name->value map for
+// the public parse callback. Never throws into the parse path — returns {} on
+// any failure. Reads ONLY the credentials doc (never the secrets doc).
+export async function getPublicValuesForUser(uid: string): Promise<Record<string, string>> {
+  try {
+    if (!uid) return {};
+    const doc = await credentialsDocRef(uid).get();
+    if (!doc.exists) return {};
+    const stored = (doc.data()?.credentials || {}) as Record<string, StoredVar>;
+    const out: Record<string, string> = {};
+    for (const [name, entry] of Object.entries(stored)) {
+      if (entry?.value != null && entry.value !== "") out[name] = entry.value;
+    }
+    return out;
+  } catch (err) {
+    console.error("getPublicValuesForUser failed:", err);
+    return {};
+  }
+}
+
 function maskSecret(plaintext: string): string {
   return plaintext.length > 4
     ? '••••••••' + plaintext.slice(-4)
     : plaintext.length > 0 ? '••••' : '';
 }
 
-export async function listSecrets({ auth }: { auth: AuthArg }) {
-  const doc = await secretsDocRef(auth.uid).get();
-  if (!doc.exists) return [];
-  const stored = (doc.data()?.secrets || {}) as Record<string, StoredSecret>;
-  return Object.entries(stored)
-    .map(([name, entry]) => ({
+// Lists the user's stored credential variables, flat. Public vars (credentials
+// doc) carry their plaintext value; private vars (secrets doc) are masked. The
+// client groups them into per-backend credentials.
+export async function listCredentials({ auth }: { auth: AuthArg }) {
+  const [credDoc, secretDoc] = await Promise.all([
+    credentialsDocRef(auth.uid).get(),
+    secretsDocRef(auth.uid).get(),
+  ]);
+  const publics = (credDoc.data()?.credentials || {}) as Record<string, StoredVar>;
+  const secrets = (secretDoc.data()?.secrets || {}) as Record<string, StoredVar>;
+  const out = [
+    ...Object.entries(publics).map(([name, entry]) => ({
       name,
-      masked: maskSecret(decrypt(entry.value)),
-      updatedAt: entry.updatedAt || "",
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+      backend: entry?.backend || null,
+      isPublic: true,
+      value: entry?.value ?? "",
+      masked: "",
+      updatedAt: entry?.updatedAt || "",
+    })),
+    ...Object.entries(secrets).map(([name, entry]) => ({
+      name,
+      backend: entry?.backend || null,
+      isPublic: false,
+      value: null as string | null,
+      masked: entry?.value != null ? maskSecret(decrypt(entry.value)) : "",
+      updatedAt: entry?.updatedAt || "",
+    })),
+  ];
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function setSecret({ auth, name, value }: { auth: AuthArg; name: string; value: string }) {
-  if (!isSecretCryptoConfigured()) {
-    // Without a usable key, encrypt() is a no-op and we'd store plaintext under
-    // a "Secrets" label. Fail loud instead. See scripts/set-compiler-secret.sh.
-    throw new Error("Secrets are unavailable: GRAFFITICODE_SECRET_KEY is not configured on the server.");
-  }
+// Writes a single credential variable. Visibility is server-authoritative for
+// known backends (resolved from the registry) so a client can't store a private
+// field as public plaintext; for custom vars the caller's `isPublic` is used.
+export async function setCredential(
+  { auth, name, value, backend, isPublic }:
+  { auth: AuthArg; name: string; value: string; backend?: string | null; isPublic?: boolean | null },
+) {
   if (!SECRET_NAME_RE.test(name)) {
-    throw new Error("Secret name must contain only lowercase letters, digits and hyphens.");
+    throw new Error("Credential name must contain only lowercase letters, digits and hyphens.");
   }
   if (!value) {
-    throw new Error("Secret value is required.");
+    throw new Error("A value is required.");
   }
-  const ref = secretsDocRef(auth.uid);
+
+  const def = getCredentialBackend(backend);
+  let pub: boolean;
+  if (def) {
+    const visibility = fieldVisibilityFor(def.key, name);
+    if (!visibility) {
+      throw new Error(`"${name}" is not a recognized field for ${def.label}.`);
+    }
+    pub = visibility === "public";
+  } else {
+    pub = !!isPublic;
+  }
+
   const updatedAt = new Date().toISOString();
-  await ref.set({ secrets: { [name]: { value: encrypt(value), updatedAt } } }, { merge: true });
-  return { name, masked: maskSecret(value), updatedAt };
+  const tag = backend != null ? { backend } : {};
+
+  if (pub) {
+    // Public field -> credentials doc, plaintext. No key required.
+    await credentialsDocRef(auth.uid).set(
+      { credentials: { [name]: { ...tag, value, updatedAt } } },
+      { merge: true },
+    );
+  } else {
+    // Private field -> secrets doc, ciphertext.
+    if (!isSecretCryptoConfigured()) {
+      // Refuse to store plaintext: encrypt() would otherwise fail loud, but check
+      // up front for a friendly message. See scripts/set-compiler-secret.sh.
+      throw new Error("Secrets are unavailable: GRAFFITICODE_SECRET_KEY is not configured on the server.");
+    }
+    await secretsDocRef(auth.uid).set(
+      { secrets: { [name]: { ...tag, value: encrypt(value), updatedAt } } },
+      { merge: true },
+    );
+  }
+
+  return {
+    name,
+    backend: backend ?? null,
+    isPublic: pub,
+    value: pub ? value : null,
+    masked: pub ? "" : maskSecret(value),
+    updatedAt,
+  };
 }
 
-export async function deleteSecret({ auth, name }: { auth: AuthArg; name: string }) {
-  await secretsDocRef(auth.uid).set(
-    { secrets: { [name]: admin.firestore.FieldValue.delete() } },
-    { merge: true },
-  );
+export async function deleteCredential({ auth, name }: { auth: AuthArg; name: string }) {
+  const del = admin.firestore.FieldValue.delete();
+  await Promise.all([
+    credentialsDocRef(auth.uid).set({ credentials: { [name]: del } }, { merge: true }),
+    secretsDocRef(auth.uid).set({ secrets: { [name]: del } }, { merge: true }),
+  ]);
   return true;
 }
 
-function buildParseCallbacks(systemValues: Record<string, string> = {}) {
+function buildParseCallbacks(
+  { privateValues = {}, publicValues = {} }:
+  { privateValues?: Record<string, string>; publicValues?: Record<string, string> } = {},
+) {
   return {
     GET_VAL_PRIVATE: (name: string) => {
-      const result = systemValues[name] || "";
-      return encrypt(result);
+      return encrypt(privateValues[name] || "");
     },
     GET_VAL_PUBLIC: (name: string) => {
-      const result = systemValues[name] || "";
+      const result = publicValues[name] || "";
       console.log("GET_VAL_PUBLIC()", "name:", name, "result:", result);
       return result;
     },
@@ -134,14 +228,17 @@ const taskDao = getTaskDaoForStore("firestore");
 
 const db = getFirestore();
 
-export async function parseCode({ lang, src, systemValues = {} }: { lang: string; src: string; systemValues?: Record<string, string> }) {
+export async function parseCode(
+  { lang, src, privateValues = {}, publicValues = {} }:
+  { lang: string; src: string; privateValues?: Record<string, string>; publicValues?: Record<string, string> },
+) {
   try {
     const lexicon = await getLanguageLexicon(lang);
     if (!lexicon) {
       // lexicon.json couldn't be fetched — treat the language service as offline.
       return { code: null, errors: [{ message: languageOfflineMessage(lang), from: -1, to: -1 }] };
     }
-    const nodePool = await parser.parse(lang, src, lexicon, buildParseCallbacks(systemValues));
+    const nodePool = await parser.parse(lang, src, lexicon, buildParseCallbacks({ privateValues, publicValues }));
 
     // Scan the AST pool for ERROR nodes
     const errors: Array<{ message: string; from: number; to: number }> = [];
@@ -640,11 +737,12 @@ export async function generateCode({
       }
     }
 
-    // Parse the head src with system values, then post it. User secrets are
-    // merged first so system keys (e.g. itemId) always take precedence.
-    const systemValues: Record<string, string> = await getSecretsForUser(auth?.uid);
-    if (itemId) systemValues.itemId = itemId;
-    const parseResult = await parseCode({ lang: headLang, src, systemValues });
+    // Parse the head src, then post it. Private secrets and public credential ids
+    // come from separate stores; itemId is a system-injected public value.
+    const privateValues: Record<string, string> = await getSecretsForUser(auth?.uid);
+    const publicValues: Record<string, string> = await getPublicValuesForUser(auth?.uid);
+    if (itemId) publicValues.itemId = itemId;
+    const parseResult = await parseCode({ lang: headLang, src, privateValues, publicValues });
     if (parseResult.errors) {
       // Preserve the generated source alongside the parse errors so the
       // editor can render it with inline compile-error decorations, matching
@@ -716,7 +814,7 @@ export async function generateCode({
           if (repair?.errors) {
             return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: mapUsageLimit(repair.errors), upstreamLangs: [] };
           }
-          const reparsed = await parseCode({ lang: headLang, src: repair.code, systemValues });
+          const reparsed = await parseCode({ lang: headLang, src: repair.code, privateValues, publicValues });
           if (reparsed.errors) {
             return { src: repair.code, taskId: null, language, description, changeSummary, model, usage, errors: reparsed.errors, upstreamLangs: [] };
           }

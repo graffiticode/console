@@ -826,7 +826,7 @@ async function verifyCode(code, authToken, lang, rid = null, isPublic = false) {
     // verification. The real itemId is substituted by the resolver's
     // parseCode call before the saved task is posted, so this placeholder
     // never reaches storage.
-    const parseResult = await parseCode({ lang, src: code, systemValues: { itemId: "verify-itemid" } });
+    const parseResult = await parseCode({ lang, src: code, publicValues: { itemId: "verify-itemid" } });
     if (parseResult.errors) {
       if (rid) {
         ragLog(rid, "verification.parse_error", {
