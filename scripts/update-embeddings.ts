@@ -21,6 +21,7 @@ import OpenAI from "openai";
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { buildExampleArtifacts } from '../src/lib/lang-embedding';
 
 // Load environment variables
 dotenv.config();
@@ -175,6 +176,9 @@ interface TrainingExample {
   expectedValues?: string[];
   sourcePath: string;
   messages: Array<{role: string, content: string}>;
+  // Set for passage-bearing languages (e.g. L0175): the structured design facets used as a
+  // query-time filter/boost. Derived from the code, never the passage prose.
+  facets?: Record<string, unknown>;
 }
 
 /**
@@ -504,10 +508,17 @@ async function storeExamplesWithEmbeddings(examples: TrainingExample[]) {
         // Create a unique ID for the example
         const docId = `${example.lang}_example_${example.exampleId}_${Date.now()}`;
         
+        // Passage-bearing languages (e.g. L0175): embed the passage-free text and store the
+        // design signature (tags + facets) instead of the raw prompt. Recomputed from the same
+        // helpers the query side uses, so doc and query vectors stay aligned.
+        const artifacts = buildExampleArtifacts(example.lang, { prompt: example.prompt, code: example.code });
+
         // Create the vector text
-        const vectorText = createVectorText(example);
+        const vectorText = artifacts && artifacts.embeddingText.trim()
+          ? artifacts.embeddingText
+          : createVectorText(example);
         textsToEmbed.push(vectorText);
-        
+
         // Prepare document data (the value/payload to store)
         // Only include defined fields to avoid Firestore errors
         const docData: any = {
@@ -515,13 +526,16 @@ async function storeExamplesWithEmbeddings(examples: TrainingExample[]) {
           exampleId: example.exampleId,
           prompt: example.prompt,
           code: example.code,
-          tags: example.tags,
+          tags: artifacts ? artifacts.tags : example.tags,
           sourcePath: example.sourcePath,
           messages: example.messages,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp()
         };
-        
+
+        // Facets power the query-time filter/boost (see hybridSearch).
+        if (artifacts) docData.facets = artifacts.facets;
+
         // Add optional fields only if they exist
         if (example.title) docData.title = example.title;
         if (example.instructions) docData.instructions = example.instructions;

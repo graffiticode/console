@@ -24,6 +24,7 @@ import {
 import { generateCodeWithContinuation, SystemBlock } from "./claude-stream-service";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
 import { findBestLanguages } from "./language-router";
+import { stripQueryPassage, queryFacets } from "./lang-embedding";
 import { getRAGConfig, withRAGFallback } from "./rag-config";
 import { parser } from "@graffiticode/parser";
 import {
@@ -204,20 +205,25 @@ function parseMarkdownExamples(markdownContent) {
   }
 }
 
-export function extractSearchQuery(prompt: string): string {
+export function extractSearchQuery(prompt: string, lang?: string): string {
   const marker = "Now, please address this new request:\n";
   const idx = prompt.lastIndexOf(marker);
+  let query = prompt;
   if (idx !== -1) {
     const latest = prompt.substring(idx + marker.length).trim();
-    if (latest.length > 0) return latest;
+    if (latest.length > 0) query = latest;
   }
-  return prompt;
+  // For passage-bearing languages, strip the reading passage so the query vector lands in the same
+  // (passage-free) space as the stored document vectors. No-op for languages without a hook.
+  return stripQueryPassage(lang, query);
 }
 
 export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null }) {
   // Extract just the latest user request for retrieval so conversation
-  // context doesn't dilute the embedding similarity.
-  const searchQuery = extractSearchQuery(prompt);
+  // context doesn't dilute the embedding similarity (and strip the reading passage for hooked langs).
+  const searchQuery = extractSearchQuery(prompt, lang);
+  // Best-effort design facets from the live prompt — used as a filter/boost during re-ranking.
+  const facets = queryFacets(lang, searchQuery);
 
   try {
     if (rid) {
@@ -243,6 +249,7 @@ export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null 
         db: db,
         rid: rid,  // Pass the request ID for analytics tracking
         vectorWeight: 0.7, // Balance between semantic and keyword matching
+        facets, // Query-time facet filter/boost for hooked langs (e.g. L0175 target)
       });
 
       if (results && results.length > 0) {

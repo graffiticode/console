@@ -15,6 +15,7 @@ import admin from "firebase-admin";
 import dotenv from "dotenv";
 import { execSync } from "child_process";
 import { unparse } from "@graffiticode/parser";
+import { buildExampleArtifacts } from "../src/lib/lang-embedding";
 
 // Load environment variables
 dotenv.config();
@@ -227,6 +228,17 @@ function convertToMarkdownFormat(trainingExamples: any[]): string {
       });
 
       markdown += `#### Code\n\n\`\`\`\n${code}\n\`\`\`\n\n`;
+
+      // For passage-bearing languages (e.g. L0175), record the passage-free embedding text and the
+      // design signature so the corpus is human-inspectable. The embed step recomputes these from
+      // the same helpers, so they stay consistent with the query side.
+      const artifacts = buildExampleArtifacts(lang, { prompt, code });
+      if (artifacts) {
+        markdown += `#### Embedding Text\n\n${artifacts.embeddingText}\n\n`;
+        if (artifacts.tags.length) {
+          markdown += `#### Tags\n\n${artifacts.tags.join(", ")}\n\n`;
+        }
+      }
 
       if (index < examples.length - 1) {
         markdown += `---\n\n`;

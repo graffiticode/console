@@ -8,6 +8,7 @@ import admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { ragLog } from "./logger";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
+import { buildExampleArtifacts, facetAdjustment } from "./lang-embedding";
 
 // VectorValue may not be available in older Firebase Admin SDK versions
 let VectorValue: any;
@@ -178,6 +179,19 @@ export async function generateBatchEmbeddings(
  * @returns {string} - Combined text for embedding
  */
 export function createEmbeddingText(example) {
+  // Prefer a precomputed passage-free embedding text. Stored docs carry `embeddingText` (the exact
+  // string that was embedded); for passage-bearing languages this is the prompt minus the passage.
+  // Using it here keeps the hybrid keyword channel passage-free too.
+  if (example.embeddingText && typeof example.embeddingText === "string" && example.embeddingText.trim()) {
+    return example.embeddingText;
+  }
+  // Not yet computed (e.g. the generate path building a fresh example): derive it for hooked langs.
+  const hooked = buildExampleArtifacts(example.lang, {
+    prompt: example.prompt || example.task,
+    code: example.code || example.src,
+  });
+  if (hooked && hooked.embeddingText && hooked.embeddingText.trim()) return hooked.embeddingText;
+
   // Helper: extract simple feature tags from code without embedding the code itself
   function extractFeatureTags(code) {
     if (!code || typeof code !== "string") return [];
@@ -443,6 +457,7 @@ export async function hybridSearch({
   vectorWeight = 0.7,
   rid = null,
   allowExact = false,
+  facets = null,
 }) {
   const startTime = Date.now();
 
@@ -475,32 +490,41 @@ export async function hybridSearch({
           .split(/\s+/)
           .filter((word) => word.length > 3);
 
-    // Score results based on both vector similarity and keyword matching
-    const scoredResults = vectorResults.map((doc) => {
-      // Vector similarity score (already computed)
-      const vectorScore = doc.similarity || 0;
+    // Score results based on vector similarity, keyword matching, and (for hooked langs) design
+    // facets. `facets` is the query's facets; a confident target mismatch drops the doc, overlaps
+    // boost it. When `facets` is null (non-hooked langs) facetAdjustment is a no-op.
+    const scoredResults = vectorResults
+      .map((doc) => {
+        // Vector similarity score (already computed)
+        const vectorScore = doc.similarity || 0;
 
-      // Keyword matching score
-      let keywordScore = 0;
-      if (keywords.length > 0) {
-        const docText = createEmbeddingText(doc).toLowerCase();
-        const matchedKeywords = keywords.filter((keyword) =>
-          docText.includes(keyword),
+        // Keyword matching score
+        let keywordScore = 0;
+        if (keywords.length > 0) {
+          const docText = createEmbeddingText(doc).toLowerCase();
+          const matchedKeywords = keywords.filter((keyword) =>
+            docText.includes(keyword),
+          );
+          keywordScore = matchedKeywords.length / keywords.length;
+        }
+
+        const adj = facetAdjustment(facets, doc.facets);
+
+        // Combined score
+        const combinedScore = Math.min(
+          1,
+          vectorScore * vectorWeight + keywordScore * (1 - vectorWeight) + adj.boost,
         );
-        keywordScore = matchedKeywords.length / keywords.length;
-      }
 
-      // Combined score
-      const combinedScore =
-            vectorScore * vectorWeight + keywordScore * (1 - vectorWeight);
-
-      return {
-        ...doc,
-        vectorScore,
-        keywordScore,
-        combinedScore,
-      };
-    });
+        return {
+          ...doc,
+          vectorScore,
+          keywordScore,
+          combinedScore,
+          _facetKeep: adj.keep,
+        };
+      })
+      .filter((doc) => doc._facetKeep);
 
 
     // Sort by combined score and return top results
