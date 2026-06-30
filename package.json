@@ -41,7 +41,7 @@
     "@graffiticode/l0175": "^0.2.0",
     "@graffiticode/lang-graffiticode": "^0.1.0",
     "@graffiticode/lezer-graffiticode": "^0.1.1",
-    "@graffiticode/parser": "^1.5.20",
+    "@graffiticode/parser": "^1.5.21",
     "@graphiql/toolkit": "^0.8.2",
     "@graphql-tools/schema": "^9.0.1",
     "@headlessui/react": "^1.7.16",
