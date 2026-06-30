@@ -11,7 +11,7 @@
  */
 
 import axios from "axios";
-import { postApiCompile, getLanguageAsset, getLanguageLexicon, languageOfflineMessage, isLanguageOfflineError } from "./api";
+import { postApiCompile, getLanguageAsset, getLanguageLexicon, isLangOverridden, languageOfflineMessage, isLanguageOfflineError } from "./api";
 import { postTask, getData, parseCode } from "../pages/api/resolvers";
 import admin from "firebase-admin";
 import { ragLog, generateRequestId } from "./logger";
@@ -408,40 +408,48 @@ export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null 
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
  * @returns {Promise<string>} - The dialect-specific instructions, or empty string if none found
  */
-async function readDialectAssets(lang): Promise<{ value: string; optInOpus: boolean }> {
+async function readDialectAssets(lang, accessToken?: string): Promise<{ value: string; optInOpus: boolean }> {
   const cacheKey = `L${lang}`;
-  const cached = languageAssetsCache.instructions.get(cacheKey);
+  // When this language is overridden for the caller the fetch is redirected to a
+  // test revision, so bypass the shared (lang-keyed) instructions cache on read
+  // and write. Non-overridden languages keep using the shared cache.
+  const overridden = await isLangOverridden(lang, accessToken);
+  const cached = !overridden && languageAssetsCache.instructions.get(cacheKey);
   if (cached && Date.now() < cached.expires) {
     return cached;
   }
 
   try {
-    const instructions = await getLanguageAsset(`L${lang}`, 'instructions.md');
+    const instructions = await getLanguageAsset(`L${lang}`, 'instructions.md', accessToken);
     // Parse the Opus opt-in from the raw instructions, then strip any gc:model
     // directive so it never reaches the LLM.
     const optInOpus = instructions ? OPUS_OPT_IN_RE.test(instructions) : false;
     const cleaned = instructions ? instructions.replace(MODEL_DIRECTIVE_STRIP_RE, "") : "";
     const value = cleaned ? `\n${cleaned}\n` : "";
     const entry = { value, optInOpus, expires: Date.now() + CACHE_TTL_MS };
-    languageAssetsCache.instructions.set(cacheKey, entry);
+    if (!overridden) {
+      languageAssetsCache.instructions.set(cacheKey, entry);
+    }
     return entry;
   } catch (error) {
     console.error(`Error fetching dialect instructions from language server for L${lang}:`, error);
     const entry = { value: "", optInOpus: false, expires: Date.now() + CACHE_TTL_MS };
-    languageAssetsCache.instructions.set(cacheKey, entry);
+    if (!overridden) {
+      languageAssetsCache.instructions.set(cacheKey, entry);
+    }
     return entry;
   }
 }
 
-export async function readDialectInstructions(lang): Promise<string> {
-  return (await readDialectAssets(lang)).value;
+export async function readDialectInstructions(lang, accessToken?: string): Promise<string> {
+  return (await readDialectAssets(lang, accessToken)).value;
 }
 
 // Whether this dialect opted into Opus for initial code generation (via the
 // <!-- gc:model=opus --> directive in its instructions.md). Shares the cached
 // instructions fetch, so this adds no extra network call.
-async function dialectOptsIntoOpus(lang): Promise<boolean> {
-  return (await readDialectAssets(lang)).optInOpus;
+async function dialectOptsIntoOpus(lang, accessToken?: string): Promise<boolean> {
+  return (await readDialectAssets(lang, accessToken)).optInOpus;
 }
 
 // Static tail of the dialect system prompt — language-independent. Concatenated
@@ -531,7 +539,7 @@ CRITICAL REMINDER: Put generated code between \`\`\` (triple backticks) to disti
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
  * @returns {Promise<SystemBlock[]>} - System content blocks ready for /v1/messages
  */
-async function getSystemPromptForDialect(lang: string): Promise<SystemBlock[]> {
+async function getSystemPromptForDialect(lang: string, accessToken?: string): Promise<SystemBlock[]> {
   // Preamble: small, lang-interpolated. Combined into the cached block below
   // since (preamble + dialect + tail) is stable for a given language.
   const preamble = `
@@ -540,7 +548,7 @@ You are a programming assistant that translates natural language into code writt
 Graffiticode is designed for end-user programming. Its syntax is simple, functional, and punctuation-light. Use only the language features below.`;
 
   // Big, lang-stable block fetched from the language server (TTL-cached locally).
-  const fileInstructions = await readDialectInstructions(lang);
+  const fileInstructions = await readDialectInstructions(lang, accessToken);
 
   // Out-of-scope clause references the dialect ID so it lives with the
   // per-language prefix rather than the static tail.
@@ -577,11 +585,12 @@ async function createCodeGenerationPrompt(
   rid = null,
   conversationSummary = null,
   upstreamContext: { lang: string; sample?: unknown } | null = null,
+  accessToken?: string,
 ) {
   // Dialect-specific blocks (cached per-language). The dialect block already
   // carries cache_control: ephemeral, so the per-language prefix is reused
   // across requests within the 5-minute Anthropic cache window.
-  const dialectBlocks = await getSystemPromptForDialect(lang);
+  const dialectBlocks = await getSystemPromptForDialect(lang, accessToken);
 
   // Developer instructions are static across all languages and all calls.
   // Adding a second cache breakpoint extends the cached prefix to include
@@ -1098,7 +1107,7 @@ function extractSummaryTags(content) {
   };
 }
 
-async function processGeneratedCode(content, lang = "0000", rid = null) {
+async function processGeneratedCode(content, lang = "0000", rid = null, accessToken?: string) {
   if (!content) return content;
 
   const originalLength = content.length;
@@ -1114,7 +1123,7 @@ async function processGeneratedCode(content, lang = "0000", rid = null) {
 
   // Try to reformat the src using the parser
   try {
-    const lexicon = await getLanguageLexicon(lang);
+    const lexicon = await getLanguageLexicon(lang, accessToken);
     const reformatted = await parser.reformat(lang, processed, lexicon, {});
 
     // If reformat produced an error comment, keep the original src
@@ -1271,7 +1280,7 @@ export async function generateCode({
   // fix/repair pass still runs on the default (current scheme thereafter).
   let opusOptIn = false;
   if (!options.model) {
-    opusOptIn = await dialectOptsIntoOpus(lang);
+    opusOptIn = await dialectOptsIntoOpus(lang, accessToken);
     if (opusOptIn) {
       modelToUse = CLAUDE_MODELS.OPUS;
     }
@@ -1431,6 +1440,7 @@ export async function generateCode({
         rid,
         conversationSummary,
         upstreamContext,
+        accessToken,
       );
     }
 
@@ -1612,7 +1622,7 @@ export async function generateCode({
     }
 
     // Process the generated code to fix any issues
-    let generatedCode = await processGeneratedCode(streamResult.code, lang, rid);
+    let generatedCode = await processGeneratedCode(streamResult.code, lang, rid, accessToken);
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
@@ -1768,7 +1778,7 @@ export async function generateCode({
           // Only accept the fix if it contains a code block; otherwise retry
           const hasCodeBlock = /```[\s\S]*```/.test(fixResult.code);
           if (hasCodeBlock) {
-            generatedCode = await processGeneratedCode(fixResult.code, lang, requestId);
+            generatedCode = await processGeneratedCode(fixResult.code, lang, requestId, accessToken);
           } else {
             if (requestId) {
               ragLog(requestId, "fix.skipped", { reason: "no code block in fix response", attempt: fixAttempts });
@@ -1798,7 +1808,7 @@ export async function generateCode({
     const { description, changeSummary } = extractSummaryTags(generatedCode);
 
     // Ensure the code is properly processed one final time before returning
-    const finalProcessedCode = await processGeneratedCode(generatedCode, lang, rid);
+    const finalProcessedCode = await processGeneratedCode(generatedCode, lang, rid, accessToken);
 
     // Track usage for token consumption
     if (auth?.uid && finalUsage.total_tokens > 0) {

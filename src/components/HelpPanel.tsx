@@ -106,7 +106,7 @@ export const HelpPanel = ({
       setSchemaLoading(true);
       try {
         const langCode = language.startsWith('L') ? language : `L${language}`;
-        const schemaText = await getLanguageAsset(langCode, "schema.json");
+        const schemaText = await getLanguageAsset(langCode, "schema.json", authToken);
         const schema = JSON.parse(schemaText || "{}");
         setLanguageSchema(schema);
       } catch (error) {
@@ -118,7 +118,7 @@ export const HelpPanel = ({
     };
 
     fetchSchema();
-  }, [language]);
+  }, [language, authToken]);
 
   // Function to get schema definition for a given context
   // Helper function to resolve JSON Schema $ref

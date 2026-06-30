@@ -42,17 +42,26 @@ const cacheTtlMs = (() => {
 const cache = new Map<string, { doc: LanguageServerDoc; expires: number }>();
 const scopeCache = new Map<string, { value: LanguageScope | null; expires: number }>();
 
-function baseUrlFor(langId: string): string {
+import { isLangOverridden } from "./api";
+
+const apiUrl = process.env.NEXT_PUBLIC_GC_API_URL || "https://api.graffiticode.org";
+
+// Build the URL for a language resource. By default these route through the API
+// gateway (`${apiUrl}/L<id>/<file>`) so a per-user language-server binding
+// override (resolved server-side from the caller's token) can apply. The
+// LANGUAGE_SERVER_BASE_URL escape hatch still points directly at a single
+// language server for local development (the override does not apply there).
+function assetUrlFor(langId: string, file: string): string {
   const override = process.env.LANGUAGE_SERVER_BASE_URL;
   if (override) {
-    return override.replace(/\/+$/, "");
+    return `${override.replace(/\/+$/, "")}/${file}`;
   }
-  return `https://l${langId}.graffiticode.org`;
+  return `${apiUrl}/L${langId}/${file}`;
 }
 
-async function fetchText(url: string): Promise<string | null> {
+async function fetchText(url: string, accessToken?: string): Promise<string | null> {
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, accessToken ? { headers: { Authorization: accessToken } } : undefined);
     if (!res.ok) return null;
     return await res.text();
   } catch {
@@ -60,19 +69,22 @@ async function fetchText(url: string): Promise<string | null> {
   }
 }
 
-export async function getLanguageServerDoc(langId: string): Promise<LanguageServerDoc> {
+export async function getLanguageServerDoc(langId: string, accessToken?: string): Promise<LanguageServerDoc> {
   const now = Date.now();
-  const cached = cache.get(langId);
+  // When this language is overridden for the caller the fetch is redirected to a
+  // test revision, so skip the shared (lang-keyed) cache on read and write.
+  const overridden = await isLangOverridden(langId, accessToken);
+  const cached = !overridden && cache.get(langId);
   if (cached && now < cached.expires) {
     return cached.doc;
   }
 
-  const base = baseUrlFor(langId);
   // Prefer the canonical `usage-guide.md`; fall back to the legacy
   // `user-guide.md` name for languages that haven't been renamed yet.
   const [envelopeRaw, usageGuideRaw] = await Promise.all([
-    fetchText(`${base}/language-info.json`),
-    fetchText(`${base}/usage-guide.md`).then((s) => s ?? fetchText(`${base}/user-guide.md`)),
+    fetchText(assetUrlFor(langId, "language-info.json"), accessToken),
+    fetchText(assetUrlFor(langId, "usage-guide.md"), accessToken)
+      .then((s) => s ?? fetchText(assetUrlFor(langId, "user-guide.md"), accessToken)),
   ]);
 
   let envelope: LanguageInfoEnvelope | null = null;
@@ -81,7 +93,7 @@ export async function getLanguageServerDoc(langId: string): Promise<LanguageServ
       envelope = JSON.parse(envelopeRaw) as LanguageInfoEnvelope;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.warn(`language-server-client: invalid JSON from ${base}/language-info.json: ${message}`);
+      console.warn(`language-server-client: invalid JSON from L${langId} language-info.json: ${message}`);
       envelope = null;
     }
   }
@@ -89,11 +101,13 @@ export async function getLanguageServerDoc(langId: string): Promise<LanguageServ
   const doc: LanguageServerDoc = { envelope, usageGuide: usageGuideRaw };
 
   const success = envelope !== null || usageGuideRaw !== null;
-  const ttl = success ? cacheTtlMs : FAILURE_TTL_MS;
-  cache.set(langId, { doc, expires: now + ttl });
+  if (!overridden) {
+    const ttl = success ? cacheTtlMs : FAILURE_TTL_MS;
+    cache.set(langId, { doc, expires: now + ttl });
+  }
 
   if (!success) {
-    console.warn(`language-server-client: could not fetch docs for L${langId} from ${base}`);
+    console.warn(`language-server-client: could not fetch docs for L${langId}`);
   }
 
   return doc;
@@ -113,15 +127,15 @@ export function clearLanguageServerCache(langId?: string): void {
 // ${base}/scope.json. Cached separately from the heavier envelope+guide so
 // the router and catalog can poll it cheaply. Returns null when the file
 // is unavailable or malformed; callers should fall back to a static seed.
-export async function getLanguageScope(langId: string): Promise<LanguageScope | null> {
+export async function getLanguageScope(langId: string, accessToken?: string): Promise<LanguageScope | null> {
   const now = Date.now();
-  const cached = scopeCache.get(langId);
+  const overridden = await isLangOverridden(langId, accessToken);
+  const cached = !overridden && scopeCache.get(langId);
   if (cached && now < cached.expires) {
     return cached.value;
   }
 
-  const base = baseUrlFor(langId);
-  const raw = await fetchText(`${base}/scope.json`);
+  const raw = await fetchText(assetUrlFor(langId, "scope.json"), accessToken);
 
   let scope: LanguageScope | null = null;
   if (raw) {
@@ -135,15 +149,17 @@ export async function getLanguageScope(langId: string): Promise<LanguageScope | 
           out_of_scope: Array.isArray(parsed.out_of_scope) ? parsed.out_of_scope.map(String) : [],
         };
       } else {
-        console.warn(`language-server-client: ${base}/scope.json missing required fields`);
+        console.warn(`language-server-client: L${langId} scope.json missing required fields`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.warn(`language-server-client: invalid JSON from ${base}/scope.json: ${message}`);
+      console.warn(`language-server-client: invalid JSON from L${langId} scope.json: ${message}`);
     }
   }
 
-  const ttl = scope !== null ? cacheTtlMs : FAILURE_TTL_MS;
-  scopeCache.set(langId, { value: scope, expires: now + ttl });
+  if (!overridden) {
+    const ttl = scope !== null ? cacheTtlMs : FAILURE_TTL_MS;
+    scopeCache.set(langId, { value: scope, expires: now + ttl });
+  }
   return scope;
 }

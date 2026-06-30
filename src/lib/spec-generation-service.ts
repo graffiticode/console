@@ -126,9 +126,9 @@ export async function generateSpec({ auth, taskId }: { auth: any; taskId: string
   const lang = task.lang;
 
   const [lexicon, hints, instructions] = await Promise.all([
-    getLanguageLexicon(lang),
-    getLanguageHints(lang),
-    readDialectInstructions(lang),
+    getLanguageLexicon(lang, auth?.token),
+    getLanguageHints(lang, auth?.token),
+    readDialectInstructions(lang, auth?.token),
   ]);
 
   const annSrc = unparse(task.code, lexicon || {}, { hints });

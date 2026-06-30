@@ -3,7 +3,7 @@ import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
 import { getFirestore } from "../../utils/db";
-import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon, languageOfflineMessage, isLanguageOfflineError } from "../../lib/api";
+import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon, isLangOverridden, languageOfflineMessage, isLanguageOfflineError } from "../../lib/api";
 import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
 import { generateSpec } from "../../lib/spec-generation-service";
@@ -229,11 +229,11 @@ const taskDao = getTaskDaoForStore("firestore");
 const db = getFirestore();
 
 export async function parseCode(
-  { lang, src, privateValues = {}, publicValues = {} }:
-  { lang: string; src: string; privateValues?: Record<string, string>; publicValues?: Record<string, string> },
+  { lang, src, privateValues = {}, publicValues = {}, accessToken }:
+  { lang: string; src: string; privateValues?: Record<string, string>; publicValues?: Record<string, string>; accessToken?: string },
 ) {
   try {
-    const lexicon = await getLanguageLexicon(lang);
+    const lexicon = await getLanguageLexicon(lang, accessToken);
     if (!lexicon) {
       // lexicon.json couldn't be fetched — treat the language service as offline.
       return { code: null, errors: [{ message: languageOfflineMessage(lang), from: -1, to: -1 }] };
@@ -611,10 +611,14 @@ export async function generateCode({
     // Template generation
     if (prompt === "Create a minimal starting template") {
       const cacheKey = `L${language}`;
-      src = templateCache.get(cacheKey);
+      // When this language is overridden for the caller the fetch is redirected
+      // to a test revision, so bypass the shared (lang-keyed) template cache on
+      // read and write. Non-overridden languages keep using the shared cache.
+      const overridden = await isLangOverridden(language, auth?.token);
+      src = overridden ? undefined : templateCache.get(cacheKey);
       if (!src) {
-        src = await getLanguageAsset(`L${language}`, 'template.gc');
-        if (src) {
+        src = await getLanguageAsset(`L${language}`, 'template.gc', auth?.token);
+        if (src && !overridden) {
           templateCache.set(cacheKey, src);
         }
       }
@@ -742,7 +746,7 @@ export async function generateCode({
     const privateValues: Record<string, string> = await getSecretsForUser(auth?.uid);
     const publicValues: Record<string, string> = await getPublicValuesForUser(auth?.uid);
     if (itemId) publicValues.itemId = itemId;
-    const parseResult = await parseCode({ lang: headLang, src, privateValues, publicValues });
+    const parseResult = await parseCode({ lang: headLang, src, privateValues, publicValues, accessToken: auth?.token });
     if (parseResult.errors) {
       // Preserve the generated source alongside the parse errors so the
       // editor can render it with inline compile-error decorations, matching
@@ -814,7 +818,7 @@ export async function generateCode({
           if (repair?.errors) {
             return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: mapUsageLimit(repair.errors), upstreamLangs: [] };
           }
-          const reparsed = await parseCode({ lang: headLang, src: repair.code, privateValues, publicValues });
+          const reparsed = await parseCode({ lang: headLang, src: repair.code, privateValues, publicValues, accessToken: auth?.token });
           if (reparsed.errors) {
             return { src: repair.code, taskId: null, language, description, changeSummary, model, usage, errors: reparsed.errors, upstreamLangs: [] };
           }
@@ -871,7 +875,7 @@ export async function generateCode({
     if (upstreamLangs.length > 0 && !fromRagHit) {
       await capturePlanForCuration(auth, prompt, [headLang, ...upstreamLangs]);
     }
-    const lexicon = await getLanguageLexicon(headLang);
+    const lexicon = await getLanguageLexicon(headLang, auth?.token);
     const resolvedSrc = unparse(code, lexicon || {});
 
     ragLog(rid, "request.end", {
@@ -1301,7 +1305,7 @@ export async function getTask({ auth, id }) {
     const codeStr = JSON.stringify(code, null, 2);
     let src = "";
     try {
-      const lexicon = await getLanguageLexicon(taskData.lang);
+      const lexicon = await getLanguageLexicon(taskData.lang, auth?.token);
       src = unparse(code, lexicon || {});
     } catch (err) {
       console.error("getTask: failed to unparse", err);
