@@ -49,6 +49,13 @@ import { assertNotCappedOrThrow, recordSpend } from "./free-plan-spend";
 import { checkBurstLimit, checkDailyLimit } from "./free-plan-throttle";
 import { FreePlanError, buildSignupUrl } from "./free-plan-context";
 
+// Sentinel itemId injected during code-generation verification. Side-effecting
+// dialects MUST treat a compile whose itemId (e.g. L0158's `lrn-id`) equals this
+// value as a DRY RUN: validate the program but skip external writes and the
+// credential gates that guard them, since verification runs without the user's
+// account credentials. Mirrored by VERIFY_ITEM_ID in the L0158 compiler.
+export const VERIFY_ITEM_ID = "verify-itemid";
+
 const ANTHROPIC_INPUT_USD_PER_TOKEN = 3 / 1_000_000;
 const ANTHROPIC_OUTPUT_USD_PER_TOKEN = 15 / 1_000_000;
 const ANTHROPIC_CACHE_WRITE_USD_PER_TOKEN = 3.75 / 1_000_000;
@@ -821,12 +828,14 @@ async function verifyCode(code, authToken, lang, rid = null, isPublic = false) {
 
   try {
     // Parse first to catch syntax errors before posting
-    // Inject a synthetic itemId so dialects that read `get-val-public
-    // "itemId"` (e.g. L0158's `set-var "lrn-id"`) compile cleanly during
-    // verification. The real itemId is substituted by the resolver's
-    // parseCode call before the saved task is posted, so this placeholder
-    // never reaches storage.
-    const parseResult = await parseCode({ lang, src: code, publicValues: { itemId: "verify-itemid" } });
+    // Inject the verification sentinel itemId so dialects that read
+    // `get-val-public "itemId"` (e.g. L0158's `set-var "lrn-id"`) compile cleanly
+    // during verification AND treat it as a dry run — skipping side-effecting
+    // writes (e.g. save-to-itembank) and their credential gates, since the user's
+    // account credentials aren't injected here. The real itemId + credentials are
+    // substituted by the resolver's parseCode before the saved task is posted, so
+    // this placeholder never reaches storage and the real compile does the write.
+    const parseResult = await parseCode({ lang, src: code, publicValues: { itemId: VERIFY_ITEM_ID } });
     if (parseResult.errors) {
       if (rid) {
         ragLog(rid, "verification.parse_error", {

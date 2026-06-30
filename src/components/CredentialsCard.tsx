@@ -9,6 +9,11 @@ import {
   varName,
 } from "../lib/credential-backends";
 
+// Placeholder shown in a secret field that already has a stored value. The user
+// must clear it (and type a new value) to replace the secret; left as-is it means
+// "keep the current secret".
+const SECRET_SENTINEL = "••••••••";
+
 // One stored variable (a single credential field).
 interface CredVar {
   name: string;
@@ -82,11 +87,17 @@ export default function CredentialsCard() {
     const d = getCredentialBackend(key);
     if (!d) return;
     const g = knownGroups.find(x => x.key === key);
-    // Prefill public field values (we have them in clear); private left blank.
+    // Prefill public fields in clear; private fields with a stored secret show the
+    // masked sentinel (clear it to replace).
     const fv: Record<string, string> = {};
     for (const f of d.fields) {
       const v = g?.vars[varName(key, f.name)];
-      if (f.visibility === "public" && v?.value) fv[f.name] = v.value;
+      if (!v) continue;
+      if (f.visibility === "public") {
+        if (v.value) fv[f.name] = v.value;
+      } else {
+        fv[f.name] = SECRET_SENTINEL;
+      }
     }
     setError(null);
     setBackend(key);
@@ -101,13 +112,17 @@ export default function CredentialsCard() {
     setEditBackend(CUSTOM_BACKEND_KEY);
     setCustomName(v.name);
     setCustomIsPublic(v.isPublic);
-    setFieldValues(v.isPublic && v.value ? { __custom: v.value } : {});
+    setFieldValues(v.isPublic ? (v.value ? { __custom: v.value } : {}) : { __custom: SECRET_SENTINEL });
     setOpen(true);
   };
 
   const handleSaveKnown = async () => {
     if (!def) return;
-    const entered = def.fields.filter(f => (fieldValues[f.name] || "").trim() !== "");
+    // Skip empty fields and untouched secret sentinels ("keep current").
+    const entered = def.fields.filter(f => {
+      const v = fieldValues[f.name] || "";
+      return v.trim() !== "" && v !== SECRET_SENTINEL;
+    });
     if (!editBackend && entered.length === 0) {
       setError("Enter at least one value.");
       return;
@@ -138,7 +153,9 @@ export default function CredentialsCard() {
       setError("Name must contain only lowercase letters, digits and hyphens.");
       return;
     }
-    const value = (fieldValues.__custom || "").trim();
+    const raw = fieldValues.__custom || "";
+    if (raw === SECRET_SENTINEL) { resetForm(); return; } // untouched secret: keep current
+    const value = raw.trim();
     if (!value && !editBackend) {
       setError("A value is required.");
       return;
@@ -272,7 +289,7 @@ export default function CredentialsCard() {
               </select>
               <input
                 type={customIsPublic ? "text" : "password"}
-                placeholder={editBackend ? "value (leave blank to keep current)" : "value"}
+                placeholder="value"
                 className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
                 value={fieldValues.__custom || ""}
                 onChange={e => setFieldValues({ __custom: e.target.value })} />
@@ -282,7 +299,7 @@ export default function CredentialsCard() {
               <input
                 key={f.name}
                 type={f.visibility === "public" ? "text" : "password"}
-                placeholder={editBackend && f.visibility === "private" ? `${f.label} (leave blank to keep current)` : f.label}
+                placeholder={f.label}
                 className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
                 value={fieldValues[f.name] || ""}
                 onChange={e => setFieldValues({ ...fieldValues, [f.name]: e.target.value })} />
@@ -294,6 +311,7 @@ export default function CredentialsCard() {
               {def.label} credential docs
             </a>
           )}
+          {editBackend && <p className="text-xs text-gray-400">Clear a secret field to replace it; leave it to keep the current value.</p>}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-2">
             <button
