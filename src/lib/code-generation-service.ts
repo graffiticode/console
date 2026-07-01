@@ -1322,6 +1322,29 @@ export async function generateCode({
     // here so the head code gen doesn't embed+search a second time).
     if (Array.isArray(precomputedExamples)) {
       relevantExamples = precomputedExamples;
+      // The resolver ran retrieval before this request's analytics record
+      // existed, so its trackRetrieval no-op'd. Record the reused examples now
+      // (record is live after startRequest above) so the RAG report shows them.
+      if (relevantExamples.length > 0) {
+        safeRAGAnalytics.trackRetrieval(
+          requestId,
+          relevantExamples.map((ex, idx) => ({
+            id: ex.id || `example-${idx}`,
+            similarity: ex.similarity,
+            keywordScore: ex.keywordScore,
+            combinedScore: ex.combinedScore,
+            prompt: ex.task || ex.description || "",
+            code: ex.code,
+          })),
+          "hybrid",
+          0,
+          0.7,
+        );
+        safeRAGAnalytics.markDocumentsUsed(
+          requestId,
+          relevantExamples.map((ex, idx) => ex.id || `example-${idx}`),
+        );
+      }
     } else if (config.enableVectorSearch || config.fallbackToKeywordSearch) {
       // Start retrieval stage
       safeRAGAnalytics.startStage(requestId, "retrieval");
