@@ -14,14 +14,19 @@ import {
   buildEmbeddingArtifacts,
   stripReadingPassage,
   extractQueryFacets,
+  verifyExample,
   type DesignFacets,
   type EmbeddingArtifacts,
+  type ExampleExpectation,
+  type VerifyResult,
 } from "@graffiticode/l0175";
 
 interface EmbeddingHook {
   buildArtifacts: (input: { prompt: string; code?: string }) => EmbeddingArtifacts;
   stripQuery: (prompt: string) => string;
   queryFacets: (prompt: string) => DesignFacets;
+  // Verify a captured example's generated code against a declared expectation (see verifyExampleForPrompt).
+  verify: (input: { code: string; errors: any[]; expect: ExampleExpectation }) => VerifyResult;
 }
 
 // Keyed by bare language id (no "L"/"l" prefix).
@@ -30,6 +35,7 @@ const HOOKS: Record<string, EmbeddingHook> = {
     buildArtifacts: ({ prompt, code }) => buildEmbeddingArtifacts({ prompt, code }),
     stripQuery: (prompt) => stripReadingPassage(prompt),
     queryFacets: (prompt) => extractQueryFacets(prompt),
+    verify: ({ code, errors, expect }) => verifyExample({ code, errors, expect }),
   },
 };
 
@@ -103,4 +109,37 @@ export function facetAdjustment(
   if (overlap(qf.standards, df.standards)) boost += 0.05;
   if (overlap(qf.dimensions, df.dimensions)) boost += 0.05;
   return { keep: true, boost };
+}
+
+/**
+ * Doc-side verification gate for the batch capture step (facet-drift only, no compile). Derives the
+ * INTENDED design from the prompt (the same query facets retrieval uses) and checks the generated
+ * code's composed signature against it — catching drift like "prompt asks c1-t9 task model 3 (EBSR)
+ * but the code came out hot-text". Returns:
+ *   - null  → no hook, or the prompt doesn't declare a target we can judge (keep the example as-is)
+ *   - VerifyResult → `.ok === false` means a blocking facet mismatch (caller skips the example)
+ * Generic over facet shape; the language supplies the actual compare via its verify hook.
+ */
+export function verifyExampleForPrompt(
+  lang: string | null | undefined,
+  input: { prompt: string; code?: string },
+): VerifyResult | null {
+  const hook = HOOKS[normalizeLang(lang)];
+  if (!hook || !input.prompt || !input.code) return null;
+  try {
+    const qf = hook.queryFacets(input.prompt);
+    // Without an intended target from the prompt there is nothing to judge drift against.
+    if (!qf || !qf.target) return null;
+    const expect: ExampleExpectation = {
+      target: qf.target,
+      itemType: qf.itemTypes && qf.itemTypes[0],
+      taskModel: qf.taskModels && qf.taskModels[0],
+    };
+    // errors: [] — facet-drift only; the compile-clean tier is intentionally skipped in batch.
+    return hook.verify({ code: input.code, errors: [], expect });
+  } catch (err) {
+    // A gate failure must never drop an example silently — treat as "cannot judge", keep it.
+    console.warn(`lang-embedding: verify failed for L${normalizeLang(lang)}:`, (err as Error).message);
+    return null;
+  }
 }

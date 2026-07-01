@@ -39,11 +39,12 @@
 import fs from "fs";
 import path from "path";
 import admin from "firebase-admin";
-import { 
-  createEmbeddingText, 
+import {
+  createEmbeddingText,
   addDocumentWithEmbedding,
-  generateBatchEmbeddings 
+  generateBatchEmbeddings
 } from '../src/lib/embedding-service';
+import { verifyExampleForPrompt } from '../src/lib/lang-embedding';
 import { FieldValue } from 'firebase-admin/firestore';
 import dotenv from 'dotenv';
 
@@ -451,7 +452,20 @@ async function storeExamplesInVectorDatabase(trainingExamples, db) {
       for (const example of batch) {
         // Create a unique ID for the example
         const docId = `${example.lang}_${example.item_id}_${example.task_id || 'notask'}`;
-        
+
+        // Drift gate (facet-drift only, no compile): skip an example whose generated code does not
+        // match the design its prompt asked for (e.g. prompt asks c1-t9 task model 3 / EBSR but the
+        // code composed hot-text). null for unhooked langs / no declared target ⇒ passes through.
+        const verdict = verifyExampleForPrompt(example.lang, {
+          prompt: example.prompt || example.task,
+          code: example.code || example.src,
+        });
+        if (verdict && !verdict.ok) {
+          stats.skipped++;
+          console.warn(`  ⤫ Skipping example ${docId} — prompt↔code drift: ${verdict.blocking.join("; ")}`);
+          continue;
+        }
+
         // Prepare document data
         const docData = {
           ...example,

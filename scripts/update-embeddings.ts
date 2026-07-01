@@ -21,7 +21,7 @@ import OpenAI from "openai";
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { buildExampleArtifacts } from '../src/lib/lang-embedding';
+import { buildExampleArtifacts, verifyExampleForPrompt } from '../src/lib/lang-embedding';
 
 // Load environment variables
 dotenv.config();
@@ -507,7 +507,19 @@ async function storeExamplesWithEmbeddings(examples: TrainingExample[]) {
       for (const example of batch) {
         // Create a unique ID for the example
         const docId = `${example.lang}_example_${example.exampleId}_${Date.now()}`;
-        
+
+        // Drift gate (facet-drift only, no compile): skip an example whose generated code does not
+        // match the design its prompt asked for — e.g. the prompt says c1-t9 task model 3 (EBSR) but
+        // the code composed hot-text. Uses the language's own verify gate via the embedding adapter
+        // (returns null for unhooked languages or prompts with no declared target, so those pass
+        // through untouched).
+        const verdict = verifyExampleForPrompt(example.lang, { prompt: example.prompt, code: example.code });
+        if (verdict && !verdict.ok) {
+          stats.skipped++;
+          console.warn(`  ⤫ Skipping example ${example.exampleId} (${example.lang}) — prompt↔code drift: ${verdict.blocking.join("; ")}`);
+          continue;
+        }
+
         // Passage-bearing languages (e.g. L0175): embed the passage-free text and store the
         // design signature (tags + facets) instead of the raw prompt. Recomputed from the same
         // helpers the query side uses, so doc and query vectors stay aligned.
