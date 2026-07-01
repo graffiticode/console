@@ -5,12 +5,57 @@ const getApiString = bent(apiUrl, "GET", "string");
 const getApiJSON = bent(apiUrl, "GET", "json");
 
 export const getBaseUrlForApi = () => apiUrl;
-export const getLanguageAsset = async (lang, file) => {
+
+// Which languages the current user has a per-user binding override for. Cached
+// per token with a short TTL. The local asset caches below key their read/write
+// gating on this (NOT on token presence): authenticated users always send a
+// token, so gating on the token alone would disable the shared caches for
+// everyone. Gating on actual override membership keeps the shared cache for the
+// (vast majority of) non-overridden languages while a tester's overridden
+// language correctly bypasses it on both read and write.
+const OVERRIDE_LANGS_TTL_MS = 2 * 60 * 1000;
+const overrideLangsCache = new Map<string, { set: Set<string>; expires: number }>();
+
+// Match the zero-padded "L0175" form used as override-doc keys, so an unpadded
+// caller id ("175") still resolves against the override set.
+const normalizeLangCode = (lang: string | number) =>
+  `L${String(lang).replace(/^L/i, "").padStart(4, "0")}`.toUpperCase();
+
+export const getOverriddenLangs = async (accessToken?: string): Promise<Set<string>> => {
+  if (!accessToken) return new Set();
+  const cached = overrideLangsCache.get(accessToken);
+  if (cached && Date.now() < cached.expires) {
+    return cached.set;
+  }
+  let set = new Set<string>();
+  try {
+    const { status, data } = await getApiJSON(`/lang-overrides`, null, { Authorization: accessToken });
+    if (status === "success" && Array.isArray(data?.langs)) {
+      set = new Set(data.langs.map(normalizeLangCode));
+    }
+  } catch (err) {
+    console.warn("Failed to fetch lang overrides:", (err as any)?.message);
+  }
+  overrideLangsCache.set(accessToken, { set, expires: Date.now() + OVERRIDE_LANGS_TTL_MS });
+  return set;
+};
+
+// True when the given language is overridden for the token-bearing caller.
+export const isLangOverridden = async (lang: string | number, accessToken?: string): Promise<boolean> => {
+  if (!accessToken) return false;
+  return (await getOverriddenLangs(accessToken)).has(normalizeLangCode(lang));
+};
+
+// `accessToken`, when supplied, is forwarded as the Authorization header so the
+// API can resolve the caller's uid and apply any per-user language-server
+// binding override. Anonymous callers omit it and get the default binding.
+export const getLanguageAsset = async (lang, file, accessToken?: string) => {
   try {
     // Bypass the CDN edge cache (api.graffiticode.org serves these with `max-age=3600`) so a
     // language deploy propagates without a manual cache purge. A unique query string forces a
     // cache MISS → fresh origin fetch; the in-memory caches below dedupe so origin load stays low.
-    return await getApiString(`/${lang}/${file}?_cb=${Date.now()}`);
+    const headers = accessToken ? { Authorization: accessToken } : undefined;
+    return await getApiString(`/${lang}/${file}?_cb=${Date.now()}`, null, headers);
   } catch (err) {
     console.warn(`Failed to fetch ${lang}/${file}:`, err.message);
     return null;
@@ -22,15 +67,19 @@ export const getLanguageAsset = async (lang, file) => {
 const LEXICON_CACHE_TTL_MS = 5 * 60 * 1000;
 const lexiconCache = new Map<string, { value: any; expires: number }>();
 
-// Get and parse lexicon for a language
-export const getLanguageLexicon = async (lang: string) => {
-  const cached = lexiconCache.get(lang);
+// Get and parse lexicon for a language. When this language is overridden for the
+// caller the fetch is redirected to a test revision, so the shared (lang-keyed)
+// cache is bypassed (read and write) to avoid mixing it with the default
+// binding. Non-overridden languages keep using the shared cache.
+export const getLanguageLexicon = async (lang: string, accessToken?: string) => {
+  const overridden = await isLangOverridden(lang, accessToken);
+  const cached = !overridden && lexiconCache.get(lang);
   if (cached && Date.now() < cached.expires) {
     return cached.value;
   }
 
   try {
-    const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.json');
+    const lexiconData = await getLanguageAsset(`L${lang}`, 'lexicon.json', accessToken);
     let lexicon = null;
 
     if (lexiconData) {
@@ -46,7 +95,7 @@ export const getLanguageLexicon = async (lang: string) => {
       }
     }
 
-    if (lexicon) {
+    if (lexicon && !overridden) {
       lexiconCache.set(lang, { value: lexicon, expires: Date.now() + LEXICON_CACHE_TTL_MS });
     }
     return lexicon;
@@ -63,15 +112,16 @@ const hintsCache = new Map<string, { value: Record<string, any>; expires: number
 // Per-language unparse hints: a map of node tag -> comment (string, or {before,after})
 // that the unparser injects as /* */ annotations to orient the spec generator. The asset
 // is optional; an absent or unparseable file yields an empty map (plain unparse output).
-export const getLanguageHints = async (lang: string): Promise<Record<string, any>> => {
-  const cached = hintsCache.get(lang);
+export const getLanguageHints = async (lang: string, accessToken?: string): Promise<Record<string, any>> => {
+  const overridden = await isLangOverridden(lang, accessToken);
+  const cached = !overridden && hintsCache.get(lang);
   if (cached && Date.now() < cached.expires) {
     return cached.value;
   }
 
   let hints: Record<string, any> = {};
   try {
-    const data = await getLanguageAsset(`L${lang}`, 'unparse-hints.json');
+    const data = await getLanguageAsset(`L${lang}`, 'unparse-hints.json', accessToken);
     if (data) {
       const parsed = typeof data === 'string'
         ? JSON.parse(data.substring(data.indexOf("{")))
@@ -84,7 +134,9 @@ export const getLanguageHints = async (lang: string): Promise<Record<string, any
     console.warn(`Failed to fetch unparse-hints for L${lang}:`, (error as any).message);
   }
 
-  hintsCache.set(lang, { value: hints, expires: Date.now() + HINTS_CACHE_TTL_MS });
+  if (!overridden) {
+    hintsCache.set(lang, { value: hints, expires: Date.now() + HINTS_CACHE_TTL_MS });
+  }
   return hints;
 };
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useToken } from '@graffiticode/auth-react';
 import { getPageTitle } from '../../lib/utils';
 import { getBaseUrlForApi, getLanguageAsset } from "../../lib/api";
 
@@ -28,6 +29,7 @@ export default function Spec({ language }) {
   const router = useRouter();
   const langId = language.name.slice(1);
   const view = parseView(router.query.view);
+  const { data: accessToken } = useToken();
 
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,22 +53,27 @@ export default function Spec({ language }) {
     setMarkdown(null);
     setLoading(true);
     (async () => {
-      let text = await getLanguageAsset(`L${langId}`, VIEW_FILES[view]);
+      let text = await getLanguageAsset(`L${langId}`, VIEW_FILES[view], accessToken);
       // Languages mid-migration may still serve `user-guide.md`; fall back.
       if (text === null && view === 'usage-guide') {
-        text = await getLanguageAsset(`L${langId}`, 'user-guide.md');
+        text = await getLanguageAsset(`L${langId}`, 'user-guide.md', accessToken);
       }
       if (cancelled) return;
       setMarkdown(text === null ? null : stripHtmlComments(text));
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [langId, view]);
+  }, [langId, view, accessToken]);
 
   const remarkPlugins = useMemo(() => [remarkGfm], []);
 
   if (view === 'spec') {
-    const src = `${getBaseUrlForApi()}/L${langId}/spec.html`;
+    // An iframe can't send an Authorization header, so pass the token as a
+    // query param (the API accepts ?access_token) to resolve any per-user
+    // language-server override for the rendered spec.
+    const src = accessToken
+      ? `${getBaseUrlForApi()}/L${langId}/spec.html?access_token=${encodeURIComponent(accessToken)}`
+      : `${getBaseUrlForApi()}/L${langId}/spec.html`;
     return (
       <iframe
         className="w-full h-screen"
