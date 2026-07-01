@@ -1031,6 +1031,20 @@ function parseGraffiticodeErrors(errorInfo) {
 }
 
 /**
+ * Build the user turn that reports compile errors back to the model as a
+ * continuation of the original conversation. Unlike createErrorFixPrompt this
+ * carries no code or system primer — the errant code is appended separately as
+ * the assistant turn, and the dialect rules already live in the original system
+ * prompt.
+ * @param {Object} errorInfo - Information about the errors from compilation
+ * @returns {string} - The user-turn content asking for a fix
+ */
+function buildErrorFeedback(errorInfo) {
+  const formattedErrors = parseGraffiticodeErrors(errorInfo);
+  return `The code you just produced failed to compile with these errors:\n\n${formattedErrors}\n\nFix them and return the complete corrected program in a single code block.`;
+}
+
+/**
  * Create a prompt for Claude to fix code based on compilation errors
  * @param {string} code - The original code that had errors
  * @param {Object} errorInfo - Information about the errors from compilation
@@ -1626,6 +1640,20 @@ export async function generateCode({
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
+
+    // Preserve the original conversation so compile-error fixes are a genuine
+    // continued turn (same system + history) rather than a stateless "repair
+    // this snippet" prompt. basePrompt is null only if formattedPrompt won't
+    // parse — in that case we fall back to the legacy createErrorFixPrompt.
+    let basePrompt: { system: any; messages: any[] } | null = null;
+    try {
+      const parsed = JSON.parse(formattedPrompt);
+      if (parsed && Array.isArray(parsed.messages)) basePrompt = parsed;
+    } catch {
+      basePrompt = null;
+    }
+    const conversationMessages: any[] = basePrompt ? [...basePrompt.messages] : [];
+    let lastRawOutput = streamResult.code; // model's most recent raw output
     let finalUsage = {
       prompt_tokens: streamResult.usage.inputTokens,
       completion_tokens: streamResult.usage.outputTokens,
@@ -1730,10 +1758,19 @@ export async function generateCode({
 
           // Fall back to legacy fix prompt if DSPy repair didn't produce a result
           if (!usedDSPyRepair) {
-            fixPrompt = createErrorFixPrompt(
-              generatedCode,
-              verificationResult,
-            );
+            if (basePrompt) {
+              // Continue the original conversation: append the model's prior
+              // output as an assistant turn, then the compile errors as a user
+              // turn. Accumulates across attempts so a later attempt sees the
+              // whole repair history. (If a prior attempt went via DSPy, that
+              // turn isn't captured here — acceptable.)
+              conversationMessages.push({ role: "assistant", content: lastRawOutput });
+              conversationMessages.push({ role: "user", content: buildErrorFeedback(verificationResult) });
+              fixPrompt = JSON.stringify({ system: basePrompt.system, messages: conversationMessages });
+            } else {
+              // formattedPrompt didn't parse — use the stateless legacy prompt.
+              fixPrompt = createErrorFixPrompt(generatedCode, verificationResult);
+            }
           }
 
           // Use the same model for fixes — no Opus upgrade.
@@ -1773,6 +1810,10 @@ export async function generateCode({
           }
 
           fixAttempts++;
+
+          // Track the model's raw output so the next iteration appends the
+          // correct assistant turn (even if this fix lacked a code block).
+          lastRawOutput = fixResult.code;
 
           // Update the generated code with the fixed version and process to fix escaping issues
           // Only accept the fix if it contains a code block; otherwise retry
