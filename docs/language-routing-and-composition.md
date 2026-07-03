@@ -131,6 +131,11 @@ in another language. For this to be faithful, your language must provide:
 - **`instructions.md`** — reused (canonical semantics) by the spec generator.
 - Keep authored content as readable string literals in the AST where possible — the spec's
   fidelity guard checks that salient authored strings survive into the spec.
+- **`spec-directive.md`** (OPTIONAL, `getLanguageSpecDirective`) — overrides the global
+  content-oriented `SPEC_DIRECTIVE` so a dialect can shape what `get_spec` emits. Absent → the
+  global directive is used (unchanged). Used by the developer-integration "oracle" dialects (e.g.
+  L0177) to emit a language-neutral **recipe** — goal, preconditions, procedure, gotchas,
+  acceptance criteria — instead of a content description.
 
 ## 8. Operational notes
 

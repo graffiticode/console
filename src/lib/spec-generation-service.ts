@@ -10,7 +10,7 @@
 
 import axios from "axios";
 import { unparse } from "@graffiticode/parser";
-import { getApiTask, getLanguageLexicon, getLanguageHints } from "./api";
+import { getApiTask, getLanguageLexicon, getLanguageHints, getLanguageSpecDirective } from "./api";
 import { readDialectInstructions, modelRejectsTemperature } from "./code-generation-service";
 
 // Translation is faithfulness-critical and constrained (annotated src + instructions + the
@@ -125,10 +125,11 @@ export async function generateSpec({ auth, taskId }: { auth: any; taskId: string
   const task = taskList[0] || apiTask;
   const lang = task.lang;
 
-  const [lexicon, hints, instructions] = await Promise.all([
+  const [lexicon, hints, instructions, specDirective] = await Promise.all([
     getLanguageLexicon(lang, auth?.token),
     getLanguageHints(lang, auth?.token),
     readDialectInstructions(lang, auth?.token),
+    getLanguageSpecDirective(lang, auth?.token),
   ]);
 
   const annSrc = unparse(task.code, lexicon || {}, { hints });
@@ -138,7 +139,11 @@ export async function generateSpec({ auth, taskId }: { auth: any; taskId: string
     throw new Error("ANTHROPIC_API_KEY not configured; cannot generate spec");
   }
 
-  const system = `${instructions}\n\n${SPEC_DIRECTIVE}`;
+  // A dialect may ship a per-language spec-directive.md to override the global
+  // content-oriented directive (e.g. to emit a developer "recipe" instead of a
+  // content description). Absent → fall back to SPEC_DIRECTIVE (unchanged behavior).
+  const directive = specDirective?.trim() || SPEC_DIRECTIVE;
+  const system = `${instructions}\n\n${directive}`;
   const spec = (await callClaudeForSpec({ system, user: annSrc, apiKey })).trim();
   const coverage = assertCoverage(spec, task.code);
 

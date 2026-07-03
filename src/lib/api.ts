@@ -140,6 +140,39 @@ export const getLanguageHints = async (lang: string, accessToken?: string): Prom
   return hints;
 };
 
+// Spec-directive cache: same short TTL/serving channel as the lexicon/hints.
+const SPEC_DIRECTIVE_CACHE_TTL_MS = 5 * 60 * 1000;
+const specDirectiveCache = new Map<string, { value: string | null; expires: number }>();
+
+// Per-language get_spec directive: an OPTIONAL markdown asset that overrides the
+// global content-oriented SPEC_DIRECTIVE, letting a dialect shape what get_spec
+// emits (e.g. a developer "recipe" — goal/preconditions/procedure/acceptance —
+// instead of a content description). Absent (404) → null, so the caller falls
+// back to the global directive. Backward-compatible: every existing dialect
+// ships no spec-directive.md and keeps identical behavior.
+export const getLanguageSpecDirective = async (lang: string, accessToken?: string): Promise<string | null> => {
+  const overridden = await isLangOverridden(lang, accessToken);
+  const cached = !overridden && specDirectiveCache.get(lang);
+  if (cached && Date.now() < cached.expires) {
+    return cached.value;
+  }
+
+  let directive: string | null = null;
+  try {
+    const data = await getLanguageAsset(`L${lang}`, 'spec-directive.md', accessToken);
+    if (typeof data === 'string' && data.trim()) {
+      directive = data;
+    }
+  } catch (error) {
+    console.warn(`Failed to fetch spec-directive for L${lang}:`, (error as any).message);
+  }
+
+  if (!overridden) {
+    specDirectiveCache.set(lang, { value: directive, expires: Date.now() + SPEC_DIRECTIVE_CACHE_TTL_MS });
+  }
+  return directive;
+};
+
 // Standardized message shown when a language service can't be reached.
 export const languageOfflineMessage = (lang: string) =>
   `Language L${lang} is offline. Try again later.`;
