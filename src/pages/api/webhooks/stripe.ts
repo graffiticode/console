@@ -183,8 +183,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const userData = userDoc.data();
 
         // Get plan details
-        const priceId = subscription.items.data[0]?.price.id;
+        const firstItem = subscription.items.data[0] as any;
+        const priceId = firstItem?.price.id;
         const planInfo = PLAN_MAPPING[priceId] || { name: 'starter', units: 5000 };
+
+        // API-version resilience: current_period_start/end moved from the
+        // Subscription to its items in 2025-03-31.basil. Read the top-level
+        // field (<=2024 payloads) or fall back to the first item (>=basil,
+        // incl. the account-default 2026 endpoint). Guard undefined so a
+        // missing value never yields an "Invalid Date".
+        const sub = subscription as any;
+        const periodStart = sub.current_period_start ?? firstItem?.current_period_start;
+        const periodEnd = sub.current_period_end ?? firstItem?.current_period_end;
 
         // Build update object
         const updateData: Record<string, any> = {
@@ -192,8 +202,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'subscription.plan': planInfo.name,
           'subscription.units': planInfo.units,
           'subscription.stripeSubscriptionId': subscription.id,
-          'subscription.currentPeriodStart': new Date(subscription.current_period_start * 1000).toISOString(),
-          'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000).toISOString(),
+          'subscription.currentPeriodStart': periodStart ? new Date(periodStart * 1000).toISOString() : null,
+          'subscription.currentPeriodEnd': periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
           'subscription.cancelAtPeriodEnd': subscription.cancel_at_period_end,
           'subscription.updatedAt': new Date().toISOString(),
           // Note: overageUnits field is intentionally NOT updated here - overage persists across billing cycles
@@ -302,8 +312,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 webhookProcessed: true,
               });
             }
-          } else if (invoice.subscription) {
-            // Subscription invoice: reset usage counter for new billing period
+          } else if ((invoice as any).subscription ?? (invoice as any).parent?.subscription_details?.subscription) {
+            // Subscription invoice: reset usage counter for new billing period.
+            // invoice.subscription moved to invoice.parent.subscription_details
+            // .subscription in 2025-03-31.basil; accept either shape.
             await db.collection('usage').doc(userId).set({
               currentMonthTotal: 0,
               lastReset: new Date().toISOString(),
