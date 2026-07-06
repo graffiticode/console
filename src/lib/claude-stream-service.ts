@@ -16,6 +16,8 @@ interface StreamOptions {
   temperature?: number;
   maxTokens?: number;
   maxContinuations?: number;
+  thinking?: unknown;  // { type: "adaptive" } | { type: "disabled" }; omitted ⇒ API default
+  effort?: string;     // "low"|"medium"|"high"|"xhigh"|"max" ⇒ output_config.effort
 }
 
 export interface SystemBlock {
@@ -196,6 +198,9 @@ export async function* streamClaudeCode({
           max_tokens: options.maxTokens || 4096,
           // Opus deprecated `temperature` — omit it there or the API 400s.
           ...(modelRejectsTemperature(model) ? {} : { temperature: options.temperature || 0.2 }),
+          // Optional thinking/effort passthrough (undefined ⇒ API model default).
+          ...(options.thinking !== undefined ? { thinking: options.thinking } : {}),
+          ...(options.effort !== undefined ? { output_config: { effort: options.effort } } : {}),
           stream: true
         },
         {

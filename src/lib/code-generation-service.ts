@@ -11,6 +11,8 @@
  */
 
 import axios from "axios";
+import * as fs from "fs";
+import * as path from "path";
 import { postApiCompile, getLanguageAsset, getLanguageLexicon, isLangOverridden, languageOfflineMessage, isLanguageOfflineError } from "./api";
 import { postTask, getData, parseCode } from "../pages/api/resolvers";
 import admin from "firebase-admin";
@@ -93,9 +95,9 @@ const languageAssetsCache = {
 // Define available Claude models with best practices
 export const CLAUDE_MODELS = {
   OPUS: "claude-opus-4-8",
-  SONNET: "claude-sonnet-4-6",
+  SONNET: "claude-sonnet-5",
   HAIKU: "claude-haiku-4-5-20251001",
-  DEFAULT: "claude-sonnet-4-6",
+  DEFAULT: "claude-sonnet-5",
 };
 
 // Opus 4.x models deprecated the `temperature` parameter: sending it makes the
@@ -103,7 +105,11 @@ export const CLAUDE_MODELS = {
 // this model.") before any tokens are generated. Callers must omit temperature
 // for these models. Regex on "opus" so future Opus ids are covered automatically.
 export function modelRejectsTemperature(model?: string): boolean {
-  return !!model && /opus/i.test(model);
+  // Opus 4.x, Sonnet 5, and Fable/Mythos 5 remove sampling params: sending
+  // `temperature`/`top_p`/`top_k` returns a 400 ("`temperature` is deprecated
+  // for this model."). Sonnet 4.x and Haiku still accept them. Match `sonnet-5`
+  // (not bare `sonnet`) so Sonnet 4.5/4.6 are unaffected.
+  return !!model && /(opus|sonnet-5|fable|mythos)/i.test(model);
 }
 
 // A language opts into Opus for its INITIAL code generation by placing this
@@ -317,10 +323,8 @@ export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null 
     }
 
     // Fallback to keyword-based search if vector search fails or returns no results
-    // Import local training data from markdown format only
-    const fs = require("fs");
-    const path = require("path");
-
+    // Import local training data from markdown format only (fs/path imported at top —
+    // inline require() breaks under ESM runners like tsx).
     let examples = [];
 
     // Load the markdown file from local /training directory
@@ -1201,6 +1205,12 @@ interface GenerateCodeOptions {
   temperature?: number;
   maxTokens?: number;
   maxContinuations?: number;  // Max number of continuation chunks (default: 5)
+  // Optional thinking/effort passthrough. Off by default (API model defaults
+  // apply). Set both identically across models for a MATCHED comparison — e.g.
+  // Sonnet 5 runs adaptive thinking by default while Opus 4.8 does not, so a
+  // naive A/B is unfair. Applies to the initial generation call.
+  thinking?: unknown;  // e.g. { type: "adaptive" } | { type: "disabled" }
+  effort?: string;     // "low" | "medium" | "high" | "xhigh" | "max"
 }
 
 export async function generateCode({
@@ -1573,7 +1583,10 @@ export async function generateCode({
         model: modelToUse,
         temperature: options.temperature || 0.2,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
-        maxContinuations: options.maxContinuations || 10  // Conservative default
+        maxContinuations: options.maxContinuations || 10,  // Conservative default
+        // Passthrough (undefined ⇒ omitted ⇒ API model default). Set to match models.
+        ...(options.thinking !== undefined ? { thinking: options.thinking } : {}),
+        ...(options.effort !== undefined ? { effort: options.effort } : {}),
       },
       onProgress: requestId ? (message) => ragLog(requestId, "streaming.progress", { message }) : undefined
     });
