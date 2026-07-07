@@ -27,7 +27,9 @@ import { generateCodeWithContinuation, SystemBlock } from "./claude-stream-servi
 import { safeRAGAnalytics } from "./rag-analytics-safe";
 import { findBestLanguages } from "./language-router";
 import { stripQueryPassage, queryFacets } from "./lang-embedding";
-import { getRAGConfig, withRAGFallback } from "./rag-config";
+import { getRAGConfig, withRAGFallback, getJudgeMode } from "./rag-config";
+import { judgeCode } from "./judge-service";
+import { ragAnalytics } from "./rag-analytics";
 import { parser } from "@graffiticode/parser";
 import {
   compilePromptSpec,
@@ -2029,6 +2031,16 @@ export async function generateCode({
       usedDSPy,
       promptSpecId,
     };
+
+    // Inline-async LLM-as-judge: fire-and-forget quality scoring, NEVER awaited and NEVER able to
+    // affect the response. Writes to rag_analytics/{requestId} out of band (post-completeRequest,
+    // so trackJudge uses a Firestore update, not the already-deleted in-memory record). Zero
+    // user-facing latency; flag-gated (JUDGE_MODE=async), default off.
+    if (getJudgeMode() === "async" && finalProcessedCode) {
+      judgeCode({ prompt, code: finalProcessedCode, lang, currentCode })
+        .then((verdict) => (verdict ? ragAnalytics.trackJudge(requestId, verdict) : undefined))
+        .catch(() => { /* judge failures must never surface */ });
+    }
 
     return result;
   } catch (error) {

@@ -18,6 +18,13 @@ export interface RAGConfig {
   dspyTimeoutMs: number;
   dspyFallbackToLegacy: boolean;
 
+  // Judge (LLM-as-judge code-quality eval) settings
+  enableJudge: boolean;
+  judgeMode: 'off' | 'async';   // 'inline' gate/selector intentionally not wired this cut
+  judgeModel: string;
+  judgeTimeoutMs: number;
+  judgeUseSpecAnchor: boolean;  // off by default inline (extra get_spec call); on for the harness
+
   // Fallback behavior
   fallbackToKeywordSearch: boolean;
   fallbackToNoExamples: boolean;
@@ -48,6 +55,13 @@ const defaultConfig: RAGConfig = {
   dspyServiceUrl: process.env.DSPY_SERVICE_URL || 'http://localhost:8080',
   dspyTimeoutMs: parseInt(process.env.DSPY_TIMEOUT_MS || '5000', 10),
   dspyFallbackToLegacy: process.env.DSPY_FALLBACK_TO_LEGACY !== 'false',
+
+  // Judge settings - disabled by default; async logs a quality score with zero user latency
+  enableJudge: process.env.JUDGE_ENABLED === 'true',
+  judgeMode: process.env.JUDGE_MODE === 'async' ? 'async' : 'off',
+  judgeModel: process.env.JUDGE_MODEL || 'claude-opus-4-8',
+  judgeTimeoutMs: parseInt(process.env.JUDGE_TIMEOUT_MS || '15000', 10),
+  judgeUseSpecAnchor: process.env.JUDGE_USE_SPEC_ANCHOR === 'true',
 
   // Fallback behavior - always enabled for resilience
   fallbackToKeywordSearch: true,
@@ -96,6 +110,32 @@ export function resetRAGConfig(): void {
  */
 export function isFeatureEnabled(feature: keyof RAGConfig): boolean {
   return !!currentConfig[feature];
+}
+
+/**
+ * Judge (LLM-as-judge) config accessor — the subset judge-service needs.
+ */
+export function getJudgeConfig() {
+  const c = getRAGConfig();
+  return {
+    enableJudge: c.enableJudge,
+    judgeMode: c.judgeMode,
+    judgeModel: c.judgeModel,
+    judgeTimeoutMs: c.judgeTimeoutMs,
+    judgeUseSpecAnchor: c.judgeUseSpecAnchor,
+  };
+}
+
+export function isJudgeEnabled(): boolean {
+  return getRAGConfig().enableJudge === true;
+}
+
+/**
+ * Effective judge mode — 'async' only takes effect when the judge is enabled, else 'off'.
+ */
+export function getJudgeMode(): 'off' | 'async' {
+  const c = getRAGConfig();
+  return c.enableJudge ? c.judgeMode : 'off';
 }
 
 /**
