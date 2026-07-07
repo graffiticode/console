@@ -1,0 +1,8 @@
+# Treat source as text so git renders diffs even when files contain multibyte
+# characters (em dashes, ×, ≥, etc.) that trip git's binary heuristic.
+*.ts   text
+*.tsx  text
+*.js   text
+*.jsx  text
+*.json text
+*.md   text
