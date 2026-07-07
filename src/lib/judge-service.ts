@@ -59,9 +59,12 @@ Then give an overall 1–5.
 Be honest about uncertainty: you cannot execute the code, so judge from its structure and the intent.
 Do not reward code that compiles but does the wrong thing.`;
 
-function clamp5(n: any): number {
+// Coerce to an integer in 1–5, or null when missing/non-numeric. NEVER 0: 0 is
+// outside the rubric, and a missing field silently scored 0 reads as "worst" and
+// poisons aggregates (the model intermittently omits `overall` under the rubric).
+function score5(n: any): number | null {
   const x = Math.round(Number(n));
-  if (!Number.isFinite(x)) return 0;
+  if (!Number.isFinite(x)) return null;
   return Math.min(5, Math.max(1, x));
 }
 
@@ -132,7 +135,8 @@ export async function judgeCode(args: JudgeCodeArgs): Promise<JudgeVerdict | nul
 
   const system = `${RUBRIC}
 
-Return ONLY a JSON object, no prose, no code fences:
+Return ONLY a JSON object, no prose, no code fences. All four score fields are REQUIRED
+integers 1–5 (never omit "overall"); put "rationale" LAST:
 {"correctness":N,"instructionFollowing":N,"idiomaticity":N,"overall":N,"rationale":"one or two sentences"}`;
   const user = `${intentBlock(args.prompt, args.lang, args.spec, args.currentCode)}
 
@@ -144,11 +148,19 @@ ${args.code}`;
     const text = await callJudge(system, user, model, apiKey, cfg.judgeTimeoutMs);
     const o = parseJson(text);
     if (!o) return null;
+    const correctness = score5(pick(o, "correctness"));
+    const instructionFollowing = score5(pick(o, "instructionFollowing", "instruction_following"));
+    const idiomaticity = score5(pick(o, "idiomaticity"));
+    // A verdict missing any dimension is unusable — skip it rather than record a 0.
+    if (correctness === null || instructionFollowing === null || idiomaticity === null) return null;
+    // The judge intermittently omits `overall`; repair from the dimension mean
+    // instead of recording a spurious 0 that would floor the aggregate.
+    const overall = score5(pick(o, "overall")) ?? Math.round((correctness + instructionFollowing + idiomaticity) / 3);
     return {
-      correctness: clamp5(pick(o, "correctness")),
-      instructionFollowing: clamp5(pick(o, "instructionFollowing", "instruction_following")),
-      idiomaticity: clamp5(pick(o, "idiomaticity")),
-      overall: clamp5(pick(o, "overall")),
+      correctness,
+      instructionFollowing,
+      idiomaticity,
+      overall,
       rationale: typeof o.rationale === "string" ? o.rationale.slice(0, 1000) : "",
       model,
       latencyMs: Math.round(performance.now() - t0),
