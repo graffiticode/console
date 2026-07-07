@@ -67,6 +67,7 @@ interface AnalyticsDoc {
   compilation?: { success?: boolean; errorMessage?: string; retryCount?: number };
   response?: { success?: boolean; code?: string };
   feedback?: { score?: number };
+  judge?: { overall?: number; correctness?: number; instructionFollowing?: number; idiomaticity?: number };
   performance?: { totalLatencyMs?: number; stages?: Array<{ stage: string; startTime?: number; endTime?: number; durationMs?: number }> };
   errors?: Array<{ stage: string; message: string }>;
   metadata?: Record<string, any>;
@@ -177,6 +178,10 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
   const feedbacks = docs.map(d => d.feedback?.score).filter((v): v is number => v != null);
   const avgFeedback = feedbacks.length > 0 ? feedbacks.reduce((a, b) => a + b, 0) / feedbacks.length : 0;
 
+  // LLM-as-judge overall quality (async, above the compile line — only present when JUDGE_MODE=async)
+  const judgeScores = docs.map(d => d.judge?.overall).filter((v): v is number => v != null);
+  const avgJudgeOverall = judgeScores.length > 0 ? judgeScores.reduce((a, b) => a + b, 0) / judgeScores.length : 0;
+
   // Error breakdown
   const errorCounts = new Map<string, number>();
   docs.forEach(d => {
@@ -190,16 +195,17 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
     .sort((a, b) => b.count - a.count);
 
   // Per-language breakdown
-  const langMap = new Map<string, { total: number; successful: number; totalLatency: number; latencyCount: number }>();
+  const langMap = new Map<string, { total: number; successful: number; totalLatency: number; latencyCount: number; judgeSum: number; judgeCount: number }>();
   docs.forEach(d => {
     const lang = getLanguage(d);
-    const entry = langMap.get(lang) || { total: 0, successful: 0, totalLatency: 0, latencyCount: 0 };
+    const entry = langMap.get(lang) || { total: 0, successful: 0, totalLatency: 0, latencyCount: 0, judgeSum: 0, judgeCount: 0 };
     entry.total++;
     if (d.response?.success || d.metadata?.success) entry.successful++;
     if (d.performance?.totalLatencyMs != null) {
       entry.totalLatency += d.performance.totalLatencyMs;
       entry.latencyCount++;
     }
+    if (d.judge?.overall != null) { entry.judgeSum += d.judge.overall; entry.judgeCount++; }
     langMap.set(lang, entry);
   });
   const languageBreakdown = Array.from(langMap.entries())
@@ -208,6 +214,7 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
       total: s.total,
       successRate: s.total > 0 ? s.successful / s.total : 0,
       avgLatency: s.latencyCount > 0 ? s.totalLatency / s.latencyCount : 0,
+      avgJudge: s.judgeCount > 0 ? s.judgeSum / s.judgeCount : null,
     }))
     .sort((a, b) => b.total - a.total);
 
@@ -226,7 +233,7 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
     });
   }
 
-  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, errorBreakdown, languageBreakdown, totalCompileUnits, totalInputTokens, totalOutputTokens };
+  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, avgJudgeOverall, judgeCount: judgeScores.length, errorBreakdown, languageBreakdown, totalCompileUnits, totalInputTokens, totalOutputTokens };
 }
 
 function escapeHtml(str: string): string {
@@ -244,7 +251,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
 
   // Language breakdown rows
   const langRows = metrics.languageBreakdown.map(l =>
-    `<tr><td>${escapeHtml(l.language)}</td><td>${l.total}</td><td>${(l.successRate * 100).toFixed(1)}%</td><td>${Math.round(l.avgLatency)}ms</td></tr>`
+    `<tr><td>${escapeHtml(l.language)}</td><td>${l.total}</td><td>${(l.successRate * 100).toFixed(1)}%</td><td>${Math.round(l.avgLatency)}ms</td><td>${l.avgJudge != null ? l.avgJudge.toFixed(2) : '—'}</td></tr>`
   ).join('\n');
 
   // Sort docs by timestamp descending for detail table
@@ -397,13 +404,14 @@ function copyMd(btn) {
   <div class="card"><div class="label">Input Tokens</div><div class="value">${metrics.totalInputTokens > 0 ? metrics.totalInputTokens.toLocaleString() : '—'}</div></div>
   <div class="card"><div class="label">Output Tokens</div><div class="value">${metrics.totalOutputTokens > 0 ? metrics.totalOutputTokens.toLocaleString() : '—'}</div></div>
   <div class="card"><div class="label">Feedback Score</div><div class="value">${metrics.feedbackCount > 0 ? metrics.avgFeedback.toFixed(1) : '—'}</div></div>
+  <div class="card"><div class="label">Judge Overall</div><div class="value">${metrics.judgeCount > 0 ? metrics.avgJudgeOverall.toFixed(2) : '—'}</div></div>
 </div>
 
 ${!language ? `<div class="section">
   <h2>By Language</h2>
   ${metrics.languageBreakdown.length > 0 ? `
   <table>
-    <thead><tr><th>Language</th><th>Requests</th><th>Success Rate</th><th>Avg Latency</th></tr></thead>
+    <thead><tr><th>Language</th><th>Requests</th><th>Success Rate</th><th>Avg Latency</th><th>Judge (1-5)</th></tr></thead>
     <tbody>${langRows}</tbody>
   </table>` : '<p class="empty">No language data</p>'}
 </div>` : ''}

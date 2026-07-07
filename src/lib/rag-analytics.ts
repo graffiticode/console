@@ -68,6 +68,17 @@ export interface UserFeedback {
   timeToFeedbackMs?: number;
 }
 
+// LLM-as-judge code-quality score (written post-hoc, out of band; see trackJudge)
+export interface JudgeScore {
+  correctness: number;          // 1-5
+  instructionFollowing: number; // 1-5
+  idiomaticity: number;         // 1-5
+  overall: number;              // 1-5
+  rationale: string;
+  model: string;
+  latencyMs: number;
+}
+
 // Stage timing information
 export interface StageTiming {
   stage: string;
@@ -129,6 +140,9 @@ export interface RAGAnalyticsRecord {
 
   // User feedback
   feedback?: UserFeedback;
+
+  // LLM-as-judge code-quality score (async, out of band)
+  judge?: JudgeScore;
 
   // Performance metrics
   performance: {
@@ -440,6 +454,30 @@ export class RAGAnalyticsService {
       });
     } catch (error) {
       console.error("Error tracking user feedback:", error);
+    }
+  }
+
+  /**
+   * Track an LLM-as-judge code-quality score. Written post-hoc via a Firestore update keyed by
+   * requestId — this fires AFTER completeRequest has already persisted and deleted the in-memory
+   * record, so it must not touch activeRequests. Mirrors trackUserFeedback.
+   */
+  public async trackJudge(
+    requestId: string,
+    judge: JudgeScore
+  ): Promise<void> {
+    try {
+      if (!this.db) {
+        console.warn("Firestore not initialized, skipping judge tracking");
+        return;
+      }
+      const docRef = this.db.collection(this.collection).doc(requestId);
+      await docRef.update({
+        judge,
+        "metadata.hasJudge": true,
+      });
+    } catch (error) {
+      console.error("Error tracking judge score:", error);
     }
   }
 
