@@ -45,19 +45,30 @@ export interface PairVerdict {
   model: string;
 }
 
-const RUBRIC = `You are a strict, fair judge of Graffiticode DSL code. Graffiticode is a family of
-domain-specific languages (spreadsheets, assessments, charts, …); each request targets one dialect.
-You are given the natural-language request (the author's INTENT) and one or more candidate programs.
-There is NO reference solution — judge each candidate on how well it realizes the intent.
+const RUBRIC = `You are a strict, discriminating judge of Graffiticode DSL code — a family of domain-specific
+languages (spreadsheets, assessments, charts, …); each request targets one dialect. You are given the
+natural-language request (the author's INTENT) and one or more candidate programs. There is NO
+reference solution — judge each candidate on how well it realizes the intent.
 
-Score these dimensions, each an integer 1–5 (5 = excellent, 1 = poor):
-- correctness: does the code correctly accomplish what the request asks (logic, values, structure)?
-- instructionFollowing: did it do specifically what was asked — every element, and nothing extraneous?
-- idiomaticity: is it clean, minimal, idiomatic Graffiticode for this dialect?
-Then give an overall 1–5.
+Method — do this BEFORE scoring:
+1. Enumerate the discrete requirements in the intent (each value, column, formula, condition, format).
+2. For EACH requirement, verify whether the candidate satisfies it — trace the actual formulas and
+   logic, do not assume. A well-formed formula that computes the wrong thing (wrong operand, wrong
+   condition, wrong base, flat where tiered was asked, tax on the wrong subtotal, …) is a FAILURE.
+3. The single worst material failure caps the score — correctness dominates presentation.
 
-Be honest about uncertainty: you cannot execute the code, so judge from its structure and the intent.
-Do not reward code that compiles but does the wrong thing.`;
+Scoring discipline:
+- Compiling/rendering is table stakes, NOT quality. A program that renders but gets the central logic
+  wrong is poor, not average — do not give credit for merely running.
+- Do NOT default to high scores. Reserve the top score for candidates that are correct, complete, AND
+  idiomatic. If any requirement is unmet or any formula is wrong, it is not a top score.
+- Be concrete: name the specific requirement(s) missed or formula(s) wrong; only say "all requirements
+  verified correct" when you have actually checked each one.
+
+Score these dimensions, each an integer 1–5:
+- correctness: is every value / formula / condition / structure actually right for the intent?
+- instructionFollowing: is every requested element present, and nothing extraneous added?
+- idiomaticity: clean, minimal, idiomatic Graffiticode for this dialect?`;
 
 // Coerce to an integer in 1–5, or null when missing/non-numeric. NEVER 0: 0 is
 // outside the rubric, and a missing field silently scored 0 reads as "worst" and
@@ -135,9 +146,17 @@ export async function judgeCode(args: JudgeCodeArgs): Promise<JudgeVerdict | nul
 
   const system = `${RUBRIC}
 
-Return ONLY a JSON object, no prose, no code fences. All four score fields are REQUIRED
-integers 1–5 (never omit "overall"); put "rationale" LAST:
-{"correctness":N,"instructionFollowing":N,"idiomaticity":N,"overall":N,"rationale":"one or two sentences"}`;
+Then an overall 1–5, anchored (correctness dominates — a clean program that computes the wrong value
+is at most a 3):
+  5 = correct, complete, idiomatic — nothing to change.
+  4 = correct and complete; only minor polish issues (formatting, numbers-as-text, awkward structure).
+  3 = on-intent but materially flawed — a requirement missing, or a formula a user would notice is wrong.
+  2 = renders but wrong — misses the core ask, or the central logic is wrong.
+  1 = broken or off-task.
+
+Return ONLY a JSON object, no prose, no code fences. All four score fields are REQUIRED integers 1–5
+(never omit "overall"); put "rationale" LAST:
+{"correctness":N,"instructionFollowing":N,"idiomaticity":N,"overall":N,"rationale":"cite the specific defect(s), or 'all requirements verified correct'"}`;
   const user = `${intentBlock(args.prompt, args.lang, args.spec, args.currentCode)}
 
 CANDIDATE:
