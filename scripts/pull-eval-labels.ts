@@ -27,6 +27,10 @@ const LANG = (() => {
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : "0166";
 })();
 const WRITE = process.argv.includes("--write");
+// Partial passes: treat items still at the default mark 1 as UNREVIEWED (overall
+// null → excluded from calibration) rather than a genuine score of 1. Off by
+// default (a full pass takes mark 1 at face value).
+const SKIP_DEFAULT = process.argv.includes("--skip-default");
 
 // Direct: overall = mark (green/1 = 1 … black/5 = 5).
 const markToOverall = (m: number) => Math.min(5, Math.max(1, Math.round(m)));
@@ -54,24 +58,27 @@ async function main() {
   }).sort((a, b) => (a.caseId || "").localeCompare(b.caseId || "") || (a.short || "").localeCompare(b.short || ""));
 
   // Apply to the in-memory labels (matched by caseId + short model).
-  let matched = 0, unmatched: string[] = [];
+  let matched = 0, skipped = 0, unmatched: string[] = [];
   for (const r of rows) {
     const lab = labels.find((l) => l.id === r.caseId && shortOf(l.model || "") === r.short);
     if (!lab) { unmatched.push(`${r.caseId} · ${r.short}`); continue; }
+    if (SKIP_DEFAULT && r.mark === 1) { lab.overall = null; skipped++; continue; }
     lab.overall = r.overall;
     matched++;
   }
 
   // Print the table.
-  console.log(`\n${WRITE ? "WRITE" : "DRY RUN (pass --write to persist)"} — ${labelsPath}\n`);
+  console.log(`\n${WRITE ? "WRITE" : "DRY RUN (pass --write to persist)"}${SKIP_DEFAULT ? "  [--skip-default: mark 1 = unreviewed]" : ""} — ${labelsPath}\n`);
   console.log(["case", "model", "mark", "→ overall"].map((h, i) => h.padEnd([24, 8, 6, 11][i])).join(""));
   for (const r of rows) {
+    const skip = SKIP_DEFAULT && r.mark === 1;
     console.log([
       (r.caseId || "?").padEnd(24), (r.short || "?").padEnd(8),
-      String(r.mark).padEnd(6), String(r.overall).padEnd(11),
+      String(r.mark).padEnd(6), (skip ? "— (unreviewed)" : String(r.overall)).padEnd(11),
     ].join(""));
   }
   if (unmatched.length) console.log(`\n⚠ no label row for: ${unmatched.join(", ")}`);
+  if (skipped) console.log(`\n${skipped} item(s) at default mark 1 left unreviewed (overall null).`);
 
   if (WRITE) {
     writeFileSync(labelsPath, JSON.stringify(labels, null, 2) + "\n");
