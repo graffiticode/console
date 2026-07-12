@@ -87,7 +87,7 @@ export const plans: Plan[] = [
     ],
     cta: 'Email',
     contactSales: true,
-    priceLabel: 'Call',
+    priceLabel: 'Contact us',
     contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Partner%20inquiry'
   }
 ];
