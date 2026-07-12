@@ -73,7 +73,7 @@ export const plans: Plan[] = [
   {
     id: 'enterprise',
     name: 'Partner',
-    description: "Let's make together",
+    description: "Let's help makers make",
     monthlyPrice: 0,
     annualPrice: 0,
     monthlyUnits: 0,
@@ -87,7 +87,7 @@ export const plans: Plan[] = [
     ],
     cta: 'Email',
     contactSales: true,
-    priceLabel: "Let's talk",
+    priceLabel: 'Call',
     contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Partner%20inquiry'
   }
 ];
