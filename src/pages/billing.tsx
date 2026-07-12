@@ -89,8 +89,8 @@ export default function Billing() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Billing</h1>
             <p className="mt-2 text-sm text-gray-600">
-              Track your usage, choose a plan, review past payments, and manage your
-              payment methods.
+              From everyone to partner — choose how you make with Graffiticode, track
+              usage, review payments, and manage payment methods.
             </p>
           </div>
 

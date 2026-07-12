@@ -11,11 +11,11 @@ export interface Plan {
   features: string[];
   cta: string;
   isFree?: boolean;
-  // Non-self-serve plan: custom pricing, sold via "Contact Sales" rather than Stripe checkout.
+  // Non-self-serve plan: custom pricing, sold via a contact CTA rather than Stripe checkout.
   contactSales?: boolean;
-  // Price text shown in place of a dollar amount for contactSales plans (e.g. "Custom").
+  // Price text shown in place of a dollar amount for contactSales plans (e.g. "Let's talk").
   priceLabel?: string;
-  // Where the Contact Sales CTA points (mailto: or URL).
+  // Where the contact CTA points (mailto: or URL).
   contactHref?: string;
 }
 
@@ -23,7 +23,7 @@ export const plans: Plan[] = [
   {
     id: 'demo',
     name: 'Free',
-    description: 'Everyone plays',
+    description: 'Everyone makes',
     monthlyPrice: 0,
     annualPrice: 0,
     monthlyUnits: 250,
@@ -56,7 +56,7 @@ export const plans: Plan[] = [
   {
     id: 'teams',
     name: 'Team',
-    description: 'Secure collaboration',
+    description: 'Collaborative making',
     monthlyPrice: 1000,
     annualPrice: 10000,
     monthlyUnits: 2000000,
@@ -72,8 +72,8 @@ export const plans: Plan[] = [
   },
   {
     id: 'enterprise',
-    name: 'Custom',
-    description: 'Agent accessibility',
+    name: 'Partner',
+    description: "Let's make together",
     monthlyPrice: 0,
     annualPrice: 0,
     monthlyUnits: 0,
@@ -85,10 +85,10 @@ export const plans: Plan[] = [
       'Monitoring & dedicated support',
       'Bring your own model keys — never pay for tokens'
     ],
-    cta: 'Contact Sales',
+    cta: 'Email',
     contactSales: true,
     priceLabel: "Let's talk",
-    contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Built%20for%20You%20inquiry'
+    contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Partner%20inquiry'
   }
 ];
 
