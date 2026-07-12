@@ -23,7 +23,7 @@ export const plans: Plan[] = [
   {
     id: 'demo',
     name: 'Free',
-    description: 'Free, no credit card required',
+    description: 'Everyone plays',
     monthlyPrice: 0,
     annualPrice: 0,
     monthlyUnits: 250,
@@ -40,7 +40,7 @@ export const plans: Plan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    description: 'Great for serious creators',
+    description: 'Serious making',
     monthlyPrice: 100,
     annualPrice: 1000,
     monthlyUnits: 100000,
@@ -56,7 +56,7 @@ export const plans: Plan[] = [
   {
     id: 'teams',
     name: 'Team',
-    description: 'For teams and high volume compiles',
+    description: 'Secure collaboration',
     monthlyPrice: 1000,
     annualPrice: 10000,
     monthlyUnits: 2000000,
@@ -72,23 +72,23 @@ export const plans: Plan[] = [
   },
   {
     id: 'enterprise',
-    name: 'Enterprise',
-    description: 'For mission-critical, high-volume deployments',
+    name: 'Custom',
+    description: 'Agent accessibility',
     monthlyPrice: 0,
     annualPrice: 0,
     monthlyUnits: 0,
     features: [
-      'Everything in Team',
-      'Custom compile-unit pricing',
-      '99.9% uptime SLA',
-      'Dedicated support & onboarding',
-      'Custom language development',
-      'SSO, GDPR & CCPA compliance'
+      'A managed, agent-driveable interface to your product',
+      'Custom language development & evolution',
+      'Micro-agent training, evaluation & benchmarking',
+      'Hosted infrastructure & managed MCP endpoints',
+      'Monitoring & dedicated support',
+      'Bring your own model keys — never pay for tokens'
     ],
     cta: 'Contact Sales',
     contactSales: true,
-    priceLabel: 'Custom',
-    contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Enterprise%20plan%20inquiry'
+    priceLabel: "Let's talk",
+    contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Built%20for%20You%20inquiry'
   }
 ];
 
