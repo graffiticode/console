@@ -85,7 +85,7 @@ export const plans: Plan[] = [
       'Monitoring & dedicated support',
       'Bring your own model keys — never pay for tokens'
     ],
-    cta: 'Email',
+    cta: 'Email us',
     contactSales: true,
     priceLabel: 'Contact us',
     contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Partner%20inquiry'
