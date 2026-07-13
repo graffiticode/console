@@ -156,6 +156,7 @@ const typeDefs = `
     id: String!
     name: String!
     description: String!
+    routingHint: String
     domains: [String!]!
   }
 
@@ -181,6 +182,7 @@ const typeDefs = `
     id: String!
     name: String!
     description: String!
+    routingHint: String
     domains: [String!]!
     examples: [String!]
     reactComponent: ReactComponent
