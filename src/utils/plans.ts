@@ -23,7 +23,7 @@ export const plans: Plan[] = [
   {
     id: 'demo',
     name: 'Free',
-    description: 'Everyone makes',
+    description: 'Free to make',
     monthlyPrice: 0,
     annualPrice: 0,
     monthlyUnits: 250,
