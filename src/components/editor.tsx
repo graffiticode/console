@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { CodePanel } from './CodePanel';
 import { DataPanel } from "./DataPanel";
+import { SpecPanel } from "./SpecPanel";
 import { HelpPanel } from "./HelpPanel";
 import MarkSelector from '../components/mark-selector';
 import PublicToggle from '../components/public-toggle';
@@ -288,6 +289,9 @@ export default function Editor({
               }}
             />
           </div>
+          {tab === "Spec" && (
+            <SpecPanel id={itemId} user={user} />
+          )}
           {tab === "Code" && (
             <CodePanel
               code={code}

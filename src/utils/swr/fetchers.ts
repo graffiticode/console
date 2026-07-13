@@ -127,6 +127,29 @@ export const getData = async ({ user, id }) => {
   return client.request(query, { id }).then(data => JSON.parse(data.data));
 };
 
+export const getSpec = async ({ user, id }) => {
+  if (!user || !id) {
+    return null;
+  }
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", {
+    headers: {
+      authorization: token,
+    }
+  });
+  const query = gql`
+    query getSpec($id: String!) {
+      spec(id: $id) {
+        spec
+        lang
+        itemId
+        coverage { checked missing }
+      }
+    }
+  `;
+  return client.request(query, { id }).then(data => data.spec);
+};
+
 export const countTasks = async ({ user, langs, mark }) => {
   // console.log(
   //   "countTasks()",
