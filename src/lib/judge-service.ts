@@ -18,7 +18,7 @@ import axios from "axios";
 import { getJudgeConfig } from "./rag-config";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const JUDGE_MAX_TOKENS = 1024;
+const JUDGE_MAX_TOKENS = 2048; // room for a reason-before-score <analysis> block + the JSON verdict
 
 // Mirror of code-generation-service.modelRejectsTemperature — Opus 4.x / Sonnet 5 / Fable / Mythos
 // 400 on `temperature`. Kept local to avoid importing code-generation-service (cycle).
@@ -84,15 +84,43 @@ function pick(o: any, ...keys: string[]): any {
   return undefined;
 }
 
-// Router-style structured parse: first {...} block, then JSON.parse. Never throws.
-function parseJson(text: string): any | null {
-  const m = (text || "").match(/\{[\s\S]*\}/);
-  if (!m) return null;
-  try {
-    return JSON.parse(m[0]);
-  } catch {
-    return null;
+// String-aware forward scan collecting every balanced top-level {...} object that
+// parses. Robust to a reason-before-score <analysis> block that contains braces
+// (formulas, "{}" cells) ahead of the verdict — unlike a greedy first-to-last regex.
+function extractJsonObjects(text: string): any[] {
+  const s = text || "", out: any[] = [];
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{") { if (depth === 0) start = i; depth++; }
+    else if (c === "}" && depth > 0) {
+      if (--depth === 0 && start !== -1) {
+        try { out.push(JSON.parse(s.slice(start, i + 1))); } catch { /* skip non-JSON */ }
+        start = -1;
+      }
+    }
   }
+  return out;
+}
+
+// The verdict is the LAST verdict-shaped object (after any reasoning). Never throws.
+function parseJson(text: string): any | null {
+  const objs = extractJsonObjects(text);
+  if (!objs.length) {
+    const m = (text || "").match(/\{[\s\S]*\}/); // fallback: greedy single block
+    if (!m) return null;
+    try { return JSON.parse(m[0]); } catch { return null; }
+  }
+  for (let i = objs.length - 1; i >= 0; i--) {
+    const o = objs[i];
+    if (o && (o.overall !== undefined || o.correctness !== undefined || o.winner !== undefined)) return o;
+  }
+  return objs[objs.length - 1];
 }
 
 async function callJudge(system: string, user: string, model: string, apiKey: string, timeoutMs: number): Promise<string> {
@@ -154,39 +182,47 @@ is at most a 3):
   2 = renders but wrong — misses the core ask, or the central logic is wrong.
   1 = broken or off-task.
 
-Return ONLY a JSON object, no prose, no code fences. All four score fields are REQUIRED integers 1–5
-(never omit "overall"); put "rationale" LAST:
+First work through the Method in an <analysis>…</analysis> block: list the intent's requirements, then
+check EACH against the candidate — name the formula/value and say whether it is right. Reason to the
+score; do not pre-commit to a high one. THEN, after </analysis>, output the verdict as a single JSON
+object (no code fences). All four score fields are REQUIRED integers 1–5 (never omit "overall"); put
+"rationale" LAST:
 {"correctness":N,"instructionFollowing":N,"idiomaticity":N,"overall":N,"rationale":"cite the specific defect(s), or 'all requirements verified correct'"}`;
   const user = `${intentBlock(args.prompt, args.lang, args.spec, args.currentCode)}
 
 CANDIDATE:
 ${args.code}`;
 
+  // One retry: at ~1.0 temp the judge occasionally emits malformed / missing-field
+  // JSON, which would silently drop the item from the sample. Retry once before giving up.
   const t0 = performance.now();
-  try {
-    const text = await callJudge(system, user, model, apiKey, cfg.judgeTimeoutMs);
-    const o = parseJson(text);
-    if (!o) return null;
-    const correctness = score5(pick(o, "correctness"));
-    const instructionFollowing = score5(pick(o, "instructionFollowing", "instruction_following"));
-    const idiomaticity = score5(pick(o, "idiomaticity"));
-    // A verdict missing any dimension is unusable — skip it rather than record a 0.
-    if (correctness === null || instructionFollowing === null || idiomaticity === null) return null;
-    // The judge intermittently omits `overall`; repair from the dimension mean
-    // instead of recording a spurious 0 that would floor the aggregate.
-    const overall = score5(pick(o, "overall")) ?? Math.round((correctness + instructionFollowing + idiomaticity) / 3);
-    return {
-      correctness,
-      instructionFollowing,
-      idiomaticity,
-      overall,
-      rationale: typeof o.rationale === "string" ? o.rationale.slice(0, 1000) : "",
-      model,
-      latencyMs: Math.round(performance.now() - t0),
-    };
-  } catch {
-    return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const text = await callJudge(system, user, model, apiKey, cfg.judgeTimeoutMs);
+      const o = parseJson(text);
+      if (!o) continue;
+      const correctness = score5(pick(o, "correctness"));
+      const instructionFollowing = score5(pick(o, "instructionFollowing", "instruction_following"));
+      const idiomaticity = score5(pick(o, "idiomaticity"));
+      // A verdict missing any dimension is unusable — retry rather than record a 0.
+      if (correctness === null || instructionFollowing === null || idiomaticity === null) continue;
+      // The judge intermittently omits `overall`; repair from the dimension mean
+      // instead of recording a spurious 0 that would floor the aggregate.
+      const overall = score5(pick(o, "overall")) ?? Math.round((correctness + instructionFollowing + idiomaticity) / 3);
+      return {
+        correctness,
+        instructionFollowing,
+        idiomaticity,
+        overall,
+        rationale: typeof o.rationale === "string" ? o.rationale.slice(0, 1000) : "",
+        model,
+        latencyMs: Math.round(performance.now() - t0),
+      };
+    } catch {
+      // fall through to retry
+    }
   }
+  return null;
 }
 
 type Side = "A" | "B" | "tie";
