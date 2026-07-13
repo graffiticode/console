@@ -73,7 +73,7 @@ export const plans: Plan[] = [
   {
     id: 'enterprise',
     name: 'Partner',
-    description: 'Services made agent accessible',
+    description: 'Agent accessibility',
     monthlyPrice: 0,
     annualPrice: 0,
     monthlyUnits: 0,
