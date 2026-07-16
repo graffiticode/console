@@ -24,9 +24,19 @@ type AuthArg = {
   sessionNamespace?: string;
 };
 
-function isItemVisibleToFreePlan(data: any, auth: AuthArg, now = Date.now()): boolean {
+function isItemVisibleToFreePlan(
+  data: any,
+  auth: AuthArg,
+  opts: { byId?: boolean } = {},
+  now = Date.now(),
+): boolean {
   if (!auth.freePlan) return true;
-  if (data?.sessionNamespace !== auth.sessionNamespace) return false;
+  // By-id access treats the unguessable item id as the capability (like the public
+  // app form page, which renders any item by id): no sessionNamespace match required,
+  // only non-expiry. This is what lets a stateless MCP client (ChatGPT opens a new
+  // session per tool call) retrieve/refine an item it just created. LISTING still
+  // requires the session match, so a session can never enumerate another's items.
+  if (!opts.byId && data?.sessionNamespace !== auth.sessionNamespace) return false;
   if (typeof data?.expiresAt === "number" && data.expiresAt <= now) return false;
   return true;
 }
@@ -1029,7 +1039,9 @@ export async function updateItem({
       throw new Error("Item not found");
     }
     const itemData = itemDoc.data();
-    if (!isItemVisibleToFreePlan(itemData, auth)) {
+    // By-id update: the item id is the capability, so a stateless client can refine an
+    // item it created under a now-expired MCP session. Listing stays session-gated.
+    if (!isItemVisibleToFreePlan(itemData, auth, { byId: true })) {
       throw new Error("Item not found");
     }
     if (auth.freePlan && isPublic) {
@@ -1179,7 +1191,9 @@ export async function getItems({ auth, lang, mark, client }) {
     // avoids an N-item network waterfall. Order is restored by the sort below.
     const settled = await Promise.all(docs.map(async (doc) => {
       const data = doc.data();
-      if (!isItemVisibleToFreePlan(data, auth, now)) return null;
+      // Listing path — stays session-gated (no byId): a session must not enumerate
+      // another session's items. `now` moves to the 4th arg after the new `opts`.
+      if (!isItemVisibleToFreePlan(data, auth, {}, now)) return null;
       let help = data.help;
       let taskId = data.taskId;
 
@@ -1345,7 +1359,9 @@ export async function getItem({ auth, id }) {
     }
 
     const data = itemDoc.data();
-    if (!isItemVisibleToFreePlan(data, auth)) {
+    // By-id read: the item id is the capability (mirrors the public form page), so a
+    // stateless MCP client can retrieve an item it created under a prior session.
+    if (!isItemVisibleToFreePlan(data, auth, { byId: true })) {
       return null;
     }
     let help = data.help;
