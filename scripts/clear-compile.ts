@@ -21,24 +21,54 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
+function readStdin(): Promise<string> {
+  return new Promise((resolve) => {
+    if (process.stdin.isTTY) return resolve('');
+    let data = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', chunk => { data += chunk; });
+    process.stdin.on('end', () => resolve(data));
+  });
+}
+
+async function clearOne(id: string): Promise<'deleted' | 'missing'> {
+  const compileRef = db.doc(`compiles/${id}`);
+  const doc = await compileRef.get();
+  if (!doc.exists) return 'missing';
+  await compileRef.delete();
+  return 'deleted';
+}
+
 async function main() {
-  const id = process.argv[2];
-  if (!id) {
-    console.log('Usage: npx ts-node scripts/clear-compile.ts <taskId>');
+  // taskIds from args, plus any newline-separated ids piped on stdin (single-process batch)
+  const ids = [
+    ...process.argv.slice(2),
+    ...(await readStdin()).split('\n'),
+  ].map(s => s.trim()).filter(Boolean);
+
+  if (ids.length === 0) {
+    console.log('Usage: npx tsx scripts/clear-compile.ts <taskId> [taskId ...]');
+    console.log('   or: <source of ids> | npx tsx scripts/clear-compile.ts');
     console.log('  taskId: The compile record ID (e.g., eyJ0YXNrSWRzIjpbIk11OXFvMU81N29Ta0cwcXF4U3BXIl19)');
     process.exit(1);
   }
 
-  const compileRef = db.doc(`compiles/${id}`);
-  const doc = await compileRef.get();
-
-  if (!doc.exists) {
-    console.log(`Compile record not found: ${id}`);
-    process.exit(1);
+  let deleted = 0;
+  let missing = 0;
+  const batchSize = 20;
+  for (let i = 0; i < ids.length; i += batchSize) {
+    const batch = ids.slice(i, i + batchSize);
+    const results = await Promise.all(batch.map(clearOne));
+    results.forEach(r => (r === 'deleted' ? deleted++ : missing++));
+    if (ids.length > 1) process.stdout.write(`\r${deleted + missing}/${ids.length}`);
   }
 
-  await compileRef.delete();
-  console.log(`Deleted compile record: ${id}`);
+  if (ids.length === 1) {
+    console.log(missing ? `Compile record not found: ${ids[0]}` : `Deleted compile record: ${ids[0]}`);
+    if (missing) process.exit(1);
+  } else {
+    console.log(`\nDone. Deleted: ${deleted}, Not found: ${missing}`);
+  }
 }
 
 main().catch(err => {
