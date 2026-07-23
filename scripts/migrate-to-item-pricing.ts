@@ -19,6 +19,7 @@
  */
 import Stripe from 'stripe';
 import admin from 'firebase-admin';
+import { readFileSync } from 'fs';
 import { STRIPE_API_VERSION, priceIdToPlan, stripeMeterPriceId, stripeBasePriceId, type PlanId } from '../src/lib/plans-config';
 
 const APPLY = process.argv.includes('--apply');
@@ -28,7 +29,7 @@ const stripe = new Stripe(KEY, { apiVersion: STRIPE_API_VERSION });
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(require(process.env.GRAFFITICODE_APP_CREDENTIALS as string)),
+    credential: admin.credential.cert(JSON.parse(readFileSync(process.env.GRAFFITICODE_APP_CREDENTIALS as string, 'utf8'))),
   });
 }
 const db = admin.firestore();

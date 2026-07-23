@@ -154,9 +154,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .where('createdAt', '<=', lastDayOfPeriod)
           .get();
 
+        // Count only billable item records (pre-migration compile/ai_generation
+        // records carry compile-unit `units` and are not items).
         let calculatedTotal = 0;
         usageRecordsSnapshot.docs.forEach(doc => {
-          calculatedTotal += doc.data().units || 0;
+          const r = doc.data();
+          if (r.type === 'item_created') calculatedTotal += r.units || 0;
         });
         if (calculatedTotal !== itemsUsed) {
           itemsUsed = calculatedTotal;

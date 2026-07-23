@@ -55,9 +55,13 @@ export async function checkItemCreateAllowed(uid: string): Promise<ItemCreateAll
         .where('userId', '==', uid)
         .where('createdAt', '>=', periodStart)
         .get();
+      // Count only billable item records. Pre-migration compile/ai_generation
+      // records carry non-zero compile-unit `units` and must not be counted as
+      // items (new such records write units: 0, but old ones linger in-period).
       let calculatedTotal = 0;
       usageRecords.docs.forEach(doc => {
-        calculatedTotal += doc.data().units || 0;
+        const r = doc.data();
+        if (r.type === 'item_created') calculatedTotal += r.units || 0;
       });
       if (calculatedTotal !== currentUsage) {
         console.log(`checkItemCreateAllowed: syncing stored (${currentUsage}) → calculated (${calculatedTotal})`);
