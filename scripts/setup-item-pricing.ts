@@ -87,6 +87,38 @@ async function ensurePrice(lookupKey: string, params: Stripe.PriceCreateParams):
   return price.id;
 }
 
+// Metered overage price, TIERED so the included bucket is free (covered by the
+// flat base fee) and only items above `includedItems` are charged at the rate.
+// Reporting one meter event per item then yields base + (overage x rate).
+async function ensureMeteredPrice(lookupKey: string, productId: string, plan: PlanConfig, meterId: string): Promise<string> {
+  const existing = await stripe.prices.list({ lookup_keys: [lookupKey], limit: 1, active: true });
+  const found = existing.data[0];
+  if (found && found.billing_scheme === 'tiered') {
+    console.log(`  price[${lookupKey}]: reusing tiered ${found.id}`);
+    return found.id;
+  }
+  if (DRY_RUN) {
+    console.log(`  price[${lookupKey}]: WOULD create tiered (0 up to ${plan.includedItems}, then ${plan.overageRatePerItem}/item)`);
+    return `price_DRYRUN_${lookupKey}`;
+  }
+  const price = await stripe.prices.create({
+    product: productId,
+    currency: 'usd',
+    billing_scheme: 'tiered',
+    tiers_mode: 'graduated',
+    tiers: [
+      { up_to: plan.includedItems, unit_amount: 0 },
+      { up_to: 'inf', unit_amount_decimal: cents(plan.overageRatePerItem as number) },
+    ],
+    recurring: { interval: 'month', usage_type: 'metered', meter: meterId },
+    lookup_key: lookupKey,
+    // If a prior (flat) price holds this lookup key, move it to the new tiered one.
+    ...(found ? { transfer_lookup_key: true } : {}),
+  });
+  console.log(`  price[${lookupKey}]: created tiered ${price.id}${found ? ' (transferred lookup key from ' + found.id + ')' : ''}`);
+  return price.id;
+}
+
 async function main() {
   console.log(`\n=== Provisioning item-based pricing${DRY_RUN ? ' (DRY RUN)' : ''} ===\n`);
   const meterId = await ensureMeter();
@@ -108,12 +140,7 @@ async function main() {
       unit_amount: plan.basePriceAnnual * 100,
       recurring: { interval: 'year' },
     });
-    const metered = await ensurePrice(`gc_${plan.id}_meter`, {
-      product: productId,
-      currency: 'usd',
-      unit_amount_decimal: cents(plan.overageRatePerItem as number),
-      recurring: { interval: 'month', usage_type: 'metered', meter: meterId },
-    });
+    const metered = await ensureMeteredPrice(`gc_${plan.id}_meter`, productId, plan, meterId);
 
     envLines.push(`${plan.stripe.baseMonthlyPriceIdEnv}=${monthly}`);
     envLines.push(`${plan.stripe.baseAnnualPriceIdEnv}=${annual}`);
