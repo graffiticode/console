@@ -231,21 +231,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const userDoc = usersQuery.docs[0];
         const userId = userDoc.id;
 
-        // Reset to free tier but preserve overage units (they're purchased separately)
+        // Always log the cancellation.
+        await db.collection('subscription_events').add({
+          userId,
+          type: 'subscription_canceled',
+          subscriptionId: subscription.id,
+          timestamp: new Date(),
+        });
+
+        // Guard against out-of-order delivery: cancel-old + create-new (a common
+        // re-subscribe pattern) can deliver this delete AFTER the new sub's
+        // created/updated event. If the customer still has another active/
+        // trialing subscription, this delete is for a superseded sub — do NOT
+        // reset to free (that new sub's created/updated event governs the plan).
+        const [activeSubs, trialingSubs] = await Promise.all([
+          stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 3 }),
+          stripe.subscriptions.list({ customer: customerId, status: 'trialing', limit: 3 }),
+        ]);
+        const otherLive = [...activeSubs.data, ...trialingSubs.data].filter(s => s.id !== subscription.id);
+        if (otherLive.length > 0) {
+          console.log(`subscription.deleted ${subscription.id}: customer ${customerId} still has ${otherLive.length} active/trialing sub(s); not resetting to free`);
+          break;
+        }
+
+        // No other live subscription — reset to free tier.
         await db.collection('users').doc(userId).update({
           'subscription.status': 'canceled',
           'subscription.plan': DEFAULT_PLAN,
           'subscription.units': includedItemsFor(DEFAULT_PLAN),
           'subscription.stripeSubscriptionId': null,
           'subscription.canceledAt': new Date().toISOString(),
-        });
-
-        // Log the event
-        await db.collection('subscription_events').add({
-          userId,
-          type: 'subscription_canceled',
-          subscriptionId: subscription.id,
-          timestamp: new Date(),
         });
 
         break;
