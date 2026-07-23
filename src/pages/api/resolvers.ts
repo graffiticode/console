@@ -11,7 +11,8 @@ import { planSequence, classifyAndRoute, composesWithFor, fenceComposition, orch
 import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
-import { chargeAutoOverage } from "../../lib/auto-overage-service";
+import { reportItemUsage } from "../../lib/item-metering";
+import { checkItemCreateAllowed } from "../../lib/usage-service";
 import fs from "fs";
 import path from "path";
 import { encrypt, decrypt, isConfigured as isSecretCryptoConfigured } from "../../lib/secret-crypto";
@@ -165,6 +166,119 @@ export async function recordVersion({
     }
   } catch (error) {
     console.error("recordVersion()", "ERROR", itemId, taskId, error);
+  }
+}
+
+/**
+ * Count a billable item exactly once — the first time a distinct item gains a
+ * valid taskId (its first successful compile). Called from createItem (sync /
+ * template creates) and from updateItem's no-taskId -> first-taskId transition
+ * (async console/MCP creates whose artifact is filled in by the worker).
+ *
+ * Excludes revisions (taskId -> different taskId), share/claim copies, and
+ * anonymous free-plan sessions (metered separately). Idempotent via a `billed`
+ * flag on the item doc set inside a transaction, so overlapping paths and
+ * retries never double-count.
+ *
+ * Effects: writes a `type: 'item_created'` usage record (units: 1), increments
+ * the monthly counter (mirroring logCompile's period reset), and reports one
+ * Stripe meter event for paid tiers. Best-effort: never throws into the caller.
+ */
+export async function recordBillableItem({
+  auth,
+  itemId,
+  taskId,
+  lang,
+  client,
+  source,
+}: {
+  auth: AuthArg;
+  itemId: string;
+  taskId: string;
+  lang?: string;
+  client?: string;
+  source?: VersionSource;
+}) {
+  try {
+    if (!itemId || !taskId) return;
+    // Anonymous free-plan (MCP trial) items resolve to a shared trial uid and are
+    // metered/capped separately — never bill them to a tenant account.
+    if (auth.freePlan) return;
+    // Share/claim copies re-post existing content; they are not authored items.
+    if (source === "claim" || source === "share") return;
+
+    const itemRef = db.doc(`users/${auth.uid}/items/${itemId}`);
+
+    // Idempotency: count each distinct item once. Set `billed` on the item doc
+    // in a transaction; bail if it's already billed or is a copy.
+    const shouldCount = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(itemRef);
+      if (!snap.exists) return false;
+      const d = snap.data() || {};
+      if (d.billed) return false;
+      if (d.sharedFrom || d.claimedFrom) return false;
+      tx.update(itemRef, { billed: true, billedTaskId: taskId, billedAt: Date.now() });
+      return true;
+    });
+    if (!shouldCount) return;
+
+    const now = new Date();
+
+    // Audit record for the billable item.
+    await db.collection("usage").add({
+      userId: auth.uid,
+      itemId,
+      taskId,
+      units: 1,
+      createdAt: now,
+      timestamp: now.toISOString(),
+      lang: lang ?? null,
+      client: client ?? "console",
+      type: "item_created",
+    });
+
+    // Increment the monthly counter, resetting at the billing-period boundary
+    // (mirrors logCompile). currentMonthTotal is the item count for the period.
+    const userDoc = await db.collection("users").doc(auth.uid).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+    const subscription = userData?.subscription || {};
+    const usageDocRef = db.collection("usage").doc(auth.uid);
+    const usageDoc = await usageDocRef.get();
+    const periodStart = subscription.currentPeriodStart
+      ? new Date(subscription.currentPeriodStart)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
+    if (usageDoc.exists) {
+      const currentData = usageDoc.data();
+      const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
+      const isNewBillingPeriod = !lastReset || lastReset < periodStart;
+      if (isNewBillingPeriod) {
+        await usageDocRef.set({
+          currentMonthTotal: 1,
+          lastReset: periodStart.toISOString(),
+          lastUpdated: now.toISOString(),
+        });
+      } else {
+        await usageDocRef.update({
+          currentMonthTotal: admin.firestore.FieldValue.increment(1),
+          lastUpdated: now.toISOString(),
+        });
+      }
+    } else {
+      await usageDocRef.set({
+        currentMonthTotal: 1,
+        lastReset: periodStart.toISOString(),
+        lastUpdated: now.toISOString(),
+      });
+    }
+
+    // Report to the Stripe metered price (paid tiers only). Best-effort.
+    await reportItemUsage({
+      plan: subscription.plan,
+      stripeCustomerId: userData?.stripeCustomerId,
+      identifier: `${itemId}__${taskId}`,
+    });
+  } catch (error) {
+    console.error("recordBillableItem()", "ERROR", itemId, taskId, error);
   }
 }
 // import { buildDynamicSchema } from "./schemas";
@@ -408,134 +522,19 @@ export async function logCompile({ auth, units, id, timestamp, status, data }) {
     data = JSON.parse(data);
     await db.doc(path).set({ id, timestamp, status, lang, data });
 
-    // Track usage units if provided
-    if (units && units > 0) {
-      const now = new Date();
-
-      // Check if user is over limit
-      let wasOverLimit = false;
-      try {
-        const userDoc = await db.collection('users').doc(auth.uid).get();
-        if (userDoc.exists) {
-          const userData = userDoc.data();
-          const plan = userData?.subscription?.plan || 'demo';
-          const overageUnits = userData?.subscription?.overageUnits || 0;
-
-          // Get plan allocation
-          const planAllocations = {
-            demo: 250,
-            starter: 5000,
-            pro: 100000,
-            teams: 2000000
-          };
-          let allocatedUnits = planAllocations[plan] || 100;
-
-          // Check for preserved allocation (from downgrade)
-          const preservedUntil = userData?.subscription?.preservedUntil;
-          const preservedAllocation = userData?.subscription?.preservedAllocation;
-          if (preservedUntil && preservedAllocation && new Date(preservedUntil) > now) {
-            allocatedUnits = preservedAllocation;
-          }
-
-          // Get current usage
-          const usageDoc = await db.collection('usage').doc(auth.uid).get();
-          const currentUsage = usageDoc.exists ? (usageDoc.data().currentMonthTotal || 0) : 0;
-
-          // Calculate if over limit (before adding these new units)
-          const totalAvailable = allocatedUnits + overageUnits;
-          wasOverLimit = currentUsage >= totalAvailable;
-        }
-      } catch (error) {
-        console.error('Error checking usage limit:', error);
-      }
-
-      // Add individual usage record for audit trail
-      await db.collection('usage').add({
-        userId: auth.uid,
-        taskId: id,
-        units: units,
-        createdAt: now,
-        timestamp: timestamp,
-        lang: lang,
-        type: 'compile',
-        status: status,
-        wasOverLimit: wasOverLimit
-      });
-
-      // Read subscription once for periodStart (reset boundary) and the
-      // post-increment usageLimitReached check.
-      const userDoc = await db.collection('users').doc(auth.uid).get();
-      const userData = userDoc.exists ? userDoc.data() : {};
-      const subscription = userData?.subscription || {};
-      const plan = subscription.plan || 'demo';
-      const overageUnits = subscription.overageUnits || 0;
-
-      // Update monthly usage total
-      const usageDocRef = db.collection('usage').doc(auth.uid);
-      const usageDoc = await usageDocRef.get();
-
-      const periodStart = subscription.currentPeriodStart
-        ? new Date(subscription.currentPeriodStart)
-        : new Date(now.getFullYear(), now.getMonth(), 1);
-      let newTotal = units;
-      if (usageDoc.exists) {
-        const currentData = usageDoc.data();
-        const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
-        const isNewBillingPeriod = !lastReset || lastReset < periodStart;
-
-        if (isNewBillingPeriod) {
-          await usageDocRef.set({
-            currentMonthTotal: units,
-            lastReset: periodStart.toISOString(),
-            lastUpdated: now.toISOString()
-          });
-          newTotal = units;
-        } else {
-          // Atomic increment — concurrent compiles can't lose updates via
-          // read-then-write.
-          await usageDocRef.update({
-            currentMonthTotal: admin.firestore.FieldValue.increment(units),
-            lastUpdated: now.toISOString()
-          });
-          newTotal = (currentData.currentMonthTotal || 0) + units;
-        }
-      } else {
-        await usageDocRef.set({
-          currentMonthTotal: units,
-          lastReset: periodStart.toISOString(),
-          lastUpdated: now.toISOString()
-        });
-        newTotal = units;
-      }
-
-
-      const planAllocations = {
-        demo: 250,
-        starter: 5000,
-        pro: 100000,
-        teams: 2000000
-      };
-      let allocatedUnits = planAllocations[plan] || 100;
-
-      // Check for preserved allocation (from downgrade)
-      const preservedUntil = subscription.preservedUntil;
-      const preservedAllocation = subscription.preservedAllocation;
-      if (preservedUntil && preservedAllocation && new Date(preservedUntil) > now) {
-        allocatedUnits = preservedAllocation;
-      }
-
-      const totalAvailable = allocatedUnits + overageUnits;
-      let usageLimitReached = newTotal > totalAvailable;
-
-      // Auto-overage: top up as soon as usage crosses the limit so subsequent
-      // requests aren't blocked. Safe/deduped via the in-flight lock.
-      if (usageLimitReached && subscription.autoOverageEnabled) {
-        const { charged } = await chargeAutoOverage(auth.uid);
-        if (charged) usageLimitReached = false;
-      }
-
-      return JSON.stringify({ success: true, usageLimitReached });
-    }
+    // Item-based billing: compiles are free (iteration is included). Keep a
+    // zero-unit audit record for history/telemetry, but never meter compiles or
+    // touch the monthly item counter. Billing is driven by recordBillableItem.
+    await db.collection("usage").add({
+      userId: auth.uid,
+      taskId: id,
+      units: 0,
+      createdAt: new Date(),
+      timestamp,
+      lang,
+      type: "compile",
+      status,
+    });
 
     return JSON.stringify({ success: true });
   } catch (x) {
@@ -1126,6 +1125,17 @@ export async function createItem({
   deferGeneration?: boolean;
 }) {
   try {
+    // Gate item creation against the account's item budget BEFORE spending any
+    // generation compute. Free tiers hard-cap; paid tiers block only past a
+    // customer-set overage cap. Anonymous free-plan sessions are metered
+    // separately (own throttle/spend caps), so skip them here.
+    if (!auth.freePlan) {
+      const gate = await checkItemCreateAllowed(auth.uid);
+      if (!gate.allowed) {
+        throw new Error(gate.reason || 'Item limit reached');
+      }
+    }
+
     // Generate a unique ID for the item
     const itemRef = db.collection(`users/${auth.uid}/items`).doc();
     const id = itemRef.id;
@@ -1191,6 +1201,7 @@ export async function createItem({
     }
     await itemRef.set(item);
     if (taskId) {
+      const resolvedSource = normalizeVersionSource(source) ?? defaultVersionSource(item.client);
       await recordVersion({
         auth,
         itemId: id,
@@ -1200,9 +1211,18 @@ export async function createItem({
         name,
         mark: item.mark,
         client: item.client,
-        source: normalizeVersionSource(source) ?? defaultVersionSource(item.client),
+        source: resolvedSource,
         label,
         createdAt: timestamp,
+      });
+      // First successful compile of a distinct item — count it for billing.
+      await recordBillableItem({
+        auth,
+        itemId: id,
+        taskId,
+        lang,
+        client: item.client,
+        source: resolvedSource,
       });
     }
     return {
@@ -1325,6 +1345,7 @@ export async function updateItem({
     // A changed taskId IS a new version — the one signal every producer (chat,
     // direct editor edit, generation worker, MCP) funnels through.
     if (taskIdChanged) {
+      const resolvedSource = normalizeVersionSource(source) ?? defaultVersionSource(data.client);
       await recordVersion({
         auth,
         itemId: id,
@@ -1334,10 +1355,24 @@ export async function updateItem({
         name: data.name,
         mark: data.mark,
         client: data.client,
-        source: normalizeVersionSource(source) ?? defaultVersionSource(data.client),
+        source: resolvedSource,
         label,
         createdAt: updates.updated,
       });
+      // Bill only the no-taskId -> first-taskId transition (the async console/MCP
+      // create landing its first artifact). Later taskId -> taskId changes are
+      // revisions and must not be counted; recordBillableItem's `billed` guard is
+      // a second line of defense.
+      if (!itemData.taskId) {
+        await recordBillableItem({
+          auth,
+          itemId: id,
+          taskId,
+          lang: data.lang,
+          client: data.client,
+          source: resolvedSource,
+        });
+      }
     }
     return {
       id,

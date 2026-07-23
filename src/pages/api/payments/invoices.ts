@@ -1,12 +1,13 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
+import { STRIPE_API_VERSION } from '../../../lib/plans-config';
 import { getFirestore } from '../../../utils/db';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2022-08-01',
+    apiVersion: STRIPE_API_VERSION,
   });
 }
 
@@ -109,7 +110,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       for (const payment of payments.data) {
         if (payment.metadata?.type === 'overage_purchase' && payment.status === 'succeeded') {
           // Skip if this payment is already represented by an invoice
-          if (payment.invoice && invoiceIds.has(payment.invoice as string)) continue;
+          // (`invoice`/`charges` were removed from the PaymentIntent shape in
+          // recent API versions; this legacy-overage block is retired anyway).
+          const pi = payment as any;
+          if (pi.invoice && invoiceIds.has(pi.invoice as string)) continue;
           invoices.push({
             id: payment.id,
             date: new Date(payment.created * 1000).toISOString(),
@@ -118,7 +122,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             description: payment.description || 'Overage units purchase',
             // Legacy PaymentIntent overage charges have no Stripe invoice/PDF,
             // but the charge has a hosted receipt — surface it so Download works.
-            invoicePdf: payment.charges?.data?.[0]?.receipt_url || undefined,
+            invoicePdf: pi.charges?.data?.[0]?.receipt_url || undefined,
             type: 'overage',
             plan: payment.metadata.plan,
           });

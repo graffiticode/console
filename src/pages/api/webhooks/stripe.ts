@@ -3,9 +3,10 @@ import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
 import admin from '../../../utils/db';
 import { buffer } from 'micro';
+import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, DEFAULT_PLAN } from '../../../lib/plans-config';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2022-08-01',
+  apiVersion: STRIPE_API_VERSION,
 });
 
 // Disable body parsing, need raw body for webhook signature verification
@@ -13,16 +14,6 @@ export const config = {
   api: {
     bodyParser: false,
   },
-};
-
-// Map Stripe price IDs to our plan names
-const PLAN_MAPPING = {
-  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || '']: { name: 'starter', units: 5000 },
-  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || '']: { name: 'starter', units: 5000 },
-  [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: { name: 'pro', units: 100000 },
-  [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: { name: 'pro', units: 100000 },
-  [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: { name: 'teams', units: 2000000 },
-  [process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID || '']: { name: 'teams', units: 2000000 },
 };
 
 // Detach duplicate cards (same fingerprint) for a customer, keeping exactly one.
@@ -182,10 +173,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const userId = userDoc.id;
         const userData = userDoc.data();
 
-        // Get plan details
-        const firstItem = subscription.items.data[0] as any;
-        const priceId = firstItem?.price.id;
-        const planInfo = PLAN_MAPPING[priceId] || { name: 'starter', units: 5000 };
+        // Get plan details. A subscription may carry two prices (flat base +
+        // metered overage); match the base price to resolve the plan.
+        const items = subscription.items.data as any[];
+        const firstItem = items[0];
+        const planName = items.map(it => priceIdToPlan(it?.price?.id)).find(Boolean) || DEFAULT_PLAN;
+        const planInfo = { name: planName, units: includedItemsFor(planName) };
 
         // API-version resilience: current_period_start/end moved from the
         // Subscription to its items in 2025-03-31.basil. Read the top-level
@@ -241,11 +234,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Reset to free tier but preserve overage units (they're purchased separately)
         await db.collection('users').doc(userId).update({
           'subscription.status': 'canceled',
-          'subscription.plan': 'demo',
-          'subscription.units': 250,
+          'subscription.plan': DEFAULT_PLAN,
+          'subscription.units': includedItemsFor(DEFAULT_PLAN),
           'subscription.stripeSubscriptionId': null,
           'subscription.canceledAt': new Date().toISOString(),
-          // DO NOT reset overage units - they roll over and persist until used
         });
 
         // Log the event
@@ -283,37 +275,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             timestamp: new Date(),
           });
 
-          if (invoice.metadata?.type === 'overage_purchase') {
-            // Overage invoice: credit units
-            const units = parseInt(invoice.metadata.units);
-            const blocks = parseInt(invoice.metadata.blocks || '1');
-            const plan = invoice.metadata.plan;
-            const pricePerUnit = parseFloat(invoice.metadata.pricePerUnit || '0');
-
-            if (units) {
-              const userData = userDoc.data();
-              const currentOverage = userData?.subscription?.overageUnits || 0;
-
-              await db.collection('users').doc(userId).update({
-                'subscription.overageUnits': currentOverage + units,
-                'subscription.lastOveragePurchase': new Date().toISOString(),
-              });
-
-              await db.collection('overage_purchases').add({
-                userId,
-                units,
-                blocks,
-                plan,
-                pricePerUnit,
-                amount: invoice.amount_paid / 100,
-                invoiceId: invoice.id,
-                timestamp: new Date(),
-                status: 'completed',
-                webhookProcessed: true,
-              });
-            }
-          } else if ((invoice as any).subscription ?? (invoice as any).parent?.subscription_details?.subscription) {
-            // Subscription invoice: reset usage counter for new billing period.
+          if ((invoice as any).subscription ?? (invoice as any).parent?.subscription_details?.subscription) {
+            // Subscription invoice: reset the item counter for the new billing
+            // period. Any metered overage for the period just ended is already
+            // billed on this invoice by Stripe (arrears).
             // invoice.subscription moved to invoice.parent.subscription_details
             // .subscription in 2025-03-31.basil; accept either shape.
             await db.collection('usage').doc(userId).set({

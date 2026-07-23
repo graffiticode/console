@@ -194,7 +194,13 @@ interface DailyBucket {
   actualUncachedInputTokens: number;
 }
 
-// Plan price per unit (monthly price / monthly units)
+// NOTE: This report predates item-based pricing and its revenue figures are NO
+// LONGER VALID. Under item pricing, revenue = flat base fee + (overage items ×
+// per-item rate), and the metered unit is `type: 'item_created'` (units: 1);
+// ai_generation/compile records now carry units: 0. Rework this report to model
+// base + included + overage before trusting its revenue numbers. The per-unit
+// map below reflects the OLD compile-unit revenue and is kept only so the
+// script still runs.
 const PLAN_PRICE_PER_UNIT: Record<string, number> = {
   free: 0, pro: 100 / 100000, teams: 1000 / 2000000,
 };

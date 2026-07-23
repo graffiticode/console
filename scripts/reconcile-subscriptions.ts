@@ -49,7 +49,7 @@ if (process.env.STRIPE_SECRET_KEY.startsWith('sk_test')) {
 
 admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId: 'graffiticode-app' });
 const db = admin.firestore();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2022-08-01' });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: STRIPE_API_VERSION });
 
 const APPLY = process.argv.includes('--apply');
 const INCLUDE_DOWNGRADES = process.argv.includes('--include-downgrades');
@@ -59,14 +59,15 @@ const ONLY_UID = (() => {
 })();
 
 // Same mapping the webhook uses (src/pages/api/webhooks/stripe.ts).
-const PLAN_MAPPING: Record<string, { name: string; units: number }> = {
-  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || '']: { name: 'starter', units: 5000 },
-  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || '']: { name: 'starter', units: 5000 },
-  [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: { name: 'pro', units: 100000 },
-  [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: { name: 'pro', units: 100000 },
-  [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: { name: 'teams', units: 2000000 },
-  [process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID || '']: { name: 'teams', units: 2000000 },
-};
+import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, DEFAULT_PLAN } from '../src/lib/plans-config';
+import { subscriptionPeriod } from '../src/lib/stripe-helpers';
+
+// Resolve the plan from a subscription's items (base price; a paid sub also
+// carries a metered overage price). Item counts come from the central config.
+function planInfoFor(sub: Stripe.Subscription): { name: string; units: number } {
+  const name = sub.items.data.map(it => priceIdToPlan(it?.price?.id)).find(Boolean) || DEFAULT_PLAN;
+  return { name, units: includedItemsFor(name) };
+}
 
 async function activeSubFor(customerId: string): Promise<Stripe.Subscription | null> {
   let subs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
@@ -97,8 +98,7 @@ async function main() {
     catch (e: any) { console.log(`  ${uid}: stripe error: ${e.message}`); skipped++; continue; }
 
     if (sub) {
-      const priceId = sub.items.data[0]?.price.id;
-      const planInfo = PLAN_MAPPING[priceId] || { name: 'starter', units: 5000 };
+      const planInfo = planInfoFor(sub);
       const mismatch = cur.plan !== planInfo.name
         || cur.units !== planInfo.units
         || cur.stripeSubscriptionId !== sub.id
@@ -112,8 +112,8 @@ async function main() {
           'subscription.plan': planInfo.name,
           'subscription.units': planInfo.units,
           'subscription.stripeSubscriptionId': sub.id,
-          'subscription.currentPeriodStart': new Date(sub.current_period_start * 1000).toISOString(),
-          'subscription.currentPeriodEnd': new Date(sub.current_period_end * 1000).toISOString(),
+          'subscription.currentPeriodStart': (() => { const p = subscriptionPeriod(sub).start; return p ? new Date(p * 1000).toISOString() : null; })(),
+          'subscription.currentPeriodEnd': (() => { const p = subscriptionPeriod(sub).end; return p ? new Date(p * 1000).toISOString() : null; })(),
           'subscription.cancelAtPeriodEnd': sub.cancel_at_period_end,
           'subscription.updatedAt': new Date().toISOString(),
           'subscription.reconciledAt': new Date().toISOString(),

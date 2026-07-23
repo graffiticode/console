@@ -1,9 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
+import { STRIPE_API_VERSION } from '../../../lib/plans-config';
 import { getFirestore } from '../../../utils/db';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2022-08-01',
+  apiVersion: STRIPE_API_VERSION,
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

@@ -280,7 +280,7 @@ export default function Editor({
                   })));
                 } else if (fetchedData?.usageLimitReached) {
                   setCompileErrors([{
-                    message: 'Usage limit reached. Please upgrade your account or add overage units in Settings to continue.',
+                    message: 'Item limit reached. Please upgrade your plan or raise your overage cap in Settings to continue.',
                     from: -1,
                     to: -1,
                   }]);

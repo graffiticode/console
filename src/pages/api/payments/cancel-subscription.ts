@@ -1,10 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
+import { STRIPE_API_VERSION } from '../../../lib/plans-config';
+import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
 import { getFirestore } from '../../../utils/db';
 import * as admin from 'firebase-admin';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2022-08-01',
+  apiVersion: STRIPE_API_VERSION,
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -135,12 +137,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Preserve the renewal date and allocation when downgrading to free
-    if (immediately && subscription.current_period_end) {
-      updateData['subscription.renewalDate'] = new Date(subscription.current_period_end * 1000).toISOString();
+    const subPeriodEnd = subscriptionPeriodEnd(subscription);
+    if (immediately && subPeriodEnd) {
+      updateData['subscription.renewalDate'] = new Date(subPeriodEnd * 1000).toISOString();
       updateData['subscription.interval'] = null; // Free plan has no interval
       updateData['subscription.stripeSubscriptionId'] = null; // Clear Stripe subscription ID
       updateData['subscription.preservedAllocation'] = currentAllocation; // Preserve old plan's allocation
-      updateData['subscription.preservedUntil'] = new Date(subscription.current_period_end * 1000).toISOString();
+      updateData['subscription.preservedUntil'] = new Date(subPeriodEnd * 1000).toISOString();
 
       // Clear any previous canceledAt field for downgrades
       updateData['subscription.canceledAt'] = admin.firestore.FieldValue.delete();
@@ -157,7 +160,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         cancelAt: canceledSubscription.cancel_at
           ? new Date(canceledSubscription.cancel_at * 1000).toISOString()
           : null,
-        currentPeriodEnd: new Date(canceledSubscription.current_period_end * 1000).toISOString(),
+        currentPeriodEnd: (() => {
+          const end = subscriptionPeriodEnd(canceledSubscription);
+          return end ? new Date(end * 1000).toISOString() : null;
+        })(),
       },
       message: immediately
         ? 'Subscription canceled immediately'

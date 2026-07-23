@@ -177,13 +177,13 @@ export default function PlanCard({
 
       {isPendingCancel && (
         <p className="mt-2 text-xs text-red-600 text-center font-medium">
-          Click again to confirm. Cancels at end of billing period. Overage credits remain.
+          Click again to confirm. Cancels at end of billing period.
         </p>
       )}
 
       {cancelAtPeriodEnd && isCurrentPlan && renewalDate && (
         <p className="mt-2 text-xs text-gray-500 text-center">
-          Ends {new Date(renewalDate).toLocaleDateString()}. Overage credits remain until used.
+          Ends {new Date(renewalDate).toLocaleDateString()}.
         </p>
       )}
     </div>

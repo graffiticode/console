@@ -1,5 +1,9 @@
-export type PlanId = 'demo' | 'starter' | 'pro' | 'teams' | 'enterprise';
-export type BillingInterval = 'monthly' | 'annual';
+// UI-facing plan catalog. Values are derived from the single source of truth in
+// src/lib/plans-config.ts — do not hardcode allowances/prices here.
+import { PLANS, type PlanId as ConfigPlanId, type BillingInterval as ConfigBillingInterval, isUpgrade as configIsUpgrade, isDowngrade as configIsDowngrade } from '../lib/plans-config';
+
+export type PlanId = ConfigPlanId;
+export type BillingInterval = ConfigBillingInterval;
 
 export interface Plan {
   id: PlanId;
@@ -7,6 +11,7 @@ export interface Plan {
   description: string;
   monthlyPrice: number;
   annualPrice: number;
+  /** Items included per month (base fee bucket). */
   monthlyUnits: number;
   features: string[];
   cta: string;
@@ -19,77 +24,96 @@ export interface Plan {
   contactHref?: string;
 }
 
+const fmt = (n: number) => n.toLocaleString('en-US');
+const rate = (id: PlanId) => {
+  const r = PLANS[id].overageRatePerItem;
+  return r == null ? '' : `$${r.toFixed(r < 0.1 ? 3 : 2).replace(/0+$/, '').replace(/\.$/, '')}`;
+};
+
 export const plans: Plan[] = [
   {
     id: 'demo',
-    name: 'Free',
+    name: PLANS.demo.displayName,
     description: 'Free, no credit card required',
-    monthlyPrice: 0,
-    annualPrice: 0,
-    monthlyUnits: 250,
+    monthlyPrice: PLANS.demo.basePriceMonthly,
+    annualPrice: PLANS.demo.basePriceAnnual,
+    monthlyUnits: PLANS.demo.includedItems,
     features: [
-      '250 compile units per month',
+      `${fmt(PLANS.demo.includedItems)} items per month`,
       'No credit card required',
       'Community support',
-      'Email support',
-      'Upgrade anytime'
+      'Hard cap — upgrade to create more',
     ],
     cta: 'Current Plan',
-    isFree: true
+    isFree: true,
   },
   {
     id: 'pro',
-    name: 'Pro',
-    description: 'Great for serious creators',
-    monthlyPrice: 100,
-    annualPrice: 1000,
-    monthlyUnits: 100000,
+    name: PLANS.pro.displayName,
+    description: 'For production agent surfaces',
+    monthlyPrice: PLANS.pro.basePriceMonthly,
+    annualPrice: PLANS.pro.basePriceAnnual,
+    monthlyUnits: PLANS.pro.includedItems,
     features: [
-      '100,000 compile units per month',
-      'Additional compiles at $0.001 each',
-      'Community support',
+      `${fmt(PLANS.pro.includedItems)} items per month included`,
+      `Additional items at ${rate('pro')} each`,
+      'Set an overage spend cap',
       'Email support',
-      'Cancel anytime'
+      'Cancel anytime',
     ],
-    cta: 'Go Pro'
+    cta: 'Choose Silver',
   },
   {
     id: 'teams',
-    name: 'Team',
-    description: 'For teams and high volume compiles',
-    monthlyPrice: 1000,
-    annualPrice: 10000,
-    monthlyUnits: 2000000,
+    name: PLANS.teams.displayName,
+    description: 'For higher-volume tenants',
+    monthlyPrice: PLANS.teams.basePriceMonthly,
+    annualPrice: PLANS.teams.basePriceAnnual,
+    monthlyUnits: PLANS.teams.includedItems,
     features: [
-      '2,000,000 compile units per month',
-      'Additional compiles at $0.0005 each',
-      'Up to 10 accounts included',
+      `${fmt(PLANS.teams.includedItems)} items per month included`,
+      `Additional items at ${rate('teams')} each`,
+      'Set an overage spend cap',
       'Priority support',
-      'Language development services',
-      'Cancel anytime'
+      'Cancel anytime',
     ],
-    cta: 'Go Team'
+    cta: 'Choose Gold',
+  },
+  {
+    id: 'platinum',
+    name: PLANS.platinum.displayName,
+    description: 'For high-volume, done-for-you deployments',
+    monthlyPrice: PLANS.platinum.basePriceMonthly,
+    annualPrice: PLANS.platinum.basePriceAnnual,
+    monthlyUnits: PLANS.platinum.includedItems,
+    features: [
+      `${fmt(PLANS.platinum.includedItems)} items per month included`,
+      `Additional items at ${rate('platinum')} each`,
+      'Custom language development',
+      'Bring your own model key (BYOK)',
+      'Priority support',
+    ],
+    cta: 'Choose Platinum',
   },
   {
     id: 'enterprise',
-    name: 'Enterprise',
+    name: PLANS.enterprise.displayName,
     description: 'For mission-critical, high-volume deployments',
     monthlyPrice: 0,
     annualPrice: 0,
     monthlyUnits: 0,
     features: [
-      'Everything in Team',
-      'Custom compile-unit pricing',
+      'Everything in Platinum',
+      'Custom item pricing',
       '99.9% uptime SLA',
       'Dedicated support & onboarding',
-      'Custom language development',
-      'SSO, GDPR & CCPA compliance'
+      'SSO, GDPR & CCPA compliance',
     ],
     cta: 'Contact Sales',
     contactSales: true,
     priceLabel: 'Custom',
-    contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Enterprise%20plan%20inquiry'
-  }
+    contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Enterprise%20plan%20inquiry',
+  },
 ];
 
 // Starter is discontinued and no longer offered (removed from `plans` above), but its
@@ -97,29 +121,21 @@ export const plans: Plan[] = [
 // resolve via `planDetails`, `PLAN_TIER`, and the `PlanId` type.
 const starterPlan: Plan = {
   id: 'starter',
-  name: 'Starter',
-  description: 'Perfect for getting started',
-  monthlyPrice: 10,
-  annualPrice: 100,
-  monthlyUnits: 5000,
-  features: [
-    '5,000 compile units per month',
-    'Additional compiles at $0.002 each',
-    'Community support',
-    'Email support',
-    'Cancel anytime'
-  ],
-  cta: 'Get Started'
+  name: PLANS.starter.displayName,
+  description: 'Discontinued',
+  monthlyPrice: PLANS.starter.basePriceMonthly,
+  annualPrice: PLANS.starter.basePriceAnnual,
+  monthlyUnits: PLANS.starter.includedItems,
+  features: [`${fmt(PLANS.starter.includedItems)} items per month`],
+  cta: 'Get Started',
 };
 
-const PLAN_TIER: Record<PlanId, number> = { demo: 0, starter: 1, pro: 2, teams: 3, enterprise: 4 };
-
 export function isUpgrade(from: PlanId, to: PlanId): boolean {
-  return PLAN_TIER[to] > PLAN_TIER[from];
+  return configIsUpgrade(from, to);
 }
 
 export function isDowngrade(from: PlanId, to: PlanId): boolean {
-  return PLAN_TIER[to] < PLAN_TIER[from];
+  return configIsDowngrade(from, to);
 }
 
 export interface ButtonLabelOpts {

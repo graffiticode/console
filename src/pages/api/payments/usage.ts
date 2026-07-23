@@ -1,28 +1,15 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '../../../utils/db';
-import admin from '../../../utils/db';
 import Stripe from 'stripe';
-import { AUTO_OVERAGE_INCREMENTS } from '../../../lib/overage-pricing';
+import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, overageRateFor, isHardCapped, DEFAULT_PLAN, type PlanId } from '../../../lib/plans-config';
+import { subscriptionPeriodStart, subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2022-08-01',
+    apiVersion: STRIPE_API_VERSION,
   });
-}
-
-// Map Stripe product/price IDs to our plan names
-const PLAN_MAPPING: Record<string, 'starter' | 'pro' | 'teams'> = {
-  [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: 'pro',
-  [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: 'pro',
-  [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: 'teams',
-  [process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID || '']: 'teams',
-};
-
-interface UsageData {
-  compilations: number;
-  timestamp: string;
 }
 
 interface DailyUsage {
@@ -53,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let firstDayOfPeriod: Date;
     let lastDayOfPeriod: Date;
     let billingInterval: 'monthly' | 'annual' | null = null;
-    let currentPlan: 'starter' | 'pro' | 'teams' | null = null;
+    let currentPlan: PlanId | null = null;
 
     // Try to get billing period and plan from Stripe subscription
     if (stripeCustomerId && stripe) {
@@ -77,31 +64,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (subscriptions.data.length > 0) {
           const subscription = subscriptions.data[0];
 
-          // Get billing interval and plan
-          const priceId = subscription.items.data[0]?.price.id;
+          // Get billing interval and plan (match the base price to a plan)
           const priceInterval = subscription.items.data[0]?.price.recurring?.interval;
           billingInterval = priceInterval === 'year' ? 'annual' : priceInterval === 'month' ? 'monthly' : null;
-          currentPlan = PLAN_MAPPING[priceId] || 'starter';
+          currentPlan = subscription.items.data
+            .map(it => priceIdToPlan(it?.price?.id))
+            .find(Boolean) || DEFAULT_PLAN;
 
           // For annual plans, calculate monthly reset periods
           // For monthly plans, use Stripe's billing period
           if (billingInterval === 'annual') {
             // Use subscription start as anchor, calculate current month within annual period
-            const subscriptionStart = new Date(subscription.current_period_start * 1000);
+            const subscriptionStart = new Date((subscriptionPeriodStart(subscription) as number) * 1000);
             const anchorDay = subscriptionStart.getDate();
 
-            // Find the current monthly period based on the anchor day
             const currentMonth = now.getMonth();
             const currentYear = now.getFullYear();
 
-            // Calculate period start: the anchor day of current or previous month
             let periodStart = new Date(currentYear, currentMonth, anchorDay);
             if (periodStart > now) {
-              // If anchor day hasn't occurred this month, go back one month
               periodStart = new Date(currentYear, currentMonth - 1, anchorDay);
             }
 
-            // Period end is one month after period start
             let periodEnd = new Date(periodStart);
             periodEnd.setMonth(periodEnd.getMonth() + 1);
 
@@ -109,11 +93,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             lastDayOfPeriod = periodEnd;
           } else {
             // Monthly plan: use Stripe billing period directly
-            firstDayOfPeriod = new Date(subscription.current_period_start * 1000);
-            lastDayOfPeriod = new Date(subscription.current_period_end * 1000);
+            firstDayOfPeriod = new Date((subscriptionPeriodStart(subscription) as number) * 1000);
+            lastDayOfPeriod = new Date((subscriptionPeriodEnd(subscription) as number) * 1000);
           }
         } else {
-          // No active subscription, use calendar month
           const currentMonth = now.getMonth();
           const currentYear = now.getFullYear();
           firstDayOfPeriod = new Date(currentYear, currentMonth, 1);
@@ -121,28 +104,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       } catch (error) {
         console.error('Error fetching Stripe subscription for billing period:', error);
-        // Fall back to calendar month on error
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
         firstDayOfPeriod = new Date(currentYear, currentMonth, 1);
         lastDayOfPeriod = new Date(currentYear, currentMonth + 1, 0);
       }
     } else {
-      // No Stripe customer - Demo/Free users use calendar month
-      // Check if there's a preserved renewal date from a downgrade
+      // No Stripe customer - Free users use calendar month (or preserved dates on downgrade)
       const preservedRenewalDate = userData?.subscription?.renewalDate;
       const preservedUntil = userData?.subscription?.preservedUntil;
 
       if (preservedRenewalDate || preservedUntil) {
-        // Use the preserved dates from the downgrade
         const renewalDate = preservedUntil || preservedRenewalDate;
         lastDayOfPeriod = new Date(renewalDate);
-
-        // Calculate the start of the period (assuming monthly for now)
         firstDayOfPeriod = new Date(lastDayOfPeriod);
         firstDayOfPeriod.setMonth(firstDayOfPeriod.getMonth() - 1);
       } else {
-        // Demo/Free users: use calendar month (1st to end of month)
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
         firstDayOfPeriod = new Date(currentYear, currentMonth, 1);
@@ -150,34 +127,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Query usage data for the current billing period
+    // Fall back to the stored plan for Free/no-Stripe accounts.
+    const plan: PlanId = currentPlan || (userData?.subscription?.plan as PlanId) || DEFAULT_PLAN;
+
+    // Items created this period. The counter is the item count; self-heal it
+    // against the actual records (billable items carry units: 1).
     const usageRef = db.collection('usage').doc(userId);
     const usageDoc = await usageRef.get();
 
-    let totalUsage = 0;
-    let compileUsage = 0;
-    let codeGenerationUsage = 0;
+    let itemsUsed = 0;
     let dailyUsage: DailyUsage[] = [];
     let lastUpdate: string | null = null;
 
     if (usageDoc.exists) {
       const data = usageDoc.data();
-
-      // Check if we need to reset monthly usage (new billing period)
       const lastReset = data?.lastReset ? new Date(data.lastReset) : null;
       const needsReset = lastReset && lastReset < firstDayOfPeriod;
-
-      if (needsReset) {
-        // The stored total is from a previous period, so we should reset it
-        console.log('Monthly usage needs reset - using 0 for stored total');
-        totalUsage = 0;
-      } else {
-        // Use current month total for all users (Demo, Starter, and Paid)
-        totalUsage = data?.currentMonthTotal || 0;
-      }
+      itemsUsed = needsReset ? 0 : (data?.currentMonthTotal || 0);
       lastUpdate = data?.lastUpdate || null;
 
-      // Get usage breakdown by type from individual usage records
       try {
         const usageRecordsSnapshot = await db
           .collection('usage')
@@ -186,36 +154,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .where('createdAt', '<=', lastDayOfPeriod)
           .get();
 
-        compileUsage = 0;
-        codeGenerationUsage = 0;
         let calculatedTotal = 0;
-
         usageRecordsSnapshot.docs.forEach(doc => {
-          const record = doc.data();
-          const units = record.units || 0;
-          calculatedTotal += units;
-          if (record.type === 'compile') {
-            compileUsage += units;
-          } else if (record.type === 'ai_generation') {
-            codeGenerationUsage += units;
-          }
+          calculatedTotal += doc.data().units || 0;
         });
-
-        // Records are the source of truth; sync both ways so an inflated
-        // stored total doesn't mask the real number on the Settings page.
-        if (calculatedTotal !== totalUsage) {
-          console.log(`Using calculated total (${calculatedTotal}) instead of stored total (${totalUsage})`);
-          totalUsage = calculatedTotal;
+        if (calculatedTotal !== itemsUsed) {
+          itemsUsed = calculatedTotal;
         }
       } catch (breakdownError) {
         console.error('Error fetching usage breakdown (may need Firestore index):', breakdownError);
-        // Fall back to using total usage as compile usage when breakdown is not available
-        // This prevents showing an "Other" category when we can't determine the breakdown
-        compileUsage = totalUsage;
-        codeGenerationUsage = 0;
       }
 
-      // Get daily breakdown if available
+      // Optional daily breakdown (best-effort)
       try {
         const dailyRef = await db
           .collection('usage')
@@ -227,118 +177,70 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .get();
 
         dailyUsage = dailyRef.docs.map(doc => {
-          const data = doc.data();
-          return {
-            date: data.timestamp.toDate().toISOString().split('T')[0],
-            count: data.count || 0,
-          };
+          const d = doc.data();
+          return { date: d.timestamp.toDate().toISOString().split('T')[0], count: d.count || 0 };
         });
       } catch (dailyError) {
-        console.error('Error fetching daily usage breakdown:', dailyError);
-        // Continue without daily breakdown
         dailyUsage = [];
       }
     }
 
-    // Determine plan limits from Stripe subscription
-    // Base units are monthly - multiply by 12 for annual plans
-    const baseUnitAllocation = {
-      demo: 250,
-      starter: 5000,
-      pro: 100000,
-      teams: 2000000,
-    };
-
-    // Check if we should use preserved allocation (from a downgrade)
+    // Included items (preserved allocation from a downgrade wins during grace).
     const preservedUntil = userData?.subscription?.preservedUntil;
     const preservedAllocation = userData?.subscription?.preservedAllocation;
     const hasPreservedAllocation = preservedUntil && preservedAllocation && new Date(preservedUntil) > now;
+    const includedItems = hasPreservedAllocation ? preservedAllocation : includedItemsFor(plan);
 
-    let planUnits;
-    if (hasPreservedAllocation) {
-      // Use the preserved allocation from the previous plan
-      planUnits = preservedAllocation;
-      console.log('Using preserved allocation:', {
-        preservedAllocation,
-        preservedUntil,
-        originalPlan: currentPlan
-      });
-    } else if (currentPlan) {
-      // Use the normal plan allocation (always monthly, even for annual plans)
-      planUnits = baseUnitAllocation[currentPlan];
-    } else {
-      // No plan selected - use demo tier allocation
-      planUnits = baseUnitAllocation.demo;
-    }
+    const overageRatePerItem = overageRateFor(plan);
+    const hardCap = isHardCapped(plan);
 
-    const overageUnits = userData?.subscription?.overageUnits || 0;
-    const autoOverageIncrement = currentPlan ? AUTO_OVERAGE_INCREMENTS[currentPlan] : undefined;
+    // Customer overage spend cap (items). null = unlimited (paid, billed in arrears).
+    const overageLimitItems = typeof userData?.subscription?.overageLimitItems === 'number'
+      ? userData.subscription.overageLimitItems
+      : null;
+    const overageLimitUsd = typeof userData?.subscription?.overageLimitUsd === 'number'
+      ? userData.subscription.overageLimitUsd
+      : null;
 
-    const totalUnits = planUnits + overageUnits;
-    const remainingUnits = Math.max(0, totalUnits - totalUsage);
-    const percentageUsed = totalUnits > 0 ? (totalUsage / totalUnits) * 100 : 0;
+    const overageItems = Math.max(0, itemsUsed - includedItems);
+    const overageCostUsd = overageRatePerItem ? overageItems * overageRatePerItem : 0;
 
-    // Calculate usage trend (last 7 days average vs previous 7 days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const fourteenDaysAgo = new Date();
-    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    // The hard ceiling on creation: included for Free; included + cap for paid
+    // with a cap; null (unlimited) for paid without a cap.
+    const creationLimit = hardCap
+      ? includedItems
+      : (overageLimitItems === null ? null : includedItems + overageLimitItems);
+    const remaining = creationLimit === null ? null : Math.max(0, creationLimit - itemsUsed);
+    const percentageUsed = creationLimit && creationLimit > 0
+      ? Math.min(100, (itemsUsed / creationLimit) * 100)
+      : 0;
 
-    const lastWeekUsage = dailyUsage
-      .filter(d => new Date(d.date) >= sevenDaysAgo)
-      .reduce((sum, d) => sum + d.count, 0);
-
-    const previousWeekUsage = dailyUsage
-      .filter(d => new Date(d.date) >= fourteenDaysAgo && new Date(d.date) < sevenDaysAgo)
-      .reduce((sum, d) => sum + d.count, 0);
-
-    let trend = 'stable';
-    if (lastWeekUsage > previousWeekUsage * 1.1) trend = 'increasing';
-    if (lastWeekUsage < previousWeekUsage * 0.9) trend = 'decreasing';
-
-    // Calculate estimated end date based on current usage rate
-    let estimatedEndDate = null;
-    if (totalUsage > 0 && remainingUnits > 0) {
-      const daysElapsed = Math.ceil((now.getTime() - firstDayOfPeriod.getTime()) / (1000 * 60 * 60 * 24));
-      const averageDailyUsage = totalUsage / daysElapsed;
-      if (averageDailyUsage > 0) {
-        const daysRemaining = Math.ceil(remainingUnits / averageDailyUsage);
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + daysRemaining);
-        estimatedEndDate = endDate.toISOString();
-      }
-    }
-
-    // Return data in the format expected by UsageMonitor component
     return res.status(200).json({
-      currentPeriodUnits: totalUsage,
-      compileUnits: compileUsage,
-      codeGenerationUnits: codeGenerationUsage,
-      allocatedUnits: planUnits,
-      overageUnits: overageUnits,
+      plan,
+      itemsUsed,
+      includedItems,
+      overageItems,
+      overageRatePerItem,
+      overageCostUsd,
+      hardCap,
+      overageLimitItems,
+      overageLimitUsd,
       lastResetDate: firstDayOfPeriod.toISOString(),
       currentPeriodEnd: lastDayOfPeriod.toISOString(),
-      autoOverageEnabled: userData?.subscription?.autoOverageEnabled || false,
-      autoOverageAvailable: !!autoOverageIncrement,
-      autoOverageAmountUsd: autoOverageIncrement?.amountUsd || null,
-      autoOverageUnits: autoOverageIncrement?.units || null,
-      // Additional data for potential future use
       extended: {
         currentPeriod: {
           start: firstDayOfPeriod.toISOString(),
           end: lastDayOfPeriod.toISOString(),
         },
         usage: {
-          total: totalUsage,
-          limit: totalUnits,
-          remaining: remainingUnits,
+          total: itemsUsed,
+          limit: creationLimit,
+          remaining,
           percentage: Math.round(percentageUsed * 10) / 10,
         },
         dailyUsage,
-        trend,
-        estimatedEndDate,
         lastUpdate,
-      }
+      },
     });
   } catch (error) {
     console.error('Error fetching usage:', error);

@@ -33,7 +33,7 @@ import {
   logClaimEvent,
 } from "./resolvers";
 import { verifyClaimToken } from "../../lib/claim-token";
-import { checkCompileAllowed } from "../../lib/usage-service";
+import { checkItemCreateAllowed } from "../../lib/usage-service";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
@@ -228,7 +228,7 @@ const typeDefs = `
   }
 
   type Query {
-    checkCompileAllowed: CompileAllowedResponse!
+    checkItemCreateAllowed: CompileAllowedResponse!
     credentials: [CredentialInfo!]!
     parse(lang: String!, src: String!, itemId: String): ParseResult!
     data(id: String!): String!
@@ -302,7 +302,7 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
-    checkCompileAllowed: async (_, __, ctx) => {
+    checkItemCreateAllowed: async (_, __, ctx) => {
       if (ctx.freePlan) {
         return { allowed: true };
       }
@@ -312,7 +312,7 @@ const resolvers = {
       }
       try {
         const { uid } = await authenticate(token);
-        return await checkCompileAllowed(uid);
+        return await checkItemCreateAllowed(uid);
       } catch (error) {
         return { allowed: false, reason: 'Authentication failed' };
       }

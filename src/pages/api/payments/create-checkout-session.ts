@@ -1,26 +1,15 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
+import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, type PlanId, type BillingInterval } from '../../../lib/plans-config';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2022-08-01',
+    apiVersion: STRIPE_API_VERSION,
   });
 }
-
-// Map our plan IDs to Stripe price IDs
-const STRIPE_PRICE_IDS = {
-  pro: {
-    monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
-    annual: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
-  },
-  teams: {
-    monthly: process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID,
-    annual: process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID,
-  },
-};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -90,9 +79,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get the appropriate price ID
-    const priceId = STRIPE_PRICE_IDS[planId]?.[interval];
+    const priceId = stripeBasePriceId(planId as PlanId, interval as BillingInterval);
 
-    console.log('Price ID mapping:', { planId, interval, priceId, allPriceIds: STRIPE_PRICE_IDS });
+    console.log('Price ID mapping:', { planId, interval, priceId });
 
     // Check if price IDs are still placeholders
     if (!priceId || priceId === 'undefined' || priceId.includes('TEST_')) {
@@ -139,16 +128,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       defaultPaymentMethod = customer.invoice_settings?.default_payment_method;
     }
 
+    // Subscription line items: the flat base price (billed in advance) plus,
+    // when the tier has one, its metered overage price (billed in arrears). The
+    // metered line carries no quantity — usage is reported via meter events.
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      { price: priceId, quantity: 1 },
+    ];
+    const meterPriceId = stripeMeterPriceId(planId as PlanId);
+    if (meterPriceId) {
+      lineItems.push({ price: meterPriceId });
+    }
+
     // Create checkout session for NEW subscriptions only
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       mode: 'subscription',
       success_url: `${process.env.NEXT_PUBLIC_URL}/billing?session_id={CHECKOUT_SESSION_ID}&success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_URL}/billing?canceled=true`,

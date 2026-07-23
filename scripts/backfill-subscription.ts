@@ -38,19 +38,13 @@ process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GRAFFITICODE_APP_CREDEN
 
 admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId: 'graffiticode-app' });
 const db = admin.firestore();
-const stripe = new Stripe(liveKey, { apiVersion: '2022-08-01' });
+const stripe = new Stripe(liveKey, { apiVersion: STRIPE_API_VERSION });
 
-// Same mapping the webhook uses (stripe.ts). Price ids come from env; in a
-// test-mode .env.local these are test ids and won't match a live sub — use --plan then.
-const PLAN_MAPPING: Record<string, { name: string; units: number }> = {
-  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || 'x1']: { name: 'starter', units: 5000 },
-  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || 'x2']: { name: 'starter', units: 5000 },
-  [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || 'x3']: { name: 'pro', units: 100000 },
-  [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || 'x4']: { name: 'pro', units: 100000 },
-  [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || 'x5']: { name: 'teams', units: 2000000 },
-  [process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID || 'x6']: { name: 'teams', units: 2000000 },
-};
-const PLAN_UNITS: Record<string, number> = { starter: 5000, pro: 100000, teams: 2000000 };
+// Plan + item allowance come from the central config (src/lib/plans-config).
+// Price ids come from env; in a test-mode .env.local these are test ids and
+// won't match a live sub — use --plan then.
+import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, type PlanId } from '../src/lib/plans-config';
+import { subscriptionPeriod } from '../src/lib/stripe-helpers';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -71,21 +65,23 @@ async function main() {
   console.log(`\nlive subscriptions: ${subs.data.length}`);
   subs.data.forEach(s => {
     const p = s.items.data[0]?.price;
-    console.log(`  ${s.id} status=${s.status} price=${p?.id} amount=${p?.unit_amount} interval=${p?.recurring?.interval} period ${new Date(s.current_period_start * 1000).toISOString()} -> ${new Date(s.current_period_end * 1000).toISOString()}`);
+    const per = subscriptionPeriod(s);
+    const fmt = (t?: number) => t ? new Date(t * 1000).toISOString() : 'n/a';
+    console.log(`  ${s.id} status=${s.status} price=${p?.id} amount=${p?.unit_amount} interval=${p?.recurring?.interval} period ${fmt(per.start)} -> ${fmt(per.end)}`);
   });
 
   const active = subs.data.find(s => ['active', 'trialing', 'past_due'].includes(s.status));
   if (!active) { console.error('\nNo active/trialing subscription found in live Stripe; nothing to backfill.'); process.exit(1); }
 
-  const priceId = active.items.data[0]?.price.id || '';
-  let planInfo = PLAN_MAPPING[priceId];
+  const resolvedName = active.items.data.map(it => priceIdToPlan(it?.price?.id)).find(Boolean) || null;
+  let planInfo = resolvedName ? { name: resolvedName, units: includedItemsFor(resolvedName) } : null;
   if (planOverride) {
-    if (!(planOverride in PLAN_UNITS)) { console.error(`--plan must be starter|pro|teams`); process.exit(1); }
-    planInfo = { name: planOverride, units: PLAN_UNITS[planOverride] };
+    planInfo = { name: planOverride as PlanId, units: includedItemsFor(planOverride) };
   }
   if (!planInfo) {
-    console.error(`\nPrice ${priceId} is not in the local PLAN_MAPPING (likely test-vs-live price ids).`);
-    console.error(`Re-run with --plan <starter|pro|teams> after confirming the plan from the Stripe dashboard.`);
+    const priceId = active.items.data[0]?.price.id || '';
+    console.error(`\nPrice ${priceId} does not map to a known plan (likely test-vs-live price ids).`);
+    console.error(`Re-run with --plan <silver|gold|platinum internal id: pro|teams|platinum> after confirming from the Stripe dashboard.`);
     process.exit(1);
   }
 
@@ -94,8 +90,8 @@ async function main() {
     'subscription.plan': planInfo.name,
     'subscription.units': planInfo.units,
     'subscription.stripeSubscriptionId': active.id,
-    'subscription.currentPeriodStart': new Date(active.current_period_start * 1000).toISOString(),
-    'subscription.currentPeriodEnd': new Date(active.current_period_end * 1000).toISOString(),
+    'subscription.currentPeriodStart': (() => { const p = subscriptionPeriod(active).start; return p ? new Date(p * 1000).toISOString() : null; })(),
+    'subscription.currentPeriodEnd': (() => { const p = subscriptionPeriod(active).end; return p ? new Date(p * 1000).toISOString() : null; })(),
     'subscription.cancelAtPeriodEnd': active.cancel_at_period_end,
     'subscription.updatedAt': new Date().toISOString(),
   };

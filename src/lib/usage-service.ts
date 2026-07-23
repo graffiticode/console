@@ -1,54 +1,56 @@
 import { getFirestore } from "../utils/db";
-import { chargeAutoOverage } from "./auto-overage-service";
+import { includedItemsFor, isHardCapped, DEFAULT_PLAN } from "./plans-config";
 
-const PLAN_ALLOCATIONS = {
-  demo: 250,
-  starter: 5000,
-  pro: 100000,
-  teams: 2000000
-};
-
-export interface CompileAllowedResult {
+export interface ItemCreateAllowedResult {
   allowed: boolean;
   reason?: string;
+  /** Items created this billing period. */
   currentUsage?: number;
+  /** Included + (customer overage limit, if any). Infinity when uncapped. */
   totalAvailable?: number;
 }
 
-export async function checkCompileAllowed(uid: string): Promise<CompileAllowedResult> {
+/**
+ * Gate item CREATION against the account's item budget for the period.
+ *
+ * - Free/hard-cap tiers: blocked once `currentUsage >= includedItems`.
+ * - Paid tiers: allowed up to `includedItems + overageLimitItems`; when the
+ *   customer set no overage cap (`overageLimitItems` null/absent), unlimited —
+ *   overage bills in arrears via the Stripe meter.
+ *
+ * currentUsage is the item count for the period. It is derived from the stored
+ * counter, self-healed against the sum of `units` on usage records since the
+ * period start (billable item records carry units: 1; compiles/generations
+ * carry units: 0, so the sum equals the item count).
+ */
+export async function checkItemCreateAllowed(uid: string): Promise<ItemCreateAllowedResult> {
   try {
     const db = getFirestore();
 
-    // Get current usage from stored total
+    // Current usage from the stored counter.
     const usageDoc = await db.collection('usage').doc(uid).get();
     let currentUsage = usageDoc.exists ? (usageDoc.data()?.currentMonthTotal || 0) : 0;
 
-    // Get subscription and calculate available units
+    // Subscription → plan, included allowance, optional customer overage cap.
     const userDoc = await db.doc(`users/${uid}`).get();
     const userData = userDoc.data() || {};
     const subscription = userData.subscription || {};
-    const plan = subscription.plan || 'demo';
-    let allocatedUnits = PLAN_ALLOCATIONS[plan] || PLAN_ALLOCATIONS.demo;
-    const overageUnits = subscription.overageUnits || 0;
+    const plan = subscription.plan || DEFAULT_PLAN;
+    let includedItems = includedItemsFor(plan);
 
-    // Check for preserved allocation (from downgrade)
+    // Preserved allocation from a downgrade keeps the old (larger) bucket for a grace window.
     const now = new Date();
     const preservedUntil = subscription.preservedUntil;
     const preservedAllocation = subscription.preservedAllocation;
     if (preservedUntil && preservedAllocation && new Date(preservedUntil) > now) {
-      allocatedUnits = preservedAllocation;
+      includedItems = preservedAllocation;
     }
 
-    // Cross-check stored total against actual usage records for the billing period
-    // The stored total can get out of sync (e.g. after calendar month reset vs billing period)
+    // Self-heal the stored counter against the actual records for the period.
     try {
-      // Use billing period start from Stripe subscription, fall back to first of month
-      let periodStart: Date;
-      if (subscription.currentPeriodStart) {
-        periodStart = new Date(subscription.currentPeriodStart);
-      } else {
-        periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      }
+      const periodStart = subscription.currentPeriodStart
+        ? new Date(subscription.currentPeriodStart)
+        : new Date(now.getFullYear(), now.getMonth(), 1);
       const usageRecords = await db.collection('usage')
         .where('userId', '==', uid)
         .where('createdAt', '>=', periodStart)
@@ -58,38 +60,40 @@ export async function checkCompileAllowed(uid: string): Promise<CompileAllowedRe
         calculatedTotal += doc.data().units || 0;
       });
       if (calculatedTotal !== currentUsage) {
-        console.log(`checkCompileAllowed: syncing stored (${currentUsage}) → calculated (${calculatedTotal})`);
+        console.log(`checkItemCreateAllowed: syncing stored (${currentUsage}) → calculated (${calculatedTotal})`);
         currentUsage = calculatedTotal;
         await db.collection('usage').doc(uid).update({ currentMonthTotal: calculatedTotal });
       }
     } catch (err) {
-      console.error('checkCompileAllowed: error calculating actual usage', err);
+      console.error('checkItemCreateAllowed: error calculating actual usage', err);
     }
 
-    let totalAvailable = allocatedUnits + overageUnits;
-    let allowed = currentUsage <= totalAvailable;
-
-    // Auto-overage: if blocked but the user opted into automatic top-ups,
-    // charge an increment and let the request through.
-    if (!allowed && subscription.autoOverageEnabled) {
-      const { charged, unitsAdded } = await chargeAutoOverage(uid);
-      if (charged) {
-        totalAvailable += unitsAdded;
-        allowed = currentUsage <= totalAvailable;
-      }
+    // Hard-cap (Free): no overage path — blocked at the included bucket.
+    if (isHardCapped(plan)) {
+      const totalAvailable = includedItems;
+      return {
+        allowed: currentUsage < totalAvailable,
+        reason: currentUsage < totalAvailable ? undefined : 'Free plan item limit reached — upgrade to create more',
+        currentUsage,
+        totalAvailable,
+      };
     }
 
+    // Paid: allow up to the customer's overage cap, or unlimited when unset.
+    const overageLimit = typeof subscription.overageLimitItems === 'number'
+      ? subscription.overageLimitItems
+      : null;
+    const totalAvailable = overageLimit === null ? Infinity : includedItems + overageLimit;
+    const allowed = currentUsage < totalAvailable;
     return {
       allowed,
-      reason: allowed ? undefined : 'Usage limit reached',
+      reason: allowed ? undefined : 'Overage spend limit reached — raise or remove your cap to create more',
       currentUsage,
-      totalAvailable
+      totalAvailable,
     };
   } catch (error) {
-    console.error('checkCompileAllowed error:', error);
-    return {
-      allowed: false,
-      reason: 'Unable to verify usage limit'
-    };
+    console.error('checkItemCreateAllowed error:', error);
+    // Fail open on infra errors so a transient Firestore blip doesn't block creation.
+    return { allowed: true, reason: 'Unable to verify item limit' };
   }
 }

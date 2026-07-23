@@ -1,22 +1,16 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
+import { STRIPE_API_VERSION, includedItemsFor, overageRateFor, priceIdToPlan, DEFAULT_PLAN } from '../../../lib/plans-config';
+import { subscriptionPeriod } from '../../../lib/stripe-helpers';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2022-08-01',
+    apiVersion: STRIPE_API_VERSION,
   });
 }
-
-// Map Stripe product/price IDs to our plan names
-const PLAN_MAPPING = {
-  [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: 'pro',
-  [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: 'pro',
-  [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: 'teams',
-  [process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID || '']: 'teams',
-};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -49,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         cancelAtPeriodEnd: false,
         nextBillingDate: endOfMonth.toISOString(),
-        units: 100, // Demo tier units
+        units: includedItemsFor('demo'),
         overageUnits: 0,
         overageRate: null,
         hasActiveSubscription: false,
@@ -70,8 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1); // First day of next month = renewal
       const renewalDate = preservedRenewalDate || endOfMonth.toISOString();
 
-      // Demo gets 100 units, Starter gets 2000
-      const units = plan === 'demo' ? 250 : 5000;
+      const units = includedItemsFor(plan);
 
       return res.status(200).json({
         plan,
@@ -158,8 +151,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       const renewalDate = preservedRenewalDate || endOfMonth.toISOString();
 
-      // Demo gets 100 units, Starter gets 2000
-      const defaultUnits = plan === 'demo' ? 250 : 5000;
+      const defaultUnits = includedItemsFor(plan);
 
       return res.status(200).json({
         plan,
@@ -182,38 +174,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const subscription = subscriptions.data[0];
-    const priceId = subscription.items.data[0]?.price.id;
-    const planName = PLAN_MAPPING[priceId] || 'starter';
+    // A subscription carries the flat base price plus (for paid tiers) a metered
+    // overage price. Match the base price to resolve the plan, and read the
+    // interval from the base (licensed) price rather than the metered one.
+    const baseItem = subscription.items.data.find(it => priceIdToPlan(it?.price?.id)) || subscription.items.data[0];
+    const planName = priceIdToPlan(baseItem?.price?.id) || DEFAULT_PLAN;
 
-    // Get billing interval from Stripe subscription
-    const stripeInterval = subscription.items.data[0]?.price.recurring?.interval;
+    // Get billing interval from the base price.
+    const stripeInterval = baseItem?.price.recurring?.interval;
     const interval = stripeInterval === 'year' ? 'annual' : stripeInterval === 'month' ? 'monthly' : null;
-
-    // Get unit allocation based on plan (monthly base)
-    const baseUnitAllocation = {
-      starter: 5000,
-      pro: 100000,
-      teams: 2000000,
-    };
 
     // Check for preserved allocation from a downgrade
     const preservedUntil = userData?.subscription?.preservedUntil;
     const preservedAllocation = userData?.subscription?.preservedAllocation;
     const hasPreservedAllocation = preservedUntil && preservedAllocation && new Date(preservedUntil) > new Date();
 
-    // Use preserved allocation if available, otherwise calculate normally
+    // Use preserved allocation if available, otherwise the plan's included items.
+    // Annual plans include 12x the monthly item bucket.
     const planUnits = hasPreservedAllocation
       ? preservedAllocation
       : (interval === 'annual'
-        ? (baseUnitAllocation[planName] || 1000) * 12
-        : (baseUnitAllocation[planName] || 1000));
-
-    // Get overage rate based on plan
-    const overageRate = {
-      starter: null,
-      pro: 0.001, // $0.001 per unit
-      teams: 0.0002, // $0.0002 per unit
-    };
+        ? includedItemsFor(planName) * 12
+        : includedItemsFor(planName));
 
     // Get any purchased overage units from metadata or database
     const overageUnits = parseInt(subscription.metadata?.overageUnits || '0');
@@ -221,7 +203,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Check for scheduled changes and get the correct renewal date
     let scheduledPlan = null;
     let scheduledInterval = null;
-    let effectiveRenewalDate = subscription.current_period_end;
+    const period = subscriptionPeriod(subscription);
+    let effectiveRenewalDate = period.end;
 
     if (subscription.schedule) {
       try {
@@ -239,7 +222,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const nextPhase = schedule.phases[1];
           if (nextPhase && nextPhase.items && nextPhase.items.length > 0) {
             const nextPriceId = nextPhase.items[0].price as string;
-            scheduledPlan = PLAN_MAPPING[nextPriceId] || null;
+            scheduledPlan = priceIdToPlan(nextPriceId) || null;
 
             // Get the scheduled interval from the price
             const nextPrice = await stripe.prices.retrieve(nextPriceId);
@@ -265,8 +248,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       scheduledInterval,
       status: displayStatus,
       currentBillingPeriod: {
-        start: new Date(subscription.current_period_start * 1000).toISOString(),
-        end: new Date(effectiveRenewalDate * 1000).toISOString(),
+        start: period.start ? new Date(period.start * 1000).toISOString() : null,
+        end: effectiveRenewalDate ? new Date(effectiveRenewalDate * 1000).toISOString() : null,
       },
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
       nextBillingDate: effectiveRenewalDate
@@ -274,7 +257,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         : null,
       units: planUnits,
       overageUnits,
-      overageRate: overageRate[planName],
+      overageRate: overageRateFor(planName),
       stripeSubscriptionId: subscription.id,
       isUsingPreservedAllocation: hasPreservedAllocation,
       preservedUntil: hasPreservedAllocation ? preservedUntil : null,

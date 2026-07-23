@@ -12,10 +12,11 @@ export default function UsageWarning({ userId }: UsageWarningProps) {
   const {
     isOverLimit,
     isNearLimit,
-    remainingUnits,
+    remainingItems,
     percentageUsed,
-    totalUnits,
-    usedUnits,
+    totalItems,
+    usedItems,
+    hardCap,
     loading
   } = useUsageStatus(userId);
 
@@ -26,6 +27,8 @@ export default function UsageWarning({ userId }: UsageWarningProps) {
     return null;
   }
 
+  const uncapped = totalItems === null;
+
   const formatNumber = (num: number) => {
     return Math.abs(num).toLocaleString();
   };
@@ -35,7 +38,7 @@ export default function UsageWarning({ userId }: UsageWarningProps) {
       return {
         dot: 'bg-red-500',
         ring: 'ring-red-500',
-        animation: remainingUnits < -1000 ? 'animate-pulse' : '',
+        animation: 'animate-pulse',
         barColor: 'bg-red-500',
         barBgColor: 'bg-red-100',
       };
@@ -150,8 +153,8 @@ export default function UsageWarning({ userId }: UsageWarningProps) {
                       {/* Usage Bar Chart */}
                       <div className="mt-6">
                         <div className="flex justify-between text-sm text-gray-600 mb-2">
-                          <span>Used: {formatNumber(usedUnits)}</span>
-                          <span>Total: {formatNumber(totalUnits)}</span>
+                          <span>Used: {formatNumber(usedItems)} items</span>
+                          <span>Included: {uncapped ? 'Unlimited' : formatNumber(totalItems as number)}</span>
                         </div>
 
                         {/* Progress Bar */}
@@ -175,13 +178,19 @@ export default function UsageWarning({ userId }: UsageWarningProps) {
 
                         {/* Additional Info */}
                         <div className="mt-4 space-y-2 text-sm">
-                          {isOverLimit ? (
+                          {uncapped ? (
+                            <div className="text-green-600 font-medium">
+                              {formatNumber(usedItems)} items created this period
+                            </div>
+                          ) : isOverLimit ? (
                             <div className="text-red-600 font-medium">
-                              Over by {formatNumber(Math.abs(remainingUnits))} units
+                              {hardCap
+                                ? `Reached your ${formatNumber(totalItems as number)}-item Free limit`
+                                : 'Overage spend cap reached'}
                             </div>
                           ) : (
                             <div className="text-green-600 font-medium">
-                              {formatNumber(remainingUnits)} units remaining
+                              {formatNumber(remainingItems as number)} items remaining
                             </div>
                           )}
                         </div>
@@ -194,7 +203,7 @@ export default function UsageWarning({ userId }: UsageWarningProps) {
                           className="inline-flex w-full justify-center rounded-none bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600"
                           onClick={() => setShowPopup(false)}
                         >
-                          {isOverLimit ? 'Upgrade Plan' : 'Manage Subscription'}
+                          {isOverLimit && hardCap ? 'Upgrade Plan' : 'Manage Subscription'}
                         </Link>
                         <button
                           type="button"

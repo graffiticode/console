@@ -1,9 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
+import { STRIPE_API_VERSION } from '../../../lib/plans-config';
+import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
 import { getFirestore } from '../../../utils/db';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2022-08-01',
+  apiVersion: STRIPE_API_VERSION,
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -131,7 +133,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id: resumedSubscription.id,
         status: resumedSubscription.status,
         cancelAtPeriodEnd: resumedSubscription.cancel_at_period_end,
-        currentPeriodEnd: new Date(resumedSubscription.current_period_end * 1000).toISOString(),
+        currentPeriodEnd: (() => {
+          const end = subscriptionPeriodEnd(resumedSubscription);
+          return end ? new Date(end * 1000).toISOString() : null;
+        })(),
       },
       message: 'Subscription has been resumed successfully',
     });

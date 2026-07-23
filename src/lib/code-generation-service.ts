@@ -46,7 +46,6 @@ import {
   formatPromptSpecForLog,
   RenderContext,
 } from "./prompt-renderer";
-import { checkCompileAllowed } from "./usage-service";
 import { assertNotCappedOrThrow, recordSpend } from "./free-plan-spend";
 import { checkBurstLimit, checkDailyLimit } from "./free-plan-throttle";
 import { FreePlanError, buildSignupUrl } from "./free-plan-context";
@@ -1269,18 +1268,10 @@ export async function generateCode({
       await checkBurstLimit(auth.sessionNamespace);
       await checkDailyLimit(auth.sessionNamespace);
     }
-  } else if (auth?.uid) {
-    // Check usage limit before proceeding
-    const { allowed, reason, currentUsage, totalAvailable } = await checkCompileAllowed(auth.uid);
-    console.log("generateCode() usage check:", { uid: auth.uid, allowed, reason, currentUsage, totalAvailable });
-    if (!allowed) {
-      console.log("generateCode() returning usage limit error");
-      return {
-        code: null,
-        errors: [{ message: reason || 'Usage limit reached' }]
-      };
-    }
   }
+  // NOTE: item-based billing gates at item CREATION (createItem /
+  // startCodeGeneration), not here — generation and its iterations are free.
+  // Editing an existing item runs generateCode without consuming item budget.
 
   // Generate request ID if not provided
   const requestId = rid || generateRequestId();
@@ -1887,63 +1878,21 @@ export async function generateCode({
     // Ensure the code is properly processed one final time before returning
     const finalProcessedCode = await processGeneratedCode(generatedCode, lang, rid, accessToken);
 
-    // Track usage for token consumption
+    // Token/cost telemetry. Under item-based billing, code generation and its
+    // iterations are FREE (billing is per successful item via recordBillableItem),
+    // so we record units: 0 and never touch the monthly item counter. The tokens
+    // and cost fields are retained for margin/cost reporting (revenue-vs-cost.ts).
     if (auth?.uid && finalUsage.total_tokens > 0) {
       try {
         const db = getFirestoreDb();
-
-        // Get user's subscription to determine pricing
         const userDoc = await db.doc(`users/${auth.uid}`).get();
-        const userData = userDoc.data();
-        const subscription = userData?.subscription || {};
-        const plan = subscription.plan || 'demo';
-
-        // Fixed ratio: tokens per compile unit, capped at 20 units per call
-        const TOKENS_PER_UNIT = 500;
-        const MAX_UNITS_PER_CALL = 20;
-        const totalTokenCost = 0; // kept for usage record
-        const rawUnits = Math.max(1, Math.ceil(finalUsage.total_tokens / TOKENS_PER_UNIT));
-        let compileUnits = Math.min(rawUnits, MAX_UNITS_PER_CALL);
-
+        const plan = userDoc.data()?.subscription?.plan || 'demo';
         const now = new Date();
 
-        // Check if user is over limit before this operation
-        let wasOverLimit = false;
-        try {
-          const overageUnits = subscription.overageUnits || 0;
-
-          // Get plan allocation
-          const planAllocations = {
-            demo: 250,
-            starter: 5000,
-            pro: 100000,
-            teams: 2000000
-          };
-          let allocatedUnits = planAllocations[plan] || 100;
-
-          // Check for preserved allocation (from downgrade)
-          const preservedUntil = subscription.preservedUntil;
-          const preservedAllocation = subscription.preservedAllocation;
-          if (preservedUntil && preservedAllocation && new Date(preservedUntil) > now) {
-            allocatedUnits = preservedAllocation;
-          }
-
-          // Get current usage
-          const usageDoc = await db.collection('usage').doc(auth.uid).get();
-          const currentUsage = usageDoc.exists ? (usageDoc.data().currentMonthTotal || 0) : 0;
-
-          // Calculate if over limit (before adding these new units)
-          const totalAvailable = allocatedUnits + overageUnits;
-          wasOverLimit = currentUsage >= totalAvailable;
-        } catch (error) {
-          console.error('Error checking usage limit:', error);
-        }
-
-        // Add individual usage record for audit trail
         await db.collection('usage').add({
           userId: auth.uid,
           taskId: requestId,
-          units: compileUnits,
+          units: 0,
           createdAt: now,
           timestamp: now.toISOString(),
           lang: lang,
@@ -1955,53 +1904,14 @@ export async function generateCode({
             total: finalUsage.total_tokens,
           },
           cost: {
-            total: totalTokenCost,
+            total: 0,
           },
           plan: plan,
-          tokensPerUnit: TOKENS_PER_UNIT,
           fixAttempts: fixAttempts,
-          wasOverLimit: wasOverLimit
         });
-
-        // Update monthly usage total
-        const usageDocRef = db.collection('usage').doc(auth.uid);
-        const usageDoc = await usageDocRef.get();
-
-        // Reset on billing-period rollover (not calendar month). lastReset is
-        // pinned to the period start so subsequent compiles in the same period
-        // take the increment branch.
-        const periodStart = subscription.currentPeriodStart
-          ? new Date(subscription.currentPeriodStart)
-          : new Date(now.getFullYear(), now.getMonth(), 1);
-        if (usageDoc.exists) {
-          const currentData = usageDoc.data();
-          const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
-          const isNewBillingPeriod = !lastReset || lastReset < periodStart;
-
-          if (isNewBillingPeriod) {
-            await usageDocRef.set({
-              currentMonthTotal: compileUnits,
-              lastReset: periodStart.toISOString(),
-              lastUpdated: now.toISOString()
-            });
-          } else {
-            // Atomic increment — Firestore applies the delta server-side so
-            // concurrent compiles can't lose updates via read-then-write.
-            await usageDocRef.update({
-              currentMonthTotal: admin.firestore.FieldValue.increment(compileUnits),
-              lastUpdated: now.toISOString()
-            });
-          }
-        } else {
-          await usageDocRef.set({
-            currentMonthTotal: compileUnits,
-            lastReset: periodStart.toISOString(),
-            lastUpdated: now.toISOString()
-          });
-        }
       } catch (error) {
-        console.error("[generateCode] Failed to track usage:", error);
-        // Don't throw - we still want to return the result even if usage tracking fails
+        console.error("[generateCode] Failed to record token telemetry:", error);
+        // Don't throw - we still want to return the result even if telemetry fails
       }
     }
 

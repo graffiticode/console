@@ -1,5 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
+import { STRIPE_API_VERSION } from '../../../lib/plans-config';
+import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
 import { getFirestore } from '../../../utils/db';
 import * as admin from 'firebase-admin';
 
@@ -7,7 +9,7 @@ import * as admin from 'firebase-admin';
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2022-08-01',
+    apiVersion: STRIPE_API_VERSION,
   });
 }
 
@@ -185,7 +187,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // Store the current renewal date before making changes
-        const preservedRenewalDate = existingSub.current_period_end;
+        const preservedRenewalDate = subscriptionPeriodEnd(existingSub);
 
         // Update subscription immediately to the new plan
         // Use 'none' proration to avoid charging/crediting - just switch the plan
@@ -226,7 +228,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Check if payment needs confirmation (3D Secure, etc) - only for new subscriptions
     if (subscription.latest_invoice) {
       const latestInvoice = subscription.latest_invoice as Stripe.Invoice;
-      const paymentIntent = latestInvoice.payment_intent as Stripe.PaymentIntent;
+      // NOTE: `invoice.payment_intent` was removed from the Invoice shape in
+      // recent API versions; the expand path still returns it at runtime. Cast
+      // to keep the 3DS confirmation flow — verify against the new API in test mode.
+      const paymentIntent = (latestInvoice as any).payment_intent as Stripe.PaymentIntent;
 
       if (paymentIntent && paymentIntent.status === 'requires_action') {
         // Payment requires additional authentication
@@ -250,7 +255,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // If this was a downgrade, store the preserved allocation
     if (existingSub && !isUpgrade) {
       updateData['subscription.preservedAllocation'] = oldAllocation;
-      updateData['subscription.preservedUntil'] = new Date(subscription.current_period_end * 1000).toISOString();
+      const subEnd = subscriptionPeriodEnd(subscription);
+      updateData['subscription.preservedUntil'] = subEnd ? new Date(subEnd * 1000).toISOString() : null;
     } else if (currentPlan === 'starter') {
       // If upgrading from starter, clear any preserved fields and canceledAt
       updateData['subscription.preservedAllocation'] = admin.firestore.FieldValue.delete();

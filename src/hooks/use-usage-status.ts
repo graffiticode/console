@@ -2,14 +2,15 @@ import useSWR from 'swr';
 import axios from 'axios';
 
 interface UsageData {
-  currentPeriodUnits: number;
-  allocatedUnits: number;
-  overageUnits: number;
+  itemsUsed: number;
+  includedItems: number;
+  hardCap: boolean;
   extended?: {
     usage?: {
       total: number;
-      limit: number;
-      remaining: number;
+      // null = unlimited (paid tier with no customer overage cap)
+      limit: number | null;
+      remaining: number | null;
       percentage: number;
     };
   };
@@ -18,10 +19,14 @@ interface UsageData {
 interface UsageStatus {
   isOverLimit: boolean;
   isNearLimit: boolean;
-  remainingUnits: number;
+  // null when the plan is uncapped (paid, no overage cap)
+  remainingItems: number | null;
   percentageUsed: number;
-  totalUnits: number;
-  usedUnits: number;
+  // null when uncapped
+  totalItems: number | null;
+  usedItems: number;
+  /** Free/hard-cap tier: blocking at the included limit is a hard stop. */
+  hardCap: boolean;
   loading: boolean;
   error: any;
 }
@@ -32,38 +37,40 @@ const fetcher = async (url: string) => {
 };
 
 export function useUsageStatus(userId: string | undefined): UsageStatus {
-  // Refresh every 30 seconds when over limit, otherwise every 60 seconds
-  const { data, error, mutate } = useSWR<UsageData>(
+  const { data, error } = useSWR<UsageData>(
     userId ? `/api/payments/usage?userId=${userId}` : null,
     fetcher,
     {
       refreshInterval: (data) => {
-        if (!data) return 60000; // 60 seconds default
-        const remaining = data.extended?.usage?.remaining || 0;
-        return remaining < 0 ? 30000 : 60000; // 30s when over, 60s otherwise
+        if (!data) return 60000;
+        const remaining = data.extended?.usage?.remaining;
+        return remaining !== null && remaining !== undefined && remaining <= 0 ? 30000 : 60000;
       },
       revalidateOnFocus: true,
     }
   );
 
-  // Calculate usage status - use extended data if available for accuracy
-  const usedUnits = data?.extended?.usage?.total || data?.currentPeriodUnits || 0;
-  const totalUnits = data?.extended?.usage?.limit || (data ? (data.allocatedUnits + data.overageUnits) : 0);
-  const remainingUnits = data?.extended?.usage?.remaining !== undefined
-    ? (data.extended.usage.remaining === 0 && usedUnits > totalUnits ? totalUnits - usedUnits : data.extended.usage.remaining)
-    : totalUnits - usedUnits;
-  const percentageUsed = data?.extended?.usage?.percentage || (totalUnits > 0 ? (usedUnits / totalUnits) * 100 : 0);
+  const usedItems = data?.extended?.usage?.total ?? data?.itemsUsed ?? 0;
+  const totalItems = data?.extended?.usage?.limit ?? (data ? data.includedItems : null);
+  const remainingItems = data?.extended?.usage?.remaining ?? (
+    totalItems === null ? null : Math.max(0, totalItems - usedItems)
+  );
+  const percentageUsed = data?.extended?.usage?.percentage
+    ?? (totalItems && totalItems > 0 ? (usedItems / totalItems) * 100 : 0);
 
-  const isNearLimit = percentageUsed >= 80 && percentageUsed < 100;
-  const isOverLimit = remainingUnits < 0;
+  // Uncapped (paid, no overage cap): never near/over the limit.
+  const uncapped = totalItems === null;
+  const isNearLimit = !uncapped && percentageUsed >= 80 && percentageUsed < 100;
+  const isOverLimit = !uncapped && remainingItems !== null && remainingItems <= 0 && usedItems >= (totalItems ?? 0);
 
   return {
     isOverLimit,
     isNearLimit,
-    remainingUnits,
-    percentageUsed: Math.min(percentageUsed, 999), // Cap at 999% for display
-    totalUnits,
-    usedUnits,
+    remainingItems,
+    percentageUsed: Math.min(percentageUsed, 999),
+    totalItems,
+    usedItems,
+    hardCap: data?.hardCap ?? false,
     loading: !error && !data,
     error,
   };

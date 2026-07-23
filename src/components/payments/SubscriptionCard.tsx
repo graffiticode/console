@@ -141,7 +141,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
               {plan.name}
             </dd>
             <dd className="mt-1 text-sm text-gray-600">
-              {displayUnits.toLocaleString()} compile units per month
+              {displayUnits.toLocaleString()} items per month
             </dd>
             {subscription.plan === 'demo' && (
               <dd className="mt-1 text-xs text-gray-500">
