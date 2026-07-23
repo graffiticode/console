@@ -7,8 +7,9 @@ import {
 } from '@heroicons/react/24/outline'
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
-import { DocumentDuplicateIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import SignIn from "./SignIn";
+import CopyableId from "./CopyableId";
 import { getAccessToken, loadTaskVersions, loadItemClientTags, getData } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "@graffiticode/auth-react";
 import TasksHeaderMenu, {
@@ -62,20 +63,10 @@ function formatTimestamp(ts) {
 }
 
 function TaskMenu({ task, isOpen, onOpen, onClose, onFilterByItem }) {
-  const [taskIdCopied, setTaskIdCopied] = useState(false);
-  const [itemIdCopied, setItemIdCopied] = useState(false);
-  const [taskIdFocused, setTaskIdFocused] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const taskIdRef = useRef<HTMLTextAreaElement>(null);
   const [menuPosition, setMenuPosition] = useState({ top: -9999, left: -9999 });
-
-  const fitTaskIdHeight = () => {
-    const el = taskIdRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
-  };
+  const itemIds: string[] = Array.isArray(task.itemIds) ? task.itemIds : [];
 
   const positionMenu = () => {
     if (buttonRef.current && menuRef.current) {
@@ -171,123 +162,45 @@ function TaskMenu({ task, isOpen, onOpen, onClose, onFilterByItem }) {
 
               <div className="mb-4">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Task ID</label>
-                <div className="flex items-start gap-1">
-                  <textarea
-                    ref={taskIdRef}
-                    rows={1}
-                    spellCheck={false}
-                    readOnly
-                    wrap="soft"
-                    className={classNames(
-                      "flex-1 min-w-0 text-xs font-mono text-gray-600 py-1.5 px-2 ring-1 ring-gray-300 rounded-none focus:outline-none focus:ring-gray-500 resize-none leading-5",
-                      taskIdFocused ? "break-all" : "whitespace-nowrap overflow-hidden"
-                    )}
-                    value={taskIdFocused ? task.id : elideCompoundId(task.id)}
-                    onFocus={(e) => {
-                      setTaskIdFocused(true);
-                      setTimeout(() => {
-                        e.target.select();
-                        fitTaskIdHeight();
-                      }, 0);
-                    }}
-                    onBlur={() => {
-                      setTaskIdFocused(false);
-                      const el = taskIdRef.current;
-                      if (el) el.style.height = '';
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(task.id);
-                      setTaskIdCopied(true);
-                      setTimeout(() => setTaskIdCopied(false), 1000);
-                    }}
-                    className="flex-shrink-0 p-1.5 text-gray-500 hover:text-gray-900 ring-1 ring-gray-300 hover:ring-gray-500 rounded-none"
-                    title="Copy task id"
-                    aria-label="Copy task id"
-                  >
-                    {taskIdCopied ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-green-500">
-                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
-                      </svg>
-                    ) : (
-                      <DocumentDuplicateIcon className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
+                <CopyableId value={task.id} display={elideCompoundId(task.id)} title="Click to copy full task id" />
               </div>
 
-              {task.itemId && (
+              {itemIds.length > 0 && (
                 <div className="mb-4">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Item ID</label>
-                  <div className="flex items-start gap-1">
-                    <input
-                      type="text"
-                      spellCheck={false}
-                      readOnly
-                      className="flex-1 min-w-0 text-xs font-mono text-gray-600 py-1.5 px-2 ring-1 ring-gray-300 rounded-none focus:outline-none focus:ring-gray-500"
-                      value={task.itemId}
-                      onFocus={(e) => e.target.select()}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(task.itemId);
-                        setItemIdCopied(true);
-                        setTimeout(() => setItemIdCopied(false), 1000);
-                      }}
-                      className="flex-shrink-0 p-1.5 text-gray-500 hover:text-gray-900 ring-1 ring-gray-300 hover:ring-gray-500 rounded-none"
-                      title="Copy item id"
-                      aria-label="Copy item id"
-                    >
-                      {itemIdCopied ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-green-500">
-                          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
-                        </svg>
-                      ) : (
-                        <DocumentDuplicateIcon className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    {itemIds.length > 1 ? `Item IDs (${itemIds.length})` : 'Item ID'}
+                  </label>
+                  {itemIds.map((id) => (
+                    <CopyableId key={id} value={id} title="Click to copy item id" />
+                  ))}
                 </div>
               )}
 
               <div className="mb-1">
                 {created && (
                   <div className="flex gap-3 text-xs text-gray-600 py-0.5">
-                    <span className="font-semibold w-20 flex-shrink-0">Created</span>
-                    <span className="font-mono">{created}</span>
+                    <span className="font-semibold w-16 flex-shrink-0">Created</span>
+                    <span className="font-mono whitespace-nowrap">{created}</span>
                   </div>
                 )}
                 <div className="flex gap-3 text-xs text-gray-600 py-0.5">
-                  <span className="font-semibold w-20 flex-shrink-0">Lang</span>
+                  <span className="font-semibold w-16 flex-shrink-0">Lang</span>
                   <span className="font-mono">{langDisplay}</span>
-                </div>
-                {task.name && (
-                  <div className="flex gap-3 text-xs text-gray-600 py-0.5">
-                    <span className="font-semibold w-20 flex-shrink-0">Name</span>
-                    <span className="font-mono truncate">{task.name}</span>
-                  </div>
-                )}
-                <div className="flex gap-3 text-xs text-gray-600 py-0.5">
-                  <span className="font-semibold w-20 flex-shrink-0">Source</span>
-                  <span className="font-mono">{task.source || '—'}</span>
                 </div>
                 {task.label && (
                   <div className="flex gap-3 text-xs text-gray-600 py-0.5">
-                    <span className="font-semibold w-20 flex-shrink-0">Change</span>
+                    <span className="font-semibold w-16 flex-shrink-0">Change</span>
                     <span className="text-gray-700 break-words">{task.label}</span>
                   </div>
                 )}
               </div>
 
               <div className="mt-4 border-t pt-4">
-                {task.itemId && (
+                {itemIds.length === 1 && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onFilterByItem(task.itemId);
+                      onFilterByItem(itemIds[0]);
                       onClose();
                     }}
                     className="flex items-center w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-none"
@@ -436,23 +349,44 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
   })();
 
   useEffect(() => {
-    // One row per recorded version, newest first — the server already orders by
-    // createdAt desc, but sort defensively so a mixed cache can't reorder the list.
-    const uniqueTaskIds = (Array.isArray(versionsData) ? versionsData : [])
-      .map((v: any) => ({
-        key: v.id,
-        id: v.taskId,
-        itemId: v.itemId,
-        timestamp: +v.createdAt || 0,
-        lang: v.lang,
-        langs: Array.isArray(v.langs) && v.langs.length ? v.langs : [v.lang],
-        name: v.name,
-        mark: v.mark,
-        client: v.client,
-        source: v.source,
-        label: v.label,
-        current: false,
-      }))
+    // Dedup by taskId: content-addressed tasks are shared when items are copied
+    // or share the same content, so the same taskId can arrive under several
+    // items. Collapse those into one row and collect the item ids; the newest
+    // record supplies the row's timestamp and display fields.
+    const byTaskId = new Map<string, any>();
+    for (const v of Array.isArray(versionsData) ? versionsData : []) {
+      const ts = +v.createdAt || 0;
+      const existing = byTaskId.get(v.taskId);
+      if (!existing) {
+        byTaskId.set(v.taskId, {
+          key: v.taskId,
+          id: v.taskId,
+          itemIds: [v.itemId],
+          timestamp: ts,
+          lang: v.lang,
+          langs: Array.isArray(v.langs) && v.langs.length ? v.langs : [v.lang],
+          name: v.name,
+          mark: v.mark,
+          client: v.client,
+          source: v.source,
+          label: v.label,
+          current: false,
+        });
+        continue;
+      }
+      if (!existing.itemIds.includes(v.itemId)) existing.itemIds.push(v.itemId);
+      if (ts > existing.timestamp) {
+        existing.timestamp = ts;
+        existing.name = v.name;
+        existing.mark = v.mark;
+        existing.client = v.client;
+        existing.source = v.source;
+        existing.label = v.label;
+      }
+    }
+    // Newest first — the server orders per-item, but dedup interleaves items, so
+    // sort the merged rows.
+    const uniqueTaskIds = Array.from(byTaskId.values())
       .sort((a, b) => b.timestamp - a.timestamp);
 
     setTaskIds(uniqueTaskIds);
@@ -575,7 +509,8 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
     if (dateFilter.from !== null && ts < dateFilter.from) return false;
     if (dateFilter.to !== null && ts > dateFilter.to) return false;
     // A full item id was already applied server-side; a prefix filters here.
-    if (!serverItemId && !matchesItemFilter(task.itemId, itemFilter)) return false;
+    // A deduped row can belong to several items — match if any of them does.
+    if (!serverItemId && !task.itemIds.some((id: string) => matchesItemFilter(id, itemFilter))) return false;
     if (!langPattern) return true;
     return matchesLangPattern(task.langs, langPattern);
   });

@@ -7,6 +7,7 @@ import MarkSelector, { marks } from './mark-selector';
 import { clientOptionForId } from './client-selector';
 import PublicToggle from './public-toggle';
 import ShareItemDialog from './ShareItemDialog';
+import CopyableId from './CopyableId';
 import { createItem } from '../utils/swr/fetchers';
 import { generateThumbnail } from '../lib/generate-thumbnail';
 import { useThumbnailJob } from '../lib/thumbnail-jobs';
@@ -45,26 +46,9 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
   const isSnapping = useThumbnailJob(itemId);
   // The snapshot dialect itself isn't a thumbnail target — hide the action on L0013 items.
   const isSnapLang = String(lang ?? '').replace(/^L/i, '').padStart(4, '0') === '0013';
-  const [taskIdValue, setTaskIdValue] = useState(taskId || "");
-  const [taskIdCopied, setTaskIdCopied] = useState(false);
-  const [taskIdFocused, setTaskIdFocused] = useState(false);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const nameInputRef = useRef(null);
-  const taskIdRef = useRef<HTMLTextAreaElement>(null);
-
-  const fitTaskIdHeight = () => {
-    const el = taskIdRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
-  };
-
-  // Keep the editable taskId field in sync when the parent's taskId changes
-  // (e.g. another generation pass writes a new chained id).
-  useEffect(() => {
-    setTaskIdValue(taskId || "");
-  }, [taskId]);
   const [menuPosition, setMenuPosition] = useState({ top: -9999, left: -9999 });
 
   // Position menu next to the button
@@ -261,96 +245,14 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
 
               <div className="mb-4">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Item ID</label>
-                <div
-                  className="text-xs font-mono text-gray-600 hover:text-gray-900 cursor-pointer py-1.5 truncate"
-                  onClick={(e) => {
-                    navigator.clipboard.writeText(itemId);
-                    const element = e.currentTarget;
-                    element.innerHTML = `
-                      <span class="text-green-500 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1">
-                          <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
-                        </svg>
-                        Copied!
-                      </span>
-                    `;
-                    setTimeout(() => {
-                      element.textContent = itemId;
-                    }, 1000);
-                  }}
-                  title="Click to copy"
-                >
-                  {itemId}
-                </div>
+                <CopyableId value={itemId} title="Click to copy item id" />
               </div>
 
               <div className="mb-4">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Task ID</label>
-                <div className="flex items-start gap-1">
-                  <textarea
-                    ref={taskIdRef}
-                    rows={1}
-                    spellCheck={false}
-                    wrap="soft"
-                    className={classNames(
-                      "flex-1 min-w-0 text-xs font-mono text-gray-600 hover:text-gray-900 focus:text-gray-900 py-1.5 px-2 ring-1 ring-gray-300 rounded-none focus:outline-none focus:ring-gray-500 resize-none leading-5",
-                      taskIdFocused ? "break-all" : "whitespace-nowrap overflow-hidden"
-                    )}
-                    value={taskIdFocused ? taskIdValue : elideCompoundId(taskIdValue)}
-                    onChange={(e) => {
-                      if (taskIdFocused) setTaskIdValue(e.target.value);
-                    }}
-                    onFocus={(e) => {
-                      setTaskIdFocused(true);
-                      const el = e.target;
-                      setTimeout(() => {
-                        el.select();
-                        fitTaskIdHeight();
-                      }, 0);
-                    }}
-                    onBlur={() => {
-                      setTaskIdFocused(false);
-                      const el = taskIdRef.current;
-                      if (el) el.style.height = '';
-                      const trimmed = taskIdValue.trim();
-                      if (trimmed && trimmed !== taskId) {
-                        onChange({ itemId, taskId: trimmed });
-                      } else if (!trimmed) {
-                        setTaskIdValue(taskId || "");
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        (e.target as HTMLTextAreaElement).blur();
-                      } else if (e.key === 'Escape') {
-                        e.preventDefault();
-                        setTaskIdValue(taskId || "");
-                        (e.target as HTMLTextAreaElement).blur();
-                      }
-                    }}
-                    title="Edit task id (chained ids use '+' between segments)"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(taskIdValue);
-                      setTaskIdCopied(true);
-                      setTimeout(() => setTaskIdCopied(false), 1000);
-                    }}
-                    className="flex-shrink-0 p-1.5 text-gray-500 hover:text-gray-900 ring-1 ring-gray-300 hover:ring-gray-500 rounded-none"
-                    title="Copy task id"
-                    aria-label="Copy task id"
-                  >
-                    {taskIdCopied ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-green-500">
-                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
-                      </svg>
-                    ) : (
-                      <DocumentDuplicateIcon className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
+                {taskId
+                  ? <CopyableId value={taskId} display={elideCompoundId(taskId)} title="Click to copy full task id" />
+                  : <div className="text-xs font-mono text-gray-400 py-1.5">—</div>}
               </div>
 
               <div className="mb-4">
