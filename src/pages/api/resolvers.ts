@@ -48,6 +48,125 @@ function freePlanItemFields(auth: AuthArg, now = Date.now()) {
     expiresAt: now + FREE_PLAN_ITEM_TTL_MS,
   };
 }
+
+// How a version came to be. Best-effort provenance: callers that know pass it,
+// everything else falls back to the item's client tag.
+export type VersionSource =
+  | "chat"
+  | "editor"
+  | "mcp"
+  | "generation-job"
+  | "claim"
+  | "share"
+  | "backfill"
+  | "unknown";
+
+const VERSION_LABEL_MAX = 200;
+
+const VERSION_SOURCES: VersionSource[] = [
+  "chat",
+  "editor",
+  "mcp",
+  "generation-job",
+  "claim",
+  "share",
+  "backfill",
+  "unknown",
+];
+
+// `source` reaches us from a GraphQL arg, so it's caller-supplied — clamp it to
+// the known set rather than storing whatever a client sends.
+function normalizeVersionSource(source: unknown): VersionSource | undefined {
+  if (typeof source !== "string") return undefined;
+  return VERSION_SOURCES.includes(source as VersionSource)
+    ? (source as VersionSource)
+    : undefined;
+}
+
+// Callers that know how a change originated pass `source` explicitly; otherwise
+// the item's client tag is the best available signal.
+function defaultVersionSource(client?: string): VersionSource {
+  if (client === "mcp") return "mcp";
+  return "unknown";
+}
+
+// Append-only record of one content state of an item. Pointer-only: the taskId is
+// content-addressed and permanently stored by api.graffiticode.org, so the code
+// itself is never duplicated here (see docs/item-versioning.md).
+//
+// Doc id is `${itemId}__${taskId}`, which makes writes idempotent by construction:
+// generate-job retries, double-saves, and reverting to an earlier state (which
+// yields the SAME taskId, since tasks are content-addressed) all collapse onto the
+// existing doc rather than piling up rows.
+//
+// Never throws — a failed version write must not fail the mutation that triggered it.
+export async function recordVersion({
+  auth,
+  itemId,
+  taskId,
+  lang,
+  upstreamLangs,
+  name,
+  mark,
+  client,
+  source = "unknown",
+  label,
+  createdAt = Date.now(),
+}: {
+  auth: AuthArg;
+  itemId: string;
+  taskId: string;
+  lang: string;
+  upstreamLangs?: string[];
+  name?: string;
+  mark?: number;
+  client?: string;
+  source?: VersionSource;
+  label?: string;
+  createdAt?: number;
+}) {
+  try {
+    if (!itemId || !taskId || !lang) return;
+    const upstream = Array.isArray(upstreamLangs) ? upstreamLangs : [];
+    const version: Record<string, any> = {
+      itemId,
+      taskId,
+      lang,
+      upstreamLangs: upstream,
+      // Denormalized head-first chain, so the tasks list can filter by lang
+      // sequence without a round-trip per compound task.
+      langs: [lang, ...upstream],
+      name: name ?? null,
+      mark: mark ?? null,
+      client: client ?? "console",
+      source,
+      createdAt,
+    };
+    if (label) {
+      version.label = String(label).slice(0, VERSION_LABEL_MAX);
+    }
+    if (auth.freePlan) {
+      Object.assign(version, freePlanItemFields(auth, createdAt));
+    }
+    const ref = db.doc(`users/${auth.uid}/versions/${itemId}__${taskId}`);
+    // create-if-absent, NOT set/merge: reverting to an earlier state re-derives
+    // the same content-addressed taskId, and merging would overwrite that
+    // version's original createdAt/source — silently rewriting history and
+    // yanking an old row to the top of the list. Record the revisit instead.
+    try {
+      await ref.create(version);
+    } catch (err: any) {
+      // 6 = ALREADY_EXISTS
+      if (err?.code === 6) {
+        await ref.update({ lastSeenAt: createdAt });
+      } else {
+        throw err;
+      }
+    }
+  } catch (error) {
+    console.error("recordVersion()", "ERROR", itemId, taskId, error);
+  }
+}
 // import { buildDynamicSchema } from "./schemas";
 
 const SECRET_NAME_RE = /^[a-z0-9-]+$/;
@@ -564,6 +683,75 @@ export async function compiles({ auth, lang, type }) {
   }
 }
 
+const TASK_VERSIONS_DEFAULT_LIMIT = 200;
+const TASK_VERSIONS_MAX_LIMIT = 1000;
+
+// The tasks list: every recorded content state for a language, newest first.
+// Replaces the `compiles` feed, which went silent once /data responses started
+// being edge-served and the api's origin callback stopped firing.
+export async function getTaskVersions({
+  auth,
+  lang,
+  client,
+  itemId,
+  limit,
+  startAfter,
+}: {
+  auth: AuthArg;
+  lang: string;
+  client?: string;
+  itemId?: string;
+  limit?: number;
+  startAfter?: string;
+}) {
+  try {
+    let query = db
+      .collection(`users/${auth.uid}/versions`)
+      .where("lang", "==", lang) as FirebaseFirestore.Query;
+    if (client && client !== "all") {
+      query = query.where("client", "==", client);
+    }
+    if (itemId) {
+      query = query.where("itemId", "==", itemId);
+    }
+    query = query.orderBy("createdAt", "desc");
+    if (startAfter) {
+      const cursor = Number(startAfter);
+      if (Number.isFinite(cursor)) {
+        query = query.startAfter(cursor);
+      }
+    }
+    const capped = Math.min(
+      Math.max(Number(limit) || TASK_VERSIONS_DEFAULT_LIMIT, 1),
+      TASK_VERSIONS_MAX_LIMIT,
+    );
+    const snap = await query.limit(capped).get();
+    return snap.docs.map((doc) => {
+      const data = doc.data();
+      const upstreamLangs = Array.isArray(data.upstreamLangs) ? data.upstreamLangs : [];
+      return {
+        id: doc.id,
+        itemId: data.itemId,
+        taskId: data.taskId,
+        lang: data.lang,
+        // Older records predate the denormalized chain; derive it when missing.
+        langs: Array.isArray(data.langs) && data.langs.length
+          ? data.langs
+          : [data.lang, ...upstreamLangs],
+        name: data.name ?? null,
+        mark: data.mark ?? null,
+        client: data.client ?? "console",
+        source: data.source ?? "unknown",
+        label: data.label ?? null,
+        createdAt: String(data.createdAt),
+      };
+    });
+  } catch (error) {
+    console.error("getTaskVersions()", "ERROR", error);
+    throw new Error(`Failed to get task versions: ${error.message}`);
+  }
+}
+
 export async function generateCode({
   auth,
   prompt,
@@ -915,6 +1103,8 @@ export async function createItem({
   client,
   upstreamLangs,
   deferGeneration,
+  source,
+  label,
 }: {
   auth: AuthArg;
   lang: string;
@@ -925,6 +1115,10 @@ export async function createItem({
   isPublic?: boolean;
   client?: string;
   upstreamLangs?: string[];
+  // Provenance for the version record written on taskId change. Best-effort:
+  // defaults to the client tag when the caller doesn't know.
+  source?: VersionSource;
+  label?: string;
   // When true, create a fast "shell" item with no task and
   // generationStatus="generating" — the caller (startCodeGeneration) runs the
   // real generation asynchronously and fills in the taskId later. Skips the
@@ -996,6 +1190,21 @@ export async function createItem({
       Object.assign(item, freePlanItemFields(auth, timestamp));
     }
     await itemRef.set(item);
+    if (taskId) {
+      await recordVersion({
+        auth,
+        itemId: id,
+        taskId,
+        lang,
+        upstreamLangs: item.upstreamLangs,
+        name,
+        mark: item.mark,
+        client: item.client,
+        source: normalizeVersionSource(source) ?? defaultVersionSource(item.client),
+        label,
+        createdAt: timestamp,
+      });
+    }
     return {
       ...item,
       created: String(timestamp),
@@ -1018,6 +1227,8 @@ export async function updateItem({
   client,
   upstreamLangs,
   lang,
+  source,
+  label,
 }: {
   auth: AuthArg;
   id: string;
@@ -1031,6 +1242,9 @@ export async function updateItem({
   // Server/worker-internal: the corrected head language when the pre-flight scope gate
   // re-routed away from the client's pick. NOT a client-facing relabel.
   lang?: string;
+  // Provenance for the version record written when taskId changes.
+  source?: VersionSource;
+  label?: string;
 }) {
   try {
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
@@ -1108,6 +1322,23 @@ export async function updateItem({
     await itemRef.update(updates);
     const updatedDoc = await itemRef.get();
     const data = updatedDoc.data();
+    // A changed taskId IS a new version — the one signal every producer (chat,
+    // direct editor edit, generation worker, MCP) funnels through.
+    if (taskIdChanged) {
+      await recordVersion({
+        auth,
+        itemId: id,
+        taskId,
+        lang: data.lang,
+        upstreamLangs: data.upstreamLangs,
+        name: data.name,
+        mark: data.mark,
+        client: data.client,
+        source: normalizeVersionSource(source) ?? defaultVersionSource(data.client),
+        label,
+        createdAt: updates.updated,
+      });
+    }
     return {
       id,
       ...data,
@@ -1214,6 +1445,21 @@ export async function getItems({ auth, lang, mark, client }) {
             taskId = taskData.id;
             // Update the item with the new taskId
             await doc.ref.update({ taskId });
+            // This repost is where a shared/claimed item's v1 comes into
+            // existence — the copy sites deliberately leave taskId null, and the
+            // original's taskId isn't in this uid's ACL, so it can't be recorded
+            // there. Idempotent, so re-running on a later read is harmless.
+            await recordVersion({
+              auth,
+              itemId: doc.id,
+              taskId,
+              lang: data.lang,
+              upstreamLangs: data.upstreamLangs,
+              name: data.name,
+              mark: data.mark,
+              client: data.client,
+              source: data.claimedFrom ? "claim" : "share",
+            });
           }
         } catch (error) {
           console.error(
@@ -1381,6 +1627,19 @@ export async function getItem({ auth, id }) {
         if (taskData?.id) {
           taskId = taskData.id;
           await itemRef.update({ taskId });
+          // Mirrors getItems(): the repost is where a shared/claimed item's
+          // first version record is born.
+          await recordVersion({
+            auth,
+            itemId: id,
+            taskId,
+            lang: data.lang,
+            upstreamLangs: data.upstreamLangs,
+            name: data.name,
+            mark: data.mark,
+            client: data.client,
+            source: data.claimedFrom ? "claim" : "share",
+          });
         }
       } catch (error) {
         console.error("getItem(): failed to create task for item", id, error);

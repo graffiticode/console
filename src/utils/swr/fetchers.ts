@@ -184,12 +184,9 @@ export const countItems = async ({ user, langs }) => {
   return counts;
 };
 
-export const loadCompiles = async ({ user, lang, type }) => {
-  // console.log(
-  //   "loadCompiles()",
-  // );
+export const loadTaskVersions = async ({ user, lang, client: clientId, itemId, limit }: { user: any; lang: string; client?: string; itemId?: string; limit?: number }) => {
   if (!user) {
-    return {};
+    return [];
   }
   const token = await user.getToken();
   const client = new GraphQLClient("/api", {
@@ -198,16 +195,23 @@ export const loadCompiles = async ({ user, lang, type }) => {
     }
   });
   const query = gql`
-    query get($lang: String!, $type: String!) {
-      compiles(lang: $lang, type: $type) {
+    query loadTaskVersions($lang: String!, $client: String, $itemId: String, $limit: Int) {
+      taskVersions(lang: $lang, client: $client, itemId: $itemId, limit: $limit) {
         id
-        status
-        timestamp
+        itemId
+        taskId
         lang
+        langs
+        name
+        mark
+        client
+        source
+        label
+        createdAt
       }
     }
   `;
-  return client.request(query, { lang, type }).then(data => data.compiles);
+  return client.request(query, { lang, client: clientId, itemId, limit }).then(data => data.taskVersions);
 };
 
 export const getAccessToken = async ({ user }) => {
@@ -357,7 +361,7 @@ export const deleteCredential = async ({ user, name }: { user: any; name: string
   return client.request(mutation, { name }).then(data => data.deleteCredential);
 };
 
-export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs }: { user: any; id: string; name?: string; taskId?: string; mark?: number; help?: string; isPublic?: boolean; client?: string; upstreamLangs?: string[] }) => {
+export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs, source }: { user: any; id: string; name?: string; taskId?: string; mark?: number; help?: string; isPublic?: boolean; client?: string; upstreamLangs?: string[]; source?: string }) => {
   if (!user) {
     return null;
   }
@@ -368,8 +372,8 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
     }
   });
   const mutation = gql`
-    mutation updateItem($id: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $client: String, $upstreamLangs: [String!]) {
-      updateItem(id: $id, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, client: $client, upstreamLangs: $upstreamLangs) {
+    mutation updateItem($id: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $client: String, $upstreamLangs: [String!], $source: String) {
+      updateItem(id: $id, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, client: $client, upstreamLangs: $upstreamLangs, source: $source) {
         id
         name
         taskId
@@ -384,7 +388,7 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
       }
     }
   `;
-  return client.request(mutation, { id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs }).then(data => data.updateItem);
+  return client.request(mutation, { id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs, source }).then(data => data.updateItem);
 };
 
 export const shareItem = async ({ user, itemId, targetUserId }) => {

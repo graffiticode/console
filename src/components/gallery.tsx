@@ -85,6 +85,13 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
+  // How the pending taskId change came about, for the version record written
+  // server-side. Set by whoever advances the taskId; read at save time.
+  const versionSourceRef = useRef<string | undefined>(undefined);
+  const setTaskIdWithSource = useCallback((newTaskId: string, source?: string) => {
+    versionSourceRef.current = source;
+    setTaskId(newTaskId);
+  }, []);
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
   const [ systemAlert, setSystemAlert ] = useState<string | null>(null);
   const dismissedAlertRef = useRef<string | null>(null);
@@ -626,7 +633,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     }
   };
 
-  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs }: { itemId: string; name?: any; taskId?: any; mark?: any; help?: any; isPublic?: any; client?: any; upstreamLangs?: string[] }) => {
+  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs, source }: { itemId: string; name?: any; taskId?: any; mark?: any; help?: any; isPublic?: any; client?: any; upstreamLangs?: string[]; source?: string }) => {
     // Prevent updates with stale item IDs - check both items array and ensure we have a valid user
     const currentItem = items.find(item => item.id === itemId);
     if (!itemId || !currentItem || !user?.uid) {
@@ -647,7 +654,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
 
     // Then update backend
     try {
-      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs });
+      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs, source });
 
       // Advance the open-editor baseline so the adopt effect treats this write as
       // our own (not a remote change) even before the next poll lands.
@@ -810,6 +817,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
             help: JSON.stringify(editorHelp),
             isPublic: selectedItem.isPublic,
             upstreamLangs,
+            source: versionSourceRef.current,
           });
         }
       } else {
@@ -1235,7 +1243,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 taskId={taskId}
                 lang={lang}
                 mark={mark}
-                setTaskId={setTaskId}
+                setTaskId={setTaskIdWithSource}
                 setUpstreamLangs={handleEditorUpstreamChange}
                 onLoadTaskFromHelp={handleLoadTaskFromHelp}
                 height="100%"

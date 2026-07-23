@@ -110,6 +110,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: itemId,
       taskId: result.taskId,
       help: updatedHelp,
+      source: "generation-job",
+      label: modification,
       ...(rerouted ? { lang: result.language } : {}),
       ...(Array.isArray(result.upstreamLangs) ? { upstreamLangs: result.upstreamLangs } : {}),
     });

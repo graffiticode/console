@@ -184,7 +184,8 @@ export default function Editor({
           const newChain = upstreamSegments.length > 0
             ? [newHead, ...upstreamSegments].join("+")
             : newHead;
-          setTaskId(newChain);
+          // A hand-edit — the version case the help transcript never recorded.
+          setTaskId(newChain, "editor");
         } catch (err) {
           console.error("Parse/postTask error:", err);
         } finally {
@@ -257,7 +258,7 @@ export default function Editor({
                   setCode(newCode);
                 }
               }}
-              setTaskId={setTaskId}
+              setTaskId={(newTaskId) => setTaskId(newTaskId, "chat")}
               setUpstreamLangs={setUpstreamLangs}
               onLoadTaskFromHelp={onLoadTaskFromHelp}
               onError={onError}

@@ -6,17 +6,22 @@ import {
   ChevronDoubleLeftIcon,
 } from '@heroicons/react/24/outline'
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
+import { AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
 import { DocumentDuplicateIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import SignIn from "./SignIn";
-import { getAccessToken, loadCompiles, getData, getTaskLangs } from '../utils/swr/fetchers';
+import { getAccessToken, loadTaskVersions, loadItemClientTags, getData } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from "@graffiticode/auth-react";
 import TasksHeaderMenu, {
   TasksDateFilter,
   TasksLangFilter,
   DEFAULT_TASKS_DATE_FILTER,
   DEFAULT_TASKS_LANG_FILTER,
+  DEFAULT_TASKS_ITEM_FILTER,
   matchesLangPattern,
+  matchesItemFilter,
+  isFullItemId,
 } from './tasks-header-menu';
+import { ClientOption, ALL_CLIENT, clientOptionForId, findClientById } from './client-selector';
 import FormView from "./FormView";
 import { DataPanel } from "./DataPanel";
 import { ReadOnlyCodePanel } from "./ReadOnlyCodePanel";
@@ -56,8 +61,9 @@ function formatTimestamp(ts) {
   }
 }
 
-function TaskMenu({ task, user, isOpen, onOpen, onClose }) {
+function TaskMenu({ task, isOpen, onOpen, onClose, onFilterByItem }) {
   const [taskIdCopied, setTaskIdCopied] = useState(false);
+  const [itemIdCopied, setItemIdCopied] = useState(false);
   const [taskIdFocused, setTaskIdFocused] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -70,11 +76,6 @@ function TaskMenu({ task, user, isOpen, onOpen, onClose }) {
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
   };
-  const isCompound = typeof task.id === 'string' && task.id.includes('+');
-  const { data: taskInfo } = useSWR(
-    isOpen && isCompound && user ? [`taskLangs-${task.id}`, { user, id: task.id }] : null,
-    ([_, params]) => getTaskLangs(params),
-  );
 
   const positionMenu = () => {
     if (buttonRef.current && menuRef.current) {
@@ -131,13 +132,11 @@ function TaskMenu({ task, user, isOpen, onOpen, onClose }) {
     return () => window.removeEventListener('resize', positionMenu);
   }, [isOpen]);
 
-  const lastCompile = formatTimestamp(task.timestamp);
-  const langDisplay = (() => {
-    const fetched = taskInfo && Array.isArray(taskInfo.langs) ? taskInfo.langs : null;
-    if (fetched && fetched.length > 0) return fetched.join('+');
-    if (isCompound) return `${task.lang || '—'}+…`;
-    return task.lang || '—';
-  })();
+  const created = formatTimestamp(task.timestamp);
+  // The version record carries the whole chain — no per-task lang fetch needed.
+  const langDisplay = Array.isArray(task.langs) && task.langs.length
+    ? task.langs.join('+')
+    : (task.lang || '—');
 
   return (
     <div className="relative" style={{ display: 'inline-block' }}>
@@ -219,24 +218,85 @@ function TaskMenu({ task, user, isOpen, onOpen, onClose }) {
                 </div>
               </div>
 
+              {task.itemId && (
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Item ID</label>
+                  <div className="flex items-start gap-1">
+                    <input
+                      type="text"
+                      spellCheck={false}
+                      readOnly
+                      className="flex-1 min-w-0 text-xs font-mono text-gray-600 py-1.5 px-2 ring-1 ring-gray-300 rounded-none focus:outline-none focus:ring-gray-500"
+                      value={task.itemId}
+                      onFocus={(e) => e.target.select()}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(task.itemId);
+                        setItemIdCopied(true);
+                        setTimeout(() => setItemIdCopied(false), 1000);
+                      }}
+                      className="flex-shrink-0 p-1.5 text-gray-500 hover:text-gray-900 ring-1 ring-gray-300 hover:ring-gray-500 rounded-none"
+                      title="Copy item id"
+                      aria-label="Copy item id"
+                    >
+                      {itemIdCopied ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-green-500">
+                          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        <DocumentDuplicateIcon className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="mb-1">
-                {lastCompile && (
+                {created && (
                   <div className="flex gap-3 text-xs text-gray-600 py-0.5">
-                    <span className="font-semibold w-20 flex-shrink-0">Compiled</span>
-                    <span className="font-mono">{lastCompile}</span>
+                    <span className="font-semibold w-20 flex-shrink-0">Created</span>
+                    <span className="font-mono">{created}</span>
                   </div>
                 )}
-                <div className="flex gap-3 text-xs text-gray-600 py-0.5">
-                  <span className="font-semibold w-20 flex-shrink-0">Status</span>
-                  <span className="font-mono">{task.status || '—'}</span>
-                </div>
                 <div className="flex gap-3 text-xs text-gray-600 py-0.5">
                   <span className="font-semibold w-20 flex-shrink-0">Lang</span>
                   <span className="font-mono">{langDisplay}</span>
                 </div>
+                {task.name && (
+                  <div className="flex gap-3 text-xs text-gray-600 py-0.5">
+                    <span className="font-semibold w-20 flex-shrink-0">Name</span>
+                    <span className="font-mono truncate">{task.name}</span>
+                  </div>
+                )}
+                <div className="flex gap-3 text-xs text-gray-600 py-0.5">
+                  <span className="font-semibold w-20 flex-shrink-0">Source</span>
+                  <span className="font-mono">{task.source || '—'}</span>
+                </div>
+                {task.label && (
+                  <div className="flex gap-3 text-xs text-gray-600 py-0.5">
+                    <span className="font-semibold w-20 flex-shrink-0">Change</span>
+                    <span className="text-gray-700 break-words">{task.label}</span>
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 border-t pt-4">
+                {task.itemId && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFilterByItem(task.itemId);
+                      onClose();
+                    }}
+                    className="flex items-center w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-none"
+                    title="Show only this item's versions"
+                  >
+                    <AdjustmentsHorizontalIcon className="h-4 w-4 mr-2" />
+                    <span>Filter by this item</span>
+                  </button>
+                )}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -296,7 +356,6 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
   const dataRef = useRef<any>(null);
   const dataPanelRef = useRef<HTMLDivElement>(null);
   const previewPanelRef = useRef<HTMLDivElement>(null);
-  const [ compiles, setCompiles ] = useState([]);
   const [ taskIds, setTaskIds ] = useState([]);
   const [ showId, setShowId ] = useState("");
   const [ openMenuId, setOpenMenuId ] = useState<string | null>(null);
@@ -322,47 +381,80 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
     const saved = localStorage.getItem('graffiticode:compiles:langFilter');
     return saved ? { sequence: saved } : DEFAULT_TASKS_LANG_FILTER;
   });
-  const [ taskLangsMap, setTaskLangsMap ] = useState<Record<string, string[]>>({});
+  const [ itemFilter, setItemFilter ] = useState<string>(() => {
+    if (typeof window === 'undefined') return DEFAULT_TASKS_ITEM_FILTER;
+    return localStorage.getItem('graffiticode:tasks:itemFilter') || DEFAULT_TASKS_ITEM_FILTER;
+  });
+  const [ clientOption, setClientOption ] = useState<ClientOption>(() => {
+    if (typeof window === 'undefined') return ALL_CLIENT;
+    const saved = localStorage.getItem('graffiticode:tasks:client');
+    return (saved && findClientById(saved)) || ALL_CLIENT;
+  });
   const taskItemsRef = useRef({});
   const tasksListRef = useRef(null);
   const tasksUlRef = useRef<HTMLUListElement>(null);
 
-  // Load compiles from the API
-  const type = "*";  // { "*" | "persistent" | "ephemeral" }
-  const { data: compilesData, isLoading: isLoadingCompiles, error } = useSWR(
-    user ? { user, lang, type } : null,
-    loadCompiles
+  // Load the version history for this language. Only a full item id is pushed
+  // down to the query — a shorter one is treated as a prefix and matched below.
+  const serverItemId = isFullItemId(itemFilter) ? itemFilter.trim() : undefined;
+  const { data: versionsData, isLoading: isLoadingTasks } = useSWR(
+    user && lang ? `task-versions-${user.uid}-${lang}-${clientOption.id}-${serverItemId || ''}` : null,
+    () => loadTaskVersions({ user, lang, client: clientOption.id, itemId: serverItemId }),
+    {
+      // Poll so versions created by other clients (e.g. the MCP server) surface here.
+      refreshInterval: 8000,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      keepPreviousData: true,
+    }
   );
 
+  // Distinct client tags for this user+lang, to populate the menu's Client filter.
+  const { data: clientTags } = useSWR(
+    user && lang ? `itemClientTags-${user.uid}-${lang}` : null,
+    () => loadItemClientTags({ user, lang }),
+    { revalidateOnFocus: true, revalidateOnReconnect: false }
+  );
 
-
-  useEffect(() => {
-    const compilesArray = compilesData && compilesData.sort((a, b) => {
-      // Sort descending.
-      return +b.timestamp - +a.timestamp;
-    }) || [];
-
-    setCompiles(compilesArray);
-
-    // Extract unique task IDs from compiles
-    const uniqueTaskIds = [];
-    const taskIdSet = new Set();
-
-    compilesArray.forEach(compile => {
-      if (!taskIdSet.has(compile.id)) {
-        taskIdSet.add(compile.id);
-        uniqueTaskIds.push({
-          id: compile.id,
-          timestamp: compile.timestamp,
-          status: compile.status,
-          lang: compile.lang,
-          current: false
-        });
+  const clientList = (() => {
+    const tags = clientTags || [];
+    if (tags.length === 0) {
+      const list: ClientOption[] = [ALL_CLIENT];
+      if (clientOption.id !== ALL_CLIENT.id) list.push(clientOption);
+      return list;
+    }
+    const list: ClientOption[] = [ALL_CLIENT];
+    const seen = new Set<string>([ALL_CLIENT.id]);
+    tags.forEach((tag: string) => {
+      if (!seen.has(tag)) {
+        seen.add(tag);
+        list.push(clientOptionForId(tag));
       }
     });
+    if (!seen.has(clientOption.id)) list.push(clientOption);
+    return list;
+  })();
 
-    // Sort by timestamp descending
-    uniqueTaskIds.sort((a, b) => +b.timestamp - +a.timestamp);
+  useEffect(() => {
+    // One row per recorded version, newest first — the server already orders by
+    // createdAt desc, but sort defensively so a mixed cache can't reorder the list.
+    const uniqueTaskIds = (Array.isArray(versionsData) ? versionsData : [])
+      .map((v: any) => ({
+        key: v.id,
+        id: v.taskId,
+        itemId: v.itemId,
+        timestamp: +v.createdAt || 0,
+        lang: v.lang,
+        langs: Array.isArray(v.langs) && v.langs.length ? v.langs : [v.lang],
+        name: v.name,
+        mark: v.mark,
+        client: v.client,
+        source: v.source,
+        label: v.label,
+        current: false,
+      }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+
     setTaskIds(uniqueTaskIds);
 
     // Try to restore the selected task ID from URL query or localStorage
@@ -403,8 +495,8 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
 
             // Scroll the selected task into view in the middle of the viewport
             setTimeout(() => {
-              if (taskItemsRef.current[matchingTask.id] && tasksListRef.current) {
-                const taskElement = taskItemsRef.current[matchingTask.id];
+              if (taskItemsRef.current[matchingTask.key] && tasksListRef.current) {
+                const taskElement = taskItemsRef.current[matchingTask.key];
                 const listContainer = tasksListRef.current;
 
                 // Get the container's visible height
@@ -437,7 +529,7 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
     }
 
     setTaskIds([...uniqueTaskIds]); // Force update with current flags
-  }, [compilesData, router.query.taskId, initialTaskId]);
+  }, [versionsData, router.query.taskId, initialTaskId]);
 
   // Auto-focus the tasks list for arrow key navigation
   useEffect(() => {
@@ -461,53 +553,31 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
     }
   }, []);
 
-  // Eagerly fetch lang sequences for compound tasks so the lang filter
-  // can match against the full chain. Single-segment tasks already have
-  // their lang on the compile record.
-  useEffect(() => {
-    if (!user || !taskIds.length) return;
-    const compoundIds = taskIds
-      .map(t => t.id)
-      .filter(id => typeof id === 'string' && id.includes('+') && !taskLangsMap[id]);
-    if (!compoundIds.length) return;
-    let cancelled = false;
-    (async () => {
-      const results = await Promise.all(
-        compoundIds.map(id =>
-          getTaskLangs({ user, id })
-            .then(r => ({ id, langs: r && Array.isArray(r.langs) ? r.langs : null }))
-            .catch(() => ({ id, langs: null }))
-        )
-      );
-      if (cancelled) return;
-      setTaskLangsMap(prev => {
-        const next = { ...prev };
-        for (const { id, langs } of results) {
-          if (langs) next[id] = langs;
-        }
-        return next;
-      });
-    })();
-    return () => { cancelled = true; };
-  }, [user, taskIds]);
+  const updateItemFilter = useCallback((next: string) => {
+    setItemFilter(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('graffiticode:tasks:itemFilter', next);
+    }
+  }, []);
 
-  // Compute the filtered task list for display + navigation.
+  const updateClient = useCallback((next: ClientOption) => {
+    setClientOption(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('graffiticode:tasks:client', next.id);
+    }
+  }, []);
+
+  // Compute the filtered task list for display + navigation. The lang chain and
+  // item id both ride along on the version record — no per-task fetches.
   const langPattern = (langFilter.sequence || '').trim();
   const filteredTaskIds = taskIds.filter((task) => {
     const ts = +task.timestamp || 0;
     if (dateFilter.from !== null && ts < dateFilter.from) return false;
     if (dateFilter.to !== null && ts > dateFilter.to) return false;
+    // A full item id was already applied server-side; a prefix filters here.
+    if (!serverItemId && !matchesItemFilter(task.itemId, itemFilter)) return false;
     if (!langPattern) return true;
-    const isCompound = typeof task.id === 'string' && task.id.includes('+');
-    const langs: string[] | null = isCompound
-      ? (taskLangsMap[task.id] || null)
-      : (task.lang ? [task.lang] : null);
-    if (langs === null) {
-      // Langs for this compound task haven't loaded yet — keep it visible
-      // so we don't drop matching tasks while fetches are in flight.
-      return true;
-    }
-    return matchesLangPattern(langs, langPattern);
+    return matchesLangPattern(task.langs, langPattern);
   });
 
   const toggleTasksPanel = useCallback(() => {
@@ -603,6 +673,11 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
                 setDateFilter={updateDateFilter}
                 langFilter={langFilter}
                 setLangFilter={updateLangFilter}
+                itemFilter={itemFilter}
+                setItemFilter={updateItemFilter}
+                client={clientOption}
+                setClient={updateClient}
+                clientList={clientList}
               />
             </div>
             <button
@@ -622,7 +697,7 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
           </div>
           {!isTasksPanelCollapsed && (
             <div className="h-[calc(100%-42px)] overflow-auto" ref={tasksListRef}>
-              {isLoadingCompiles ? (
+              {isLoadingTasks ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-sm text-gray-500">Loading tasks...</div>
                 </div>
@@ -649,20 +724,22 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
                           : (currentIndex + (e.key === 'ArrowUp' ? -1 : 1) + filteredTaskIds.length) % filteredTaskIds.length;
                         const nextTask = filteredTaskIds[nextIndex];
                         handleSelectTask(nextTask.id);
-                        taskItemsRef.current[nextTask.id]?.scrollIntoView({ block: 'nearest' });
+                        taskItemsRef.current[nextTask.key]?.scrollIntoView({ block: 'nearest' });
                       }
                     }}
                   >
+                    {/* Keyed on the version id, not the taskId: the same task can
+                        appear under more than one item. */}
                     {filteredTaskIds.map((task) => (
-                      <li key={task.id} ref={el => { taskItemsRef.current[task.id] = el; }}>
+                      <li key={task.key} ref={el => { taskItemsRef.current[task.key] = el; }}>
                         <div
                           className={classNames(
                             task.current ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200',
                             "flex flex-row justify-between pr-2"
                           )}
                           onMouseOver={() => {
-                            if (showId !== task.id) {
-                              setShowId(task.id);
+                            if (showId !== task.key) {
+                              setShowId(task.key);
                             }
                           }}
                         >
@@ -672,13 +749,13 @@ export default function TasksGallery({ lang, initialTaskId = null }: { lang: any
                           >
                             {elideCompoundId(task.id)}
                           </button>
-                          {(task.id === showId || openMenuId === task.id) && (
+                          {(task.key === showId || openMenuId === task.key) && (
                             <TaskMenu
                               task={task}
-                              user={user}
-                              isOpen={openMenuId === task.id}
-                              onOpen={() => setOpenMenuId(task.id)}
+                              isOpen={openMenuId === task.key}
+                              onOpen={() => setOpenMenuId(task.key)}
                               onClose={() => setOpenMenuId(null)}
+                              onFilterByItem={updateItemFilter}
                             />
                           )}
                         </div>

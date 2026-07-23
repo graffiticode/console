@@ -102,6 +102,42 @@
         { "fieldPath": "freePlan", "order": "ASCENDING" },
         { "fieldPath": "sessionNamespace", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "versions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lang", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "versions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lang", "order": "ASCENDING" },
+        { "fieldPath": "client", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "versions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lang", "order": "ASCENDING" },
+        { "fieldPath": "itemId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "versions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lang", "order": "ASCENDING" },
+        { "fieldPath": "client", "order": "ASCENDING" },
+        { "fieldPath": "itemId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -109,6 +145,16 @@
       "collectionGroup": "items",
       "fieldPath": "claimedFrom",
       "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
+      "comment": "app.graffiticode.org resolves an item by id without knowing the owner (collectionGroup('items').where('id','==',id) in app/src/server/resolvers.ts). That needs COLLECTION_GROUP scope on this field — do not remove.",
+      "collectionGroup": "items",
+      "fieldPath": "id",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
         { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
       ]
     },

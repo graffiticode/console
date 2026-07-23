@@ -10,6 +10,7 @@ import {
   compiles,
   logCompile,
   getTasks,
+  getTaskVersions,
   getTask,
   postTask,
   getData,
@@ -84,6 +85,22 @@ const typeDefs = `
     timestamp: String!
     status: String!
     lang: String
+  }
+
+  # One recorded content state of an item. Pointer-only: taskId addresses the
+  # immutable, content-addressed task on api.graffiticode.org.
+  type TaskVersion {
+    id: String!
+    itemId: String!
+    taskId: String!
+    lang: String!
+    langs: [String!]!
+    name: String
+    mark: Int
+    client: String
+    source: String
+    label: String
+    createdAt: String!
   }
 
   type Task {
@@ -216,6 +233,7 @@ const typeDefs = `
     parse(lang: String!, src: String!, itemId: String): ParseResult!
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
+    taskVersions(lang: String!, client: String, itemId: String, limit: Int, startAfter: String): [TaskVersion!]!
     tasks(lang: String!, mark: Int!): [Task!]
     task(id: String!): Task
     items(lang: String!, mark: Int, client: String): [Item!]
@@ -261,8 +279,8 @@ const typeDefs = `
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
     generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
     startCodeGeneration(itemId: String, lang: String!, name: String, client: String, prompt: String!, modification: String!, currentSrc: String): GenerationJob!
-    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!]): Item!
-    updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!]): Item!
+    createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
+    updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
     claimFreePlanSession(token: String!): ClaimResult!
     setCredential(name: String!, value: String!, backend: String, isPublic: Boolean): CredentialInfo!
@@ -334,6 +352,21 @@ const resolvers = {
       const { lang, type } = args;
       const { uid, idToken } = await authenticate(token);
       return await compiles({ auth: { uid, token: idToken }, lang, type });
+    },
+    taskVersions: async (_, args, ctx) => {
+      // Browser-only surface (the console requires real sign-in), same as compiles.
+      if (ctx.freePlan) return [];
+      const { token } = ctx;
+      const { lang, client, itemId, limit, startAfter } = args;
+      const { uid, idToken } = await authenticate(token);
+      return await getTaskVersions({
+        auth: { uid, token: idToken },
+        lang,
+        client,
+        itemId,
+        limit,
+        startAfter,
+      });
     },
     tasks: async (_, args, ctx) => {
       if (ctx.freePlan) return [];
@@ -468,14 +501,14 @@ const resolvers = {
       return resp;
     },
     createItem: async (_, args, ctx) => {
-      const { lang, name, taskId, mark, help, isPublic, client, upstreamLangs } = args;
+      const { lang, name, taskId, mark, help, isPublic, client, upstreamLangs, source, label } = args;
       const auth = await resolveAuth(ctx);
-      return await createItem({ auth, lang, name, taskId, mark, help, isPublic, client, upstreamLangs });
+      return await createItem({ auth, lang, name, taskId, mark, help, isPublic, client, upstreamLangs, source, label });
     },
     updateItem: async (_, args, ctx) => {
-      const { id, name, taskId, mark, help, isPublic, client, upstreamLangs } = args;
+      const { id, name, taskId, mark, help, isPublic, client, upstreamLangs, source, label } = args;
       const auth = await resolveAuth(ctx);
-      return await updateItem({ auth, id, name, taskId, mark, help, isPublic, client, upstreamLangs });
+      return await updateItem({ auth, id, name, taskId, mark, help, isPublic, client, upstreamLangs, source, label });
     },
     shareItem: async (_, args, ctx) => {
       if (ctx.freePlan) {

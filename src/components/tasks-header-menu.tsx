@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
+import ClientSelector, { ClientOption, ALL_CLIENT } from './client-selector';
 
 export interface TasksDateFilter {
   from: number | null;
@@ -12,6 +13,7 @@ export interface TasksLangFilter {
 
 export const DEFAULT_TASKS_DATE_FILTER: TasksDateFilter = { from: null, to: null };
 export const DEFAULT_TASKS_LANG_FILTER: TasksLangFilter = { sequence: '' };
+export const DEFAULT_TASKS_ITEM_FILTER = '';
 
 export function isDefaultTasksDateFilter(df: TasksDateFilter) {
   return df.from === null && df.to === null;
@@ -19,6 +21,20 @@ export function isDefaultTasksDateFilter(df: TasksDateFilter) {
 
 export function isDefaultTasksLangFilter(lf: TasksLangFilter) {
   return !lf.sequence.trim();
+}
+
+// Item ids are Firestore auto-ids (20 chars). Anything shorter is treated as a
+// prefix and matched client-side; a full id is pushed down to the query.
+export const ITEM_ID_LENGTH = 20;
+
+export function isFullItemId(value: string) {
+  return value.trim().length >= ITEM_ID_LENGTH;
+}
+
+export function matchesItemFilter(itemId: string, filter: string): boolean {
+  const f = filter.trim();
+  if (!f) return true;
+  return typeof itemId === 'string' && itemId.startsWith(f);
 }
 
 // Pattern semantics (chain = task langs joined by '+'):
@@ -102,6 +118,11 @@ interface Props {
   setDateFilter: (d: TasksDateFilter) => void;
   langFilter: TasksLangFilter;
   setLangFilter: (l: TasksLangFilter) => void;
+  itemFilter: string;
+  setItemFilter: (v: string) => void;
+  client: ClientOption;
+  setClient: (c: ClientOption) => void;
+  clientList?: ClientOption[];
 }
 
 export default function TasksHeaderMenu({
@@ -109,18 +130,32 @@ export default function TasksHeaderMenu({
   setDateFilter,
   langFilter,
   setLangFilter,
+  itemFilter,
+  setItemFilter,
+  client,
+  setClient,
+  clientList,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: -9999, left: -9999 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [seqDraft, setSeqDraft] = useState(langFilter.sequence);
+  const [itemDraft, setItemDraft] = useState(itemFilter);
 
   useEffect(() => {
     setSeqDraft(langFilter.sequence);
   }, [langFilter.sequence]);
 
-  const showBadge = !isDefaultTasksDateFilter(dateFilter) || !isDefaultTasksLangFilter(langFilter);
+  useEffect(() => {
+    setItemDraft(itemFilter);
+  }, [itemFilter]);
+
+  const showBadge =
+    !isDefaultTasksDateFilter(dateFilter) ||
+    !isDefaultTasksLangFilter(langFilter) ||
+    itemFilter.trim() !== '' ||
+    client.id !== ALL_CLIENT.id;
 
   const positionMenu = () => {
     if (!buttonRef.current || !panelRef.current) return;
@@ -158,10 +193,25 @@ export default function TasksHeaderMenu({
     }
   };
 
+  const commitItem = () => {
+    const trimmed = itemDraft.trim();
+    if (trimmed !== itemFilter) {
+      setItemFilter(trimmed);
+    }
+  };
+
+  const commitDrafts = () => {
+    commitSeq();
+    commitItem();
+  };
+
   const handleReset = () => {
     setDateFilter(DEFAULT_TASKS_DATE_FILTER);
     setLangFilter(DEFAULT_TASKS_LANG_FILTER);
+    setItemFilter(DEFAULT_TASKS_ITEM_FILTER);
+    setClient(ALL_CLIENT);
     setSeqDraft('');
+    setItemDraft('');
   };
 
   return (
@@ -186,7 +236,7 @@ export default function TasksHeaderMenu({
       {isOpen && (
         <div
           className="fixed inset-0 z-50"
-          onClick={() => { commitSeq(); setIsOpen(false); }}
+          onClick={() => { commitDrafts(); setIsOpen(false); }}
         >
           <div
             ref={panelRef}
@@ -203,6 +253,37 @@ export default function TasksHeaderMenu({
             <div className="p-4 space-y-4">
               <div>
                 <div className="text-xs font-semibold text-gray-700 mb-2">Filter</div>
+
+                <div className="flex items-center gap-3 mb-3">
+                  <label className="block text-xs text-gray-600 w-12">Client</label>
+                  <ClientSelector client={client} setClient={setClient} clientList={clientList} />
+                </div>
+
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-600 mb-1">Item</label>
+                  <input
+                    type="text"
+                    spellCheck={false}
+                    placeholder="item id or prefix"
+                    value={itemDraft}
+                    onChange={(e) => setItemDraft(e.target.value)}
+                    onBlur={commitItem}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        commitItem();
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setItemDraft(itemFilter);
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    className="w-full text-xs font-mono ring-1 ring-gray-300 px-2 py-1.5 rounded-none focus:outline-none focus:ring-gray-500"
+                  />
+                  <p className="mt-1 text-[10px] text-gray-500 leading-tight">
+                    Show every version of one item. Copy an id from a task&apos;s menu.
+                  </p>
+                </div>
 
                 <div className="mb-3">
                   <label className="block text-xs text-gray-600 mb-1">Lang</label>
@@ -237,7 +318,7 @@ export default function TasksHeaderMenu({
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Compiled (date range)</label>
+                  <label className="block text-xs text-gray-600 mb-1">Created (date range)</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="date"

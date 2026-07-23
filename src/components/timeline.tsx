@@ -1,6 +1,6 @@
 import useSWR from "swr";
 import { useState, useEffect } from 'react';
-import { loadCompiles } from '../utils/swr/fetchers';
+import { loadTaskVersions } from '../utils/swr/fetchers';
 import { CheckIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/20/solid'
 import useGraffiticodeAuth from "@graffiticode/auth-react";
 import SignIn from '../components/SignIn'
@@ -20,20 +20,22 @@ async function handleClick({ user, id, lang }) {
 
 export default function Timeline({ lang }) {
   const { user } = useGraffiticodeAuth();
-  const type = "*";  // { "*" | "persistent" | "ephemeral" }
   const [compiles, setCompiles] = useState([]);
   const { isLoading, data } =
     useSWR(
-      user ? { user, lang, type } : null,
-      loadCompiles
+      user && lang ? `timeline-versions-${lang}` : null,
+      () => loadTaskVersions({ user, lang })
     );
 
   useEffect(() => {
-    const compiles = data && data.sort((a, b) => {
-      // Sort descending.
-      return +b.timestamp - +a.timestamp;
-    }) || [];
-    setCompiles(compiles);
+    const versions = (Array.isArray(data) ? data : []).map((v: any) => ({
+      id: v.taskId,
+      timestamp: v.createdAt,
+      lang: v.lang,
+    }));
+    // Sort descending.
+    versions.sort((a, b) => +b.timestamp - +a.timestamp);
+    setCompiles(versions);
   }, [data]);
 
   if (!user) {
