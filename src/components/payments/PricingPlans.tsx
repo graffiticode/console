@@ -60,7 +60,8 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
         hasPaymentMethod: methods.length > 0,
       });
 
-      setBillingInterval(effectiveInterval);
+      // Annual billing is hidden from the page for now; always present monthly.
+      setBillingInterval('monthly');
       setHighlightedPlan(
         subscription.hasActiveSubscription && plan !== 'demo' ? plan : 'pro'
       );
@@ -233,37 +234,6 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
 
   return (
     <div className="space-y-8">
-      {/* Billing Toggle */}
-      <div className="flex justify-center">
-        <div className="relative flex bg-gray-100 rounded-none p-0.5">
-          <button
-            type="button"
-            className={`${
-              billingInterval === 'monthly'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500'
-            } relative rounded-none py-2 px-6 text-sm font-medium whitespace-nowrap focus:outline-none focus:z-10 transition-all`}
-            onClick={() => setBillingInterval('monthly')}
-          >
-            Monthly billing
-          </button>
-          <button
-            type="button"
-            className={`${
-              billingInterval === 'annual'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500'
-            } relative rounded-none py-2 px-6 text-sm font-medium whitespace-nowrap focus:outline-none focus:z-10 transition-all ml-0.5`}
-            onClick={() => setBillingInterval('annual')}
-          >
-            Annual billing
-            <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Save 17%
-            </span>
-          </button>
-        </div>
-      </div>
-
       {/* Pricing Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {plans.map((plan) => (

@@ -95,25 +95,6 @@ export const plans: Plan[] = [
     ],
     cta: 'Choose Platinum',
   },
-  {
-    id: 'enterprise',
-    name: PLANS.enterprise.displayName,
-    description: 'For mission-critical, high-volume deployments',
-    monthlyPrice: 0,
-    annualPrice: 0,
-    monthlyUnits: 0,
-    features: [
-      'Everything in Platinum',
-      'Custom item pricing',
-      '99.9% uptime SLA',
-      'Dedicated support & onboarding',
-      'SSO, GDPR & CCPA compliance',
-    ],
-    cta: 'Contact Sales',
-    contactSales: true,
-    priceLabel: 'Custom',
-    contactHref: 'mailto:jeff@graffiticode.com?subject=Graffiticode%20Enterprise%20plan%20inquiry',
-  },
 ];
 
 // Starter is discontinued and no longer offered (removed from `plans` above), but its

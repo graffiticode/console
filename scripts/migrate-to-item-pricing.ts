@@ -62,7 +62,7 @@ async function main() {
       }
     }
 
-    if (!plan || plan === 'demo' || plan === 'enterprise') { skipped++; continue; }
+    if (!plan || plan === 'demo') { skipped++; continue; }
 
     const meterPriceId = stripeMeterPriceId(plan);
     if (!meterPriceId) { console.log(`  ${doc.id}: no meter price configured for ${plan}; skipping`); skipped++; continue; }

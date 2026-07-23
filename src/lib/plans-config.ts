@@ -11,7 +11,7 @@
 //   demo -> "Free", pro -> "Silver", teams -> "Gold", platinum -> "Platinum".
 // `starter` is discontinued but retained in the type/lookup for legacy data.
 
-export type PlanId = 'demo' | 'starter' | 'pro' | 'teams' | 'platinum' | 'enterprise';
+export type PlanId = 'demo' | 'starter' | 'pro' | 'teams' | 'platinum';
 export type BillingInterval = 'monthly' | 'annual';
 
 // Pinned Stripe API version — matches the version the installed stripe SDK
@@ -122,18 +122,6 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       meterPriceIdEnv: 'STRIPE_PLATINUM_METER_PRICE_ID',
       meterEventName: 'item_created',
     },
-  },
-  enterprise: {
-    id: 'enterprise',
-    displayName: 'Enterprise',
-    basePriceMonthly: 0,
-    basePriceAnnual: 0,
-    includedItems: 0,
-    overageRatePerItem: null,
-    hardCap: false,
-    tier: 5,
-    contactSales: true,
-    stripe: {},
   },
 };
 

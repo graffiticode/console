@@ -1,6 +1,16 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION } from '../../../lib/plans-config';
+import {
+  STRIPE_API_VERSION,
+  stripeBasePriceId,
+  stripeMeterPriceId,
+  priceIdToPlan,
+  includedItemsFor,
+  isUpgrade as isPlanUpgrade,
+  DEFAULT_PLAN,
+  type PlanId,
+  type BillingInterval,
+} from '../../../lib/plans-config';
 import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
 import { getFirestore } from '../../../utils/db';
 import * as admin from 'firebase-admin';
@@ -13,27 +23,13 @@ if (process.env.STRIPE_SECRET_KEY) {
   });
 }
 
-// Map our plan IDs to Stripe price IDs
-const STRIPE_PRICE_IDS = {
-  pro: {
-    monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
-    annual: process.env.STRIPE_PRO_ANNUAL_PRICE_ID,
-  },
-  teams: {
-    monthly: process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID,
-    annual: process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID,
-  },
-};
-
-// Map Stripe price IDs back to our plan names
-const PLAN_MAPPING: Record<string, string> = {
-  [process.env.STRIPE_STARTER_MONTHLY_PRICE_ID || '']: 'starter',
-  [process.env.STRIPE_STARTER_ANNUAL_PRICE_ID || '']: 'starter',
-  [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: 'pro',
-  [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: 'pro',
-  [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: 'teams',
-  [process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID || '']: 'teams',
-};
+// A paid subscription carries two line items: the flat base (licensed) price
+// and the metered overage price. Identify them by usage_type.
+function splitItems(sub: Stripe.Subscription) {
+  const metered = sub.items.data.find(it => it.price?.recurring?.usage_type === 'metered');
+  const base = sub.items.data.find(it => it.id !== metered?.id) ?? sub.items.data[0];
+  return { base, metered };
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -98,14 +94,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Get the price ID
-    const priceId = STRIPE_PRICE_IDS[planId]?.[interval];
+    // Resolve the flat base price and (for paid tiers) the metered overage price.
+    const basePriceId = stripeBasePriceId(planId as PlanId, interval as BillingInterval);
+    const meterPriceId = stripeMeterPriceId(planId as PlanId);
 
-    if (!priceId || !priceId.startsWith('price_')) {
+    if (!basePriceId || !basePriceId.startsWith('price_')) {
       return res.status(400).json({
         error: 'Invalid plan configuration'
       });
     }
+
+    // Build the target line items for an in-place subscription update: swap the
+    // base item's price and align the metered item (swap, add, or drop).
+    const buildUpdateItems = (sub: Stripe.Subscription): Stripe.SubscriptionUpdateParams.Item[] => {
+      const { base, metered } = splitItems(sub);
+      const items: Stripe.SubscriptionUpdateParams.Item[] = [{ id: base.id, price: basePriceId }];
+      if (meterPriceId) {
+        items.push(metered ? { id: metered.id, price: meterPriceId } : { price: meterPriceId });
+      } else if (metered) {
+        items.push({ id: metered.id, deleted: true });
+      }
+      return items;
+    };
 
     // Check if user already has an active or trialing subscription
     const [activeSubs, trialingSubs] = await Promise.all([
@@ -124,93 +134,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (existingSubscriptions.data.length > 0) {
       // User has existing subscription - update it
       existingSub = existingSubscriptions.data[0];
-      const existingPriceId = existingSub.items.data[0]?.price.id;
+      const { base } = splitItems(existingSub);
 
-      // Determine the current plan and interval from the existing subscription
-      const existingPlan = PLAN_MAPPING[existingPriceId] || 'starter';
-      const currentPrice = await stripe.prices.retrieve(existingPriceId);
-      const currentInterval = currentPrice.recurring?.interval === 'year' ? 'annual' : 'monthly';
+      // Determine the current plan and interval from the base line item.
+      const existingPlan = (priceIdToPlan(base?.price?.id) as PlanId) || 'starter';
+      const currentInterval: BillingInterval = base?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly';
 
       // Starter is discontinued; let stragglers upgrade out of it cleanly.
       // Treat Starter -> any paid plan as an upgrade so we don't write a
       // preserved-allocation cap (which would limit them to Starter's units).
       const isStarterUpgrade = existingPlan === 'starter' && planId !== 'starter';
 
-      // Determine if this is an upgrade or downgrade
+      // Determine if this is an upgrade or downgrade (config-driven tier order).
       isUpgrade =
-        isStarterUpgrade || // Starter -> Pro/Team
-        (existingPlan === 'pro' && planId === 'teams') || // Pro -> Max
-        (currentInterval === 'monthly' && interval === 'annual'); // Monthly -> Annual
+        isStarterUpgrade ||
+        isPlanUpgrade(existingPlan, planId as PlanId) ||
+        (currentInterval === 'monthly' && interval === 'annual');
+
+      const updateItems = buildUpdateItems(existingSub);
 
       if (isUpgrade) {
-        // For upgrades: Apply immediately with proration credit for unused time
-        // If there's an existing schedule, release it first
+        // For upgrades: apply immediately with proration credit for unused time.
         if (existingSub.schedule) {
           await stripe.subscriptionSchedules.release(existingSub.schedule as string);
         }
 
         subscription = await stripe.subscriptions.update(existingSub.id, {
-          items: [{
-            id: existingSub.items.data[0].id,
-            price: priceId,
-          }],
+          items: updateItems,
           // Starter migrations switch with no immediate charge (billed at next
           // renewal); other upgrades prorate the difference immediately.
           proration_behavior: isStarterUpgrade ? 'none' : 'create_prorations',
           ...(isStarterUpgrade ? { billing_cycle_anchor: 'unchanged' as const } : {}),
-          metadata: {
-            userId,
-            planId,
-            interval,
-          },
+          metadata: { userId, planId, interval },
         });
       } else {
-        // For downgrades/lateral moves: Apply immediately but preserve renewal date and allocation
-
-        // Calculate the old plan's allocation to preserve
-        if (existingPlan === 'teams') {
-          oldAllocation = 2000000; // Teams monthly allocation
-        } else if (existingPlan === 'pro') {
-          oldAllocation = 100000; // Pro monthly allocation
-        } else {
-          oldAllocation = 2000; // Starter allocation
-        }
-
-        // Multiply by 12 if current plan is annual
+        // For downgrades/lateral moves: apply immediately but preserve the
+        // renewal date and the old (larger) item allowance until period end.
+        oldAllocation = includedItemsFor(existingPlan);
         if (currentInterval === 'annual') {
           oldAllocation = oldAllocation * 12;
         }
 
-        // If there's an existing schedule, release it first
         if (existingSub.schedule) {
           await stripe.subscriptionSchedules.release(existingSub.schedule as string);
         }
 
-        // Store the current renewal date before making changes
-        const preservedRenewalDate = subscriptionPeriodEnd(existingSub);
-
-        // Update subscription immediately to the new plan
-        // Use 'none' proration to avoid charging/crediting - just switch the plan
         subscription = await stripe.subscriptions.update(existingSub.id, {
-          items: [{
-            id: existingSub.items.data[0].id,
-            price: priceId,
-          }],
+          items: updateItems,
           proration_behavior: 'none', // No proration - immediate switch without credits/charges
-          metadata: {
-            userId,
-            planId,
-            interval,
-          },
+          metadata: { userId, planId, interval },
           // Preserve the billing cycle anchor to keep the same renewal date
           billing_cycle_anchor: 'unchanged',
         });
       }
     } else {
-      // No existing subscription - create new one
+      // No existing subscription - create one with base + metered line items.
       subscription = await stripe.subscriptions.create({
         customer: stripeCustomerId,
-        items: [{ price: priceId }],
+        items: [
+          { price: basePriceId },
+          ...(meterPriceId ? [{ price: meterPriceId }] : []),
+        ],
         default_payment_method: defaultPaymentMethod as string,
         payment_behavior: 'default_incomplete',
         payment_settings: {
