@@ -103,8 +103,6 @@ export default function PlanCard({
       <div className="mb-6">
         {isContactSales ? (
           <span className="text-4xl font-bold text-gray-900">{plan.priceLabel || 'Custom'}</span>
-        ) : isFree ? (
-          <span className="text-4xl font-bold text-gray-900">Free</span>
         ) : (
           <>
             <span className="text-4xl font-bold text-gray-900">${price.toLocaleString()}</span>
