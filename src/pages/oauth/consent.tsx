@@ -127,12 +127,28 @@ export default function OAuthConsent() {
       setLoading(false);
       setSuccess(true);
 
-      // Redirect back to callback URL with the Google ID token
-      const redirectUrl = new URL(callbackUrl);
-      redirectUrl.searchParams.set('google_id_token', idToken);
-      redirectUrl.searchParams.set('state', stateParam);
-
-      window.location.href = redirectUrl.toString();
+      // Hand the Google ID token back by POSTing a form, NOT by putting it in the
+      // URL. A query string is recorded in the CDN and Cloud Run access logs (a real
+      // user's id_token was found sitting in plaintext in Cloud Logging), kept in
+      // browser history, and can leak via Referer. A form body is in none of those.
+      // The MCP server accepts POST at /oauth/callback and answers 303, so the
+      // browser follows on to the client's redirect_uri with a GET.
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = callbackUrl;
+      form.style.display = 'none';
+      for (const [name, value] of [
+        ['google_id_token', idToken],
+        ['state', stateParam],
+      ]) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
     } catch (err: any) {
       console.error('OAuth consent error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
