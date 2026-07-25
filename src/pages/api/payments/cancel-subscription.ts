@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION } from '../../../lib/plans-config';
+import { STRIPE_API_VERSION, includedItemsFor, priceIdToPlan, DEFAULT_PLAN } from '../../../lib/plans-config';
 import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
 import { getFirestore } from '../../../utils/db';
 import * as admin from 'firebase-admin';
@@ -67,18 +67,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // (that staleness is what previously fell back to the bogus Starter 2,000).
     let currentAllocation = 0;
     if (immediately) {
-      const priceId = subscription.items.data[0]?.price.id;
-      const PLAN_UNITS_BY_PRICE: Record<string, number> = {
-        [process.env.STRIPE_PRO_MONTHLY_PRICE_ID || '']: 100000,
-        [process.env.STRIPE_PRO_ANNUAL_PRICE_ID || '']: 100000,
-        [process.env.STRIPE_TEAMS_MONTHLY_PRICE_ID || '']: 2000000,
-        [process.env.STRIPE_TEAMS_ANNUAL_PRICE_ID || '']: 2000000,
-      };
-      // Monthly allocation, matching the webhook PLAN_MAPPING and usage display.
-      currentAllocation = PLAN_UNITS_BY_PRICE[priceId] ?? 250; // unknown price → Free
+      // Resolve the live base price to a plan and take its monthly item bucket
+      // from plans-config (never a hardcoded map — those went stale when
+      // compile units were retired for item-based pricing).
+      const priceId = subscription.items.data.map(it => it?.price?.id).find(id => priceIdToPlan(id))
+        || subscription.items.data[0]?.price.id;
+      const cancelingPlan = priceIdToPlan(priceId) ?? DEFAULT_PLAN;
+      currentAllocation = includedItemsFor(cancelingPlan);
 
       console.log('Preserving allocation on downgrade to free:', {
         priceId,
+        plan: cancelingPlan,
         preservedAllocation: currentAllocation,
       });
     }

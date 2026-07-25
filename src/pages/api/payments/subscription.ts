@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
-import { STRIPE_API_VERSION, includedItemsFor, overageRateFor, priceIdToPlan, DEFAULT_PLAN } from '../../../lib/plans-config';
+import { STRIPE_API_VERSION, includedItemsFor, effectiveIncludedItems, preservedAllocationApplies, overageRateFor, priceIdToPlan, DEFAULT_PLAN } from '../../../lib/plans-config';
 import { subscriptionPeriod } from '../../../lib/stripe-helpers';
 
 // Initialize Stripe only if secret key is available
@@ -95,7 +95,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const now = new Date();
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         const renewalDate = preservedRenewalDate || endOfMonth.toISOString();
-        const units = plan === 'demo' ? 250 : 5000;
+        const units = includedItemsFor(plan);
 
         return res.status(200).json({
           plan,
@@ -139,11 +139,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Check if there's a preserved renewal date from a previous subscription
       const preservedRenewalDate = userData?.subscription?.renewalDate || null;
 
-      // Check for preserved allocation from a downgrade
-      const preservedUntil = userData?.subscription?.preservedUntil;
-      const preservedAllocation = userData?.subscription?.preservedAllocation;
-      const hasPreservedAllocation = preservedUntil && preservedAllocation && new Date(preservedUntil) > new Date();
-
       const plan = userData?.subscription?.plan || 'demo';
 
       // For demo/free users, calculate end of current month as renewal date
@@ -151,7 +146,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       const renewalDate = preservedRenewalDate || endOfMonth.toISOString();
 
-      const defaultUnits = includedItemsFor(plan);
+      // Preserved allocation from a downgrade only ever raises the allowance.
+      const preservedUntil = userData?.subscription?.preservedUntil;
+      const hasPreservedAllocation = preservedAllocationApplies(plan, userData?.subscription, now);
+      const units = effectiveIncludedItems(plan, userData?.subscription, now);
 
       return res.status(200).json({
         plan,
@@ -163,7 +161,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         cancelAtPeriodEnd: false,
         nextBillingDate: renewalDate,
-        units: hasPreservedAllocation ? preservedAllocation : defaultUnits,
+        units,
         overageUnits: userData?.subscription?.overageUnits || 0,
         overageRate: null,
         isUsingPreservedAllocation: hasPreservedAllocation,
@@ -184,18 +182,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const stripeInterval = baseItem?.price.recurring?.interval;
     const interval = stripeInterval === 'year' ? 'annual' : stripeInterval === 'month' ? 'monthly' : null;
 
-    // Check for preserved allocation from a downgrade
+    // The plan's own bucket (annual plans include 12x the monthly item bucket),
+    // raised by a downgrade's preserved allocation while that grace window lasts.
     const preservedUntil = userData?.subscription?.preservedUntil;
-    const preservedAllocation = userData?.subscription?.preservedAllocation;
-    const hasPreservedAllocation = preservedUntil && preservedAllocation && new Date(preservedUntil) > new Date();
-
-    // Use preserved allocation if available, otherwise the plan's included items.
-    // Annual plans include 12x the monthly item bucket.
-    const planUnits = hasPreservedAllocation
-      ? preservedAllocation
-      : (interval === 'annual'
-        ? includedItemsFor(planName) * 12
-        : includedItemsFor(planName));
+    const baseUnits = interval === 'annual'
+      ? includedItemsFor(planName) * 12
+      : includedItemsFor(planName);
+    const hasPreservedAllocation = preservedAllocationApplies(planName, userData?.subscription, new Date(), baseUnits);
+    const planUnits = effectiveIncludedItems(planName, userData?.subscription, new Date(), baseUnits);
 
     // Get any purchased overage units from metadata or database
     const overageUnits = parseInt(subscription.metadata?.overageUnits || '0');

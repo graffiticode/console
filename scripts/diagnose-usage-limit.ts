@@ -29,10 +29,11 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
-// Mirror of usage-service.ts PLAN_ALLOCATIONS
-const PLAN_ALLOCATIONS: Record<string, number> = {
-  demo: 250, starter: 5000, pro: 100000, teams: 2000000,
-};
+// Allowances come from the central config — never a local map (the old mirrored
+// map here went stale when compile units were retired for item-based pricing).
+import {
+  PLANS, DEFAULT_PLAN, includedItemsFor, effectiveIncludedItems, isHardCapped, overageRateFor,
+} from '../src/lib/plans-config';
 
 async function findUid(arg: string): Promise<string | null> {
   if (!arg.includes('@')) {
@@ -60,16 +61,13 @@ async function main() {
   const lastReset = usageDoc.data()?.lastReset;
 
   const now = new Date();
-  const plan = sub.plan || 'demo';
-  const planKnown = plan in PLAN_ALLOCATIONS;
-  let allocatedUnits = PLAN_ALLOCATIONS[plan] || PLAN_ALLOCATIONS.demo;
-  const overageUnits = sub.overageUnits || 0;
-
-  let preservedApplied = false;
-  if (sub.preservedUntil && sub.preservedAllocation && new Date(sub.preservedUntil) > now) {
-    allocatedUnits = sub.preservedAllocation;
-    preservedApplied = true;
-  }
+  const plan = sub.plan || DEFAULT_PLAN;
+  const planKnown = plan in PLANS;
+  const planIncluded = includedItemsFor(plan);
+  // Preserved allocation only ever RAISES the allowance (see plans-config).
+  const includedItems = effectiveIncludedItems(plan, sub, now);
+  const preservedApplied = includedItems > planIncluded;
+  const preservedUnexpired = !!(sub.preservedUntil && sub.preservedAllocation && new Date(sub.preservedUntil) > now);
 
   const periodStart = sub.currentPeriodStart
     ? new Date(sub.currentPeriodStart)
@@ -79,41 +77,54 @@ async function main() {
     .where('userId', '==', uid)
     .where('createdAt', '>=', periodStart)
     .get();
+  // Only billable item records count; legacy compile/ai_generation records carry
+  // compile-unit `units` and are not items.
   let calc = 0;
-  recs.docs.forEach(d => { calc += d.data().units || 0; });
+  recs.docs.forEach(d => { const r = d.data(); if (r.type === 'item_created') calc += r.units || 0; });
 
-  const currentUsage = calc; // checkCompileAllowed syncs stored -> calc
-  const totalAvailable = allocatedUnits + overageUnits;
-  const allowed = currentUsage <= totalAvailable;
+  const currentUsage = calc; // checkItemCreateAllowed syncs stored -> calc
+  const hardCap = isHardCapped(plan);
+  const overageLimitItems = typeof sub.overageLimitItems === 'number' ? sub.overageLimitItems : null;
+  const totalAvailable = hardCap
+    ? includedItems
+    : (overageLimitItems === null ? Infinity : includedItems + overageLimitItems);
+  const allowed = currentUsage < totalAvailable;
 
   console.log(`\n=== Usage-limit diagnosis for ${userData.email || userData.signInEmail || uid} ===`);
   console.log(`uid:                 ${uid}`);
   console.log(`\n-- subscription --`);
-  console.log(`plan:                ${plan}  ${planKnown ? '' : '  ⚠️  UNKNOWN KEY → falls back to demo (250)'}`);
+  console.log(`plan:                ${plan}  ${planKnown ? `(${PLANS[plan as keyof typeof PLANS].displayName}, ${planIncluded} items/mo)` : `  ⚠️  UNKNOWN KEY → falls back to ${DEFAULT_PLAN} (${includedItemsFor(DEFAULT_PLAN)})`}`);
   console.log(`status:              ${sub.status}`);
-  console.log(`units (stored):      ${sub.units}`);
-  console.log(`overageUnits:        ${overageUnits}`);
+  console.log(`units (stored):      ${sub.units}${typeof sub.units === 'number' && sub.units !== planIncluded ? `  ⚠️ stale (plan includes ${planIncluded}); display-only, run reconcile-subscriptions.ts` : ''}`);
+  console.log(`overageLimitItems:   ${overageLimitItems === null ? 'none (uncapped)' : overageLimitItems}`);
   console.log(`currentPeriodStart:  ${sub.currentPeriodStart}`);
   console.log(`currentPeriodEnd:    ${sub.currentPeriodEnd}`);
   console.log(`stripeSubscriptionId:${sub.stripeSubscriptionId}`);
   console.log(`updatedAt:           ${sub.updatedAt}`);
-  if (sub.preservedAllocation) console.log(`preservedAllocation: ${sub.preservedAllocation} until ${sub.preservedUntil}${preservedApplied ? '  ⚠️ ACTIVE (caps allocation)' : ' (expired)'}`);
-  console.log(`autoOverageEnabled:  ${!!sub.autoOverageEnabled}`);
+  if (sub.preservedAllocation) {
+    const state = preservedApplied
+      ? '  ACTIVE (raises allowance)'
+      : preservedUnexpired
+        ? `  (unexpired but ignored — ${sub.preservedAllocation} < plan's ${planIncluded}; stale leftover, safe to delete)`
+        : ' (expired)';
+    console.log(`preservedAllocation: ${sub.preservedAllocation} until ${sub.preservedUntil}${state}`);
+  }
   console.log(`\n-- usage doc --`);
   console.log(`currentMonthTotal:   ${storedTotal}`);
   console.log(`lastReset:           ${lastReset}`);
-  console.log(`\n-- recomputed (what checkCompileAllowed does) --`);
+  console.log(`\n-- recomputed (what checkItemCreateAllowed does) --`);
   console.log(`periodStart used:    ${periodStart.toISOString()}`);
   console.log(`usage records since: ${recs.size}`);
-  console.log(`calculated usage:    ${calc}  ${calc !== storedTotal ? `(differs from stored ${storedTotal})` : ''}`);
-  console.log(`allocatedUnits:      ${allocatedUnits}`);
-  console.log(`totalAvailable:      ${totalAvailable}  (= ${allocatedUnits} + ${overageUnits} overage)`);
-  console.log(`\n>>> allowed:         ${allowed}  (${currentUsage} <= ${totalAvailable})`);
+  console.log(`items counted:       ${calc}  ${calc !== storedTotal ? `(differs from stored ${storedTotal})` : ''}`);
+  console.log(`includedItems:       ${includedItems}${preservedApplied ? '  (via preserved allocation)' : ''}`);
+  console.log(`overage rate:        ${overageRateFor(plan) === null ? 'n/a (hard cap)' : `$${overageRateFor(plan)}/item`}`);
+  console.log(`totalAvailable:      ${totalAvailable === Infinity ? 'unlimited (paid, no spend cap)' : totalAvailable}`);
+  console.log(`\n>>> allowed:         ${allowed}  (${currentUsage} < ${totalAvailable === Infinity ? '∞' : totalAvailable})`);
   if (!allowed) {
-    console.log(`\nVERDICT: blocked because used ${currentUsage} > available ${totalAvailable}.`);
-    if (!planKnown) console.log(`  → ROOT CAUSE likely: plan "${plan}" is not a known key, so allocation defaulted to demo 250.`);
-    else if (preservedApplied) console.log(`  → ROOT CAUSE likely: a downgrade left preservedAllocation=${sub.preservedAllocation} capping this account.`);
-    else console.log(`  → plan "${plan}" resolves to ${PLAN_ALLOCATIONS[plan]} units; usage genuinely exceeds it (check if upgrade webhook ran: updatedAt/stripeSubscriptionId above).`);
+    console.log(`\nVERDICT: blocked because used ${currentUsage} >= available ${totalAvailable}.`);
+    if (!planKnown) console.log(`  → ROOT CAUSE likely: plan "${plan}" is not a known key, so allocation defaulted to ${DEFAULT_PLAN} (${includedItemsFor(DEFAULT_PLAN)}).`);
+    else if (hardCap) console.log(`  → plan "${plan}" is hard-capped at ${includedItems} items/mo; upgrade to create more.`);
+    else console.log(`  → overage spend cap reached (${overageLimitItems} items past the included ${includedItems}); raise or remove the cap.`);
   }
   console.log('');
 }

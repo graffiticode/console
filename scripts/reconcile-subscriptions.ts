@@ -14,7 +14,7 @@
 //   npx tsx scripts/reconcile-subscriptions.ts                 # dry-run, active subs only
 //   npx tsx scripts/reconcile-subscriptions.ts --apply         # write fixes for active/trialing subs
 //   npx tsx scripts/reconcile-subscriptions.ts --include-downgrades --apply
-//                                                              # also reset users with no active sub to demo/250
+//                                                              # also reset users with no active sub to the free plan
 //   npx tsx scripts/reconcile-subscriptions.ts --uid <uid>     # limit to one user
 
 import admin from 'firebase-admin';
@@ -121,16 +121,17 @@ async function main() {
         fixed++;
       }
     } else {
-      // No active/trialing Stripe sub. Canonical free state is demo/250.
-      const claimsPaid = cur.plan && cur.plan !== 'demo';
+      // No active/trialing Stripe sub. Canonical free state is the default plan.
+      const freeUnits = includedItemsFor(DEFAULT_PLAN);
+      const claimsPaid = cur.plan && cur.plan !== DEFAULT_PLAN;
       if (!claimsPaid) { ok++; continue; }
       drift++;
-      console.log(`  DRIFT ${uid}: firestore plan=${cur.plan} but NO active Stripe sub -> should be demo/250${INCLUDE_DOWNGRADES ? '' : '  (skipped; pass --include-downgrades to fix)'}`);
+      console.log(`  DRIFT ${uid}: firestore plan=${cur.plan} but NO active Stripe sub -> should be ${DEFAULT_PLAN}/${freeUnits}${INCLUDE_DOWNGRADES ? '' : '  (skipped; pass --include-downgrades to fix)'}`);
       if (APPLY && INCLUDE_DOWNGRADES) {
         await db.collection('users').doc(uid).update({
           'subscription.status': 'canceled',
-          'subscription.plan': 'demo',
-          'subscription.units': 250,
+          'subscription.plan': DEFAULT_PLAN,
+          'subscription.units': freeUnits,
           'subscription.stripeSubscriptionId': null,
           'subscription.updatedAt': new Date().toISOString(),
           'subscription.reconciledAt': new Date().toISOString(),

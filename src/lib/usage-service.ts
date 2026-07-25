@@ -1,5 +1,5 @@
 import { getFirestore } from "../utils/db";
-import { includedItemsFor, isHardCapped, DEFAULT_PLAN } from "./plans-config";
+import { effectiveIncludedItems, isHardCapped, DEFAULT_PLAN } from "./plans-config";
 
 export interface ItemCreateAllowedResult {
   allowed: boolean;
@@ -36,15 +36,10 @@ export async function checkItemCreateAllowed(uid: string): Promise<ItemCreateAll
     const userData = userDoc.data() || {};
     const subscription = userData.subscription || {};
     const plan = subscription.plan || DEFAULT_PLAN;
-    let includedItems = includedItemsFor(plan);
-
-    // Preserved allocation from a downgrade keeps the old (larger) bucket for a grace window.
+    // Preserved allocation from a downgrade keeps the old (larger) bucket for a
+    // grace window; it can only raise the allowance, never cap it.
     const now = new Date();
-    const preservedUntil = subscription.preservedUntil;
-    const preservedAllocation = subscription.preservedAllocation;
-    if (preservedUntil && preservedAllocation && new Date(preservedUntil) > now) {
-      includedItems = preservedAllocation;
-    }
+    const includedItems = effectiveIncludedItems(plan, subscription, now);
 
     // Self-heal the stored counter against the actual records for the period.
     try {

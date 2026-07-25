@@ -136,6 +136,45 @@ export function includedItemsFor(id: string | undefined | null): number {
   return getPlan(id).includedItems;
 }
 
+export interface PreservedAllocation {
+  preservedAllocation?: number | null;
+  preservedUntil?: string | Date | null;
+}
+
+/**
+ * Items included for a subscription, honoring a downgrade's preserved
+ * allocation. The preserved bucket exists so a downgraded customer keeps what
+ * they already paid for until the period ends — so it may only ever RAISE the
+ * allowance. A stale or smaller value (e.g. a legacy compile-unit figure left
+ * on the doc, or an expired grace window) must never cap a plan below its own
+ * included items.
+ */
+export function effectiveIncludedItems(
+  id: string | undefined | null,
+  subscription: PreservedAllocation | undefined | null,
+  now: Date = new Date(),
+  baseIncluded?: number,
+): number {
+  const included = baseIncluded ?? includedItemsFor(id);
+  const preserved = subscription?.preservedAllocation;
+  const until = subscription?.preservedUntil;
+  if (typeof preserved === 'number' && until && new Date(until) > now) {
+    return Math.max(included, preserved);
+  }
+  return included;
+}
+
+/** Whether a preserved allocation is both unexpired and actually raising the allowance. */
+export function preservedAllocationApplies(
+  id: string | undefined | null,
+  subscription: PreservedAllocation | undefined | null,
+  now: Date = new Date(),
+  baseIncluded?: number,
+): boolean {
+  const included = baseIncluded ?? includedItemsFor(id);
+  return effectiveIncludedItems(id, subscription, now, included) > included;
+}
+
 /** Per-item overage rate for a plan (null when no overage/hard cap). */
 export function overageRateFor(id: string | undefined | null): number | null {
   return getPlan(id).overageRatePerItem;

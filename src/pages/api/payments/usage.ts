@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '../../../utils/db';
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, overageRateFor, isHardCapped, DEFAULT_PLAN, type PlanId } from '../../../lib/plans-config';
+import { STRIPE_API_VERSION, priceIdToPlan, effectiveIncludedItems, overageRateFor, isHardCapped, DEFAULT_PLAN, type PlanId } from '../../../lib/plans-config';
 import { subscriptionPeriodStart, subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
 
 // Initialize Stripe only if secret key is available
@@ -188,11 +188,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Included items (preserved allocation from a downgrade wins during grace).
-    const preservedUntil = userData?.subscription?.preservedUntil;
-    const preservedAllocation = userData?.subscription?.preservedAllocation;
-    const hasPreservedAllocation = preservedUntil && preservedAllocation && new Date(preservedUntil) > now;
-    const includedItems = hasPreservedAllocation ? preservedAllocation : includedItemsFor(plan);
+    // Included items (a downgrade's preserved allocation raises this during
+    // grace; it never caps the plan below its own included items).
+    const includedItems = effectiveIncludedItems(plan, userData?.subscription, now);
 
     const overageRatePerItem = overageRateFor(plan);
     const hardCap = isHardCapped(plan);
