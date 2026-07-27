@@ -38,9 +38,6 @@ const INGEST_LAG_MS = 60_000;
 const MAX_PAGES = 20;
 const PAGE_SIZE = 1000;
 
-/** The hour (PT) whose report always sends, even when the period was empty. */
-const HEARTBEAT_HOUR = 8;
-
 const STATE_DOC = "alert-state/digest";
 const SEEN_DOC = "alert-state/seen";
 
@@ -300,23 +297,30 @@ export function aggregate(
   return d;
 }
 
-/** True when nothing worth reporting happened. */
-export function isEmpty(d: Digest): boolean {
-  return (
-    d.sessions.total === 0 &&
-    d.items.ok === 0 &&
-    d.items.failed === 0 &&
-    Object.keys(d.walls).length === 0 &&
-    d.claims.count === 0 &&
-    d.signups.direct === 0 &&
-    d.signups.viaClaim === 0 &&
-    d.plans.length === 0 &&
-    d.overageRaised === 0 &&
-    d.apiKeys === 0 &&
-    d.context.edits === 0 &&
-    d.context.views === 0 &&
-    d.context.toolCalls === 0
-  );
+/** Calendar date in PT, e.g. "2026-07-27". The unit "first of the day" counts in. */
+export function ptDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+/**
+ * Send when there was tool activity, or when nothing has been sent yet today.
+ *
+ * Tool calls are the liveness signal: a period with none is one where no agent
+ * did anything, whatever else the counters say. The once-a-day floor means
+ * silence is unambiguous — exactly one message arrives on a dead day, so no
+ * message at all means the job itself is broken.
+ *
+ * Keyed on the last sent PT date rather than a fixed hour, so a run that fails
+ * or a schedule that shifts can't skip the day's only report.
+ */
+export function shouldSend(d: Digest, state: DigestState, now = new Date()): boolean {
+  if (d.context.toolCalls > 0) return true;
+  return state.lastSentDate !== ptDate(now);
 }
 
 // --- Formatting -------------------------------------------------------------
@@ -330,17 +334,17 @@ function ptTime(date: Date): string {
   }).format(date);
 }
 
-export function ptHour(date: Date): number {
-  return Number(
-    new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "2-digit", hour12: false }).format(date),
-  );
-}
-
 function plural(n: number): string {
   return n === 1 ? "" : "s";
 }
 
-/** "claude-ai 2, cursor 1" — highest first, tail collapsed so the SMS stays short. */
+/**
+ * "claude-ai 2, cursor 1" — highest first, tail collapsed so the SMS stays short.
+ *
+ * Only for breakdowns where a long tail is noise (walls, surfaces). NEVER for
+ * client kinds: which agents showed up is the point, and collapsing the 4th into
+ * "+1 other" hides exactly the arrival worth knowing about. Use clientList().
+ */
 function breakdown(map: Record<string, number>, limit = 3): string {
   const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
   const head = entries.slice(0, limit).map(([k, v]) => `${k} ${v}`);
@@ -349,14 +353,65 @@ function breakdown(map: Record<string, number>, limit = 3): string {
   return head.join(", ");
 }
 
+/**
+ * Every client kind that showed up, named, never truncated, with ⚑ on the ones
+ * seen for the first time.
+ *
+ * Client names are raw MCP `clientInfo.name` values on purpose — no normalizing
+ * families together. "claude-code" and "claude-ai" are different surfaces, and
+ * "codex-mcp-client" vs "openai-mcp (Codex)" is a real version difference worth
+ * seeing rather than smoothing away.
+ */
+function clientList(d: Digest): string {
+  const isNew = new Set(d.sessions.newClientKinds);
+  return Object.entries(d.sessions.byClient)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([k, v]) => `${isNew.has(k) ? "⚑" : ""}${k} ${v}`)
+    .join(" · ");
+}
+
+/**
+ * The SMS body: a headline you can read on a lock screen, plus a link to the
+ * full report.
+ *
+ * Deliberately much shorter than formatDigest(). Everything that used to be
+ * crammed into the text now lives on the report page, which has room for the
+ * breakdowns and doesn't pay per character. What stays is the shape of the
+ * hour — enough to decide whether to tap.
+ */
+export function formatSms(d: Digest, url?: string): string {
+  const head: string[] = [`${d.context.toolCalls} tool call${plural(d.context.toolCalls)}`];
+  if (d.sessions.total) head.push(`${d.sessions.total} session${plural(d.sessions.total)}`);
+  if (d.items.ok) head.push(`${d.items.ok} item${plural(d.items.ok)}`);
+
+  const lines = [`GC ${ptTime(d.from)}–${ptTime(d.to)} PT`, head.join(" · ")];
+
+  // Every client that showed up, in full. Which agents are reaching us is the
+  // headline question this whole thing exists to answer, so it is never elided
+  // even when that costs a segment.
+  const clients = clientList(d);
+  if (clients) lines.push(`▶ ${clients}`);
+
+  // Money and conversion are the two things worth surfacing before the tap.
+  const flags: string[] = [];
+  if (d.claims.count) flags.push(`★ ${d.claims.count} claim${plural(d.claims.count)}`);
+  if (d.signups.direct) flags.push(`★ ${d.signups.direct} signup${plural(d.signups.direct)}`);
+  if (d.plans.length) flags.push(`$ ${d.plans.length} plan change${plural(d.plans.length)}`);
+  if (flags.length) lines.push(flags.join(" · "));
+
+  if (d.context.toolCalls === 0 && !flags.length && !clients) lines.push("quiet");
+  if (url) lines.push(url);
+
+  return lines.join("\n");
+}
+
 export function formatDigest(d: Digest): string {
   const lines: string[] = [`GC ${ptTime(d.from)}–${ptTime(d.to)} PT`];
 
   if (d.sessions.total > 0) {
     let line = `▶ ${d.sessions.total} session${plural(d.sessions.total)}`;
-    const parts = breakdown(d.sessions.byClient);
+    const parts = clientList(d);
     if (parts) line += ` — ${parts}`;
-    if (d.sessions.newClientKinds.length) line += ` ⚑new ${d.sessions.newClientKinds.join("/")}`;
     if (d.sessions.newGeos.length) line += ` ⚑geo ${d.sessions.newGeos.join("/")}`;
     lines.push(line);
   }
@@ -427,9 +482,11 @@ export function formatDigest(d: Digest): string {
 
 // --- Cursor + novelty state -------------------------------------------------
 
-interface DigestState {
+export interface DigestState {
   cursor?: string;
   lastSentAt?: string;
+  /** PT calendar date of the last send, for the once-a-day floor. */
+  lastSentDate?: string;
 }
 
 export async function readState(): Promise<DigestState> {
@@ -448,6 +505,34 @@ export async function readSeen(): Promise<{ clientKinds: Set<string>; geos: Set<
     clientKinds: new Set<string>(data?.clientKinds ?? []),
     geos: new Set<string>(data?.geos ?? []),
   };
+}
+
+/**
+ * Cached per-day rollup for the report page's 7-day trend.
+ *
+ * A completed PT day can never change, so re-querying six of them on every page
+ * load is pure waste — that was most of the report's 7s render. Only today is
+ * live. Counts only; the full aggregate is never stored.
+ */
+export interface DayRollup {
+  toolCalls: number;
+  sessions: number;
+  items: number;
+}
+
+export async function readDayCache(date: string): Promise<DayRollup | null> {
+  const snap = await getFirestore().collection("funnel-daily").doc(date).get();
+  if (!snap.exists) return null;
+  const d = snap.data() || {};
+  if (typeof d.toolCalls !== "number") return null;
+  return { toolCalls: d.toolCalls, sessions: d.sessions ?? 0, items: d.items ?? 0 };
+}
+
+export async function writeDayCache(date: string, roll: DayRollup): Promise<void> {
+  await getFirestore()
+    .collection("funnel-daily")
+    .doc(date)
+    .set({ ...roll, cachedAt: new Date().toISOString() }, { merge: true });
 }
 
 export async function writeSeen(seen: {
@@ -473,9 +558,4 @@ export function resolveWindow(state: DigestState, now = new Date()): { from: Dat
   if (!COVER_SINCE_LAST_REPORT || !state.cursor) return { from: hourAgo, to };
   const cursor = new Date(state.cursor);
   return { from: Number.isNaN(cursor.getTime()) ? hourAgo : cursor, to };
-}
-
-/** The 8am PT report always sends, so silence there means the job is broken. */
-export function isHeartbeatRun(now = new Date()): boolean {
-  return ptHour(now) === HEARTBEAT_HOUR;
 }

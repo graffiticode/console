@@ -19,15 +19,17 @@ import {
   aggregate,
   fetchEvents,
   formatDigest,
-  isEmpty,
-  isHeartbeatRun,
+  formatSms,
+  ptDate,
   readSeen,
   readState,
   resolveWindow,
+  shouldSend,
   writeSeen,
   writeState,
 } from "../../../lib/funnel-digest";
 import { sendSms } from "../../../lib/alert-sms";
+import { reportUrl } from "../../../lib/report-link";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const dry = req.query.dry === "1";
@@ -54,28 +56,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { events, truncated } = await fetchEvents(window.from, window.to);
     const seen = await readSeen();
     const digest = aggregate(events, { ...window, truncated }, seen);
-    const message = formatDigest(digest);
+    const url = reportUrl(window.from, window.to, now);
+    const message = formatSms(digest, url);
 
     if (dry) {
       return res.status(200).json({
         window: { from: window.from.toISOString(), to: window.to.toISOString() },
         events: events.length,
+        wouldSend: shouldSend(digest, state, now),
         message,
+        url,
+        // The long form is no longer sent, but it stays the readable summary for
+        // eyeballing a window from the terminal.
+        detail: formatDigest(digest),
         digest: { ...digest, from: undefined, to: undefined },
       });
     }
 
-    // A quiet hour sends nothing; the 8am run always does, so it doubles as the
-    // daily proof the job is alive.
-    const quiet = isEmpty(digest) && !isHeartbeatRun(now);
-    const result = quiet ? { sent: false, reason: "quiet" } : await sendSms(message);
+    // Tool calls are the liveness signal; a period with none sends nothing
+    // unless it's the day's first report, so silence stays unambiguous.
+    const send = shouldSend(digest, state, now);
+    const result = send ? await sendSms(message) : { sent: false, reason: "no_activity" };
 
     // Advance the cursor whether or not an SMS went out — the window WAS
     // reported on, and replaying it would double-count. A send failure is
-    // visible in the logs and in the next run's heartbeat.
+    // visible in the logs and in the next day's floor.
     await writeState({
       cursor: window.to.toISOString(),
-      ...(result.sent ? { lastSentAt: now.toISOString() } : {}),
+      ...(result.sent ? { lastSentAt: now.toISOString(), lastSentDate: ptDate(now) } : {}),
     });
     // Novelty is one-way: once a client kind or country has been announced it
     // must never be announced again, even if this run's SMS failed.

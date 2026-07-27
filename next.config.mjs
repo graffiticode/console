@@ -26,6 +26,13 @@ const nextConfig = {
     return [{
       source: "/docs",
       destination: "https://docs.graffiticode.com",
+    }, {
+      // Funnel report links land here. Served by an API route (not a page) so it
+      // bypasses _app.tsx's AuthWrapper — the signed token is the credential and
+      // the link has to open from an SMS with no sign-in. Short path because
+      // every character competes with the digest text in a 160-char segment.
+      source: "/r/:token",
+      destination: "/api/r/:token",
     }];
   },
   async headers() {
