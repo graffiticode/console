@@ -34,6 +34,7 @@ import {
 } from "./resolvers";
 import { verifyClaimToken } from "../../lib/claim-token";
 import { checkItemCreateAllowed } from "../../lib/usage-service";
+import { checkBurstLimit, BURST } from "../../lib/free-plan-throttle";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
@@ -63,16 +64,20 @@ type AuthContext = {
   token: string;
   freePlan?: boolean;
   sessionNamespace?: string;
+  sessionUuid?: string;
 };
 
 async function resolveAuth(ctx): Promise<AuthContext> {
   if (ctx.freePlan) {
     const { uid, idToken } = await getFreePlanCredentials();
+    // A fresh object per request — resolvers may rebind sessionNamespace onto it
+    // (adoptWorkspace) and that must not leak across requests.
     return {
       uid,
       token: idToken,
       freePlan: true,
       sessionNamespace: ctx.sessionNamespace,
+      sessionUuid: ctx.sessionUuid,
     };
   }
   const { uid, idToken } = await authenticate(ctx.token);
@@ -134,6 +139,12 @@ const typeDefs = `
     generationStatus: String
     generationError: String
     generationStartedAt: String
+    # Free-plan only. workspace is a signed handle the client sends back as
+    # X-Free-Plan-Session so its next call lands in the same workspace even
+    # though its transport session is gone; claimToken addresses that
+    # workspace's items for /claim. Both are null for authenticated callers.
+    workspace: String
+    claimToken: String
   }
 
   type GenerationJob {
@@ -303,8 +314,17 @@ const typeDefs = `
 const resolvers = {
   Query: {
     checkItemCreateAllowed: async (_, __, ctx) => {
+      // Free-plan callers get a real answer now that the trial is metered in
+      // items against the trial account's own plan allowance — it used to
+      // return an unconditional `allowed: true` because the trial was capped in
+      // dollars, in a unit this query couldn't express.
       if (ctx.freePlan) {
-        return { allowed: true };
+        try {
+          const { uid } = await resolveAuth(ctx);
+          return await checkItemCreateAllowed(uid, { failClosed: true, skipSelfHeal: true });
+        } catch (error) {
+          return { allowed: false, reason: 'Unable to verify item limit' };
+        }
       }
       const { token } = ctx;
       if (!token) {
@@ -612,7 +632,25 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   } else {
-    const freePlan = isFreePlanRequest(req);
+    let freePlan: Awaited<ReturnType<typeof isFreePlanRequest>>;
+    try {
+      freePlan = await isFreePlanRequest(req);
+      // Hammering guard for every free-plan surface, applied once here rather
+      // than resolver by resolver — reads, writes and anything added later are
+      // covered without having to remember to. Generously sized (see BURST.API);
+      // the actual budget is items, enforced at creation.
+      if (freePlan.freePlan) {
+        await checkBurstLimit(freePlan.sessionNamespace, BURST.API);
+      }
+    } catch (err) {
+      // A rejected free-plan session (bad signature, expired, or raw uuid once
+      // signed sessions are required) is an auth failure, not a GraphQL error.
+      // Rate-limit rejections land here too and carry their own 429 + payload.
+      const status = (err as any)?.status || 401;
+      const payload = (err as any)?.payload || { error: "free_plan_session_invalid" };
+      res.status(status).json(payload);
+      return;
+    }
     const { operationName, query, variables } = getGraphQLParameters(request);
     const result = await processRequest({
       operationName,

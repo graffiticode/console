@@ -47,6 +47,9 @@ export default function Claim() {
   // Guards against double-submits within a mount (the success path also clears
   // the stashed token, so a remount can't re-run the non-idempotent copy).
   const claimingRef = useRef(false);
+  // The sign-in flow remounts this page, so without a guard one visit would
+  // report several views and overstate the top of the funnel.
+  const viewLoggedRef = useRef(false);
 
   // Resolve the claim token once the router is ready and persist it. Prefer the
   // URL param; fall back to the stashed copy after a sign-in remount.
@@ -56,6 +59,18 @@ export default function Claim() {
     if (fromQuery) {
       sessionStorage.setItem(CLAIM_TOKEN_KEY, fromQuery);
       setToken(fromQuery);
+      // Report the open on the URL-param visit only: that's the real arrival.
+      // The stashed-token branch is the post-sign-in remount of the same visit.
+      if (!viewLoggedRef.current) {
+        viewLoggedRef.current = true;
+        const src = typeof router.query.src === 'string' ? router.query.src : 'unknown';
+        // Fire-and-forget: telemetry must never delay or break a claim.
+        fetch('/api/claim-view', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: fromQuery, src }),
+        }).catch(() => {});
+      }
     } else {
       setToken(sessionStorage.getItem(CLAIM_TOKEN_KEY));
     }

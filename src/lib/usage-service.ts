@@ -8,6 +8,35 @@ export interface ItemCreateAllowedResult {
   currentUsage?: number;
   /** Included + (customer overage limit, if any). Infinity when uncapped. */
   totalAvailable?: number;
+  /**
+   * The plan's included bucket alone, before any overage allowance. Always
+   * finite, unlike totalAvailable — callers deriving a rate from the budget
+   * (the trial daily pace) must use this, or a plan with no overage cap set
+   * yields an infinite rate and silently stops pacing.
+   */
+  includedItems?: number;
+  /**
+   * End of the current billing period, when the subscription declares one.
+   * Returned so callers pacing usage across the period (the trial daily cap)
+   * don't have to re-read the user doc.
+   */
+  periodEnd?: Date;
+}
+
+export interface ItemCreateAllowedOptions {
+  /**
+   * Deny on infra error instead of the default fail-open. Right for the shared
+   * anonymous trial account, where there is no tenant to bill and no user to
+   * notify — a Firestore blip must not become an open bar.
+   */
+  failClosed?: boolean;
+  /**
+   * Skip reconciling the stored counter against the period's usage records.
+   * That query reads every record in the period, so on the trial account (which
+   * runs at its full allowance every month, by design) it grows without bound
+   * and runs on every create. Trust the counter there; reconcile out-of-band.
+   */
+  skipSelfHeal?: boolean;
 }
 
 /**
@@ -23,7 +52,10 @@ export interface ItemCreateAllowedResult {
  * period start (billable item records carry units: 1; compiles/generations
  * carry units: 0, so the sum equals the item count).
  */
-export async function checkItemCreateAllowed(uid: string): Promise<ItemCreateAllowedResult> {
+export async function checkItemCreateAllowed(
+  uid: string,
+  options: ItemCreateAllowedOptions = {},
+): Promise<ItemCreateAllowedResult> {
   try {
     const db = getFirestore();
 
@@ -40,31 +72,36 @@ export async function checkItemCreateAllowed(uid: string): Promise<ItemCreateAll
     // grace window; it can only raise the allowance, never cap it.
     const now = new Date();
     const includedItems = effectiveIncludedItems(plan, subscription, now);
+    const periodEnd = subscription.currentPeriodEnd
+      ? new Date(subscription.currentPeriodEnd)
+      : undefined;
 
     // Self-heal the stored counter against the actual records for the period.
-    try {
-      const periodStart = subscription.currentPeriodStart
-        ? new Date(subscription.currentPeriodStart)
-        : new Date(now.getFullYear(), now.getMonth(), 1);
-      const usageRecords = await db.collection('usage')
-        .where('userId', '==', uid)
-        .where('createdAt', '>=', periodStart)
-        .get();
-      // Count only billable item records. Pre-migration compile/ai_generation
-      // records carry non-zero compile-unit `units` and must not be counted as
-      // items (new such records write units: 0, but old ones linger in-period).
-      let calculatedTotal = 0;
-      usageRecords.docs.forEach(doc => {
-        const r = doc.data();
-        if (r.type === 'item_created') calculatedTotal += r.units || 0;
-      });
-      if (calculatedTotal !== currentUsage) {
-        console.log(`checkItemCreateAllowed: syncing stored (${currentUsage}) → calculated (${calculatedTotal})`);
-        currentUsage = calculatedTotal;
-        await db.collection('usage').doc(uid).update({ currentMonthTotal: calculatedTotal });
+    if (!options.skipSelfHeal) {
+      try {
+        const periodStart = subscription.currentPeriodStart
+          ? new Date(subscription.currentPeriodStart)
+          : new Date(now.getFullYear(), now.getMonth(), 1);
+        const usageRecords = await db.collection('usage')
+          .where('userId', '==', uid)
+          .where('createdAt', '>=', periodStart)
+          .get();
+        // Count only billable item records. Pre-migration compile/ai_generation
+        // records carry non-zero compile-unit `units` and must not be counted as
+        // items (new such records write units: 0, but old ones linger in-period).
+        let calculatedTotal = 0;
+        usageRecords.docs.forEach(doc => {
+          const r = doc.data();
+          if (r.type === 'item_created') calculatedTotal += r.units || 0;
+        });
+        if (calculatedTotal !== currentUsage) {
+          console.log(`checkItemCreateAllowed: syncing stored (${currentUsage}) → calculated (${calculatedTotal})`);
+          currentUsage = calculatedTotal;
+          await db.collection('usage').doc(uid).update({ currentMonthTotal: calculatedTotal });
+        }
+      } catch (err) {
+        console.error('checkItemCreateAllowed: error calculating actual usage', err);
       }
-    } catch (err) {
-      console.error('checkItemCreateAllowed: error calculating actual usage', err);
     }
 
     // Hard-cap (Free): no overage path — blocked at the included bucket.
@@ -75,6 +112,8 @@ export async function checkItemCreateAllowed(uid: string): Promise<ItemCreateAll
         reason: currentUsage < totalAvailable ? undefined : 'Free plan item limit reached — upgrade to create more',
         currentUsage,
         totalAvailable,
+        includedItems,
+        periodEnd,
       };
     }
 
@@ -89,10 +128,17 @@ export async function checkItemCreateAllowed(uid: string): Promise<ItemCreateAll
       reason: allowed ? undefined : 'Overage spend limit reached — raise or remove your cap to create more',
       currentUsage,
       totalAvailable,
+      includedItems,
+      periodEnd,
     };
   } catch (error) {
     console.error('checkItemCreateAllowed error:', error);
-    // Fail open on infra errors so a transient Firestore blip doesn't block creation.
+    // Fail open on infra errors so a transient Firestore blip doesn't block a
+    // paying tenant. Anonymous trial callers pass failClosed: there is no
+    // account to bill and no user to notify, so a blip must not open the bar.
+    if (options.failClosed) {
+      return { allowed: false, reason: 'Unable to verify item limit' };
+    }
     return { allowed: true, reason: 'Unable to verify item limit' };
   }
 }

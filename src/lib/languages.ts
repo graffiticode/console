@@ -37,6 +37,16 @@ export interface Language {
   //   - absent / empty — ATOMIC ONLY (no composition)
   // See composesWithFor / fenceComposition in language-router.ts.
   composesWith?: string[];
+  // Anonymous free-plan (MCP trial) scope. Marking ANY language with this turns
+  // the trial into an allowlist: only marked languages may be created without an
+  // account, and everything else returns a structured
+  // `language_not_in_trial_scope` listing what is allowed.
+  //
+  // Ships inert on purpose. With nothing marked the gate is a no-op, so
+  // deploying it can't silently take languages away from trial users mid-task;
+  // enabling it is then a reversible data change (mark the set) rather than a
+  // release. See freePlanLanguageIds() / isLanguageInFreePlanScope().
+  freePlan?: boolean;
 }
 
 export const LANGUAGES: Language[] = [
@@ -140,4 +150,28 @@ export async function listLanguages({ search, domain }: { search?: string; domai
   }
 
   return results;
+}
+
+/**
+ * Language ids inside the anonymous free-plan scope, or an empty array when the
+ * allowlist is inert (nothing marked) — see `freePlan` on the Language type.
+ */
+export function freePlanLanguageIds(): string[] {
+  return LANGUAGES.filter(l => l.freePlan).map(l => l.id);
+}
+
+/**
+ * Whether a language may be created on the anonymous free plan.
+ *
+ * Permissive while the allowlist is empty, so the gate can ship before anyone
+ * has decided which languages belong in it. Once ANY language is marked, this
+ * becomes a strict allowlist.
+ */
+export function isLanguageInFreePlanScope(lang: string | undefined | null): boolean {
+  const allowed = freePlanLanguageIds();
+  if (allowed.length === 0) return true;
+  if (!lang) return false;
+  // Callers pass either "0166" or "L0166".
+  const id = String(lang).replace(/^L/i, "");
+  return allowed.includes(id);
 }

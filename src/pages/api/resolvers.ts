@@ -13,6 +13,19 @@ import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
 import { reportItemUsage } from "../../lib/item-metering";
 import { checkItemCreateAllowed } from "../../lib/usage-service";
+import {
+  assertWithinDailyPace,
+  buildItemExpiredError,
+  buildMonthlyQuotaError,
+  buildRevisionLimitError,
+  buildScopeError,
+  maybeAlertBudget,
+  recordTrialItem,
+} from "../../lib/free-plan-quota";
+import { freePlanLanguageIds, isLanguageInFreePlanScope } from "../../lib/languages";
+import { trialItemRevisionLimit } from "../../lib/plans-config";
+import { mintSessionToken, isSessionTokenConfigured } from "../../lib/free-plan-session-token";
+import { mintClaimToken } from "../../lib/claim-token";
 import fs from "fs";
 import path from "path";
 import { encrypt, decrypt, isConfigured as isSecretCryptoConfigured } from "../../lib/secret-crypto";
@@ -22,7 +35,11 @@ type AuthArg = {
   uid: string;
   token: string;
   freePlan?: boolean;
+  // The effective workspace. Starts as the caller's session namespace and may be
+  // rebound by adoptWorkspace when the request names an item that already
+  // belongs somewhere else.
   sessionNamespace?: string;
+  sessionUuid?: string;
 };
 
 function isItemVisibleToFreePlan(
@@ -40,6 +57,163 @@ function isItemVisibleToFreePlan(
   if (!opts.byId && data?.sessionNamespace !== auth.sessionNamespace) return false;
   if (typeof data?.expiresAt === "number" && data.expiresAt <= now) return false;
   return true;
+}
+
+/**
+ * Whether a by-id lookup failed specifically because the item aged out.
+ *
+ * Worth distinguishing: "not found" tells an agent nothing it can act on, and it
+ * will usually retry the same id. "Expired" tells it the content is gone for a
+ * knowable reason, with a recovery (recreate, or sign in to keep items) — which
+ * is also the moment the 48h TTL is most persuasive as a signup argument.
+ */
+function isExpiredForFreePlan(data: any, auth: AuthArg, now = Date.now()): boolean {
+  if (!auth.freePlan) return false;
+  return typeof data?.expiresAt === "number" && data.expiresAt <= now;
+}
+
+/**
+ * Gate item creation against the caller's item budget, throwing when it's spent.
+ *
+ * One path for everyone. The anonymous trial resolves to a real account with a
+ * real subscription (auth.uid is already that account), so its plan allowance IS
+ * the trial's monthly budget — no parallel counter, no hardcoded number. Trial
+ * callers additionally pace that budget across the billing period so a single
+ * day can't burn the month, and they fail CLOSED: there's no tenant to bill and
+ * no user to notify if the check itself breaks.
+ */
+async function assertItemCreateAllowed(auth: AuthArg, lang?: string): Promise<void> {
+  if (auth.freePlan && !isLanguageInFreePlanScope(lang)) {
+    throw buildScopeError(lang, freePlanLanguageIds());
+  }
+  const gate = await checkItemCreateAllowed(auth.uid, {
+    failClosed: auth.freePlan,
+    // The trial account runs at its full allowance every month by design, so
+    // the self-heal's per-period record scan grows without bound and would run
+    // on every create. Trust the counter here; reconcile out-of-band.
+    skipSelfHeal: auth.freePlan,
+  });
+  if (!gate.allowed) {
+    if (auth.freePlan) {
+      throw buildMonthlyQuotaError(gate.currentUsage, gate.totalAvailable);
+    }
+    throw new Error(gate.reason || "Item limit reached");
+  }
+  if (auth.freePlan) {
+    await assertWithinDailyPace({
+      includedItems: gate.includedItems ?? 0,
+      currentPeriodTotal: gate.currentUsage ?? 0,
+      periodEnd: gate.periodEnd,
+    });
+    // Warn while there's still budget left to protect, rather than letting the
+    // cap announce itself by refusing a user's request.
+    await maybeAlertBudget({
+      used: gate.currentUsage ?? 0,
+      included: gate.includedItems ?? 0,
+      periodEnd: gate.periodEnd,
+    });
+  }
+}
+
+/**
+ * Throw when a trial item has spent its revision budget.
+ *
+ * Enforced at the top of generateCode rather than in updateItem because that's
+ * where the money goes: the MCP client calls generateCode first and only then
+ * writes the resulting taskId back through updateItem, so gating the write
+ * would bill the LLM call and refuse it afterwards.
+ *
+ * A not-yet-written item doc (createItem generates its template before the doc
+ * exists) and a first generation (no taskId yet) both read 0 and pass.
+ */
+async function assertRevisionsRemaining(auth: AuthArg, itemId?: string): Promise<void> {
+  if (!auth.freePlan || !itemId) return;
+  const limit = trialItemRevisionLimit();
+  const snap = await db.doc(`users/${auth.uid}/items/${itemId}`).get();
+  if (!snap.exists) return;
+  const used = Number(snap.data()?.trialRevisions) || 0;
+  if (used >= limit) {
+    throw buildRevisionLimitError(limit);
+  }
+}
+
+/**
+ * Rebind the caller's workspace to the one an existing item already belongs to.
+ *
+ * An MCP "session" is not a durable thing — it dies on restart and on scale-out,
+ * and ChatGPT mints a fresh one per tool call. Its namespace is therefore a bad
+ * owner for an item that outlives it. What the client DOES re-present across all
+ * that churn is the item id, which this codebase already treats as a capability
+ * (see isItemVisibleToFreePlan's byId branch). So the item's namespace, not the
+ * transport's, is the real workspace identity.
+ *
+ * Mutation only. A read must never pull the reader into someone else's
+ * workspace; touching an item you were merely shown shouldn't enroll you in it.
+ *
+ * Mutates `auth` deliberately: resolveAuth builds a fresh object per request, so
+ * the rebind is request-scoped, and everything downstream in this request
+ * (expiresAt refresh, version stamping, the claim token in the response) has to
+ * see the adopted value or it will write the ephemeral one back.
+ */
+function adoptWorkspace(auth: AuthArg, itemData: any): void {
+  if (!auth.freePlan) return;
+  const owner = itemData?.sessionNamespace;
+  if (typeof owner !== "string" || !owner) return;
+  if (owner === auth.sessionNamespace) return;
+  auth.sessionNamespace = owner;
+}
+
+/**
+ * Free-plan-only response fields: a signed workspace token the client sends back
+ * so its next call stays in this workspace, and a claim token addressing this
+ * workspace's items. Both derive from the EFFECTIVE namespace, i.e. after any
+ * adoption above.
+ *
+ * Best-effort — a missing salt degrades to no tokens (the item still returns)
+ * rather than failing the whole mutation, matching how the MCP server has always
+ * treated an unconfigured salt.
+ */
+async function freePlanTokens(
+  auth: AuthArg,
+): Promise<{ workspace?: string; claimToken?: string }> {
+  if (!auth.freePlan || !auth.sessionNamespace || !isSessionTokenConfigured()) return {};
+  const payload = {
+    sessionNamespace: auth.sessionNamespace,
+    sessionUuid: auth.sessionUuid || auth.sessionNamespace,
+  };
+  try {
+    const [workspace, claimToken] = await Promise.all([
+      mintSessionToken(payload),
+      mintClaimToken(payload),
+    ]);
+    return { workspace, claimToken };
+  } catch (err) {
+    console.error("freePlanTokens()", "ERROR", err);
+    return {};
+  }
+}
+
+/**
+ * Claim token for a specific workspace, without granting the workspace itself.
+ * Used on read paths, where the reader may legitimately need to save an item it
+ * can see but must not be enrolled into that item's workspace.
+ */
+async function freePlanClaimTokenFor(
+  auth: AuthArg,
+  namespace: unknown,
+): Promise<{ claimToken?: string }> {
+  if (!auth.freePlan || typeof namespace !== "string" || !namespace) return {};
+  if (!isSessionTokenConfigured()) return {};
+  try {
+    const claimToken = await mintClaimToken({
+      sessionNamespace: namespace,
+      sessionUuid: auth.sessionUuid || namespace,
+    });
+    return { claimToken };
+  } catch (err) {
+    console.error("freePlanClaimTokenFor()", "ERROR", err);
+    return {};
+  }
 }
 
 function freePlanItemFields(auth: AuthArg, now = Date.now()) {
@@ -201,9 +375,6 @@ export async function recordBillableItem({
 }) {
   try {
     if (!itemId || !taskId) return;
-    // Anonymous free-plan (MCP trial) items resolve to a shared trial uid and are
-    // metered/capped separately — never bill them to a tenant account.
-    if (auth.freePlan) return;
     // Share/claim copies re-post existing content; they are not authored items.
     if (source === "claim" || source === "share") return;
 
@@ -269,6 +440,16 @@ export async function recordBillableItem({
         lastReset: periodStart.toISOString(),
         lastUpdated: now.toISOString(),
       });
+    }
+
+    // Anonymous free-plan (MCP trial) items are COUNTED — the writes above are
+    // what checkItemCreateAllowed reads, so the trial account's own plan
+    // allowance becomes the monthly budget — but never INVOICED. Stop here,
+    // before the meter report, and record the day's tally for the derived
+    // daily pace.
+    if (auth.freePlan) {
+      await recordTrialItem(now);
+      return;
     }
 
     // Report to the Stripe metered price (paid tiers only). Best-effort.
@@ -767,6 +948,11 @@ export async function generateCode({
       return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: "language is required" }] };
     }
 
+    // Free-plan revision budget, checked before any generation spend. Creation
+    // is gated separately (assertItemCreateAllowed); this bounds iteration on an
+    // item that already exists.
+    await assertRevisionsRemaining(auth, itemId);
+
     prompt = prompt.trim();
     let description = null;
     let changeSummary = null;
@@ -1127,14 +1313,14 @@ export async function createItem({
   try {
     // Gate item creation against the account's item budget BEFORE spending any
     // generation compute. Free tiers hard-cap; paid tiers block only past a
-    // customer-set overage cap. Anonymous free-plan sessions are metered
-    // separately (own throttle/spend caps), so skip them here.
-    if (!auth.freePlan) {
-      const gate = await checkItemCreateAllowed(auth.uid);
-      if (!gate.allowed) {
-        throw new Error(gate.reason || 'Item limit reached');
-      }
-    }
+    // customer-set overage cap.
+    //
+    // Anonymous free-plan callers run the SAME gate: the trial account is a real
+    // account with a real subscription, and auth.uid already resolves to it, so
+    // its plan allowance is the trial's monthly budget. Move that account
+    // between tiers and the cap follows with no code change. It carries an
+    // overageLimitItems of 0, which turns the paid-tier branch into a hard cap.
+    await assertItemCreateAllowed(auth, lang);
 
     // Generate a unique ID for the item
     const itemRef = db.collection(`users/${auth.uid}/items`).doc();
@@ -1229,6 +1415,7 @@ export async function createItem({
       ...item,
       created: String(timestamp),
       updated: String(timestamp),
+      ...(await freePlanTokens(auth)),
     };
   } catch (error) {
     console.error("createItem()", "ERROR", error);
@@ -1276,8 +1463,12 @@ export async function updateItem({
     // By-id update: the item id is the capability, so a stateless client can refine an
     // item it created under a now-expired MCP session. Listing stays session-gated.
     if (!isItemVisibleToFreePlan(itemData, auth, { byId: true })) {
+      if (isExpiredForFreePlan(itemData, auth)) throw buildItemExpiredError();
       throw new Error("Item not found");
     }
+    // This is a mutation on an existing item, so the item's workspace wins over
+    // whatever ephemeral session the request arrived on.
+    adoptWorkspace(auth, itemData);
     if (auth.freePlan && isPublic) {
       throw new Error("Free plan items cannot be made public.");
     }
@@ -1372,6 +1563,15 @@ export async function updateItem({
           client: data.client,
           source: resolvedSource,
         });
+      } else if (auth.freePlan) {
+        // A real taskId -> taskId change: the content actually moved, so this is
+        // a revision against the trial budget. Counting the successful change
+        // rather than the attempt means a generation that failed to compile
+        // doesn't burn one of only a handful of revisions — runaway retries are
+        // bounded by the burst limiter instead.
+        await itemRef.update({
+          trialRevisions: admin.firestore.FieldValue.increment(1),
+        });
       }
     }
     return {
@@ -1379,6 +1579,7 @@ export async function updateItem({
       ...data,
       created: String(data.created),
       updated: String(data.updated),
+      ...(await freePlanTokens(auth)),
     };
   } catch (error) {
     console.error("updateItem()", "ERROR", error);
@@ -1643,6 +1844,7 @@ export async function getItem({ auth, id }) {
     // By-id read: the item id is the capability (mirrors the public form page), so a
     // stateless MCP client can retrieve an item it created under a prior session.
     if (!isItemVisibleToFreePlan(data, auth, { byId: true })) {
+      if (isExpiredForFreePlan(data, auth)) throw buildItemExpiredError();
       return null;
     }
     let help = data.help;
@@ -1710,6 +1912,13 @@ export async function getItem({ auth, id }) {
       generationStatus: data.generationStatus ?? null,
       generationError: data.generationError ?? null,
       generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
+      // Claim token only — a read must be able to offer "save this item" for the
+      // workspace the item actually lives in (this retrieval path is where the
+      // claim link is surfaced, after the agent polls a create to "ready"), but
+      // it must NOT hand back a workspace handle: seeing an item is not joining
+      // its workspace. Minted from the ITEM's namespace, not the reader's, which
+      // is the whole fix — the reader's ephemeral namespace holds nothing.
+      ...(await freePlanClaimTokenFor(auth, data.sessionNamespace)),
     };
   } catch (error) {
     console.error("getItem()", "ERROR", error);
@@ -1833,6 +2042,31 @@ export async function shareItem({ auth, itemId, targetUserId }) {
 // the MCP server), so failures never reach the mcp_tool stream and Firestore only
 // records successes — this is the only signal the funnel report has for the
 // anonymous→account (north-star #1) step. Best-effort; never breaks a claim.
+/**
+ * The claim link was OPENED — the step between "agent surfaced a claim link" and
+ * "items transferred", which until now left no trace at all. Firestore only ever
+ * recorded successful claims, so a link that was clicked and abandoned (or never
+ * clicked) was indistinguishable from one that was never issued, and the middle
+ * of the anonymous→account funnel could not be measured.
+ *
+ * `src` attributes the click to where the link was surfaced: "chat" (the
+ * claim_url an agent prints) vs "footer" (the render-host's Claim button on
+ * view_url). Those two convert very differently and the copy for each is tuned
+ * separately, so a blended rate is not actionable.
+ */
+export function logClaimView(fields: { session: string; src: string }) {
+  try {
+    console.log(JSON.stringify({
+      ev: "claim_view",
+      t: new Date().toISOString(),
+      session: fields.session,
+      src: fields.src,
+    }));
+  } catch {
+    // ignore
+  }
+}
+
 export function logClaimEvent(fields: { outcome: "ok" | "error"; transferred?: number; session: string; err?: string }) {
   try {
     console.log(JSON.stringify({

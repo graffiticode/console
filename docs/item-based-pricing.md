@@ -34,9 +34,15 @@ creates them tiered; don't change that.
   its first successful compile — from `createItem` success and from `updateItem`'s no-taskId→first-taskId
   transition (async console/MCP creates whose artifact the worker fills in). Idempotent via a `billed`
   flag on the item doc (Firestore transaction).
-- **Excluded:** revisions (taskId→taskId), share/claim copies (`source ∈ {claim,share}` or
-  `sharedFrom`/`claimedFrom`), and anonymous free-plan (MCP trial) sessions (`auth.freePlan`) — trial
-  items resolve under the shared trial uid and must not bill it.
+- **Excluded:** revisions (taskId→taskId) and share/claim copies (`source ∈ {claim,share}` or
+  `sharedFrom`/`claimedFrom`).
+- **Anonymous free-plan (MCP trial) items are COUNTED but never INVOICED.** They resolve under the
+  shared trial uid and flow through the `billed` transaction, the `usage` record and the
+  `currentMonthTotal` increment — which is exactly what makes the trial account's own plan allowance
+  serve as the trial's monthly budget — then return **before** the Stripe meter report. The account
+  carries `overageLimitItems: 0`, so `checkItemCreateAllowed`'s paid-tier branch becomes a hard cap at
+  its included items, and it can never accrue billable overage.
+  See `docs/free-plan-attested-sessions.md` and `free-plan-quota.ts`.
 - **Effects:** writes a `usage` record `{type:'item_created', units:1}`, increments
   `usage/{uid}.currentMonthTotal`, and (paid tiers only) reports a Stripe meter event via
   `src/lib/item-metering.ts` (event name `item_created`, `value:1`, idempotency key `itemId__taskId`).

@@ -4,6 +4,7 @@ import { getBaseUrlForApi } from "../../lib/api";
 import { client as authClient } from "../../lib/auth";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
 import { getFreePlanCredentials, isFreePlanRequest } from "../../lib/free-plan-context";
+import { checkBurstLimit, BURST } from "../../lib/free-plan-throttle";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -19,7 +20,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  const freePlan = isFreePlanRequest(req);
+  let freePlan: Awaited<ReturnType<typeof isFreePlanRequest>>;
+  try {
+    freePlan = await isFreePlanRequest(req);
+    // This proxy reaches a compiler service, and until now nothing bounded how
+    // often an anonymous caller could do that.
+    if (freePlan.freePlan) {
+      await checkBurstLimit(freePlan.sessionNamespace, BURST.COMPILE);
+    }
+  } catch (err) {
+    const status = (err as any)?.status || 401;
+    const payload = (err as any)?.payload || { error: "free_plan_session_invalid" };
+    res.status(status).json(payload);
+    return;
+  }
   const incomingAuth = (req.headers.authorization as string) || "";
   let downstreamAuth: string;
 

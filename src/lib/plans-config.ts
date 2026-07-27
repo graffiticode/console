@@ -127,6 +127,31 @@ export const PLANS: Record<PlanId, PlanConfig> = {
 
 export const DEFAULT_PLAN: PlanId = 'demo';
 
+/**
+ * Anonymous free-plan (MCP trial) limits.
+ *
+ * Deliberately NOT a PLANS entry: a trial is not a PlanId, has no Stripe
+ * mapping, and adding one would pollute getPlan()'s fallback, the tier
+ * comparisons and priceIdToPlan.
+ *
+ * Note what is absent — the trial's ITEM budget. That comes from the trial
+ * account's own subscription (it is a real account; see checkItemCreateAllowed),
+ * so moving that account between tiers moves the monthly cap, and the derived
+ * daily pace with it, without a code or env change.
+ */
+const DEFAULT_TRIAL_ITEM_REVISIONS = 5;
+
+/**
+ * Revisions allowed per trial item, counted on successful content change (a
+ * failed generation must not burn one of only five). Resolved at call time so
+ * it can be tuned by env without a deploy.
+ */
+export function trialItemRevisionLimit(): number {
+  const raw = process.env.FREE_PLAN_ITEM_REVISION_LIMIT;
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TRIAL_ITEM_REVISIONS;
+}
+
 export function getPlan(id: string | undefined | null): PlanConfig {
   return PLANS[(id as PlanId)] ?? PLANS[DEFAULT_PLAN];
 }

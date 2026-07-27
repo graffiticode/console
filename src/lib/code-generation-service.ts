@@ -46,8 +46,7 @@ import {
   formatPromptSpecForLog,
   RenderContext,
 } from "./prompt-renderer";
-import { assertNotCappedOrThrow, recordSpend } from "./free-plan-spend";
-import { checkBurstLimit, checkDailyLimit } from "./free-plan-throttle";
+import { checkBurstLimit } from "./free-plan-throttle";
 import { FreePlanError, buildSignupUrl } from "./free-plan-context";
 
 // Sentinel itemId injected during code-generation verification. Side-effecting
@@ -56,27 +55,6 @@ import { FreePlanError, buildSignupUrl } from "./free-plan-context";
 // credential gates that guard them, since verification runs without the user's
 // account credentials. Mirrored by VERIFY_ITEM_ID in the L0158 compiler.
 export const VERIFY_ITEM_ID = "verify-itemid";
-
-const ANTHROPIC_INPUT_USD_PER_TOKEN = 3 / 1_000_000;
-const ANTHROPIC_OUTPUT_USD_PER_TOKEN = 15 / 1_000_000;
-const ANTHROPIC_CACHE_WRITE_USD_PER_TOKEN = 3.75 / 1_000_000;
-const ANTHROPIC_CACHE_READ_USD_PER_TOKEN = 0.3 / 1_000_000;
-
-function estimateUsdCost(usage?: {
-  inputTokens?: number;
-  outputTokens?: number;
-  cacheCreationInputTokens?: number;
-  cacheReadInputTokens?: number;
-}): number {
-  if (!usage) return 0;
-  const input = Math.max(0, (usage.inputTokens || 0) - (usage.cacheCreationInputTokens || 0) - (usage.cacheReadInputTokens || 0));
-  return (
-    input * ANTHROPIC_INPUT_USD_PER_TOKEN +
-    (usage.outputTokens || 0) * ANTHROPIC_OUTPUT_USD_PER_TOKEN +
-    (usage.cacheCreationInputTokens || 0) * ANTHROPIC_CACHE_WRITE_USD_PER_TOKEN +
-    (usage.cacheReadInputTokens || 0) * ANTHROPIC_CACHE_READ_USD_PER_TOKEN
-  );
-}
 
 const MIN_FREE_PLAN_PROMPT = 20;
 // Caps the prompt the MCP server sends — a windowed dialog (last ~6 user turns +
@@ -1263,10 +1241,12 @@ export async function generateCode({
         signup_url: signupUrl,
       });
     }
-    await assertNotCappedOrThrow();
+    // Runaway-loop guard only. The trial's actual budget is denominated in
+    // items and enforced at item creation (assertItemCreateAllowed) and at
+    // revision (assertRevisionsRemaining) — both in resolvers.ts, both anchored
+    // to durable Firestore state rather than to the caller's session id.
     if (auth?.sessionNamespace) {
       await checkBurstLimit(auth.sessionNamespace);
-      await checkDailyLimit(auth.sessionNamespace);
     }
   }
   // NOTE: item-based billing gates at item CREATION (createItem /
@@ -1606,13 +1586,6 @@ export async function generateCode({
           latencyMs: generationLatency,
         });
       }
-      if (isFreePlan) {
-        try {
-          await recordSpend(estimateUsdCost(u));
-        } catch (err) {
-          console.error("[free-plan] failed to record spend", err);
-        }
-      }
     }
 
     if (streamResult.error) {
@@ -1827,14 +1800,6 @@ export async function generateCode({
           finalUsage.prompt_tokens += fixResult.usage.inputTokens;
           finalUsage.completion_tokens += fixResult.usage.outputTokens;
           finalUsage.total_tokens += fixResult.usage.inputTokens + fixResult.usage.outputTokens;
-
-          if (isFreePlan) {
-            try {
-              await recordSpend(estimateUsdCost(fixResult.usage));
-            } catch (err) {
-              console.error("[free-plan] failed to record fix spend", err);
-            }
-          }
 
           fixAttempts++;
 

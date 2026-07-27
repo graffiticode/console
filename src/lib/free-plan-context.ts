@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { getCredentialsForApiKey, type ApiKeyCredentials } from "./api-credentials";
+import { looksLikeSessionToken, verifySessionToken } from "./free-plan-session-token";
 
 export const FREE_PLAN_SESSION_HEADER = "x-free-plan-session";
 
@@ -12,7 +13,13 @@ export type FreePlanContext = {
 };
 
 export function deriveSessionNamespace(uuid: string): string {
-  const salt = process.env.FREE_PLAN_NAMESPACE_SALT || "";
+  const salt = process.env.FREE_PLAN_NAMESPACE_SALT;
+  // Never fall back to an unsalted hash. A missing salt used to yield a
+  // globally-predictable namespace — anyone could compute it and read the
+  // items inside — while looking like it worked. Fail like getFreePlanApiKey().
+  if (!salt) {
+    throw new Error("FREE_PLAN_NAMESPACE_SALT is not configured");
+  }
   return crypto.createHash("sha256").update(`${salt}:${uuid}`).digest("hex");
 }
 
@@ -22,13 +29,46 @@ function readHeader(req, name: string): string | undefined {
   return value;
 }
 
-export function isFreePlanRequest(req): FreePlanContext | { freePlan: false } {
-  const sessionUuid = readHeader(req, FREE_PLAN_SESSION_HEADER);
-  if (!sessionUuid) return { freePlan: false };
+/**
+ * Resolve the free-plan session from the request header.
+ *
+ * Two accepted forms:
+ * - A signed session/workspace token we issued. Its namespace is authoritative,
+ *   which is what lets a client rejoin a workspace across the transport sessions
+ *   it keeps losing.
+ * - A raw session uuid, hashed on arrival. Self-asserted and therefore
+ *   forgeable; accepted for compatibility until FREE_PLAN_REQUIRE_SIGNED_SESSION
+ *   is set, at which point only the signed form gets in.
+ *
+ * A malformed or expired signed token is rejected outright rather than falling
+ * back to hashing it as a uuid — that fallback would let anyone downgrade to the
+ * forgeable path just by corrupting a byte.
+ */
+export async function isFreePlanRequest(
+  req,
+): Promise<FreePlanContext | { freePlan: false }> {
+  const raw = readHeader(req, FREE_PLAN_SESSION_HEADER);
+  if (!raw) return { freePlan: false };
+
+  if (looksLikeSessionToken(raw)) {
+    const { sessionNamespace, sessionUuid } = await verifySessionToken(raw);
+    return { freePlan: true, sessionUuid, sessionNamespace };
+  }
+
+  if (process.env.FREE_PLAN_REQUIRE_SIGNED_SESSION === "true") {
+    throw new FreePlanError("free_plan_session_invalid", 401, {
+      error: "free_plan_session_invalid",
+      message:
+        "This free-plan session is not recognized. Reconnect to the Graffiticode MCP server " +
+        "to start a new session, or create a free account at graffiticode.org/signup.",
+      signup_url: buildSignupUrl("invalid_session"),
+    });
+  }
+
   return {
     freePlan: true,
-    sessionUuid,
-    sessionNamespace: deriveSessionNamespace(sessionUuid),
+    sessionUuid: raw,
+    sessionNamespace: deriveSessionNamespace(raw),
   };
 }
 
