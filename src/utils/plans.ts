@@ -27,7 +27,8 @@ export interface Plan {
 const fmt = (n: number) => n.toLocaleString('en-US');
 const rate = (id: PlanId) => {
   const r = PLANS[id].overageRatePerItem;
-  return r == null ? '' : `$${r.toFixed(r < 0.1 ? 3 : 2).replace(/0+$/, '').replace(/\.$/, '')}`;
+  // Always at least 2 decimals ($0.10, not $0.1); a 3rd only when it's significant ($0.025).
+  return r == null ? '' : `$${r.toFixed(3).replace(/0$/, '')}`;
 };
 
 export const plans: Plan[] = [
