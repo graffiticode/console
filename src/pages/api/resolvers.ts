@@ -2135,6 +2135,14 @@ export async function claimFreePlanSession({
       id: newId,
       taskId: null, // triggers lazy repost in getItem/getItems under the new uid
       claimedFrom: sessionUuid,
+      // The workspace this item actually came from — recorded explicitly rather
+      // than left to be re-derived by hashing `claimedFrom`. Since workspace
+      // adoption, the claim token's sessionUuid is whichever session happened to
+      // present the token, which is not necessarily the session whose hash
+      // equals the workspace the items live in. Re-hashing the uuid therefore
+      // yields the wrong namespace and the funnel report loses the join back to
+      // the originating session's events.
+      claimedFromNamespace: sessionNamespace,
       // Surface claimed items in the default /items view (which filters to
       // client=='console'). Provenance is preserved in `claimedFrom`.
       client: "console",

@@ -92,6 +92,26 @@ export function dailyItemAllowance({
   return Math.ceil(remaining / daysRemainingInPeriod(periodEnd, now));
 }
 
+/**
+ * Record LLM spend for the day. Telemetry only — the budget is items, and
+ * nothing reads this to allow or refuse a request.
+ *
+ * It exists because cost-per-acquired-account is a funnel metric
+ * (scripts/mcp-funnel-report.ts reads these docs). Deleting the dollar cap
+ * removed the writer as well as the control, which would have left that metric
+ * reading $0 forever — indistinguishable from "we spend nothing".
+ */
+export async function recordSpend(usd: number, now = new Date()): Promise<void> {
+  if (!Number.isFinite(usd) || usd <= 0) return;
+  const ref = db.collection("free-plan-state").doc(`spend-${todayKey(now)}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const prev = snap.exists ? Number(snap.data()?.usd) : 0;
+    const next = (Number.isFinite(prev) ? prev : 0) + usd;
+    tx.set(ref, { usd: next, updated: now.toISOString() }, { merge: true });
+  });
+}
+
 export async function getTodayItemCount(now = new Date()): Promise<number> {
   const snap = await dailyDocRef(now).get();
   if (!snap.exists) return 0;

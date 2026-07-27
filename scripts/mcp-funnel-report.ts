@@ -461,7 +461,16 @@ async function fetchFirestore(start: Date | null, end: Date): Promise<FsStats> {
     const d = doc.data();
     const claimedAt = toMillis(d.updated) ?? toMillis(d.created);
     if (!inWindow(claimedAt, start, end)) return;
-    if (typeof d.claimedFrom === 'string') claimedNamespaces.add(deriveSessionNamespace(d.claimedFrom));
+    // Prefer the namespace the claim resolver actually queried. Re-hashing
+    // `claimedFrom` is only correct when the claiming session was the one that
+    // created the items; with workspace adoption it often isn't, so the hash
+    // resolves to a namespace holding nothing and the join silently drops the
+    // claim. Fall back to the hash for items claimed before the field existed.
+    if (typeof d.claimedFromNamespace === 'string') {
+      claimedNamespaces.add(d.claimedFromNamespace);
+    } else if (typeof d.claimedFrom === 'string') {
+      claimedNamespaces.add(deriveSessionNamespace(d.claimedFrom));
+    }
     const ownerUid = doc.ref.parent.parent?.id;
     if (ownerUid) accountUids.add(ownerUid);
   });

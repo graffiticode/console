@@ -49,6 +49,8 @@ import {
   RenderContext,
 } from "./prompt-renderer";
 import { checkBurstLimit } from "./free-plan-throttle";
+import { recordSpend } from "./free-plan-quota";
+import { estimateUsdCost } from "./model-pricing";
 import { FreePlanError, buildSignupUrl } from "./free-plan-context";
 
 // Sentinel itemId injected during code-generation verification. Side-effecting
@@ -1588,6 +1590,12 @@ export async function generateCode({
           latencyMs: generationLatency,
         });
       }
+      if (isFreePlan) {
+        // Telemetry only — the free-plan budget is items, not dollars.
+        recordSpend(estimateUsdCost(u, modelToUse)).catch((err) => {
+          console.error("[free-plan] failed to record spend", err);
+        });
+      }
     }
 
     if (streamResult.error) {
@@ -1802,6 +1810,12 @@ export async function generateCode({
           finalUsage.prompt_tokens += fixResult.usage.inputTokens;
           finalUsage.completion_tokens += fixResult.usage.outputTokens;
           finalUsage.total_tokens += fixResult.usage.inputTokens + fixResult.usage.outputTokens;
+
+          if (isFreePlan) {
+            recordSpend(estimateUsdCost(fixResult.usage, modelToUse)).catch((err) => {
+              console.error("[free-plan] failed to record fix spend", err);
+            });
+          }
 
           fixAttempts++;
 
