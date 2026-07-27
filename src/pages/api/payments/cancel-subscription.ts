@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { STRIPE_API_VERSION, includedItemsFor, priceIdToPlan, DEFAULT_PLAN } from '../../../lib/plans-config';
 import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
+import { emitPlanChanged } from '../../../lib/funnel-events';
 import { getFirestore } from '../../../utils/db';
 import * as admin from 'firebase-admin';
 
@@ -149,6 +150,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     await db.collection('users').doc(userId).update(updateData);
+
+    // Immediate cancellation moves the plan now; a period-end cancellation is a
+    // decision whose plan write lands later (via customer.subscription.deleted).
+    // Report the decision when it's made — a month's delay makes it useless for
+    // retention — and let the eventual sync report the transition separately.
+    emitPlanChanged({
+      uid: userId,
+      from: userData?.subscription?.plan ?? DEFAULT_PLAN,
+      to: DEFAULT_PLAN,
+      reason: immediately ? 'subscription_sync' : 'cancel_requested',
+    });
 
     return res.status(200).json({
       success: true,

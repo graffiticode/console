@@ -4,6 +4,7 @@ import { getFirestore } from '../../../utils/db';
 import admin from '../../../utils/db';
 import { buffer } from 'micro';
 import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, DEFAULT_PLAN } from '../../../lib/plans-config';
+import { emitPlanChanged } from '../../../lib/funnel-events';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -209,6 +210,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         await db.collection('users').doc(userId).update(updateData);
 
+        // The plan write is the one place every Stripe path converges, so this
+        // is where the funnel event belongs — not on each webhook type.
+        emitPlanChanged({
+          uid: userId,
+          from: userData?.subscription?.plan ?? DEFAULT_PLAN,
+          to: planInfo.name,
+          reason: 'subscription_sync',
+        });
+
         break;
       }
 
@@ -261,6 +271,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'subscription.units': includedItemsFor(DEFAULT_PLAN),
           'subscription.stripeSubscriptionId': null,
           'subscription.canceledAt': new Date().toISOString(),
+        });
+
+        emitPlanChanged({
+          uid: userId,
+          from: userDoc.data()?.subscription?.plan ?? DEFAULT_PLAN,
+          to: DEFAULT_PLAN,
+          reason: 'subscription_sync',
         });
 
         break;

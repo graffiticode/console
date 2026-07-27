@@ -70,6 +70,10 @@ export default function AuthWrapper({ children }) {
           body: JSON.stringify({
             uid: user.uid,
             created: new Date().toISOString(),
+            // Attribution only — not persisted. A signup on /claim is the same
+            // happening the `claim` event already reports, so the digest counts
+            // it separately from an unprompted signup.
+            via: window.location.pathname.startsWith('/claim') ? 'claim' : 'direct',
           }),
         });
 

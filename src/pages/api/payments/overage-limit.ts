@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '../../../utils/db';
 import { getPlan, overageDollarsToItems, DEFAULT_PLAN } from '../../../lib/plans-config';
+import { emitEvent, actor } from '../../../lib/funnel-events';
 
 // Set (or clear) a customer's overage spend cap. The client sends a dollar
 // budget; we store it as a number of items using the plan's per-item rate. A
@@ -24,6 +25,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const plan = userDoc.data()?.subscription?.plan || DEFAULT_PLAN;
     const planConfig = getPlan(plan);
+    // null means "no cap" (unlimited), so it is the HIGHEST value, not the
+    // lowest — the comparisons below have to treat it that way.
+    const prevUsd = userDoc.data()?.subscription?.overageLimitUsd ?? null;
 
     // Clearing the cap.
     if (limitUsd === null || limitUsd === undefined || limitUsd === '') {
@@ -31,6 +35,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'subscription.overageLimitItems': null,
         'subscription.overageLimitUsd': null,
       });
+      if (prevUsd !== null) {
+        emitEvent('overage_limit_raised', { ...actor({ uid: userId }), plan, from: String(prevUsd), to: 'unlimited' });
+      }
       return res.status(200).json({ overageLimitItems: null, overageLimitUsd: null });
     }
 
@@ -49,6 +56,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'subscription.overageLimitItems': overageLimitItems,
       'subscription.overageLimitUsd': usd,
     });
+
+    // Only an increase is the expansion signal. Coming down from unlimited
+    // (prevUsd === null) is a tightening, however large the new number.
+    if (prevUsd !== null && usd > prevUsd) {
+      emitEvent('overage_limit_raised', { ...actor({ uid: userId }), plan, from: String(prevUsd), to: String(usd) });
+    }
 
     return res.status(200).json({ overageLimitItems, overageLimitUsd: usd });
   } catch (error) {

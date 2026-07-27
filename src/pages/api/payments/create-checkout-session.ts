@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
 import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, type PlanId, type BillingInterval } from '../../../lib/plans-config';
+import { emitEvent, actor } from '../../../lib/funnel-events';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -171,6 +172,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const session = await stripe.checkout.sessions.create(sessionConfig);
+
+    // Intent, not a plan change — a session that's never completed is an
+    // abandoned checkout, which is why the digest reports this separately from
+    // plan_changed rather than as a second revenue line.
+    emitEvent('checkout_started', { ...actor({ uid: userId }), to: planId, interval });
 
     return res.status(200).json({
       checkoutUrl: session.url

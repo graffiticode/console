@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { STRIPE_API_VERSION } from '../../../lib/plans-config';
 import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
+import { emitPlanChanged } from '../../../lib/funnel-events';
 import { getFirestore } from '../../../utils/db';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
@@ -125,6 +126,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'subscription.cancelAt': null,
       'subscription.canceledAt': null,
       'subscription.resumedAt': new Date().toISOString(),
+    });
+
+    // A recovered cancellation. The plan value never moved, so this reports the
+    // decision rather than a transition.
+    emitPlanChanged({
+      uid: userId,
+      from: userData?.subscription?.plan,
+      to: userData?.subscription?.plan,
+      reason: 'resume_requested',
     });
 
     return res.status(200).json({

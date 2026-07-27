@@ -17,6 +17,7 @@ import { client } from "../../lib/auth";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
 import { getFreePlanCredentials } from "../../lib/free-plan-context";
 import type { AuthReplay, GenerationJob } from "../../lib/generation-queue";
+import { emitEvent, actor } from "../../lib/funnel-events";
 
 type Auth = { uid: string; token: string; freePlan?: boolean; sessionNamespace?: string };
 
@@ -94,6 +95,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (result.errors?.length || !result.taskId) {
       const message = result.errors?.map((e: any) => e.message).join("\n") || "No taskId returned";
       await setItemGenerationStatus({ auth, id: itemId, status: "failed", error: message });
+      // Only the terminal failure is reported. The catch below returns 5xx so
+      // Cloud Tasks retries, and emitting there would count one failure once per
+      // attempt.
+      emitEvent("item_generation_failed", { ...actor(auth), lang, err: message });
       // Handled outcome — 2xx so the queue does NOT retry.
       return res.status(200).json({ status: "failed", error: message });
     }

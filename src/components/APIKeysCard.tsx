@@ -91,6 +91,13 @@ export default function APIKeysCard() {
     const userToken = await getIdToken(user);
     const apiKey = await client.apiKeys.create(userToken);
     setNewApiKey(apiKey);
+    // Key creation happens against the auth service, so nothing server-side in
+    // this repo would otherwise see it. Fire-and-forget; never blocks the UI.
+    void fetch("/api/beacon/api-key-created", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: user.uid, source: "settings" }),
+    }).catch(() => {});
   };
 
   if (!user?.uid || status === "loading") {

@@ -12,6 +12,7 @@ import {
   type BillingInterval,
 } from '../../../lib/plans-config';
 import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
+import { emitPlanChanged } from '../../../lib/funnel-events';
 import { getFirestore } from '../../../utils/db';
 import * as admin from 'firebase-admin';
 
@@ -249,6 +250,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     await db.collection('users').doc(userId).update(updateData);
+
+    // The in-app plan write. Stripe's customer.subscription.updated webhook will
+    // land on the same value moments later; emitPlanChanged's from !== to guard
+    // is what keeps that from reporting the change a second time.
+    emitPlanChanged({
+      uid: userId,
+      from: currentPlan ?? DEFAULT_PLAN,
+      to: planId,
+      reason: 'subscription_sync',
+    });
 
     return res.status(200).json({
       success: true,

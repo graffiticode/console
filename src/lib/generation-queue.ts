@@ -9,6 +9,8 @@
 // runtime that Next.js standalone output-tracing doesn't bundle, which 500s the
 // route. REST has no such footprint.
 
+import { getAccessToken } from "./gcp-token";
+
 const PROJECT =
   process.env.GENERATION_QUEUE_PROJECT ||
   process.env.GOOGLE_CLOUD_PROJECT ||
@@ -22,9 +24,6 @@ const WORKER_URL = process.env.GENERATION_JOB_URL || `${CONSOLE_URL}/api/generat
 // Fire the worker directly (un-awaited fetch) instead of via Cloud Tasks. Set
 // for local dev, where the dev server stays running and there's no queue.
 const LOCAL = process.env.GENERATION_QUEUE_LOCAL === "1";
-
-const METADATA_TOKEN_URL =
-  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
 // Worker auth: how the worker re-derives credentials to act as the caller.
 // Free-plan re-derives fresh creds (idTokens are short-lived, dispatch can lag),
@@ -40,15 +39,6 @@ export interface GenerationJob {
   modification: string;
   currentSrc?: string | null;
   authReplay: AuthReplay;
-}
-
-async function getAccessToken(): Promise<string> {
-  const res = await fetch(METADATA_TOKEN_URL, { headers: { "Metadata-Flavor": "Google" } });
-  if (!res.ok) {
-    throw new Error(`metadata token fetch failed: ${res.status}`);
-  }
-  const json = (await res.json()) as { access_token: string };
-  return json.access_token;
 }
 
 export async function enqueueGenerationJob(job: GenerationJob): Promise<void> {

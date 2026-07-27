@@ -1,5 +1,6 @@
 import { getFirestore } from "../utils/db";
 import { FreePlanError, buildSignupUrl } from "./free-plan-context";
+import { emitEvent } from "./funnel-events";
 
 // Anonymous free-plan (MCP trial) quota, denominated in ITEMS to match the rest
 // of the product (docs/item-based-pricing.md). Replaces the old per-token dollar
@@ -132,8 +133,15 @@ export async function recordTrialItem(now = new Date()): Promise<void> {
 
 // Every message below is self-contained on purpose: only the string propagates
 // back through the MCP tool result, so each has to carry its own recovery path.
+//
+// Each builder emits its `wall_hit` event: every one is called directly inside a
+// `throw`, so the builder is the one choke point that can't drift as call sites
+// move. The trade-off is that a builder has no auth context, so a wall is
+// counted by kind but not attributed to a session — which is all the hourly
+// digest reports.
 
 export function buildMonthlyQuotaError(itemsUsed?: number, itemsLimit?: number): FreePlanError {
+  emitEvent("wall_hit", { wall: "item_limit", auth: "freePlan" });
   return new FreePlanError("free_plan_item_limit_reached", 429, {
     error: "free_plan_item_limit_reached",
     message:
@@ -146,6 +154,7 @@ export function buildMonthlyQuotaError(itemsUsed?: number, itemsLimit?: number):
 }
 
 export function buildScopeError(lang: string | undefined | null, allowed: string[]): FreePlanError {
+  emitEvent("wall_hit", { wall: "language_scope", auth: "freePlan", lang: lang ?? undefined });
   const allowedList = allowed.map((id) => `L${id}`).join(", ");
   return new FreePlanError("language_not_in_trial_scope", 403, {
     error: "language_not_in_trial_scope",
@@ -160,6 +169,7 @@ export function buildScopeError(lang: string | undefined | null, allowed: string
 }
 
 export function buildItemExpiredError(): FreePlanError {
+  emitEvent("wall_hit", { wall: "item_expired", auth: "freePlan" });
   return new FreePlanError("free_plan_item_expired", 410, {
     error: "free_plan_item_expired",
     message:
@@ -170,6 +180,7 @@ export function buildItemExpiredError(): FreePlanError {
 }
 
 export function buildRevisionLimitError(limit: number): FreePlanError {
+  emitEvent("wall_hit", { wall: "revision_limit", auth: "freePlan" });
   return new FreePlanError("free_plan_revision_limit_reached", 429, {
     error: "free_plan_revision_limit_reached",
     message:
@@ -220,9 +231,13 @@ export async function maybeAlertBudget({
       return true;
     });
     if (fired) {
+      // Keep this prefix stable: an existing Cloud Logging alert policy matches
+      // on it. The structured twin below feeds the hourly digest instead; the
+      // two are deliberately separate so this doesn't page twice.
       console.log(
         `[free-plan] period budget ${threshold}% — ${used}/${included} items used this period`,
       );
+      emitEvent("free_plan_budget", { threshold, used, included });
     }
   } catch (err) {
     // Telemetry must never fail a create.
@@ -231,6 +246,7 @@ export async function maybeAlertBudget({
 }
 
 export function buildDailyPaceError(allowance: number, now = new Date()): FreePlanError {
+  emitEvent("wall_hit", { wall: "daily_pace", auth: "freePlan" });
   return new FreePlanError("free_plan_daily_limit_reached", 429, {
     error: "free_plan_daily_limit_reached",
     message:

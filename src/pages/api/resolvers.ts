@@ -13,6 +13,7 @@ import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
 import { reportItemUsage } from "../../lib/item-metering";
 import { checkItemCreateAllowed } from "../../lib/usage-service";
+import { emitEvent, actor } from "../../lib/funnel-events";
 import {
   assertWithinDailyPace,
   buildItemExpiredError,
@@ -95,8 +96,14 @@ async function assertItemCreateAllowed(auth: AuthArg, lang?: string): Promise<vo
   });
   if (!gate.allowed) {
     if (auth.freePlan) {
+      // buildMonthlyQuotaError emits its own wall_hit.
       throw buildMonthlyQuotaError(gate.currentUsage, gate.totalAvailable);
     }
+    emitEvent("wall_hit", {
+      ...actor(auth),
+      wall: gate.wall ?? "plan_item_limit",
+      lang,
+    });
     throw new Error(gate.reason || "Item limit reached");
   }
   if (auth.freePlan) {
@@ -415,6 +422,9 @@ export async function recordBillableItem({
     const subscription = userData?.subscription || {};
     const usageDocRef = db.collection("usage").doc(auth.uid);
     const usageDoc = await usageDocRef.get();
+    // The usage doc is created by the first billable item and never deleted, so
+    // its absence is the account's first-ever item (not merely first this period).
+    const firstForAccount = !usageDoc.exists;
     const periodStart = subscription.currentPeriodStart
       ? new Date(subscription.currentPeriodStart)
       : new Date(now.getFullYear(), now.getMonth(), 1);
@@ -441,6 +451,14 @@ export async function recordBillableItem({
         lastUpdated: now.toISOString(),
       });
     }
+
+    emitEvent("item_created", {
+      ...actor(auth),
+      lang,
+      app: client ?? "console",
+      first_for_account: firstForAccount || undefined,
+      source,
+    });
 
     // Anonymous free-plan (MCP trial) items are COUNTED — the writes above are
     // what checkItemCreateAllowed reads, so the trial account's own plan
@@ -1563,15 +1581,24 @@ export async function updateItem({
           client: data.client,
           source: resolvedSource,
         });
-      } else if (auth.freePlan) {
-        // A real taskId -> taskId change: the content actually moved, so this is
-        // a revision against the trial budget. Counting the successful change
-        // rather than the attempt means a generation that failed to compile
-        // doesn't burn one of only a handful of revisions — runaway retries are
-        // bounded by the burst limiter instead.
-        await itemRef.update({
-          trialRevisions: admin.firestore.FieldValue.increment(1),
+      } else {
+        // A real taskId -> taskId change: the content actually moved. Not
+        // billable, but it is the edit signal the digest reports as depth.
+        emitEvent("item_updated", {
+          ...actor(auth),
+          lang: data.lang,
+          app: data.client ?? "console",
+          source: resolvedSource,
         });
+        if (auth.freePlan) {
+          // This is a revision against the trial budget. Counting the successful
+          // change rather than the attempt means a generation that failed to
+          // compile doesn't burn one of only a handful of revisions — runaway
+          // retries are bounded by the burst limiter instead.
+          await itemRef.update({
+            trialRevisions: admin.firestore.FieldValue.increment(1),
+          });
+        }
       }
     }
     return {

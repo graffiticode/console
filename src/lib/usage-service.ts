@@ -4,6 +4,11 @@ import { effectiveIncludedItems, isHardCapped, DEFAULT_PLAN } from "./plans-conf
 export interface ItemCreateAllowedResult {
   allowed: boolean;
   reason?: string;
+  /**
+   * Which limit denied the create, when one did. Lets the caller report the wall
+   * without re-deriving the plan or pattern-matching on `reason`.
+   */
+  wall?: "plan_item_limit" | "overage_cap";
   /** Items created this billing period. */
   currentUsage?: number;
   /** Included + (customer overage limit, if any). Infinity when uncapped. */
@@ -110,6 +115,7 @@ export async function checkItemCreateAllowed(
       return {
         allowed: currentUsage < totalAvailable,
         reason: currentUsage < totalAvailable ? undefined : 'Free plan item limit reached — upgrade to create more',
+        wall: currentUsage < totalAvailable ? undefined : 'plan_item_limit',
         currentUsage,
         totalAvailable,
         includedItems,
@@ -126,6 +132,7 @@ export async function checkItemCreateAllowed(
     return {
       allowed,
       reason: allowed ? undefined : 'Overage spend limit reached — raise or remove your cap to create more',
+      wall: allowed ? undefined : 'overage_cap',
       currentUsage,
       totalAvailable,
       includedItems,
