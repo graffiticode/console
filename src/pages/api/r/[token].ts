@@ -94,7 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (d.date === todayKey) {
         roll = {
           toolCalls: todayDigest.context.toolCalls,
-          sessions: todayDigest.sessions.total,
+          workspaces: todayDigest.workspaces.total,
           items: todayDigest.items.ok,
         };
       } else if (cached[i]) {
@@ -102,8 +102,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         const dg = backfilled[i];
         roll = dg
-          ? { toolCalls: dg.context.toolCalls, sessions: dg.sessions.total, items: dg.items.ok }
-          : { toolCalls: 0, sessions: 0, items: 0 };
+          ? { toolCalls: dg.context.toolCalls, workspaces: dg.workspaces.total, items: dg.items.ok }
+          : { toolCalls: 0, workspaces: 0, items: 0 };
         // Fill the cache for next time. Fire-and-forget: a page must not fail
         // because a cache write did.
         void writeDayCache(d.date, roll).catch(() => {});
@@ -112,11 +112,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         date: d.date,
         ...roll,
         // A tool call always emits mcp_session_started, so tool calls with zero
-        // sessions means that day predates the instrumentation rather than being
-        // a day where nobody started one. Rendering it as "0" reads as a real
+        // workspaces means that day predates the instrumentation rather than
+        // being a day where nobody was active. Rendering it as "0" reads as a real
         // measurement; the page shows "–" instead. Self-clearing as the window
         // rolls past the deploy.
-        instrumented: !(roll.toolCalls > 0 && roll.sessions === 0),
+        instrumented: !(roll.toolCalls > 0 && roll.workspaces === 0),
       };
     });
 

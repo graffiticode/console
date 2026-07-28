@@ -14,10 +14,11 @@ export interface DayPoint {
   /** PT calendar date, YYYY-MM-DD. */
   date: string;
   toolCalls: number;
-  sessions: number;
+  /** Distinct workspaces active that day — see Digest.workspaces. */
+  workspaces: number;
   items: number;
   /**
-   * False for days before session/item events existed. Those columns are
+   * False for days before workspace/item events existed. Those columns are
    * unknown, not zero, and must not render as a measurement.
    */
   instrumented: boolean;
@@ -135,14 +136,14 @@ function sparkTable(series: DayPoint[]): string {
           (p.toolCalls / max) * 100
         }%"></span></td><td class="n">${p.toolCalls}</td>` +
         (p.instrumented
-          ? `<td class="n dim">${p.sessions}s</td><td class="n dim">${p.items}i</td>`
+          ? `<td class="n dim">${p.workspaces}w</td><td class="n dim">${p.items}i</td>`
           : `<td class="n dim">–</td><td class="n dim">–</td>`) +
         `</tr>`,
     )
     .join("");
   return (
     `<table class="trend">${body}</table>` +
-    (anyPre ? `<p class="none">– sessions and items not yet instrumented on that day</p>` : "")
+    (anyPre ? `<p class="none">– workspaces and items not yet instrumented on that day</p>` : "")
   );
 }
 
@@ -170,13 +171,13 @@ function digestBlock(d: Digest): string {
   return `
   <div class="stats">
     ${stat("tool calls", d.context.toolCalls)}
-    ${stat("sessions", d.sessions.total, `${d.context.connectsWithoutUse} probes filtered`)}
+    ${stat("workspaces", d.workspaces.total, `${d.context.connectsWithoutUse} probes filtered`)}
     ${stat("items", d.items.ok, d.items.failed ? `${d.items.failed} failed` : undefined)}
     ${stat("edits", d.context.edits)}
     ${stat("views", d.context.views)}
     ${stat("walls", Object.values(d.walls).reduce((a, b) => a + b, 0))}
   </div>
-  ${section("By client", rows(d.sessions.byClient))}
+  ${section("By client", rows(d.workspaces.byClient))}
   ${section("By language", languageRows(d))}
   ${section("Items by surface", rows(d.items.byApp))}
   ${section("Walls hit", rows(d.walls))}
@@ -257,7 +258,7 @@ ${digestBlock(window)}
 <p class="sub">since 00:00 PT</p>
 <div class="stats">
   ${stat("tool calls", today.context.toolCalls)}
-  ${stat("sessions", today.sessions.total)}
+  ${stat("workspaces", today.workspaces.total)}
   ${stat("items", today.items.ok)}
   ${stat("claims", today.claims.count)}
   ${stat("signups", today.signups.direct + today.signups.viaClaim)}
@@ -265,7 +266,7 @@ ${digestBlock(window)}
 </div>
 <hr>
 <h1 style="margin-top:26px">Last 7 days</h1>
-<p class="sub">tool calls · sessions · items, by PT day</p>
+<p class="sub">tool calls · workspaces · items, by PT day</p>
 ${sparkTable(series)}
 <footer>Generated ${esc(
     new Intl.DateTimeFormat("en-US", {

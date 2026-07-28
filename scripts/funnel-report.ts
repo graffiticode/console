@@ -132,8 +132,8 @@ async function main() {
   // Every client looks new against a throwaway set, so the flags would mark all
   // of them — noise here, and a claim the report can't back up. Novelty is only
   // meaningful against the SMS's persisted history.
-  digest.sessions.newClientKinds = [];
-  digest.sessions.newGeos = [];
+  digest.workspaces.newClientKinds = [];
+  digest.workspaces.newGeos = [];
 
   const series: DayPoint[] = [];
   let todayDigest = digest;
@@ -150,10 +150,10 @@ async function main() {
     series.push({
       date: ptDate(dFrom),
       toolCalls: dg.context.toolCalls,
-      sessions: dg.sessions.total,
+      workspaces: dg.workspaces.total,
       items: dg.items.ok,
-      // Tool calls with no sessions means that day predates the instrumentation.
-      instrumented: !(dg.context.toolCalls > 0 && dg.sessions.total === 0),
+      // Tool calls with no workspaces means that day predates the instrumentation.
+      instrumented: !(dg.context.toolCalls > 0 && dg.workspaces.total === 0),
     });
   }
 

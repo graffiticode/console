@@ -109,7 +109,16 @@ export interface Digest {
   from: Date;
   to: Date;
   truncated: boolean;
-  sessions: {
+  /**
+   * Distinct WORKSPACES active in the window — not transport sessions.
+   *
+   * The event's `session` field carries `sessionNamespace`, which CLAUDE.md
+   * defines as the workspace: an MCP session is an ephemeral transport binding
+   * that some hosts re-mint per tool call, while the workspace survives that via
+   * adoptWorkspace. The wire field keeps the name `session` because
+   * scripts/mcp-funnel-report.ts joins on it and 30d of logs already use it.
+   */
+  workspaces: {
     total: number;
     byClient: Record<string, number>;
     newClientKinds: string[];
@@ -200,7 +209,7 @@ export function aggregate(
     from: window.from,
     to: window.to,
     truncated: window.truncated,
-    sessions: { total: 0, byClient: {}, newClientKinds: [], newGeos: [] },
+    workspaces: { total: 0, byClient: {}, newClientKinds: [], newGeos: [] },
     items: { ok: 0, failed: 0, byApp: {}, firstForAccount: 0 },
     languages: { created: {}, attempted: {} },
     walls: {},
@@ -226,7 +235,7 @@ export function aggregate(
   const used = new Set<string>();
   const checkoutStarted = new Set<string>();
   const planChanged = new Set<string>();
-  // session id -> the client kind / geo it presented, deduped.
+  // workspace namespace -> the client kind / geo it presented, deduped.
   //
   // Populated from EVERY event that names a client, not just mcp_session_started.
   // A session's start event fires only on its first tool call, so a conversation
@@ -344,16 +353,16 @@ export function aggregate(
   // One session = one distinct id that used a tool in this window, however many
   // start events it produced. Novelty is diffed here, after the dedupe, so a
   // repeated start event can't announce the same client kind twice.
-  d.sessions.total = active.size;
+  d.workspaces.total = active.size;
   for (const { kind, geo } of active.values()) {
-    bump(d.sessions.byClient, kind);
+    bump(d.workspaces.byClient, kind);
     if (kind !== "unknown" && !seen.clientKinds.has(kind)) {
       seen.clientKinds.add(kind);
-      d.sessions.newClientKinds.push(kind);
+      d.workspaces.newClientKinds.push(kind);
     }
     if (geo && !seen.geos.has(geo)) {
       seen.geos.add(geo);
-      d.sessions.newGeos.push(geo);
+      d.workspaces.newGeos.push(geo);
     }
   }
 
@@ -450,8 +459,8 @@ function breakdown(map: Record<string, number>, limit = 3): string {
  * seeing rather than smoothing away.
  */
 function clientList(d: Digest): string {
-  const isNew = new Set(d.sessions.newClientKinds);
-  return Object.entries(d.sessions.byClient)
+  const isNew = new Set(d.workspaces.newClientKinds);
+  return Object.entries(d.workspaces.byClient)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([k, v]) => `${isNew.has(k) ? "⚑" : ""}${k} ${v}`)
     .join(" · ");
@@ -461,7 +470,7 @@ function clientList(d: Digest): string {
  * The SMS body. Exactly three lines, always:
  *
  *   GC 19:01–20:01 PT
- *   15 tool calls · 2 sessions · 3 items
+ *   15 tool calls · 2 workspaces · 3 items
  *   https://console.graffiticode.org/r/<token>
  *
  * Nothing else belongs here. Claims, plan changes, new-client arrivals, and
@@ -472,7 +481,7 @@ function clientList(d: Digest): string {
  */
 export function formatSms(d: Digest, url?: string): string {
   const head: string[] = [`${d.context.toolCalls} tool call${plural(d.context.toolCalls)}`];
-  if (d.sessions.total) head.push(`${d.sessions.total} session${plural(d.sessions.total)}`);
+  if (d.workspaces.total) head.push(`${d.workspaces.total} workspace${plural(d.workspaces.total)}`);
   if (d.items.ok) head.push(`${d.items.ok} item${plural(d.items.ok)}`);
 
   const lines = [`GC ${ptRange(d.from, d.to)}`, head.join(" · ")];
@@ -484,11 +493,11 @@ export function formatSms(d: Digest, url?: string): string {
 export function formatDigest(d: Digest): string {
   const lines: string[] = [`GC ${ptRange(d.from, d.to)}`];
 
-  if (d.sessions.total > 0) {
-    let line = `▶ ${d.sessions.total} session${plural(d.sessions.total)}`;
+  if (d.workspaces.total > 0) {
+    let line = `▶ ${d.workspaces.total} workspace${plural(d.workspaces.total)}`;
     const parts = clientList(d);
     if (parts) line += ` — ${parts}`;
-    if (d.sessions.newGeos.length) line += ` ⚑geo ${d.sessions.newGeos.join("/")}`;
+    if (d.workspaces.newGeos.length) line += ` ⚑geo ${d.workspaces.newGeos.join("/")}`;
     lines.push(line);
   }
 
@@ -592,7 +601,7 @@ export async function readSeen(): Promise<{ clientKinds: Set<string>; geos: Set<
  */
 export interface DayRollup {
   toolCalls: number;
-  sessions: number;
+  workspaces: number;
   items: number;
 }
 
@@ -601,7 +610,7 @@ export async function readDayCache(date: string): Promise<DayRollup | null> {
   if (!snap.exists) return null;
   const d = snap.data() || {};
   if (typeof d.toolCalls !== "number") return null;
-  return { toolCalls: d.toolCalls, sessions: d.sessions ?? 0, items: d.items ?? 0 };
+  return { toolCalls: d.toolCalls, workspaces: d.workspaces ?? 0, items: d.items ?? 0 };
 }
 
 export async function writeDayCache(date: string, roll: DayRollup): Promise<void> {
