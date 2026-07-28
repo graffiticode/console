@@ -11,24 +11,32 @@
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
-  aggregate,
+  aggregateSplit,
   fetchEvents,
   ptDate,
   readDayCache,
+  rollupOf,
   writeDayCache,
-  type Digest,
+  type SplitDigest,
   type DayRollup,
 } from "../../../lib/funnel-digest";
 import { renderInvalid, renderReport, type DayPoint } from "../../../lib/funnel-report-html";
 import { verifyReportToken } from "../../../lib/report-link";
 
-/** Aggregate a window with novelty disabled — the page must not consume ⚑new flags. */
-async function digestFor(from: Date, to: Date): Promise<Digest> {
+/**
+ * Aggregate a window into its anonymous / signed-in split, with novelty
+ * disabled — the page must not consume ⚑new flags.
+ */
+async function digestFor(from: Date, to: Date): Promise<SplitDigest> {
   const { events, truncated } = await fetchEvents(from, to);
   // A throwaway `seen` set: passing the persisted one would mark client kinds as
   // announced just because somebody loaded a report, and the next real SMS would
   // silently drop its ⚑new flag.
-  return aggregate(events, { from, to, truncated }, { clientKinds: new Set(), geos: new Set() });
+  return aggregateSplit(
+    events,
+    { from, to, truncated },
+    { clientKinds: new Set(), geos: new Set() },
+  );
 }
 
 /** Midnight PT for the day containing `at`, as a UTC instant. */
@@ -92,18 +100,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const series: DayPoint[] = days.map((d, i) => {
       let roll: DayRollup;
       if (d.date === todayKey) {
-        roll = {
-          toolCalls: todayDigest.context.toolCalls,
-          workspaces: todayDigest.workspaces.total,
-          items: todayDigest.items.ok,
-        };
+        roll = rollupOf(todayDigest);
       } else if (cached[i]) {
         roll = cached[i] as DayRollup;
       } else {
         const dg = backfilled[i];
         roll = dg
-          ? { toolCalls: dg.context.toolCalls, workspaces: dg.workspaces.total, items: dg.items.ok }
-          : { toolCalls: 0, workspaces: 0, items: 0 };
+          ? rollupOf(dg)
+          : {
+              toolCalls: 0,
+              workspaces: 0,
+              items: 0,
+              anonToolCalls: 0,
+              anonWorkspaces: 0,
+              anonItems: 0,
+            };
         // Fill the cache for next time. Fire-and-forget: a page must not fail
         // because a cache write did.
         void writeDayCache(d.date, roll).catch(() => {});

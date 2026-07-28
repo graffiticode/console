@@ -49,6 +49,69 @@ export interface LogEvent {
   [key: string]: unknown;
 }
 
+// --- Anonymous vs signed-in -------------------------------------------------
+
+/**
+ * Which side of the sign-in line an event falls on.
+ *
+ * `auth: "firebase"` is the only positive evidence that a signed-in account did
+ * something — every emitter stamps it from `actor()`/`identify()`. artifact_view
+ * comes from app.graffiticode.org, which has no auth vocabulary and reports a
+ * plain `authed` boolean instead; it is honoured here so a signed-in form view
+ * isn't filed as anonymous.
+ *
+ * Everything else is anonymous: free-plan trial traffic, and the account-less
+ * events (claim_view, claim) that carry no auth field at all because there is no
+ * account yet — they ARE the anonymous funnel. Defaulting the unmarked case to
+ * anonymous rather than a third bucket keeps `anon + authed == total` exactly,
+ * so the two report sections can't quietly lose events between them.
+ */
+export function isAuthenticated(e: LogEvent): boolean {
+  return e.auth === "firebase" || e.authed === true;
+}
+
+export interface SplitDigest {
+  /** Everything in the window. */
+  all: Digest;
+  /** Free-plan / no-sign-in traffic — what the SMS reports. */
+  anon: Digest;
+  /** Signed-in accounts, including our own console use. */
+  authed: Digest;
+}
+
+/**
+ * Aggregate a window three ways: total, anonymous, signed-in.
+ *
+ * Segmenting the EVENTS and re-running the same aggregate — rather than
+ * threading a segment through every counter — means the two sections can never
+ * drift from the total or from each other, and session dedupe stays correct
+ * within each side (one workspace that is anonymous cannot also be signed in).
+ *
+ * Only the total consumes `seen`: novelty is one-way state owned by the SMS, and
+ * announcing a client kind twice (once per segment) would spend the flag on the
+ * side that happened to aggregate first. The segment digests get throwaway sets
+ * and their flags are cleared.
+ */
+export function aggregateSplit(
+  events: LogEvent[],
+  window: { from: Date; to: Date; truncated: boolean },
+  seen: { clientKinds: Set<string>; geos: Set<string> },
+): SplitDigest {
+  const fresh = () => ({ clientKinds: new Set<string>(), geos: new Set<string>() });
+  const all = aggregate(events, window, seen);
+  const segment = (keep: (e: LogEvent) => boolean) => {
+    const d = aggregate(events.filter(keep), window, fresh());
+    d.workspaces.newClientKinds = [];
+    d.workspaces.newGeos = [];
+    return d;
+  };
+  return {
+    all,
+    anon: segment((e) => !isAuthenticated(e)),
+    authed: segment(isAuthenticated),
+  };
+}
+
 // --- Cloud Logging ----------------------------------------------------------
 
 /**
@@ -382,21 +445,13 @@ export function ptDate(date: Date): string {
   }).format(date);
 }
 
-/**
- * Send when there was tool activity, or when nothing has been sent yet today.
- *
- * Tool calls are the liveness signal: a period with none is one where no agent
- * did anything, whatever else the counters say. The once-a-day floor means
- * silence is unambiguous — exactly one message arrives on a dead day, so no
- * message at all means the job itself is broken.
- *
- * Keyed on the last sent PT date rather than a fixed hour, so a run that fails
- * or a schedule that shifts can't skip the day's only report.
- */
-export function shouldSend(d: Digest, state: DigestState, now = new Date()): boolean {
-  if (d.context.toolCalls > 0) return true;
-  return state.lastSentDate !== ptDate(now);
-}
+// Send policy: EVERY run sends, activity or not. The schedule IS the policy —
+// Cloud Scheduler fires hourly 8am-8pm PT and each firing produces one message,
+// so a quiet hour reports "0 tool calls" rather than going silent. Silence now
+// means the job is broken, with no "was that a dead hour or a dead cron?"
+// ambiguity to resolve. (There used to be an activity gate plus a once-a-day
+// floor here; the floor existed only to make silence readable, which sending
+// unconditionally does directly.)
 
 // --- Formatting -------------------------------------------------------------
 
@@ -469,22 +524,28 @@ function clientList(d: Digest): string {
 /**
  * The SMS body. Exactly three lines, always:
  *
- *   GC 19:01–20:01 PT
+ *   GC anon 19:01–20:01 PT
  *   15 tool calls · 2 workspaces · 3 items
  *   https://console.graffiticode.org/r/<token>
  *
+ * Pass the ANONYMOUS segment (see aggregateSplit). The text answers one
+ * question — did a stranger use the product this hour — and mixing our own
+ * signed-in console work into that number made a busy afternoon of my own
+ * editing read as demand. The signed-in side isn't dropped, it's on the report
+ * page, one tap away, alongside the total.
+ *
  * Nothing else belongs here. Claims, plan changes, new-client arrivals, and
- * per-client breakdowns all live on the report page, which has room for them
- * and doesn't pay per character. Every attempt to surface "just one more
- * important thing" in the text has ended up either redundant with the page or
- * misleading because the text can't carry the qualifiers.
+ * per-client breakdowns all live on that page, which has room for them and
+ * doesn't pay per character. Every attempt to surface "just one more important
+ * thing" in the text has ended up either redundant with the page or misleading
+ * because the text can't carry the qualifiers.
  */
 export function formatSms(d: Digest, url?: string): string {
   const head: string[] = [`${d.context.toolCalls} tool call${plural(d.context.toolCalls)}`];
   if (d.workspaces.total) head.push(`${d.workspaces.total} workspace${plural(d.workspaces.total)}`);
   if (d.items.ok) head.push(`${d.items.ok} item${plural(d.items.ok)}`);
 
-  const lines = [`GC ${ptRange(d.from, d.to)}`, head.join(" · ")];
+  const lines = [`GC anon ${ptRange(d.from, d.to)}`, head.join(" · ")];
   if (url) lines.push(url);
 
   return lines.join("\n");
@@ -570,8 +631,6 @@ export function formatDigest(d: Digest): string {
 export interface DigestState {
   cursor?: string;
   lastSentAt?: string;
-  /** PT calendar date of the last send, for the once-a-day floor. */
-  lastSentDate?: string;
 }
 
 export async function readState(): Promise<DigestState> {
@@ -603,21 +662,55 @@ export interface DayRollup {
   toolCalls: number;
   workspaces: number;
   items: number;
+  /** The anonymous share of the same three counts. */
+  anonToolCalls: number;
+  anonWorkspaces: number;
+  anonItems: number;
 }
+
+/**
+ * Schema version of a cached day.
+ *
+ * A cached day is immutable but its SHAPE isn't: v1 docs predate the
+ * anonymous/signed-in split and have no way to supply it. Treating a stale
+ * version as a miss re-aggregates that day once and rewrites it — self-healing,
+ * and better than rendering a day's anonymous share as zero because the cache
+ * couldn't answer.
+ */
+const DAY_CACHE_VERSION = 2;
 
 export async function readDayCache(date: string): Promise<DayRollup | null> {
   const snap = await getFirestore().collection("funnel-daily").doc(date).get();
   if (!snap.exists) return null;
   const d = snap.data() || {};
-  if (typeof d.toolCalls !== "number") return null;
-  return { toolCalls: d.toolCalls, workspaces: d.workspaces ?? 0, items: d.items ?? 0 };
+  if (typeof d.toolCalls !== "number" || d.v !== DAY_CACHE_VERSION) return null;
+  return {
+    toolCalls: d.toolCalls,
+    workspaces: d.workspaces ?? 0,
+    items: d.items ?? 0,
+    anonToolCalls: d.anonToolCalls ?? 0,
+    anonWorkspaces: d.anonWorkspaces ?? 0,
+    anonItems: d.anonItems ?? 0,
+  };
 }
 
 export async function writeDayCache(date: string, roll: DayRollup): Promise<void> {
   await getFirestore()
     .collection("funnel-daily")
     .doc(date)
-    .set({ ...roll, cachedAt: new Date().toISOString() }, { merge: true });
+    .set({ ...roll, v: DAY_CACHE_VERSION, cachedAt: new Date().toISOString() }, { merge: true });
+}
+
+/** The trend row for one day, from that day's split aggregate. */
+export function rollupOf(split: SplitDigest): DayRollup {
+  return {
+    toolCalls: split.all.context.toolCalls,
+    workspaces: split.all.workspaces.total,
+    items: split.all.items.ok,
+    anonToolCalls: split.anon.context.toolCalls,
+    anonWorkspaces: split.anon.workspaces.total,
+    anonItems: split.anon.items.ok,
+  };
 }
 
 export async function writeSeen(seen: {

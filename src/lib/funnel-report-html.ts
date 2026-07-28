@@ -8,15 +8,11 @@
 // Mobile-first — this is opened on a phone from an SMS — and styled inline so
 // there is no stylesheet request and no dependency on the app's Tailwind build.
 
-import type { Digest } from "./funnel-digest";
+import type { Digest, DayRollup, SplitDigest } from "./funnel-digest";
 
-export interface DayPoint {
+export interface DayPoint extends DayRollup {
   /** PT calendar date, YYYY-MM-DD. */
   date: string;
-  toolCalls: number;
-  /** Distinct workspaces active that day — see Digest.workspaces. */
-  workspaces: number;
-  items: number;
   /**
    * False for days before workspace/item events existed. Those columns are
    * unknown, not zero, and must not render as a measurement.
@@ -124,25 +120,36 @@ function languageRows(d: Digest): string {
     .join("")}</table><p class="none">made / attempted · bar = share of activity</p>`;
 }
 
-/** Inline bar chart. Avoids a chart library and the CSP/asset weight one costs. */
+/**
+ * Inline bar chart. Avoids a chart library and the CSP/asset weight one costs.
+ *
+ * Each bar is the day's total tool calls scaled by the week's max, with the
+ * anonymous share filled solid inside it. One bar rather than two rows per day:
+ * the question the trend answers is "how much of this is strangers", which a
+ * part-of-whole fill states directly and two adjacent bars make you compute.
+ */
 function sparkTable(series: DayPoint[]): string {
   if (!series.length) return `<p class="none">no data</p>`;
   const max = Math.max(1, ...series.map((p) => p.toolCalls));
   const anyPre = series.some((p) => !p.instrumented);
   const body = series
-    .map(
-      (p) =>
-        `<tr><td class="k">${esc(p.date.slice(5))}</td><td class="bar"><span style="width:${
+    .map((p) => {
+      const anonPct = p.toolCalls ? (p.anonToolCalls / p.toolCalls) * 100 : 0;
+      return (
+        `<tr><td class="k">${esc(p.date.slice(5))}</td><td class="bar"><span class="split" style="width:${
           (p.toolCalls / max) * 100
-        }%"></span></td><td class="n">${p.toolCalls}</td>` +
+        }%"><i style="width:${anonPct.toFixed(1)}%"></i></span></td>` +
+        `<td class="n">${p.anonToolCalls}</td><td class="n dim">/${p.toolCalls}</td>` +
         (p.instrumented
-          ? `<td class="n dim">${p.workspaces}w</td><td class="n dim">${p.items}i</td>`
+          ? `<td class="n dim">${p.anonWorkspaces}w</td><td class="n dim">${p.anonItems}i</td>`
           : `<td class="n dim">–</td><td class="n dim">–</td>`) +
-        `</tr>`,
-    )
+        `</tr>`
+      );
+    })
     .join("");
   return (
     `<table class="trend">${body}</table>` +
+    `<p class="none">anon / all tool calls · anon workspaces &amp; items · solid = anon share</p>` +
     (anyPre ? `<p class="none">– workspaces and items not yet instrumented on that day</p>` : "")
   );
 }
@@ -199,9 +206,29 @@ function digestBlock(d: Digest): string {
  * Keep the head free of any literal title-tag text in comments — preview
  * scrapers regex for it and would match the comment instead.
  */
+/**
+ * One segment's heading + block. `share` states this side's weight against the
+ * window total, so a section reading "3 items" can't be mistaken for the whole.
+ */
+function segmentSection(title: string, d: Digest, total: Digest): string {
+  const pct = total.context.toolCalls
+    ? Math.round((d.context.toolCalls / total.context.toolCalls) * 100)
+    : 0;
+  return `<h1 class="seg">${esc(title)}</h1>
+<p class="sub">${
+    total.context.toolCalls ? `${pct}% of tool calls this window` : "no tool calls this window"
+  }</p>
+${digestBlock(d)}`;
+}
+
+/** A stat whose hint is the anon/signed-in split of the same number. */
+function splitStat(label: string, anon: number, authed: number): string {
+  return stat(label, anon + authed, `${anon} anon · ${authed} signed in`);
+}
+
 export function renderReport(input: {
-  window: Digest;
-  today: Digest;
+  window: SplitDigest;
+  today: SplitDigest;
   series: DayPoint[];
   generatedAt: Date;
 }): string {
@@ -239,6 +266,10 @@ export function renderReport(input: {
   td.bar { width:100%; }
   td.bar span { display:block; height:7px; border-radius:4px; background:var(--accent); min-width:3px; }
   td.bar span.stalled { background:#dc2626; }
+  /* Part-of-whole: the outer span is the day's total, the inner fill its anon share. */
+  td.bar span.split { background:var(--line); }
+  td.bar span.split i { display:block; height:100%; border-radius:4px; background:var(--accent); }
+  h1.seg { margin-top:26px; }
   .none { color:var(--dim); font-size:14px; margin:4px 0; }
   .big { font-size:15px; margin:4px 0; }
   .warn { margin-top:16px; padding:9px 11px; border-radius:6px; font-size:13px;
@@ -251,22 +282,34 @@ export function renderReport(input: {
 </style>
 </head><body>
 <h1>Graffiticode usage</h1>
-<p class="sub">${esc(fmtRange(window))}</p>
-${digestBlock(window)}
+<p class="sub">${esc(fmtRange(window.all))}</p>
+${/*
+   Anonymous first: it is the demand signal the SMS reports, and the signed-in
+   side is mostly our own console work. The two are disjoint by construction
+   (see isAuthenticated) so they sum to the window total — no third section is
+   needed and none is offered.
+*/ ""}
+${segmentSection("Anonymous — no sign-in", window.anon, window.all)}
+<hr>
+${segmentSection("Signed in", window.authed, window.all)}
 <hr>
 <h1 style="margin-top:26px">Today so far</h1>
 <p class="sub">since 00:00 PT</p>
 <div class="stats">
-  ${stat("tool calls", today.context.toolCalls)}
-  ${stat("workspaces", today.workspaces.total)}
-  ${stat("items", today.items.ok)}
-  ${stat("claims", today.claims.count)}
-  ${stat("signups", today.signups.direct + today.signups.viaClaim)}
-  ${stat("walls", Object.values(today.walls).reduce((a, b) => a + b, 0))}
+  ${splitStat("tool calls", today.anon.context.toolCalls, today.authed.context.toolCalls)}
+  ${splitStat("workspaces", today.anon.workspaces.total, today.authed.workspaces.total)}
+  ${splitStat("items", today.anon.items.ok, today.authed.items.ok)}
+  ${stat("claims", today.all.claims.count)}
+  ${stat("signups", today.all.signups.direct + today.all.signups.viaClaim)}
+  ${splitStat(
+    "walls",
+    Object.values(today.anon.walls).reduce((a, b) => a + b, 0),
+    Object.values(today.authed.walls).reduce((a, b) => a + b, 0),
+  )}
 </div>
 <hr>
 <h1 style="margin-top:26px">Last 7 days</h1>
-<p class="sub">tool calls · workspaces · items, by PT day</p>
+<p class="sub">anonymous tool calls, by PT day</p>
 ${sparkTable(series)}
 <footer>Generated ${esc(
     new Intl.DateTimeFormat("en-US", {

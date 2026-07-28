@@ -92,7 +92,7 @@ async function main() {
 
   // Imported after the env shuffle above: the shared module opens a Firestore
   // handle at import time and needs GOOGLE_APPLICATION_CREDENTIALS set first.
-  const { fetchEvents, aggregate, formatDigest, formatSms, ptDate } = await import(
+  const { fetchEvents, aggregateSplit, rollupOf, formatDigest, formatSms, ptDate } = await import(
     "../src/lib/funnel-digest"
   );
   const { renderReport } = await import("../src/lib/funnel-report-html");
@@ -128,46 +128,61 @@ async function main() {
   const fresh = () => ({ clientKinds: new Set<string>(), geos: new Set<string>() });
 
   const windowEvents = events.filter((e) => inRange(e, from, to));
-  const digest = aggregate(windowEvents, { from, to, truncated }, fresh());
+  const split = aggregateSplit(windowEvents, { from, to, truncated }, fresh());
   // Every client looks new against a throwaway set, so the flags would mark all
   // of them — noise here, and a claim the report can't back up. Novelty is only
   // meaningful against the SMS's persisted history.
-  digest.workspaces.newClientKinds = [];
-  digest.workspaces.newGeos = [];
+  split.all.workspaces.newClientKinds = [];
+  split.all.workspaces.newGeos = [];
 
   const series: DayPoint[] = [];
-  let todayDigest = digest;
+  let todaySplit = split;
   for (let i = 0; i < opts.days; i++) {
     const dFrom = new Date(trendStart.getTime() + i * 86_400_000);
     const dTo = new Date(Math.min(dFrom.getTime() + 86_400_000, to.getTime()));
     if (dFrom >= to) break;
-    const dg = aggregate(
+    const dg = aggregateSplit(
       events.filter((e) => inRange(e, dFrom, dTo)),
       { from: dFrom, to: dTo, truncated: false },
       fresh(),
     );
-    if (i === opts.days - 1) todayDigest = dg;
+    if (i === opts.days - 1) todaySplit = dg;
     series.push({
       date: ptDate(dFrom),
-      toolCalls: dg.context.toolCalls,
-      workspaces: dg.workspaces.total,
-      items: dg.items.ok,
+      ...rollupOf(dg),
       // Tool calls with no workspaces means that day predates the instrumentation.
-      instrumented: !(dg.context.toolCalls > 0 && dg.workspaces.total === 0),
+      instrumented: !(dg.all.context.toolCalls > 0 && dg.all.workspaces.total === 0),
     });
   }
 
   writeFileSync(
     opts.output,
-    renderReport({ window: digest, today: todayDigest, series, generatedAt: new Date() }),
+    renderReport({ window: split, today: todaySplit, series, generatedAt: new Date() }),
   );
 
   if (opts.json) {
-    console.log(JSON.stringify({ from, to, events: windowEvents.length, digest }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          from,
+          to,
+          events: windowEvents.length,
+          digest: split.all,
+          anon: split.anon,
+          authed: split.authed,
+        },
+        null,
+        2,
+      ),
+    );
   } else if (!opts.quiet) {
-    console.log(formatDigest(digest));
+    console.log("— anonymous —");
+    console.log(formatDigest(split.anon));
+    console.log("\n— signed in —");
+    console.log(formatDigest(split.authed));
+    // The SMS carries the anonymous side only; print what would actually go out.
     console.log("\n— SMS form —");
-    console.log(formatSms(digest));
+    console.log(formatSms(split.anon));
   }
   if (!opts.quiet) console.error(`\nWrote ${opts.output}`);
 }
