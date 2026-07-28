@@ -396,6 +396,20 @@ export default function Profile() {
                     </dd>
                   </div>
 
+                  {/* The address the account was created with. Read-only: it is not a
+                      stored credential but the input that derives the embedded wallet,
+                      so it can't be renamed here. To sign in with a different address,
+                      add one under Settings → Linked Emails. Absent for wallet-created
+                      accounts and any predating the email sign-in path. */}
+                  {userData?.signInEmail && (
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Signed up with</dt>
+                      <dd className="mt-1 text-sm text-gray-900 break-all">
+                        {userData.signInEmail}
+                      </dd>
+                    </div>
+                  )}
+
                   {userData?.phone && (
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Phone</dt>
