@@ -68,6 +68,36 @@ function section(title: string, body: string): string {
   return `<section><h2>${esc(title)}</h2>${body}</section>`;
 }
 
+/**
+ * Language use: items that compiled, with attempts alongside.
+ *
+ * Bars are sized by attempts, not creations, so a language that was tried a lot
+ * and produced nothing still shows up — that gap is the interesting case and
+ * sizing by creations would render it as a sliver. A language with attempts but
+ * zero creations is flagged.
+ */
+function languageRows(d: Digest): string {
+  const keys = [
+    ...new Set([...Object.keys(d.languages.attempted), ...Object.keys(d.languages.created)]),
+  ];
+  if (!keys.length) return `<p class="none">none</p>`;
+  const val = (k: string) => Math.max(d.languages.attempted[k] ?? 0, d.languages.created[k] ?? 0);
+  const max = Math.max(1, ...keys.map(val));
+  return `<table>${keys
+    .sort((a, b) => val(b) - val(a) || a.localeCompare(b))
+    .map((k) => {
+      const made = d.languages.created[k] ?? 0;
+      const tried = d.languages.attempted[k] ?? 0;
+      const stalled = tried > 0 && made === 0;
+      return `<tr><td class="k">${esc(k)}</td><td class="bar"><span style="width:${
+        (val(k) / max) * 100
+      }%"${stalled ? ' class="stalled"' : ""}></span></td><td class="n">${made}</td><td class="n dim">${
+        tried ? `/${tried}` : "&nbsp;"
+      }</td></tr>`;
+    })
+    .join("")}</table><p class="none">made / attempted</p>`;
+}
+
 /** Inline bar chart. Avoids a chart library and the CSP/asset weight one costs. */
 function sparkTable(series: DayPoint[]): string {
   if (!series.length) return `<p class="none">no data</p>`;
@@ -122,6 +152,7 @@ function digestBlock(d: Digest): string {
     ${stat("walls", Object.values(d.walls).reduce((a, b) => a + b, 0))}
   </div>
   ${section("By client", rows(d.sessions.byClient))}
+  ${section("By language", languageRows(d))}
   ${section("Items by surface", rows(d.items.byApp))}
   ${section("Walls hit", rows(d.walls))}
   ${section(
@@ -171,6 +202,7 @@ export function renderReport(input: {
   td.n.dim { color:var(--dim); font-size:12px; width:34px; }
   td.bar { width:100%; }
   td.bar span { display:block; height:7px; border-radius:4px; background:var(--accent); min-width:3px; }
+  td.bar span.stalled { background:#dc2626; }
   .none { color:var(--dim); font-size:14px; margin:4px 0; }
   .big { font-size:15px; margin:4px 0; }
   .warn { margin-top:16px; padding:9px 11px; border-radius:6px; font-size:13px;

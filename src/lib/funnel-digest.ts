@@ -116,6 +116,14 @@ export interface Digest {
     newGeos: string[];
   };
   items: { ok: number; failed: number; byApp: Record<string, number>; firstForAccount: number };
+  /**
+   * Language use. `created` counts items that actually compiled; `attempted`
+   * counts tool calls naming that language. The gap between them is the
+   * language's failure rate — which is why they're kept apart rather than
+   * summed. Keys are normalized to "L0166" form; events carry both spellings
+   * (item docs store "0166", MCP tool args pass "L0166").
+   */
+  languages: { created: Record<string, number>; attempted: Record<string, number> };
   walls: Record<string, number>;
   claims: { count: number; transferred: number };
   signups: { direct: number; viaClaim: number };
@@ -139,6 +147,13 @@ function bump(map: Record<string, number>, key: string | undefined, by = 1): voi
   map[key] = (map[key] ?? 0) + by;
 }
 
+/** "0166" and "L0166" are the same language; item docs use one, MCP args the other. */
+function langKey(v: unknown): string | undefined {
+  if (typeof v !== "string" || !v) return undefined;
+  const t = v.trim();
+  return /^\d+$/.test(t) ? `L${t}` : t.toUpperCase();
+}
+
 /**
  * Roll events into the digest shape.
  *
@@ -157,6 +172,7 @@ export function aggregate(
     truncated: window.truncated,
     sessions: { total: 0, byClient: {}, newClientKinds: [], newGeos: [] },
     items: { ok: 0, failed: 0, byApp: {}, firstForAccount: 0 },
+    languages: { created: {}, attempted: {} },
     walls: {},
     claims: { count: 0, transferred: 0 },
     signups: { direct: 0, viaClaim: 0 },
@@ -193,6 +209,9 @@ export function aggregate(
       case "mcp_tool":
         d.context.toolCalls++;
         if (session) used.add(session);
+        // Only authoring tools carry a language; reads (get_item, render_item,
+        // list_languages) don't, so this counts attempts to BUILD something.
+        bump(d.languages.attempted, langKey(e.lang));
         if (e.outcome === "generation_failed") d.context.genFailures++;
         break;
 
@@ -213,6 +232,7 @@ export function aggregate(
       case "item_created":
         d.items.ok++;
         bump(d.items.byApp, typeof e.app === "string" ? e.app : "console");
+        bump(d.languages.created, langKey(e.lang));
         if (e.first_for_account) d.items.firstForAccount++;
         break;
 
