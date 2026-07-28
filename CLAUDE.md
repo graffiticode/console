@@ -10,32 +10,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-```bash
-npm run dev          # Start dev server at localhost:3000
-npm run build        # Production build
-npm run lint         # Run ESLint
-npm run lint:fix     # Auto-fix ESLint errors
-npm run typecheck    # TypeScript type checking
-npm run gcp:build    # Deploy to Cloud Run (requires gcloud auth)
-npm run gcp:restart  # Redeploy :latest image without rebuilding
-npm run gcp:clear-cache # Roll a fresh revision to evict warm in-memory caches
-npm run gcp:logs     # Read recent Cloud Run logs
-npm run gcp:logs:tail # Stream Cloud Run logs
-npm run test:streaming # Manual streaming smoke test (scripts/test-streaming.ts)
-```
+See `package.json` scripts for the full list.
 
 There is no unit-test runner (no `npm test`); `test:streaming` is a manual `tsx` script. The real gate is: `npm run lint` and `npm run typecheck` must pass.
 
 ## Architecture
 
 Next.js 15 + React 18 app with GraphQL API, Claude AI code generation, and Firestore.
-
-**Key directories:**
-- `src/pages/` - Routes and API handlers (`/api` for GraphQL endpoint)
-- `src/components/` - React components
-- `src/lib/` - Core services (code-generation-service.ts, claude-stream-service.ts, embedding-service.ts)
-- `src/hooks/` - Custom React hooks
-- `src/utils/` - Utilities including storage abstraction (Firestore/Memory)
 
 **Code generation flow:**
 Request → **scope-gate head routing** → **permission-governed composition** → per-stage code gen (RAG vector search → Claude streaming → Graffiticode API verification → error correction) → post-parse binding repair.
@@ -47,14 +28,6 @@ Request → **scope-gate head routing** → **permission-governed composition** 
 **Cross-language content (`get_spec` round-trip):** moving an item's content into another language is a client-orchestrated round-trip — author the content in its specialist dialect → `get_spec(item_id)` (platform-neutral English spec, `src/lib/spec-generation-service.ts`) → `create_item(host_language, spec + intent)`. The server then decides **embed** (inner lang ∈ host's `composesWith` → live widget `+`-chain) vs **native reformat** (host re-authors from the spec). The agent never wires pipelines or names upstreams; `create_item` stays referentially transparent. Agent guidance lives in `graffiticode-skills/assessments/SKILL.md` ("two parts of the whole").
 
 **Per-language Opus opt-in:** code generation defaults to Sonnet (`CLAUDE_MODELS.DEFAULT`), with Haiku for small property-only edits. A language whose generation is more subtle can opt its **initial** generation into Opus by placing `<!-- gc:model=opus -->` anywhere in its `instructions.md` (served by its l0NNN service). The directive is parsed + stripped during the instructions fetch in `src/lib/code-generation-service.ts` (`dialectOptsIntoOpus`), so it never reaches the LLM. Only the initial generation uses Opus; the error-correction/fix pass and all non-opted languages stay on the current Sonnet/Haiku scheme. An explicit caller `options.model` still overrides everything.
-
-**External services:**
-- Graffiticode API (api.graffiticode.org) - language compilation
-- Claude API - code generation
-- OpenAI - embeddings (text-embedding-3-small)
-- DSPy service - prompt optimization (configurable via DSPY_SERVICE_URL)
-- Firebase/Firestore - auth and storage
-- Stripe - payments
 
 **Authentication:**
 - Primary: Ethereum wallet sign-in (via SIWE - Sign-In with Ethereum)
@@ -141,16 +114,7 @@ export GRAFFITICODE_APP_CREDENTIALS=~/graffiticode-app-key.json # graffiticode-a
 - `./scripts/set-free-plan-secrets.sh` - Push `FREE_PLAN_API_KEY` and `FREE_PLAN_NAMESPACE_SALT` from `.env.local` into Secret Manager and remount on the `console` Cloud Run service. Re-running rotates (creates a new secret version) and rolls a new revision. Rotating the salt invalidates active free-plan namespaces.
 - `./scripts/set-compiler-secret.sh <lang>` - Propagate `GRAFFITICODE_SECRET_KEY` from the console secret (Secret Manager, project `graffiticode-app`) to a language/compiler Cloud Run service (e.g. `l0166`) in project `graffiticode`, mounting the identical key. Accepts `l0166`/`L0166`/`0166`. **The key MUST NEVER CHANGE** — the script refuses to overwrite an existing target key with a different value.
 
-**Shared secret encryption (`get-val-private` / account Secrets):** values are encrypted at parse time (console, `src/lib/secret-crypto.ts`, used by `src/pages/api/resolvers.ts`) and decrypted at compile time (basis, `src/compiler.js`). The two `decrypt` implementations must stay in lockstep. The **identical keyring** must be present on the console runtime AND every `l0NNN` compiler service (the console encrypts; the compiler services decrypt). If no usable key is configured, `encrypt()` **throws** (never returns plaintext — so secrets are never stored/transported unencrypted); `setCredential` pre-checks `isConfigured()` (only when writing a secret) for a friendly error, and the `get-val-private` parse path surfaces the throw as a parse error. `decrypt()` stays lenient (returns the input unchanged on missing key / wrong key / tampered ciphertext) so the compile path doesn't crash on undecryptable values.
-
-**Credentials (account `get-val-public` / `get-val-private`):** the `/settings` "Credentials" card (`src/components/CredentialsCard.tsx`) stores each credential **field as its own variable**, bound to code by the name **`<backend>-<field>`** (e.g. `learnosity-key`, `learnosity-secret`). Variables are split by visibility across **two physically separate Firestore docs under `users/{uid}/settings`**: the **credentials** doc `{ <name>: { backend?, value: <plaintext>, updatedAt } }` (public fields) and the **secrets** doc `{ <name>: { backend?, value: <ciphertext>, updatedAt } }` (private fields). Parse callbacks (`buildParseCallbacks` in `resolvers.ts`) read disjoint maps: `get-val-public "<name>"` → `getPublicValuesForUser` (credentials doc only), `get-val-private "<name>"` → `getSecretsForUser` (secrets doc only). The public read path never opens the secrets doc, so a secret can't leak in cleartext. A console-only registry `src/lib/credential-backends.ts` (`CREDENTIAL_BACKENDS`) declares known backends — `key` (the var-name prefix), `label`, an open-ended `fields[]` (each `{ name, label, visibility }`), `docsUrl` — driving the grouped add-credential form + native field labels. Field count is open-ended (a config with two public ids is just two public fields). `setCredential` writes one variable; **visibility is server-authoritative for known backends** (resolved from the registry via `fieldVisibilityFor`, so a client can't store a private field as public plaintext) and from the caller's `isPublic` for custom vars; the crypto check gates only private writes. The compiler maps the generic `<backend>-<field>` vars to the service's real field names (e.g. Learnosity `learnosity-key`→`consumer_key`, `learnosity-secret`→`consumer_secret`). GraphQL: `credentials` query (flat vars), `setCredential`/`deleteCredential` mutations (free-plan gated); the client groups vars by backend into one row per credential.
-
-Two ciphertext formats are understood: legacy `<iv>:<enc>` (AES-256-CBC, deterministic IV) and versioned `v<N>:<iv>:<ct>:<tag>` (AES-256-GCM, random IV, authenticated). Env vars:
-- `GRAFFITICODE_SECRET_KEY` — the canonical key; this is key **version 1** and the key for all legacy ciphertext. Created once; see the error output of `set-compiler-secret.sh`.
-- `GRAFFITICODE_SECRET_KEYS` — optional JSON keyring for versions ≥2, e.g. `{"2":"<secret2>"}`. Needed (for decrypt) on every service before any value is written under that version.
-- `GRAFFITICODE_SECRET_KEY_VERSION` — the version **new** writes use. Unset/`0` ⇒ legacy CBC (default, backward-compatible). Set to `N` (on the **console** only) to start writing GCM under key N.
-
-**Rotation procedure** (the reason versioning exists — old ciphertext persists forever and only decrypts with the key that wrote it): (1) add key `N` to `GRAFFITICODE_SECRET_KEYS` on **all** services and redeploy so everything can *decrypt* it; (2) set `GRAFFITICODE_SECRET_KEY_VERSION=N` on the console so new writes use it; (3) lazily/backfill re-encrypt old values via `reencryptToCurrent()` in `secret-crypto.ts`; (4) once nothing references the old key, retire it. Never change the value of an existing key version. For local dev, set the same vars in `.env.local` and in the local API/compile server's env.
+**Secrets & credentials:** account credentials are split across a public `credentials` doc and an encrypted `secrets` doc under `users/{uid}/settings`; the **identical keyring** must be present on the console runtime AND every `l0NNN` compiler service (console encrypts, compilers decrypt). **Never change the value of an existing secret key version** — old ciphertext persists forever and only decrypts with the key that wrote it. Full contract (ciphertext formats, env vars, rotation procedure): `docs/secret-encryption.md`.
 
 ## Local Development
 
