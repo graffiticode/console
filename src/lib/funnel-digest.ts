@@ -142,6 +142,14 @@ export interface Digest {
   };
 }
 
+function langSafeKind(v: unknown): string | undefined {
+  return typeof v === "string" && v ? v : undefined;
+}
+
+function geoOf(e: LogEvent): string | undefined {
+  return typeof e.geo_country === "string" ? e.geo_country : undefined;
+}
+
 function bump(map: Record<string, number>, key: string | undefined, by = 1): void {
   if (!key) return;
   map[key] = (map[key] ?? 0) + by;
@@ -197,7 +205,13 @@ export function aggregate(
   const checkoutStarted = new Set<string>();
   const planChanged = new Set<string>();
   // session id -> the client kind / geo it presented, deduped.
-  const started = new Map<string, { kind: string; geo?: string }>();
+  //
+  // Populated from EVERY event that names a client, not just mcp_session_started.
+  // A session's start event fires only on its first tool call, so a conversation
+  // that began in an earlier window keeps working here while emitting no start
+  // event — attributing off starts alone left those clients unnamed even though
+  // they were plainly active.
+  const active = new Map<string, { kind: string; geo?: string }>();
 
   for (const e of events) {
     const session = typeof e.session === "string" ? e.session : undefined;
@@ -208,7 +222,13 @@ export function aggregate(
 
       case "mcp_tool":
         d.context.toolCalls++;
-        if (session) used.add(session);
+        if (session) {
+          used.add(session);
+          const kind = langSafeKind(e.client_kind);
+          if (kind && !active.has(session)) {
+            active.set(session, { kind, geo: geoOf(e) });
+          }
+        }
         // Only authoring tools carry a language; reads (get_item, render_item,
         // list_languages) don't, so this counts attempts to BUILD something.
         bump(d.languages.attempted, langKey(e.lang));
@@ -221,9 +241,9 @@ export function aggregate(
         // Run scaling, a host that re-binds mid-conversation). Deduping by
         // session id downstream makes the count right either way, where
         // incrementing here would report the same person twice.
-        started.set(session ?? `anon:${started.size}`, {
-          kind: typeof e.client_kind === "string" ? e.client_kind : "unknown",
-          geo: typeof e.geo_country === "string" ? e.geo_country : undefined,
+        active.set(session ?? `anon:${active.size}`, {
+          kind: langSafeKind(e.client_kind) ?? "unknown",
+          geo: geoOf(e),
         });
         if (session) used.add(session);
         break;
@@ -295,11 +315,11 @@ export function aggregate(
     }
   }
 
-  // One session = one distinct id that actually used a tool, however many
+  // One session = one distinct id that used a tool in this window, however many
   // start events it produced. Novelty is diffed here, after the dedupe, so a
   // repeated start event can't announce the same client kind twice.
-  d.sessions.total = started.size;
-  for (const { kind, geo } of started.values()) {
+  d.sessions.total = active.size;
+  for (const { kind, geo } of active.values()) {
     bump(d.sessions.byClient, kind);
     if (kind !== "unknown" && !seen.clientKinds.has(kind)) {
       seen.clientKinds.add(kind);
@@ -406,20 +426,18 @@ export function formatSms(d: Digest, url?: string): string {
 
   const lines = [`GC ${ptTime(d.from)}–${ptTime(d.to)} PT`, head.join(" · ")];
 
-  // Every client that showed up, in full. Which agents are reaching us is the
-  // headline question this whole thing exists to answer, so it is never elided
-  // even when that costs a segment.
-  const clients = clientList(d);
-  if (clients) lines.push(`▶ ${clients}`);
-
-  // Money and conversion are the two things worth surfacing before the tap.
+  // No per-client breakdown here — that lives on the report page, which has room
+  // to show every client with its own counts. A first-time client kind is a
+  // different thing from a breakdown, though: it's an arrival worth knowing
+  // about before you tap, so the flag survives.
   const flags: string[] = [];
   if (d.claims.count) flags.push(`★ ${d.claims.count} claim${plural(d.claims.count)}`);
   if (d.signups.direct) flags.push(`★ ${d.signups.direct} signup${plural(d.signups.direct)}`);
   if (d.plans.length) flags.push(`$ ${d.plans.length} plan change${plural(d.plans.length)}`);
+  if (d.sessions.newClientKinds.length) flags.push(`⚑ new ${d.sessions.newClientKinds.join(", ")}`);
   if (flags.length) lines.push(flags.join(" · "));
 
-  if (d.context.toolCalls === 0 && !flags.length && !clients) lines.push("quiet");
+  if (d.context.toolCalls === 0 && !flags.length) lines.push("quiet");
   if (url) lines.push(url);
 
   return lines.join("\n");
