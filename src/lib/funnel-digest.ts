@@ -165,11 +165,23 @@ function bump(map: Record<string, number>, key: string | undefined, by = 1): voi
  */
 const AUTHORING_TOOLS = new Set(["create_item", "update_item"]);
 
-/** "0166" and "L0166" are the same language; item docs use one, MCP args the other. */
+/**
+ * "0166" and "L0166" are the same language; item docs use one, MCP args the
+ * other.
+ *
+ * Anything that isn't an L-number is bucketed as "(invalid)" rather than passed
+ * through. Clients do send junk here — a real week had a call whose `language`
+ * argument was "create a green bar chart using mock data", which the old
+ * pass-through turned into its own 40-character row in the language table.
+ * Bucketing keeps that visible as a malformed-call count without letting one bad
+ * caller name a language.
+ */
 function langKey(v: unknown): string | undefined {
   if (typeof v !== "string" || !v) return undefined;
   const t = v.trim();
-  return /^\d+$/.test(t) ? `L${t}` : t.toUpperCase();
+  if (/^\d{2,6}$/.test(t)) return `L${t}`;
+  if (/^L\d{2,6}$/i.test(t)) return t.toUpperCase();
+  return "(invalid)";
 }
 
 /**
@@ -388,6 +400,27 @@ function ptTime(date: Date): string {
   }).format(date);
 }
 
+function ptDayLabel(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ,
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+/**
+ * Human range for a window.
+ *
+ * Dates appear only when the window crosses a PT day. Without that, an
+ * hour-of-the-day label like "18:08-18:08" is what a 24h window renders as —
+ * technically true and completely useless. Hourly digests stay short; the
+ * overnight window and any multi-day report get dated ends.
+ */
+export function ptRange(from: Date, to: Date): string {
+  if (ptDate(from) === ptDate(to)) return `${ptTime(from)}\u2013${ptTime(to)} PT`;
+  return `${ptDayLabel(from)} ${ptTime(from)} \u2013 ${ptDayLabel(to)} ${ptTime(to)} PT`;
+}
+
 function plural(n: number): string {
   return n === 1 ? "" : "s";
 }
@@ -438,7 +471,7 @@ export function formatSms(d: Digest, url?: string): string {
   if (d.sessions.total) head.push(`${d.sessions.total} session${plural(d.sessions.total)}`);
   if (d.items.ok) head.push(`${d.items.ok} item${plural(d.items.ok)}`);
 
-  const lines = [`GC ${ptTime(d.from)}–${ptTime(d.to)} PT`, head.join(" · ")];
+  const lines = [`GC ${ptRange(d.from, d.to)}`, head.join(" · ")];
 
   // No per-client breakdown here — that lives on the report page, which has room
   // to show every client with its own counts. A first-time client kind is a
@@ -458,7 +491,7 @@ export function formatSms(d: Digest, url?: string): string {
 }
 
 export function formatDigest(d: Digest): string {
-  const lines: string[] = [`GC ${ptTime(d.from)}–${ptTime(d.to)} PT`];
+  const lines: string[] = [`GC ${ptRange(d.from, d.to)}`];
 
   if (d.sessions.total > 0) {
     let line = `▶ ${d.sessions.total} session${plural(d.sessions.total)}`;

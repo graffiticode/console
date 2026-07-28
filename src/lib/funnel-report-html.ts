@@ -29,6 +29,11 @@ function esc(s: string): string {
   );
 }
 
+/**
+ * Dates on both ends when the window crosses a PT day, otherwise only on the
+ * start. A week-long window rendered with the end's time alone reads as a
+ * one-hour window on the start date.
+ */
 function fmtRange(d: Digest): string {
   const opts: Intl.DateTimeFormatOptions = {
     timeZone: "America/Los_Angeles",
@@ -38,9 +43,17 @@ function fmtRange(d: Digest): string {
     minute: "2-digit",
     hour12: false,
   };
+  const day = (x: Date) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(x);
+  const endOpts = day(d.from) === day(d.to) ? { ...opts, month: undefined, day: undefined } : opts;
   return `${new Intl.DateTimeFormat("en-US", opts).format(d.from)} – ${new Intl.DateTimeFormat(
     "en-US",
-    { ...opts, month: undefined, day: undefined },
+    endOpts,
   ).format(d.to)} PT`;
 }
 
