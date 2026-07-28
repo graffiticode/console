@@ -155,6 +155,16 @@ function bump(map: Record<string, number>, key: string | undefined, by = 1): voi
   map[key] = (map[key] ?? 0) + by;
 }
 
+/**
+ * MCP tools that actually try to BUILD something in a language.
+ *
+ * Deliberately an allowlist, not "has a lang field". get_language_info takes
+ * `language` as its argument, so a docs lookup carries one; counting it as an
+ * attempt inflates a language's failure rate and can mark it as tried-and-failed
+ * when nobody tried. Any new authoring tool must be added here.
+ */
+const AUTHORING_TOOLS = new Set(["create_item", "update_item"]);
+
 /** "0166" and "L0166" are the same language; item docs use one, MCP args the other. */
 function langKey(v: unknown): string | undefined {
   if (typeof v !== "string" || !v) return undefined;
@@ -229,9 +239,13 @@ export function aggregate(
             active.set(session, { kind, geo: geoOf(e) });
           }
         }
-        // Only authoring tools carry a language; reads (get_item, render_item,
-        // list_languages) don't, so this counts attempts to BUILD something.
-        bump(d.languages.attempted, langKey(e.lang));
+        // Authoring calls only. Carrying a `lang` is NOT sufficient:
+        // get_language_info takes `language` as its argument, so a docs lookup
+        // emits one too and would be counted as a failed attempt to build —
+        // rendering a language red for "tried, made nothing" when nobody tried.
+        if (AUTHORING_TOOLS.has(String(e.tool))) {
+          bump(d.languages.attempted, langKey(e.lang));
+        }
         if (e.outcome === "generation_failed") d.context.genFailures++;
         break;
 
