@@ -458,13 +458,17 @@ function clientList(d: Digest): string {
 }
 
 /**
- * The SMS body: a headline you can read on a lock screen, plus a link to the
- * full report.
+ * The SMS body. Exactly three lines, always:
  *
- * Deliberately much shorter than formatDigest(). Everything that used to be
- * crammed into the text now lives on the report page, which has room for the
- * breakdowns and doesn't pay per character. What stays is the shape of the
- * hour — enough to decide whether to tap.
+ *   GC 19:01–20:01 PT
+ *   15 tool calls · 2 sessions · 3 items
+ *   https://console.graffiticode.org/r/<token>
+ *
+ * Nothing else belongs here. Claims, plan changes, new-client arrivals, and
+ * per-client breakdowns all live on the report page, which has room for them
+ * and doesn't pay per character. Every attempt to surface "just one more
+ * important thing" in the text has ended up either redundant with the page or
+ * misleading because the text can't carry the qualifiers.
  */
 export function formatSms(d: Digest, url?: string): string {
   const head: string[] = [`${d.context.toolCalls} tool call${plural(d.context.toolCalls)}`];
@@ -472,19 +476,6 @@ export function formatSms(d: Digest, url?: string): string {
   if (d.items.ok) head.push(`${d.items.ok} item${plural(d.items.ok)}`);
 
   const lines = [`GC ${ptRange(d.from, d.to)}`, head.join(" · ")];
-
-  // No per-client breakdown here — that lives on the report page, which has room
-  // to show every client with its own counts. A first-time client kind is a
-  // different thing from a breakdown, though: it's an arrival worth knowing
-  // about before you tap, so the flag survives.
-  const flags: string[] = [];
-  if (d.claims.count) flags.push(`★ ${d.claims.count} claim${plural(d.claims.count)}`);
-  if (d.signups.direct) flags.push(`★ ${d.signups.direct} signup${plural(d.signups.direct)}`);
-  if (d.plans.length) flags.push(`$ ${d.plans.length} plan change${plural(d.plans.length)}`);
-  if (d.sessions.newClientKinds.length) flags.push(`⚑ new ${d.sessions.newClientKinds.join(", ")}`);
-  if (flags.length) lines.push(flags.join(" · "));
-
-  if (d.context.toolCalls === 0 && !flags.length) lines.push("quiet");
   if (url) lines.push(url);
 
   return lines.join("\n");
