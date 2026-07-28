@@ -53,6 +53,7 @@ rag-analytics-report*.html
 /data
 revenue-vs-cost.html
 user-report.html
+funnel-report.html
 
 # generated training data
 *-training-examples.md
