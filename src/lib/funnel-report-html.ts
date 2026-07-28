@@ -188,6 +188,16 @@ function digestBlock(d: Digest): string {
   ${d.truncated ? `<p class="warn">Read capped — counts are floors, not totals.</p>` : ""}`;
 }
 
+/**
+ * The page title carries NO date range on purpose.
+ *
+ * SMS clients render it as a link-preview card beneath the message, where it
+ * repeated the window the body's first line already states. The range still
+ * appears on the page itself, under the heading.
+ *
+ * Keep the head free of any literal title-tag text in comments — preview
+ * scrapers regex for it and would match the comment instead.
+ */
 export function renderReport(input: {
   window: Digest;
   today: Digest;
@@ -200,7 +210,7 @@ export function renderReport(input: {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Graffiticode usage — ${esc(fmtRange(window))}</title>
+<title>Graffiticode usage</title>
 <style>
   :root { color-scheme: light dark; --fg:#111; --dim:#666; --line:#e5e5e5; --bg:#fff; --accent:#2563eb; }
   @media (prefers-color-scheme: dark) {
