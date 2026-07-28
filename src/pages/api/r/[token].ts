@@ -51,7 +51,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     // Never cached or indexed: the URL is a bearer credential.
     res.setHeader("Cache-Control", "private, no-store");
-    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    // nosnippet/noimageindex ask link-preview fetchers not to render a card for
+    // this URL. Messaging clients build that card themselves from what they
+    // fetch, so this is a request, not a guarantee — but it's the only
+    // server-side lever there is.
+    res.setHeader("X-Robots-Tag", "noindex, nofollow, nosnippet, noimageindex, noarchive");
     res.status(status).send(html);
   };
 

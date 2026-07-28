@@ -209,7 +209,7 @@ export function renderReport(input: {
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
+<meta name="robots" content="noindex, nofollow, nosnippet, noimageindex, noarchive">
 <title>Graffiticode usage</title>
 <style>
   :root { color-scheme: light dark; --fg:#111; --dim:#666; --line:#e5e5e5; --bg:#fff; --accent:#2563eb; }
@@ -281,7 +281,7 @@ export function renderInvalid(): string {
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
+<meta name="robots" content="noindex, nofollow, nosnippet, noimageindex, noarchive">
 <title>Link not valid</title>
 <style>
  :root { color-scheme: light dark; }
