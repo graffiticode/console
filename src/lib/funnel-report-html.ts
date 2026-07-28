@@ -63,16 +63,26 @@ function stat(label: string, value: number | string, hint?: string): string {
   )}</div>${hint ? `<div class="h">${esc(hint)}</div>` : ""}</div>`;
 }
 
+/**
+ * Categorical bars are scaled by the TOTAL, not the largest value.
+ *
+ * Max-scaling makes the top row 100% by definition, so a table of four
+ * languages at one item each rendered as four full-width bars — every chart
+ * looked maxed out and carried no information. Share-of-total gives them 25%
+ * each and reads as the proportion it actually is. Time series still scale by
+ * max (see sparkTable); that's the right convention for a trend.
+ */
 function rows(map: Record<string, number>): string {
-  const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  const entries = Object.entries(map).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   if (!entries.length) return `<p class="none">none</p>`;
-  const max = Math.max(...entries.map(([, v]) => v));
+  const total = entries.reduce((sum, [, v]) => sum + v, 0) || 1;
   return `<table>${entries
     .map(
       ([k, v]) =>
-        `<tr><td class="k">${esc(k)}</td><td class="bar"><span style="width:${
-          (v / max) * 100
-        }%"></span></td><td class="n">${v}</td></tr>`,
+        `<tr><td class="k">${esc(k)}</td><td class="bar"><span style="width:${(
+          (v / total) *
+          100
+        ).toFixed(1)}%"></span></td><td class="n">${v}</td></tr>`,
     )
     .join("")}</table>`;
 }
@@ -95,20 +105,22 @@ function languageRows(d: Digest): string {
   ];
   if (!keys.length) return `<p class="none">none</p>`;
   const val = (k: string) => Math.max(d.languages.attempted[k] ?? 0, d.languages.created[k] ?? 0);
-  const max = Math.max(1, ...keys.map(val));
+  // Share of total, same reason as rows(): scaling by max made every language
+  // with an equal count render full-width.
+  const total = keys.reduce((sum, k) => sum + val(k), 0) || 1;
   return `<table>${keys
     .sort((a, b) => val(b) - val(a) || a.localeCompare(b))
     .map((k) => {
       const made = d.languages.created[k] ?? 0;
       const tried = d.languages.attempted[k] ?? 0;
       const stalled = tried > 0 && made === 0;
-      return `<tr><td class="k">${esc(k)}</td><td class="bar"><span style="width:${
-        (val(k) / max) * 100
-      }%"${stalled ? ' class="stalled"' : ""}></span></td><td class="n">${made}</td><td class="n dim">${
+      return `<tr><td class="k">${esc(k)}</td><td class="bar"><span${
+        stalled ? ' class="stalled"' : ""
+      } style="width:${((val(k) / total) * 100).toFixed(1)}%"></span></td><td class="n">${made}</td><td class="n dim">${
         tried ? `/${tried}` : "&nbsp;"
       }</td></tr>`;
     })
-    .join("")}</table><p class="none">made / attempted</p>`;
+    .join("")}</table><p class="none">made / attempted · bar = share of activity</p>`;
 }
 
 /** Inline bar chart. Avoids a chart library and the CSP/asset weight one costs. */
