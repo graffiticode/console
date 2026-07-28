@@ -7,6 +7,12 @@ import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { useEmailSignIn } from '@graffiticode/auth-react';
 import AuthMethodDialog from '../components/AuthMethodDialog';
 import WalletSelectionDialog from '../components/WalletSelectionDialog';
+import ConnectAgentInstructions, {
+  hostTakesApiKey,
+  parseClientHost,
+  type ClientHost,
+} from '../components/ConnectAgentInstructions';
+import { client } from '../lib/auth';
 import { getPageTitle } from '../lib/utils';
 
 interface Wallet {
@@ -19,6 +25,10 @@ interface Wallet {
 // signInWithCustomToken, after which router.query.token can momentarily be
 // empty. The stashed copy lets the claim proceed regardless.
 const CLAIM_TOKEN_KEY = 'graffiticode:claim-token';
+// The agent the claim link came from (`agent=` on the URL, set by the MCP server).
+// Stashed for the same reason the token is: the sign-in remount empties router.query,
+// and losing it would drop the user onto generic instructions for an agent we knew.
+const CLAIM_AGENT_KEY = 'graffiticode:claim-agent';
 
 export default function Claim() {
   const router = useRouter();
@@ -44,6 +54,13 @@ export default function Claim() {
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claimEmpty, setClaimEmpty] = useState(false);
+  const [host, setHost] = useState<ClientHost>('unknown');
+  // Set once the copy succeeds — this is the success screen's gate, and it holds the
+  // item we hand the "Open item" button.
+  const [claimed, setClaimed] = useState<{ count: number; target: string } | null>(null);
+  const [apiKey, setApiKey] = useState<{ id: string; token: string } | null>(null);
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
   // Guards against double-submits within a mount (the success path also clears
   // the stashed token, so a remount can't re-run the non-idempotent copy).
   const claimingRef = useRef(false);
@@ -56,6 +73,15 @@ export default function Claim() {
   useEffect(() => {
     if (!router.isReady) return;
     const fromQuery = typeof router.query.token === 'string' ? router.query.token : null;
+    // `agent`, not `client`: _app.tsx already consumes `?client=` app-wide as the
+    // item source surface (console|mcp|front).
+    const agentFromQuery = typeof router.query.agent === 'string' ? router.query.agent : null;
+    if (agentFromQuery) {
+      sessionStorage.setItem(CLAIM_AGENT_KEY, agentFromQuery);
+      setHost(parseClientHost(agentFromQuery));
+    } else {
+      setHost(parseClientHost(sessionStorage.getItem(CLAIM_AGENT_KEY)));
+    }
     if (fromQuery) {
       sessionStorage.setItem(CLAIM_TOKEN_KEY, fromQuery);
       setToken(fromQuery);
@@ -75,7 +101,7 @@ export default function Claim() {
       setToken(sessionStorage.getItem(CLAIM_TOKEN_KEY));
     }
     setTokenChecked(true);
-  }, [router.isReady, router.query.token]);
+  }, [router.isReady, router.query.token, router.query.agent]);
 
   // The copy is an explicit user action (Save button) on a stable, signed-in
   // page — not a passive effect racing the sign-in remount.
@@ -115,25 +141,52 @@ export default function Claim() {
         setClaimEmpty(true);
         return;
       }
-      // Clear before navigating so a remount or re-visit can't re-run the copy.
+      // Clear before showing the success screen so a remount or re-visit can't
+      // re-run the copy.
       sessionStorage.removeItem(CLAIM_TOKEN_KEY);
-      // Hard navigation (not router.replace): /claim has just been through the
-      // auth provider's sign-in remount, and the SPA route change silently
-      // no-ops in that state — the URL never changes. window.location.assign
-      // forces a real navigation. The ?lang= param (honored by _app.tsx) makes
-      // the claimed item's language active from first paint, so the items
-      // sidebar lists the claimed items immediately instead of the previously
-      // selected language's list.
+      // The items are safe now, but the agent that made them is still anonymous —
+      // and this is the one moment we have the user's attention to fix that. So we
+      // stop here instead of dropping them straight into the editor; "Open item"
+      // still gets them there in one click.
+      //
+      // The ?lang= param (honored by _app.tsx) makes the claimed item's language
+      // active from first paint, so the items sidebar lists the claimed items
+      // immediately instead of the previously selected language's list.
       const target = items[0].lang
         ? `/items/${items[0].id}?lang=${items[0].lang}`
         : `/items/${items[0].id}`;
-      window.location.assign(target);
+      setClaimed({ count: items.length, target });
     } catch (err: any) {
       // Leave the token in place so "Try again" can retry.
       setClaimError(err?.message || 'Failed to claim items');
     } finally {
       claimingRef.current = false;
       setClaiming(false);
+    }
+  };
+
+  // Mint a key for the config-file hosts, mirroring APIKeysCard's create path
+  // (client.apiKeys.create runs against the auth service, so nothing server-side in
+  // this repo sees it — hence the beacon). `source: 'claim'` separates keys minted
+  // here from keys minted in Settings, which is how we'll know whether this screen
+  // does anything.
+  const handleCreateKey = async () => {
+    if (!user || creatingKey) return;
+    setCreatingKey(true);
+    setKeyError(null);
+    try {
+      const userToken = await user.getToken();
+      const created = await client.apiKeys.create(userToken);
+      setApiKey(created);
+      void fetch('/api/beacon/api-key-created', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: user.uid, source: 'claim' }),
+      }).catch(() => {});
+    } catch (err: any) {
+      setKeyError(err?.message || 'Failed to create an API key');
+    } finally {
+      setCreatingKey(false);
     }
   };
 
@@ -186,6 +239,52 @@ export default function Claim() {
           <p className="text-sm text-gray-600 text-center max-w-sm">
             This claim link is missing or malformed. Ask your assistant to send a new one.
           </p>
+        </div>
+      </>
+    );
+  }
+
+  // Claimed: items are safe. Offer the connect step before the editor.
+  if (user && claimed) {
+    return (
+      <>
+        <Head><title>{getPageTitle('Claim')}</title></Head>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-100px)] px-4 py-8">
+          <div className="w-full max-w-md flex flex-col">
+            <h1 className="text-xl font-semibold text-gray-900 mb-1 text-center">
+              Saved {claimed.count} {claimed.count === 1 ? 'item' : 'items'}
+            </h1>
+            <p className="text-sm text-gray-600 mb-6 text-center">
+              They&rsquo;re in your account now.
+            </p>
+
+            <div className="border-t border-gray-200 pt-5 mb-6">
+              <ConnectAgentInstructions
+                host={host}
+                onHostChange={(next) => {
+                  setHost(next);
+                  // A host switch can move between key-taking and not; drop a key the
+                  // user hasn't used rather than leaving a stale secret on screen.
+                  if (!hostTakesApiKey(next)) setApiKey(null);
+                }}
+                apiKey={apiKey}
+                onCreateKey={handleCreateKey}
+                creatingKey={creatingKey}
+                keyError={keyError}
+              />
+            </div>
+
+            <button
+              type="button"
+              className="w-full rounded-none border border-gray-900 bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-800"
+              // Hard navigation, not router.push: /claim has just been through the
+              // auth provider's sign-in remount, and an SPA route change silently
+              // no-ops in that state — the URL never changes.
+              onClick={() => window.location.assign(claimed.target)}
+            >
+              Open item
+            </button>
+          </div>
         </div>
       </>
     );

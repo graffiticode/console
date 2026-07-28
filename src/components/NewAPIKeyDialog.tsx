@@ -1,39 +1,5 @@
-import { ClipboardDocumentIcon, ClipboardDocumentCheckIcon } from "@heroicons/react/24/outline";
-import React, { useEffect, useRef, useState } from "react";
-
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for older browsers
-      const textarea = document.createElement('textarea');
-      textarea.value = value;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  return (
-    <button onClick={handleCopy} title="Copy to clipboard">
-      {copied ? (
-        <ClipboardDocumentCheckIcon className="h-5 w-5 text-green-600" />
-      ) : (
-        <ClipboardDocumentIcon className="h-5 w-5 text-gray-500 hover:text-gray-700" />
-      )}
-    </button>
-  );
-}
+import React, { useEffect, useRef } from "react";
+import CopyButton from "./CopyButton";
 
 export default function NewAPIKeyDialog({ apiKey }) {
   const ref = useRef<HTMLDialogElement>(null);
