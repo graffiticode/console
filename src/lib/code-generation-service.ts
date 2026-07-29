@@ -517,13 +517,9 @@ CRITICAL REMINDER: Put generated code between \`\`\` (triple backticks) to disti
  * Returns the appropriate system prompt blocks for a given dialect.
  *
  * Returns an array of Anthropic content blocks rather than a single string so
- * the caller can append its own static blocks before placing a single
- * `cache_control` breakpoint. Within a language the entire prefix is stable
- * across requests.
- *
- * Deliberately carries NO cache_control of its own — see the single-breakpoint
- * note in createCodeGenerationPrompt. Marking this block *and* a later one
- * writes the prefix twice.
+ * the dialect-specific prefix can carry a `cache_control: ephemeral` marker.
+ * Within a language the entire prefix is stable across requests, so one
+ * breakpoint at the end of the per-dialect block caches the whole thing.
  *
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
  * @returns {Promise<SystemBlock[]>} - System content blocks ready for /v1/messages
@@ -553,6 +549,7 @@ When in doubt, attempt to generate code. Only use OUT_OF_SCOPE when you are conf
     {
       type: "text",
       text: dialectBlock,
+      cache_control: { type: "ephemeral" },
     },
   ];
 }
@@ -575,12 +572,14 @@ async function createCodeGenerationPrompt(
   upstreamContext: { lang: string; sample?: unknown } | null = null,
   accessToken?: string,
 ) {
-  // Dialect-specific blocks (stable per-language), cached by the single
-  // breakpoint placed at the end of systemBlocks below.
+  // Dialect-specific blocks (cached per-language). The dialect block already
+  // carries cache_control: ephemeral, so the per-language prefix is reused
+  // across requests within the 5-minute Anthropic cache window.
   const dialectBlocks = await getSystemPromptForDialect(lang, accessToken);
 
-  // Developer instructions are static across all languages and all calls, so
-  // they sit inside the cached prefix rather than after it.
+  // Developer instructions are static across all languages and all calls.
+  // Adding a second cache breakpoint extends the cached prefix to include
+  // them — both blocks together get reused on subsequent requests.
   const developerInstructions = `
 ## APPROACH
 
@@ -599,18 +598,6 @@ async function createCodeGenerationPrompt(
 - Ensure all \`let\` statements end with \`..\`
 - Ensure the program ends with \`..\``.trim();
 
-  // EXACTLY ONE cache_control breakpoint, on the LAST block.
-  //
-  // A breakpoint caches everything before it, so one marker at the end covers
-  // dialect + developer. Marking the dialect block as well doesn't extend the
-  // cached prefix — it creates a SECOND entry that re-writes the same dialect
-  // text, so the ~13k-token prefix was being written twice on every cold
-  // generation (measured: 26,764 cache-creation tokens for L0176 against a
-  // ~13,471-token prefix; L0175 likewise 38,286 against ~19,256). Cache writes
-  // are 1.25x input rate and dominate a cold generation's cost, so the
-  // duplicate roughly doubled it.
-  //
-  // If you add another static block, append it here and keep the marker last.
   const systemBlocks: SystemBlock[] = [
     ...dialectBlocks,
     {
