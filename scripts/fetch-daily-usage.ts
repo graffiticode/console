@@ -49,14 +49,33 @@ async function apiFetch(url: string): Promise<any> {
   throw new Error('Failed after 3 retries');
 }
 
-// Find the API key ID by matching the key value against partial hints
-// Hints look like "sk-ant-api03-mR3...sQAA" — match prefix before "..." and suffix after
+// Find the API key ID to snapshot.
+//
+// ANTHROPIC_CONSOLE_KEY_IDS wins when set: since local dev moved onto its own
+// key, ANTHROPIC_API_KEY names the DEV key, and matching against it would
+// quietly snapshot developer traffic instead of production's.
+//
+// Otherwise fall back to matching the key value against partial hints, which
+// look like "sk-ant-api03-mR3...sQAA" — prefix before "..." and suffix after.
 async function findApiKeyId(): Promise<{ id: string; name: string } | null> {
+  const wanted = (process.env.ANTHROPIC_CONSOLE_KEY_IDS || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+
   let afterId: string | undefined;
   do {
     const params = new URLSearchParams({ limit: '100' });
     if (afterId) params.set('after_id', afterId);
     const data = await apiFetch(`https://api.anthropic.com/v1/organizations/api_keys?${params}`);
+    if (wanted.length > 0) {
+      for (const key of data.data || []) {
+        if (wanted.includes(key.id) ||
+            wanted.some(w => w.toLowerCase() === String(key.name || '').toLowerCase())) {
+          return { id: key.id, name: key.name };
+        }
+      }
+      afterId = data.has_more ? data.last_id : undefined;
+      continue;
+    }
     for (const key of data.data || []) {
       const hint = key.partial_key_hint || '';
       const dotIdx = hint.indexOf('...');

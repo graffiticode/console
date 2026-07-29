@@ -50,9 +50,11 @@ const FALLBACK = MODEL_RATES["claude-sonnet-5"];
 
 /**
  * Cache pricing is a fixed multiple of a model's input rate, so it needs no
- * per-model entries: a 5-minute-TTL write costs 1.25×, a read costs 0.1×.
+ * per-model entries: a 5-minute-TTL write costs 1.25×, a 1-hour-TTL write 2×,
+ * and a read 0.1×.
  */
 const CACHE_WRITE_MULTIPLIER = 1.25;
+const CACHE_WRITE_1H_MULTIPLIER = 2.0;
 const CACHE_READ_MULTIPLIER = 0.1;
 
 /** Model ids may carry a date suffix (`claude-haiku-4-5-20251001`); the table is keyed without one. */
@@ -68,6 +70,17 @@ function rateFor(model: string | undefined, now: Date): { input: number; output:
   return { input: entry.input, output: entry.output };
 }
 
+/**
+ * Cost of one Messages API response, from its `usage` object.
+ *
+ * `inputTokens` is the **uncached remainder**, not the whole prompt: the API
+ * reports `input_tokens`, `cache_creation_input_tokens`, and
+ * `cache_read_input_tokens` as disjoint counts, so the full prompt is their
+ * sum. This function previously subtracted the cached parts back out of
+ * `inputTokens`, which double-discounted them and understated every cached
+ * generation — the more effective the prompt cache, the larger the shortfall.
+ * Free-plan spend telemetry (`recordSpend`) was low for that reason.
+ */
 export function estimateUsdCost(
   usage:
     | {
@@ -81,18 +94,52 @@ export function estimateUsdCost(
   now = new Date(),
 ): number {
   if (!usage) return 0;
+  // The per-request usage object doesn't split cache creation by TTL; 5m is the
+  // default and what we write, so it prices as a 5-minute entry.
+  return usdCostFromReport(
+    {
+      uncachedInput: usage.inputTokens || 0,
+      cacheWrite5m: usage.cacheCreationInputTokens || 0,
+      cacheRead: usage.cacheReadInputTokens || 0,
+      output: usage.outputTokens || 0,
+    },
+    model,
+    now,
+  );
+}
+
+/**
+ * Prices one row of the Admin API's usage report
+ * (`/v1/organizations/usage_report/messages`).
+ *
+ * Deliberately separate from `estimateUsdCost` rather than folded into it,
+ * because the two consume opposite conventions and silently mixing them
+ * under-counts. The Messages API reports `input_tokens` *inclusive* of the
+ * cached portions, so `estimateUsdCost` subtracts them back out; the usage
+ * report already hands back `uncached_input_tokens` *exclusive* of cache, so
+ * subtracting again would charge nothing for input that was really billed.
+ * The report also splits cache creation by TTL, which the per-request usage
+ * object does not — and the two TTLs are priced differently (2× vs 1.25×).
+ */
+export function usdCostFromReport(
+  tokens: {
+    uncachedInput?: number;
+    cacheWrite5m?: number;
+    cacheWrite1h?: number;
+    cacheRead?: number;
+    output?: number;
+  },
+  model?: string,
+  now = new Date(),
+): number {
   const rate = rateFor(model, now);
-  const cacheWrite = usage.cacheCreationInputTokens || 0;
-  const cacheRead = usage.cacheReadInputTokens || 0;
-  // inputTokens is reported inclusive of the cached portions; bill the
-  // remainder at the full rate and the cached parts at their own multiples.
-  const uncachedInput = Math.max(0, (usage.inputTokens || 0) - cacheWrite - cacheRead);
 
   const usd =
-    uncachedInput * rate.input +
-    (usage.outputTokens || 0) * rate.output +
-    cacheWrite * rate.input * CACHE_WRITE_MULTIPLIER +
-    cacheRead * rate.input * CACHE_READ_MULTIPLIER;
+    (tokens.uncachedInput || 0) * rate.input +
+    (tokens.output || 0) * rate.output +
+    (tokens.cacheWrite5m || 0) * rate.input * CACHE_WRITE_MULTIPLIER +
+    (tokens.cacheWrite1h || 0) * rate.input * CACHE_WRITE_1H_MULTIPLIER +
+    (tokens.cacheRead || 0) * rate.input * CACHE_READ_MULTIPLIER;
 
   return usd / PER_MILLION;
 }

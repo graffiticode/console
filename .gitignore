@@ -32,6 +32,8 @@ yarn-error.log*
 
 # local env files
 .env*.local
+# Backups of the above hold real secrets; `.env*.local` does not match them.
+.env*.bak
 
 # vercel
 .vercel
@@ -55,6 +57,7 @@ revenue-vs-cost.html
 user-report.html
 funnel-report.html
 mcp-funnel.html
+cost-per-item.html
 
 # generated training data
 *-training-examples.md
