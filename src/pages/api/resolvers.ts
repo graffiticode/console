@@ -1127,6 +1127,7 @@ export async function generateCode({
           rid,
           conversationSummary,
           precomputedExamples: headExamples,
+          itemId,
         });
 
         if ('errors' in result && result.errors) {
@@ -1180,6 +1181,7 @@ export async function generateCode({
                   maxTokens: options?.maxTokens,
                 },
                 rid,
+                itemId,
               })
             )
           );
@@ -1213,6 +1215,7 @@ export async function generateCode({
             rid,
             conversationSummary,
             precomputedExamples: headLang === language ? headExamples : null,
+            itemId,
             upstreamContext: { lang: expected },
             prompt: `${prompt}\n\nIMPORTANT: This program is the HEAD of a composition pipeline and MUST bind its upstream by emitting a top-level \`data use "${expected}"\` so the upstream data flows at runtime. Do not omit it.`,
           });

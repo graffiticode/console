@@ -1206,6 +1206,7 @@ export async function generateCode({
   conversationSummary = null,
   upstreamContext = null,
   precomputedExamples = null,
+  itemId = null,
 }: {
   auth: any;
   prompt: string;
@@ -1218,6 +1219,13 @@ export async function generateCode({
   conversationSummary?: ConversationSummary | null;
   upstreamContext?: { lang: string; sample?: unknown } | null;
   precomputedExamples?: any[] | null;
+  /**
+   * The item this generation is for, when one exists. Null on a fresh create —
+   * the item is created after generation returns — which is why the usage record
+   * also carries the generated taskId: `users/{uid}/versions` maps that back to
+   * an itemId, so cost is attributable either way.
+   */
+  itemId?: string | null;
 }) {
   const accessToken = auth?.token;
   const isFreePlan = !!auth?.freePlan;
@@ -1667,7 +1675,14 @@ export async function generateCode({
     let finalUsage = {
       prompt_tokens: streamResult.usage.inputTokens,
       completion_tokens: streamResult.usage.outputTokens,
-      total_tokens: streamResult.usage.inputTokens + streamResult.usage.outputTokens
+      total_tokens: streamResult.usage.inputTokens + streamResult.usage.outputTokens,
+      // Tracked separately from prompt_tokens because they price differently
+      // (1.25x write, 0.1x read) and are disjoint from it — the API reports the
+      // three counts side by side, and the prompt is their sum. Without these
+      // the recorded cost is not just imprecise but structurally wrong: a
+      // well-cached generation looks nearly free.
+      cache_creation_tokens: streamResult.usage.cacheCreationInputTokens || 0,
+      cache_read_tokens: streamResult.usage.cacheReadInputTokens || 0,
     };
 
     // Estimate compile units from initial generation.
@@ -1810,6 +1825,8 @@ export async function generateCode({
           finalUsage.prompt_tokens += fixResult.usage.inputTokens;
           finalUsage.completion_tokens += fixResult.usage.outputTokens;
           finalUsage.total_tokens += fixResult.usage.inputTokens + fixResult.usage.outputTokens;
+          finalUsage.cache_creation_tokens += fixResult.usage.cacheCreationInputTokens || 0;
+          finalUsage.cache_read_tokens += fixResult.usage.cacheReadInputTokens || 0;
 
           if (isFreePlan) {
             recordSpend(estimateUsdCost(fixResult.usage, modelToUse)).catch((err) => {
@@ -1870,9 +1887,26 @@ export async function generateCode({
         const plan = userDoc.data()?.subscription?.plan || 'demo';
         const now = new Date();
 
+        const costUsd = estimateUsdCost({
+          inputTokens: finalUsage.prompt_tokens,
+          outputTokens: finalUsage.completion_tokens,
+          cacheCreationInputTokens: finalUsage.cache_creation_tokens,
+          cacheReadInputTokens: finalUsage.cache_read_tokens,
+        }, modelToUse, now);
+
         await db.collection('usage').add({
           userId: auth.uid,
+          // Pre-existing field, kept as-is: it holds the RAG request id, not a
+          // Graffiticode task id, and existing readers depend on that. `rid` and
+          // `generatedTaskId` below are the unambiguous replacements.
           taskId: requestId,
+          rid: requestId,
+          // The two attribution keys. `itemId` is set when the item already
+          // exists (an edit); on a fresh create it is null and
+          // `generatedTaskId` is the join — `users/{uid}/versions` carries both
+          // `taskId` and `itemId`, so cost resolves to an item either way.
+          itemId: itemId ?? null,
+          generatedTaskId: verificationResult?.taskId ?? null,
           units: 0,
           createdAt: now,
           timestamp: now.toISOString(),
@@ -1883,9 +1917,16 @@ export async function generateCode({
             input: finalUsage.prompt_tokens,
             output: finalUsage.completion_tokens,
             total: finalUsage.total_tokens,
+            cacheCreation: finalUsage.cache_creation_tokens,
+            cacheRead: finalUsage.cache_read_tokens,
           },
           cost: {
-            total: 0,
+            // Priced at write time rather than left to the reader: the rate for
+            // a model can change (intro rates expire), and what this generation
+            // actually cost is a fact about the moment it ran.
+            total: costUsd,
+            usd: costUsd,
+            model: modelToUse,
           },
           plan: plan,
           fixAttempts: fixAttempts,
