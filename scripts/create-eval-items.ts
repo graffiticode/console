@@ -76,7 +76,17 @@ async function main() {
       const taskData = await postTask({ auth, task: { lang: LANG, code }, ephemeral: false });
       const taskId = taskData?.id;
       if (!taskId) throw new Error("postTask returned no id");
-      const item = await createItem({ auth, lang: LANG, name, taskId, client: "eval", help: helpFor(prompts.get(lab.id)) });
+      // Seed the mark from any score this candidate already carries, so a re-run
+      // does not silently destroy existing labels: this script PURGES the prior
+      // eval items, and a recreated item defaults to mark 1 — which
+      // pull-eval-labels would then read back as a genuine score of 1 and write
+      // over a real label. Seeding means the console shows prior labels and only
+      // genuinely unscored candidates sit at the default.
+      const item = await createItem({
+        auth, lang: LANG, name, taskId, client: "eval",
+        mark: lab.overall != null ? Math.min(5, Math.max(1, Math.round(Number(lab.overall)))) : 1,
+        help: helpFor(prompts.get(lab.id)),
+      });
       console.error(`  ✓ ${name.padEnd(34)} task=${taskId}  item=${item.id}`);
       results.push({ id: lab.id, model: lab.model, name, taskId, itemId: item.id });
     } catch (e: any) {
