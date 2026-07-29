@@ -23,7 +23,6 @@ export interface RAGConfig {
   judgeMode: 'off' | 'async';   // 'inline' gate/selector intentionally not wired this cut
   judgeModel: string;
   judgeTimeoutMs: number;
-  judgeUseSpecAnchor: boolean;  // off by default inline (extra get_spec call); on for the harness
 
   // Fallback behavior
   fallbackToKeywordSearch: boolean;
@@ -59,9 +58,8 @@ const defaultConfig: RAGConfig = {
   // Judge settings - disabled by default; async logs a quality score with zero user latency
   enableJudge: process.env.JUDGE_ENABLED === 'true',
   judgeMode: process.env.JUDGE_MODE === 'async' ? 'async' : 'off',
-  judgeModel: process.env.JUDGE_MODEL || 'claude-opus-4-8',
+  judgeModel: process.env.JUDGE_MODEL || 'claude-opus-5',
   judgeTimeoutMs: parseInt(process.env.JUDGE_TIMEOUT_MS || '15000', 10),
-  judgeUseSpecAnchor: process.env.JUDGE_USE_SPEC_ANCHOR === 'true',
 
   // Fallback behavior - always enabled for resilience
   fallbackToKeywordSearch: true,
@@ -122,7 +120,6 @@ export function getJudgeConfig() {
     judgeMode: c.judgeMode,
     judgeModel: c.judgeModel,
     judgeTimeoutMs: c.judgeTimeoutMs,
-    judgeUseSpecAnchor: c.judgeUseSpecAnchor,
   };
 }
 

@@ -52,7 +52,20 @@ cloudrun-env-vars.yaml
 
 # generated reports
 rag-analytics-report*.html
-/data
+# Local data dumps stay out — EXCEPT the eval evidence. A MODEL_PRIORITY ordering in
+# src/lib/model-priority.ts cites an eval run; if the cases and human labels behind it
+# are local-only, nobody else can reproduce or challenge that ordering.
+#
+# Written as a directory walk, not `/data` + `!` exceptions: git cannot re-include a
+# file whose parent directory is excluded, so the obvious `/data` then
+# `!/data/model-eval/*.json` silently keeps ignoring everything.
+/data/*
+!/data/model-eval/
+/data/model-eval/*
+!/data/model-eval/*.json
+!/data/model-eval/labels/
+/data/model-eval/labels/*
+!/data/model-eval/labels/*.json
 revenue-vs-cost.html
 user-report.html
 funnel-report.html

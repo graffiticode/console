@@ -39,13 +39,18 @@ Compile/render is **saturated** (~100%) — it is table stakes, not quality. So 
 satisfaction and correctness**, not to whether it runs. Correctness dominates: a clean sheet that
 computes the wrong tax is a 2–3, never a 4.
 
+> **Canonical source:** the table below is a copy for reading convenience. The anchors live in
+> `OVERALL_ANCHORS` in `src/lib/judge-service.ts`, which is what the judge scores against and what
+> `gen-label-worksheet.ts` renders. Edit them there — `--calibrate` compares judge to human, so a
+> drifted copy would show up as judge error rather than as the scale mismatch it actually is.
+
 | overall | meaning |
 |---|---|
 | **1** | Broken or off-task — doesn't render, or renders something unrelated to the intent. |
-| **2** | Renders but **wrong** — misses the core ask or gets the central logic wrong (e.g. flat rate where marginal tiers were asked). "It runs, but it's not the thing requested." |
-| **3** | On-intent but **materially flawed** — one requirement missing or one incorrect formula a user would notice (e.g. tax applied to the pre-discount subtotal). |
-| **4** | Correct and complete, **minor** issues — right logic and all requirements, but polish problems (numbers stored as text, missing `$` formatting, awkward structure). |
-| **5** | Correct, complete, idiomatic — does exactly what was asked; nothing you'd change. |
+| **2** | Renders but **wrong** — misses the core ask, or the central logic is wrong. |
+| **3** | On-intent but **materially flawed** — a requirement missing, or a formula a user would notice is wrong. |
+| **4** | Correct and complete; only **minor** polish issues (formatting, numbers-as-text, awkward structure). |
+| **5** | Correct, complete, idiomatic — nothing to change. |
 
 Two rules of thumb:
 - **1 = broken, 2 = runs-but-wrong, 3–5 = on-intent quality gradient.**

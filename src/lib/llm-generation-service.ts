@@ -26,6 +26,13 @@ export interface StreamOptions {
   maxContinuations?: number;
   thinking?: unknown;
   effort?: string;
+  /**
+   * Per-call timeout. Generation wants the long default (a program can take
+   * 60-110s); an observer like the judge wants a much shorter leash, since a
+   * hung judge would stall the run it is only scoring. Falls back to
+   * CODEGEN_PROVIDER_TIMEOUT_MS.
+   */
+  timeoutMs?: number;
 }
 
 export interface SystemBlock {
@@ -370,7 +377,7 @@ async function requestAnthropic({
           "anthropic-version": "2023-06-01",
         },
         responseType: "stream",
-        timeout: providerTimeoutMs(),
+        timeout: options.timeoutMs || providerTimeoutMs(),
       },
     );
 
@@ -508,7 +515,13 @@ async function requestOpenAI({
         ? { reasoning: { effort: options.effort } }
         : {}),
     };
-    const stream = await client.responses.create(request);
+    // Per-request timeout override: the client is cached and carries the long
+    // generation default, so a short-leash caller (the judge) passes its own here
+    // rather than getting the 180s one.
+    const stream = await client.responses.create(
+      request,
+      options.timeoutMs ? { timeout: options.timeoutMs } : undefined,
+    );
 
     for await (const event of stream as any) {
       if (event.type === "response.output_text.delta") {
@@ -647,6 +660,44 @@ async function requestProvider(
   return provider === "openai"
     ? requestOpenAI(args)
     : requestAnthropic(args);
+}
+
+/**
+ * One provider call, raw text back — no continuation loop, no code-block
+ * extraction, no program assembly.
+ *
+ * This is the seam for provider-neutral callers that are NOT generating a
+ * program: the LLM judge, and anything else that wants a single scored/parsed
+ * response. Generation should keep using generateCodeWithContinuation, which
+ * adds the continuation and assembly this deliberately omits.
+ *
+ * Returns `{ content, usage, failure }` rather than throwing, matching the
+ * adapters — a judge that throws would take down the request it was observing.
+ */
+export async function completeOnce({
+  provider,
+  model,
+  systemPrompt,
+  messages,
+  options = {},
+}: {
+  provider: LlmProvider;
+  model: string;
+  systemPrompt?: SystemPrompt;
+  messages: Array<{ role: string; content: string }>;
+  options?: StreamOptions;
+}): Promise<{ content: string; usage: TokenUsage; failure?: ProviderFailure }> {
+  const result = await requestProvider(provider, {
+    model,
+    systemPrompt,
+    messages,
+    options,
+  });
+  return {
+    content: result.content,
+    usage: result.usage,
+    failure: result.failure,
+  };
 }
 
 async function generateLongCode({

@@ -25,7 +25,13 @@
     "gcp:clear-cache": "./scripts/gcp-clear-cache.sh",
     "gcp:logs": "gcloud logging read 'resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"console\"' --project graffiticode-app --limit 100 --format='table(timestamp,severity,httpRequest.status,httpRequest.requestMethod,httpRequest.requestUrl,httpRequest.latency,textPayload)'",
     "gcp:logs:tail": "gcloud beta run services logs tail console --project graffiticode-app --region us-central1",
-    "upgrade-basis-and-deploy": "npx tsx scripts/upgrade-basis-and-deploy.ts"
+    "upgrade-basis-and-deploy": "npx tsx scripts/upgrade-basis-and-deploy.ts",
+    "eval:holdout": "npx tsx scripts/model-eval.ts --holdout-only",
+    "eval:calibrate": "npx tsx scripts/model-eval.ts --calibrate",
+    "eval:label-items": "npx tsx scripts/create-eval-items.ts",
+    "eval:label-pull": "npx tsx scripts/pull-eval-labels.ts",
+    "eval:label-sheet": "npx tsx scripts/gen-label-worksheet.ts",
+    "eval:judge-smoke": "npx tsx scripts/judge-smoke.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",

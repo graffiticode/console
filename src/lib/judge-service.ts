@@ -9,20 +9,27 @@
  * are then directly comparable. Reference-free: the eval sets and live requests have no gold answer,
  * so the judge scores the candidate against the prompt (intent) alone, on three rubric dimensions.
  *
- * Built on the same raw-axios POST /v1/messages pattern as spec/router calls (there is no
- * @anthropic-ai/sdk in this repo). Deliberately does NOT import from code-generation-service to
- * avoid a code-gen ↔ judge import cycle (code-gen imports judgeCode); the temperature guard and
- * default model are inlined instead.
+ * Provider-neutral: calls run through llm-generation-service's completeOnce, so the judge can be
+ * an Anthropic OR an OpenAI model. That matters for cross-family comparison — a Claude judge scoring
+ * Claude-vs-GPT output is grading its own family's work, so judgePanel (below) runs one judge per
+ * family and the harness measures the disagreement rather than assuming it away.
+ *
+ * Imports llm-generation-service, not code-generation-service: the latter imports judgeCode, and
+ * going through it would close a cycle. The tier/model tables live in llm-models, which is
+ * cycle-free.
  */
-import axios from "axios";
+import {
+  completeOnce,
+  type SystemPrompt,
+} from "./llm-generation-service";
+import {
+  inferProviderFromModel,
+  modelForProvider,
+  type LlmProvider,
+} from "./llm-models";
 import { getJudgeConfig } from "./rag-config";
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const JUDGE_MAX_TOKENS = 2048; // room for a reason-before-score <analysis> block + the JSON verdict
-
-// Mirror of code-generation-service.modelRejectsTemperature — Opus 4.x / Sonnet 5 / Fable / Mythos
-// 400 on `temperature`. Kept local to avoid importing code-generation-service (cycle).
-const rejectsTemperature = (model: string) => /(opus|sonnet-5|fable|mythos)/i.test(model || "");
 
 export interface JudgeVerdict {
   correctness: number;          // 1–5: does the code correctly accomplish what the prompt asks
@@ -43,6 +50,40 @@ export interface PairVerdict {
   };
   agreed: boolean; // true when the two A/B orderings agree on the overall winner
   model: string;
+}
+
+/**
+ * The 1-5 `overall` scale, in one place.
+ *
+ * These anchors were maintained in three hand-kept copies — this prompt,
+ * data/model-eval/labels/README.md, and scripts/gen-label-worksheet.ts. Since
+ * --calibrate measures judge-vs-human agreement, any drift between the copies
+ * corrupts the trust gate itself: the judge and the human would be scoring
+ * against different scales and the disagreement would look like judge error.
+ * The worksheet now renders from this constant; the README points here as
+ * canonical.
+ */
+export const OVERALL_ANCHORS: Array<{ score: number; meaning: string }> = [
+  { score: 1, meaning: "Broken or off-task — doesn't render, or renders something unrelated to the intent." },
+  { score: 2, meaning: "Renders but **wrong** — misses the core ask, or the central logic is wrong." },
+  { score: 3, meaning: "On-intent but **materially flawed** — a requirement missing, or a formula a user would notice is wrong." },
+  { score: 4, meaning: "Correct and complete; only **minor** polish issues (formatting, numbers-as-text, awkward structure)." },
+  { score: 5, meaning: "Correct, complete, idiomatic — nothing to change." },
+];
+
+/** Why the scale is anchored low — shared by the judge prompt and the human worksheet. */
+export const ANCHOR_DISCIPLINE =
+  "Compiling/rendering is saturated and is table stakes, NOT quality: \"it renders\" is a 2, not a " +
+  "free 3. Correctness dominates presentation — a clean program that computes the wrong value is at " +
+  "most a 3. Do not default to high scores.";
+
+/** Markdown table of the anchors, for the human labeling worksheet. */
+export function anchorTableMarkdown(): string {
+  return [
+    "| overall | meaning |",
+    "|---|---|",
+    ...OVERALL_ANCHORS.map((a) => `| **${a.score}** | ${a.meaning} |`),
+  ].join("\n");
 }
 
 const RUBRIC = `You are a strict, discriminating judge of Graffiticode DSL code — a family of domain-specific
@@ -123,26 +164,52 @@ function parseJson(text: string): any | null {
   return objs[objs.length - 1];
 }
 
-async function callJudge(system: string, user: string, model: string, apiKey: string, timeoutMs: number): Promise<string> {
-  const resp = await axios.post(
-    ANTHROPIC_URL,
-    {
-      model,
-      system,
-      messages: [{ role: "user", content: user }],
-      max_tokens: JUDGE_MAX_TOKENS,
-      ...(rejectsTemperature(model) ? {} : { temperature: 0 }),
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      timeout: timeoutMs,
-    },
-  );
-  return resp.data?.content?.[0]?.text ?? "";
+/**
+ * One judge call. The provider is derived from the model id, so a judge model is
+ * the only thing a caller picks — there is no separate provider argument to get
+ * out of sync with it.
+ *
+ * Temperature is left to the adapter's own model rules (completeOnce → the
+ * provider adapter drops it where the model rejects it), which is why the local
+ * copy of the temperature guard is gone.
+ */
+async function callJudge(
+  system: SystemPrompt,
+  user: string,
+  model: string,
+  timeoutMs: number,
+): Promise<string> {
+  const provider = inferProviderFromModel(model);
+  if (!provider) throw new Error(`Unrecognized judge model "${model}"`);
+  const { content, failure } = await completeOnce({
+    provider,
+    model,
+    systemPrompt: system,
+    messages: [{ role: "user", content: user }],
+    options: { maxTokens: JUDGE_MAX_TOKENS, temperature: 0, timeoutMs },
+  });
+  if (failure) throw new Error(failure.message);
+  return content;
+}
+
+/**
+ * Validate a judge model and confirm its provider has a credential.
+ *
+ * Returns null rather than throwing, because both callers already contract to
+ * return null on any failure — a judge is an observer, and a missing OPENAI_API_KEY
+ * should silently drop that judge from a panel, not fail the run being scored.
+ */
+function resolveJudgeModel(model: string | undefined): string | null {
+  if (!model) return null;
+  const provider = inferProviderFromModel(model);
+  if (!provider) return null;
+  const key = provider === "openai" ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY;
+  return key ? model : null;
+}
+
+/** The quality-tier model for a family — the default judge for that family. */
+export function judgeModelForFamily(family: LlmProvider): string {
+  return modelForProvider(family, "quality");
 }
 
 function intentBlock(prompt: string, lang: string, spec?: string | null, currentCode?: string | null): string {
@@ -158,8 +225,8 @@ interface JudgeCodeArgs {
   lang: string;
   spec?: string | null;
   currentCode?: string | null;
+  /** Judge model id; its provider is inferred. Defaults to JUDGE_MODEL. */
   model?: string;
-  apiKey?: string;
 }
 
 /**
@@ -168,19 +235,13 @@ interface JudgeCodeArgs {
  */
 export async function judgeCode(args: JudgeCodeArgs): Promise<JudgeVerdict | null> {
   const cfg = getJudgeConfig();
-  const model = args.model || cfg.judgeModel;
-  const apiKey = args.apiKey || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
+  const model = resolveJudgeModel(args.model || cfg.judgeModel);
+  if (!model) return null;
 
   const system = `${RUBRIC}
 
-Then an overall 1–5, anchored (correctness dominates — a clean program that computes the wrong value
-is at most a 3):
-  5 = correct, complete, idiomatic — nothing to change.
-  4 = correct and complete; only minor polish issues (formatting, numbers-as-text, awkward structure).
-  3 = on-intent but materially flawed — a requirement missing, or a formula a user would notice is wrong.
-  2 = renders but wrong — misses the core ask, or the central logic is wrong.
-  1 = broken or off-task.
+Then an overall 1–5. ${ANCHOR_DISCIPLINE}
+${[...OVERALL_ANCHORS].reverse().map((a) => `  ${a.score} = ${a.meaning.replace(/\*\*/g, "")}`).join("\n")}
 
 First work through the Method in an <analysis>…</analysis> block: list the intent's requirements, then
 check EACH against the candidate — name the formula/value and say whether it is right. Reason to the
@@ -198,7 +259,7 @@ ${args.code}`;
   const t0 = performance.now();
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const text = await callJudge(system, user, model, apiKey, cfg.judgeTimeoutMs);
+      const text = await callJudge(system, user, model, cfg.judgeTimeoutMs);
       const o = parseJson(text);
       if (!o) continue;
       const correctness = score5(pick(o, "correctness"));
@@ -234,7 +295,7 @@ function flip(s: Side): Side {
   return s === "A" ? "B" : s === "B" ? "A" : "tie";
 }
 
-async function judgeOnce(prompt: string, lang: string, first: string, second: string, spec: string | null | undefined, model: string, apiKey: string, timeoutMs: number): Promise<{ winner: Side; dims: Record<string, Side> } | null> {
+async function judgeOnce(prompt: string, lang: string, first: string, second: string, spec: string | null | undefined, model: string, timeoutMs: number): Promise<{ winner: Side; dims: Record<string, Side> } | null> {
   const system = `${RUBRIC}
 
 Two candidates, A and B. Decide which better realizes the intent overall and per dimension. Ties allowed.
@@ -248,7 +309,7 @@ ${first}
 CANDIDATE B:
 ${second}`;
   try {
-    const text = await callJudge(system, user, model, apiKey, timeoutMs);
+    const text = await callJudge(system, user, model, timeoutMs);
     const o = parseJson(text);
     if (!o) return null;
     return {
@@ -270,8 +331,8 @@ interface JudgePairArgs {
   codeB: string;
   lang: string;
   spec?: string | null;
+  /** Judge model id; its provider is inferred. Defaults to JUDGE_MODEL. */
   model?: string;
-  apiKey?: string;
 }
 
 /**
@@ -281,13 +342,12 @@ interface JudgePairArgs {
  */
 export async function judgePair(args: JudgePairArgs): Promise<PairVerdict | null> {
   const cfg = getJudgeConfig();
-  const model = args.model || cfg.judgeModel;
-  const apiKey = args.apiKey || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
+  const model = resolveJudgeModel(args.model || cfg.judgeModel);
+  if (!model) return null;
 
   // Ordering 1: A=codeA, B=codeB. Ordering 2: A=codeB, B=codeA (flip the verdict back).
-  const r1 = await judgeOnce(args.prompt, args.lang, args.codeA, args.codeB, args.spec, model, apiKey, cfg.judgeTimeoutMs);
-  const r2 = await judgeOnce(args.prompt, args.lang, args.codeB, args.codeA, args.spec, model, apiKey, cfg.judgeTimeoutMs);
+  const r1 = await judgeOnce(args.prompt, args.lang, args.codeA, args.codeB, args.spec, model, cfg.judgeTimeoutMs);
+  const r2 = await judgeOnce(args.prompt, args.lang, args.codeB, args.codeA, args.spec, model, cfg.judgeTimeoutMs);
   if (!r1 || !r2) return null;
 
   const combine = (a: Side, bRaw: Side): Side => {
@@ -307,4 +367,84 @@ export async function judgePair(args: JudgePairArgs): Promise<PairVerdict | null
     agreed: flip(r2.winner) === r1.winner,
     model,
   };
+}
+
+// ── Cross-provider panel (OFFLINE / HARNESS ONLY) ────────────────────────────
+//
+// Do NOT call this from the inline production path. `judgeCode` is what
+// generateCode uses, one call per request; a panel multiplies that per-request
+// cost by the number of judges for a signal production does not act on. The
+// panel exists to answer a question only the harness asks: when we rank model
+// FAMILIES against each other, how much of the ranking is the judge preferring
+// its own family?
+//
+// A single-family judge cannot answer that about itself. Running one judge per
+// family and reporting the disagreement makes the bias measurable instead of
+// assumed — and where the judges disagree, the honest move is a human label, not
+// a tiebreak. Position bias is already handled separately by judgePair, which
+// runs both A/B orderings; this is the provider-bias analogue, not a replacement.
+
+export interface PanelEntry {
+  /** Family of the JUDGE (not of the candidate). */
+  judge: LlmProvider;
+  model: string;
+  verdict: JudgeVerdict | null;
+}
+
+export interface PanelVerdict {
+  entries: PanelEntry[];
+  /** Judges that returned a usable verdict. */
+  scored: PanelEntry[];
+  /** Mean `overall` across scored judges, or null when none scored. */
+  meanOverall: number | null;
+  /** Largest pairwise gap in `overall` between judges — 0 with fewer than two. */
+  spread: number;
+  /**
+   * True when every scored judge lands within one point on `overall`. Below that,
+   * the panel is not a usable ranking signal for this candidate and the case
+   * should go to a human label.
+   */
+  agreed: boolean;
+}
+
+/**
+ * Score one candidate with one judge per family.
+ *
+ * `judges` defaults to both families' quality-tier models. A family with no
+ * credential is dropped (resolveJudgeModel returns null), so this degrades to a
+ * single-judge run rather than failing — but `scored.length` then tells the
+ * caller it cannot measure self-preference, and it should say so rather than
+ * report a bias of zero.
+ */
+export async function judgePanel(args: {
+  prompt: string;
+  code: string;
+  lang: string;
+  spec?: string | null;
+  currentCode?: string | null;
+  judges?: LlmProvider[];
+}): Promise<PanelVerdict> {
+  const families = args.judges?.length ? args.judges : (["anthropic", "openai"] as LlmProvider[]);
+  const entries: PanelEntry[] = [];
+
+  for (const family of families) {
+    const model = judgeModelForFamily(family);
+    const verdict = await judgeCode({
+      prompt: args.prompt,
+      code: args.code,
+      lang: args.lang,
+      spec: args.spec,
+      currentCode: args.currentCode,
+      model,
+    });
+    entries.push({ judge: family, model, verdict });
+  }
+
+  const scored = entries.filter((e) => e.verdict);
+  const overalls = scored.map((e) => e.verdict!.overall);
+  const meanOverall = overalls.length
+    ? overalls.reduce((s, x) => s + x, 0) / overalls.length
+    : null;
+  const spread = overalls.length > 1 ? Math.max(...overalls) - Math.min(...overalls) : 0;
+  return { entries, scored, meanOverall, spread, agreed: spread <= 1 };
 }

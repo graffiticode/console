@@ -11,6 +11,7 @@
  * Usage: npx tsx scripts/gen-label-worksheet.ts [--lang 0166]
  */
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { ANCHOR_DISCIPLINE, anchorTableMarkdown } from "../src/lib/judge-service";
 
 const LANG = (() => {
   const i = process.argv.indexOf("--lang");
@@ -20,20 +21,17 @@ const LANG = (() => {
 const ANCHORS = `# L${LANG} labeling worksheet
 
 Score each candidate **overall 1–5** (in \`data/model-eval/labels/${LANG}.json\`, or by setting the
-item mark in the console eval tab → \`pull-eval-labels\`). Be discriminating: compile/render is
-saturated, so "it renders" is a **2, not a free 3**. Anchor to intent + correctness.
+item mark in the console eval tab → \`pull-eval-labels\`).
 
-| overall | meaning |
-|---|---|
-| **1** | Broken or off-task — doesn't render, or renders something unrelated to the intent. |
-| **2** | Renders but **wrong** — misses the core ask or gets the central logic wrong. |
-| **3** | On-intent but **materially flawed** — a requirement missing or an incorrect formula a user would notice. |
-| **4** | Correct and complete, **minor** issues — polish only (values-as-text, missing formatting, awkward structure). |
-| **5** | Correct, complete, idiomatic — does exactly what was asked; nothing you'd change. |
+${ANCHOR_DISCIPLINE}
 
-Rules of thumb: **1 broken · 2 runs-but-wrong · 3–5 on-intent quality gradient.** Correctness
-dominates — a clean sheet that computes the wrong value is a 2–3, never a 4. Label stricter than the
-judge and spread the range.
+${anchorTableMarkdown()}
+
+Rules of thumb: **1 broken · 2 runs-but-wrong · 3–5 on-intent quality gradient.** Label stricter than
+the judge and spread the range.
+
+<!-- Anchors render from OVERALL_ANCHORS in src/lib/judge-service.ts — the judge scores against the
+     same constant, so the human and the judge cannot drift onto different scales. Edit them there. -->
 `;
 
 function main() {
