@@ -1,16 +1,15 @@
 /**
- * Code generation service for Claude API integration
+ * Provider-neutral code generation service
  *
  * This service implements:
  * 1. Language detection from prompts
- * 2. API calls to Claude for code generation
+ * 2. Provider routing and model-tier selection
  * 3. Token usage tracking
  * 4. Code verification via Graffiticode API
- * 5. Error correction via Claude
+ * 5. LLM-assisted compile-error correction
  * 6. Retrieval of relevant examples to enhance generation accuracy
  */
 
-import axios from "axios";
 import * as fs from "fs";
 import * as path from "path";
 import { postApiCompile, getLanguageAsset, getLanguageLexicon, isLangOverridden, languageOfflineMessage, isLanguageOfflineError } from "./api";
@@ -23,7 +22,19 @@ import {
   vectorSearch,
   hybridSearch,
 } from "./embedding-service";
-import { generateCodeWithContinuation, SystemBlock } from "./claude-stream-service";
+import {
+  generateCodeWithContinuation,
+  SystemBlock,
+} from "./llm-generation-service";
+import {
+  CLAUDE_MODELS,
+  GenerationTier,
+  LanguageGenerationPolicy,
+  modelForProvider,
+  modelRejectsTemperature,
+  parseLanguageGenerationPolicy,
+  resolveGenerationRoute,
+} from "./llm-models";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
 import { findBestLanguages } from "./language-router";
 import { stripQueryPassage, queryFacets } from "./lang-embedding";
@@ -69,38 +80,19 @@ const MAX_FREE_PLAN_PROMPT = 10000;
 // Global cache for language assets with TTL
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const languageAssetsCache = {
-  instructions: new Map<string, { value: string; optInOpus: boolean; expires: number }>(),
+  instructions: new Map<
+    string,
+    {
+      value: string;
+      generationPolicy: LanguageGenerationPolicy;
+      expires: number;
+    }
+  >(),
   templates: new Map<string, string>(),
 };
 
-// Define available Claude models with best practices
-export const CLAUDE_MODELS = {
-  OPUS: "claude-opus-4-8",
-  SONNET: "claude-sonnet-5",
-  HAIKU: "claude-haiku-4-5-20251001",
-  DEFAULT: "claude-sonnet-5",
-};
-
-// Opus 4.x models deprecated the `temperature` parameter: sending it makes the
-// Anthropic API reject the request with a 400 ("`temperature` is deprecated for
-// this model.") before any tokens are generated. Callers must omit temperature
-// for these models. Regex on "opus" so future Opus ids are covered automatically.
-export function modelRejectsTemperature(model?: string): boolean {
-  // Opus 4.x, Sonnet 5, and Fable/Mythos 5 remove sampling params: sending
-  // `temperature`/`top_p`/`top_k` returns a 400 ("`temperature` is deprecated
-  // for this model."). Sonnet 4.x and Haiku still accept them. Match `sonnet-5`
-  // (not bare `sonnet`) so Sonnet 4.5/4.6 are unaffected.
-  return !!model && /(opus|sonnet-5|fable|mythos)/i.test(model);
-}
-
-// A language opts into Opus for its INITIAL code generation by placing this
-// directive anywhere in its instructions.md (served by its l0NNN service):
-//   <!-- gc:model=opus -->
-// It's parsed + stripped during the instructions fetch (so it never reaches the
-// LLM) and only affects the first generation call; fixes stay on the default.
-const OPUS_OPT_IN_RE = /<!--\s*gc:model\s*[:=]\s*opus\s*-->/i;
-// Broader matcher used only to strip any gc:model directive from the prompt text.
-const MODEL_DIRECTIVE_STRIP_RE = /<!--\s*gc:model\s*[:=]\s*\w+\s*-->/gi;
+// Preserve the existing imports used by the router and spec generator.
+export { CLAUDE_MODELS, modelRejectsTemperature };
 
 // Default max output tokens per generation chunk. Large enough that most
 // programs (incl. multi-page L0175 assessments) complete in a single chunk
@@ -393,7 +385,13 @@ export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null 
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
  * @returns {Promise<string>} - The dialect-specific instructions, or empty string if none found
  */
-async function readDialectAssets(lang, accessToken?: string): Promise<{ value: string; optInOpus: boolean }> {
+async function readDialectAssets(
+  lang,
+  accessToken?: string,
+): Promise<{
+  value: string;
+  generationPolicy: LanguageGenerationPolicy;
+}> {
   const cacheKey = `L${lang}`;
   // When this language is overridden for the caller the fetch is redirected to a
   // test revision, so bypass the shared (lang-keyed) instructions cache on read
@@ -406,19 +404,27 @@ async function readDialectAssets(lang, accessToken?: string): Promise<{ value: s
 
   try {
     const instructions = await getLanguageAsset(`L${lang}`, 'instructions.md', accessToken);
-    // Parse the Opus opt-in from the raw instructions, then strip any gc:model
-    // directive so it never reaches the LLM.
-    const optInOpus = instructions ? OPUS_OPT_IN_RE.test(instructions) : false;
-    const cleaned = instructions ? instructions.replace(MODEL_DIRECTIVE_STRIP_RE, "") : "";
+    // Routing directives are private configuration and must never enter the
+    // prompt. The legacy gc:model=opus directive maps to the quality tier.
+    const { cleaned, policy: generationPolicy } =
+      parseLanguageGenerationPolicy(instructions || "");
     const value = cleaned ? `\n${cleaned}\n` : "";
-    const entry = { value, optInOpus, expires: Date.now() + CACHE_TTL_MS };
+    const entry = {
+      value,
+      generationPolicy,
+      expires: Date.now() + CACHE_TTL_MS,
+    };
     if (!overridden) {
       languageAssetsCache.instructions.set(cacheKey, entry);
     }
     return entry;
   } catch (error) {
     console.error(`Error fetching dialect instructions from language server for L${lang}:`, error);
-    const entry = { value: "", optInOpus: false, expires: Date.now() + CACHE_TTL_MS };
+    const entry = {
+      value: "",
+      generationPolicy: {},
+      expires: Date.now() + CACHE_TTL_MS,
+    };
     if (!overridden) {
       languageAssetsCache.instructions.set(cacheKey, entry);
     }
@@ -430,11 +436,13 @@ export async function readDialectInstructions(lang, accessToken?: string): Promi
   return (await readDialectAssets(lang, accessToken)).value;
 }
 
-// Whether this dialect opted into Opus for initial code generation (via the
-// <!-- gc:model=opus --> directive in its instructions.md). Shares the cached
-// instructions fetch, so this adds no extra network call.
-async function dialectOptsIntoOpus(lang, accessToken?: string): Promise<boolean> {
-  return (await readDialectAssets(lang, accessToken)).optInOpus;
+// Provider/tier preference declared by a dialect's instructions. Shares the
+// cached instructions fetch, so this adds no extra language-service request.
+async function readDialectGenerationPolicy(
+  lang,
+  accessToken?: string,
+): Promise<LanguageGenerationPolicy> {
+  return (await readDialectAssets(lang, accessToken)).generationPolicy;
 }
 
 // Static tail of the dialect system prompt — language-independent. Concatenated
@@ -516,8 +524,9 @@ CRITICAL REMINDER: Put generated code between \`\`\` (triple backticks) to disti
 /**
  * Returns the appropriate system prompt blocks for a given dialect.
  *
- * Returns an array of Anthropic content blocks rather than a single string so
- * the dialect-specific prefix can carry a `cache_control: ephemeral` marker.
+ * Returns structured system blocks so Anthropic can retain a
+ * `cache_control: ephemeral` breakpoint. OpenAI receives the same block text
+ * flattened into Responses API instructions.
  * Within a language the entire prefix is stable across requests, so one
  * breakpoint at the end of the per-dialect block caches the whole thing.
  *
@@ -555,12 +564,12 @@ When in doubt, attempt to generate code. Only use OUT_OF_SCOPE when you are conf
 }
 
 /**
- * Create a prompt for Claude that will generate high-quality code
+ * Create a prompt for an LLM that will generate high-quality code
  * @param {string} userPrompt - The user's original prompt
  * @param {Array} examples - Relevant examples to include
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
  * @param {string} currentCode - The current code (if available) to use as a starting point
- * @returns {string} - A well-formatted prompt for Claude
+ * @returns {string} - A well-formatted generation prompt
  */
 async function createCodeGenerationPrompt(
   userPrompt,
@@ -689,119 +698,6 @@ Emit the Graffiticode between triple backticks, must end with "..". Then on new 
   };
 
   return JSON.stringify(promptData, null, 2);
-}
-
-/**
- * Make an API call to Claude
- * @param {string} prompt - The formatted prompt for Claude
- * @param {Object} options - Options for the API call
- * @returns {Promise<Object>} - The response from Claude
- */
-async function callClaudeAPI(prompt, options, rid = null) {
-  // Get the API key from environment variables
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  if (!apiKey) {
-    console.warn(
-      "ANTHROPIC_API_KEY not found in environment. Falling back to mock response.",
-    );
-    // Return fallback mock response if API key is not available
-    return getFallbackResponse(prompt, options);
-  }
-
-  const startTime = Date.now();
-
-  if (rid) {
-    ragLog(rid, "llm.call.start", {
-      model: options.model,
-      temperature: options.temperature,
-      maxTokens: options.max_tokens,
-    });
-  }
-
-  try {
-    // Anthropic API endpoint
-    const apiUrl = "https://api.anthropic.com/v1/messages";
-
-    // Prepare the request payload
-    const payload = {
-      model: options.model,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      max_tokens: options.max_tokens,
-      // Opus deprecated `temperature` — omit it there or the API 400s.
-      ...(modelRejectsTemperature(options.model) ? {} : { temperature: options.temperature }),
-    };
-
-    // Make the API call
-    const response = await axios.post(apiUrl, payload, {
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-    });
-
-    const latency = Date.now() - startTime;
-
-    // Extract the relevant data from the response
-    const result = {
-      id: response.data.id,
-      model: response.data.model,
-      content: response.data.content[0].text,
-      usage: {
-        prompt_tokens: response.data.usage.input_tokens,
-        completion_tokens: response.data.usage.output_tokens,
-        total_tokens:
-          response.data.usage.input_tokens + response.data.usage.output_tokens,
-      },
-    };
-
-    if (rid) {
-      ragLog(rid, "llm.call.complete", {
-        model: options.model,
-        latency,
-        usage: result.usage,
-      });
-    }
-
-    return result;
-  } catch (error) {
-    console.error(
-      "Error calling Claude API:",
-      error.response?.data || error.message,
-    );
-
-    if (rid) {
-      ragLog(rid, "llm.call.error", {
-        error: error.message,
-        latency: Date.now() - startTime,
-      });
-    }
-
-    // If the API call fails, return a fallback response
-    return getFallbackResponse(prompt, options);
-  }
-}
-
-function getFallbackResponse(prompt, options) {
-  console.warn("Using fallback response for Claude API");
-  const sampleCode = `let message = "Fallback response - Claude API unavailable"..`;
-  return {
-    id: "fallback-" + Math.random().toString(36).substring(2, 12),
-    model: options.model || CLAUDE_MODELS.DEFAULT,
-    content: sampleCode,
-    usage: {
-      prompt_tokens: Math.ceil(prompt.length / 4),
-      completion_tokens: Math.ceil(sampleCode.length / 4),
-      total_tokens:
-        Math.ceil(prompt.length / 4) + Math.ceil(sampleCode.length / 4),
-    },
-  };
 }
 
 /**
@@ -1030,10 +926,10 @@ function buildErrorFeedback(errorInfo) {
 }
 
 /**
- * Create a prompt for Claude to fix code based on compilation errors
+ * Create a prompt for an LLM to fix code based on compilation errors
  * @param {string} code - The original code that had errors
  * @param {Object} errorInfo - Information about the errors from compilation
- * @returns {string} - A prompt for Claude to fix the code
+ * @returns {string} - A prompt for fixing the code
  */
 function createErrorFixPrompt(code, errorInfo) {
   // Parse and format the error information
@@ -1088,7 +984,7 @@ When fixing code:
 
 /**
  * Processes generated source to fix common issues and extract only the src portion
- * @param {string} content - The content returned from Claude API
+ * @param {string} content - The content returned by the generation provider
  * @param {string} lang - The language/dialect ID (e.g., "0002", "0159")
  * @returns {Promise<string>} - The processed and reformatted src with fixes applied
  */
@@ -1182,6 +1078,11 @@ async function processGeneratedCode(content, lang = "0000", rid = null, accessTo
  * @returns {Promise<Object>} - The final code response
  */
 interface GenerateCodeOptions {
+  // INTERNAL ONLY — no GraphQL field maps to `tier` or `model`. The eval harness
+  // (scripts/model-eval.ts) calls generateCode() in-process and uses them to pin a
+  // single model so it measures one variable; a client cannot reach them, which is
+  // what keeps model choice a server decision.
+  tier?: GenerationTier;
   model?: string;
   temperature?: number;
   maxTokens?: number;
@@ -1270,28 +1171,29 @@ export async function generateCode({
 
   // Floor max output tokens at the server default. A client must not be able to
   // request a cap so small it forces large programs to chunk — continuation can
-  // corrupt or restart a long program (see claude-stream-service). Clients may
+  // corrupt or restart a long program (see llm-generation-service). Clients may
   // still request MORE than the default; they just can't go below it.
   options = {
     ...options,
     maxTokens: Math.max(options.maxTokens ?? 0, DEFAULT_MAX_TOKENS),
   };
 
-  // Initial model selection (may be overridden later based on formatted prompt)
-  let modelToUse = options.model || CLAUDE_MODELS.DEFAULT;
-
-  // Per-language Opus opt-in: a language can request Opus for its INITIAL
-  // generation via <!-- gc:model=opus --> in its instructions.md. Honored only
-  // when the caller didn't pin a model. When opted in, the initial gen is Opus
-  // unconditionally (it wins over the Haiku small-edit downgrade below); the
-  // fix/repair pass still runs on the default (current scheme thereafter).
-  let opusOptIn = false;
-  if (!options.model) {
-    opusOptIn = await dialectOptsIntoOpus(lang, accessToken);
-    if (opusOptIn) {
-      modelToUse = CLAUDE_MODELS.OPUS;
-    }
-  }
+  // Which FAMILY serves this request comes from the language's static priority
+  // list (src/lib/model-priority.ts) — never from the caller. The dialect still
+  // chooses its TIER, i.e. how much model to spend within that family.
+  const dialectPolicy = !options.model
+    ? await readDialectGenerationPolicy(lang, accessToken)
+    : {};
+  let tierToUse: GenerationTier =
+    options.tier || dialectPolicy.tier || "balanced";
+  let plannedRoute = resolveGenerationRoute({
+    lang,
+    tier: tierToUse,
+    model: options.model,
+  });
+  let modelToUse =
+    options.model ||
+    modelForProvider(plannedRoute.providers[0], plannedRoute.tier);
 
   // Start analytics tracking with the user's latest message (not full conversation context)
   const userQuery = extractSearchQuery(prompt);
@@ -1299,12 +1201,14 @@ export async function generateCode({
     lang,
     hasCurrentCode: !!currentCode,
     model: modelToUse,
+    provider: plannedRoute.providers[0],
+    tier: plannedRoute.tier,
   });
 
-  // Model selection best practices:
-  // - Default (Sonnet): Best for code generation, most tasks - faster and more cost-effective
-  // - Override with OPUS only for: Very complex logic, multi-step reasoning
-  // - Override with HAIKU for: Simple templates, basic transformations
+  // Tier selection best practices:
+  // - balanced: default for most generation
+  // - quality: complex, multi-step dialects
+  // - fast: small, mechanical property updates
 
   try {
     const config = getRAGConfig();
@@ -1412,7 +1316,7 @@ export async function generateCode({
         const promptSpec = await compilePromptSpec(contextPack, requestId);
 
         if (promptSpec) {
-          // Render PromptSpec to Claude message format
+          // Render PromptSpec to the provider-neutral message format.
           const renderContext: RenderContext = {
             userRequest: prompt,
             currentCode,
@@ -1425,7 +1329,7 @@ export async function generateCode({
 
           // Convert to legacy format for compatibility with generateCodeWithContinuation.
           // Wrap the system prompt as a single content-block with cache_control:ephemeral
-          // so the entire DSPy-rendered prefix is cached on the Anthropic side.
+          // so Anthropic can cache the prefix; OpenAI receives the same text.
           const dspySystemBlocks: SystemBlock[] = [
             {
               type: "text",
@@ -1461,7 +1365,7 @@ export async function generateCode({
 
     // Fall back to legacy prompt construction if DSPy didn't produce a result
     if (!usedDSPy) {
-      // Create a well-formatted prompt for Claude to generate Graffiticode with dialect-specific instructions
+      // Create a well-formatted Graffiticode prompt with dialect instructions.
       formattedPrompt = await createCodeGenerationPrompt(
         prompt,
         relevantExamples,
@@ -1475,7 +1379,11 @@ export async function generateCode({
     }
 
     // Check formatted prompt for property update pattern and adjust model if needed
-    if (!options.model && !opusOptIn) {
+    if (
+      !options.model &&
+      !options.tier &&
+      dialectPolicy.tier !== "quality"
+    ) {
       try {
         // Parse the JSON formatted prompt to check the actual user content
         const promptData = JSON.parse(formattedPrompt);
@@ -1538,8 +1446,19 @@ export async function generateCode({
             const currentCodeSize = currentCode ? currentCode.length : 0;
 
             if (currentCodeSize < 4000) {
-              // Use Haiku for property update prompts with code under 4KB
-              modelToUse = CLAUDE_MODELS.HAIKU;
+              // Use the fast tier for property updates with code under 4KB.
+              // Re-resolving with the same lang keeps the family ordering intact:
+              // only the tier changes, so an OpenAI-first language downgrades to
+              // gpt-5.6-luna rather than jumping families to Haiku.
+              tierToUse = "fast";
+              plannedRoute = resolveGenerationRoute({
+                lang,
+                tier: tierToUse,
+              });
+              modelToUse = modelForProvider(
+                plannedRoute.providers[0],
+                plannedRoute.tier,
+              );
             }
           }
         }
@@ -1563,8 +1482,10 @@ export async function generateCode({
       lang,
       currentCode,
       options: {
-        model: modelToUse,
-        temperature: options.temperature || 0.2,
+        lang,
+        tier: tierToUse,
+        ...(options.model ? { model: options.model } : {}),
+        temperature: options.temperature ?? 0.2,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         maxContinuations: options.maxContinuations || 10,  // Conservative default
         // Passthrough (undefined ⇒ omitted ⇒ API model default). Set to match models.
@@ -1576,31 +1497,49 @@ export async function generateCode({
 
     const generationLatency = Date.now() - generationStartTime;
     safeRAGAnalytics.endStage(requestId, "generation");
+    modelToUse = streamResult.model;
+    tierToUse = streamResult.tier;
+    const providerUsed = streamResult.provider;
+    const providerAttempts = streamResult.attempts.map((attempt) => ({
+      stage: "generation",
+      ...attempt,
+    }));
+    let totalCostUsd = estimateUsdCost(
+      streamResult.usage,
+      modelToUse,
+      new Date(),
+      providerUsed,
+    );
 
-    // Surface Anthropic prompt-cache stats so we can confirm Tier-3 caching is
-    // actually firing. cache_read_input_tokens > 0 means the system prefix
-    // hit cache; cache_creation_input_tokens > 0 means we just wrote it.
+    // Surface normalized provider usage. Input/cache counts use a disjoint
+    // convention for both APIs, so cost and cache telemetry remain comparable.
     {
       const u = streamResult.usage || { inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 };
       console.log(
-        `[code-gen] rid=${rid} lang=L${lang} model=${modelToUse} ` +
+        `[code-gen] rid=${rid} lang=L${lang} provider=${providerUsed} model=${modelToUse} tier=${tierToUse} ` +
         `input=${u.inputTokens} output=${u.outputTokens} ` +
         `cache_create=${u.cacheCreationInputTokens || 0} cache_read=${u.cacheReadInputTokens || 0} ` +
         `latencyMs=${generationLatency}`
       );
       if (requestId) {
-        ragLog(requestId, "anthropic.usage", {
+        ragLog(requestId, "llm.usage", {
+          provider: providerUsed,
+          routeSource: streamResult.routeSource,
+          priority: streamResult.priority,
+          tier: tierToUse,
           model: modelToUse,
           inputTokens: u.inputTokens,
           outputTokens: u.outputTokens,
           cacheCreationInputTokens: u.cacheCreationInputTokens || 0,
           cacheReadInputTokens: u.cacheReadInputTokens || 0,
           latencyMs: generationLatency,
+          fallbackReason: streamResult.fallbackReason || null,
+          attempts: streamResult.attempts,
         });
       }
       if (isFreePlan) {
         // Telemetry only — the free-plan budget is items, not dollars.
-        recordSpend(estimateUsdCost(u, modelToUse)).catch((err) => {
+        recordSpend(totalCostUsd).catch((err) => {
           console.error("[free-plan] failed to record spend", err);
         });
       }
@@ -1646,6 +1585,8 @@ export async function generateCode({
         taskId: null,
         lang,
         model: modelToUse,
+        provider: providerUsed,
+        tier: tierToUse,
         usage: {
           input_tokens: streamResult.usage.inputTokens,
           output_tokens: streamResult.usage.outputTokens,
@@ -1683,6 +1624,10 @@ export async function generateCode({
       // well-cached generation looks nearly free.
       cache_creation_tokens: streamResult.usage.cacheCreationInputTokens || 0,
       cache_read_tokens: streamResult.usage.cacheReadInputTokens || 0,
+      // A SUBSET of completion_tokens (providers that report it bill it at the
+      // output rate and include it there), carried for attribution only — never
+      // added into a total. See TokenUsage.reasoningTokens.
+      reasoning_tokens: streamResult.usage.reasoningTokens || 0,
     };
 
     // Estimate compile units from initial generation.
@@ -1798,23 +1743,38 @@ export async function generateCode({
             }
           }
 
-          // Use the same model for fixes — no Opus upgrade.
-          // Sonnet handles error correction well and keeps costs predictable.
-          let fixModel = options.model || CLAUDE_MODELS.DEFAULT;
-
-          // Use streaming service to fix the code
+          // Repairs start on the provider that completed generation. Unless the
+          // caller pinned a raw model, use that provider's balanced tier.
           const fixResult = await generateCodeWithContinuation({
             formattedPrompt: fixPrompt,
             lang,
             currentCode: generatedCode,
             options: {
-              model: fixModel,
+              lang,
+              tier: "balanced",
+              // Pin the repair to the family that produced the program. A repair
+              // is a continuation of that output, so handing it to another family
+              // means asking a model to fix code it did not write against a
+              // dialect it may rank differently. A model pin gives us exactly
+              // that family with no failover.
+              model:
+                options.model ||
+                modelForProvider(providerUsed, "balanced"),
               temperature: 0.1, // Lower temperature for more deterministic fixes
               maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
-              maxContinuations: 10
+              maxContinuations: 10,
+              ...(options.effort !== undefined
+                ? { effort: options.effort }
+                : {}),
             },
             onProgress: requestId ? (message) => ragLog(requestId, "fix.progress", { message }) : undefined
           });
+          providerAttempts.push(
+            ...fixResult.attempts.map((attempt) => ({
+              stage: `repair_${fixAttempts + 1}`,
+              ...attempt,
+            })),
+          );
 
           if (fixResult.error) {
             console.error("Failed to fix code:", fixResult.error);
@@ -1827,9 +1787,17 @@ export async function generateCode({
           finalUsage.total_tokens += fixResult.usage.inputTokens + fixResult.usage.outputTokens;
           finalUsage.cache_creation_tokens += fixResult.usage.cacheCreationInputTokens || 0;
           finalUsage.cache_read_tokens += fixResult.usage.cacheReadInputTokens || 0;
+          finalUsage.reasoning_tokens += fixResult.usage.reasoningTokens || 0;
+          const fixCostUsd = estimateUsdCost(
+            fixResult.usage,
+            fixResult.model,
+            new Date(),
+            fixResult.provider,
+          );
+          totalCostUsd += fixCostUsd;
 
           if (isFreePlan) {
-            recordSpend(estimateUsdCost(fixResult.usage, modelToUse)).catch((err) => {
+            recordSpend(fixCostUsd).catch((err) => {
               console.error("[free-plan] failed to record fix spend", err);
             });
           }
@@ -1887,12 +1855,7 @@ export async function generateCode({
         const plan = userDoc.data()?.subscription?.plan || 'demo';
         const now = new Date();
 
-        const costUsd = estimateUsdCost({
-          inputTokens: finalUsage.prompt_tokens,
-          outputTokens: finalUsage.completion_tokens,
-          cacheCreationInputTokens: finalUsage.cache_creation_tokens,
-          cacheReadInputTokens: finalUsage.cache_read_tokens,
-        }, modelToUse, now);
+        const costUsd = totalCostUsd;
 
         await db.collection('usage').add({
           userId: auth.uid,
@@ -1912,13 +1875,21 @@ export async function generateCode({
           timestamp: now.toISOString(),
           lang: lang,
           type: 'ai_generation',
+          provider: providerUsed,
+          routeSource: streamResult.routeSource,
+          priority: streamResult.priority,
+          tier: tierToUse,
           model: modelToUse,
+          providerAttempts,
+          fallbackReason: streamResult.fallbackReason ?? null,
           tokens: {
             input: finalUsage.prompt_tokens,
             output: finalUsage.completion_tokens,
             total: finalUsage.total_tokens,
             cacheCreation: finalUsage.cache_creation_tokens,
             cacheRead: finalUsage.cache_read_tokens,
+            // Subset of `output`, not additive — see TokenUsage.reasoningTokens.
+            reasoning: finalUsage.reasoning_tokens,
           },
           cost: {
             // Priced at write time rather than left to the reader: the rate for
@@ -1926,6 +1897,7 @@ export async function generateCode({
             // actually cost is a fact about the moment it ran.
             total: costUsd,
             usd: costUsd,
+            provider: providerUsed,
             model: modelToUse,
           },
           plan: plan,
@@ -1949,6 +1921,10 @@ export async function generateCode({
       taskId: verificationResult?.taskId || null,
       lang: lang,
       model: modelToUse,
+      provider: providerUsed,
+      tier: tierToUse,
+      providerAttempts,
+      fallbackReason: streamResult.fallbackReason ?? null,
       usage: {
         input_tokens: finalUsage.prompt_tokens,
         output_tokens: finalUsage.completion_tokens,

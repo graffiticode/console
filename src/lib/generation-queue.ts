@@ -32,7 +32,21 @@ export type AuthReplay =
   | { kind: "bearer"; token: string }
   | { kind: "freePlan"; sessionNamespace?: string; sessionUuid?: string };
 
+/**
+ * Payload schema version. A task already in the Cloud Tasks queue was serialized
+ * by whatever revision enqueued it, so a rename or removal here is a silent field
+ * loss for anything in flight. Bump this when the shape changes and have the
+ * worker branch on it rather than trusting field presence.
+ *
+ * v1: itemId/lang/prompt/modification/currentSrc/authReplay. NOTE there are no
+ * model-selection fields: the family and tier come from the language's static
+ * priority list at generation time, so nothing about model choice travels in the
+ * payload and an in-flight task can never pin an unreviewed model.
+ */
+export const GENERATION_JOB_VERSION = 1;
+
 export interface GenerationJob {
+  v?: number;
   itemId: string;
   lang: string;
   prompt: string;
@@ -45,7 +59,7 @@ export async function enqueueGenerationJob(job: GenerationJob): Promise<void> {
   if (!SECRET) {
     throw new Error("INTERNAL_JOB_SECRET is not configured — cannot enqueue generation job");
   }
-  const body = JSON.stringify(job);
+  const body = JSON.stringify({ v: GENERATION_JOB_VERSION, ...job });
 
   if (LOCAL) {
     // Local dev: invoke the worker without awaiting completion. The dev server

@@ -159,6 +159,8 @@ const typeDefs = `
     changeSummary: String
     language: String
     model: String
+    provider: String
+    tier: String
     usage: UsageInfo
     errors: [CodeError]
     upstreamLangs: [String!]
@@ -298,8 +300,12 @@ const typeDefs = `
     deleteCredential(name: String!): Boolean!
   }
 
+  # Model selection is deliberately absent. Which model family and tier serve a
+  # request is a server decision driven by the language's static priority list
+  # (src/lib/model-priority.ts) — see docs/language-routing-and-composition.md.
+  # Neither an end user nor a client agent (including MCP) may influence it, so
+  # there is no provider/tier/model field here to influence it with.
   input CodeGenerationOptions {
-    model: String
     temperature: Float
     maxTokens: Int
   }
@@ -458,7 +464,15 @@ const resolvers = {
     // instead of holding one long call. See src/lib/generation-queue.ts.
     startCodeGeneration: async (_, args, ctx) => {
       const auth = await resolveAuth(ctx);
-      const { itemId, lang, name, client, prompt, modification, currentSrc } = args;
+      const {
+        itemId,
+        lang,
+        name,
+        client,
+        prompt,
+        modification,
+        currentSrc,
+      } = args;
       // Credential the worker replays to act as this caller. For free-plan we
       // re-derive fresh credentials in the worker (idTokens are short-lived and
       // dispatch can lag), so carry the session, not a baked idToken.

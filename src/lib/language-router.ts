@@ -423,6 +423,8 @@ export interface OrchestrationResult {
   headDescription: string | null;
   headChangeSummary: string | null;
   headModel: string;
+  headProvider: string | null;
+  headTier: string | null;
   headUsage: { input_tokens: number; output_tokens: number };
   headLang: string;
   upstreamLangs: string[];
@@ -441,6 +443,8 @@ function failedOrchestration(
     headDescription: null,
     headChangeSummary: null,
     headModel,
+    headProvider: null,
+    headTier: null,
     headUsage,
     headLang,
     upstreamLangs: [],
@@ -520,6 +524,8 @@ export async function orchestrateComposition({
     headDescription: headResult.description ?? null,
     headChangeSummary: headResult.changeSummary ?? null,
     headModel: headResult.model || "",
+    headProvider: headResult.provider || null,
+    headTier: headResult.tier || null,
     headUsage: {
       input_tokens: headResult.usage?.input_tokens || 0,
       output_tokens: headResult.usage?.output_tokens || 0,

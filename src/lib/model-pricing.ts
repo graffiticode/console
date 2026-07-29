@@ -1,4 +1,4 @@
-// Per-model Anthropic pricing, USD per token.
+// Per-model provider pricing, USD per token.
 //
 // Replaces four hardcoded Sonnet-rate constants that were applied to every
 // model regardless of which one ran — so an Opus generation (5× Sonnet's input
@@ -7,8 +7,10 @@
 // cost-per-acquired-account in the funnel report, and a figure that silently
 // understates the expensive model is worse than no figure.
 //
-// Rates are per 1M tokens, from the published price list. Keep this table in
-// sync when adding a model to CLAUDE_MODELS.
+// Rates are per 1M tokens, from the providers' standard price lists. Keep this
+// table in sync with src/lib/llm-models.ts.
+
+import { inferProviderFromModel, LlmProvider } from "./llm-models";
 
 const PER_MILLION = 1_000_000;
 
@@ -17,6 +19,7 @@ interface ModelRate {
   input: number;
   /** USD per 1M output tokens. */
   output: number;
+  provider: LlmProvider;
   /**
    * Promotional rate in effect until the given date (ISO). After it, `input`
    * and `output` above apply. Encoded rather than ignored because the
@@ -29,18 +32,22 @@ interface ModelRate {
 }
 
 const MODEL_RATES: Record<string, ModelRate> = {
-  "claude-fable-5": { input: 10, output: 50 },
-  "claude-opus-5": { input: 5, output: 25 },
-  "claude-opus-4-8": { input: 5, output: 25 },
-  "claude-opus-4-7": { input: 5, output: 25 },
-  "claude-opus-4-6": { input: 5, output: 25 },
+  "claude-fable-5": { provider: "anthropic", input: 10, output: 50 },
+  "claude-opus-5": { provider: "anthropic", input: 5, output: 25 },
+  "claude-opus-4-8": { provider: "anthropic", input: 5, output: 25 },
+  "claude-opus-4-7": { provider: "anthropic", input: 5, output: 25 },
+  "claude-opus-4-6": { provider: "anthropic", input: 5, output: 25 },
   "claude-sonnet-5": {
+    provider: "anthropic",
     input: 3,
     output: 15,
     intro: { input: 2, output: 10, until: "2026-08-31" },
   },
-  "claude-sonnet-4-6": { input: 3, output: 15 },
-  "claude-haiku-4-5": { input: 1, output: 5 },
+  "claude-sonnet-4-6": { provider: "anthropic", input: 3, output: 15 },
+  "claude-haiku-4-5": { provider: "anthropic", input: 1, output: 5 },
+  "gpt-5.6-sol": { provider: "openai", input: 5, output: 30 },
+  "gpt-5.6-terra": { provider: "openai", input: 2.5, output: 15 },
+  "gpt-5.6-luna": { provider: "openai", input: 1, output: 6 },
 };
 
 // Unknown models fall back to the default generation model's rate rather than
@@ -58,16 +65,31 @@ const CACHE_WRITE_1H_MULTIPLIER = 2.0;
 const CACHE_READ_MULTIPLIER = 0.1;
 
 /** Model ids may carry a date suffix (`claude-haiku-4-5-20251001`); the table is keyed without one. */
-function rateFor(model: string | undefined, now: Date): { input: number; output: number } {
+function rateFor(
+  model: string | undefined,
+  now: Date,
+  provider?: LlmProvider,
+): { input: number; output: number; provider: LlmProvider } {
   const id = String(model || "");
   const entry =
     MODEL_RATES[id] ??
     MODEL_RATES[id.replace(/-\d{8}$/, "")] ??
-    FALLBACK;
+    (provider === "openai"
+      ? MODEL_RATES["gpt-5.6-terra"]
+      : FALLBACK);
   if (entry.intro && now < new Date(`${entry.intro.until}T23:59:59Z`)) {
-    return { input: entry.intro.input, output: entry.intro.output };
+    return {
+      input: entry.intro.input,
+      output: entry.intro.output,
+      provider: entry.provider,
+    };
   }
-  return { input: entry.input, output: entry.output };
+  return {
+    input: entry.input,
+    output: entry.output,
+    provider:
+      provider || inferProviderFromModel(model) || entry.provider,
+  };
 }
 
 /**
@@ -92,6 +114,7 @@ export function estimateUsdCost(
     | undefined,
   model?: string,
   now = new Date(),
+  provider?: LlmProvider,
 ): number {
   if (!usage) return 0;
   // The per-request usage object doesn't split cache creation by TTL; 5m is the
@@ -105,6 +128,7 @@ export function estimateUsdCost(
     },
     model,
     now,
+    provider,
   );
 }
 
@@ -131,15 +155,20 @@ export function usdCostFromReport(
   },
   model?: string,
   now = new Date(),
+  provider?: LlmProvider,
 ): number {
-  const rate = rateFor(model, now);
+  const rate = rateFor(model, now, provider);
+  // OpenAI prompt caching has the same 1.25x write and 0.1x read multipliers
+  // represented by the normalized provider usage fields.
+  const cacheWriteMultiplier = CACHE_WRITE_MULTIPLIER;
+  const cacheReadMultiplier = CACHE_READ_MULTIPLIER;
 
   const usd =
     (tokens.uncachedInput || 0) * rate.input +
     (tokens.output || 0) * rate.output +
-    (tokens.cacheWrite5m || 0) * rate.input * CACHE_WRITE_MULTIPLIER +
+    (tokens.cacheWrite5m || 0) * rate.input * cacheWriteMultiplier +
     (tokens.cacheWrite1h || 0) * rate.input * CACHE_WRITE_1H_MULTIPLIER +
-    (tokens.cacheRead || 0) * rate.input * CACHE_READ_MULTIPLIER;
+    (tokens.cacheRead || 0) * rate.input * cacheReadMultiplier;
 
   return usd / PER_MILLION;
 }

@@ -521,6 +521,8 @@ export const generateCode = async ({ user, prompt, language, options, currentSrc
         description
         language
         model
+        provider
+        tier
         usage {
           input_tokens
           output_tokens
@@ -557,4 +559,3 @@ export const generateCode = async ({ user, prompt, language, options, currentSrc
     throw new Error(`Failed to generate code: ${error.message}`);
   }
 };
-

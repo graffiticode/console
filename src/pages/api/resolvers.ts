@@ -975,6 +975,8 @@ export async function generateCode({
     let description = null;
     let changeSummary = null;
     let model = null;
+    let provider = null;
+    let tier = null;
     let usage = { input_tokens: 0, output_tokens: 0 };
 
     ragLog(rid, "request.start", {
@@ -996,8 +998,10 @@ export async function generateCode({
     // Hoisted out of the `if (!src)` block below so the post-parse repair (which lives in
     // the outer scope) can reuse them: codegen options, the usage-limit message mapper, and
     // the head-lang retrieval (reused for the compose trigger, the head gen, and the repair).
+    // No model/provider/tier here on purpose: the language's static priority list
+    // decides which family serves the request, so there is nothing for a caller to
+    // pass. See src/lib/model-priority.ts.
     const codegenOptions = {
-      model: options?.model,
       temperature: options?.temperature,
       maxTokens: options?.maxTokens,
     };
@@ -1106,11 +1110,13 @@ export async function generateCode({
         });
 
         if (orch.errors) {
-          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: mapUsageLimit(orch.errors), upstreamLangs: [] };
+          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: orch.headProvider ?? null, tier: orch.headTier ?? null, usage: null, errors: mapUsageLimit(orch.errors), upstreamLangs: [] };
         }
 
         src = orch.headSrc;
         model = orch.headModel;
+        provider = orch.headProvider;
+        tier = orch.headTier;
         usage = orch.headUsage;
         description = orch.headDescription;
         changeSummary = orch.headChangeSummary;
@@ -1131,12 +1137,23 @@ export async function generateCode({
         });
 
         if ('errors' in result && result.errors) {
-          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: mapUsageLimit(result.errors), upstreamLangs: [] };
+          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: (result as any).provider ?? null, tier: (result as any).tier ?? null, usage: null, errors: mapUsageLimit(result.errors), upstreamLangs: [] };
         }
 
-        const successResult = result as { code: any; taskId: string; model: string; usage: any; description: string | null; changeSummary: string | null };
+        const successResult = result as {
+          code: any;
+          taskId: string;
+          model: string;
+          provider: string;
+          tier: string;
+          usage: any;
+          description: string | null;
+          changeSummary: string | null;
+        };
         src = successResult.code;
         model = successResult.model;
+        provider = successResult.provider;
+        tier = successResult.tier;
         usage = successResult.usage;
         description = successResult.description;
         changeSummary = successResult.changeSummary;
@@ -1153,7 +1170,7 @@ export async function generateCode({
       // Preserve the generated source alongside the parse errors so the
       // editor can render it with inline compile-error decorations, matching
       // the user-typed flow.
-      return { src, taskId: null, language, description, changeSummary, model, usage, errors: parseResult.errors, upstreamLangs: [] };
+      return { src, taskId: null, language, description, changeSummary, model, provider, tier, usage, errors: parseResult.errors, upstreamLangs: [] };
     }
     let code = JSON.parse(parseResult.code);
 
@@ -1175,11 +1192,7 @@ export async function generateCode({
                 auth,
                 prompt,
                 lang: uLang,
-                options: {
-                  model: options?.model,
-                  temperature: options?.temperature,
-                  maxTokens: options?.maxTokens,
-                },
+                options: codegenOptions,
                 rid,
                 itemId,
               })
@@ -1191,7 +1204,7 @@ export async function generateCode({
             return [];
           });
           if (upstreamErrors.length > 0) {
-            return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: upstreamErrors, upstreamLangs: [] };
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: upstreamErrors, upstreamLangs: [] };
           }
           upstreamTaskIds = upstreamResults.map((r: any) => r.taskId as string);
         }
@@ -1220,17 +1233,19 @@ export async function generateCode({
             prompt: `${prompt}\n\nIMPORTANT: This program is the HEAD of a composition pipeline and MUST bind its upstream by emitting a top-level \`data use "${expected}"\` so the upstream data flows at runtime. Do not omit it.`,
           });
           if (repair?.errors) {
-            return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: mapUsageLimit(repair.errors), upstreamLangs: [] };
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: mapUsageLimit(repair.errors), upstreamLangs: [] };
           }
           const reparsed = await parseCode({ lang: headLang, src: repair.code, privateValues, publicValues, accessToken: auth?.token });
           if (reparsed.errors) {
-            return { src: repair.code, taskId: null, language, description, changeSummary, model, usage, errors: reparsed.errors, upstreamLangs: [] };
+            return { src: repair.code, taskId: null, language, description, changeSummary, model, provider, tier, usage, errors: reparsed.errors, upstreamLangs: [] };
           }
           code = JSON.parse(reparsed.code);
           resolved = await resolveUpstreams(code);
           if (resolved.upstreams.includes(expected)) {
             src = repair.code;
             model = repair.model;
+            provider = repair.provider;
+            tier = repair.tier;
             usage = repair.usage;
             description = repair.description ?? description;
             changeSummary = repair.changeSummary ?? changeSummary;
@@ -1240,7 +1255,7 @@ export async function generateCode({
             console.warn(`[composition] rid=${rid} repair.failed head=L${headLang} expected=L${expected}`);
             ragLog(rid, "composition.repair.failed", { headLang, expected });
             return {
-              src: repair.code, taskId: null, language, description, changeSummary, model, usage,
+              src: repair.code, taskId: null, language, description, changeSummary, model, provider, tier, usage,
               errors: [{ message: `Composition failed: head L${headLang} could not bind upstream L${expected}. Try rephrasing the request.` }],
               upstreamLangs: [],
             };
@@ -1249,7 +1264,7 @@ export async function generateCode({
       }
     } catch (err: any) {
       return {
-        src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null,
+        src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null,
         errors: [{ message: err?.message || "Composition discovery failed", from: -1, to: -1 }],
         upstreamLangs: [],
       };
@@ -1285,16 +1300,21 @@ export async function generateCode({
     ragLog(rid, "request.end", {
       taskId,
       model,
+      provider,
+      tier,
       usage,
       upstreamLangs,
       success: true,
     });
 
-    return { src: resolvedSrc, taskId, language: headLang, description, changeSummary, model, usage, errors: null, upstreamLangs };
+    return { src: resolvedSrc, taskId, language: headLang, description, changeSummary, model, provider, tier, usage, errors: null, upstreamLangs };
   } catch (error) {
     console.error("generateCode()", "ERROR", error);
     ragLog(rid, "request.error", { error: error.message });
-    return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: error.message }], upstreamLangs: [] };
+    // Outermost catch: sits outside the scope where model/provider/tier are
+    // bound, and a throw this far out may predate generation entirely — so
+    // nulls here are the honest answer, not a dropped field.
+    return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: null, tier: null, usage: null, errors: [{ message: error.message }], upstreamLangs: [] };
   }
 }
 

@@ -16,6 +16,7 @@ import {
 import { client } from "../../lib/auth";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
 import { getFreePlanCredentials } from "../../lib/free-plan-context";
+import { GENERATION_JOB_VERSION } from "../../lib/generation-queue";
 import type { AuthReplay, GenerationJob } from "../../lib/generation-queue";
 import { emitEvent, actor } from "../../lib/funnel-events";
 
@@ -67,9 +68,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const job = req.body as GenerationJob;
-  const { itemId, lang, prompt, modification, currentSrc, authReplay } = job || {};
+  const {
+    v,
+    itemId,
+    lang,
+    prompt,
+    modification,
+    currentSrc,
+    authReplay,
+  } = job || {};
   if (!itemId || !lang || !prompt || !authReplay) {
     return res.status(400).json({ error: "Missing required job fields" });
+  }
+  // Tasks enqueued before versioning carry no `v`; treat them as v1 since the
+  // required fields above are identical. A version we don't recognize is from a
+  // NEWER revision, so fail loudly rather than guessing at its shape — 400 keeps
+  // Cloud Tasks from retrying a payload this revision will never understand.
+  if (v !== undefined && v !== GENERATION_JOB_VERSION) {
+    console.error("[generate-job] unsupported payload version", v, itemId);
+    return res.status(400).json({ error: "unsupported_job_version", v });
   }
 
   let auth: Auth;
