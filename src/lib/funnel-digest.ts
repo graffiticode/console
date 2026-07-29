@@ -522,11 +522,16 @@ function clientList(d: Digest): string {
 }
 
 /**
- * The SMS body. Exactly three lines, always:
+ * The SMS body. Three lines, or two on a quiet hour:
  *
- *   GC anon 19:01–20:01 PT
- *   15 tool calls · 2 workspaces · 3 items
+ *   GC 19:01–20:01 PT 15 anon calls
+ *   2 workspaces · 3 items
  *   https://console.graffiticode.org/r/<token>
+ *
+ * The call count lives on line 1 because a phone's unread list shows only that
+ * line: a preview reading just the window said when, never what, so you had to
+ * open the message to learn whether anyone showed up. Line 2 carries what's
+ * left and is dropped entirely when there are no workspaces and no items.
  *
  * Pass the ANONYMOUS segment (see aggregateSplit). The text answers one
  * question — did a stranger use the product this hour — and mixing our own
@@ -541,11 +546,13 @@ function clientList(d: Digest): string {
  * because the text can't carry the qualifiers.
  */
 export function formatSms(d: Digest, url?: string): string {
-  const head: string[] = [`${d.context.toolCalls} tool call${plural(d.context.toolCalls)}`];
-  if (d.workspaces.total) head.push(`${d.workspaces.total} workspace${plural(d.workspaces.total)}`);
-  if (d.items.ok) head.push(`${d.items.ok} item${plural(d.items.ok)}`);
+  const calls = d.context.toolCalls;
+  const rest: string[] = [];
+  if (d.workspaces.total) rest.push(`${d.workspaces.total} workspace${plural(d.workspaces.total)}`);
+  if (d.items.ok) rest.push(`${d.items.ok} item${plural(d.items.ok)}`);
 
-  const lines = [`GC anon ${ptRange(d.from, d.to)}`, head.join(" · ")];
+  const lines = [`GC ${ptRange(d.from, d.to)} ${calls} anon call${plural(calls)}`];
+  if (rest.length) lines.push(rest.join(" · "));
   if (url) lines.push(url);
 
   return lines.join("\n");
