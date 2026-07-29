@@ -35,6 +35,11 @@ interface StreamChunk {
   // Anthropic stop_reason on a "complete" chunk: "end_turn" | "max_tokens"
   // | "stop_sequence" | "tool_use" | null. Drives continuation decisions.
   stopReason?: string;
+  // True only on the single cumulative usage chunk emitted after the last
+  // continuation. Per-event chunks are PARTIAL by design — message_start
+  // carries the prompt-side counts and message_delta the output — so a
+  // consumer that assigns rather than accumulates must wait for this one.
+  usageFinal?: boolean;
   usage?: {
     inputTokens: number;
     outputTokens: number;
@@ -84,31 +89,42 @@ class ClaudeStreamParser {
               content: parsed.delta?.text || ""
             });
           } else if (parsed.type === 'message_start') {
-            // message_start carries the initial usage block, including
-            // cache_creation_input_tokens / cache_read_input_tokens which only
-            // appear here (message_delta only has the per-stream input/output).
+            // Usage chunks are SUMMED downstream (see totalUsage), so each field
+            // must be emitted from exactly one event type or it gets counted
+            // twice. message_start is the source of truth for the prompt-side
+            // counts: input, cache creation, and cache read.
+            //
+            // Its output_tokens is a partial (typically 1-3) that message_delta
+            // supersedes with the final cumulative count, so it is dropped here
+            // rather than added.
             const u = parsed.message?.usage;
             if (u) {
               chunks.push({
                 type: "usage",
                 usage: {
                   inputTokens: u.input_tokens || 0,
-                  outputTokens: u.output_tokens || 0,
+                  outputTokens: 0,
                   cacheCreationInputTokens: u.cache_creation_input_tokens || 0,
                   cacheReadInputTokens: u.cache_read_input_tokens || 0,
                 }
               });
             }
           } else if (parsed.type === 'message_delta') {
-            // Usage information in message_delta
+            // message_delta is the source of truth for output_tokens (final,
+            // cumulative for this request).
+            //
+            // It also ECHOES the prompt-side counts. Reading them here is what
+            // made every cached generation record exactly double its true cache
+            // usage — measured against the Admin API, our cacheRead was 2.00x
+            // the provider's for the same key and window. Take output only.
             if (parsed.usage) {
               chunks.push({
                 type: "usage",
                 usage: {
-                  inputTokens: parsed.usage.input_tokens || 0,
+                  inputTokens: 0,
                   outputTokens: parsed.usage.output_tokens || 0,
-                  cacheCreationInputTokens: parsed.usage.cache_creation_input_tokens || 0,
-                  cacheReadInputTokens: parsed.usage.cache_read_input_tokens || 0,
+                  cacheCreationInputTokens: 0,
+                  cacheReadInputTokens: 0,
                 }
               });
             }
@@ -328,9 +344,11 @@ export async function* streamClaudeCode({
     continuationCount++;
   }
 
-  // Yield final usage information
+  // Cumulative across every continuation. Marked so consumers can tell it
+  // apart from the partial per-event chunks above.
   yield {
     type: "usage",
+    usageFinal: true,
     usage: totalUsage
   };
 
@@ -387,7 +405,10 @@ export async function generateLongCode({
     if (chunk.type === "content" && chunk.content) {
       fullContent += chunk.content;
 
-    } else if (chunk.type === "usage" && chunk.usage) {
+    } else if (chunk.type === "usage" && chunk.usage && chunk.usageFinal) {
+      // Assign, don't accumulate: this chunk is already the total across
+      // continuations. Gated on usageFinal so a partial per-event chunk can't
+      // land here and zero out the fields it doesn't carry.
       totalUsage.inputTokens = chunk.usage.inputTokens;
       totalUsage.outputTokens = chunk.usage.outputTokens;
       totalUsage.cacheCreationInputTokens = chunk.usage.cacheCreationInputTokens || 0;
