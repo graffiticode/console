@@ -79,6 +79,11 @@ Average AI cost to produce one item, for a period.
   --per-item                Per-item cost distribution from ai_generation records
                             (mean/median/p90). Only sees generations recorded
                             after per-item attribution shipped.
+  --lang <id>               Restrict to a language (0176, L0176 and 176 all work);
+                            repeatable, so --lang 0158 --lang 0176 pools a family.
+                            Implies --per-item, and SUPPRESSES the blended figure:
+                            provider-reported spend cannot be split by language,
+                            so only the attributed path can answer per-language.
   --output <file.html>      Also write an HTML report (open it in a browser)
   --json                    Emit JSON to stdout (progress goes to stderr)
   --help, -h                Show this
@@ -101,8 +106,15 @@ interface Opts {
   allKeys: boolean;
   check: boolean;
   perItem: boolean;
+  langs: string[];
   output?: string;
   json: boolean;
+}
+
+/** Records store a bare 4-digit id ("0176"); accept the L-prefixed and unpadded forms too. */
+function normalizeLang(raw: string): string {
+  const digits = String(raw).trim().replace(/^L/i, '');
+  return /^\d+$/.test(digits) ? digits.padStart(4, '0') : digits;
 }
 
 function parseArgs(argv: string[]): Opts {
@@ -114,6 +126,7 @@ function parseArgs(argv: string[]): Opts {
     allKeys: false,
     check: false,
     perItem: false,
+    langs: [],
     json: false,
   };
   for (let i = 0; i < args.length; i++) {
@@ -126,6 +139,7 @@ function parseArgs(argv: string[]): Opts {
     else if (a === '--all-keys') { opts.allKeys = true; }
     else if (a === '--check') { opts.check = true; }
     else if (a === '--per-item') { opts.perItem = true; }
+    else if (a === '--lang' && args[i + 1]) { opts.langs.push(normalizeLang(args[++i])); }
     else if (a === '--output' && args[i + 1]) { opts.output = args[++i]; }
     else if (a === '--json') { opts.json = true; }
     else if (a === '--help' || a === '-h') {
@@ -140,6 +154,9 @@ function parseArgs(argv: string[]): Opts {
     console.error('Error: --period must be "day", "week", or "month"');
     process.exit(1);
   }
+  // Provider spend can't be split by language, so a language scope is only
+  // answerable from the attributed records.
+  if (opts.langs.length > 0) opts.perItem = true;
   return opts;
 }
 
@@ -428,16 +445,20 @@ function toMillis(v: any): number {
  * The date is filtered in JS to avoid needing a (type, createdAt) composite
  * index — the established convention in these scripts.
  */
-async function countItems(start: Date, end: Date): Promise<{ total: number; byDay: Record<string, number> }> {
+async function countItems(
+  start: Date, end: Date, langs: string[] = [],
+): Promise<{ total: number; byDay: Record<string, number> }> {
   const snap = await db.collection('usage')
     .where('type', '==', 'item_created')
-    .select('createdAt')
+    .select('createdAt', 'lang')
     .get();
 
   let total = 0;
   const byDay: Record<string, number> = {};
   for (const doc of snap.docs) {
-    const ms = toMillis(doc.data().createdAt);
+    const d = doc.data();
+    if (langs.length > 0 && !langs.includes(normalizeLang(String(d.lang ?? '')))) continue;
+    const ms = toMillis(d.createdAt);
     if (ms < start.getTime() || ms >= end.getTime()) continue;
     total++;
     const day = new Date(ms).toISOString().split('T')[0];
@@ -508,7 +529,7 @@ interface PerItem {
  * exists: use `itemId` when the record has one (an edit), otherwise map
  * `generatedTaskId` through `users/{uid}/versions`, which stores both.
  */
-async function fetchPerItem(start: Date, end: Date): Promise<PerItem> {
+async function fetchPerItem(start: Date, end: Date, langs: string[] = []): Promise<PerItem> {
   const snap = await db.collection('usage')
     .where('type', '==', 'ai_generation')
     .select('createdAt', 'userId', 'itemId', 'generatedTaskId', 'cost', 'lang', 'model')
@@ -517,6 +538,7 @@ async function fetchPerItem(start: Date, end: Date): Promise<PerItem> {
   const records: GenRecord[] = [];
   for (const doc of snap.docs) {
     const d = doc.data();
+    if (langs.length > 0 && !langs.includes(normalizeLang(String(d.lang ?? '')))) continue;
     const ms = toMillis(d.createdAt);
     if (ms < start.getTime() || ms >= end.getTime()) continue;
     const usd = Number(d.cost?.usd ?? d.cost?.total ?? 0);
@@ -797,13 +819,18 @@ async function main() {
   let perItem: PerItem | null = null;
   if (opts.perItem) {
     console.error('Attributing cost per item...');
-    perItem = await fetchPerItem(start, end);
+    perItem = await fetchPerItem(start, end, opts.langs);
   }
 
   console.error('Counting items...');
   const [items, trial] = await Promise.all([
-    countItems(start, end),
-    countTrialItems(start, end),
+    countItems(start, end, opts.langs),
+    // The trial counter is a per-day tally with no language dimension, so it
+    // can't be narrowed. Zeroed under --lang rather than reported as a subset
+    // of a different population.
+    opts.langs.length > 0
+      ? Promise.resolve({ total: 0, byDay: {} as Record<string, number> })
+      : countTrialItems(start, end),
   ]);
   const totalItems = items.total;
   const trialItems = trial.total;
@@ -890,6 +917,7 @@ async function main() {
       reportedThrough: reportedThrough?.toISOString() ?? null,
       warnings,
       apiKeys: opts.allKeys ? 'all' : keys.map(k => ({ id: k.id, name: k.name })),
+      langs: opts.langs.length > 0 ? opts.langs : null,
       items: { total: totalItems, trial: trialItems, paid: paidItems, denominator },
       tokens: totals,
       cost: {
@@ -927,7 +955,8 @@ async function main() {
   }
 
   const label = `${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`;
-  console.log(`\n=== Cost per item — ${label} (UTC) ===`);
+  const langLabel = opts.langs.length > 0 ? ` · lang ${opts.langs.join('+')}` : '';
+  console.log(`\n=== Cost per item — ${label} (UTC)${langLabel} ===`);
   console.log(`${pad('Items created')}: ${num(totalItems)}`);
   console.log(`${pad('  paid accounts')}: ${num(paidItems)}`);
   console.log(`${pad('  free-plan trial')}: ${num(trialItems)}`);
@@ -935,7 +964,7 @@ async function main() {
   const keyLabel = opts.allKeys
     ? 'ALL KEYS — org-wide'
     : `key${keys.length > 1 ? 's' : ''}: ${keys.map(k => k.name).join(', ')}`;
-  console.log(`\nAnthropic (${keyLabel})`);
+  console.log(`\nAnthropic (${keyLabel})${opts.langs.length > 0 ? ' — ALL languages, not just the selected ones' : ''}`);
   console.log(`${pad('  uncached input')}: ${num(totals.uncachedInput)} tok`);
   console.log(`${pad('  cache write 5m/1h')}: ${num(totals.cacheWrite5m)} / ${num(totals.cacheWrite1h)} tok`);
   console.log(`${pad('  cache read')}: ${num(totals.cacheRead)} tok`);
@@ -961,7 +990,12 @@ async function main() {
   console.log(`${' '.repeat(25)}--------`);
   console.log(`${pad('Total AI cost')}: ${usd(totalCost)}${openai ? '' : ' (Anthropic only)'}`);
 
-  if (denominator > 0) {
+  if (opts.langs.length > 0) {
+    console.log(`\n${pad('Cost per item')}: not computed for a language scope.`);
+    console.log(`  Provider-reported spend covers the whole API key and cannot be split by`);
+    console.log(`  language, so dividing it by one language's items would be meaningless.`);
+    console.log(`  Use the per-item attribution below.`);
+  } else if (denominator > 0) {
     console.log(`\n${pad('Cost per item')}: ${usd(totalCost / denominator)}${opts.excludeTrial ? '  (paid items only)' : ''}`);
     console.log(`${pad('  Anthropic')}: ${usd(anthropicCost / denominator)}`);
     if (openai) console.log(`${pad('  OpenAI')}: ${usd(openaiCost / denominator)}`);
@@ -999,7 +1033,9 @@ async function main() {
     // counting message_start and message_delta, or missing the fix passes) —
     // not that the provider is wrong.
     const recorded = perItem.attributedCost + perItem.unattributedCost;
-    if (recorded > 0 && anthropicCost > 0) {
+    if (opts.langs.length > 0) {
+      console.log(`${pad('  recorded (this lang)')}: ${usd(recorded)}  (not comparable to the provider total — that covers all languages)`);
+    } else if (recorded > 0 && anthropicCost > 0) {
       const ratio = (recorded / anthropicCost) * 100;
       const flag = ratio > 115 || ratio < 60 ? '  <-- CHECK: stream accounting may be off' : '';
       console.log(`${pad('  recorded vs provider')}: ${usd(recorded)} vs ${usd(anthropicCost)} = ${ratio.toFixed(1)}%${flag}`);
