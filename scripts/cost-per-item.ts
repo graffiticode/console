@@ -340,13 +340,27 @@ async function fetchAnthropicUsage(
  * `amount` is a decimal string in the currency's LOWEST unit — cents for USD,
  * so "366.00043" is $3.66, not $366.
  */
-async function fetchAnthropicBilled(start: Date, end: Date): Promise<number> {
+async function fetchAnthropicBilled(start: Date, end: Date, now = new Date()): Promise<number | null> {
+  // cost_report does 1d buckets only, snaps both ends to UTC days, and won't
+  // report a day that hasn't closed. A window inside today therefore collapses
+  // to a zero-length range and 400s with "ending date must be after starting
+  // date". Bound it to completed days and say it's unavailable rather than
+  // erroring — billed cost genuinely doesn't exist yet for today.
+  const todayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dayStart = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  const endDay = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+  const dayEnd = new Date(Math.min(
+    end.getTime() > endDay ? endDay + 86_400_000 : endDay,
+    todayStart,
+  ));
+  if (dayEnd.getTime() <= dayStart.getTime()) return null;
+
   let cents = 0;
   let page: string | undefined;
   do {
     const params = new URLSearchParams({
-      starting_at: start.toISOString(),
-      ending_at: end.toISOString(),
+      starting_at: dayStart.toISOString(),
+      ending_at: dayEnd.toISOString(),
       bucket_width: '1d',
       limit: '31',
     });
@@ -805,6 +819,9 @@ async function main() {
   if (opts.check) {
     console.error('Fetching org-wide billed cost...');
     billedOrgWide = await fetchAnthropicBilled(start, end);
+    if (billedOrgWide === null) {
+      console.error('  unavailable — cost_report only covers completed UTC days');
+    }
   }
 
   console.error('Fetching OpenAI costs...');
@@ -976,6 +993,8 @@ async function main() {
   if (billedOrgWide !== null) {
     const share = billedOrgWide > 0 ? ((anthropicCost / billedOrgWide) * 100).toFixed(1) : '—';
     console.log(`${pad('  org-wide billed')}: ${usd(billedOrgWide)}  (selected keys = ${share}% of the bill)`);
+  } else if (opts.check) {
+    console.log(`${pad('  org-wide billed')}: unavailable — cost_report covers completed UTC days only`);
   }
 
   if (openai) {
