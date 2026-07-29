@@ -22,8 +22,49 @@ async function main() {
 
   const lang = "0166";
   const prompt = "Build a sheet with cells A1=10, A2=20, and A3 = the sum of A1 and A2.";
-  const good = `'A1' = 10..\n'A2' = 20..\n'A3' = add(cell 'A1', cell 'A2')..`;
-  const bad = `'A1' = 10..`; // ignores A2 and the requested sum
+
+  // REAL L0166. Both programs below were verified to parse and compile cleanly
+  // against api.graffiticode.org (`good` yields cells A1/A2/A3 with A3="=SUM(A1:A2)";
+  // `bad` yields only A1), so a low score here is a judgment about quality rather
+  // than about invalid syntax.
+  //
+  // This previously used core-Graffiticode-looking pseudocode (`'A1' = 10..`,
+  // `add(cell 'A1', ...)`) which is NOT L0166 — the dialect is title/columns/cells.
+  // That made the test actively misleading: the Anthropic judge scored the
+  // "correct" candidate a 1, which was the RIGHT call on invalid code, and it was
+  // easy to misread as the judge failing. Keep these fixtures compilable.
+  const good = [
+    'columns [',
+    '  column A',
+    '    width 100 {}',
+    ']',
+    'cells [',
+    '  cell A1',
+    '    text "10" {}',
+    '  cell A2',
+    '    text "20" {}',
+    '  cell A3',
+    '    text "=SUM(A1:A2)" {}',
+    ']',
+    '{',
+    '  v: "0.0.1"',
+    '}..',
+  ].join("\n");
+  // Compiles, but ignores A2 and the requested sum — "renders but wrong", a 2 or
+  // below on the shared anchors.
+  const bad = [
+    'columns [',
+    '  column A',
+    '    width 100 {}',
+    ']',
+    'cells [',
+    '  cell A1',
+    '    text "10" {}',
+    ']',
+    '{',
+    '  v: "0.0.1"',
+    '}..',
+  ].join("\n");
 
   const checks: { name: string; pass: boolean }[] = [];
 
