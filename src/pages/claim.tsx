@@ -368,7 +368,16 @@ export default function Claim() {
           and lets the wallet picker show. Mirrors SignIn.tsx's handleSelectEthereum. */}
       <AuthMethodDialog
         isOpen={!showWalletDialog}
-        onClose={() => router.push('/')}
+        // Only a deliberate dismissal may leave the page. Headless UI fires
+        // onClose for any overlay/escape/outside-click, and Privy raises its own
+        // overlay while creating the embedded wallet — so on the create-account
+        // path this navigated to '/' mid-sign-in, the claim mutation never ran,
+        // and the user landed in a brand-new empty account with their items left
+        // behind. Signing in is exactly when abandoning the claim is worst.
+        onClose={() => {
+          if (codeVerifying || emailSending || claiming) return;
+          router.push('/');
+        }}
         onSelectEthereum={handleSelectEthereum}
         onSubmitEmail={sendCode}
         onSubmitCode={verifyAndSignIn}
