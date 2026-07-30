@@ -64,8 +64,22 @@ import { subscriptionPeriod } from '../src/lib/stripe-helpers';
 
 // Resolve the plan from a subscription's items (base price; a paid sub also
 // carries a metered overage price). Item counts come from the central config.
-function planInfoFor(sub: Stripe.Subscription): { name: string; units: number } {
-  const name = sub.items.data.map(it => priceIdToPlan(it?.price?.id)).find(Boolean) || DEFAULT_PLAN;
+function planInfoFor(sub: Stripe.Subscription): { name: string; units: number } | null {
+  // Returns null when no price maps — NEVER DEFAULT_PLAN.
+  //
+  // priceIdToPlan compares against STRIPE_*_PRICE_ID env vars, which are
+  // mode-specific: live price ids do not resolve under a test key and vice
+  // versa. Running this script with a live key while .env.local still has the
+  // TEST price ids active makes every paid price unmappable — and the old
+  // `|| DEFAULT_PLAN` then reported "stripe plan=demo" for an active $100/mo
+  // subscription. With --apply that writes the downgrade onto a paying account,
+  // which is the exact opposite of reconciling.
+  //
+  // An unmappable price means the environment is misconfigured, not that the
+  // customer is free. Skip the user and say so; a missed fix is recoverable, a
+  // written downgrade is not.
+  const name = sub.items.data.map(it => priceIdToPlan(it?.price?.id)).find(Boolean);
+  if (!name) return null;
   return { name, units: includedItemsFor(name) };
 }
 
@@ -99,6 +113,17 @@ async function main() {
 
     if (sub) {
       const planInfo = planInfoFor(sub);
+      if (!planInfo) {
+        const priceIds = sub.items.data.map(it => it?.price?.id).filter(Boolean).join(', ');
+        console.log(
+          `  UNMAPPABLE ${uid}: subscription ${sub.id} is ${sub.status} but none of its price ids ` +
+          `[${priceIds}] map to a known plan — refusing to touch this account. This is almost ` +
+          `always a live/test mode mismatch: check the STRIPE_*_PRICE_ID values match the mode of ` +
+          `STRIPE_SECRET_KEY.`,
+        );
+        skipped++;
+        continue;
+      }
       const mismatch = cur.plan !== planInfo.name
         || cur.units !== planInfo.units
         || cur.stripeSubscriptionId !== sub.id
