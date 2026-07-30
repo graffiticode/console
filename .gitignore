@@ -76,7 +76,10 @@ cost-per-item.html
 *-training-examples.md
 
 # claude code
-.claude/
+# `.claude/*` not `.claude/` — git won't descend into an excluded directory,
+# so the skills negation below only works if the parent isn't pruned.
+.claude/*
+!.claude/skills/
 # model-eval harness results
 model-eval.json
 # Timestamped run outputs (the default since runs must not clobber each other).
