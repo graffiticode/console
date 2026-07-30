@@ -327,7 +327,7 @@ const resolvers = {
       if (ctx.freePlan) {
         try {
           const { uid } = await resolveAuth(ctx);
-          return await checkItemCreateAllowed(uid, { failClosed: true, skipSelfHeal: true });
+          return await checkItemCreateAllowed(uid, { failClosed: true, skipSelfHeal: true, skipSubscriptionRepair: true });
         } catch (error) {
           return { allowed: false, reason: 'Unable to verify item limit' };
         }

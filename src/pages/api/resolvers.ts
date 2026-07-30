@@ -93,6 +93,9 @@ async function assertItemCreateAllowed(auth: AuthArg, lang?: string): Promise<vo
     // the self-heal's per-period record scan grows without bound and would run
     // on every create. Trust the counter here; reconcile out-of-band.
     skipSelfHeal: auth.freePlan,
+    // Same reasoning: the trial account has no Stripe customer, so the
+    // subscription repair is a guaranteed no-op on this path.
+    skipSubscriptionRepair: auth.freePlan,
   });
   if (!gate.allowed) {
     if (auth.freePlan) {

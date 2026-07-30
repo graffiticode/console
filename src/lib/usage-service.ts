@@ -1,5 +1,6 @@
 import { getFirestore } from "../utils/db";
 import { effectiveIncludedItems, isHardCapped, DEFAULT_PLAN } from "./plans-config";
+import { repairSubscriptionFromStripe, subscriptionCacheIsEmpty } from "./subscription-cache";
 
 export interface ItemCreateAllowedResult {
   allowed: boolean;
@@ -42,6 +43,15 @@ export interface ItemCreateAllowedOptions {
    * and runs on every create. Trust the counter there; reconcile out-of-band.
    */
   skipSelfHeal?: boolean;
+  /**
+   * Skip repairing an empty `users/{uid}.subscription` cache from Stripe.
+   *
+   * The repair costs one Stripe call on a cache miss for a Stripe-linked
+   * account, then never again. Set this for the shared anonymous trial account:
+   * it has no Stripe customer, so the repair is a guaranteed no-op, and for a
+   * path that runs on every anonymous create the check is not worth carrying.
+   */
+  skipSubscriptionRepair?: boolean;
 }
 
 /**
@@ -71,7 +81,21 @@ export async function checkItemCreateAllowed(
     // Subscription → plan, included allowance, optional customer overage cap.
     const userDoc = await db.doc(`users/${uid}`).get();
     const userData = userDoc.data() || {};
-    const subscription = userData.subscription || {};
+    let subscription = userData.subscription || {};
+
+    // An empty cache on a Stripe-linked account means "we don't know this
+    // account's plan", NOT "this account is free". Treating the two as the same
+    // is how a paying customer gets hard-blocked at 50 items while the billing
+    // UI — which reads Stripe directly — shows 0 of 1,000 used. Repair from
+    // Stripe once and write it back; subsequent creates are cache-only again.
+    // Skipped for free-plan/anonymous callers, which have no Stripe customer.
+    if (!options.skipSubscriptionRepair &&
+        subscriptionCacheIsEmpty(subscription) &&
+        userData.stripeCustomerId) {
+      const repaired = await repairSubscriptionFromStripe(uid, userData.stripeCustomerId);
+      if (repaired) subscription = { ...subscription, ...repaired };
+    }
+
     const plan = subscription.plan || DEFAULT_PLAN;
     // Preserved allocation from a downgrade keeps the old (larger) bucket for a
     // grace window; it can only raise the allowance, never cap it.
