@@ -178,7 +178,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // metered overage); match the base price to resolve the plan.
         const items = subscription.items.data as any[];
         const firstItem = items[0];
-        const planName = items.map(it => priceIdToPlan(it?.price?.id)).find(Boolean) || DEFAULT_PLAN;
+
+        // NEVER fall back to DEFAULT_PLAN for an unmappable price.
+        //
+        // priceIdToPlan compares the price id against STRIPE_*_PRICE_ID env
+        // vars. If a price is rotated in Stripe before this service's env is
+        // updated — or the env is otherwise misconfigured — every paid price
+        // stops matching, and `|| DEFAULT_PLAN` would write `demo` over an
+        // active paid subscription. That is a silent downgrade of a paying
+        // customer, applied unattended on an ordinary subscription event, and
+        // it would then be enforced by checkItemCreateAllowed on their very
+        // next item.
+        //
+        // Skip the whole write rather than a partial one: we do not know the
+        // plan, and an existing customer's already-correct cached plan is
+        // better left untouched than overwritten with a record whose plan is
+        // wrong or missing but whose updatedAt says "synced". The error log
+        // plus scripts/reconcile-subscriptions.ts are the recovery path, and
+        // the on-read repair in src/lib/subscription-cache.ts retries once the
+        // env is fixed.
+        const planName = items.map(it => priceIdToPlan(it?.price?.id)).find(Boolean);
+        if (!planName) {
+          const priceIds = items.map(it => it?.price?.id).filter(Boolean).join(', ');
+          console.error(
+            `[stripe-webhook] REFUSING to sync subscription ${subscription.id} for customer ` +
+            `${customerId}: none of its price ids [${priceIds}] map to a known plan. This is a ` +
+            `configuration problem (a rotated price, or STRIPE_*_PRICE_ID not matching the mode ` +
+            `of STRIPE_SECRET_KEY) — NOT a free-plan account. Left the cached subscription ` +
+            `untouched; fix the env and run scripts/reconcile-subscriptions.ts.`,
+          );
+          break;
+        }
         const planInfo = { name: planName, units: includedItemsFor(planName) };
 
         // API-version resilience: current_period_start/end moved from the
