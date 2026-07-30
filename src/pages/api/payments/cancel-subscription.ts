@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION, includedItemsFor, priceIdToPlan, DEFAULT_PLAN } from '../../../lib/plans-config';
+import { STRIPE_API_VERSION, includedItemsFor, priceIdToPlan, DEFAULT_PLAN, PLANS, type PlanId } from '../../../lib/plans-config';
 import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
 import { emitPlanChanged } from '../../../lib/funnel-events';
 import { getFirestore } from '../../../utils/db';
@@ -66,21 +66,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Derive the allocation from the LIVE Stripe price — NOT from the Firestore
     // `subscription.plan`, which can be stale if a prior webhook didn't land
     // (that staleness is what previously fell back to the bogus Starter 2,000).
-    let currentAllocation = 0;
+    // null (not 0) means "we could not determine it" — see the refusal below.
+    let currentAllocation: number | null = null;
     if (immediately) {
       // Resolve the live base price to a plan and take its monthly item bucket
       // from plans-config (never a hardcoded map — those went stale when
       // compile units were retired for item-based pricing).
       const priceId = subscription.items.data.map(it => it?.price?.id).find(id => priceIdToPlan(id))
         || subscription.items.data[0]?.price.id;
-      const cancelingPlan = priceIdToPlan(priceId) ?? DEFAULT_PLAN;
-      currentAllocation = includedItemsFor(cancelingPlan);
 
-      console.log('Preserving allocation on downgrade to free:', {
-        priceId,
-        plan: cancelingPlan,
-        preservedAllocation: currentAllocation,
-      });
+      // NEVER fall back to DEFAULT_PLAN here. priceIdToPlan resolves against
+      // the STRIPE_*_PRICE_ID env vars, so a rotated price (or an env whose
+      // mode does not match STRIPE_SECRET_KEY) makes every paid price match
+      // nothing — and `?? DEFAULT_PLAN` then wrote preservedAllocation: 50
+      // onto a customer who had just cancelled a Gold plan. The grace window
+      // exists precisely because they paid through period end and should keep
+      // their 20,000-item bucket; 50 items under a hard-capped plan locks them
+      // out of a period they already paid for.
+      //
+      // The live Stripe price stays the primary source (the cached plan can be
+      // stale if a webhook never landed). But the cache is now a safe *last*
+      // resort: the webhook, reconciler and on-read repair all refuse to write
+      // an unmappable plan, so it is either correct or absent.
+      const cachedPlan = userData?.subscription?.plan;
+      const cancelingPlan = priceIdToPlan(priceId)
+        ?? (cachedPlan && cachedPlan in PLANS ? (cachedPlan as PlanId) : null);
+
+      if (cancelingPlan) {
+        currentAllocation = includedItemsFor(cancelingPlan);
+        console.log('Preserving allocation on downgrade to free:', {
+          priceId,
+          plan: cancelingPlan,
+          preservedAllocation: currentAllocation,
+        });
+      } else {
+        // The cancellation itself still proceeds — the customer asked for it
+        // and is entitled to it. Only the grace allocation is withheld, and
+        // omitting it is recoverable (scripts/set-preserved-allocation.ts)
+        // whereas a written 50 looks deliberate and would not be noticed.
+        console.error(
+          `[cancel-subscription] Cancelling ${subscription.id} for user ${userId} WITHOUT a ` +
+          `preserved allocation: price ${priceId} maps to no known plan and the cached plan ` +
+          `${JSON.stringify(cachedPlan)} is not a known plan either. This is a configuration ` +
+          `problem (a rotated price, or STRIPE_*_PRICE_ID not matching the mode of ` +
+          `STRIPE_SECRET_KEY) — NOT a free account. Writing DEFAULT_PLAN's allowance here ` +
+          `would cap a customer who paid through period end. Fix the env, then restore the ` +
+          `grace window with scripts/set-preserved-allocation.ts.`,
+        );
+      }
     }
 
     // Cancel the subscription
@@ -142,8 +175,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       updateData['subscription.renewalDate'] = new Date(subPeriodEnd * 1000).toISOString();
       updateData['subscription.interval'] = null; // Free plan has no interval
       updateData['subscription.stripeSubscriptionId'] = null; // Clear Stripe subscription ID
-      updateData['subscription.preservedAllocation'] = currentAllocation; // Preserve old plan's allocation
-      updateData['subscription.preservedUntil'] = new Date(subPeriodEnd * 1000).toISOString();
+      // Both fields or neither: preservedUntil without an allocation is a
+      // grace window with nothing in it.
+      if (currentAllocation !== null) {
+        updateData['subscription.preservedAllocation'] = currentAllocation; // Preserve old plan's allocation
+        updateData['subscription.preservedUntil'] = new Date(subPeriodEnd * 1000).toISOString();
+      }
 
       // Clear any previous canceledAt field for downgrades
       updateData['subscription.canceledAt'] = admin.firestore.FieldValue.delete();
