@@ -34,7 +34,7 @@
  */
 import Stripe from "stripe";
 import { getFirestore } from "../utils/db";
-import { STRIPE_API_VERSION, priceIdToPlan, DEFAULT_PLAN } from "./plans-config";
+import { STRIPE_API_VERSION, priceIdToPlan } from "./plans-config";
 import { subscriptionPeriodStart, subscriptionPeriodEnd } from "./stripe-helpers";
 
 export interface CachedSubscription {
@@ -95,9 +95,32 @@ export async function repairSubscriptionFromStripe(
     const sub = subs.data[0];
     if (!sub) return null;
 
-    const plan = sub.items.data
-      .map((it) => priceIdToPlan(it?.price?.id))
-      .find(Boolean) || DEFAULT_PLAN;
+    // NEVER fall back to DEFAULT_PLAN here.
+    //
+    // priceIdToPlan resolves by comparing the subscription's price id against
+    // env vars (STRIPE_PRO_PRICE_ID and friends). In an environment where one of
+    // those is unset, a real paid price matches nothing — and `|| DEFAULT_PLAN`
+    // would then write `demo` over an active Silver subscription, silently
+    // downgrading a paying customer and looking authoritative doing it. Observed
+    // for real: a local run mapped an active "Graffiticode Silver" $100/mo
+    // subscription to demo/50 because STRIPE_PRO_PRICE_ID was missing.
+    //
+    // An unmappable price means the environment is misconfigured, not that the
+    // customer is on the free plan. Those need opposite responses: refuse and
+    // shout, rather than write a wrong plan. Leaving the cache empty keeps the
+    // account on its existing behavior, which is recoverable; a written
+    // downgrade is not.
+    const plan = sub.items.data.map((it) => priceIdToPlan(it?.price?.id)).find(Boolean);
+    if (!plan) {
+      const priceIds = sub.items.data.map((it) => it?.price?.id).filter(Boolean).join(", ");
+      console.error(
+        `[subscription-cache] REFUSING to repair ${uid}: subscription ${sub.id} is ${sub.status} ` +
+        `but none of its price ids [${priceIds}] map to a known plan. This is almost always a ` +
+        `missing STRIPE_*_PRICE_ID in this environment — NOT a free-plan account. Fix the env ` +
+        `and re-run; writing DEFAULT_PLAN here would downgrade a paying customer.`,
+      );
+      return null;
+    }
     const start = subscriptionPeriodStart(sub);
     const end = subscriptionPeriodEnd(sub);
 
