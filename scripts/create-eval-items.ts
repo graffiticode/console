@@ -4,10 +4,13 @@
  * being calibrated can be eyeballed/rendered in /items instead of only as raw
  * code in data/model-eval/labels/<lang>.json.
  *
- * For each labeled candidate: post its EXACT code to api.graffiticode.org (a
- * persistent task → renderable taskId), then write an item doc under the eval
- * account tagged `client: 'eval'` (the /items "App" chip filters on `client`,
- * so these surface under an "eval" tab, out of the default console view).
+ * For each labeled candidate, run the SAME flow as the console editor and the
+ * async generation worker — createItem (shell) → parseCode → postTask →
+ * updateItem — so the item exists before its EXACT code is parsed and the item's
+ * own id is in scope for `get-val-public "itemId"` (L0158/L0176 bake it in as
+ * the Learnosity item reference; parsing first froze "" into the AST). Items are
+ * tagged `client: 'eval'` (the /items "App" chip filters on `client`, so these
+ * surface under an "eval" tab, out of the default console view).
  *
  * IDEMPOTENT and quota-safe. Reconciles in place: an existing item for a
  * candidate has its taskId updated (a revision, not billed), an identical
@@ -26,7 +29,10 @@ import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap before 
 
 import { readFileSync, existsSync } from "fs";
 import { getCredentialsForApiKey } from "../src/lib/api-credentials";
-import { postTask, createItem, updateItem, parseCode } from "../src/pages/api/resolvers";
+import {
+  postTask, createItem, updateItem, parseCode,
+  getPublicValuesForUser, setItemGenerationStatus,
+} from "../src/pages/api/resolvers";
 import { getFirestore } from "../src/utils/db";
 
 const LANG = (() => {
@@ -94,6 +100,14 @@ async function main() {
     seen.set(n, lab.model);
   }
 
+  // The account's non-secret credential ids (Learnosity consumer key, item bank
+  // id, ...), substituted at parse time exactly as the console's generateCode
+  // path does. Account SECRETS are deliberately not injected: a candidate
+  // carrying a side-effecting write (L0158's save-to-itembank) would then write
+  // to the real item bank on every render of an eval item. A dialect that needs
+  // one fails visibly at render instead.
+  const accountPublicValues = await getPublicValuesForUser(creds.uid);
+
   const results: any[] = [];
   let created = 0, updated = 0, unchanged = 0;
   const wanted = new Set<string>();
@@ -101,51 +115,93 @@ async function main() {
     if (!lab.code) { console.error(`  – skip ${lab.id}/${lab.model}: no code`); continue; }
     const name = nameFor(lab);
     wanted.add(name);
+    const prior = byName.get(name);
+    const isNew = !prior;
+    let itemId = prior?.id;
     try {
+      // Same shape as the console editor and the async generation worker: the
+      // ITEM EXISTS FIRST, then its source is parsed with the item's own id in
+      // scope, then the resulting taskId is written back.
+      //
+      //   createItem (shell) -> parseCode(itemId) -> postTask -> updateItem(taskId)
+      //
+      // The order is forced, not stylistic: L0158/L0176 read
+      // `get-val-public "itemId"` for the Learnosity item reference, and
+      // parseCode bakes the substituted value permanently into the AST that the
+      // taskId hashes. Parse before the item exists and the item reference is
+      // "" forever. deferGeneration gives a task-less shell WITHOUT invoking
+      // generateCode — these labels are exact captured generations and must
+      // never be re-generated.
+      //
+      // Billing is unaffected by the split: a shell carries no taskId, so
+      // createItem does not meter it; updateItem's no-taskId -> first-taskId
+      // transition does, exactly once.
+      if (!itemId) {
+        // Seed the mark from any score the label already carries so a fresh item
+        // does not sit at the default and read back as a genuine 1.
+        const shell = await createItem({
+          auth, lang: LANG, name, client: "eval", deferGeneration: true,
+          mark: lab.overall != null ? Math.min(5, Math.max(1, Math.round(Number(lab.overall)))) : 1,
+          help: helpFor(prompts.get(lab.id)),
+        }) as unknown as { id: string };
+        itemId = shell.id;
+      }
+
       // labels store DSL source; /task expects the parsed AST — compile first.
-      const parsed = await parseCode({ lang: LANG, src: lab.code, accessToken: auth.token });
+      const parsed = await parseCode({
+        lang: LANG,
+        src: lab.code,
+        publicValues: { ...accountPublicValues, itemId },
+        accessToken: auth.token,
+      });
       if (parsed.errors) throw new Error(`parse: ${parsed.errors.map((e: any) => e.message).join("; ")}`);
       const code = JSON.parse(parsed.code as string);
       const taskData = await postTask({ auth, task: { lang: LANG, code }, ephemeral: false });
       const taskId = taskData?.id;
       if (!taskId) throw new Error("postTask returned no id");
 
-      const prior = byName.get(name);
-      if (prior) {
-        if (prior.taskId === taskId) {
-          // Tasks are content-addressed, so an identical program yields an
-          // identical taskId — nothing changed and there is nothing to write.
-          unchanged++;
-          console.error(`  = ${name.padEnd(34)} unchanged  item=${prior.id}`);
-          results.push({ id: lab.id, model: lab.model, name, taskId, itemId: prior.id, action: "unchanged" });
-          continue;
-        }
-        // Deliberately does NOT pass `mark`: the item's mark is the human's
-        // score and updateItem merges only the fields given, so omitting it
-        // preserves the label. Refreshing content must never reset a score.
-        await updateItem({
-          auth, id: prior.id, taskId,
-          help: helpFor(prompts.get(lab.id)),
-          source: "eval" as any,
-        });
-        updated++;
-        console.error(`  ~ ${name.padEnd(34)} task=${taskId}  item=${prior.id} (updated)`);
-        results.push({ id: lab.id, model: lab.model, name, taskId, itemId: prior.id, action: "updated" });
+      if (prior?.taskId === taskId) {
+        // Tasks are content-addressed, so an identical program yields an
+        // identical taskId — nothing changed and there is nothing to write.
+        unchanged++;
+        console.error(`  = ${name.padEnd(34)} unchanged  item=${itemId}`);
+        results.push({ id: lab.id, model: lab.model, name, taskId, itemId, action: "unchanged" });
         continue;
       }
 
-      // New candidate. Seed the mark from any score the label already carries so
-      // a fresh item does not sit at the default and read back as a genuine 1.
-      const item = await createItem({
-        auth, lang: LANG, name, taskId, client: "eval",
-        mark: lab.overall != null ? Math.min(5, Math.max(1, Math.round(Number(lab.overall)))) : 1,
+      // Deliberately does NOT pass `mark`: the item's mark is the human's score
+      // and updateItem merges only the fields given, so omitting it preserves
+      // the label. Refreshing content must never reset a score.
+      await updateItem({
+        auth, id: itemId, taskId,
         help: helpFor(prompts.get(lab.id)),
+        source: "eval" as any,
       });
-      created++;
-      console.error(`  + ${name.padEnd(34)} task=${taskId}  item=${item.id} (created)`);
-      results.push({ id: lab.id, model: lab.model, name, taskId, itemId: item.id, action: "created" });
+      // The shell was born generationStatus="generating" and now has its task.
+      // Also clears a shell stranded by an earlier failed run.
+      if (!prior?.taskId) {
+        await setItemGenerationStatus({ auth, id: itemId, status: "ready" });
+      }
+
+      if (isNew) {
+        created++;
+        console.error(`  + ${name.padEnd(34)} task=${taskId}  item=${itemId} (created)`);
+      } else {
+        updated++;
+        console.error(`  ~ ${name.padEnd(34)} task=${taskId}  item=${itemId} (updated)`);
+      }
+      results.push({ id: lab.id, model: lab.model, name, taskId, itemId, action: isNew ? "created" : "updated" });
     } catch (e: any) {
       console.error(`  \u2717 ${name.padEnd(34)} ${e?.message || e}`);
+      // Leave the shell in place rather than deleting it: deleting returns
+      // nothing to the quota, and the next run reconciles it by name (its
+      // missing taskId makes it an update, billed then). Mark it failed so it
+      // does not sit in /items reading as perpetually generating.
+      if (itemId) {
+        await setItemGenerationStatus({
+          auth, id: itemId, status: "failed", error: String(e?.message || e),
+        }).catch(() => {});
+      }
     }
   }
 
