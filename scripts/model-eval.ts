@@ -63,6 +63,7 @@ import { judgeCode, judgePair, judgePanel, judgeModelForFamily } from "../src/li
 import { inferProviderFromModel, type LlmProvider } from "../src/lib/llm-models";
 import { estimateUsdCost } from "../src/lib/model-pricing";
 import { assertHoldout } from "./eval-holdout";
+import { pickRepresentative } from "./eval-representative";
 
 
 interface EvalCase { id: string; prompt: string; currentCode?: string | null }
@@ -262,8 +263,8 @@ function repCode(runs: RunResult[]): Map<string, string> {
   }
   const m = new Map<string, string>();
   for (const [k, rs] of buckets) {
-    rs.sort((a, b) => a.latencyMs - b.latencyMs || a.trial - b.trial);
-    m.set(k, rs[Math.floor((rs.length - 1) / 2)].code!);
+    const rep = pickRepresentative(rs);
+    if (rep?.code) m.set(k, rep.code);
   }
   return m;
 }
