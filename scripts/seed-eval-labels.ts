@@ -22,7 +22,7 @@
  *
  * Then: npx tsx scripts/create-eval-items.ts --lang <lang>   (renders them in /items)
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "fs";
 import { pickRepresentative } from "./eval-representative";
 
 function arg(name: string): string | undefined {
@@ -43,12 +43,18 @@ function resolveRunFile(): string {
     if (!existsSync(explicit)) { console.error(`No such run file: ${explicit}`); process.exit(1); }
     return explicit;
   }
-  const candidates = readdirSync(".").filter(f => /^model-eval.*\.json$/.test(f)).sort();
+  // Newest by MTIME, not by name. A name sort is wrong here: "-" (0x2d) sorts
+  // before "." (0x2e), so the legacy `model-eval.json` sorts AFTER every
+  // `model-eval-<iso>.json` and a name sort silently picks the stale one.
+  const candidates = readdirSync(".")
+    .filter(f => /^model-eval.*\.json$/.test(f))
+    .map(f => ({ f, mtime: statSync(f).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
   if (!candidates.length) {
     console.error("No model-eval*.json in the cwd. Run a sweep first, or pass --from.");
     process.exit(1);
   }
-  return candidates[candidates.length - 1];
+  return candidates[0].f;
 }
 
 function main() {
@@ -79,7 +85,11 @@ function main() {
   // for a model sweep the two coincide.
   const buckets = new Map<string, any[]>();
   for (const r of runsForLang) {
-    if (!r.ok || !r.code) continue;
+    // Compiling runs only — same rule as the harness's repCode. A human should
+    // not be asked to score a program that never compiled: the objective metric
+    // already counted that failure, and labeling it would feed --calibrate a
+    // comparison the judge should never have been given either.
+    if (!r.finalCompile || !r.code) continue;
     const model = r.model || r.variantId;
     if (ONLY_MODELS.length && !ONLY_MODELS.includes(model)) continue;
     const k = `${r.caseId}␟${model}`;

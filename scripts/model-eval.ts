@@ -257,7 +257,13 @@ function printTable(rows: any[]) {
 function repCode(runs: RunResult[]): Map<string, string> {
   const buckets = new Map<string, RunResult[]>();
   for (const r of runs) {
-    if (!r.ok || !r.code) continue;
+    // finalCompile, not `ok`: `ok` only means the generateCode call returned.
+    // Handing the judge a program that failed verification double-counts a
+    // failure the objective metric already recorded, and does it unevenly — only
+    // for whichever variant happened to fail. Observed on 0176: an OpenAI judge
+    // scored 5/5 twice on code that does not parse. Compiling is table stakes,
+    // so a candidate that fails it has nothing for the judge to rank.
+    if (!r.finalCompile || !r.code) continue;
     const k = `${r.lang}|${r.caseId}|${r.variantId}`;
     (buckets.get(k) ?? buckets.set(k, []).get(k)!).push(r);
   }

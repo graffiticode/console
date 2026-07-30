@@ -67,6 +67,8 @@ const MIN_CONTAINMENT_LENGTH = 40;
  * calibrated. Exact + containment is cheap, explainable, and catches the leak
  * that actually happens.
  */
+export class EmptyCorpusError extends Error {}
+
 export async function findHoldoutLeaks(
   lang: string,
   cases: Array<{ id: string; prompt: string }>,
@@ -77,6 +79,20 @@ export async function findHoldoutLeaks(
     id: doc.id,
     prompt: normalize((doc.data() as any)?.prompt || ""),
   })).filter((entry) => entry.prompt);
+
+  // An empty corpus produces "no overlap" — a pass indistinguishable from a real
+  // one, and therefore worse than an error. It means either the language has no
+  // training examples (so RAG contributes nothing and the run measures a
+  // different pipeline than production) or we are pointed at the wrong Firestore
+  // — the emulator has 0 training_examples, so a run there would silently clear
+  // this gate while retrieving nothing. Refuse either way.
+  if (!corpus.length) {
+    throw new EmptyCorpusError(
+      `no training_examples for L${lang} in "${collection}" — cannot verify hold-out. ` +
+      `Check you are pointed at prod Firestore (the emulator has none), or that this ` +
+      `language actually has a RAG corpus.`,
+    );
+  }
 
   const leaks: Leak[] = [];
   for (const c of cases) {
@@ -123,11 +139,14 @@ export async function assertHoldout(
     try {
       leaks = await findHoldoutLeaks(lang, cases, opts.collection);
     } catch (err: any) {
-      // Cannot verify ⇒ do not proceed. An unreadable corpus is indistinguishable
-      // from an empty one, and "empty" would silently pass the gate.
+      // Cannot verify => do not proceed. An unreadable or empty corpus is
+      // indistinguishable from a clean one, and both would silently pass.
+      const why = err instanceof EmptyCorpusError
+        ? `the corpus is EMPTY: ${err.message}`
+        : `could not read the corpus: ${err?.message || err}`;
       console.error(
-        `\n[holdout] FAILED to read the training corpus for L${lang}: ${err?.message || err}` +
-        `\n[holdout] Refusing to run: an unreadable corpus looks identical to a clean one.`,
+        `\n[holdout] Cannot verify hold-out for L${lang} — ${why}` +
+        `\n[holdout] Refusing to run: an unverifiable corpus looks identical to a clean one.`,
       );
       return false;
     }
