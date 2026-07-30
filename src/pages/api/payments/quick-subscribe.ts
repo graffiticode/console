@@ -8,6 +8,7 @@ import {
   includedItemsFor,
   isUpgrade as isPlanUpgrade,
   DEFAULT_PLAN,
+  PLANS,
   type PlanId,
   type BillingInterval,
 } from '../../../lib/plans-config';
@@ -138,7 +139,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { base } = splitItems(existingSub);
 
       // Determine the current plan and interval from the base line item.
-      const existingPlan = (priceIdToPlan(base?.price?.id) as PlanId) || 'starter';
+      //
+      // NEVER guess the existing plan. priceIdToPlan resolves against the
+      // STRIPE_*_PRICE_ID env vars, so a rotated price — or an env whose mode
+      // does not match STRIPE_SECRET_KEY — makes a real paid price match
+      // nothing. The old `|| 'starter'` fallback turned that into a silent
+      // downgrade of a paying customer: a Gold->Silver change would read as a
+      // Starter *upgrade* (isStarterUpgrade below), take the upgrade branch,
+      // and therefore skip the preservedAllocation write entirely — dropping
+      // them from 20,000 items to 1,000 mid-period after they had paid for
+      // Gold, and losing the proration credit too. Silently, with no error.
+      //
+      // A genuine Starter straggler resolves to 'starter' through
+      // priceIdToPlan, so that fallback only ever fired on the broken case.
+      //
+      // Fall back to the cached plan — the webhook, reconciler and on-read
+      // repair now all refuse to write an unmappable one, so it is either
+      // correct or absent, never confidently wrong — and refuse outright if
+      // neither source can name the plan. This value classifies both the
+      // Stripe proration behavior and the customer's item allowance; guessing
+      // it wrong costs them money either way.
+      const cachedPlan = userData?.subscription?.plan;
+      const existingPlan: PlanId | null = (priceIdToPlan(base?.price?.id) as PlanId | null)
+        ?? (cachedPlan && cachedPlan in PLANS ? (cachedPlan as PlanId) : null);
+
+      if (!existingPlan) {
+        console.error(
+          `[quick-subscribe] REFUSING plan change for user ${userId}: subscription ` +
+          `${existingSub.id} carries base price ${base?.price?.id}, which maps to no known ` +
+          `plan, and the cached plan ${JSON.stringify(cachedPlan)} is not a known plan ` +
+          `either. This is a configuration problem (a rotated price, or STRIPE_*_PRICE_ID ` +
+          `not matching the mode of STRIPE_SECRET_KEY) — NOT a Starter account. Refusing ` +
+          `rather than misclassifying the change as an upgrade, which would drop the ` +
+          `customer's preserved allocation. Fix the env and retry.`,
+        );
+        return res.status(500).json({
+          error: 'We could not determine your current plan, so this change was not applied. ' +
+            'Your subscription is unchanged. Please try again shortly.',
+        });
+      }
+
       const currentInterval: BillingInterval = base?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly';
 
       // Starter is discontinued; let stragglers upgrade out of it cleanly.
