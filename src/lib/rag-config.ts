@@ -59,7 +59,10 @@ const defaultConfig: RAGConfig = {
   enableJudge: process.env.JUDGE_ENABLED === 'true',
   judgeMode: process.env.JUDGE_MODE === 'async' ? 'async' : 'off',
   judgeModel: process.env.JUDGE_MODEL || 'claude-opus-5',
-  judgeTimeoutMs: parseInt(process.env.JUDGE_TIMEOUT_MS || '15000', 10),
+  // A reason-before-score judge enumerates every requirement and traces every
+  // formula before emitting a verdict; 15s aborted mid-analysis often enough to
+  // be the top source of dropped candidates in calibration runs.
+  judgeTimeoutMs: parseInt(process.env.JUDGE_TIMEOUT_MS || '90000', 10),
 
   // Fallback behavior - always enabled for resilience
   fallbackToKeywordSearch: true,

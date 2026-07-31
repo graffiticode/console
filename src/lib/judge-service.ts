@@ -29,7 +29,12 @@ import {
 } from "./llm-models";
 import { getJudgeConfig } from "./rag-config";
 
-const JUDGE_MAX_TOKENS = 2048; // room for a reason-before-score <analysis> block + the JSON verdict
+// Must cover the WHOLE reason-before-score response: the <analysis> block (every
+// requirement enumerated and each formula traced) AND the JSON verdict that
+// follows it. At 2048 the analysis alone exhausted the budget on content-heavy
+// items, so the verdict was never emitted and the candidate silently dropped out
+// of the sample — the dominant cause of judge "errors" once timeouts were fixed.
+const JUDGE_MAX_TOKENS = parseInt(process.env.JUDGE_MAX_TOKENS || "8192", 10);
 
 export interface JudgeVerdict {
   correctness: number;          // 1–5: does the code correctly accomplish what the prompt asks
@@ -161,7 +166,12 @@ function parseJson(text: string): any | null {
     const o = objs[i];
     if (o && (o.overall !== undefined || o.correctness !== undefined || o.winner !== undefined)) return o;
   }
-  return objs[objs.length - 1];
+  // No verdict-shaped object: the response was truncated before the verdict, or
+  // the judge never emitted one. Do NOT fall back to the last object parsed —
+  // the analysis quotes both Graffiticode (`{}` cells, `{}..` terminators) and
+  // Learnosity JSON, so the salvaged object is arbitrary prose scrapings. That
+  // fallback reported truncation as "missing dimension" and hid the real cause.
+  return null;
 }
 
 /**
@@ -254,19 +264,39 @@ object (no code fences). All four score fields are REQUIRED integers 1–5 (neve
 CANDIDATE:
 ${args.code}`;
 
-  // One retry: at ~1.0 temp the judge occasionally emits malformed / missing-field
-  // JSON, which would silently drop the item from the sample. Retry once before giving up.
+  // One retry, because a judge call can fail three distinct ways: the call itself
+  // throws (timeout / rate limit / provider error), the response carries no
+  // verdict-shaped JSON, or the JSON is missing a dimension. All three silently
+  // drop the candidate from the sample, so JUDGE_DEBUG=1 reports which one — a
+  // dropped candidate is not a neutral loss, it biases whatever the sample gates.
   const t0 = performance.now();
+  const debug = process.env.JUDGE_DEBUG === "1";
+  const note = (attempt: number, why: string, detail?: string) => {
+    if (debug) {
+      console.error(`[judge] attempt=${attempt} model=${model} ${why}` +
+        (detail ? ` :: ${detail.replace(/\s+/g, " ").slice(0, 240)}` : ""));
+    }
+  };
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const text = await callJudge(system, user, model, cfg.judgeTimeoutMs);
+      // The retry must be a DIFFERENT request, not a replay: temperature is 0, so
+      // re-sending the same prompt reproduces the same truncation. Drop the
+      // analysis on the second attempt — the verdict alone always fits.
+      const sys = attempt === 0
+        ? system
+        : `${system}\n\nRETRY: your previous response was cut off before the verdict. Skip the ` +
+          `<analysis> block entirely and output ONLY the single JSON object, nothing else.`;
+      const text = await callJudge(sys, user, model, cfg.judgeTimeoutMs);
       const o = parseJson(text);
-      if (!o) continue;
+      if (!o) { note(attempt, "no verdict-shaped JSON", `len=${text?.length ?? 0} tail=${(text || "").slice(-200)}`); continue; }
       const correctness = score5(pick(o, "correctness"));
       const instructionFollowing = score5(pick(o, "instructionFollowing", "instruction_following"));
       const idiomaticity = score5(pick(o, "idiomaticity"));
       // A verdict missing any dimension is unusable — retry rather than record a 0.
-      if (correctness === null || instructionFollowing === null || idiomaticity === null) continue;
+      if (correctness === null || instructionFollowing === null || idiomaticity === null) {
+        note(attempt, "missing dimension", JSON.stringify(o));
+        continue;
+      }
       // The judge intermittently omits `overall`; repair from the dimension mean
       // instead of recording a spurious 0 that would floor the aggregate.
       const overall = score5(pick(o, "overall")) ?? Math.round((correctness + instructionFollowing + idiomaticity) / 3);
@@ -279,8 +309,8 @@ ${args.code}`;
         model,
         latencyMs: Math.round(performance.now() - t0),
       };
-    } catch {
-      // fall through to retry
+    } catch (e: any) {
+      note(attempt, "call threw", e?.message || String(e));
     }
   }
   return null;
