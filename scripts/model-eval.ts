@@ -82,9 +82,30 @@ interface EvalCase { id: string; prompt: string; currentCode?: string | null }
 interface RunResult {
   lang: string; variantId: string; model: string; family?: LlmProvider; caseId: string; trial: number;
   ok: boolean; firstPass: boolean; finalCompile: boolean; fixRounds: number;
+  stub: boolean;   // parsed, but emitted no content — see isStub
   latencyMs: number; inputTokens: number; outputTokens: number; cost: number;
   code?: string;   // retained for the --judge pass; discarded from the console table
   error?: string;
+}
+
+/**
+ * A program that parses but emits no content — e.g. L0176's preamble alone:
+ *   set-var "lrn-id" get-val-public "itemId"..
+ * It compiles, so a taskId-only success test counted it as a first-pass WIN and
+ * pickRepresentative then seeded it as the case's labeled candidate. That single
+ * hole is why a variant could show 88% first-pass while humans scored three of
+ * its seven outputs a 1.
+ *
+ * The test is content structure, not length or dialect keywords: every dialect in
+ * these eval sets builds its content out of bracketed lists, so zero brackets
+ * (outside string literals) means nothing was authored. Verified against all 32
+ * labeled candidates in 0166 + 0176 — real programs carry 2-11 brackets, the two
+ * known stubs carry 0. Deliberately NOT a quality test: a substantive program
+ * that gets the task wrong still compiled, and belongs to the human/judge scale.
+ */
+function isStub(code: string | null | undefined): boolean {
+  if (!code) return true;
+  return !code.replace(/"(\\.|[^"\\])*"/g, '""').includes("[");
 }
 
 function parseArgs(argv: string[]) {
@@ -155,7 +176,7 @@ async function runOne(
   const t0 = performance.now();
   const base: RunResult = {
     lang, variantId: model, model, family: inferProviderFromModel(model),
-    caseId: c.id, trial, ok: false, firstPass: false, finalCompile: false,
+    caseId: c.id, trial, ok: false, firstPass: false, finalCompile: false, stub: false,
     fixRounds: 0, latencyMs: 0, inputTokens: 0, outputTokens: 0, cost: 0,
   };
   try {
@@ -168,14 +189,17 @@ async function runOne(
       rid: `eval-${lang}-${model}-${c.id}-${trial}`,
     });
     const latencyMs = performance.now() - t0;
-    // compiled ⇔ verification produced a taskId AND we got code back
-    const compiled = !!res?.taskId && !!res?.code;
+    // compiled ⇔ verification produced a taskId AND we got back code that
+    // actually authored something. A stub parses, so it would otherwise score as
+    // a first-pass win — the metric would reward emitting nothing.
+    const stub = isStub(res?.code);
+    const compiled = !!res?.taskId && !!res?.code && !stub;
     const fixRounds = res?.fixAttempts ?? 0;
     const inputTokens = res?.usage?.input_tokens ?? 0;
     const outputTokens = res?.usage?.output_tokens ?? 0;
     return {
       ...base, ok: true, latencyMs, inputTokens, outputTokens,
-      finalCompile: compiled, firstPass: compiled && fixRounds === 0, fixRounds,
+      finalCompile: compiled, firstPass: compiled && fixRounds === 0, fixRounds, stub,
       cost: costOf(model, inputTokens, outputTokens),
       code: typeof res?.code === "string" ? res.code : undefined,
     };
@@ -208,11 +232,12 @@ function summarize(runs: RunResult[]) {
     const n = rs.length, ok = rs.filter((r) => r.ok);
     const first = rs.filter((r) => r.firstPass).length;
     const final = rs.filter((r) => r.finalCompile).length;
+    const stubs = rs.filter((r) => r.stub).length;
     const lat = ok.map((r) => r.latencyMs);
     const totalCost = rs.reduce((s, r) => s + r.cost, 0);
     rows.push({
       lang, variantId, model, family: rs[0].family, runs: n, errors: n - ok.length,
-      firstPassRate: first / n, finalRate: final / n,
+      firstPassRate: first / n, finalRate: final / n, stubRate: stubs / n,
       avgFixRounds: rs.reduce((s, r) => s + r.fixRounds, 0) / n,
       latencyP50: quantile(lat, 0.5), latencyP90: quantile(lat, 0.9),
       avgCost: totalCost / n,
@@ -228,12 +253,13 @@ function printTable(rows: any[]) {
   const ms = (x: number) => (x / 1000).toFixed(1) + "s";
   console.log(
     "\n" +
-    ["lang", "model", "runs", "err", "1st-pass", "final", "fixes", "p50", "p90", "$/run", "$/win"]
-      .map((h, i) => h.padEnd([6, 20, 5, 4, 9, 7, 6, 7, 7, 8, 8][i])).join(""));
+    ["lang", "model", "runs", "err", "1st-pass", "final", "stub", "fixes", "p50", "p90", "$/run", "$/win"]
+      .map((h, i) => h.padEnd([6, 20, 5, 4, 9, 7, 6, 6, 7, 7, 8, 8][i])).join(""));
   for (const r of rows) {
     console.log([
       r.lang.padEnd(6), r.model.padEnd(20), String(r.runs).padEnd(5), String(r.errors).padEnd(4),
-      pct(r.firstPassRate).padEnd(9), pct(r.finalRate).padEnd(7), r.avgFixRounds.toFixed(2).padEnd(6),
+      pct(r.firstPassRate).padEnd(9), pct(r.finalRate).padEnd(7), pct(r.stubRate).padEnd(6),
+      r.avgFixRounds.toFixed(2).padEnd(6),
       ms(r.latencyP50).padEnd(7), ms(r.latencyP90).padEnd(7),
       ("$" + r.avgCost.toFixed(4)).padEnd(8),
       (r.costPerSuccess === Infinity ? "—" : "$" + r.costPerSuccess.toFixed(4)).padEnd(8),
@@ -669,7 +695,7 @@ async function main() {
         for (let t = 0; t < args.trials; t++) {
           const r = await runOne(auth, lang, model, c, t, precomputed, { thinking: args.thinking, effort: args.effort });
           allRuns.push(r);
-          process.stderr.write(r.ok ? (r.firstPass ? "." : r.finalCompile ? "o" : "x") : "!");
+          process.stderr.write(r.ok ? (r.firstPass ? "." : r.finalCompile ? "o" : r.stub ? "s" : "x") : "!");
         }
       }
     }
@@ -678,7 +704,7 @@ async function main() {
 
   const summary = summarize(allRuns);
   printTable(summary);
-  console.log("Legend: '.' first-pass compile  'o' compiled after fixes  'x' never compiled  '!' error");
+  console.log("Legend: '.' first-pass compile  'o' compiled after fixes  's' stub (parsed, authored nothing)  'x' never compiled  '!' error");
 
   // ── Phase 2 (subjective) — LLM-as-judge, opt-in via --judge (keeps Phase 1 cheap). ──
   // Reference-free rubric (correctness / instruction-following / idiomaticity / overall) scored
