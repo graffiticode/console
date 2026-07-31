@@ -122,17 +122,36 @@ function initializeFirebase() {
 // Cache lexicons — fetched before Firebase init to avoid HTTP interference
 const lexiconCache: Record<string, any> = {};
 
+// Try the api gateway first, then the dialect's own host. A dialect that has
+// migrated to lexicon.json may not serve the legacy lexicon.js path, and an
+// unparse with no lexicon silently degrades every node to a `/* TAG */` stub
+// (see unparse.js) — which is how the L0176 corpus was poisoned — so treat a
+// missed lexicon as fatal rather than warn-and-continue.
 function prefetchLexicon(lang: string): void {
   if (lexiconCache[lang] !== undefined) return;
-  try {
-    const apiUrl = "https://api.graffiticode.org";
-    const text = execSync(`curl -sf '${apiUrl}/L${lang}/lexicon.js'`, { encoding: 'utf-8' });
-    const jsonStr = text.substring(text.indexOf("{"));
-    lexiconCache[lang] = JSON.parse(jsonStr);
-  } catch (err: any) {
-    console.warn(`Warning: failed to fetch lexicon for L${lang}: ${err.message}`);
-    lexiconCache[lang] = null;
+  const urls = [
+    `https://api.graffiticode.org/L${lang}/lexicon.json`,
+    `https://api.graffiticode.org/L${lang}/lexicon.js`,
+    `https://l${lang}.graffiticode.org/lexicon.json`,
+  ];
+  for (const url of urls) {
+    try {
+      const text = execSync(`curl -sf '${url}'`, { encoding: 'utf-8' });
+      const parsed = JSON.parse(text.substring(text.indexOf("{")));
+      if (parsed && Object.keys(parsed).length > 0) {
+        lexiconCache[lang] = parsed;
+        console.log(`  Lexicon for L${lang}: ${Object.keys(parsed).length} entries from ${url}`);
+        return;
+      }
+    } catch {
+      // try the next candidate
+    }
   }
+  console.error(
+    `Error: could not fetch a lexicon for L${lang}. Unparsing without one would ` +
+    `emit /* TAG */ stubs instead of source and poison the training corpus.`
+  );
+  process.exit(1);
 }
 
 function getCachedLexicon(lang: string): any {
@@ -167,7 +186,21 @@ async function fetchCodeFromTask(taskId: string, lang: string): Promise<string |
       return null;
     }
     const lexicon = getCachedLexicon(lang);
-    return unparse(ast, lexicon || {});
+    if (!lexicon) {
+      throw new Error(`no lexicon cached for L${lang} — refusing to unparse into stubs`);
+    }
+    const src = unparse(ast, lexicon);
+    // A tag missing from the lexicon unparses to `/* TAG */`. Such an example
+    // teaches the model to emit comments instead of code, so drop it here.
+    const stubs = src.match(/\/\*\s*[A-Z][A-Z0-9_]*\s*\*\//g);
+    if (stubs) {
+      console.warn(
+        `  ⤫ Dropping ${taskId}: unparse produced ${stubs.length} unknown-tag stub(s) ` +
+        `(${[...new Set(stubs)].slice(0, 5).join(", ")})`
+      );
+      return null;
+    }
+    return src;
   } catch (err: any) {
     console.warn(`  Warning: failed to fetch task code for ${taskId}: ${err.message}`);
     return null;
