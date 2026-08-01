@@ -244,6 +244,31 @@ function convertToMarkdownFormat(trainingExamples: any[]): string {
 
     examples.forEach((example, index) => {
       const prompt = extractTaskFromMessages(example.messages);
+      // DE-RESOLVE THE ITEM ID — deliberate, and the thing to read before
+      // concluding the parser or the corpus is broken.
+      //
+      // `itemId` can only be resolved at PARSE time (the id does not exist until
+      // the item does), so parseCode substitutes it via GET_VAL_PUBLIC and the
+      // stored AST keeps only the literal — no call node, no "itemId" string
+      // anywhere in it. `unparse` therefore renders it faithfully as
+      //   set-var "lrn-id" "08O6OFYGyvwDngIiEWEn"
+      // and that is CORRECT: the AST is the source of truth and it really does
+      // hold that id.
+      //
+      // But a training example teaches the model what to EMIT, and the model
+      // writes source before any item exists. Shipping the literal would teach it
+      // to hardcode one Learnosity item reference into every generation. So the
+      // rendered literal is turned back into the call form that authored source
+      // must contain — the form L0176/L0158's instructions.md mandates as line 1.
+      //
+      // Consequences worth knowing:
+      //   - The corpus deliberately does NOT round-trip to the stored AST. If you
+      //     unparse a task directly you will see the literal and the corpus will
+      //     not; both are right. That discrepancy is this line, not a bug.
+      //   - The match is positional on `set-var "lrn-id" "<any>"`. If a dialect's
+      //     preamble changes shape this silently stops firing and literal ids
+      //     start reaching the corpus — grep a fresh download for a 20-char id
+      //     after any preamble change.
       const code = example.code.trim()
         .replace(/set-var "lrn-id" "[^"]*"/g, 'set-var "lrn-id" get-val-public "itemId"')
         .split("\n")
