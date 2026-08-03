@@ -16,10 +16,6 @@
     "prompt": "Create a Learnosity math fill-in item asking the student to simplify the expression 4/8 to lowest terms. Score it on mathematical equivalence so that 1/2, 0.5, and 2/4 reduced are all accepted as correct, but 4/8 left unsimplified is not."
   },
   {
-    "id": "custom-spreadsheet-embed",
-    "prompt": "Create a Learnosity custom item that embeds an interactive Graffiticode L0166 spreadsheet as the interaction. The stimulus should ask the student to complete the budget worksheet by entering a formula in the total row. The spreadsheet should show three expense rows with amounts and an empty total cell the student must fill with a SUM formula."
-  },
-  {
     "id": "hot-text-distractors",
     "prompt": "Create a Learnosity token-highlight item over this passage: \"The quick brown fox jumps over the lazy dog while the tired cat sleeps soundly.\" Ask the student to highlight every adjective. The correct tokens are quick, brown, lazy, and tired. Also make the words fox, jumps, and soundly clickable so students can select them and be marked wrong, but leave the remaining words unselectable."
   },
