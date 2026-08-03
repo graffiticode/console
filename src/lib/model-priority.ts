@@ -39,6 +39,15 @@ import type { LlmProvider } from "./llm-models";
 export const MODEL_PRIORITY: Record<string, LlmProvider[]> = {
   // "0166": ["anthropic", "openai"],  // eval YYYY-MM-DD: finalRate .94 vs .81
   // "0158": ["openai", "anthropic"],  // eval YYYY-MM-DD: $/win 0.031 vs 0.052
+
+  // eval 2026-08-03 (model-eval-2026-08-03T13-50-58, 7 cases x 3 trials, hold-out enforced):
+  // gpt-5.6-terra 100% first-pass vs claude-sonnet-5 96%, $0.0038 vs $0.0077 per run,
+  // p50 4.2s vs 7.7s. Human labels tie on quality (3.71 vs 3.57; 6 of 7 cases tied).
+  // Judge deliberately NOT used: --calibrate gives rho .10, CI [-.52, .66], and the panel
+  // agreed only 75% — this ordering rests on the objective columns and human labels.
+  // Sonnet's one failure was a stray `..` mid-program; fixing that would erase the
+  // first-pass gap and leave only cost and latency behind this line.
+  "0176": ["openai", "anthropic"],
 };
 
 /**
