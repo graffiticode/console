@@ -89,6 +89,60 @@ function section(title: string, body: string): string {
 }
 
 /**
+ * How far each client that connected actually got: connect → catalog listed →
+ * guide read → tool called.
+ *
+ * This replaces a parenthetical that read "N probes filtered" and hid the
+ * single largest thing the logs know. Most of those connects are agent hosts
+ * that opened a transport, took the catalog and never called anything — the top
+ * of the funnel, and the number that instruction and positioning work is meant
+ * to move. Self-identifying automation is collapsed to one line beneath rather
+ * than dropped, so a NEW crawler still shows up instead of silently joining the
+ * filtered pile.
+ *
+ * Deliberately numeric, no bars: this is a drop-off across a row, and a bar per
+ * row invites reading down the column instead of across it.
+ */
+function reachRows(d: Digest): string {
+  const entries = Object.entries(d.reach.byClient).sort(
+    (a, b) => b[1].connects - a[1].connects || a[0].localeCompare(b[0]),
+  );
+  const mid = d.reach.instrumented;
+  const notes: string[] = [];
+  if (d.reach.crawlers.sessions) {
+    const named = Object.entries(d.reach.crawlers.byName)
+      .sort((a, b) => b[1] - a[1])
+      // Scanners identify themselves with a full user-agent string; one of them
+      // is 60 characters and wraps this footnote across a phone screen.
+      .map(([k, v]) => `${k.length > 24 ? `${k.slice(0, 23)}…` : k} ${v}`)
+      .join(", ");
+    notes.push(`automated: ${d.reach.crawlers.sessions} — ${named}`);
+  }
+  if (d.reach.unnamed) notes.push(`unnamed: ${d.reach.unnamed} — client reported no name`);
+  // Unknown, not zero. mcp_listed/mcp_resource postdate most of the log
+  // history, and rendering 0 for a window that never measured them would state
+  // that nobody looked.
+  if (!mid) notes.push("– catalog and guide reads not instrumented in this window");
+  const foot = notes.map((n) => `<p class="none">${esc(n)}</p>`).join("");
+
+  if (!entries.length) return `<p class="none">no agent connects</p>${foot}`;
+
+  const head =
+    `<tr class="hd"><td class="k">client</td><td class="n">conn</td>` +
+    (mid ? `<td class="n">list</td><td class="n">read</td>` : "") +
+    `<td class="n">used</td></tr>`;
+  const body = entries
+    .map(
+      ([k, r]) =>
+        `<tr><td class="k">${esc(k)}</td><td class="n">${r.connects}</td>` +
+        (mid ? `<td class="n">${r.listed}</td><td class="n">${r.read}</td>` : "") +
+        `<td class="n${r.used ? "" : " zero"}">${r.used}</td></tr>`,
+    )
+    .join("");
+  return `<table>${head}${body}</table>${foot}`;
+}
+
+/**
  * Language use: items that compiled, with attempts alongside.
  *
  * Bars are sized by attempts, not creations, so a language that was tried a lot
@@ -178,12 +232,13 @@ function digestBlock(d: Digest): string {
   return `
   <div class="stats">
     ${stat("tool calls", d.context.toolCalls)}
-    ${stat("workspaces", d.workspaces.total, `${d.context.connectsWithoutUse} probes filtered`)}
+    ${stat("workspaces", d.workspaces.total, `${d.reach.agentIdle} agents idle`)}
     ${stat("items", d.items.ok, d.items.failed ? `${d.items.failed} failed` : undefined)}
     ${stat("edits", d.context.edits)}
     ${stat("views", d.context.views)}
     ${stat("walls", Object.values(d.walls).reduce((a, b) => a + b, 0))}
   </div>
+  ${section("Reach", reachRows(d))}
   ${section("By client", rows(d.workspaces.byClient))}
   ${section("By language", languageRows(d))}
   ${section("Items by surface", rows(d.items.byApp))}
@@ -263,6 +318,9 @@ export function renderReport(input: {
   td.k { white-space:nowrap; padding-right:10px; max-width:44%; overflow:hidden; text-overflow:ellipsis; }
   td.n { text-align:right; width:38px; font-variant-numeric:tabular-nums; }
   td.n.dim { color:var(--dim); font-size:12px; width:34px; }
+  td.n.zero { color:var(--dim); }
+  tr.hd td { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.05em;
+             padding-bottom:2px; }
   td.bar { width:100%; }
   td.bar span { display:block; height:7px; border-radius:4px; background:var(--accent); min-width:3px; }
   td.bar span.stalled { background:#dc2626; }

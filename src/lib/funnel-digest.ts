@@ -212,7 +212,76 @@ export interface Digest {
     genFailures: number;
     budgetThreshold?: number;
   };
+  /**
+   * What connected, and how far it got — the inside of `connectsWithoutUse`.
+   *
+   * That one number counted every connect that never called a tool and the
+   * report filed the lot as "probes filtered", which is how ~1,100 sessions of
+   * real agent hosts came to be reported as noise. They are not the same thing
+   * as a Censys scan: a host that opened a transport, took our catalog, and
+   * passed on it is a positioning result, and it's the number that instruction
+   * work is supposed to move.
+   *
+   * `listed`/`read` come from the MCP server's mcp_listed/mcp_resource events.
+   * Windows that predate them must render blank, not zero — see `instrumented`.
+   */
+  reach: {
+    byClient: Record<
+      string,
+      { connects: number; sessions: number; listed: number; read: number; used: number }
+    >;
+    /** Self-identifying automation, collapsed to one line. */
+    crawlers: { sessions: number; byName: Record<string, number> };
+    /** Connects with no client_kind at all — pre-2026-07-28 data, and clients that send none. */
+    unnamed: number;
+    /** Agent sessions that connected and never called a tool. THE number. */
+    agentIdle: number;
+    /** Whether mcp_listed exists in this window at all. */
+    instrumented: boolean;
+  };
 }
+
+/**
+ * Which side of the noise line a connect falls on.
+ *
+ * `crawler` is only ever a client that SAYS it is one — directory audits,
+ * reputation scanners, `Mozilla/`-shaped user agents pasted into clientInfo.
+ * Everything else that gives a name is an `agent`, including names we suspect
+ * are automated: `Anthropic/ClaudeAI` is far and away the largest bucket and
+ * has never produced a tool call, but guessing it into the bin would delete the
+ * evidence either way. It gets its own row, and the mcp_listed column settles
+ * it — a validator handshakes and stops, a host lists our tools.
+ *
+ * `unnamed` is its own bucket rather than folded into `agent`. Connects carried
+ * no client_kind until 2026-07-28, so merging them would invent demand out of
+ * data that predates the field.
+ */
+export function classifyConnect(kind?: string): "crawler" | "agent" | "unnamed" {
+  if (!kind) return "unnamed";
+  if (CRAWLER_NAMES.has(kind)) return "crawler";
+  return CRAWLER_PATTERN.test(kind) ? "crawler" : "agent";
+}
+
+const CRAWLER_NAMES = new Set([
+  "agent-tools.cloud",
+  "forge-catalog-audit",
+  "catalog-health",
+  "census-probe",
+  "mcp-reputation-scanner",
+  "probe",
+]);
+
+/**
+ * Whole words only, and no bare "catalog" or "health".
+ *
+ * This pattern's job is to catch the NEXT crawler, not to re-catch the ones
+ * already named above, and a loose substring match is how a real client called
+ * something like "healthcare-tutor" would disappear into the automated line.
+ * Misfiling is visible either way — the footnote names what it collapsed — but
+ * the default should be to leave a client in the table.
+ */
+const CRAWLER_PATTERN =
+  /\b(scanner|crawler|spider|censys|probe|audit|healthcheck|uptime|monitor)\b|^Mozilla\//i;
 
 function langSafeKind(v: unknown): string | undefined {
   return typeof v === "string" && v ? v : undefined;
@@ -290,12 +359,51 @@ export function aggregate(
       checkoutAbandoned: 0,
       genFailures: 0,
     },
+    reach: {
+      byClient: {},
+      crawlers: { sessions: 0, byName: {} },
+      unnamed: 0,
+      agentIdle: 0,
+      instrumented: false,
+    },
   };
 
-  // Session-level joins: a connect that never produced a tool call is a probe,
-  // and a checkout that never produced a plan change was abandoned.
-  const connected = new Set<string>();
-  const used = new Set<string>();
+  // Session-level joins: what became of each connect, and a checkout that never
+  // produced a plan change was abandoned.
+  //
+  // Keyed on `tns` — the MCP server's stable per-transport namespace — falling
+  // back to `session` for events that predate that field. `session` alone
+  // cannot carry this join: it starts as the transport's namespace and becomes
+  // the console's WORKSPACE handle once a call adopts a workspace, so a connect
+  // and the tool calls that followed it land under different values, and the
+  // connect is then indistinguishable from one that went nowhere.
+  //
+  // Records are created by mcp_connect ONLY. This map is the inside of
+  // connectsWithoutUse, so it holds exactly the connects made in this window;
+  // a tool call from a session that connected in an earlier one is already
+  // counted as a workspace and has no connect here to explain.
+  interface Reach {
+    kind?: string;
+    connects: number;
+  }
+  const reach = new Map<string, Reach>();
+  // What each key did is collected in sets and applied at the end, NOT flagged
+  // onto the record as the loop goes. Flagging would only work if events
+  // arrived in timestamp order: a tool call read before its own connect finds
+  // no record yet and its session reports as idle. The live path does fetch
+  // ascending, but `gcloud logging read` defaults to descending and any offline
+  // analysis would then undercount by exactly the sessions that converted.
+  const usedKeys = new Set<string>();
+  const listedKeys = new Set<string>();
+  const readKeys = new Set<string>();
+  const reachKey = (e: LogEvent): string | undefined => {
+    if (typeof e.tns === "string" && e.tns) return e.tns;
+    return typeof e.session === "string" && e.session ? e.session : undefined;
+  };
+  const mark = (set: Set<string>, e: LogEvent): void => {
+    const key = reachKey(e);
+    if (key) set.add(key);
+  };
   const checkoutStarted = new Set<string>();
   const planChanged = new Set<string>();
   // workspace namespace -> the client kind / geo it presented, deduped.
@@ -310,14 +418,36 @@ export function aggregate(
   for (const e of events) {
     const session = typeof e.session === "string" ? e.session : undefined;
     switch (e.ev) {
-      case "mcp_connect":
-        if (session) connected.add(session);
+      case "mcp_connect": {
+        const key = reachKey(e);
+        if (key) {
+          const r = reach.get(key) ?? { connects: 0 };
+          r.connects++;
+          // First non-empty name wins. One key can span several connects, and
+          // the older ones predate client_kind — a key that ever named itself
+          // is named.
+          if (!r.kind) r.kind = langSafeKind(e.client_kind);
+          reach.set(key, r);
+        }
+        break;
+      }
+
+      // The two stages between "a transport opened" and "someone asked for
+      // something". Absent these, a directory validator and an agent host that
+      // read our guides and passed produce identical evidence.
+      case "mcp_listed":
+        d.reach.instrumented = true;
+        mark(listedKeys, e);
+        break;
+
+      case "mcp_resource":
+        mark(readKeys, e);
         break;
 
       case "mcp_tool":
         d.context.toolCalls++;
+        mark(usedKeys, e);
         if (session) {
-          used.add(session);
           const kind = langSafeKind(e.client_kind);
           if (kind && !active.has(session)) {
             active.set(session, { kind, geo: geoOf(e) });
@@ -343,7 +473,7 @@ export function aggregate(
           kind: langSafeKind(e.client_kind) ?? "unknown",
           geo: geoOf(e),
         });
-        if (session) used.add(session);
+        mark(usedKeys, e);
         break;
       }
 
@@ -429,7 +559,41 @@ export function aggregate(
     }
   }
 
-  for (const s of connected) if (!used.has(s)) d.context.connectsWithoutUse++;
+  // One pass over the connects, splitting them by who made them. The total is
+  // still reported as connectsWithoutUse — the SMS line is unchanged — but the
+  // report page now gets to say which of them were machines announcing
+  // themselves, which were nameless, and which were agent hosts that took the
+  // catalog and left.
+  for (const [key, r] of reach) {
+    const used = usedKeys.has(key);
+    if (!used) d.context.connectsWithoutUse++;
+    switch (classifyConnect(r.kind)) {
+      case "crawler":
+        d.reach.crawlers.sessions++;
+        bump(d.reach.crawlers.byName, r.kind);
+        break;
+      case "unnamed":
+        d.reach.unnamed++;
+        break;
+      case "agent": {
+        const row = (d.reach.byClient[r.kind as string] ??= {
+          connects: 0,
+          sessions: 0,
+          listed: 0,
+          read: 0,
+          used: 0,
+        });
+        row.connects += r.connects;
+        row.sessions++;
+        if (listedKeys.has(key)) row.listed++;
+        if (readKeys.has(key)) row.read++;
+        if (used) row.used++;
+        else d.reach.agentIdle++;
+        break;
+      }
+    }
+  }
+
   for (const s of checkoutStarted) if (!planChanged.has(s)) d.context.checkoutAbandoned++;
 
   return d;
