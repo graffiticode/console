@@ -128,28 +128,102 @@ export async function listLanguages({ search, domain }: { search?: string; domai
   if (search) {
     const searchLower = search.toLowerCase();
     const domainLower = (domain || "").toLowerCase();
-    results = results.filter(lang => {
-      // A vendor-gated language answers a search only if the search names its gate
-      // (or the caller already scoped to the gate's domain, which is itself the ask).
-      // Its item-type text is generic by nature and would otherwise match any
-      // un-branded question search.
-      const gates = lang.gatedBy || [];
-      if (gates.length > 0 &&
+    const tokens = searchTokens(search);
+
+    const scored = results
+      .filter(lang => {
+        // A vendor-gated language answers a search only if the search names its gate
+        // (or the caller already scoped to the gate's domain, which is itself the ask).
+        // Its item-type text is generic by nature and would otherwise match any
+        // un-branded question search. Deliberately still tested against the RAW
+        // phrase: naming the vendor anywhere in the query is the gate, and
+        // tokenizing must not widen what counts as naming it.
+        const gates = lang.gatedBy || [];
+        return !(gates.length > 0 &&
           !gates.includes(domainLower) &&
-          !gates.some(g => searchLower.includes(g))) {
-        return false;
-      }
-      return (
-        lang.name.toLowerCase().includes(searchLower) ||
-        lang.description.toLowerCase().includes(searchLower) ||
-        (lang.longDescription || "").toLowerCase().includes(searchLower) ||
-        (lang.summary || "").toLowerCase().includes(searchLower) ||
-        (lang.inScope || []).some(s => s.toLowerCase().includes(searchLower))
-      );
-    });
+          !gates.some(g => searchLower.includes(g)));
+      })
+      .map(lang => ({ lang, score: scoreLanguage(lang, tokens) }))
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    // Ranked, and capped. Uncapped OR-matching hands back most of the catalog for
+    // a query with one common word, which reads as "everything fits" and invites
+    // the nearest-match failure eval-routing.ts exists to catch. A caller that
+    // wants the whole catalog omits `search` — which is what agents already do
+    // when a search disappoints them.
+    results = scored.slice(0, SEARCH_LIMIT).map(({ lang }) => lang);
   }
 
   return results;
+}
+
+/** Ranked-search result ceiling. See the cap note in listLanguages(). */
+const SEARCH_LIMIT = 8;
+
+/**
+ * Words that describe nearly every language here, or nothing at all.
+ *
+ * "interactive" is in this list because it appears in most routing hints — as a
+ * query token it selects the catalog rather than narrowing it.
+ */
+const STOPWORDS = new Set([
+  "a", "an", "and", "the", "of", "for", "to", "in", "on", "with", "from", "by", "or",
+  "my", "our", "their", "this", "that", "these", "those", "it", "its",
+  "make", "create", "build", "generate", "author", "want", "need", "please",
+  "interactive", "activity", "activities", "app", "thing", "something", "content",
+]);
+
+/**
+ * Split a query into matchable terms.
+ *
+ * The old matcher tested the whole phrase as one substring, so any multi-word
+ * query — which is what agents overwhelmingly send — matched nothing unless it
+ * appeared verbatim. A fit eval over 28 prompts sent 36 distinct searches that
+ * returned zero; 17 were multi-word, including "bar chart" against a charts
+ * language whose description says "bar". Zero results is the worst possible
+ * answer: the agent concludes the capability doesn't exist and stops.
+ */
+export function searchTokens(search: string): string[] {
+  return [
+    ...new Set(
+      search
+        .toLowerCase()
+        .split(/[^a-z0-9+]+/)
+        .filter(t => t.length > 1 && !STOPWORDS.has(t)),
+    ),
+  ];
+}
+
+/** Whole-word match, so "form" stops matching inside "transform". */
+function hasWord(haystack: string, token: string): boolean {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Plurals are the same ask: "forms" must reach a language that says "form".
+  return new RegExp(`\\b${escaped}(s|es)?\\b`, "i").test(haystack);
+}
+
+/**
+ * How well a language answers a query: one point per distinct query term it
+ * matches, doubled for a term in its name or one-line description, since those
+ * are what the language IS rather than what it happens to mention.
+ *
+ * ANY term scoring is deliberate. Requiring every term would reproduce the
+ * failure this replaces — a user's phrasing carries words no catalog entry uses
+ * ("students", "shade", "6th grade"), and one unmatched word should not erase a
+ * language that answers the rest.
+ */
+function scoreLanguage(lang: Language, tokens: string[]): number {
+  if (!tokens.length) return 1; // punctuation-only query: don't filter anything out
+  const primary = `${lang.name} ${lang.description}`;
+  const secondary = [lang.longDescription, lang.routingHint, lang.summary, ...(lang.inScope || [])]
+    .filter(Boolean)
+    .join(" ");
+  let score = 0;
+  for (const t of tokens) {
+    if (hasWord(primary, t)) score += 2;
+    else if (hasWord(secondary, t)) score += 1;
+  }
+  return score;
 }
 
 /**
