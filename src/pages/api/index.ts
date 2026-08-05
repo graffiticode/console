@@ -495,6 +495,7 @@ const resolvers = {
         modification,
         currentSrc,
         authReplay,
+        client,
       });
 
       return { itemId: id, status: "generating" };

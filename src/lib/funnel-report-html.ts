@@ -213,21 +213,21 @@ function sparkTable(series: DayPoint[]): string {
 // means every client kind and country in the window looks novel here. Rendering
 // that would state something false. Novelty belongs to the SMS, which holds the
 // real prior state.
+/*
+ * Walls, signups, api keys and plan changes are NOT rendered.
+ *
+ * They are emitted by the console with no `app` field, so the MCP-only reader
+ * drops them (see isMcpOrigin) and every one of them would be a structural zero.
+ * A tile reading "walls 0" is a claim that no request was refused, which is a
+ * different and stronger statement than "this report does not measure that" — so
+ * the tiles are gone rather than pinned at zero. Claims survive because
+ * claim/claim_view are MCP-funnel events, and item failures survive because
+ * item_generation_failed now carries `app`.
+ */
 function digestBlock(d: Digest): string {
-  const conv: string[] = [];
-  if (d.claims.count) conv.push(`${d.claims.count} claim (+${d.claims.transferred} items)`);
-  if (d.signups.direct) conv.push(`${d.signups.direct} signup direct`);
-  if (d.signups.viaClaim) conv.push(`${d.signups.viaClaim} signup via claim`);
-  if (d.apiKeys) conv.push(`${d.apiKeys} api key`);
-  const plans = d.plans
-    .map((p) =>
-      p.reason === "cancel_requested"
-        ? `cancel requested (${p.from ?? "?"})`
-        : p.reason === "resume_requested"
-          ? `resumed (${p.from ?? "?"})`
-          : `${p.from ?? "?"} → ${p.to ?? "?"}`,
-    )
-    .join(", ");
+  const conv = d.claims.count
+    ? `${d.claims.count} claim (+${d.claims.transferred} items)`
+    : "";
 
   return `
   <div class="stats">
@@ -236,18 +236,14 @@ function digestBlock(d: Digest): string {
     ${stat("items", d.items.ok, d.items.failed ? `${d.items.failed} failed` : undefined)}
     ${stat("edits", d.context.edits)}
     ${stat("views", d.context.views)}
-    ${stat("walls", Object.values(d.walls).reduce((a, b) => a + b, 0))}
   </div>
   ${section("Reach", reachRows(d))}
   ${section("By client", rows(d.workspaces.byClient))}
   ${section("By language", languageRows(d))}
-  ${section("Items by surface", rows(d.items.byApp))}
-  ${section("Walls hit", rows(d.walls))}
   ${section(
     "Conversion",
-    conv.length ? `<p class="big">${esc(conv.join(" · "))}</p>` : `<p class="none">none</p>`,
+    conv ? `<p class="big">${esc(conv)}</p>` : `<p class="none">none</p>`,
   )}
-  ${section("Plan changes", plans ? `<p class="big">${esc(plans)}</p>` : `<p class="none">none</p>`)}
   ${d.truncated ? `<p class="warn">Read capped — counts are floors, not totals.</p>` : ""}`;
 }
 
@@ -342,14 +338,16 @@ export function renderReport(input: {
 <h1>Graffiticode usage</h1>
 <p class="sub">${esc(fmtRange(window.all))}</p>
 ${/*
-   Anonymous first: it is the demand signal the SMS reports, and the signed-in
-   side is mostly our own console work. The two are disjoint by construction
-   (see isAuthenticated) so they sum to the window total — no third section is
-   needed and none is offered.
+   Anonymous first: it is the demand signal the SMS reports. The signed-in side
+   used to be mostly our own console authoring, which is why the split existed;
+   now that the reader is MCP-only and our accounts are excluded, it means signed
+   -in agents talking to us over MCP — a small but real segment. The two are
+   disjoint by construction (see isAuthenticated) so they sum to the window
+   total — no third section is needed and none is offered.
 */ ""}
 ${segmentSection("Anonymous — no sign-in", window.anon, window.all)}
 <hr>
-${segmentSection("Signed in", window.authed, window.all)}
+${segmentSection("Signed in — over MCP", window.authed, window.all)}
 <hr>
 <h1 style="margin-top:26px">Today so far</h1>
 <p class="sub">since 00:00 PT</p>
@@ -358,12 +356,6 @@ ${segmentSection("Signed in", window.authed, window.all)}
   ${splitStat("workspaces", today.anon.workspaces.total, today.authed.workspaces.total)}
   ${splitStat("items", today.anon.items.ok, today.authed.items.ok)}
   ${stat("claims", today.all.claims.count)}
-  ${stat("signups", today.all.signups.direct + today.all.signups.viaClaim)}
-  ${splitStat(
-    "walls",
-    Object.values(today.anon.walls).reduce((a, b) => a + b, 0),
-    Object.values(today.authed.walls).reduce((a, b) => a + b, 0),
-  )}
 </div>
 <hr>
 <h1 style="margin-top:26px">Last 7 days</h1>

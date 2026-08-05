@@ -53,6 +53,18 @@ export interface GenerationJob {
   modification: string;
   currentSrc?: string | null;
   authReplay: AuthReplay;
+  /**
+   * Source surface ("console" | "mcp" | "front"), carried solely so a terminal
+   * failure can be attributed to it — the funnel report is MCP-only and drops
+   * anything it can't qualify (see isMcpOrigin in funnel-digest.ts).
+   *
+   * Optional, and deliberately NOT a GENERATION_JOB_VERSION bump: adding a field
+   * is backward compatible, whereas bumping would 400 every job already in the
+   * queue at deploy time. A v1 job that predates this lands as "console", which
+   * under-counts MCP failures for one deploy's worth of in-flight work rather
+   * than inventing any.
+   */
+  client?: string;
 }
 
 export async function enqueueGenerationJob(job: GenerationJob): Promise<void> {

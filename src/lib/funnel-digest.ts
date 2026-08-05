@@ -1,5 +1,12 @@
-// Hourly funnel digest: read the period's events out of Cloud Logging, roll
+// Hourly funnel digest: read the period's MCP events out of Cloud Logging, roll
 // them up, and render one SMS.
+//
+// SCOPE: MCP activity only, excluding our own accounts. The report answers "what
+// did agents do over MCP", so console-surface authoring is filtered out at the
+// reader (isMcpOrigin) and our dev/eval accounts with it (isExcludedAccount).
+// It counted our own console work before, which is a demand signal that reads as
+// real and isn't; a report you have to mentally subtract yourself from is worse
+// than one that says zero.
 //
 // A scheduled PULL rather than a push pipeline. Every service already writes its
 // events to Cloud Logging as JSON lines (console via src/lib/funnel-events.ts,
@@ -47,6 +54,116 @@ export interface LogEvent {
   session?: string;
   auth?: string;
   [key: string]: unknown;
+}
+
+// --- MCP origin -------------------------------------------------------------
+
+/**
+ * Events emitted by the MCP server itself. Every one of them describes an agent
+ * talking to us over MCP, so no further qualification is needed.
+ */
+const MCP_SERVER_EVENTS = new Set([
+  "mcp_connect",
+  "mcp_listed",
+  "mcp_resource",
+  "mcp_session_started",
+  "mcp_tool",
+]);
+
+/**
+ * Console-emitted events that belong to the MCP funnel despite the console
+ * being the process that logs them. The trial claim flow exists only to convert
+ * an anonymous MCP workspace into an account — there is no console-surface way
+ * to reach it — so a claim is MCP activity no matter who writes the log line.
+ */
+const MCP_FUNNEL_EVENTS = new Set(["claim", "claim_view"]);
+
+/**
+ * Console-emitted events that describe authoring and therefore have to be
+ * qualified by the surface that requested it. Each stamps `app` from the
+ * mutation's `client` argument (resolvers.ts for the first two, generate-job.ts
+ * for the third, which carries it through the queued job), so "mcp" here is
+ * positive evidence rather than an absence.
+ */
+const SURFACE_QUALIFIED_EVENTS = new Set([
+  "item_created",
+  "item_updated",
+  "item_generation_failed",
+]);
+
+/**
+ * Whether an event describes MCP activity.
+ *
+ * The report is about what agents do over MCP, so this is an ALLOWLIST: an
+ * unrecognized event is not MCP. The alternative — dropping a known console set
+ * and letting everything else through — silently re-admits console traffic the
+ * next time an emitter is added, which is exactly the failure this filter
+ * exists to fix (the report was counting our own console authoring as demand).
+ *
+ * Deliberately excluded, and each one goes quiet as a result: signup,
+ * plan_changed, checkout_started, api_key_created, overage_limit_raised,
+ * wall_hit, free_plan_budget (none carries an `app` field to qualify it by) and
+ * artifact_view (app.graffiticode.org, not MCP).
+ *
+ * What that costs in the SMS (formatSms): the ⛔ wall line and the $ revenue
+ * line can no longer fire at all, and the ★ line narrows to claims only (signups
+ * and api keys drop out of it). Both are `> 0`-guarded, so they omit their line
+ * rather than printing a misleading zero.
+ *
+ * The exclusion is not permanent — stamp `app` at the emitter and add the event
+ * to SURFACE_QUALIFIED_EVENTS. item_generation_failed did exactly that on
+ * 2026-08-05 (the `client` now rides the queued job; see generation-queue.ts).
+ */
+export function isMcpOrigin(e: LogEvent): boolean {
+  if (MCP_SERVER_EVENTS.has(e.ev)) return true;
+  if (MCP_FUNNEL_EVENTS.has(e.ev)) return true;
+  if (SURFACE_QUALIFIED_EVENTS.has(e.ev)) return e.app === "mcp";
+  return false;
+}
+
+// --- Excluded accounts ------------------------------------------------------
+
+/**
+ * Our own accounts, as the `session` value their events carry.
+ *
+ * Stored as the sha256(uid) hash the events already use, NOT as uids. Two
+ * reasons: the comparison is then a direct lookup with no hashing at read time,
+ * and the privacy contract's "never log a wallet address" stays true of the
+ * source as well — most Firebase uids here ARE wallet addresses, which are
+ * publicly linkable. Recover a hash's owner out-of-band by scanning the users
+ * collection; don't paste the uid back in here.
+ *
+ * These are dev/QA accounts whose activity is indistinguishable in shape from a
+ * customer's and would otherwise read as demand — the eval harness alone can
+ * post dozens of items in a run.
+ */
+const EXCLUDED_SESSIONS = new Set([
+  // Jeff — console development and manual testing.
+  "c7b82fb7e78e342ae0fbe73158f0574a90992852fd90acf4e51d668838b6e5d7",
+  // Eval harness (EVAL_UID) — scripts/model-eval.ts, create-eval-items.ts.
+  "3fe1525d7590f241b8df5fdd5e4d01ab355bd4663c182890278bae3cf7049ed9",
+]);
+
+/**
+ * Additional sessions to exclude, as a comma-separated list of sha256(uid)
+ * hashes. Additive to EXCLUDED_SESSIONS so a new test account can be muted
+ * without a deploy.
+ */
+const EXTRA_EXCLUDED = (process.env.FUNNEL_EXCLUDE_SESSIONS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+/**
+ * Whether this event belongs to an account the report deliberately ignores.
+ *
+ * Only ever matches authenticated traffic: free-plan events carry a
+ * sessionNamespace in the same field, and a namespace is a uuid that cannot
+ * collide with a sha256 hex digest. So this can't silently mute a real trial.
+ */
+export function isExcludedAccount(e: LogEvent): boolean {
+  if (typeof e.session !== "string" || !e.session) return false;
+  return EXCLUDED_SESSIONS.has(e.session) || EXTRA_EXCLUDED.includes(e.session);
 }
 
 // --- Anonymous vs signed-in -------------------------------------------------
@@ -115,8 +232,18 @@ export function aggregateSplit(
 // --- Cloud Logging ----------------------------------------------------------
 
 /**
- * Fetch every `ev`-bearing log entry in [from, to). Returns the events plus
- * whether the page cap truncated the read.
+ * Fetch every MCP-origin `ev`-bearing log entry in [from, to). Returns the
+ * events plus whether the page cap truncated the read.
+ *
+ * Both filters — MCP origin and excluded accounts — are applied HERE, at the one
+ * reader all three surfaces share (SMS, /r/<token>, scripts/funnel-report.ts),
+ * for the same reason the aggregation itself is shared: a surface that filtered
+ * on its own could drift. They are applied in code rather than folded into the
+ * Logging query so each definition lives in exactly one place — see isMcpOrigin
+ * and isExcludedAccount.
+ *
+ * Note this means paging still walks console events; MAX_PAGES bounds entries
+ * READ, not entries kept, so a noisy console hour can still truncate the window.
  */
 export async function fetchEvents(
   from: Date,
@@ -157,7 +284,11 @@ export async function fetchEvents(
       nextPageToken?: string;
     };
     for (const entry of json.entries ?? []) {
-      if (entry.jsonPayload?.ev) events.push(entry.jsonPayload);
+      const payload = entry.jsonPayload;
+      if (!payload?.ev) continue;
+      if (!isMcpOrigin(payload)) continue;
+      if (isExcludedAccount(payload)) continue;
+      events.push(payload);
     }
     pageToken = json.nextPageToken;
     pages++;
@@ -847,8 +978,12 @@ export interface DayRollup {
  * version as a miss re-aggregates that day once and rewrites it — self-healing,
  * and better than rendering a day's anonymous share as zero because the cache
  * couldn't answer.
+ *
+ * v3: MCP-only. v2 days counted console authoring in `items`, so leaving them
+ * cached would draw a 7-day trend whose older bars mean something different
+ * from its newer ones — the one way this cache can lie.
  */
-const DAY_CACHE_VERSION = 2;
+const DAY_CACHE_VERSION = 3;
 
 export async function readDayCache(date: string): Promise<DayRollup | null> {
   const snap = await getFirestore().collection("funnel-daily").doc(date).get();

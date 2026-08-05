@@ -76,6 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     modification,
     currentSrc,
     authReplay,
+    client,
   } = job || {};
   if (!itemId || !lang || !prompt || !authReplay) {
     return res.status(400).json({ error: "Missing required job fields" });
@@ -115,7 +116,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Only the terminal failure is reported. The catch below returns 5xx so
       // Cloud Tasks retries, and emitting there would count one failure once per
       // attempt.
-      emitEvent("item_generation_failed", { ...actor(auth), lang, err: message });
+      // `app` mirrors the item_created/item_updated convention in resolvers.ts —
+      // it is what lets the MCP-only report keep this event (isMcpOrigin).
+      emitEvent("item_generation_failed", { ...actor(auth), lang, app: client ?? "console", err: message });
       // Handled outcome — 2xx so the queue does NOT retry.
       return res.status(200).json({ status: "failed", error: message });
     }
