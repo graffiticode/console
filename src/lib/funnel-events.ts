@@ -32,6 +32,10 @@ export type FunnelEventName =
   | "api_key_created"
   | "signup"
   | "plan_changed"
+  // First card on file: a hard-capped tier enrolling in pay-as-you-go. Headline
+  // because it is the conversion moment on the free tier — the plan id doesn't
+  // move, so plan_changed can never report it.
+  | "payg_enabled"
   | "overage_limit_raised"
   // context
   | "item_updated"

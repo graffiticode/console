@@ -1,14 +1,26 @@
 /**
  * Provision Stripe objects for item-based pricing:
  *   - one Billing Meter (event_name "item_created", sum aggregation)
- *   - per paid tier: a product, monthly + annual flat base prices, and a
- *     metered overage price (referencing the meter) at the tier's per-item rate
+ *   - per metered tier: a product, a monthly (and, where the tier offers one,
+ *     annual) flat base price, and a metered overage price (referencing the
+ *     meter) at the tier's per-item rate
+ *
+ * Bronze is included and is the odd one out: its base price is $0/month and it
+ * has no annual price. The $0 price still has to exist — it is the line item
+ * priceIdToPlan matches to resolve the plan on subscription webhooks, and
+ * without it the webhook refuses to sync a pay-as-you-go enrollment.
  *
  * Idempotent: prices are created with stable `lookup_key`s and reused if present;
  * the meter is matched by event_name. Prints the env vars to set afterwards.
  *
  * Usage:
- *   STRIPE_SECRET_KEY=sk_test_... npx tsx scripts/setup-item-pricing.ts [--dry-run]
+ *   STRIPE_SECRET_KEY=sk_test_... npx tsx scripts/setup-item-pricing.ts [--dry-run] [--only demo,pro]
+ *
+ * `--only` restricts the run to named plan ids. Use it against LIVE: the paid
+ * tiers' prices already exist and carry real subscribers, and if any of them
+ * was created outside this script (no `gc_*` lookup key) an unfiltered run would
+ * MINT A DUPLICATE and print its id as the one to set. Pasting that env var
+ * would then stop priceIdToPlan from recognizing every existing subscription.
  *
  * Run against TEST mode first. After running, copy the printed env vars into
  * .env.local (dev) / .env.production (prod) and redeploy.
@@ -25,7 +37,24 @@ if (!KEY) {
 const stripe = new Stripe(KEY, { apiVersion: STRIPE_API_VERSION });
 
 const METER_EVENT_NAME = 'item_created';
-const PAID_TIERS: PlanConfig[] = [PLANS.pro, PLANS.teams, PLANS.platinum];
+// Every tier that meters overage — Bronze included, since pay-as-you-go gave it
+// a rate. `starter` is discontinued and deliberately absent.
+const METERED_TIERS: PlanConfig[] = [PLANS.demo, PLANS.pro, PLANS.teams, PLANS.platinum];
+
+// --only demo,pro → provision just those plan ids.
+const onlyArg = process.argv[process.argv.indexOf('--only') + 1];
+const ONLY = process.argv.includes('--only') && onlyArg && !onlyArg.startsWith('--')
+  ? new Set(onlyArg.split(',').map(s => s.trim()).filter(Boolean))
+  : null;
+if (process.argv.includes('--only') && !ONLY) {
+  console.error('--only requires a comma-separated list of plan ids, e.g. --only demo');
+  process.exit(1);
+}
+const TIERS = ONLY ? METERED_TIERS.filter(p => ONLY.has(p.id)) : METERED_TIERS;
+if (!TIERS.length) {
+  console.error(`--only matched no plans. Known: ${METERED_TIERS.map(p => p.id).join(', ')}`);
+  process.exit(1);
+}
 
 // cents-as-decimal string for a dollar amount (handles sub-cent per-item rates).
 // Cast to any at call sites: Stripe types unit_amount_decimal as a branded Decimal.
@@ -120,11 +149,12 @@ async function ensureMeteredPrice(lookupKey: string, productId: string, plan: Pl
 }
 
 async function main() {
-  console.log(`\n=== Provisioning item-based pricing${DRY_RUN ? ' (DRY RUN)' : ''} ===\n`);
+  console.log(`\n=== Provisioning item-based pricing${DRY_RUN ? ' (DRY RUN)' : ''} ===`);
+  console.log(`plans: ${TIERS.map(p => p.id).join(', ')}${ONLY ? ' (--only)' : ''}\n`);
   const meterId = await ensureMeter();
   const envLines: string[] = [];
 
-  for (const plan of PAID_TIERS) {
+  for (const plan of TIERS) {
     console.log(`\n--- ${plan.displayName} (${plan.id}) ---`);
     const productId = await ensureProduct(plan);
 
@@ -134,16 +164,20 @@ async function main() {
       unit_amount: plan.basePriceMonthly * 100,
       recurring: { interval: 'month' },
     });
-    const annual = await ensurePrice(`gc_${plan.id}_annual`, {
-      product: productId,
-      currency: 'usd',
-      unit_amount: plan.basePriceAnnual * 100,
-      recurring: { interval: 'year' },
-    });
-    const metered = await ensureMeteredPrice(`gc_${plan.id}_meter`, productId, plan, meterId);
-
     envLines.push(`${plan.stripe.baseMonthlyPriceIdEnv}=${monthly}`);
-    envLines.push(`${plan.stripe.baseAnnualPriceIdEnv}=${annual}`);
+
+    // Bronze is monthly-only; don't mint an annual $0 price nobody can select.
+    if (plan.stripe.baseAnnualPriceIdEnv) {
+      const annual = await ensurePrice(`gc_${plan.id}_annual`, {
+        product: productId,
+        currency: 'usd',
+        unit_amount: plan.basePriceAnnual * 100,
+        recurring: { interval: 'year' },
+      });
+      envLines.push(`${plan.stripe.baseAnnualPriceIdEnv}=${annual}`);
+    }
+
+    const metered = await ensureMeteredPrice(`gc_${plan.id}_meter`, productId, plan, meterId);
     envLines.push(`${plan.stripe.meterPriceIdEnv}=${metered}`);
   }
 

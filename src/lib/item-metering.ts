@@ -1,11 +1,11 @@
-// Reports item-creation usage to Stripe's Billing Meter for paid tiers.
+// Reports item-creation usage to Stripe's Billing Meter for metered tiers.
 //
 // The subscription carries a metered (usage-based) price; we send one meter
 // event per successfully created item and Stripe bills the overage above the
-// included bucket in arrears on the next invoice. Free/contact-sales tiers have
-// no meter and are skipped. Best-effort: never throws into the create path.
+// included bucket in arrears on the next invoice. Contact-sales tiers have no
+// meter and are skipped. Best-effort: never throws into the create path.
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION, getPlan } from './plans-config';
+import { STRIPE_API_VERSION, getPlan, payAsYouGoEnabled, type SubscriptionState } from './plans-config';
 
 let stripe: Stripe | null = null;
 function getStripe(): Stripe | null {
@@ -16,18 +16,30 @@ function getStripe(): Stripe | null {
 }
 
 export async function reportItemUsage({
-  plan,
+  subscription,
   stripeCustomerId,
   identifier,
 }: {
-  plan: string | undefined | null;
+  /** The cached `users/{uid}.subscription` map — plan AND enrollment state. */
+  subscription: SubscriptionState | undefined | null;
   stripeCustomerId: string | undefined | null;
   /** Idempotency key (Stripe dedupes within a 24h window). Use itemId__taskId. */
   identifier?: string;
 }): Promise<void> {
   try {
-    const eventName = getPlan(plan).stripe.meterEventName;
+    const plan = subscription?.plan;
+    const planConfig = getPlan(plan);
+    const eventName = planConfig.stripe.meterEventName;
     if (!eventName || !stripeCustomerId) return;
+
+    // A hard-capped tier only meters once it has enrolled in pay-as-you-go.
+    // The stripeCustomerId check above is NOT sufficient on its own: a Bronze
+    // user who opens Checkout and abandons it still gets a customer id written,
+    // and would then meter every item against a customer with no metered
+    // subscription. Enrollment is the thing that makes billing legitimate, so
+    // it is checked here — the single choke point every create funnels through
+    // — rather than at the call site where a future caller could miss it.
+    if (planConfig.hardCap && !payAsYouGoEnabled(subscription)) return;
     const client = getStripe();
     if (!client) return;
     await client.billing.meterEvents.create({

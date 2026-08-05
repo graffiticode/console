@@ -3,12 +3,17 @@
 // Billing model: a flat base fee billed IN ADVANCE (on signup + each renewal)
 // plus metered overage billed IN ARREARS on the next invoice. We meter one
 // "item" per successfully created (compiled, valid) item; iteration, reads, and
-// retrievals are free. Free is a hard cap (no overage); paid tiers meter overage
-// via Stripe and may set an optional customer spend cap (see overage limit).
+// retrievals are free. Paid tiers meter overage via Stripe and may set an
+// optional customer spend cap (see overage limit).
+//
+// Bronze is a TWO-STATE tier — see payAsYouGoEnabled()/isHardCappedFor(). With
+// no card on file it is hard-capped at its included items (the historical "Free"
+// behavior); once the customer enrolls in pay-as-you-go (a $0-base subscription
+// carrying the metered price) it meters overage like any paid tier.
 //
 // Internal plan ids are kept stable for backward compat with existing Firestore
 // subscription docs and Stripe mappings:
-//   demo -> "Free", pro -> "Silver", teams -> "Gold", platinum -> "Platinum".
+//   demo -> "Bronze", pro -> "Silver", teams -> "Gold", platinum -> "Platinum".
 // `starter` is discontinued but retained in the type/lookup for legacy data.
 
 export type PlanId = 'demo' | 'starter' | 'pro' | 'teams' | 'platinum';
@@ -30,7 +35,11 @@ export interface PlanConfig {
   includedItems: number;
   /** Price per item beyond the included bucket (metered, in arrears). null = no overage. */
   overageRatePerItem: number | null;
-  /** When true, creation is blocked at includedItems (no overage path). */
+  /**
+   * When true, creation is blocked at includedItems UNLESS the account has
+   * enrolled in pay-as-you-go. Prefer isHardCappedFor(plan, subscription) over
+   * reading this directly — this flag alone cannot see the enrollment.
+   */
   hardCap: boolean;
   /** Tier ranking for upgrade/downgrade comparisons. */
   tier: number;
@@ -51,14 +60,25 @@ export interface PlanConfig {
 export const PLANS: Record<PlanId, PlanConfig> = {
   demo: {
     id: 'demo',
-    displayName: 'Free',
+    displayName: 'Bronze',
     basePriceMonthly: 0,
     basePriceAnnual: 0,
     includedItems: 50,
-    overageRatePerItem: null,
+    // Deliberately dearer per item than Silver ($0.10): pay-as-you-go is the
+    // bridge past the wall, not a way to live below a subscription forever.
+    overageRatePerItem: 0.2,
+    // True = hard-capped *until enrolled*; see isHardCappedFor.
     hardCap: true,
     tier: 0,
-    stripe: {},
+    stripe: {
+      // $0/month recurring price. It exists solely so a Bronze subscription has
+      // a base line item that priceIdToPlan can match — without it the webhook
+      // cannot resolve the plan and refuses to sync.
+      baseMonthlyPriceIdEnv: 'STRIPE_FREE_MONTHLY_PRICE_ID',
+      // MUST be graduated: tier 1 = 0..includedItems at $0, tier 2 = $0.20.
+      meterPriceIdEnv: 'STRIPE_FREE_METER_PRICE_ID',
+      meterEventName: 'item_created',
+    },
   },
   // Discontinued; retained so legacy subscribers/data still resolve.
   starter: {
@@ -205,8 +225,61 @@ export function overageRateFor(id: string | undefined | null): number | null {
   return getPlan(id).overageRatePerItem;
 }
 
+/**
+ * Whether a plan is hard-capped *as a plan shape*, ignoring enrollment.
+ *
+ * Almost every caller wants isHardCappedFor() instead — this one cannot see
+ * that a Bronze account has enrolled in pay-as-you-go, so it answers `true` for
+ * every Bronze account. That is the safe direction (block rather than hand out
+ * uncapped billable items), which is why the enrollment-blind version is kept.
+ */
 export function isHardCapped(id: string | undefined | null): boolean {
   return getPlan(id).hardCap;
+}
+
+/** Shape of the cached `users/{uid}.subscription` map that gating reads. */
+export interface SubscriptionState extends PreservedAllocation {
+  plan?: string | null;
+  status?: string | null;
+  stripeSubscriptionId?: string | null;
+  overageLimitItems?: number | null;
+  overageLimitUsd?: number | null;
+}
+
+/**
+ * Whether an account has enrolled in pay-as-you-go on a hard-capped tier.
+ *
+ * Enrollment means a live Stripe subscription carrying the tier's $0 base price
+ * and its metered price — which the customer can only obtain by completing
+ * Checkout, i.e. by putting a card on file. That is the whole point: we ask for
+ * payment details at the wall, never at signup, so the presence of the
+ * subscription IS the signal that we are allowed to bill for overage.
+ *
+ * A cancelled or past_due subscription is not enrollment; those accounts fall
+ * back to the hard cap on their next create, with no code path of their own.
+ */
+export function payAsYouGoEnabled(subscription: SubscriptionState | undefined | null): boolean {
+  if (!subscription) return false;
+  if (!getPlan(subscription.plan).hardCap) return false;
+  if (!subscription.stripeSubscriptionId) return false;
+  return subscription.status === 'active' || subscription.status === 'trialing';
+}
+
+/**
+ * Whether creation must be blocked at the included bucket for THIS account.
+ *
+ * Answers the question isHardCapped() can't: a Bronze account that has enrolled
+ * in pay-as-you-go is no longer capped at 50, it is capped by its own spend cap
+ * (enforced by the same overage path every paid tier uses).
+ */
+export function isHardCappedFor(
+  id: string | undefined | null,
+  subscription: SubscriptionState | undefined | null,
+): boolean {
+  // No rate means there is nothing to bill overage against (contact-sales
+  // tiers). Enrollment cannot unlock what has no price.
+  if (getPlan(id).overageRatePerItem == null) return true;
+  return getPlan(id).hardCap && !payAsYouGoEnabled(subscription);
 }
 
 export function isUpgrade(from: PlanId, to: PlanId): boolean {
@@ -250,7 +323,7 @@ export function priceIdToPlan(priceId: string | undefined | null): PlanId | unde
 /**
  * Convert a customer's dollar overage budget into a number of items, using the
  * plan's per-item rate. Used by the customer-set spend cap. Returns null when
- * the plan has no overage rate (Free/contact-sales) or usd is not positive.
+ * the plan has no overage rate (contact-sales) or usd is not positive.
  */
 export function overageDollarsToItems(id: string | undefined | null, usd: number): number | null {
   const rate = overageRateFor(id);

@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '../../../utils/db';
-import { getPlan, overageDollarsToItems, DEFAULT_PLAN } from '../../../lib/plans-config';
+import { getPlan, overageDollarsToItems, payAsYouGoEnabled, DEFAULT_PLAN } from '../../../lib/plans-config';
 import { emitEvent, actor } from '../../../lib/funnel-events';
 
 // Set (or clear) a customer's overage spend cap. The client sends a dollar
@@ -23,11 +23,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const plan = userDoc.data()?.subscription?.plan || DEFAULT_PLAN;
+    const subscription = userDoc.data()?.subscription;
+    const plan = subscription?.plan || DEFAULT_PLAN;
     const planConfig = getPlan(plan);
+    // A cap on a hard-capped tier only means something once the account can
+    // actually incur overage — which requires a card. Setting a cap is the
+    // second of the two moments we ask for payment details (the first is the
+    // wall itself); tell the client to route into Checkout rather than storing
+    // a number that would never be enforced.
+    const needsEnrollment = planConfig.overageRatePerItem != null &&
+      planConfig.hardCap &&
+      !payAsYouGoEnabled(subscription);
+    if (needsEnrollment) {
+      return res.status(402).json({
+        error: 'Payment method required',
+        message: `${planConfig.displayName} includes ${planConfig.includedItems} items per month. ` +
+          `Add a payment method to create more at $${planConfig.overageRatePerItem!.toFixed(2)} per item.`,
+        requiresPaymentMethod: true,
+        plan,
+        overageRatePerItem: planConfig.overageRatePerItem,
+        includedItems: planConfig.includedItems,
+      });
+    }
+
     // null means "no cap" (unlimited), so it is the HIGHEST value, not the
     // lowest — the comparisons below have to treat it that way.
-    const prevUsd = userDoc.data()?.subscription?.overageLimitUsd ?? null;
+    const prevUsd = subscription?.overageLimitUsd ?? null;
 
     // Clearing the cap.
     if (limitUsd === null || limitUsd === undefined || limitUsd === '') {
@@ -46,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'limitUsd must be a non-negative number or null' });
     }
 
-    // Free / contact-sales tiers have no overage path.
+    // Contact-sales tiers have no overage path.
     if (planConfig.overageRatePerItem == null) {
       return res.status(400).json({ error: `Plan "${plan}" does not support overage` });
     }

@@ -112,7 +112,13 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
     ? 'text-yellow-600 bg-yellow-100'
     : 'text-gray-600 bg-gray-100';
 
+  // Bronze is two states, and the pill is the only place they're visible at a
+  // glance: no card on file is genuinely free, a card on file meters overage.
+  const isPayAsYouGo = subscription.plan === 'demo' &&
+    (subscription.status === 'active' || subscription.status === 'trialing');
+
   const getStatusLabel = () => {
+    if (isPayAsYouGo) return 'Pay as you go';
     if (subscription.status === 'none') return 'Free';
     if (subscription.plan === 'demo') return 'Free';
     if (subscription.status === 'active' || subscription.status === 'trialing') return 'Active';
@@ -145,7 +151,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
             </dd>
             {subscription.plan === 'demo' && (
               <dd className="mt-1 text-xs text-gray-500">
-                No credit card required.
+                {isPayAsYouGo ? 'Then billed per item.' : 'No credit card required.'}
               </dd>
             )}
           </div>
@@ -154,7 +160,9 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
             <dt className="text-sm font-medium text-gray-500">Billing</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
               {currentPrice === 0 ? (
-                'Free'
+                // $0 base. On pay-as-you-go that is not the whole bill, so don't
+                // say "Free" to someone whose next invoice may not be.
+                isPayAsYouGo ? '$0 + usage' : 'Free'
               ) : (
                 <>
                   ${currentPrice}

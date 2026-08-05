@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '../../../utils/db';
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION, priceIdToPlan, effectiveIncludedItems, overageRateFor, isHardCapped, DEFAULT_PLAN, type PlanId } from '../../../lib/plans-config';
+import { STRIPE_API_VERSION, priceIdToPlan, effectiveIncludedItems, overageRateFor, isHardCappedFor, payAsYouGoEnabled, DEFAULT_PLAN, type PlanId } from '../../../lib/plans-config';
 import { subscriptionPeriodStart, subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
 
 // Initialize Stripe only if secret key is available
@@ -193,7 +193,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const includedItems = effectiveIncludedItems(plan, userData?.subscription, now);
 
     const overageRatePerItem = overageRateFor(plan);
-    const hardCap = isHardCapped(plan);
+    // Enrollment-aware: a Bronze account with a card on file is no longer
+    // capped at its included items, it is capped by its own spend cap.
+    const hardCap = isHardCappedFor(plan, userData?.subscription);
+    const paygEnabled = payAsYouGoEnabled(userData?.subscription);
+    // The tier offers pay-as-you-go and this account hasn't taken it — i.e.
+    // adding a card is the way past the wall, not upgrading.
+    const paygAvailable = hardCap && overageRatePerItem != null;
 
     // Customer overage spend cap (items). null = unlimited (paid, billed in arrears).
     const overageLimitItems = typeof userData?.subscription?.overageLimitItems === 'number'
@@ -224,6 +230,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       overageRatePerItem,
       overageCostUsd,
       hardCap,
+      payAsYouGoEnabled: paygEnabled,
+      payAsYouGoAvailable: paygAvailable,
       overageLimitItems,
       overageLimitUsd,
       lastResetDate: firstDayOfPeriod.toISOString(),

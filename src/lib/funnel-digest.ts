@@ -101,9 +101,9 @@ const SURFACE_QUALIFIED_EVENTS = new Set([
  * exists to fix (the report was counting our own console authoring as demand).
  *
  * Deliberately excluded, and each one goes quiet as a result: signup,
- * plan_changed, checkout_started, api_key_created, overage_limit_raised,
- * wall_hit, free_plan_budget (none carries an `app` field to qualify it by) and
- * artifact_view (app.graffiticode.org, not MCP).
+ * plan_changed, payg_enabled, checkout_started, api_key_created,
+ * overage_limit_raised, wall_hit, free_plan_budget (none carries an `app` field
+ * to qualify it by) and artifact_view (app.graffiticode.org, not MCP).
  *
  * What that costs in the SMS (formatSms): the ⛔ wall line and the $ revenue
  * line can no longer fire at all, and the ★ line narrows to claims only (signups
@@ -331,6 +331,12 @@ export interface Digest {
   claims: { count: number; transferred: number };
   signups: { direct: number; viaClaim: number };
   plans: Array<{ from?: string; to?: string; reason?: string }>;
+  /**
+   * Pay-as-you-go enrollments: a hard-capped tier putting its first card on
+   * file. Counted apart from `plans` because the plan id doesn't move, so it is
+   * invisible to plan_changed — but it is the free tier's conversion moment.
+   */
+  paygEnabled: number;
   overageRaised: number;
   apiKeys: number;
   context: {
@@ -479,6 +485,7 @@ export function aggregate(
     claims: { count: 0, transferred: 0 },
     signups: { direct: 0, viaClaim: 0 },
     plans: [],
+    paygEnabled: 0,
     overageRaised: 0,
     apiKeys: 0,
     context: {
@@ -658,6 +665,11 @@ export function aggregate(
 
       case "checkout_started":
         if (session) checkoutStarted.add(session);
+        break;
+
+      case "payg_enabled":
+        d.paygEnabled++;
+        if (session) planChanged.add(session);
         break;
 
       case "overage_limit_raised":
@@ -899,6 +911,7 @@ export function formatDigest(d: Digest): string {
     revenue.push(move);
   }
   if (d.plans.length > 4) revenue.push(`+${d.plans.length - 4} more`);
+  if (d.paygEnabled > 0) revenue.push(`${d.paygEnabled} card added`);
   if (d.overageRaised > 0) revenue.push(`${d.overageRaised} cap raised`);
   if (revenue.length) lines.push(`$ ${revenue.join(" · ")}`);
 

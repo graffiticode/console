@@ -12,10 +12,49 @@ changed (`starter` is retained but discontinued).
 
 | Display | Internal id | Base $/mo (advance) | Included items/mo | Overage (arrears) |
 |---|---|---:|---:|---:|
-| Free | `demo` | $0 | 50 — hard cap | none |
+| Bronze | `demo` | $0 | 50 | $0.20 / item — **requires enrollment**, see below |
 | Silver | `pro` | $100 | 1,000 | $0.10 / item |
 | Gold | `teams` | $1,000 | 20,000 | $0.05 / item |
 | Platinum | `platinum` | $10,000 | 400,000 | $0.025 / item |
+
+Bronze was called "Free" until pay-as-you-go landed; the internal id stays `demo` (it is written into
+every `users/{uid}.subscription.plan` doc and the `PlanId` union). Its overage rate is deliberately the
+*highest* — pay-as-you-go is the bridge past the wall, not a cheaper substitute for a subscription.
+
+## Bronze is two states
+
+| State | Signal | Behavior |
+|---|---|---|
+| Unenrolled | no `subscription.stripeSubscriptionId` | hard cap at `includedItems` |
+| Pay-as-you-go | active `demo` subscription | 50 free, then $0.20/item up to the customer's cap |
+
+**We capture payment details at exactly two moments, never earlier:** when the customer hits the 50-item
+wall, and when they set a spend cap (`POST /api/payments/overage-limit` answers **402
+`requiresPaymentMethod`** for an unenrolled tier rather than storing a number it could not enforce).
+
+Enrollment is a hosted Stripe Checkout in `mode: 'subscription'` carrying the **$0/mo base price + the
+graduated metered price**; `payment_method_collection: 'always'` is what makes Stripe collect a card on a
+$0 total. A monthly spend cap is **required** to enroll — a $0-base account with an uncapped card is how
+a trial user gets a four-figure surprise — and rides on `subscription_data.metadata.overageLimitUsd` so an
+abandoned Checkout leaves nothing behind.
+
+Read the state with `payAsYouGoEnabled(subscription)` / `isHardCappedFor(plan, subscription)`
+(`plans-config.ts`), never bare `isHardCapped(plan)` — that one can't see the enrollment and answers
+"capped" for every Bronze account. That is the safe direction, which is why it still exists.
+
+### First-period anchoring (do not remove)
+
+Stripe stamps `current_period_start` at the moment of enrollment. The gate counts usage from
+`currentPeriodStart`, so storing that verbatim would hide every item the customer already created this
+month — a user enrolling at item 50 on the 20th would receive 50 fresh included items, free, and again
+every month they re-enrolled. So:
+
+- Checkout sets `subscription_data.billing_cycle_anchor_config = { day_of_month: 1 }`, making Stripe's own
+  periods calendar-aligned from period 2 onward;
+- the `customer.subscription.created` handler writes the **calendar-month start** as
+  `subscription.currentPeriodStart` for the **first** period only.
+
+From the first renewal the stored and Stripe periods agree and the special case stops applying.
 
 ## Billing model
 
@@ -44,8 +83,10 @@ creates them tiered; don't change that.
   its included items, and it can never accrue billable overage.
   See `docs/free-plan-attested-sessions.md` and `free-plan-quota.ts`.
 - **Effects:** writes a `usage` record `{type:'item_created', units:1}`, increments
-  `usage/{uid}.currentMonthTotal`, and (paid tiers only) reports a Stripe meter event via
+  `usage/{uid}.currentMonthTotal`, and (metered tiers only) reports a Stripe meter event via
   `src/lib/item-metering.ts` (event name `item_created`, `value:1`, idempotency key `itemId__taskId`).
+  `reportItemUsage` re-checks enrollment itself: a Bronze user who opens Checkout and abandons it still
+  gets a `stripeCustomerId`, so the customer-id check alone would meter them.
 - **Free records:** `logCompile` and the generation token meter now write `units:0` (kept for cost
   telemetry). **The gate and usage endpoint sum only `type==='item_created'` records** — otherwise
   lingering pre-migration compile-unit records would inflate item counts.
@@ -54,10 +95,13 @@ creates them tiered; don't change that.
 
 - `checkItemCreateAllowed()` (`src/lib/usage-service.ts`) runs at **item creation** entry (`createItem` /
   `startCodeGeneration`), not inside `generateCode` — editing an existing item is free.
-- Free = **hard block** at `includedItems`. Paid = allowed up to an optional customer cap
-  `subscription.overageLimitItems`, else unlimited (overage bills in arrears).
+- Hard-capped (Bronze, unenrolled) = **hard block** at `includedItems`, wall `plan_item_limit`. Metered
+  (paid, or Bronze enrolled) = allowed up to the customer cap `subscription.overageLimitItems`, else
+  unlimited (overage bills in arrears), wall `overage_cap`. No new wall kind was added.
 - The cap is set in **dollars** via `POST /api/payments/overage-limit` (stored as items using the tier
-  rate) and enforced by us, so Stripe never bills past it. UI: the spend-cap control in
+  rate) and enforced by us, so Stripe never bills past it. A plan change **recomputes
+  `overageLimitItems` from `overageLimitUsd`** at the new rate (`quick-subscribe.ts`) — carrying the item
+  count across would silently move the dollar ceiling the customer agreed to. UI: the spend-cap control in
   `components/payments/UsageMonitor.tsx`.
 
 ## Stripe integration

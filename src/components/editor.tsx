@@ -280,7 +280,7 @@ export default function Editor({
                   })));
                 } else if (fetchedData?.usageLimitReached) {
                   setCompileErrors([{
-                    message: 'Item limit reached. Please upgrade your plan or raise your overage cap in Settings to continue.',
+                    message: 'Item limit reached. Add a payment method, raise your spend cap, or upgrade your plan on the Billing page to continue.',
                     from: -1,
                     to: -1,
                   }]);

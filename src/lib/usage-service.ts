@@ -1,5 +1,5 @@
 import { getFirestore } from "../utils/db";
-import { effectiveIncludedItems, isHardCapped, DEFAULT_PLAN } from "./plans-config";
+import { effectiveIncludedItems, isHardCappedFor, overageRateFor, getPlan, DEFAULT_PLAN } from "./plans-config";
 import { repairSubscriptionFromStripe, subscriptionCacheIsEmpty } from "./subscription-cache";
 
 export interface ItemCreateAllowedResult {
@@ -27,6 +27,15 @@ export interface ItemCreateAllowedResult {
    * don't have to re-read the user doc.
    */
   periodEnd?: Date;
+  /**
+   * The account is on a hard-capped tier that OFFERS pay-as-you-go but hasn't
+   * enrolled — i.e. adding a card would clear this wall. Lets a caller render
+   * "add a payment method to continue" instead of "upgrade" without re-deriving
+   * the plan, the same way `wall` saves it pattern-matching on `reason`.
+   */
+  payAsYouGoAvailable?: boolean;
+  /** Per-item overage rate for the plan, so callers can quote it in the wall copy. */
+  overageRatePerItem?: number | null;
 }
 
 export interface ItemCreateAllowedOptions {
@@ -57,10 +66,13 @@ export interface ItemCreateAllowedOptions {
 /**
  * Gate item CREATION against the account's item budget for the period.
  *
- * - Free/hard-cap tiers: blocked once `currentUsage >= includedItems`.
- * - Paid tiers: allowed up to `includedItems + overageLimitItems`; when the
- *   customer set no overage cap (`overageLimitItems` null/absent), unlimited —
- *   overage bills in arrears via the Stripe meter.
+ * - Hard-capped tiers (Bronze with no card on file): blocked once
+ *   `currentUsage >= includedItems`. Clearing it means enrolling in
+ *   pay-as-you-go, not necessarily upgrading.
+ * - Metered tiers (paid, or Bronze enrolled in pay-as-you-go): allowed up to
+ *   `includedItems + overageLimitItems`; when the customer set no overage cap
+ *   (`overageLimitItems` null/absent), unlimited — overage bills in arrears via
+ *   the Stripe meter.
  *
  * currentUsage is the item count for the period. It is derived from the stored
  * counter, self-healed against the sum of `units` on usage records since the
@@ -133,21 +145,36 @@ export async function checkItemCreateAllowed(
       }
     }
 
-    // Hard-cap (Free): no overage path — blocked at the included bucket.
-    if (isHardCapped(plan)) {
+    const overageRatePerItem = overageRateFor(plan);
+
+    // Hard-capped: no overage path for THIS account — blocked at the included
+    // bucket. For Bronze that state is escapable (enroll in pay-as-you-go);
+    // for contact-sales tiers it isn't, so the copy has to differ.
+    if (isHardCappedFor(plan, subscription)) {
       const totalAvailable = includedItems;
+      const allowed = currentUsage < totalAvailable;
+      // A rate exists but we're still capped ⇒ the tier offers pay-as-you-go and
+      // this account simply hasn't put a card on file yet.
+      const payAsYouGoAvailable = overageRatePerItem != null;
+      const rate = overageRatePerItem != null ? `$${overageRatePerItem.toFixed(2)}` : '';
       return {
-        allowed: currentUsage < totalAvailable,
-        reason: currentUsage < totalAvailable ? undefined : 'Free plan item limit reached — upgrade to create more',
-        wall: currentUsage < totalAvailable ? undefined : 'plan_item_limit',
+        allowed,
+        reason: allowed
+          ? undefined
+          : payAsYouGoAvailable
+            ? `${getPlan(plan).displayName} includes ${includedItems} items this month — add a payment method to continue at ${rate}/item, or upgrade`
+            : 'Item limit reached — upgrade to create more',
+        wall: allowed ? undefined : 'plan_item_limit',
         currentUsage,
         totalAvailable,
         includedItems,
         periodEnd,
+        payAsYouGoAvailable,
+        overageRatePerItem,
       };
     }
 
-    // Paid: allow up to the customer's overage cap, or unlimited when unset.
+    // Metered: allow up to the customer's overage cap, or unlimited when unset.
     const overageLimit = typeof subscription.overageLimitItems === 'number'
       ? subscription.overageLimitItems
       : null;
@@ -161,6 +188,8 @@ export async function checkItemCreateAllowed(
       totalAvailable,
       includedItems,
       periodEnd,
+      payAsYouGoAvailable: false,
+      overageRatePerItem,
     };
   } catch (error) {
     console.error('checkItemCreateAllowed error:', error);

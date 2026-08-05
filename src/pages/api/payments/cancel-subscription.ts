@@ -173,8 +173,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const subPeriodEnd = subscriptionPeriodEnd(subscription);
     if (immediately && subPeriodEnd) {
       updateData['subscription.renewalDate'] = new Date(subPeriodEnd * 1000).toISOString();
-      updateData['subscription.interval'] = null; // Free plan has no interval
-      updateData['subscription.stripeSubscriptionId'] = null; // Clear Stripe subscription ID
+      updateData['subscription.interval'] = null; // Bronze has no interval
+      // Clearing this is also what un-enrolls a Bronze pay-as-you-go account:
+      // payAsYouGoEnabled() keys off it, so the account drops back to the
+      // included-items hard cap on its very next create.
+      updateData['subscription.stripeSubscriptionId'] = null;
       // Both fields or neither: preservedUntil without an allocation is a
       // grace window with nothing in it.
       if (currentAllocation !== null) {

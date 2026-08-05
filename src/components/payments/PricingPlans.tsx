@@ -190,6 +190,14 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
   const handleSubscribe = async (planId: string) => {
     if (planId === 'demo' && !sub.hasActiveSubscription) return;
     if (planId === 'demo' && sub.hasActiveSubscription) {
+      // On Bronze already: the only "subscription" is the pay-as-you-go
+      // enrollment, so cancelling drops them back to the included-items cap
+      // rather than changing tier. Confirm it, since the button next to it
+      // ("Current Plan") reads like a no-op.
+      if (sub.currentUserPlan === 'demo' &&
+          !window.confirm('Turn off pay-as-you-go? You\'ll keep your included items each month, but new items will stop once you reach them.')) {
+        return;
+      }
       await cancelToDemo();
       return;
     }
@@ -203,7 +211,11 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
       (isChangingInterval && sub.currentBillingInterval === 'monthly' && billingInterval === 'annual');
 
     try {
-      if (sub.hasActiveSubscription && sub.currentUserPlan !== 'demo') {
+      // Any live subscription — including a Bronze pay-as-you-go enrollment —
+      // means a card is on file and Checkout will refuse the change ("cannot
+      // change subscription through checkout"). Prorated in-place updates are
+      // what quick-subscribe exists for, so route every subscriber through it.
+      if (sub.hasActiveSubscription) {
         console.log('Attempting quick subscribe:', { isChangingInterval, wouldBeUpgrade, planId, interval: billingInterval });
         const handled = await quickSubscribe(planId, wouldBeUpgrade);
         if (handled) return;

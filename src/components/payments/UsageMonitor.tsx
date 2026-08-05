@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
+import { planDetails, type PlanId } from '../../utils/plans';
 
 interface UsageData {
   plan: string;
@@ -11,6 +12,10 @@ interface UsageData {
   overageRatePerItem: number | null;
   overageCostUsd: number;
   hardCap: boolean;
+  /** A card is on file and overage meters (pay-as-you-go on a hard-capped tier). */
+  payAsYouGoEnabled: boolean;
+  /** The tier offers pay-as-you-go and this account hasn't enrolled yet. */
+  payAsYouGoAvailable: boolean;
   overageLimitItems: number | null;
   overageLimitUsd: number | null;
   lastResetDate: string;
@@ -23,11 +28,18 @@ interface UsageMonitorProps {
 
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// Prefilled enrollment cap. Deliberately a round, small number: the point of
+// asking is that the customer picks a ceiling they're comfortable with before
+// a card goes on file, not that they accept ours.
+const DEFAULT_ENROLL_CAP_USD = 20;
+
 export default function UsageMonitor({ userId }: UsageMonitorProps) {
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingCap, setSavingCap] = useState(false);
   const [capInput, setCapInput] = useState('');
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollCapInput, setEnrollCapInput] = useState(String(DEFAULT_ENROLL_CAP_USD));
 
   useEffect(() => {
     fetchUsageData();
@@ -49,13 +61,43 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
     }
   };
 
+  // Enroll in pay-as-you-go: Checkout collects the card AND creates the $0-base
+  // metered subscription in one step. The cap rides along so it is applied by
+  // the subscription webhook — an abandoned Checkout leaves nothing behind.
+  const enroll = async (limitUsd: number) => {
+    if (enrolling) return;
+    setEnrolling(true);
+    try {
+      const response = await axios.post('/api/payments/create-checkout-session', {
+        userId,
+        planId: usage?.plan ?? 'demo',
+        interval: 'monthly',
+        overageLimitUsd: limitUsd,
+      });
+      window.location.href = response.data.checkoutUrl;
+    } catch (error: any) {
+      console.error('Error starting pay-as-you-go checkout:', error);
+      alert(error?.response?.data?.message || error?.response?.data?.error ||
+        'Could not start checkout. Please try again.');
+      setEnrolling(false);
+    }
+  };
+
   const saveCap = async (limitUsd: number | null) => {
     if (savingCap) return;
     setSavingCap(true);
     try {
       await axios.post('/api/payments/overage-limit', { userId, limitUsd });
       await fetchUsageData();
-    } catch (error) {
+    } catch (error: any) {
+      // Setting a cap on a tier that hasn't enrolled is the OTHER moment we ask
+      // for payment details — the cap is meaningless until overage can be
+      // billed, so carry the amount they chose straight into Checkout.
+      if (error?.response?.status === 402 && error.response.data?.requiresPaymentMethod && limitUsd) {
+        setSavingCap(false);
+        await enroll(limitUsd);
+        return;
+      }
       console.error('Error setting overage limit:', error);
       alert('Failed to update overage limit. Please try again.');
     } finally {
@@ -85,6 +127,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
 
   const remainingIncluded = Math.max(0, included - used);
   const isAtIncludedLimit = used >= included;
+  const planName = planDetails[usage.plan as PlanId]?.name ?? usage.plan;
 
   // Customer overage cap remaining (paid tiers with a cap set).
   const capItems = usage.overageLimitItems;
@@ -181,13 +224,61 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
       <div className="bg-white overflow-hidden shadow rounded-none">
         <div className="px-4 py-5 sm:p-6">
           <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Overage Spend Cap
+            {usage.payAsYouGoAvailable ? 'Keep Creating' : 'Overage Spend Cap'}
           </h3>
 
-          {usage.hardCap ? (
+          {usage.payAsYouGoAvailable ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-none p-4">
+              <p className="text-sm text-gray-600 mb-3">
+                {planName} includes {included.toLocaleString()} items per month.
+                {' '}Add a payment method to keep creating at{' '}
+                <span className="font-medium">
+                  {usage.overageRatePerItem ? money(usage.overageRatePerItem) : '—'} per item
+                </span>
+                , billed on your next invoice. Choose a monthly cap first — we stop new items
+                once you reach it, so you can never be charged more than you picked.
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={enrollCapInput}
+                    onChange={(e) => setEnrollCapInput(e.target.value)}
+                    aria-label="Monthly spend cap in dollars"
+                    className="pl-6 pr-3 py-2 w-40 border border-gray-300 rounded-none text-sm focus:outline-none focus:ring-1 focus:ring-gray-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={enrolling || !(Number(enrollCapInput) > 0)}
+                  onClick={() => enroll(Number(enrollCapInput))}
+                  className="inline-flex justify-center rounded-none bg-gray-700 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {enrolling ? 'Redirecting…' : 'Add payment method'}
+                </button>
+              </div>
+              {Number(enrollCapInput) > 0 && usage.overageRatePerItem ? (
+                <p className="mt-2 text-xs text-gray-500">
+                  {money(Number(enrollCapInput))} caps you at about{' '}
+                  {Math.floor(Number(enrollCapInput) / usage.overageRatePerItem).toLocaleString()}{' '}
+                  additional items per month. Change or remove it any time.
+                </p>
+              ) : null}
+              <p className="mt-3 text-xs text-gray-500">
+                Creating a lot more than that?{' '}
+                <Link href="/billing" className="text-gray-600 hover:text-gray-800 font-medium">
+                  Compare plans
+                </Link>
+                {' '}— paid tiers include a large bucket at a lower per-item rate.
+              </p>
+            </div>
+          ) : usage.hardCap ? (
             <div className="bg-gray-50 border border-gray-200 rounded-none p-4">
               <p className="text-sm text-gray-600">
-                The Free plan is capped at {included.toLocaleString()} items per month with no
+                {planName} is capped at {included.toLocaleString()} items per month with no
                 overage.{' '}
                 <Link href="/billing" className="text-gray-600 hover:text-gray-800 font-medium">
                   Upgrade to create more.

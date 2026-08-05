@@ -7,6 +7,7 @@ import {
   priceIdToPlan,
   includedItemsFor,
   isUpgrade as isPlanUpgrade,
+  overageDollarsToItems,
   DEFAULT_PLAN,
   PLANS,
   type PlanId,
@@ -276,6 +277,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'subscription.interval': interval,
       'subscription.updatedAt': new Date().toISOString(),
     };
+
+    // Re-derive the spend cap against the NEW plan's per-item rate.
+    //
+    // The cap is stored twice: overageLimitUsd is what the customer chose, and
+    // overageLimitItems is what the gate enforces, converted at their plan's
+    // rate. A plan change moves the rate, so carrying the item count across
+    // silently changes the dollar ceiling they agreed to — Bronze→Silver
+    // ($0.20→$0.10) would halve a $20 cap to $10 of headroom while the UI kept
+    // saying $20. Honor the dollars; recompute the items.
+    const capUsd = userData?.subscription?.overageLimitUsd;
+    if (typeof capUsd === 'number' && capUsd > 0) {
+      const recomputed = overageDollarsToItems(planId as PlanId, capUsd);
+      if (recomputed != null) {
+        updateData['subscription.overageLimitItems'] = recomputed;
+      }
+    }
 
     // If this was a downgrade, store the preserved allocation
     if (existingSub && !isUpgrade) {

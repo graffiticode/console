@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
-import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, type PlanId, type BillingInterval } from '../../../lib/plans-config';
+import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, type PlanId, type BillingInterval } from '../../../lib/plans-config';
 import { emitEvent, actor } from '../../../lib/funnel-events';
 
 // Initialize Stripe only if secret key is available
@@ -18,12 +18,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId, planId, interval } = req.body;
+    const { userId, planId, interval, overageLimitUsd } = req.body;
 
-    console.log('Create checkout session request:', { userId, planId, interval });
+    console.log('Create checkout session request:', { userId, planId, interval, overageLimitUsd });
 
     if (!userId || !planId || !interval) {
       return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    // Bronze pay-as-you-go enrollment: the base fee is $0 and only a monthly
+    // price exists, so an "annual" request here is a client bug, not a choice.
+    const planConfig = getPlan(planId);
+    const isPayAsYouGoEnrollment = planConfig.hardCap && planConfig.overageRatePerItem != null;
+    const effectiveInterval: BillingInterval = isPayAsYouGoEnrollment
+      ? 'monthly'
+      : (interval as BillingInterval);
+
+    // A spend cap is REQUIRED to enroll: the customer is putting a card behind a
+    // $0-base plan, and "unlimited by default" there is how a trial user gets a
+    // four-figure surprise. Paid tiers keep their existing opt-in cap semantics.
+    let enrollmentCapUsd: number | null = null;
+    if (isPayAsYouGoEnrollment) {
+      const usd = Number(overageLimitUsd);
+      if (!Number.isFinite(usd) || usd <= 0) {
+        return res.status(400).json({
+          error: 'A monthly spend cap is required',
+          details: 'Pass overageLimitUsd as a positive dollar amount.',
+        });
+      }
+      enrollmentCapUsd = usd;
     }
 
     // Validate Stripe configuration
@@ -80,9 +103,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get the appropriate price ID
-    const priceId = stripeBasePriceId(planId as PlanId, interval as BillingInterval);
+    const priceId = stripeBasePriceId(planId as PlanId, effectiveInterval);
 
-    console.log('Price ID mapping:', { planId, interval, priceId });
+    console.log('Price ID mapping:', { planId, interval: effectiveInterval, priceId });
 
     // Check if price IDs are still placeholders
     if (!priceId || priceId === 'undefined' || priceId.includes('TEST_')) {
@@ -151,14 +174,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Allow modifying quantities, promo codes, etc
       allow_promotion_codes: true,
       billing_address_collection: 'auto',
-      // Save payment method for future use (subscription mode)
+      // Save payment method for future use (subscription mode). On a Bronze
+      // enrollment the amount due today is $0, so this flag is the only thing
+      // making Stripe collect a card at all — the entire point of the flow.
       payment_method_collection: 'always',
       metadata: {
         userId,
         planId,
-        interval,
+        interval: effectiveInterval,
+      },
+      // Carried on the SUBSCRIPTION, not the session: customer.subscription.created
+      // is where the plan (and now the cap) is written, and a session that is
+      // never completed must leave no trace.
+      subscription_data: {
+        metadata: {
+          userId,
+          planId,
+          ...(enrollmentCapUsd != null ? { overageLimitUsd: String(enrollmentCapUsd) } : {}),
+        },
       },
     };
+
+    if (isPayAsYouGoEnrollment) {
+      // Keep Bronze on calendar months. Usage is counted per billing period, so
+      // an anchor that drifted with the enrollment date would silently move
+      // everyone's reset day off the 1st and make usage reports incomparable.
+      sessionConfig.subscription_data!.billing_cycle_anchor_config = { day_of_month: 1 };
+      // The base price is $0; a proration line for it would only be noise.
+      sessionConfig.subscription_data!.proration_behavior = 'none';
+    }
 
     // If customer has a saved payment method, configure to use it
     if (defaultPaymentMethod) {

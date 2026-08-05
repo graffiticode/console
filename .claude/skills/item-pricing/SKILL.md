@@ -7,7 +7,7 @@ description: Item-based pricing and metering — plan tiers, where items are cou
 
 Full reference: `docs/item-based-pricing.md`.
 
-Billing meters **successful items created per month** (a create request that returns a compiled, valid artifact) — iteration, reads, and compiles are free. The single source of truth is `src/lib/plans-config.ts` (`PLANS`): tiers are Free (`demo`, $0, 50 items, hard cap), Silver (`pro`, $100, 1,000, $0.10/item over), Gold (`teams`, $1,000, 20,000, $0.05), Platinum (`platinum`, $10,000, 400,000, $0.025). Internal plan ids are kept stable; only display names/numbers changed (`starter` is discontinued). **Everything imports allowances/rates/price-id mappings from `plans-config.ts`** — never hardcode them (this replaced ~6 duplicated maps). Billing model = flat base billed **in advance** + **Stripe metered overage** billed in arrears on the next invoice (one clean monthly invoice).
+Billing meters **successful items created per month** (a create request that returns a compiled, valid artifact) — iteration, reads, and compiles are free. The single source of truth is `src/lib/plans-config.ts` (`PLANS`): tiers are Bronze (`demo`, $0, 50 items, then $0.20/item **once enrolled in pay-as-you-go**), Silver (`pro`, $100, 1,000, $0.10/item over), Gold (`teams`, $1,000, 20,000, $0.05), Platinum (`platinum`, $10,000, 400,000, $0.025). Internal plan ids are kept stable; only display names/numbers changed (Bronze was displayed as "Free" before pay-as-you-go; `starter` is discontinued). **Everything imports allowances/rates/price-id mappings from `plans-config.ts`** — never hardcode them (this replaced ~6 duplicated maps). Billing model = flat base billed **in advance** + **Stripe metered overage** billed in arrears on the next invoice (one clean monthly invoice).
 
 ## Counting
 
@@ -15,7 +15,9 @@ Billing meters **successful items created per month** (a create request that ret
 
 ## Gating
 
-`checkItemCreateAllowed()` (`src/lib/usage-service.ts`, renamed from `checkCompileAllowed`) runs at `createItem`/`startCodeGeneration` entry (not inside `generateCode` — edits are free). Free = hard block at included; paid = allowed up to an optional customer **overage spend cap** (`subscription.overageLimitItems`, set in dollars via `POST /api/payments/overage-limit`, enforced by us so Stripe never bills past it), else unlimited.
+`checkItemCreateAllowed()` (`src/lib/usage-service.ts`, renamed from `checkCompileAllowed`) runs at `createItem`/`startCodeGeneration` entry (not inside `generateCode` — edits are free). Hard-capped = hard block at included; metered = allowed up to an optional customer **overage spend cap** (`subscription.overageLimitItems`, set in dollars via `POST /api/payments/overage-limit`, enforced by us so Stripe never bills past it), else unlimited.
+
+**Bronze is two states, and which one you're in is not a plan id.** Unenrolled (no `subscription.stripeSubscriptionId`) = hard-capped at 50; enrolled in pay-as-you-go (active `demo` subscription = a card on file) = metered at $0.20/item up to a **required** spend cap. Branch on `isHardCappedFor(plan, subscription)` / `payAsYouGoEnabled(subscription)`, never bare `isHardCapped(plan)` — that one can't see enrollment and answers "capped" for every Bronze account (the safe direction, which is why it still exists). We capture payment details at exactly two moments: the 50-item wall, and setting a spend cap (which 402s with `requiresPaymentMethod` when unenrolled). Enrollment is hosted Checkout with a $0 base price + graduated metered price; `payment_method_collection: 'always'` is the only reason Stripe collects a card on a $0 total. **First-period anchoring** in the `customer.subscription.created` handler stops a mid-month enrollment from resetting the usage counter and granting 50 free items — see `docs/item-based-pricing.md`.
 
 ## Stripe
 

@@ -3,8 +3,8 @@ import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
 import admin from '../../../utils/db';
 import { buffer } from 'micro';
-import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, DEFAULT_PLAN } from '../../../lib/plans-config';
-import { emitPlanChanged } from '../../../lib/funnel-events';
+import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, getPlan, overageDollarsToItems, DEFAULT_PLAN } from '../../../lib/plans-config';
+import { emitPlanChanged, emitEvent, actor } from '../../../lib/funnel-events';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -220,18 +220,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const periodStart = sub.current_period_start ?? firstItem?.current_period_start;
         const periodEnd = sub.current_period_end ?? firstItem?.current_period_end;
 
+        // Pay-as-you-go enrollment on a hard-capped tier (Bronze): the customer
+        // just put a card behind a $0-base plan by completing Checkout.
+        const isEnrollment = event.type === 'customer.subscription.created' &&
+          getPlan(planInfo.name).hardCap;
+
+        // FIRST-PERIOD ANCHORING — do not "simplify" this away.
+        //
+        // Stripe stamps current_period_start = the moment of enrollment. The
+        // gate (checkItemCreateAllowed) counts usage from currentPeriodStart, so
+        // storing Stripe's value verbatim would make every item the customer
+        // already created this month invisible — a user who enrolls at item 50
+        // on the 20th would be handed 50 fresh included items, free, and again
+        // every month they re-enrolled. Anchor the FIRST period to the calendar
+        // month they actually spent those items in. billing_cycle_anchor_config
+        // (day_of_month: 1, set at Checkout) makes Stripe's own periods
+        // calendar-aligned from period 2 on, so the two agree from then.
+        const enrollmentNow = new Date();
+        const calendarMonthStart = new Date(Date.UTC(
+          enrollmentNow.getUTCFullYear(),
+          enrollmentNow.getUTCMonth(),
+          1,
+        ));
+        const storedPeriodStart = isEnrollment
+          ? calendarMonthStart.toISOString()
+          : (periodStart ? new Date(periodStart * 1000).toISOString() : null);
+
         // Build update object
         const updateData: Record<string, any> = {
           'subscription.status': subscription.status,
           'subscription.plan': planInfo.name,
           'subscription.units': planInfo.units,
           'subscription.stripeSubscriptionId': subscription.id,
-          'subscription.currentPeriodStart': periodStart ? new Date(periodStart * 1000).toISOString() : null,
+          'subscription.currentPeriodStart': storedPeriodStart,
           'subscription.currentPeriodEnd': periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
           'subscription.cancelAtPeriodEnd': subscription.cancel_at_period_end,
           'subscription.updatedAt': new Date().toISOString(),
           // Note: overageUnits field is intentionally NOT updated here - overage persists across billing cycles
         };
+
+        // The spend cap chosen during enrollment. It rides on the subscription's
+        // metadata (not the session's) precisely so an abandoned Checkout writes
+        // nothing — see create-checkout-session.ts.
+        const capUsdRaw = subscription.metadata?.overageLimitUsd;
+        if (isEnrollment && capUsdRaw) {
+          const capUsd = Number(capUsdRaw);
+          const capItems = Number.isFinite(capUsd) ? overageDollarsToItems(planInfo.name, capUsd) : null;
+          if (capItems != null) {
+            updateData['subscription.overageLimitItems'] = capItems;
+            updateData['subscription.overageLimitUsd'] = capUsd;
+          } else {
+            console.error(
+              `[stripe-webhook] subscription ${subscription.id}: could not convert enrollment cap ` +
+              `"${capUsdRaw}" to items for plan ${planInfo.name}; leaving the cap unset (uncapped).`,
+            );
+          }
+        }
 
         // Record trial usage if this is a trialing subscription and user hasn't used trial before
         if (subscription.status === 'trialing' && !userData?.trialUsedAt) {
@@ -242,12 +286,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // The plan write is the one place every Stripe path converges, so this
         // is where the funnel event belongs — not on each webhook type.
-        emitPlanChanged({
-          uid: userId,
-          from: userData?.subscription?.plan ?? DEFAULT_PLAN,
-          to: planInfo.name,
-          reason: 'subscription_sync',
-        });
+        const previousPlan = userData?.subscription?.plan ?? DEFAULT_PLAN;
+        if (isEnrollment && previousPlan === planInfo.name) {
+          // Enrolling in pay-as-you-go is not a plan change — the tier is the
+          // same on both sides. Reporting it as one would show up in the funnel
+          // as a demo→demo "upgrade" worth $0 and inflate the plan-change count.
+          emitEvent('payg_enabled', {
+            ...actor({ uid: userId }),
+            plan: planInfo.name,
+            cap_usd: updateData['subscription.overageLimitUsd'] != null
+              ? String(updateData['subscription.overageLimitUsd'])
+              : 'unlimited',
+          });
+        } else {
+          emitPlanChanged({
+            uid: userId,
+            from: previousPlan,
+            to: planInfo.name,
+            reason: 'subscription_sync',
+          });
+        }
 
         break;
       }

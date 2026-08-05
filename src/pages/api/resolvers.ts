@@ -473,9 +473,10 @@ export async function recordBillableItem({
       return;
     }
 
-    // Report to the Stripe metered price (paid tiers only). Best-effort.
+    // Report to the Stripe metered price (metered tiers only — paid, or Bronze
+    // enrolled in pay-as-you-go). Best-effort.
     await reportItemUsage({
-      plan: subscription.plan,
+      subscription,
       stripeCustomerId: userData?.stripeCustomerId,
       identifier: `${itemId}__${taskId}`,
     });

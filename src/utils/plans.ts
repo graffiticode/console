@@ -35,15 +35,19 @@ export const plans: Plan[] = [
   {
     id: 'demo',
     name: PLANS.demo.displayName,
-    description: 'Free, no credit card required',
+    // Keep the word "free" here even though the plan is now named Bronze — it's
+    // the zero-price signal that makes the tier convert. Only the plan NAME
+    // moved; what you pay to start did not.
+    description: 'Free to start, no credit card required',
     monthlyPrice: PLANS.demo.basePriceMonthly,
     annualPrice: PLANS.demo.basePriceAnnual,
     monthlyUnits: PLANS.demo.includedItems,
     features: [
-      `${fmt(PLANS.demo.includedItems)} items per month`,
-      'No credit card required',
+      `${fmt(PLANS.demo.includedItems)} items per month, free`,
+      'No credit card required to start',
+      `Then ${rate('demo')} per item with a card on file`,
+      'Set a monthly spend cap',
       'Community support',
-      'Hard cap — upgrade to create more',
     ],
     cta: 'Current Plan',
     isFree: true,
@@ -139,7 +143,7 @@ export interface ButtonLabelOpts {
 export function getButtonLabel(opts: ButtonLabelOpts): string {
   if (opts.processing) return 'Processing...';
   if (opts.isFree && opts.isCurrentPlan) return 'Current Plan';
-  if (opts.isFree && opts.hasActiveSubscription) return 'Downgrade to Free';
+  if (opts.isFree && opts.hasActiveSubscription) return `Downgrade to ${opts.planName}`;
   if (opts.cancelAtPeriodEnd && opts.isCurrentPlan) return 'Canceling at Period End';
   if (opts.isCurrentPlan && opts.isSameBillingInterval && !opts.isFree) {
     return opts.pendingCancel ? 'Confirm Cancel' : 'Cancel Plan';
