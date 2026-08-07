@@ -31,6 +31,18 @@ const rate = (id: PlanId) => {
   return r == null ? '' : `$${r.toFixed(3).replace(/0$/, '')}`;
 };
 
+// Card copy mirrors the AGENT audience of the public pricing page
+// (www/data/contract.ts → PRICING.plans + PRICING.audiences.agent), which is the
+// same reader: someone driving the product through an agent, deciding which tier
+// to be on. Keep the two in step — a customer who compares the marketing page
+// with their billing page and finds different promises has found a bug.
+//
+// The framing that page settles on, and that these cards carry:
+//   - every tier is a FLAT per-item rate with a monthly minimum, so the included
+//     bucket costs the same per item as anything above it — no overage penalty;
+//   - Bronze's included 50 need no card at all. A card (and a required spend
+//     cap) buys ADDITIONAL items, nothing else;
+//   - you move up a tier exactly when it lowers your per-item cost.
 export const plans: Plan[] = [
   {
     id: 'demo',
@@ -38,15 +50,15 @@ export const plans: Plan[] = [
     // Keep the word "free" here even though the plan is now named Bronze — it's
     // the zero-price signal that makes the tier convert. Only the plan NAME
     // moved; what you pay to start did not.
-    description: 'Free to start, no credit card required',
+    description: 'The on-ramp — free to start, no credit card',
     monthlyPrice: PLANS.demo.basePriceMonthly,
     annualPrice: PLANS.demo.basePriceAnnual,
     monthlyUnits: PLANS.demo.includedItems,
     features: [
       `${fmt(PLANS.demo.includedItems)} items per month, free`,
-      'No credit card required to start',
-      `Then ${rate('demo')} per item with a card on file`,
-      'Set a monthly spend cap',
+      'No credit card for the included items',
+      `Additional items at ${rate('demo')} each`,
+      'A card and a monthly spend cap, only to go past the free items',
       'Community support',
     ],
     cta: 'Current Plan',
@@ -55,13 +67,13 @@ export const plans: Plan[] = [
   {
     id: 'pro',
     name: PLANS.pro.displayName,
-    description: 'For production agent surfaces',
+    description: `Flat ${rate('pro')}/item with a $${fmt(PLANS.pro.basePriceMonthly)} monthly minimum`,
     monthlyPrice: PLANS.pro.basePriceMonthly,
     annualPrice: PLANS.pro.basePriceAnnual,
     monthlyUnits: PLANS.pro.includedItems,
     features: [
       `${fmt(PLANS.pro.includedItems)} items per month included`,
-      `Additional items at ${rate('pro')} each`,
+      `Additional items at ${rate('pro')} each — same rate, no overage penalty`,
       'Set an overage spend cap',
       'Email support',
       'Cancel anytime',
@@ -71,13 +83,13 @@ export const plans: Plan[] = [
   {
     id: 'teams',
     name: PLANS.teams.displayName,
-    description: 'For higher-volume tenants',
+    description: `Cheaper than ${PLANS.pro.displayName} above ~10,000 items/mo`,
     monthlyPrice: PLANS.teams.basePriceMonthly,
     annualPrice: PLANS.teams.basePriceAnnual,
     monthlyUnits: PLANS.teams.includedItems,
     features: [
       `${fmt(PLANS.teams.includedItems)} items per month included`,
-      `Additional items at ${rate('teams')} each`,
+      `Additional items at ${rate('teams')} each — same rate, no overage penalty`,
       'Set an overage spend cap',
       'Priority support',
       'Cancel anytime',
@@ -87,15 +99,18 @@ export const plans: Plan[] = [
   {
     id: 'platinum',
     name: PLANS.platinum.displayName,
-    description: 'For high-volume, done-for-you deployments',
+    description: 'The partner engagement — our lowest per-item rate',
     monthlyPrice: PLANS.platinum.basePriceMonthly,
     annualPrice: PLANS.platinum.basePriceAnnual,
     monthlyUnits: PLANS.platinum.includedItems,
     features: [
       `${fmt(PLANS.platinum.includedItems)} items per month included`,
-      `Additional items at ${rate('platinum')} each`,
-      'Custom language development',
-      'Bring your own model key (BYOK)',
+      `Additional items at ${rate('platinum')} each — our lowest rate`,
+      // A public commitment, not a feature blurb: the pricing page states the
+      // same terms (PRICING.languageService). Don't soften or add a turnaround
+      // figure here that the marketing surface doesn't also promise.
+      'Custom language development included — no separate build fee',
+      'Pause or cancel any month',
       'Priority support',
     ],
     cta: 'Choose Platinum',
