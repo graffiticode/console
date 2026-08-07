@@ -19,6 +19,7 @@ import { getFreePlanCredentials } from "../../lib/free-plan-context";
 import { GENERATION_JOB_VERSION } from "../../lib/generation-queue";
 import type { AuthReplay, GenerationJob } from "../../lib/generation-queue";
 import { emitEvent, actor } from "../../lib/funnel-events";
+import { resolveFirstOutcome } from "../../lib/workspace-registry";
 
 type Auth = { uid: string; token: string; freePlan?: boolean; sessionNamespace?: string };
 
@@ -100,6 +101,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "auth_failed" });
   }
 
+  // The workspace this generation belongs to, as the same key actor() stamps on
+  // events so the registry and the event stream agree. resolveFirstOutcome only
+  // moves a row out of "pending", so calling it on every generation is safe:
+  // all but the workspace's first attempt no-op.
+  const workspaceKey = (actor(auth) as { session?: string }).session;
+
   try {
     const result = await generateCode({
       auth,
@@ -119,6 +126,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // `app` mirrors the item_created/item_updated convention in resolvers.ts —
       // it is what lets the MCP-only report keep this event (isMcpOrigin).
       emitEvent("item_generation_failed", { ...actor(auth), lang, app: client ?? "console", err: message });
+      await resolveFirstOutcome(workspaceKey, "generation_failed");
       // Handled outcome — 2xx so the queue does NOT retry.
       return res.status(200).json({ status: "failed", error: message });
     }
@@ -141,6 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...(Array.isArray(result.upstreamLangs) ? { upstreamLangs: result.upstreamLangs } : {}),
     });
     await setItemGenerationStatus({ auth, id: itemId, status: "ready" });
+    await resolveFirstOutcome(workspaceKey, "ok");
 
     return res.status(200).json({ status: "ready", taskId: result.taskId });
   } catch (err: any) {

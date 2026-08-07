@@ -99,6 +99,27 @@ export function actor(input: {
 }
 
 /**
+ * Normalize a language to its canonical "L0166" form.
+ *
+ * Lives here, on the request path, so the workspace registry and the reports
+ * bucket a language the same way. The MCP server strips the `L` prefix before
+ * calling us, so without one shared normalizer the registry's `lang` and the
+ * log-derived language tables disagree about the same call.
+ *
+ * Anything that isn't an L-number becomes "(invalid)" rather than passing
+ * through. Clients do send junk: a real week had a call whose `language`
+ * argument was "create a green bar chart using mock data", which a pass-through
+ * turned into its own 40-character row in the language table.
+ */
+export function langKey(v: unknown): string | undefined {
+  if (typeof v !== "string" || !v) return undefined;
+  const t = v.trim();
+  if (/^\d{2,6}$/.test(t)) return `L${t}`;
+  if (/^L\d{2,6}$/i.test(t)) return t.toUpperCase();
+  return "(invalid)";
+}
+
+/**
  * Report a subscription plan transition.
  *
  * Emit this at the point our OWN state changes — the `users/{uid}` plan write —

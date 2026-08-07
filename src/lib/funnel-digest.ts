@@ -22,6 +22,10 @@
 
 import { getFirestore } from "../utils/db";
 import { getAccessToken } from "./gcp-token";
+// "0166" and "L0166" are the same language; item docs use one, MCP args the
+// other. Shared with the workspace registry so both bucket a language alike.
+import { langKey } from "./funnel-events";
+import { isExcludedSession } from "./funnel-exclusions";
 
 const PROJECT =
   process.env.GENERATION_QUEUE_PROJECT ||
@@ -124,46 +128,19 @@ export function isMcpOrigin(e: LogEvent): boolean {
 // --- Excluded accounts ------------------------------------------------------
 
 /**
- * Our own accounts, as the `session` value their events carry.
- *
- * Stored as the sha256(uid) hash the events already use, NOT as uids. Two
- * reasons: the comparison is then a direct lookup with no hashing at read time,
- * and the privacy contract's "never log a wallet address" stays true of the
- * source as well — most Firebase uids here ARE wallet addresses, which are
- * publicly linkable. Recover a hash's owner out-of-band by scanning the users
- * collection; don't paste the uid back in here.
- *
- * These are dev/QA accounts whose activity is indistinguishable in shape from a
- * customer's and would otherwise read as demand — the eval harness alone can
- * post dozens of items in a run.
- */
-const EXCLUDED_SESSIONS = new Set([
-  // Jeff — console development and manual testing.
-  "c7b82fb7e78e342ae0fbe73158f0574a90992852fd90acf4e51d668838b6e5d7",
-  // Eval harness (EVAL_UID) — scripts/model-eval.ts, create-eval-items.ts.
-  "3fe1525d7590f241b8df5fdd5e4d01ab355bd4663c182890278bae3cf7049ed9",
-]);
-
-/**
- * Additional sessions to exclude, as a comma-separated list of sha256(uid)
- * hashes. Additive to EXCLUDED_SESSIONS so a new test account can be muted
- * without a deploy.
- */
-const EXTRA_EXCLUDED = (process.env.FUNNEL_EXCLUDE_SESSIONS ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-/**
  * Whether this event belongs to an account the report deliberately ignores.
+ * The list itself lives in src/lib/funnel-exclusions.ts, shared with the
+ * write-time `internal` stamp on the workspace registry.
  *
- * Only ever matches authenticated traffic: free-plan events carry a
- * sessionNamespace in the same field, and a namespace is a uuid that cannot
- * collide with a sha256 hex digest. So this can't silently mute a real trial.
+ * Only ever matches authenticated traffic. Free-plan events carry a
+ * sessionNamespace in this same field — also a sha256 hex digest, so the two
+ * are structurally identical and only the `auth` value tells them apart, but a
+ * collision between a namespace and one of our uid hashes is not a practical
+ * concern. Anonymous internal traffic is therefore invisible here by
+ * construction; that is what the registry's `internal` flag is for.
  */
 export function isExcludedAccount(e: LogEvent): boolean {
-  if (typeof e.session !== "string" || !e.session) return false;
-  return EXCLUDED_SESSIONS.has(e.session) || EXTRA_EXCLUDED.includes(e.session);
+  return isExcludedSession(typeof e.session === "string" ? e.session : undefined);
 }
 
 // --- Anonymous vs signed-in -------------------------------------------------
@@ -442,25 +419,6 @@ function bump(map: Record<string, number>, key: string | undefined, by = 1): voi
  * when nobody tried. Any new authoring tool must be added here.
  */
 const AUTHORING_TOOLS = new Set(["create_item", "update_item"]);
-
-/**
- * "0166" and "L0166" are the same language; item docs use one, MCP args the
- * other.
- *
- * Anything that isn't an L-number is bucketed as "(invalid)" rather than passed
- * through. Clients do send junk here — a real week had a call whose `language`
- * argument was "create a green bar chart using mock data", which the old
- * pass-through turned into its own 40-character row in the language table.
- * Bucketing keeps that visible as a malformed-call count without letting one bad
- * caller name a language.
- */
-function langKey(v: unknown): string | undefined {
-  if (typeof v !== "string" || !v) return undefined;
-  const t = v.trim();
-  if (/^\d{2,6}$/.test(t)) return `L${t}`;
-  if (/^L\d{2,6}$/i.test(t)) return t.toUpperCase();
-  return "(invalid)";
-}
 
 /**
  * Roll events into the digest shape.

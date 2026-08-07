@@ -29,6 +29,16 @@ import crypto from 'crypto';
 import { execFileSync } from 'child_process';
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
+import {
+  agentOmtmMetric,
+  currentWeek,
+  partnerOmtmMetric,
+  totalCreatingWorkspaces,
+  weeklyNewCreatingWorkspaces,
+  type Metric,
+  type WeeklyNewCreatingWorkspaces,
+} from '../src/lib/omtm';
+import { OMTM_CLOCK_START } from '../src/lib/workspace-week';
 
 // --- Load .env.local (same pattern as user-report.ts) -----------------------
 const envPath = resolve(process.cwd(), '.env.local');
@@ -66,6 +76,12 @@ function parseArgs(argv: string[]) {
   let from = '';
   let to = '';
   let slowMs = 60000; // errors slower than this are flagged as likely timeouts
+  // The OMTM window is an ISO week and is deliberately INDEPENDENT of --period:
+  // the weekly metric must not silently change shape because someone asked for a
+  // day's engagement numbers.
+  let week = currentWeek();
+  let partnerSessions: number | undefined;
+  let partnerLog = '';
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--period' && args[i + 1]) { period = args[++i]; }
     else if (args[i] === '--output' && args[i + 1]) { output = args[++i]; }
@@ -73,6 +89,13 @@ function parseArgs(argv: string[]) {
     else if (args[i] === '--from' && args[i + 1]) { from = args[++i]; }
     else if (args[i] === '--to' && args[i + 1]) { to = args[++i]; }
     else if (args[i] === '--slow-ms' && args[i + 1]) { slowMs = parseInt(args[++i], 10); }
+    else if (args[i] === '--week' && args[i + 1]) { week = args[++i]; }
+    else if (args[i] === '--partner-sessions' && args[i + 1]) { partnerSessions = parseInt(args[++i], 10); }
+    else if (args[i] === '--partner-log' && args[i + 1]) { partnerLog = args[++i]; }
+  }
+  if (!/^\d{4}-W\d{2}$/.test(week)) {
+    console.error('Error: --week must be an ISO week, e.g. "2026-W32"');
+    process.exit(1);
   }
   if (!['all', 'month', 'week', 'day'].includes(period)) {
     console.error('Error: --period must be "all", "month", "week", or "day"');
@@ -82,7 +105,7 @@ function parseArgs(argv: string[]) {
     console.error('Error: --slow-ms must be a positive number of milliseconds');
     process.exit(1);
   }
-  return { period, output, freshness, from, to, slowMs };
+  return { period, output, freshness, from, to, slowMs, week, partnerSessions, partnerLog };
 }
 
 function windowBounds(opts: { period: string; from: string; to: string }) {
@@ -523,6 +546,18 @@ function funnelRow(stage: string, count: number | string, conv: string, note = '
   return `<tr><td>${stage}</td><td class="num">${count}</td><td class="num">${conv}</td><td class="note">${note}</td></tr>`;
 }
 
+// One row per OMTM. A table with a fixed two-row body, deliberately not cards:
+// adding a third OMTM has to be a visible structural edit, not one more div.
+function omtmRow(funnel: string, m: Metric): string {
+  return `<tr><td>${funnel}</td><td><b>${m.name}</b></td><td class="num" style="font-size:1.2rem;font-weight:600;">${m.value}</td>` +
+    `<td>${m.owner}</td><td class="note">${m.window}</td><td class="note">${m.source}</td></tr>`;
+}
+
+function gateRow(gate: string, target: string, actual: string, passed: boolean, evidence: string): string {
+  const status = actual === '—' ? '<span class="note">not measured</span>' : passed ? '✅ met' : '◐ open';
+  return `<tr><td>${gate}</td><td class="num">${target}</td><td class="num">${actual}</td><td>${status}</td><td class="note">${evidence}</td></tr>`;
+}
+
 function generateHtml(data: {
   periodLabel: string;
   freshness: string;
@@ -530,12 +565,16 @@ function generateHtml(data: {
   fs: FsStats;
   claims: ClaimStats;
   av: ArtifactViewStats;
+  omtm: WeeklyNewCreatingWorkspaces;
+  agentMetric: Metric;
+  partnerMetric: Metric;
+  cumulativeWorkspaces: number;
 }): string {
   const now = new Date().toISOString();
   const { log, fs, claims, av } = data;
 
-  const northAccount = pct(fs.accounts, fs.anonSessions);
-  const northFirstTry = pct(log.firstTrySuccess, log.sessionsWithCreate);
+  const claimConversion = pct(fs.accounts, fs.anonSessions);
+  const firstAttemptSuccess = pct(log.firstTrySuccess, log.sessionsWithCreate);
   const overallSuccess = pct(log.toolOk, log.toolTotal);
   const callsPerSession = log.distinctSessions
     ? (log.toolTotal / log.distinctSessions).toFixed(1) : '—';
@@ -579,6 +618,7 @@ function generateHtml(data: {
   td.num,th.num { text-align:right; font-variant-numeric:tabular-nums; }
   td.note { color:#94a3b8; font-size:.78rem; }
   .banner { background:#fffbeb; border:1px solid #fde68a; color:#92400e; padding:10px 14px; border-radius:8px; font-size:.8rem; margin-bottom:20px; }
+  .banner-red { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
 </style></head><body>
 <h1>MCP Funnel Report</h1>
 <p class="subtitle">Period: ${data.periodLabel} · logs freshness: ${data.freshness} · generated ${now}</p>
@@ -588,20 +628,71 @@ function generateHtml(data: {
   event stream (Cloud Logging) and only covers traffic <b>since the instrumented server deployed</b>.
   The <b>Items &amp; conversion</b> table is Firestore state and includes <b>historical</b> items
   that predate instrumentation. So the two tables won't reconcile yet — that's expected during the
-  fill-in window, not a bug. North-star ratios are computed within whichever source has the data.
+  fill-in window, not a bug. Guardrail ratios are computed within whichever source has the data.
+  <br><br>
+  The <b>OMTM</b> comes from neither: it reads the Firestore <b>workspaces</b> registry, which is
+  durable and has no retention ceiling. It will not reconcile with the log-derived session counts —
+  different source, window and exclusions. Do not "fix" that by moving the OMTM back onto logs;
+  Cloud Logging retains ~30 days, which is exactly what makes "new" uncomputable there.
 </div>
 
-<h2>North-star metrics</h2>
+${data.omtm.isClockStartWeek ? `<div class="banner banner-red">
+  <b>Week 1 — not trend data.</b> The workspace registry started on ${OMTM_CLOCK_START} and no backfill
+  was performed (decided 2026-08-07). Every workspace that already existed reads as new this week.
+  Label it as such and discard it from trend lines.
+</div>` : ''}
+
+<h2>1 · Current OMTMs</h2>
+<p class="subtitle" style="margin:-4px 0 12px;">
+  Exactly two — one per funnel. A diagnostic or platform-health measure is never a third
+  (contract §3). Definitions: graffiticode-funnel-and-omtm-contract.md §4.
+</p>
+<table>
+  <thead><tr><th>Funnel</th><th>OMTM</th><th class="num">Value</th><th>Owner</th><th>Window</th><th>Source</th></tr></thead>
+  <tbody>
+    ${omtmRow('Agent', data.agentMetric)}
+    ${omtmRow('Service partner', data.partnerMetric)}
+  </tbody>
+</table>
+<p class="note" style="margin-top:8px;font-size:.78rem;">
+  Agent formula: ${data.agentMetric.formula}.<br>
+  ${data.agentMetric.note ?? ''}
+  ${data.omtm.authedDiagnostic ? `<br><b>${data.omtm.authedDiagnostic}</b> authenticated workspace(s) excluded from the published number (diagnostic only).` : ''}
+  ${data.omtm.internalExcluded ? `<br><b>${data.omtm.internalExcluded}</b> row(s) suppressed as internal traffic.` : ''}
+</p>
+
+<h2>2 · Empathy milestone progress</h2>
+<table>
+  <thead><tr><th>Gate</th><th class="num">Target</th><th class="num">Actual</th><th>Status</th><th>Evidence</th></tr></thead>
+  <tbody>
+    ${gateRow('Qualified external first-create attempts', '≥ 30', String(data.cumulativeWorkspaces), data.cumulativeWorkspaces >= 30, 'workspaces registry (auto)')}
+    ${gateRow('Genuine, in-scope artifact jobs', '≥ 70%', '—', false, 'manual — prompt audit, Agent Empathy memo')}
+    ${gateRow('Descriptions reveal repeatable job patterns', 'qualitative', '—', false, 'manual — Agent Empathy memo')}
+    ${gateRow('Provider interviews completed', '12', '—', false, 'manual — partner interview log')}
+    ${gateRow('Name the problem unprompted', '≥ 9 of 12', '—', false, 'manual — partner interview log')}
+    ${gateRow('Buying/partnering seriously on the table', '≥ 6 of 12', '—', false, 'manual — partner interview log')}
+    ${gateRow('Request a product-specific working session', '≥ 5 of 12', '—', false, 'manual — the partner OMTM line in the sand')}
+  </tbody>
+</table>
+
+<h2>3 · Platform guardrails &amp; diagnostics</h2>
+<p class="subtitle" style="margin:-4px 0 12px;">
+  Evidence supporting both funnels. Never a third funnel, never a competing OMTM (contract §3).
+</p>
 <div class="cards">
-  ${card('① Anon → Account', northAccount, `${fs.accounts} accounts / ${fs.anonSessions} anon sessions (Firestore)`)}
-  ${card('② First-try success', northFirstTry, `${log.firstTrySuccess} ok / ${log.sessionsWithCreate} first creates (logs)`)}
-</div>
-<div class="cards" style="margin-top:16px;">
+  ${card('First-attempt success', firstAttemptSuccess, `${log.firstTrySuccess} ok / ${log.sessionsWithCreate} first creates — guardrail`)}
+  ${card('Claim conversion', claimConversion, `${fs.accounts} accounts / ${fs.anonSessions} anon sessions — diagnostic`)}
   ${card('Overall tool success', overallSuccess, `${log.toolOk}/${log.toolTotal} calls (logs)`)}
   ${card('Calls / session', callsPerSession, 'engagement depth (logs)')}
   ${card('Free-plan spend', `$${fs.spendUsd.toFixed(2)}`, costPerAccount + ' / account')}
   ${card('Paid (from claim)', `${fs.paidFromClaim}`, `${fs.paidGlobal} paid overall`)}
 </div>
+<p class="note" style="margin-top:8px;font-size:.78rem;">
+  <b>First-attempt success</b> is a reliability guardrail, not demand: counting only successful creates
+  would let a regression here read as a demand collapse, which is why the OMTM counts attempts
+  (contract §4). <b>Claim conversion</b> is downstream of activation, which is the artifact being
+  <i>opened</i> — a create nobody looked at is not activation (contract §2).
+</p>
 
 <h2>Engagement — MCP event logs <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(since instrumentation deployed)</span></h2>
 <table>
@@ -714,8 +805,32 @@ async function main() {
     fetchArtifactViewEvents(freshness), fs.itemToNamespace, fs.claimedNamespaces, start, end,
   );
 
-  const html = generateHtml({ periodLabel, freshness, log, fs, claims, av });
+  console.log('Reading workspace registry (OMTM)...');
+  const omtm = await weeklyNewCreatingWorkspaces(db, { week: opts.week });
+  const cumulativeWorkspaces = await totalCreatingWorkspaces(db);
+  const agentMetric = agentOmtmMetric(omtm);
+  const partnerMetric = partnerOmtmMetric({
+    sessions: opts.partnerSessions,
+    logUrl: opts.partnerLog || undefined,
+  });
+
+  const html = generateHtml({
+    periodLabel, freshness, log, fs, claims, av,
+    omtm, agentMetric, partnerMetric, cumulativeWorkspaces,
+  });
   writeFileSync(opts.output, html);
+
+  // The OMTMs print FIRST and alone. Everything below them is a guardrail or a
+  // diagnostic, and the ordering is what keeps that distinction legible.
+  console.log(`\n=== OMTM — week ${omtm.week} ===`);
+  console.log(`Agent   : ${agentMetric.value}  ${agentMetric.name} (free-plan only)`);
+  console.log(`Partner : ${partnerMetric.value}  ${partnerMetric.name} (manual log)`);
+  if (omtm.isClockStartWeek) {
+    console.log('  ! Week 1 — pre-existing workspaces count as new (no backfill). Not trend data.');
+  }
+  if (omtm.authedDiagnostic) console.log(`  (${omtm.authedDiagnostic} authenticated workspace(s) excluded — diagnostic only)`);
+  if (omtm.internalExcluded) console.log(`  (${omtm.internalExcluded} row(s) suppressed as internal)`);
+  console.log(`  Empathy gate: ${cumulativeWorkspaces}/30 cumulative first-create attempts since ${OMTM_CLOCK_START}`);
 
   // Terminal summary (handy even though the artifact is HTML). Two sources kept
   // visually separate — they cover different time windows during fill-in.
@@ -724,7 +839,6 @@ async function main() {
   console.log(`Sessions connected     : ${log.distinctSessions}`);
   console.log(`Browse (read) calls    : ${log.browseCalls}`);
   console.log(`Create / update calls  : ${log.createCalls} / ${log.updateCalls}`);
-  console.log(`North#2 first-try succ : ${pct(log.firstTrySuccess, log.sessionsWithCreate)} (${log.firstTrySuccess}/${log.sessionsWithCreate})`);
   console.log(`Overall tool success   : ${pct(log.toolOk, log.toolTotal)} (${log.toolOk}/${log.toolTotal})`);
   console.log(`Errors / slow (timeouts): ${log.toolError} / ${log.slowErrors} (≥${(log.slowMs / 1000).toFixed(0)}s${log.maxErrorMs ? `, slowest ${(log.maxErrorMs / 1000).toFixed(0)}s` : ''})`);
   const topN = (counts: Record<string, number>) => Object.entries(counts)
@@ -738,9 +852,11 @@ async function main() {
   console.log(`Artifact-view → claim  : ${pct(av.viewedAndClaimed, av.viewedSessions)} (${av.viewedAndClaimed}/${av.viewedSessions})`);
   console.log(`Claimed → accounts     : ${fs.claimedSessions} → ${fs.accounts}`);
   console.log(`Claim attempts ok/err  : ${claims.ok}/${claims.errors}${claims.attempts ? ` (${pct(claims.ok, claims.attempts)} success, ${claims.transferred} items)` : ' (no claim events — deploy resolver instrumentation)'}`);
-  console.log(`North#1 anon→account   : ${pct(fs.accounts, fs.anonSessions)} (${fs.accounts}/${fs.anonSessions})`);
   console.log(`Paid (from claim/all)  : ${fs.paidFromClaim} / ${fs.paidGlobal}`);
   console.log(`Free-plan spend        : $${fs.spendUsd.toFixed(2)}`);
+  console.log('-- Guardrails & diagnostics (never an OMTM) --');
+  console.log(`First-attempt success  : ${pct(log.firstTrySuccess, log.sessionsWithCreate)} (${log.firstTrySuccess}/${log.sessionsWithCreate}) — reliability guardrail`);
+  console.log(`Claim conversion       : ${pct(fs.accounts, fs.anonSessions)} (${fs.accounts}/${fs.anonSessions}) — downstream of activation`);
   console.log(`\nWrote ${opts.output}`);
   process.exit(0);
 }

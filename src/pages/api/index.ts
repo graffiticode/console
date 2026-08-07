@@ -44,6 +44,12 @@ import {
   getFreePlanCredentials,
   isFreePlanRequest,
 } from "../../lib/free-plan-context";
+import { hashUid, langKey } from "../../lib/funnel-events";
+import { isInternalRequest } from "../../lib/funnel-exclusions";
+import {
+  registerFirstCreateAttempt,
+  resolveFirstOutcome,
+} from "../../lib/workspace-registry";
 
 // Normalizes any inbound credential into { uid, idToken }, where idToken is
 // always a Firebase ID token (or signed JWT) suitable for forwarding to
@@ -291,7 +297,7 @@ const typeDefs = `
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
     generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
-    startCodeGeneration(itemId: String, lang: String!, name: String, client: String, prompt: String!, modification: String!, currentSrc: String): GenerationJob!
+    startCodeGeneration(itemId: String, lang: String!, name: String, client: String, clientKind: String, prompt: String!, modification: String!, currentSrc: String): GenerationJob!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
@@ -463,16 +469,62 @@ const resolvers = {
     // Lets MCP clients with short tool-call timeouts poll get_item for completion
     // instead of holding one long call. See src/lib/generation-queue.ts.
     startCodeGeneration: async (_, args, ctx) => {
-      const auth = await resolveAuth(ctx);
       const {
         itemId,
         lang,
         name,
         client,
+        clientKind,
         prompt,
         modification,
         currentSrc,
       } = args;
+
+      // The agent OMTM counts a workspace's FIRST create attempt, any outcome.
+      // Gated on `!itemId` because this resolver serves update_item too, and a
+      // revision is not a new workspace.
+      //
+      // Free-plan registers BEFORE resolveAuth: the namespace is already on ctx,
+      // so an attempt whose credential exchange fails still lands a row.
+      //
+      // clientKind arrives either way — the GraphQL arg (explicit, per call) or
+      // the X-Client-Kind header (per connection). Whichever the caller sends.
+      const hints = {
+        lang: langKey(lang),
+        clientKind: clientKind ?? ctx.clientKind,
+        geoCountry: ctx.geoCountry,
+      };
+      if (!itemId && ctx.freePlan && ctx.sessionNamespace) {
+        await registerFirstCreateAttempt({
+          key: ctx.sessionNamespace,
+          auth: "free",
+          ...hints,
+          internal: isInternalRequest({
+            internalHeader: ctx.internalHeader,
+            sessionNamespace: ctx.sessionNamespace,
+          }),
+        });
+      }
+
+      const auth = await resolveAuth(ctx);
+
+      // Authenticated has to wait for the uid. Keyed on sha256(uid) so a token
+      // rotation doesn't invent a second workspace.
+      let workspaceKey = ctx.freePlan ? ctx.sessionNamespace : undefined;
+      if (!ctx.freePlan && auth.uid) {
+        workspaceKey = hashUid(auth.uid);
+        if (!itemId) {
+          await registerFirstCreateAttempt({
+            key: workspaceKey,
+            auth: "firebase",
+            ...hints,
+            internal: isInternalRequest({
+              internalHeader: ctx.internalHeader,
+              uidHash: workspaceKey,
+            }),
+          });
+        }
+      }
       // Credential the worker replays to act as this caller. For free-plan we
       // re-derive fresh credentials in the worker (idTokens are short-lived and
       // dispatch can lag), so carry the session, not a baked idToken.
@@ -482,8 +534,21 @@ const resolvers = {
 
       let id = itemId;
       if (!id) {
-        const shell = await createItem({ auth, lang, name, client, deferGeneration: true }) as unknown as { id: string };
-        id = shell.id;
+        try {
+          const shell = await createItem({ auth, lang, name, client, deferGeneration: true }) as unknown as { id: string };
+          id = shell.id;
+        } catch (err) {
+          // The synchronous half of firstOutcome. A refusal at the quota gate is
+          // still an attempt the OMTM counts, and it is the case that otherwise
+          // leaves no Firestore row at all — assertItemCreateAllowed throws
+          // before the item shell is written.
+          const cause = (err as { cause?: unknown })?.cause;
+          await resolveFirstOutcome(
+            workspaceKey,
+            cause instanceof FreePlanError ? "wall" : "error",
+          );
+          throw err;
+        }
       } else {
         await setItemGenerationStatus({ auth, id, status: "generating" });
       }
@@ -623,10 +688,27 @@ const resolvers = {
 
 const schema = makeExecutableSchema({ typeDefs, resolvers });
 
+/** Telemetry-only connection hints. Absent is always fine — see contextFactory. */
+function readClientHints(req): {
+  clientKind?: string;
+  geoCountry?: string;
+  internalHeader?: string;
+} {
+  const one = (v: unknown) => (Array.isArray(v) ? v[0] : v);
+  return {
+    clientKind: one(req.headers["x-client-kind"]),
+    geoCountry: one(req.headers["x-client-geo"]),
+    internalHeader: one(req.headers["x-gc-internal"]),
+  };
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Free-Plan-Session");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Free-Plan-Session, X-Client-Kind, X-Client-Geo, X-GC-Internal",
+  );
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -678,6 +760,11 @@ export default async function handler(req, res) {
         freePlan: freePlan.freePlan,
         sessionUuid: freePlan.freePlan ? freePlan.sessionUuid : undefined,
         sessionNamespace: freePlan.freePlan ? freePlan.sessionNamespace : undefined,
+        // Caller-asserted telemetry hints, headers rather than GraphQL args
+        // because they describe the connection, not the mutation — same
+        // convention as X-Free-Plan-Session. Sanitized where they are stored
+        // (workspace-registry). NEVER used for authorization or quota.
+        ...readClientHints(req),
       }),
     });
     sendResult(result, res);

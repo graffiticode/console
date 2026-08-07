@@ -1464,7 +1464,13 @@ export async function createItem({
     };
   } catch (error) {
     console.error("createItem()", "ERROR", error);
-    throw new Error(`Failed to create item: ${error.message}`);
+    // Message and type are unchanged — callers and MCP error rendering both read
+    // `.message`. `cause` is attached so a caller can still tell a quota refusal
+    // from a genuine failure, which the workspace registry needs to record the
+    // first attempt's outcome as "wall" rather than "error".
+    const wrapped = new Error(`Failed to create item: ${error.message}`);
+    (wrapped as Error & { cause?: unknown }).cause = error;
+    throw wrapped;
   }
 }
 
