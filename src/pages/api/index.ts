@@ -297,7 +297,7 @@ const typeDefs = `
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
     generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
-    startCodeGeneration(itemId: String, lang: String!, name: String, client: String, clientKind: String, prompt: String!, modification: String!, currentSrc: String): GenerationJob!
+    startCodeGeneration(itemId: String, lang: String!, name: String, client: String, clientKind: String, geoCountry: String, prompt: String!, modification: String!, currentSrc: String): GenerationJob!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
@@ -475,6 +475,7 @@ const resolvers = {
         name,
         client,
         clientKind,
+        geoCountry,
         prompt,
         modification,
         currentSrc,
@@ -487,12 +488,16 @@ const resolvers = {
       // Free-plan registers BEFORE resolveAuth: the namespace is already on ctx,
       // so an attempt whose credential exchange fails still lands a row.
       //
-      // clientKind arrives either way — the GraphQL arg (explicit, per call) or
-      // the X-Client-Kind header (per connection). Whichever the caller sends.
+      // The hints arrive either way — a GraphQL arg (explicit, per call) or a
+      // header (per connection). Whichever the caller sends.
+      //
+      // geoCountry MUST be forwarded: MCP→console is a server-to-server fetch
+      // from Cloud Run, so there is no edge in front of this request to read it
+      // from. Reading our own headers here would record our egress region.
       const hints = {
         lang: langKey(lang),
         clientKind: clientKind ?? ctx.clientKind,
-        geoCountry: ctx.geoCountry,
+        geoCountry: geoCountry ?? ctx.geoCountry,
       };
       if (!itemId && ctx.freePlan && ctx.sessionNamespace) {
         await registerFirstCreateAttempt({
