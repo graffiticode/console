@@ -8,12 +8,20 @@ export type BillingInterval = ConfigBillingInterval;
 export interface Plan {
   id: PlanId;
   name: string;
-  description: string;
   monthlyPrice: number;
   annualPrice: number;
+  /**
+   * Struck-through list price shown before the real one, in USD. PRESENTATION
+   * ONLY — an anchor with no counterpart in plans-config or Stripe. Nothing ever
+   * bills at this figure. Mirrors `listPrice` on the public pricing page.
+   */
+  listPrice?: number;
   /** Items included per month (base fee bucket). */
   monthlyUnits: number;
-  features: string[];
+  /** Per-item price above the included bucket, or null when overage isn't offered. */
+  additionalItem: number | null;
+  /** The paragraph under the divider. One sentence or two, not a feature list. */
+  note: string;
   cta: string;
   isFree?: boolean;
   // Non-self-serve plan: custom pricing, sold via "Contact Sales" rather than Stripe checkout.
@@ -25,10 +33,11 @@ export interface Plan {
 }
 
 const fmt = (n: number) => n.toLocaleString('en-US');
+/** Always at least 2 decimals ($0.10, not $0.1); a 3rd only when significant ($0.025). */
+export const perItem = (n: number) => `$${n.toFixed(3).replace(/0$/, '')}`;
 const rate = (id: PlanId) => {
   const r = PLANS[id].overageRatePerItem;
-  // Always at least 2 decimals ($0.10, not $0.1); a 3rd only when it's significant ($0.025).
-  return r == null ? '' : `$${r.toFixed(3).replace(/0$/, '')}`;
+  return r == null ? '' : perItem(r);
 };
 
 // Card copy mirrors the AGENT audience of the public pricing page
@@ -47,72 +56,51 @@ export const plans: Plan[] = [
   {
     id: 'demo',
     name: PLANS.demo.displayName,
-    // Keep the word "free" here even though the plan is now named Bronze — it's
-    // the zero-price signal that makes the tier convert. Only the plan NAME
-    // moved; what you pay to start did not.
-    description: 'The on-ramp — free to start, no credit card',
+    // Keep the word "free" in the note even though the plan is now named Bronze
+    // — it's the zero-price signal that makes the tier convert. Only the plan
+    // NAME moved; what you pay to start did not.
     monthlyPrice: PLANS.demo.basePriceMonthly,
     annualPrice: PLANS.demo.basePriceAnnual,
+    listPrice: 10,
     monthlyUnits: PLANS.demo.includedItems,
-    features: [
-      `${fmt(PLANS.demo.includedItems)} items per month, free`,
-      'No credit card for the included items',
-      `Additional items at ${rate('demo')} each`,
-      'A card and a monthly spend cap, only to go past the free items',
-      'Community support',
-    ],
+    additionalItem: PLANS.demo.overageRatePerItem,
+    note: `The on-ramp — the first ${fmt(PLANS.demo.includedItems)} items each month are free, with no credit card. A card is required only to create additional items, along with a monthly spend cap; move to ${PLANS.pro.displayName} when volume makes the flat rate cheaper.`,
     cta: 'Current Plan',
     isFree: true,
   },
   {
     id: 'pro',
     name: PLANS.pro.displayName,
-    description: `Flat ${rate('pro')}/item with a $${fmt(PLANS.pro.basePriceMonthly)} monthly minimum`,
     monthlyPrice: PLANS.pro.basePriceMonthly,
     annualPrice: PLANS.pro.basePriceAnnual,
     monthlyUnits: PLANS.pro.includedItems,
-    features: [
-      `${fmt(PLANS.pro.includedItems)} items per month included`,
-      `Additional items at ${rate('pro')} each — same rate, no overage penalty`,
-      'Set an overage spend cap',
-      'Email support',
-      'Cancel anytime',
-    ],
+    additionalItem: PLANS.pro.overageRatePerItem,
+    note: `Flat ${rate('pro')}/item with a $${fmt(PLANS.pro.basePriceMonthly)} monthly minimum.`,
     cta: 'Choose Silver',
   },
   {
     id: 'teams',
     name: PLANS.teams.displayName,
-    description: `Cheaper than ${PLANS.pro.displayName} above ~10,000 items/mo`,
     monthlyPrice: PLANS.teams.basePriceMonthly,
     annualPrice: PLANS.teams.basePriceAnnual,
     monthlyUnits: PLANS.teams.includedItems,
-    features: [
-      `${fmt(PLANS.teams.includedItems)} items per month included`,
-      `Additional items at ${rate('teams')} each — same rate, no overage penalty`,
-      'Set an overage spend cap',
-      'Priority support',
-      'Cancel anytime',
-    ],
+    additionalItem: PLANS.teams.overageRatePerItem,
+    // ~10,000 is the Silver/Gold crossover — derived from the two rates and
+    // minimums, not a field in plans-config. The pricing page states the same.
+    note: `Cheaper than ${PLANS.pro.displayName} above ~10,000 items/mo — ${rate('teams')}/item.`,
     cta: 'Choose Gold',
   },
   {
     id: 'platinum',
     name: PLANS.platinum.displayName,
-    description: 'The partner engagement — our lowest per-item rate',
     monthlyPrice: PLANS.platinum.basePriceMonthly,
     annualPrice: PLANS.platinum.basePriceAnnual,
     monthlyUnits: PLANS.platinum.includedItems,
-    features: [
-      `${fmt(PLANS.platinum.includedItems)} items per month included`,
-      `Additional items at ${rate('platinum')} each — our lowest rate`,
-      // A public commitment, not a feature blurb: the pricing page states the
-      // same terms (PRICING.languageService). Don't soften or add a turnaround
-      // figure here that the marketing surface doesn't also promise.
-      'Custom language development included — no separate build fee',
-      'Pause or cancel any month',
-      'Priority support',
-    ],
+    additionalItem: PLANS.platinum.overageRatePerItem,
+    // "includes custom language development" is a public commitment, not a
+    // blurb — PRICING.languageService on the pricing page states the same terms.
+    // Don't soften it or add a turnaround figure marketing doesn't also promise.
+    note: `The partner engagement — our lowest per-item rate at ${rate('platinum')}, and it includes custom language development with no additional fee.`,
     cta: 'Choose Platinum',
   },
 ];
@@ -123,11 +111,11 @@ export const plans: Plan[] = [
 const starterPlan: Plan = {
   id: 'starter',
   name: PLANS.starter.displayName,
-  description: 'Discontinued',
   monthlyPrice: PLANS.starter.basePriceMonthly,
   annualPrice: PLANS.starter.basePriceAnnual,
   monthlyUnits: PLANS.starter.includedItems,
-  features: [`${fmt(PLANS.starter.includedItems)} items per month`],
+  additionalItem: PLANS.starter.overageRatePerItem,
+  note: 'Discontinued — retained so legacy subscribers still resolve.',
   cta: 'Get Started',
 };
 

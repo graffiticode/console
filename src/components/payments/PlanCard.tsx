@@ -1,5 +1,4 @@
-import { CheckIcon } from '@heroicons/react/24/outline';
-import { Plan, PlanId, BillingInterval, isUpgrade, isDowngrade, getButtonLabel } from '@/utils/plans';
+import { Plan, PlanId, BillingInterval, isUpgrade, isDowngrade, getButtonLabel, perItem } from '@/utils/plans';
 
 interface PlanCardProps {
   plan: Plan;
@@ -95,32 +94,51 @@ export default function PlanCard({
         </div>
       )}
 
-      <div className="mb-4">
+      <div className="mb-4 flex items-baseline justify-between gap-2">
         <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
-        <p className="mt-1 text-sm text-gray-500">{plan.description}</p>
+        {isFree && (
+          <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+            on-ramp
+          </span>
+        )}
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 flex items-baseline gap-1.5">
         {isContactSales ? (
           <span className="text-4xl font-bold text-gray-900">{plan.priceLabel || 'Custom'}</span>
         ) : (
           <>
+            {/* Anchor price. Monthly only — it is a per-month figure, and showing
+                it beside an annual total would compare two different units. */}
+            {plan.listPrice !== undefined && billingInterval === 'monthly' && (
+              <s className="text-xl font-medium text-gray-400 decoration-gray-400/70">
+                ${plan.listPrice.toLocaleString()}
+              </s>
+            )}
             <span className="text-4xl font-bold text-gray-900">${price.toLocaleString()}</span>
-            <span className="text-gray-500 ml-1">
+            <span className="text-sm text-gray-500">
               /{billingInterval === 'monthly' ? 'mo' : 'yr'}
             </span>
           </>
         )}
       </div>
 
-      <ul className="space-y-3 mb-6">
-        {plan.features.map((feature) => (
-          <li key={feature} className="flex items-start">
-            <CheckIcon className="flex-shrink-0 h-5 w-5 text-green-500" />
-            <span className="ml-2 text-sm text-gray-700">{feature}</span>
-          </li>
-        ))}
-      </ul>
+      {/* The two numbers that actually decide a tier, in the same shape the
+          public pricing page uses. Tabular figures so they line up down the row. */}
+      <dl className="space-y-2 text-sm">
+        <div className="flex justify-between gap-2">
+          <dt className="text-gray-500">Included / mo</dt>
+          <dd className="font-mono text-gray-900">{plan.monthlyUnits.toLocaleString('en-US')}</dd>
+        </div>
+        <div className="flex justify-between gap-2">
+          <dt className="text-gray-500">Additional</dt>
+          <dd className="font-mono text-gray-900">
+            {plan.additionalItem === null ? '—' : `${perItem(plan.additionalItem)} ea`}
+          </dd>
+        </div>
+      </dl>
+
+      <p className="mt-4 mb-6 border-t border-gray-200 pt-4 text-sm text-gray-600">{plan.note}</p>
 
       {isContactSales ? (
         <a
