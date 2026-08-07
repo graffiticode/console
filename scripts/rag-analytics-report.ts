@@ -116,8 +116,22 @@ function formatTimestamp(d: AnalyticsDoc, period?: string): string {
 
 interface UsageInfo {
   units: number;
+  /**
+   * TOTAL prompt tokens = the record's uncached `input` plus both cache buckets.
+   *
+   * The stored `tokens.input` is uncached-only: TokenUsage in
+   * llm-generation-service.ts uses a disjoint convention, so cached input lives in
+   * `cacheRead`/`cacheCreation` instead. Reading `input` alone is not comparable
+   * ACROSS PROVIDERS — Anthropic caches only to explicit cache_control breakpoints
+   * (leaving the query and retrieved examples uncached every call), while OpenAI
+   * auto-caches the whole prefix, so its residue is near zero for the same prompt.
+   * Summing the three restores an apples-to-apples number.
+   */
   inputTokens: number;
   outputTokens: number;
+  /** Cache buckets kept separately so the hit rate stays visible, not averaged away. */
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
 }
 
 async function fetchUsageInfo(requestIds: string[]): Promise<Map<string, UsageInfo>> {
@@ -132,10 +146,14 @@ async function fetchUsageInfo(requestIds: string[]): Promise<Map<string, UsageIn
   snapshot.forEach(doc => {
     const data = doc.data();
     if (data.taskId && requestIds.includes(data.taskId)) {
+      const cacheRead = data.tokens?.cacheRead || 0;
+      const cacheCreation = data.tokens?.cacheCreation || 0;
       info.set(data.taskId, {
         units: data.units || 0,
-        inputTokens: data.tokens?.input || 0,
+        inputTokens: (data.tokens?.input || 0) + cacheRead + cacheCreation,
         outputTokens: data.tokens?.output || 0,
+        cacheReadTokens: cacheRead,
+        cacheCreationTokens: cacheCreation,
       });
     }
   });
@@ -227,10 +245,10 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
 
   // Per-model breakdown. Retries are the error-correction rounds, so a model with a
   // high success rate but nonzero avg retries is passing on the second try.
-  const modelMap = new Map<string, { total: number; successful: number; totalLatency: number; latencyCount: number; retrySum: number; firstPass: number; inputTokens: number; outputTokens: number }>();
+  const modelMap = new Map<string, { total: number; successful: number; totalLatency: number; latencyCount: number; retrySum: number; firstPass: number; inputTokens: number; outputTokens: number; cacheReadTokens: number }>();
   docs.forEach(d => {
     const model = getModel(d);
-    const entry = modelMap.get(model) || { total: 0, successful: 0, totalLatency: 0, latencyCount: 0, retrySum: 0, firstPass: 0, inputTokens: 0, outputTokens: 0 };
+    const entry = modelMap.get(model) || { total: 0, successful: 0, totalLatency: 0, latencyCount: 0, retrySum: 0, firstPass: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 };
     entry.total++;
     const ok = !!(d.response?.success || d.metadata?.success);
     if (ok) entry.successful++;
@@ -245,6 +263,7 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
     if (info) {
       entry.inputTokens += info.inputTokens;
       entry.outputTokens += info.outputTokens;
+      entry.cacheReadTokens += info.cacheReadTokens;
     }
     modelMap.set(model, entry);
   });
@@ -258,6 +277,9 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
       avgRetries: s.total > 0 ? s.retrySum / s.total : 0,
       inputTokens: s.inputTokens,
       outputTokens: s.outputTokens,
+      // Share of total prompt tokens served from cache. Differs by provider for
+      // structural reasons (see UsageInfo.inputTokens), so compare within a model.
+      cacheHitRate: s.inputTokens > 0 ? s.cacheReadTokens / s.inputTokens : null,
     }))
     .sort((a, b) => b.total - a.total);
 
@@ -265,6 +287,7 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
   let totalCompileUnits = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let totalCacheReadTokens = 0;
   if (usageInfo) {
     docs.forEach(d => {
       const info = usageInfo.get(d.requestId);
@@ -272,11 +295,13 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
         totalCompileUnits += info.units;
         totalInputTokens += info.inputTokens;
         totalOutputTokens += info.outputTokens;
+        totalCacheReadTokens += info.cacheReadTokens;
       }
     });
   }
+  const cacheHitRate = totalInputTokens > 0 ? totalCacheReadTokens / totalInputTokens : null;
 
-  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, avgJudgeOverall, judgeCount: judgeScores.length, errorBreakdown, languageBreakdown, modelBreakdown, totalCompileUnits, totalInputTokens, totalOutputTokens };
+  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, avgJudgeOverall, judgeCount: judgeScores.length, errorBreakdown, languageBreakdown, modelBreakdown, totalCompileUnits, totalInputTokens, totalOutputTokens, totalCacheReadTokens, cacheHitRate };
 }
 
 function escapeHtml(str: string): string {
@@ -299,7 +324,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
 
   // Model breakdown rows
   const modelRows = metrics.modelBreakdown.map(m =>
-    `<tr><td class="model">${escapeHtml(m.model)}</td><td>${m.total}</td><td>${(m.successRate * 100).toFixed(1)}%</td><td>${(m.firstPassRate * 100).toFixed(1)}%</td><td>${m.avgRetries.toFixed(2)}</td><td>${Math.round(m.avgLatency)}ms</td><td>${m.inputTokens > 0 ? m.inputTokens.toLocaleString() : '—'}</td><td>${m.outputTokens > 0 ? m.outputTokens.toLocaleString() : '—'}</td></tr>`
+    `<tr><td class="model">${escapeHtml(m.model)}</td><td>${m.total}</td><td>${(m.successRate * 100).toFixed(1)}%</td><td>${(m.firstPassRate * 100).toFixed(1)}%</td><td>${m.avgRetries.toFixed(2)}</td><td>${Math.round(m.avgLatency)}ms</td><td>${m.inputTokens > 0 ? m.inputTokens.toLocaleString() : '—'}</td><td>${m.cacheHitRate != null ? (m.cacheHitRate * 100).toFixed(1) + '%' : '—'}</td><td>${m.outputTokens > 0 ? m.outputTokens.toLocaleString() : '—'}</td></tr>`
   ).join('\n');
 
   // Card value: one model gets its name; several get a name + share list, because a
@@ -475,7 +500,8 @@ function copyMd(btn) {
   <div class="card"><div class="label">Avg Latency</div><div class="value">${Math.round(metrics.avgLatency)}ms</div></div>
   <div class="card"><div class="label">Avg Top Similarity</div><div class="value">${metrics.avgTopSimilarity.toFixed(3)}</div></div>
   <div class="card"><div class="label">Compile Units</div><div class="value">${metrics.totalCompileUnits > 0 ? metrics.totalCompileUnits.toLocaleString() : '—'}</div></div>
-  <div class="card"><div class="label">Input Tokens</div><div class="value">${metrics.totalInputTokens > 0 ? metrics.totalInputTokens.toLocaleString() : '—'}</div></div>
+  <div class="card"><div class="label" title="Uncached input + cache reads + cache writes">Input Tokens</div><div class="value">${metrics.totalInputTokens > 0 ? metrics.totalInputTokens.toLocaleString() : '—'}</div></div>
+  <div class="card"><div class="label" title="Share of input tokens served from cache">Cached Input</div><div class="value">${metrics.cacheHitRate != null ? (metrics.cacheHitRate * 100).toFixed(1) + '%' : '—'}</div></div>
   <div class="card"><div class="label">Output Tokens</div><div class="value">${metrics.totalOutputTokens > 0 ? metrics.totalOutputTokens.toLocaleString() : '—'}</div></div>
   <div class="card"><div class="label">Feedback Score</div><div class="value">${metrics.feedbackCount > 0 ? metrics.avgFeedback.toFixed(1) : '—'}</div></div>
   <div class="card"><div class="label">Judge Overall</div><div class="value">${metrics.judgeCount > 0 ? metrics.avgJudgeOverall.toFixed(2) : '—'}</div></div>
@@ -494,7 +520,7 @@ ${!language ? `<div class="section">
   <h2>By Model</h2>
   ${metrics.modelBreakdown.length > 0 ? `
   <table>
-    <thead><tr><th>Model</th><th>Requests</th><th>Success Rate</th><th>First Pass</th><th>Avg Retries</th><th>Avg Latency</th><th>In Tokens</th><th>Out Tokens</th></tr></thead>
+    <thead><tr><th>Model</th><th>Requests</th><th>Success Rate</th><th>First Pass</th><th>Avg Retries</th><th>Avg Latency</th><th title="Uncached input + cache reads + cache writes">In Tokens (total)</th><th title="Share of input tokens served from cache">Cached</th><th>Out Tokens</th></tr></thead>
     <tbody>${modelRows}</tbody>
   </table>` : '<p class="empty">No model data</p>'}
 </div>
@@ -513,7 +539,7 @@ ${!language ? `<div class="section">
   ${docs.length > 0 ? `
   <div style="overflow-x:auto">
   <table>
-    <thead><tr><th>Timestamp</th><th>Language</th><th>Model</th><th>Query</th><th>Success</th><th>Latency</th><th>Top Similarity</th><th>Units</th><th>In Tokens</th><th>Out Tokens</th><th>Retries</th></tr></thead>
+    <thead><tr><th>Timestamp</th><th>Language</th><th>Model</th><th>Query</th><th>Success</th><th>Latency</th><th>Top Similarity</th><th>Units</th><th title="Uncached input + cache reads + cache writes">In Tokens</th><th>Out Tokens</th><th>Retries</th></tr></thead>
     <tbody>${detailRows}</tbody>
   </table>
   </div>` : '<p class="empty">No requests in this period</p>'}
