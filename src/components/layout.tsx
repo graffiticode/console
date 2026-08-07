@@ -227,12 +227,12 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                         Integrations
                       </Link> */}
                       <a
-                        href="https://forum.graffiticode.org"
+                        href="https://forum.graffiticode.org/c/support"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-gray-300 hover:text-white text-sm tracking-wide font-medium"
                       >
-                        Forum
+                        Support
                       </a>
                       <div className="flex items-center gap-2 text-gray-400 hover:text-white">
                         <SignIn />
@@ -290,12 +290,12 @@ export default function Layout({ children, language, setLanguage, mark, setMark 
                   </Disclosure.Button> */}
                   <Disclosure.Button
                     as="a"
-                    href="https://forum.graffiticode.org"
+                    href="https://forum.graffiticode.org/c/support"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-gray-300 hover:text-white block px-3 py-2 rounded-none text-base font-medium"
                   >
-                    Forum
+                    Support
                   </Disclosure.Button>
                 </div>
                 <div className="pt-4 pb-3 border-t border-gray-700">

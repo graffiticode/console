@@ -60,9 +60,9 @@ export default function InviteCodeDialog({ open, onClose, onSubmit }) {
             </button>
           </div>
           <p className="mt-4 text-xs text-gray-600 text-left">
-            DM jeff at our community{' '}
-            <a href="https://forum.graffiticode.org" className="underline">forum</a>{' '}
-            if you need an invite code.
+            DM jeff on our{' '}
+            <a href="https://forum.graffiticode.org/c/support" className="underline">Support</a>{' '}
+            forum if you need an invite code.
           </p>
         </form>
       </div>
