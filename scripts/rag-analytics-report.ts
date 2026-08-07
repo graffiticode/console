@@ -80,6 +80,13 @@ function getLanguage(d: AnalyticsDoc): string {
   return raw.toUpperCase();
 }
 
+// Which model actually served the request. Set from the resolved family ordering
+// in src/lib/model-priority.ts, so this is also how you see a failover to the
+// second family. Older records predate the field.
+function getModel(d: AnalyticsDoc): string {
+  return (d.generation?.model || d.metadata?.model || 'unrecorded').toString();
+}
+
 function getTimestampMs(d: AnalyticsDoc): number | null {
   // Try the Firestore timestamp first
   const ts = d.timestamp as any;
@@ -218,6 +225,42 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
     }))
     .sort((a, b) => b.total - a.total);
 
+  // Per-model breakdown. Retries are the error-correction rounds, so a model with a
+  // high success rate but nonzero avg retries is passing on the second try.
+  const modelMap = new Map<string, { total: number; successful: number; totalLatency: number; latencyCount: number; retrySum: number; firstPass: number; inputTokens: number; outputTokens: number }>();
+  docs.forEach(d => {
+    const model = getModel(d);
+    const entry = modelMap.get(model) || { total: 0, successful: 0, totalLatency: 0, latencyCount: 0, retrySum: 0, firstPass: 0, inputTokens: 0, outputTokens: 0 };
+    entry.total++;
+    const ok = !!(d.response?.success || d.metadata?.success);
+    if (ok) entry.successful++;
+    const retries = d.compilation?.retryCount ?? 0;
+    entry.retrySum += retries;
+    if (ok && retries === 0) entry.firstPass++;
+    if (d.performance?.totalLatencyMs != null) {
+      entry.totalLatency += d.performance.totalLatencyMs;
+      entry.latencyCount++;
+    }
+    const info = usageInfo?.get(d.requestId);
+    if (info) {
+      entry.inputTokens += info.inputTokens;
+      entry.outputTokens += info.outputTokens;
+    }
+    modelMap.set(model, entry);
+  });
+  const modelBreakdown = Array.from(modelMap.entries())
+    .map(([model, s]) => ({
+      model,
+      total: s.total,
+      successRate: s.total > 0 ? s.successful / s.total : 0,
+      firstPassRate: s.total > 0 ? s.firstPass / s.total : 0,
+      avgLatency: s.latencyCount > 0 ? s.totalLatency / s.latencyCount : 0,
+      avgRetries: s.total > 0 ? s.retrySum / s.total : 0,
+      inputTokens: s.inputTokens,
+      outputTokens: s.outputTokens,
+    }))
+    .sort((a, b) => b.total - a.total);
+
   // Total compile units and tokens
   let totalCompileUnits = 0;
   let totalInputTokens = 0;
@@ -233,7 +276,7 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
     });
   }
 
-  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, avgJudgeOverall, judgeCount: judgeScores.length, errorBreakdown, languageBreakdown, totalCompileUnits, totalInputTokens, totalOutputTokens };
+  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, avgJudgeOverall, judgeCount: judgeScores.length, errorBreakdown, languageBreakdown, modelBreakdown, totalCompileUnits, totalInputTokens, totalOutputTokens };
 }
 
 function escapeHtml(str: string): string {
@@ -254,6 +297,25 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     `<tr><td>${escapeHtml(l.language)}</td><td>${l.total}</td><td>${(l.successRate * 100).toFixed(1)}%</td><td>${Math.round(l.avgLatency)}ms</td><td>${l.avgJudge != null ? l.avgJudge.toFixed(2) : '—'}</td></tr>`
   ).join('\n');
 
+  // Model breakdown rows
+  const modelRows = metrics.modelBreakdown.map(m =>
+    `<tr><td class="model">${escapeHtml(m.model)}</td><td>${m.total}</td><td>${(m.successRate * 100).toFixed(1)}%</td><td>${(m.firstPassRate * 100).toFixed(1)}%</td><td>${m.avgRetries.toFixed(2)}</td><td>${Math.round(m.avgLatency)}ms</td><td>${m.inputTokens > 0 ? m.inputTokens.toLocaleString() : '—'}</td><td>${m.outputTokens > 0 ? m.outputTokens.toLocaleString() : '—'}</td></tr>`
+  ).join('\n');
+
+  // Card value: one model gets its name; several get a name + share list, because a
+  // split is usually a failover to the second family and "which one, how much" is
+  // the whole question. Beyond three, the tail collapses into a count.
+  const modelCard = (() => {
+    const ms = metrics.modelBreakdown;
+    if (ms.length === 0) return '—';
+    if (ms.length === 1) return `<span class="model-name">${escapeHtml(ms[0].model)}</span>`;
+    const shown = ms.slice(0, 3).map(m =>
+      `<span class="model-split"><span class="model-name">${escapeHtml(m.model)}</span><span class="model-share">${Math.round((m.total / metrics.total) * 100)}%</span></span>`
+    ).join('');
+    const rest = ms.length - 3;
+    return shown + (rest > 0 ? `<span class="model-split model-more">+${rest} more</span>` : '');
+  })();
+
   // Sort docs by timestamp descending for detail table
   const sorted = [...docs].sort((a, b) => (getTimestampMs(b) || 0) - (getTimestampMs(a) || 0));
 
@@ -261,6 +323,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
   const detailRows = sorted.map((d, i) => {
     const ts = formatTimestamp(d, period);
     const lang = getLanguage(d);
+    const model = getModel(d);
     const query = escapeHtml((d.query?.text || '—').substring(0, 60));
     const success = d.response?.success ? 'Yes' : 'No';
     const latency = d.performance?.totalLatencyMs != null ? `${Math.round(d.performance.totalLatencyMs)}ms` : '—';
@@ -296,6 +359,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
       '',
       `- **Timestamp:** ${ts}`,
       `- **Language:** ${lang}`,
+      `- **Model:** ${model}`,
       `- **Success:** ${success}`,
       `- **Latency:** ${latency}`,
       `- **Compile Units:** ${unitsStr}`,
@@ -317,8 +381,8 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     ].join('\n');
     const mdAttr = escapeHtml(md);
 
-    const summaryRow = `<tr class="${successClass} clickable" onclick="toggle(${i})"><td class="ts">${ts}</td><td>${lang}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${unitsStr}</td><td>${inputTokensStr}</td><td>${outputTokensStr}</td><td>${retries}</td></tr>`;
-    const detailRow = `<tr class="detail-row" id="detail-${i}"><td colspan="10"><div class="detail-panel">
+    const summaryRow = `<tr class="${successClass} clickable" onclick="toggle(${i})"><td class="ts">${ts}</td><td>${lang}</td><td class="model">${escapeHtml(model)}</td><td>${query}</td><td>${success}</td><td>${latency}</td><td>${topSim}</td><td>${unitsStr}</td><td>${inputTokensStr}</td><td>${outputTokensStr}</td><td>${retries}</td></tr>`;
+    const detailRow = `<tr class="detail-row" id="detail-${i}"><td colspan="11"><div class="detail-panel">
 <div class="detail-actions"><button class="copy-btn" onclick="copyMd(this)" data-md="${mdAttr}">Copy</button></div>
 <div class="detail-section"><div class="detail-label">User Prompt</div><pre class="detail-pre">${fullQuery}</pre></div>
 ${embeddingText !== fullQuery ? `<div class="detail-section"><div class="detail-label">Search Query</div><pre class="detail-pre">${embeddingText}</pre></div>` : ''}
@@ -353,6 +417,15 @@ ${embeddingText !== fullQuery ? `<div class="detail-section"><div class="detail-
   tr.failure td { background: #fef2f2; }
   tr.success td { }
   td.ts { font-family: monospace; font-size: 0.8rem; white-space: nowrap; }
+  td.model { font-family: monospace; font-size: 0.8rem; white-space: nowrap; }
+  /* Model ids are long and hyphenated; give the card two columns so the common
+     single-model case fits on one line, and break at hyphens rather than mid-token. */
+  .card.model-card { grid-column: span 2; }
+  .model-value { font-size: 1rem; font-weight: 500; overflow-wrap: break-word; word-break: normal; }
+  .model-name { font-family: monospace; }
+  .model-split { display: flex; justify-content: space-between; gap: 12px; font-size: 0.9rem; line-height: 1.5; }
+  .model-share { color: #64748b; font-variant-numeric: tabular-nums; }
+  .model-more { color: #94a3b8; font-size: 0.8rem; }
   .empty { color: #94a3b8; text-align: center; padding: 32px; }
   tr.clickable { cursor: pointer; }
   tr.clickable:hover td { background: #f1f5f9; }
@@ -398,6 +471,7 @@ function copyMd(btn) {
 <div class="cards">
   <div class="card"><div class="label">Total Requests</div><div class="value">${metrics.total}</div></div>
   <div class="card"><div class="label">Success Rate</div><div class="value">${(metrics.successRate * 100).toFixed(1)}%</div></div>
+  <div class="card model-card"><div class="label">Model</div><div class="value model-value">${modelCard}</div></div>
   <div class="card"><div class="label">Avg Latency</div><div class="value">${Math.round(metrics.avgLatency)}ms</div></div>
   <div class="card"><div class="label">Avg Top Similarity</div><div class="value">${metrics.avgTopSimilarity.toFixed(3)}</div></div>
   <div class="card"><div class="label">Compile Units</div><div class="value">${metrics.totalCompileUnits > 0 ? metrics.totalCompileUnits.toLocaleString() : '—'}</div></div>
@@ -417,6 +491,15 @@ ${!language ? `<div class="section">
 </div>` : ''}
 
 <div class="section">
+  <h2>By Model</h2>
+  ${metrics.modelBreakdown.length > 0 ? `
+  <table>
+    <thead><tr><th>Model</th><th>Requests</th><th>Success Rate</th><th>First Pass</th><th>Avg Retries</th><th>Avg Latency</th><th>In Tokens</th><th>Out Tokens</th></tr></thead>
+    <tbody>${modelRows}</tbody>
+  </table>` : '<p class="empty">No model data</p>'}
+</div>
+
+<div class="section">
   <h2>Error Breakdown</h2>
   ${metrics.errorBreakdown.length > 0 ? `
   <table>
@@ -430,7 +513,7 @@ ${!language ? `<div class="section">
   ${docs.length > 0 ? `
   <div style="overflow-x:auto">
   <table>
-    <thead><tr><th>Timestamp</th><th>Language</th><th>Query</th><th>Success</th><th>Latency</th><th>Top Similarity</th><th>Units</th><th>In Tokens</th><th>Out Tokens</th><th>Retries</th></tr></thead>
+    <thead><tr><th>Timestamp</th><th>Language</th><th>Model</th><th>Query</th><th>Success</th><th>Latency</th><th>Top Similarity</th><th>Units</th><th>In Tokens</th><th>Out Tokens</th><th>Retries</th></tr></thead>
     <tbody>${detailRows}</tbody>
   </table>
   </div>` : '<p class="empty">No requests in this period</p>'}
