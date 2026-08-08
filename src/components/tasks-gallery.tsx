@@ -28,22 +28,8 @@ import { DataPanel } from "./DataPanel";
 import { ReadOnlyCodePanel } from "./ReadOnlyCodePanel";
 import { CompilerTabs } from "./CompilerTabs";
 import { useRouter } from 'next/router';
+import { elideCompoundId } from '../utils';
 
-// Helper to elide task IDs, showing only characters 18-25
-const elideTaskId = (id) => {
-  return id.length > 25 ? id.substring(17, 25) : id;
-};
-
-// Helper to elide compound IDs (with +), eliding each part separately
-const elideCompoundId = (id) => {
-  if (!id.includes('+')) {
-    return elideTaskId(id);
-  }
-
-  const parts = id.split('+');
-  const elided = parts.map(part => elideTaskId(part));
-  return elided.join('+');
-};
 
 
 

@@ -9,7 +9,7 @@ import {
 import Editor from './editor';
 import { ImageGallery } from './ImageGallery';
 import SignIn from "./SignIn";
-import { getAccessToken, loadItems, loadItemClientTags, createItem, updateItem, getData, getItem, getTask, compile } from '../utils/swr/fetchers';
+import { getAccessToken, loadItems, loadItemClientTags, createItem, updateItem, getData, getItem, getTask, compile, loadTaskVersions } from '../utils/swr/fetchers';
 import { readItemsCache, writeItemsCache } from '../utils/items-cache';
 import useGraffiticodeAuth from "@graffiticode/auth-react";
 import FormView from "./FormView";
@@ -20,6 +20,10 @@ import { PlusIcon } from '@heroicons/react/20/solid';
 import ItemsHeaderMenu, { DEFAULT_SORT, DEFAULT_DATE_FILTER, Sort, DateFilter } from "./items-header-menu";
 import { ClientOption, ALL_CLIENT, clientOptionForId } from "./client-selector";
 import { findLanguageByNumber } from "./language-selector";
+
+// Newest N versions of the open item. The server caps at 1000; 200 is plenty of
+// scrollback for a transcript and keeps the per-item poll cheap.
+const ITEM_VERSIONS_LIMIT = 200;
 
 const normalizeLangId = (raw: any): string | null => {
   if (raw === null || raw === undefined) return null;
@@ -85,11 +89,15 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
-  // How the pending taskId change came about, for the version record written
-  // server-side. Set by whoever advances the taskId; read at save time.
+  // How the pending taskId change came about, and a short description of it, for
+  // the version record written server-side. Set by whoever advances the taskId;
+  // read at save time, then cleared so a later metadata-only save (a rename, a
+  // mark change) doesn't inherit stale provenance.
   const versionSourceRef = useRef<string | undefined>(undefined);
-  const setTaskIdWithSource = useCallback((newTaskId: string, source?: string) => {
+  const versionLabelRef = useRef<string | undefined>(undefined);
+  const setTaskIdWithSource = useCallback((newTaskId: string, source?: string, label?: string) => {
     versionSourceRef.current = source;
+    versionLabelRef.current = label;
     setTaskId(newTaskId);
   }, []);
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
@@ -345,6 +353,33 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     user && initialItemId ? `item-${user.uid}-${initialItemId}` : null,
     () => getItem({ user, id: initialItemId }),
     {
+      refreshInterval: 8000,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+    }
+  );
+
+  // Every recorded content state of the OPEN item, including the ones the help
+  // transcript never captured: hand edits, MCP edits, a claimed/shared item's v1.
+  // Deliberately unfiltered by the client selector — the point is to show every
+  // producer — and deliberately without keepPreviousData, since the key is
+  // per-item and the previous item's versions would be a lie during a switch.
+  //
+  // Keyed on the ITEM's lang, not the filter lang: on a deep-linked /items/[id]
+  // the two can disagree mid-sync, and getTaskVersions' where("lang","==") would
+  // silently return nothing.
+  const selectedItemLang = normalizeLangId(
+    items.find(item => item.id === selectedItemId)?.lang
+  ) ?? normalizeLangId(lang);
+  const itemVersionsKey = user && selectedItemLang && selectedItemId
+    ? `item-versions-${user.uid}-${selectedItemLang}-${selectedItemId}`
+    : null;
+  const { data: itemVersions, mutate: mutateItemVersions } = useSWR(
+    itemVersionsKey,
+    () => loadTaskVersions({ user, lang: selectedItemLang, itemId: selectedItemId, limit: ITEM_VERSIONS_LIMIT }),
+    {
+      // Surface versions written by other clients (MCP, the generation worker).
+      // Our own writes revalidate immediately from handleUpdateItem.
       refreshInterval: 8000,
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
@@ -633,7 +668,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     }
   };
 
-  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs, source }: { itemId: string; name?: any; taskId?: any; mark?: any; help?: any; isPublic?: any; client?: any; upstreamLangs?: string[]; source?: string }) => {
+  const handleUpdateItem = async ({ itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs, source, label }: { itemId: string; name?: any; taskId?: any; mark?: any; help?: any; isPublic?: any; client?: any; upstreamLangs?: string[]; source?: string; label?: string }) => {
     // Prevent updates with stale item IDs - check both items array and ensure we have a valid user
     const currentItem = items.find(item => item.id === itemId);
     if (!itemId || !currentItem || !user?.uid) {
@@ -654,13 +689,18 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
 
     // Then update backend
     try {
-      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs, source });
+      const result = await updateItem({ user, id: itemId, name, taskId, mark: newMark, help, isPublic, client: newClient, upstreamLangs: newUpstreamLangs, source, label });
 
       // Advance the open-editor baseline so the adopt effect treats this write as
       // our own (not a remote change) even before the next poll lands.
       if (selectedItemId === itemId && result) {
         if (result.taskId) baselineTaskIdRef.current = result.taskId;
         baselineUpdatedRef.current = Number(result.updated) || baselineUpdatedRef.current;
+        // updateItem awaits recordVersion before returning, so by now the version
+        // doc is committed — one revalidate here covers every writer (the
+        // debounced editor persist, chat, mark changes, restore) and the new row
+        // reaches the transcript without waiting on the poll.
+        if (result.taskId) mutateItemVersions();
       }
 
       // If mark changed and this is the selected item, we need to reload the task data
@@ -769,15 +809,17 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
 
       if (taskData) {
         // Loading a prior task makes it the item's current state → persist it.
+        // Restoring re-derives the SAME content-addressed taskId, so the version
+        // record already exists: recordVersion's create hits ALREADY_EXISTS and
+        // only bumps lastSeenAt. The transcript doesn't grow and the restored row
+        // keeps its original position.
         editorDirtyRef.current = true;
-        setTaskId(taskIdToLoad);
+        setTaskIdWithSource(taskIdToLoad, "editor");
         setEditorCode(taskData.src || "");
-
-        if (taskData.help !== undefined) {
-          const helpData = typeof taskData.help === "string" ?
-            JSON.parse(taskData.help || "[]") :
-            (taskData.help || []);
-          setEditorHelp(helpData);
+        // A compound chain carries its upstreams; without this the previous
+        // item's upstreamLangs would be persisted and fed to the compiler.
+        if (Array.isArray(taskData.langs)) {
+          setUpstreamLangs(taskData.langs.slice(1));
         }
       }
     } catch (error) {
@@ -809,6 +851,12 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
           // saved (last-write-wins), so any pending remote-update prompt is moot.
           editorDirtyRef.current = false;
           setRemoteUpdateAvailable(false);
+          // Consume the provenance: it describes THIS taskId change, so a later
+          // metadata-only save must not inherit it.
+          const versionSource = versionSourceRef.current;
+          const versionLabel = versionLabelRef.current;
+          versionSourceRef.current = undefined;
+          versionLabelRef.current = undefined;
           handleUpdateItem({
             itemId: selectedItemId,
             name: selectedItem.name,
@@ -817,7 +865,8 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
             help: JSON.stringify(editorHelp),
             isPublic: selectedItem.isPublic,
             upstreamLangs,
-            source: versionSourceRef.current,
+            source: versionSource,
+            label: versionLabel,
           });
         }
       } else {
@@ -1254,6 +1303,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 initialCode={editorCode}
                 initialHelp={editorHelp}
                 itemId={selectedItemId}
+                itemVersions={itemVersions}
               />
               )}
               </div>

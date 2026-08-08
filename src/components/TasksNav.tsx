@@ -3,24 +3,9 @@ import { Disclosure } from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import { Fragment, useEffect, useState } from 'react';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
+import { elideTaskId, elideCompoundId } from '../utils';
 
 const sliceName = name => name.slice(17).slice(0,27);
-
-// Helper to elide task IDs, showing only characters 18-25
-const elideTaskId = (id) => {
-  return id.length > 25 ? id.substring(17, 25) : id;
-}
-
-// Helper to elide compound IDs (with +), eliding each part separately
-const elideCompoundId = (id) => {
-  if (!id.includes('+')) {
-    return elideTaskId(id);
-  }
-
-  const parts = id.split('+');
-  const elided = parts.map(part => elideTaskId(part));
-  return elided.join('+');
-}
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')

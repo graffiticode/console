@@ -9,6 +9,7 @@ import PublicToggle from './public-toggle';
 import ShareItemDialog from './ShareItemDialog';
 import CopyableId from './CopyableId';
 import { createItem } from '../utils/swr/fetchers';
+import { elideCompoundId } from '../utils';
 import { generateThumbnail } from '../lib/generate-thumbnail';
 import { useThumbnailJob } from '../lib/thumbnail-jobs';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
@@ -16,14 +17,6 @@ import useGraffiticodeAuth from '@graffiticode/auth-react';
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
-
-const elideTaskId = (id) => (id && id.length > 25 ? id.substring(17, 25) : id || '');
-
-const elideCompoundId = (id) => {
-  if (!id) return '';
-  if (!id.includes('+')) return elideTaskId(id);
-  return id.split('+').map(elideTaskId).join('+');
-};
 
 function formatTimestamp(ts) {
   if (!ts) return null;

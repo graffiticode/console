@@ -184,7 +184,7 @@ export const countItems = async ({ user, langs }) => {
   return counts;
 };
 
-export const loadTaskVersions = async ({ user, lang, client: clientId, itemId, limit }: { user: any; lang: string; client?: string; itemId?: string; limit?: number }) => {
+export const loadTaskVersions = async ({ user, lang, client: clientId, itemId, limit, startAfter }: { user: any; lang: string; client?: string; itemId?: string; limit?: number; startAfter?: string }) => {
   if (!user) {
     return [];
   }
@@ -195,8 +195,8 @@ export const loadTaskVersions = async ({ user, lang, client: clientId, itemId, l
     }
   });
   const query = gql`
-    query loadTaskVersions($lang: String!, $client: String, $itemId: String, $limit: Int) {
-      taskVersions(lang: $lang, client: $client, itemId: $itemId, limit: $limit) {
+    query loadTaskVersions($lang: String!, $client: String, $itemId: String, $limit: Int, $startAfter: String) {
+      taskVersions(lang: $lang, client: $client, itemId: $itemId, limit: $limit, startAfter: $startAfter) {
         id
         itemId
         taskId
@@ -211,7 +211,8 @@ export const loadTaskVersions = async ({ user, lang, client: clientId, itemId, l
       }
     }
   `;
-  return client.request(query, { lang, client: clientId, itemId, limit }).then(data => data.taskVersions);
+  // startAfter is the createdAt of the last row seen (epoch ms as a string), not a doc id.
+  return client.request(query, { lang, client: clientId, itemId, limit, startAfter }).then(data => data.taskVersions);
 };
 
 export const getAccessToken = async ({ user }) => {
@@ -361,7 +362,7 @@ export const deleteCredential = async ({ user, name }: { user: any; name: string
   return client.request(mutation, { name }).then(data => data.deleteCredential);
 };
 
-export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs, source }: { user: any; id: string; name?: string; taskId?: string; mark?: number; help?: string; isPublic?: boolean; client?: string; upstreamLangs?: string[]; source?: string }) => {
+export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs, source, label }: { user: any; id: string; name?: string; taskId?: string; mark?: number; help?: string; isPublic?: boolean; client?: string; upstreamLangs?: string[]; source?: string; label?: string }) => {
   if (!user) {
     return null;
   }
@@ -372,8 +373,8 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
     }
   });
   const mutation = gql`
-    mutation updateItem($id: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $client: String, $upstreamLangs: [String!], $source: String) {
-      updateItem(id: $id, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, client: $client, upstreamLangs: $upstreamLangs, source: $source) {
+    mutation updateItem($id: String!, $name: String, $taskId: String, $mark: Int, $help: String, $isPublic: Boolean, $client: String, $upstreamLangs: [String!], $source: String, $label: String) {
+      updateItem(id: $id, name: $name, taskId: $taskId, mark: $mark, help: $help, isPublic: $isPublic, client: $client, upstreamLangs: $upstreamLangs, source: $source, label: $label) {
         id
         name
         taskId
@@ -388,7 +389,7 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
       }
     }
   `;
-  return client.request(mutation, { id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs, source }).then(data => data.updateItem);
+  return client.request(mutation, { id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs, source, label }).then(data => data.updateItem);
 };
 
 export const shareItem = async ({ user, itemId, targetUserId }) => {

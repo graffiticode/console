@@ -33,6 +33,8 @@ import {
   processMixedContent,
   formatTokenUsage,
 } from "../utils/helpPanelUtils";
+import { buildTranscriptRows, versionSourceLabel } from "../utils/itemVersions";
+import { elideCompoundId } from "../utils";
 
 // Add custom CSS for dropzone (removed duplicate overlay to prevent flashing)
 const dropzoneStyles = ``;
@@ -60,6 +62,7 @@ export const HelpPanel = ({
   onError,
   taskId,
   itemId,
+  itemVersions,
 }) => {
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
@@ -1645,30 +1648,13 @@ export const HelpPanel = ({
     }
   }), []);
 
-  // Function to prepare messages for display
-  const prepareMessagesForDisplay = () => {
-    // Find all user and system messages in chronological order (oldest to newest)
-    // Include both user messages and system messages (e.g., sharing notes)
-    const userMessages = help
-      .filter(item => item.type === 'user' || item.role === 'system')
-      .map((msg, idx) => ({
-        ...msg,
-        index: help.indexOf(msg)
-      }));
-      // Removed .reverse() to keep chronological order
-
-    // Find the last bot response
-    const lastBotIndex = [...help].reverse().findIndex(item => item.type === 'bot');
-    const lastBotResponse = lastBotIndex !== -1 ? help[help.length - 1 - lastBotIndex] : null;
-
-    return {
-      userMessages,
-      lastBotResponse: lastBotResponse ? {
-        ...lastBotResponse,
-        index: help.indexOf(lastBotResponse)
-      } : null
-    };
-  };
+  // The transcript is the chat history merged with the item's recorded version
+  // history: a prompt bubble for each generation, plus a row for every version
+  // that has no prompt of its own (hand edits, MCP edits, a shared item's v1).
+  const transcript = useMemo(
+    () => buildTranscriptRows({ help, versions: itemVersions, itemId }),
+    [help, itemVersions, itemId]
+  );
 
   // Calculate if there are any changes to send
   const hasChangesToSend = useMemo(() => {
@@ -2477,80 +2463,110 @@ export const HelpPanel = ({
       <div
         className="flex-1 overflow-auto px-4 py-4"
       >
-        {help.length > 0 && (() => {
-          const { lastBotResponse, userMessages } = prepareMessagesForDisplay();
+        {transcript.rows.length > 0 && (
+          /* Newest first — the merge helper owns the ordering. */
+          <div className="space-y-2">
+            {transcript.rows.map((row) => {
+              // A version with no prompt of its own: a hand edit, an agent edit,
+              // or the v1 of a shared/claimed item. Rendered outlined-on-white to
+              // read as a record rather than a message, and with no delete
+              // affordance — version history is append-only.
+              if (row.kind === 'version') {
+                const version = row.version || {};
+                const isCurrent = row.taskId && row.taskId === taskId;
+                return (
+                  <div key={row.key} className="mb-2 w-full">
+                    <div
+                      className={`bg-white rounded-none overflow-hidden ${
+                        isCurrent ? 'border-2 border-gray-500' : 'border border-gray-200'
+                      } ${onLoadTaskFromHelp ? 'cursor-pointer hover:bg-gray-50 transition-all' : ''}`}
+                      onClick={() => {
+                        if (onLoadTaskFromHelp) onLoadTaskFromHelp(row.taskId);
+                      }}
+                      title={onLoadTaskFromHelp ? 'Click to load this version' : ''}
+                    >
+                      {/* Timestamp header — same shape as a prompt bubble's */}
+                      <div className="px-3 pt-2 pb-1 flex items-baseline gap-2">
+                        <span className="text-xs text-gray-500">
+                          {row.ts ? new Date(row.ts).toLocaleString() : ''}
+                        </span>
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                          {versionSourceLabel(version.source)}
+                        </span>
+                      </div>
 
-          return (
-            <>
-
-
-              {/* User messages in reverse chronological order, newest first */}
-              <div className="space-y-2">
-                {userMessages
-                  .reverse() // Display messages in reverse chronological order (newest first)
-                  .map((message, index) => {
-                    // Check if this message is pending (waiting for a response)
-                    const isPending = isLoading &&
-                                     (message.index === help.length - 1 ||
-                                      help[message.index + 1]?.type !== 'bot');
-
-                    return (
-                      <div key={message.timestamp || message.index} className="mb-2 w-full">
-                        <div className="relative group">
-                          {/* Delete button for each user message */}
-                          {message.role !== 'system' && (
-                            <button
-                              className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10 ${isPending ? 'text-red-400 hover:text-red-600 bg-white rounded-full shadow-sm' : 'text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm'}`}
-                              onClick={() => handleDeleteMessagePair(message.index)}
-                              title={isPending ? "Cancel and delete request" : "Delete message"}
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          )}
-
-                          <div
-                            className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-gray-200'} rounded-none overflow-hidden ${isPending ? 'border-2 border-gray-300' : ''} ${
-                              message.taskId && message.taskId === taskId ? 'border-2 border-gray-500' : ''
-                            } ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:brightness-95 transition-all' : ''}`}
-                            onClick={() => {
-                              if (message.taskId && onLoadTaskFromHelp) {
-                                onLoadTaskFromHelp(message.taskId);
-                              }
-                            }}
-                            title={message.taskId && onLoadTaskFromHelp ? 'Click to load task' : ''}
-                          >
-                            {/* Timestamp header */}
-                            {message.timestamp && (
-                              <div className="px-3 pt-2 pb-1">
-                                <span className="text-xs text-gray-500">
-                                  {new Date(message.timestamp).toLocaleString()}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Content */}
-                            <div className={`px-3 pb-3 ${message.timestamp ? 'pt-0' : 'pt-3'}`}>
-                              <div className="text-sm prose prose-sm prose-blue max-w-none prose-img:mb-0">
-                                <ReactMarkdown
-                                  remarkPlugins={remarkPlugins}
-                                  components={markdownComponents}
-                                >
-                                  {message.role === 'system' ? message.content : message.user}
-                                </ReactMarkdown>
-                              </div>
-                            </div>
-                          </div>
+                      {/* Description */}
+                      <div className="px-3 pb-3 pt-0">
+                        <div className={`text-sm text-gray-700 truncate ${version.label ? '' : 'font-mono'}`}>
+                          {version.label || elideCompoundId(row.taskId)}
+                          {row.collapsedCount > 1 && ` (${row.collapsedCount} edits)`}
                         </div>
                       </div>
-                    );
-                  })}
-              </div>
+                    </div>
+                  </div>
+                );
+              }
 
-            </>
-          );
-        })()}
+              const message = row.message;
+              // Check if this message is pending (waiting for a response)
+              const isPending = isLoading &&
+                               (row.index === help.length - 1 ||
+                                help[row.index + 1]?.type !== 'bot');
+
+              return (
+                <div key={`help-${row.index}`} className="mb-2 w-full">
+                  <div className="relative group">
+                    {/* Delete button for each user message */}
+                    {message.role !== 'system' && (
+                      <button
+                        className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity -mt-2 -mr-2 z-10 ${isPending ? 'text-red-400 hover:text-red-600 bg-white rounded-full shadow-sm' : 'text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm'}`}
+                        onClick={() => handleDeleteMessagePair(row.index)}
+                        title={isPending ? "Cancel and delete request" : "Delete message"}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+
+                    <div
+                      className={`${message.role === 'system' ? 'bg-gray-100' : 'bg-gray-200'} rounded-none overflow-hidden ${isPending ? 'border-2 border-gray-300' : ''} ${
+                        message.taskId && message.taskId === taskId ? 'border-2 border-gray-500' : ''
+                      } ${message.taskId && onLoadTaskFromHelp ? 'cursor-pointer hover:brightness-95 transition-all' : ''}`}
+                      onClick={() => {
+                        if (message.taskId && onLoadTaskFromHelp) {
+                          onLoadTaskFromHelp(message.taskId);
+                        }
+                      }}
+                      title={message.taskId && onLoadTaskFromHelp ? 'Click to load task' : ''}
+                    >
+                      {/* Timestamp header */}
+                      {message.timestamp && (
+                        <div className="px-3 pt-2 pb-1">
+                          <span className="text-xs text-gray-500">
+                            {new Date(message.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Content */}
+                      <div className={`px-3 pb-3 ${message.timestamp ? 'pt-0' : 'pt-3'}`}>
+                        <div className="text-sm prose prose-sm prose-blue max-w-none prose-img:mb-0">
+                          <ReactMarkdown
+                            remarkPlugins={remarkPlugins}
+                            components={markdownComponents}
+                          >
+                            {message.role === 'system' ? message.content : message.user}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

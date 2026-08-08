@@ -9,7 +9,7 @@ import { parse, postTask } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { createState } from "../lib/state";
 import { Tabs } from "./Tabs";
-import { isNonNullNonEmptyObject } from "../utils";
+import { isNonNullNonEmptyObject, summarizeSrcDiff } from "../utils";
 import useLocalStorage from '../hooks/use-local-storage';
 
 function classNames(...classes) {
@@ -71,6 +71,7 @@ export default function Editor({
   initialCode,
   initialHelp,
   itemId,
+  itemVersions,
 }: any) {
   const [ code, setCode ] = useState(initialCode || "");
   const [ help, setHelp ] = useState(initialHelp || []);
@@ -88,6 +89,10 @@ export default function Editor({
   const dataPanelRef = React.useRef(null);
   const currentTaskIdRef = React.useRef(null);
   const codeRef = React.useRef(initialCode || "");
+  // Source as of the last posted task — the baseline a hand edit is diffed
+  // against to label its version record. Distinct from codeRef, which tracks
+  // every keystroke.
+  const lastPostedSrcRef = React.useRef(initialCode || "");
   // Source most recently applied from chat generation. The resolver already
   // posted that task (its taskId is set via the chat path), so the debounced
   // re-post effect skips this source to avoid creating a duplicate task.
@@ -131,6 +136,7 @@ export default function Editor({
       if (initialCode !== undefined && initialCode !== codeRef.current) {
         setCode(initialCode);
         codeRef.current = initialCode;
+        lastPostedSrcRef.current = initialCode;
       }
       if (initialHelp !== undefined) {
         setHelp(initialHelp);
@@ -144,6 +150,7 @@ export default function Editor({
     if (initialCode !== undefined) {
       setCode(initialCode);
       codeRef.current = initialCode;
+      lastPostedSrcRef.current = initialCode;
     }
   }, [initialCode]);
 
@@ -185,7 +192,11 @@ export default function Editor({
             ? [newHead, ...upstreamSegments].join("+")
             : newHead;
           // A hand-edit — the version case the help transcript never recorded.
-          setTaskId(newChain, "editor");
+          // Label it with a line-count delta so its row in the transcript says
+          // something more than an elided task id.
+          const label = summarizeSrcDiff(lastPostedSrcRef.current, code);
+          lastPostedSrcRef.current = code;
+          setTaskId(newChain, "editor", label);
         } catch (err) {
           console.error("Parse/postTask error:", err);
         } finally {
@@ -263,6 +274,7 @@ export default function Editor({
               onLoadTaskFromHelp={onLoadTaskFromHelp}
               onError={onError}
               taskId={taskId}
+              itemVersions={itemVersions}
             />
           </div>
           <div style={{ display: tab === "Data" ? undefined : "none" }}>
