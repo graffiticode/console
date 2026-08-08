@@ -34,6 +34,7 @@ import {
   formatTokenUsage,
 } from "../utils/helpPanelUtils";
 import { buildTranscriptRows, versionSourceLabel } from "../utils/itemVersions";
+import { useVersionSrc } from "../hooks/use-version-src";
 import { elideCompoundId } from "../utils";
 
 // Add custom CSS for dropzone (removed duplicate overlay to prevent flashing)
@@ -1651,9 +1652,12 @@ export const HelpPanel = ({
   // The transcript is the chat history merged with the item's recorded version
   // history: a prompt bubble for each generation, plus a row for every version
   // that has no prompt of its own (hand edits, MCP edits, a shared item's v1).
+  // Version records are pointer-only, so a row's "+N −M lines" has to be derived
+  // from the task sources — fetched once per taskId and cached forever.
+  const versionSrc = useVersionSrc({ user, versions: itemVersions, itemId });
   const transcript = useMemo(
-    () => buildTranscriptRows({ help, versions: itemVersions, itemId }),
-    [help, itemVersions, itemId]
+    () => buildTranscriptRows({ help, versions: itemVersions, itemId, srcByTaskId: versionSrc }),
+    [help, itemVersions, itemId, versionSrc]
   );
 
   // Calculate if there are any changes to send
@@ -2474,6 +2478,13 @@ export const HelpPanel = ({
               if (row.kind === 'version') {
                 const version = row.version || {};
                 const isCurrent = row.taskId && row.taskId === taskId;
+                // A hand edit's stored label IS a line delta, so it would just
+                // repeat row.stats — but it's the only stat available before the
+                // sources land, so it stands in until they do. Every other
+                // source's label is prose (a generation job's is the prompt).
+                const isEditLabel = version.source === 'editor';
+                const description = isEditLabel ? null : version.label;
+                const stats = row.stats || (isEditLabel ? version.label : null);
                 return (
                   <div key={row.key} className="mb-2 w-full">
                     <div
@@ -2495,12 +2506,24 @@ export const HelpPanel = ({
                         </span>
                       </div>
 
-                      {/* Description */}
+                      {/* What changed. The task id is the last resort — shown
+                          only when neither a description nor a delta resolved. */}
                       <div className="px-3 pb-3 pt-0">
-                        <div className={`text-sm text-gray-700 truncate ${version.label ? '' : 'font-mono'}`}>
-                          {version.label || elideCompoundId(row.taskId)}
-                          {row.collapsedCount > 1 && ` (${row.collapsedCount} edits)`}
-                        </div>
+                        {description ? (
+                          <div className="text-sm text-gray-700 truncate">
+                            {description}
+                          </div>
+                        ) : !stats && (
+                          <div className="text-sm text-gray-700 truncate font-mono">
+                            {elideCompoundId(row.taskId)}
+                          </div>
+                        )}
+                        {stats && (
+                          <div className="text-xs text-gray-500">{stats}</div>
+                        )}
+                        {row.collapsedCount > 1 && (
+                          <div className="text-xs text-gray-500">{`${row.collapsedCount} edits`}</div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2512,6 +2535,11 @@ export const HelpPanel = ({
               const isPending = isLoading &&
                                (row.index === help.length - 1 ||
                                 help[row.index + 1]?.type !== 'bot');
+              // A prompt bubble is a code generation, so it carries the same
+              // provenance chip a version row does. System rows are notices,
+              // not generations.
+              const sourceChip = message.role === 'system' ? null : 'Agent';
+              const showHeader = message.timestamp || sourceChip;
 
               return (
                 <div key={`help-${row.index}`} className="mb-2 w-full">
@@ -2540,17 +2568,24 @@ export const HelpPanel = ({
                       }}
                       title={message.taskId && onLoadTaskFromHelp ? 'Click to load task' : ''}
                     >
-                      {/* Timestamp header */}
-                      {message.timestamp && (
-                        <div className="px-3 pt-2 pb-1">
-                          <span className="text-xs text-gray-500">
-                            {new Date(message.timestamp).toLocaleString()}
-                          </span>
+                      {/* Timestamp + source header — same shape as a version row's */}
+                      {showHeader && (
+                        <div className="px-3 pt-2 pb-1 flex items-baseline gap-2">
+                          {message.timestamp && (
+                            <span className="text-xs text-gray-500">
+                              {new Date(message.timestamp).toLocaleString()}
+                            </span>
+                          )}
+                          {sourceChip && (
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                              {sourceChip}
+                            </span>
+                          )}
                         </div>
                       )}
 
                       {/* Content */}
-                      <div className={`px-3 pb-3 ${message.timestamp ? 'pt-0' : 'pt-3'}`}>
+                      <div className={`px-3 pb-3 ${showHeader ? 'pt-0' : 'pt-3'}`}>
                         <div className="text-sm prose prose-sm prose-blue max-w-none prose-img:mb-0">
                           <ReactMarkdown
                             remarkPlugins={remarkPlugins}
@@ -2559,6 +2594,10 @@ export const HelpPanel = ({
                             {message.role === 'system' ? message.content : message.user}
                           </ReactMarkdown>
                         </div>
+                        {/* What the generation this prompt produced changed */}
+                        {row.stats && (
+                          <div className="text-xs text-gray-500 mt-1">{row.stats}</div>
+                        )}
                       </div>
                     </div>
                   </div>

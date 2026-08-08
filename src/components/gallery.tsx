@@ -20,10 +20,9 @@ import { PlusIcon } from '@heroicons/react/20/solid';
 import ItemsHeaderMenu, { DEFAULT_SORT, DEFAULT_DATE_FILTER, Sort, DateFilter } from "./items-header-menu";
 import { ClientOption, ALL_CLIENT, clientOptionForId } from "./client-selector";
 import { findLanguageByNumber } from "./language-selector";
-
-// Newest N versions of the open item. The server caps at 1000; 200 is plenty of
-// scrollback for a transcript and keeps the per-item poll cheap.
-const ITEM_VERSIONS_LIMIT = 200;
+// Newest N versions of the open item. Defined next to the merge that reads it,
+// which needs to know when a history came back truncated.
+import { ITEM_VERSIONS_LIMIT } from "../utils/itemVersions";
 
 const normalizeLangId = (raw: any): string | null => {
   if (raw === null || raw === undefined) return null;

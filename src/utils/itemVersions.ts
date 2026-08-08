@@ -12,7 +12,12 @@
 // unmatched ones become their own rows. Nothing is written back into help —
 // that array is also the LLM's conversation context.
 
-import { isNonNullObject } from './index';
+import { isNonNullObject, summarizeSrcDiff } from './index';
+
+// Newest N versions of an item the transcript asks for. The server caps at 1000;
+// 200 is plenty of scrollback and keeps the per-item poll cheap. Lives here so
+// the merge can tell a complete history from a truncated page of one.
+export const ITEM_VERSIONS_LIMIT = 200;
 
 // The eight VersionSource values (src/pages/api/resolvers.ts). The server clamps
 // `source` to this set and defaults nulls to "unknown", so the fallbacks below
@@ -23,7 +28,9 @@ import { isNonNullObject } from './index';
 export const VERSION_SOURCE_LABELS = {
   'chat': 'Chat',
   'generation-job': 'Generated',
-  'editor': 'Edit',
+  // "Human" vs "Agent": the chip answers who made the change, not which screen
+  // it was made on.
+  'editor': 'Human',
   'mcp': 'Agent',
   'claim': 'Claimed',
   'share': 'Shared',
@@ -57,13 +64,16 @@ const kindRank = (row) => (row.kind === 'help' ? 0 : 1);
  * @param help      parsed help array (chat transcript)
  * @param versions  taskVersions rows for this item, newest-first
  * @param itemId    the open item; versions for any other item are dropped
+ * @param srcByTaskId  source text per taskId (useVersionSrc); the rows it covers
+ *                     get a "+N −M lines" stat instead of a bare task id
  * @param collapseWindowMs  fold runs of consecutive hand edits closer together
  *                          than this into one row. 0 (default) disables it.
  */
-export const buildTranscriptRows = ({ help, versions, itemId, collapseWindowMs = 0 }: {
+export const buildTranscriptRows = ({ help, versions, itemId, srcByTaskId, collapseWindowMs = 0 }: {
   help?: any[];
   versions?: any[];
   itemId?: string;
+  srcByTaskId?: Map<string, string>;
   collapseWindowMs?: number;
 }) => {
   const helpEntries = Array.isArray(help) ? help : [];
@@ -126,7 +136,16 @@ export const buildTranscriptRows = ({ help, versions, itemId, collapseWindowMs =
     });
   }
 
-  // 5. Newest first. Fully deterministic: never rely on sort stability.
+  // 5. What each version changed. Both row kinds get it: a matched version
+  // renders as its prompt bubble, and that bubble should still report the
+  // delta it produced.
+  const statsByTaskId = computeVersionStats(versionsByTaskId, srcByTaskId);
+  for (const row of rows) {
+    const stats = row.taskId && statsByTaskId.get(row.taskId);
+    if (stats) row.stats = stats;
+  }
+
+  // 6. Newest first. Fully deterministic: never rely on sort stability.
   rows.sort((a, b) => (
     (b.ts - a.ts) ||
     (kindRank(a) - kindRank(b)) ||
@@ -137,6 +156,42 @@ export const buildTranscriptRows = ({ help, versions, itemId, collapseWindowMs =
   const collapsed = collapseWindowMs > 0 ? collapseEditRuns(rows, collapseWindowMs) : rows;
   return { rows: collapsed, versionCount: versionsByTaskId.size };
 };
+
+// A "+N −M lines" label per version, diffed against the version before it.
+//
+// The predecessor is the previous version in TIME, not the previous transcript
+// row: help rows without a version of their own sit between them, and a row's
+// delta is only meaningful against the content state it replaced.
+//
+// Two versions get no stat: one whose source (or its predecessor's) hasn't been
+// fetched, and the oldest one when the history came back truncated — its
+// predecessor is off the page, so crediting it with the whole file would be a
+// lie. A genuine v1 does get the whole file, which is what it added.
+function computeVersionStats(versionsByTaskId, srcByTaskId) {
+  const stats = new Map();
+  if (!srcByTaskId || srcByTaskId.size === 0) return stats;
+
+  const ordered = [...versionsByTaskId.values()].sort(
+    (a, b) => (toEpochMs(a.createdAt) ?? 0) - (toEpochMs(b.createdAt) ?? 0)
+  );
+  const truncated = ordered.length >= ITEM_VERSIONS_LIMIT;
+
+  let prevSrc = truncated ? null : '';
+  for (const version of ordered) {
+    const src = srcByTaskId.get(version.taskId);
+    if (src === undefined) {
+      // Unknown content: the next version can't be diffed against it either.
+      prevSrc = null;
+      continue;
+    }
+    if (prevSrc !== null) {
+      const summary = summarizeSrcDiff(prevSrc, src);
+      if (summary) stats.set(version.taskId, summary);
+    }
+    prevSrc = src;
+  }
+  return stats;
+}
 
 // Every debounced keystroke burst can mint a version. Folding adjacent hand
 // edits keeps the transcript readable when someone types through the editor.
