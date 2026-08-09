@@ -19,7 +19,12 @@
  *   objective (free, deterministic, from generateCode's return):
  *     firstPassCompile = fixAttempts === 0 && compiled
  *     finalCompile     = compiled after error-correction
+ *     drift            = compiled, but the wrong design (hooked langs only, e.g. L0175
+ *                        asked for c1-t9 EBSR, emitted hot-text) — see driftedFromPrompt
+ *     warnings         = what the compiler objected to, split fixable/unfixable by
+ *                        scripts/eval-warning-taxonomy.ts
  *     fixRounds, latencyMs, cost (priced via src/lib/model-pricing.ts)
+ *
  *   subjective (--judge, costs judge calls):
  *     pointwise 1-5 on the shared rubric; pairwise blind + order-controlled
  *     (both A/B orderings, must agree) round-robin over ALL variant pairs.
@@ -29,6 +34,19 @@
  *     A Claude judge ranking Claude against GPT is grading its own family, so a
  *     single-judge cross-family ordering is not defensible. Required before
  *     committing a MODEL_PRIORITY line.
+ *
+ * CONVERGENCE (--converge N) — the metric that matters for a dialect whose compile rate is
+ * saturated. Compiling is table stakes; Graffiticode's actual advantage is that the compiler
+ * talks back, so what distinguishes models is the item they reach after iterating and what that
+ * iteration costs. A run becomes one AGENT SESSION: generate, then feed the compiler's own
+ * warnings back (as an agent would through update_item) for up to N turns. Reports convergence
+ * rate, turns-to-clean, residual warnings, per-turn defect buckets, and $/converged, with latency
+ * and cost accumulated across the whole session.
+ *
+ * Without it, a variant that emits a mediocre item in one turn beats one that reaches a good item
+ * in three — and a human labeling first-shot output would score them the same. The 0175 baseline
+ * (2026-08-08) hit 100% compile, 0 stubs and 0 drift on all three variants while 35 of 60 compiles
+ * carried warnings the harness never looked at; under --converge the same three separated at once.
  *
  * GATE: eval cases must not be in the RAG corpus (see scripts/eval-holdout.ts). A
  * leaked case grades every model on copying a retrieved answer, which flatters
@@ -48,6 +66,7 @@
  * USAGE
  *   npm run eval:holdout   -- --lang 0166              # gate only, free
  *   npm run eval           -- --lang 0166 --models claude-opus-5,gpt-5.6-sol --trials 3
+ *   npm run eval           -- --lang 0175 --converge 5 # agent-session mode (see CONVERGENCE)
  *   npm run eval           -- --lang 0166 --panel      # + cross-family judge panel
  *   npm run eval:calibrate -- --lang 0166              # judge vs human labels
  *
@@ -56,14 +75,16 @@
  */
 import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap, before any app import
 
-import { writeFileSync, readFileSync, existsSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, appendFileSync } from "fs";
 import { generateCode, getRelevantExamples } from "../src/lib/code-generation-service";
 import { getCredentialsForApiKey } from "../src/lib/api-credentials";
-import { judgeCode, judgePair, judgePanel, judgeModelForFamily } from "../src/lib/judge-service";
+import { judgeCode, judgePair, judgePanel, judgeModelForFamily, anchorVersion } from "../src/lib/judge-service";
 import { inferProviderFromModel, type LlmProvider } from "../src/lib/llm-models";
 import { estimateUsdCost } from "../src/lib/model-pricing";
 import { assertHoldout } from "./eval-holdout";
 import { pickRepresentative } from "./eval-representative";
+import { verifyExampleForPrompt } from "../src/lib/lang-embedding";
+import { warningsFromVerification, bucketCounts, classifyWarning } from "./eval-warning-taxonomy";
 
 
 interface EvalCase { id: string; prompt: string; currentCode?: string | null }
@@ -83,9 +104,37 @@ interface RunResult {
   lang: string; variantId: string; model: string; family?: LlmProvider; caseId: string; trial: number;
   ok: boolean; firstPass: boolean; finalCompile: boolean; fixRounds: number;
   stub: boolean;   // parsed, but emitted no content — see isStub
+  drift?: boolean; // compiled, but the wrong design — see driftedFromPrompt (undefined ⇒ unjudgeable)
   latencyMs: number; inputTokens: number; outputTokens: number; cost: number;
   code?: string;   // retained for the --judge pass; discarded from the console table
   error?: string;
+
+  // ── Compiler feedback (see scripts/eval-warning-taxonomy.ts) ──────────────
+  // Compiling is table stakes for a dialect like L0175; the WARNINGS are the quality
+  // signal, and they were being thrown away. Recorded for every run, single-shot or not.
+  warningsFixable: number;    // what a repair turn could legitimately act on
+  warningsUnfixable: number;  // stimulus-level complaints (e.g. the prompt's passage reads above grade)
+  warningBuckets?: Record<string, number>;
+  /** Messages the taxonomy didn't recognize — surfaced after the run so it can be extended. */
+  unknownWarnings?: string[];
+  alternativeClaims?: number | null; // compiler's own leftover-foil-depth measure; 0 ⇒ bare pool
+
+  // ── Convergence (--converge N) ────────────────────────────────────────────
+  // A run is one AGENT SESSION, not one generation: turn 1 plus repair turns driven by
+  // the compiler's warnings. latencyMs/cost/tokens above are cumulative over the session,
+  // so `$/win` prices the whole chain rather than the opening move.
+  turns: number;              // 1 when no repair turns ran
+  converged?: boolean;        // reached zero FIXABLE warnings
+  turnsToClean?: number | null; // turn index at which that happened; null if never
+  stuck?: boolean;            // a turn failed to reduce the fixable count
+  // Per turn: not just HOW MANY warnings but WHICH — the counts alone can say a model needed a
+  // repair turn without saying what it got wrong, which is the part that explains a result.
+  // `warnings` holds the compiler's messages verbatim (a handful of short strings next to a full
+  // program, so the payload cost is nil) and is what the repair prompt was built from.
+  turnLog?: Array<{
+    turn: number; fixable: number; unfixable: number; errors: boolean; cost: number; latencyMs: number;
+    buckets: Record<string, number>; warnings: string[];
+  }>;
 }
 
 /**
@@ -108,17 +157,51 @@ function isStub(code: string | null | undefined): boolean {
   return !code.replace(/"(\\.|[^"\\])*"/g, '""').includes("[");
 }
 
+/**
+ * Compiled, and it authored something — but something ELSE. A prompt that asks for
+ * c1-t9 EBSR can come back as hot-text: valid program, wrong design, and both
+ * `firstPass` and `finalCompile` score it a win. isStub catches "authored nothing";
+ * this catches "authored the wrong thing", for the languages that can tell.
+ *
+ * The whole check is delegated to verifyExampleForPrompt (src/lib/lang-embedding.ts) —
+ * the same helper the batch capture step uses to drop drifted training examples. It
+ * derives the INTENDED design from the prompt's own facets (no expectation field on
+ * the eval case to keep in sync) and compares it to the code's signature.
+ *
+ * Tri-state on purpose. `undefined` means unjudgeable — the language has no embedding
+ * hook (every dialect but L0175 today), or the prompt declares no target to judge
+ * against — and must not be collapsed into "clean", because a rate computed over
+ * unjudgeable runs would read as 0% drift on languages that never checked.
+ *
+ * Reporting only: drift is deliberately NOT folded into firstPass/finalCompile.
+ * Compiling and being on-design are different claims, and the compile columns have to
+ * stay comparable with the 0166/0176 runs already on disk.
+ */
+function driftedFromPrompt(lang: string, prompt: string, code?: string): boolean | undefined {
+  if (!code) return undefined;
+  const verdict = verifyExampleForPrompt(lang, { prompt, code });
+  return verdict ? !verdict.ok : undefined;
+}
+
 function parseArgs(argv: string[]) {
   const a = { langs: [] as string[], models: ["claude-sonnet-5", "gpt-5.6-terra"],
     trials: 3, limit: 3, out: "model-eval.json", setDir: "data/model-eval",
     labelsDir: "data/model-eval/labels", judge: false, calibrate: false,
     panel: false, allowLeak: false, stamp: true, holdoutOnly: false,
+    // --converge N: run each case as an agent SESSION — generate, then repair against the
+    // compiler's warnings up to N turns. Default 1 = today's single-shot behavior, so runs on
+    // disk stay comparable and the new mode is always an explicit choice.
+    converge: 1, fromCheckpoint: undefined as string | undefined,
     thinking: undefined as unknown, effort: undefined as string | undefined };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
     if (v === "--lang") { while (argv[i + 1] && !argv[i + 1].startsWith("--")) a.langs.push(argv[++i]); }
     else if (v === "--models") a.models = argv[++i].split(",").map((s) => s.trim());
     else if (v === "--trials") a.trials = parseInt(argv[++i], 10);
+    else if (v === "--converge") a.converge = Math.max(1, parseInt(argv[++i], 10) || 1);
+    // Rebuild a run payload from a .partial.jsonl checkpoint — summarize and write the normal
+    // output file for a sweep that was interrupted. Generates nothing, costs nothing.
+    else if (v === "--from-checkpoint") a.fromCheckpoint = argv[++i];
     else if (v === "--limit") a.limit = parseInt(argv[++i], 10);
     else if (v === "--out") a.out = argv[++i];
     else if (v === "--set-dir") a.setDir = argv[++i];
@@ -158,6 +241,30 @@ function costOf(model: string, input: number, output: number): number {
   return estimateUsdCost({ inputTokens: input, outputTokens: output }, model);
 }
 
+/**
+ * Append-as-you-go checkpoint.
+ *
+ * The payload is written once, after every run finishes. A sweep is now an hours-long job —
+ * 63 sessions x up to 5 turns — and a converge sweep that was stopped two sessions from the end
+ * lost all 86 completed generations (~$6) because nothing had been written yet. One JSONL line
+ * per completed run makes an interrupted sweep salvageable: `--from-checkpoint` turns those lines
+ * back into a normal run payload with no generation at all.
+ *
+ * Deliberately dumb: append one JSON line, never rewrite. A crash mid-write costs the last line,
+ * not the file.
+ */
+function checkpointPath(out: string): string {
+  return out.replace(/(\.json)?$/, "") + ".partial.jsonl";
+}
+
+function loadCheckpoint(path: string): RunResult[] {
+  return readFileSync(path, "utf8")
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((l) => { try { return JSON.parse(l) as RunResult; } catch { return null; } })
+    .filter((r): r is RunResult => !!r);
+}
+
 function loadCases(setDir: string, lang: string): EvalCase[] {
   const path = `${setDir}/${lang}.json`;
   if (!existsSync(path)) {
@@ -169,42 +276,143 @@ function loadCases(setDir: string, lang: string): EvalCase[] {
   return cases;
 }
 
+/**
+ * The repair turn, phrased the way an AGENT would phrase it through `update_item`: hand back the
+ * compiler's own warning text against the current program and ask for a fix.
+ *
+ * Deliberately quotes the compiler verbatim rather than paraphrasing. What is being measured is
+ * whether a model can act on the feedback the platform actually gives it — a nicer, harness-written
+ * hint would measure a channel no real caller has.
+ *
+ * "Do not change the design" matters: without it a model can clear a thin-pool warning by swapping
+ * the item for an easier one, which converges the metric while defeating its purpose. The eval also
+ * checks design drift independently (driftedFromPrompt), so that dodge would show up.
+ */
+function repairPrompt(originalPrompt: string, warnings: string[]): string {
+  return [
+    "The program you wrote compiles, but the Graffiticode compiler reported these warnings:",
+    ...warnings.map((w) => `- ${w}`),
+    "",
+    "Revise the program to resolve them. Keep the same passage, the same target, the same item",
+    "type, and the same correct answer — fix only what the warnings call out.",
+    "",
+    "For reference, the original request was:",
+    originalPrompt,
+  ].join("\n");
+}
+
+/**
+ * One AGENT SESSION for a (case, variant, trial): the initial generation, then up to
+ * `maxTurns - 1` compiler-driven repair turns.
+ *
+ * The loop lives here rather than in the product because `generateCode`'s internal fix loop is
+ * error-only (`verificationSucceeded` treats an empty `errors` array as done, so a warning never
+ * triggers it). Iterating at this level measures iterate-ability exactly as an agent experiences
+ * it today — no production behavior changes, and the single-shot mode (`maxTurns = 1`) stays
+ * byte-comparable with the 0166/0176 runs already on disk.
+ *
+ * Stops on: zero fixable warnings, the turn budget, a hard compile failure (nothing to repair
+ * against), or NO PROGRESS — a turn that fails to reduce the fixable count. Without the last one a
+ * model that rewrites the same flawed item five times bills five turns to reach turn one's result.
+ */
 async function runOne(
   auth: any, lang: string, model: string, c: EvalCase, trial: number, precomputed: any[],
-  gen: { thinking?: unknown; effort?: string },
+  gen: { thinking?: unknown; effort?: string }, maxTurns = 1,
 ): Promise<RunResult> {
   const t0 = performance.now();
   const base: RunResult = {
     lang, variantId: model, model, family: inferProviderFromModel(model),
     caseId: c.id, trial, ok: false, firstPass: false, finalCompile: false, stub: false,
     fixRounds: 0, latencyMs: 0, inputTokens: 0, outputTokens: 0, cost: 0,
+    warningsFixable: 0, warningsUnfixable: 0, turns: 0,
   };
+  const acc = { ...base };
+  const turnLog: NonNullable<RunResult["turnLog"]> = [];
+  let code: string | undefined;
+  let prompt = c.prompt;
+  let currentCode = c.currentCode ?? null;
+  let report = { fixable: [] as any[], unfixable: [] as any[], all: [] as any[], alternativeClaims: null as number | null };
+  let turnsToClean: number | null = null;
+  let stuck = false;
+
   try {
-    const res: any = await generateCode({
-      auth, prompt: c.prompt, lang, currentCode: c.currentCode ?? null,
-      // pin model → bypasses opt-in + Haiku downgrade; thinking/effort applied
-      // identically across models for a matched comparison (undefined ⇒ API default).
-      options: { model, thinking: gen.thinking, effort: gen.effort },
-      precomputedExamples: precomputed, // identical RAG context across models
-      rid: `eval-${lang}-${model}-${c.id}-${trial}`,
-    });
-    const latencyMs = performance.now() - t0;
-    // compiled ⇔ verification produced a taskId AND we got back code that
-    // actually authored something. A stub parses, so it would otherwise score as
-    // a first-pass win — the metric would reward emitting nothing.
-    const stub = isStub(res?.code);
-    const compiled = !!res?.taskId && !!res?.code && !stub;
-    const fixRounds = res?.fixAttempts ?? 0;
-    const inputTokens = res?.usage?.input_tokens ?? 0;
-    const outputTokens = res?.usage?.output_tokens ?? 0;
+    for (let turn = 1; turn <= Math.max(1, maxTurns); turn++) {
+      const tTurn = performance.now();
+      const res: any = await generateCode({
+        auth, prompt, lang, currentCode,
+        // pin model → bypasses opt-in + Haiku downgrade; thinking/effort applied
+        // identically across models for a matched comparison (undefined ⇒ API default).
+        options: { model, thinking: gen.thinking, effort: gen.effort },
+        precomputedExamples: precomputed, // identical RAG context across models
+        rid: `eval-${lang}-${model}-${c.id}-${trial}-t${turn}`,
+      });
+      const turnLatency = performance.now() - tTurn;
+      const inputTokens = res?.usage?.input_tokens ?? 0;
+      const outputTokens = res?.usage?.output_tokens ?? 0;
+      const turnCost = costOf(model, inputTokens, outputTokens);
+
+      // compiled ⇔ verification produced a taskId AND we got back code that
+      // actually authored something. A stub parses, so it would otherwise score as
+      // a first-pass win — the metric would reward emitting nothing.
+      const stub = isStub(res?.code);
+      const compiled = !!res?.taskId && !!res?.code && !stub;
+      const fixRounds = res?.fixAttempts ?? 0;
+      const next = typeof res?.code === "string" ? res.code : undefined;
+      const prevFixable = report.fixable.length;
+      report = warningsFromVerification(res?.verification);
+
+      acc.ok = true;
+      acc.inputTokens += inputTokens;
+      acc.outputTokens += outputTokens;
+      acc.cost += turnCost;
+      acc.turns = turn;
+      turnLog.push({
+        turn, fixable: report.fixable.length, unfixable: report.unfixable.length,
+        errors: !compiled, cost: turnCost, latencyMs: turnLatency,
+        buckets: bucketCounts([report as any]),
+        warnings: report.all.map((w: any) => w.message),
+      });
+
+      if (turn === 1) {
+        // First-shot columns keep their original meaning: they describe the opening move, so
+        // they stay comparable with runs made before convergence existed.
+        acc.finalCompile = compiled;
+        acc.firstPass = compiled && fixRounds === 0;
+        acc.fixRounds = fixRounds;
+        acc.stub = stub;
+      } else if (compiled) {
+        // A repair turn may only improve the session's standing, never revoke a compile.
+        acc.finalCompile = true;
+        acc.stub = false;
+      }
+      if (next) code = next;
+
+      if (!report.fixable.length) { if (turnsToClean === null) turnsToClean = turn; break; }
+      if (!compiled) break;                       // nothing to repair against
+      if (turn > 1 && report.fixable.length >= prevFixable) { stuck = true; break; }
+      if (turn >= maxTurns) break;
+
+      prompt = repairPrompt(c.prompt, report.fixable.map((w) => w.message));
+      currentCode = code ?? currentCode;
+    }
+
     return {
-      ...base, ok: true, latencyMs, inputTokens, outputTokens,
-      finalCompile: compiled, firstPass: compiled && fixRounds === 0, fixRounds, stub,
-      cost: costOf(model, inputTokens, outputTokens),
-      code: typeof res?.code === "string" ? res.code : undefined,
+      ...acc,
+      latencyMs: performance.now() - t0,
+      drift: driftedFromPrompt(lang, c.prompt, code),
+      code,
+      warningsFixable: report.fixable.length,
+      warningsUnfixable: report.unfixable.length,
+      warningBuckets: bucketCounts([report as any]),
+      unknownWarnings: report.all.filter((w: any) => w.bucket === "unknown").map((w: any) => w.message),
+      alternativeClaims: report.alternativeClaims,
+      converged: report.fixable.length === 0,
+      turnsToClean,
+      stuck,
+      turnLog,
     };
   } catch (e: any) {
-    return { ...base, latencyMs: performance.now() - t0, error: e?.message || String(e) };
+    return { ...acc, latencyMs: performance.now() - t0, turnLog, error: e?.message || String(e) };
   }
 }
 
@@ -233,11 +441,62 @@ function summarize(runs: RunResult[]) {
     const first = rs.filter((r) => r.firstPass).length;
     const final = rs.filter((r) => r.finalCompile).length;
     const stubs = rs.filter((r) => r.stub).length;
+    // Drift is rated over the JUDGEABLE runs only, not over n. A language with no
+    // embedding hook produces all-undefined, and dividing by n would print 0% —
+    // "no drift" and "never checked" must not look the same.
+    const judgeable = rs.filter((r) => r.drift !== undefined);
+    const drifted = judgeable.filter((r) => r.drift).length;
     const lat = ok.map((r) => r.latencyMs);
     const totalCost = rs.reduce((s, r) => s + r.cost, 0);
+    // Convergence: the share of sessions that reached zero FIXABLE warnings, the turns it took
+    // when they did, and what was still outstanding when they didn't. `turnsToClean` averages
+    // over converged runs only — folding in the ones that never converged as if they cost
+    // maxTurns would flatter a variant that gives up early.
+    const converged = rs.filter((r) => r.converged).length;
+    const cleanTurns = rs.map((r) => r.turnsToClean).filter((t): t is number => typeof t === "number");
     rows.push({
       lang, variantId, model, family: rs[0].family, runs: n, errors: n - ok.length,
       firstPassRate: first / n, finalRate: final / n, stubRate: stubs / n,
+      driftRate: judgeable.length ? drifted / judgeable.length : null, driftJudged: judgeable.length,
+      convergedRate: converged / n,
+      avgTurnsToClean: cleanTurns.length ? cleanTurns.reduce((s, t) => s + t, 0) / cleanTurns.length : null,
+      avgTurns: rs.reduce((s, r) => s + (r.turns || 0), 0) / n,
+      avgWarningsFixable: rs.reduce((s, r) => s + (r.warningsFixable || 0), 0) / n,
+      avgWarningsUnfixable: rs.reduce((s, r) => s + (r.warningsUnfixable || 0), 0) / n,
+      stuckRate: rs.filter((r) => r.stuck).length / n,
+      // Compiler's own pool-depth measure; averaged over runs that reported one.
+      avgAlternativeClaims: (() => {
+        const xs = rs.map((r) => r.alternativeClaims).filter((x): x is number => typeof x === "number");
+        return xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null;
+      })(),
+      costPerConverged: converged > 0 ? totalCost / converged : Infinity,
+      // Buckets in the FINAL state. After a converged session this is empty by definition, which
+      // is why it cannot be the diagnostic — see defectsFirstTurn below.
+      warningBuckets: rs.reduce((acc: Record<string, number>, r) => {
+        for (const [bucket, k] of Object.entries(r.warningBuckets || {})) acc[bucket] = (acc[bucket] || 0) + k;
+        return acc;
+      }, {}),
+      // What the variant got wrong in its OPENING item, which is the thing that explains a turn
+      // count. First turn rather than every turn: a defect that survives a repair would otherwise
+      // be counted once per turn and read as several distinct mistakes.
+      // Classified from the stored MESSAGES, not from the buckets recorded during the run: the
+      // messages are the raw data and the buckets are derived, so re-deriving here means a
+      // taxonomy fix applies retroactively to payloads already on disk. (It had to — the sweep
+      // that first hit `Only N Part B foil source(s)` recorded it as `unknown`, and rebuilding
+      // from its own stored buckets would have preserved the misfiling forever.) Falls back to
+      // the stored buckets for older payloads that predate per-turn message capture.
+      defectsFirstTurn: rs.reduce((acc: Record<string, number>, r) => {
+        const first = r.turnLog?.[0];
+        if (first?.warnings?.length) {
+          for (const w of first.warnings) {
+            const b = classifyWarning(w).bucket;
+            acc[b] = (acc[b] || 0) + 1;
+          }
+        } else {
+          for (const [bucket, k] of Object.entries(first?.buckets || {})) acc[bucket] = (acc[bucket] || 0) + k;
+        }
+        return acc;
+      }, {}),
       avgFixRounds: rs.reduce((s, r) => s + r.fixRounds, 0) / n,
       latencyP50: quantile(lat, 0.5), latencyP90: quantile(lat, 0.9),
       avgCost: totalCost / n,
@@ -253,17 +512,43 @@ function printTable(rows: any[]) {
   const ms = (x: number) => (x / 1000).toFixed(1) + "s";
   console.log(
     "\n" +
-    ["lang", "model", "runs", "err", "1st-pass", "final", "stub", "fixes", "p50", "p90", "$/run", "$/win"]
-      .map((h, i) => h.padEnd([6, 20, 5, 4, 9, 7, 6, 6, 7, 7, 8, 8][i])).join(""));
+    ["lang", "model", "runs", "err", "1st-pass", "final", "conv", "turns", "warn", "alt", "drift", "p50", "p90", "$/run", "$/conv"]
+      .map((h, i) => h.padEnd([6, 20, 5, 4, 9, 7, 6, 6, 6, 5, 7, 7, 7, 8, 8][i])).join(""));
   for (const r of rows) {
     console.log([
       r.lang.padEnd(6), r.model.padEnd(20), String(r.runs).padEnd(5), String(r.errors).padEnd(4),
-      pct(r.firstPassRate).padEnd(9), pct(r.finalRate).padEnd(7), pct(r.stubRate).padEnd(6),
-      r.avgFixRounds.toFixed(2).padEnd(6),
+      pct(r.firstPassRate).padEnd(9), pct(r.finalRate).padEnd(7),
+      pct(r.convergedRate).padEnd(6),
+      // Mean turns among runs that DID converge — blank when none did.
+      (r.avgTurnsToClean === null ? "—" : r.avgTurnsToClean.toFixed(1)).padEnd(6),
+      // Residual fixable warnings per run: what the compiler still objected to at the end.
+      r.avgWarningsFixable.toFixed(1).padEnd(6),
+      (r.avgAlternativeClaims === null ? "—" : r.avgAlternativeClaims.toFixed(1)).padEnd(5),
+      // "—" = nothing judgeable (no embedding hook, or no target in the prompt).
+      (r.driftRate === null ? "—" : pct(r.driftRate)).padEnd(7),
       ms(r.latencyP50).padEnd(7), ms(r.latencyP90).padEnd(7),
       ("$" + r.avgCost.toFixed(4)).padEnd(8),
-      (r.costPerSuccess === Infinity ? "—" : "$" + r.costPerSuccess.toFixed(4)).padEnd(8),
+      (r.costPerConverged === Infinity ? "—" : "$" + r.costPerConverged.toFixed(4)).padEnd(8),
     ].join(""));
+  }
+  // Which defects each variant actually made. A turn count says a model needed help; this says
+  // what it needed help WITH, which is the part that transfers into dialect instructions or RAG.
+  const anyDefects = rows.some((r) => Object.keys(r.defectsFirstTurn || {}).length);
+  if (anyDefects) {
+    console.log("\nDefects in the opening item (compiler warnings before any repair turn):");
+    for (const r of rows) {
+      const parts = Object.entries(r.defectsFirstTurn || {}).sort((a, b) => b[1] - a[1]).map(([b, k]) => `${b}=${k}`);
+      console.log(`  ${r.model.padEnd(20)} ${parts.length ? parts.join("  ") : "none"}`);
+    }
+  }
+
+  const unfixable = rows.reduce((s, r) => s + r.avgWarningsUnfixable, 0);
+  if (unfixable > 0) {
+    console.log(
+      "\nNOTE: stimulus-level warnings (e.g. the prompt's passage reading above grade) are EXCLUDED " +
+      "from 'warn' and from convergence — they are the eval set's to fix, not the model's. " +
+      `Mean per run across variants: ${(unfixable / rows.length).toFixed(1)}.`,
+    );
   }
 }
 
@@ -586,14 +871,29 @@ function scoreHist(vals: number[]): string {
 async function runCalibrate(args: any) {
   if (!process.env.ANTHROPIC_API_KEY) { console.error("Set ANTHROPIC_API_KEY for --calibrate"); process.exit(1); }
   const rows: { lang: string; id: string; human: number; judge: number; authorFamily: LlmProvider | null }[] = [];
+  let staleSkipped = 0;
   process.stderr.write("[calibrate] ");
   for (const lang of args.langs) {
     const path = `${args.labelsDir}/${lang}.json`;
     if (!existsSync(path)) { console.error(`\nNo labels at ${path} (see labels/README.md)`); continue; }
     const labels = JSON.parse(readFileSync(path, "utf8")) as any[];
     const prompts = new Map(loadCases(args.setDir, lang).map((c) => [c.id, c.prompt]));
+    // The 4-5 band is dialect-specific and versioned. A row scored under an older version was
+    // scored against different anchor MEANINGS, so comparing it to a judge on the current ones
+    // reports a scale mismatch as judge error — the one failure this gate exists to prevent.
+    // Rows with no version predate versioning entirely and are equally unusable.
+    const current = anchorVersion(lang);
+    const stale = labels.filter((l) => l.overall != null && l.code && (l.anchorVersion ?? 0) !== current);
+    if (stale.length) {
+      staleSkipped += stale.length;
+      console.error(
+        `\n[calibrate] L${lang}: skipping ${stale.length} row(s) scored under anchor version ` +
+        `${[...new Set(stale.map((l) => l.anchorVersion ?? "none"))].join("/")} (current is ${current}). Rescore them.`,
+      );
+    }
     for (const lab of labels) {
       if (lab.overall == null || !lab.code) continue; // skip unlabeled / template rows
+      if ((lab.anchorVersion ?? 0) !== current) continue;
       const prompt = lab.prompt || prompts.get(lab.id);
       if (!prompt) { console.error(`\nNo prompt for label ${lang}/${lab.id}`); continue; }
       // Which family AUTHORED the labeled candidate. Calibration has to be read
@@ -607,7 +907,15 @@ async function runCalibrate(args: any) {
     }
   }
   process.stderr.write("\n");
-  if (!rows.length) { console.error("No usable labels found (each needs { id, code, overall })."); return; }
+  if (!rows.length) {
+    // Distinguish "nothing scored yet" from "everything scored against retired anchors" — the fix
+    // is different (label them vs rescore them), and the generic message sent you looking for
+    // missing fields that are all present.
+    console.error(staleSkipped
+      ? `No usable labels: all ${staleSkipped} scored row(s) were written under a retired anchor version. Rescore them against the current anchors (see data/model-eval/labels/README.md).`
+      : "No usable labels found (each needs { id, code, overall }).");
+    return;
+  }
   const n = rows.length;
   const exactK = rows.filter((r) => Math.round(r.human) === r.judge).length;
   const within1K = rows.filter((r) => Math.abs(r.human - r.judge) <= 1).length;
@@ -667,6 +975,40 @@ async function main() {
   // Calibration is generation-free (judge only) — short-circuit before requiring an eval account.
   if (args.calibrate) { await runCalibrate(args); return; }
 
+  // Salvage path: rebuild the summary + payload from an interrupted sweep's checkpoint. Also
+  // generation-free, so it short-circuits ahead of the hold-out gate and the eval account.
+  if (args.fromCheckpoint) {
+    if (!existsSync(args.fromCheckpoint)) { console.error(`No checkpoint at ${args.fromCheckpoint}`); process.exit(1); }
+    const runs = loadCheckpoint(args.fromCheckpoint);
+    if (!runs.length) { console.error(`Checkpoint is empty: ${args.fromCheckpoint}`); process.exit(1); }
+    const summary = summarize(runs);
+    printTable(summary);
+    const out = args.out.replace(/(\.json)?$/, "-from-checkpoint.json");
+    writeFileSync(out, JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      holdout: "enforced (inherited from the interrupted run)",
+      // Loud, because a partial sweep is not a balanced design: whichever variants the loop had
+      // reached have more runs than the rest, so cross-variant rates are not directly comparable.
+      partial: `rebuilt from ${args.fromCheckpoint} — ${runs.length} runs; the sweep did not finish`,
+      args, summary, runs,
+    }, null, 2));
+    console.log(`\nRebuilt ${runs.length} runs → ${out}`);
+    // Only warn when the design is actually unbalanced. A checkpoint rebuild is not inherently
+    // partial — a merged one can be complete — and crying partial over a balanced set trains the
+    // reader to ignore the notice on the runs where it matters.
+    const perVariant = new Map<string, Set<string>>();
+    const counts = new Map<string, number>();
+    for (const r of runs) {
+      counts.set(r.variantId, (counts.get(r.variantId) || 0) + 1);
+      (perVariant.get(r.variantId) ?? perVariant.set(r.variantId, new Set()).get(r.variantId)!).add(r.caseId);
+    }
+    const balanced = new Set([...counts.values()]).size === 1 && new Set([...perVariant.values()].map((s) => s.size)).size === 1;
+    console.log(balanced
+      ? `Balanced: every variant has ${[...counts.values()][0]} runs over ${[...perVariant.values()][0].size} cases.`
+      : "PARTIAL: run counts or case coverage differ per variant; treat rates as indicative, not as a settled comparison.");
+    return;
+  }
+
   // GATE: eval cases must not be in the RAG corpus, or every model is scored
   // partly on copying a retrieved answer. Runs BEFORE the eval account and before
   // any spend, because the whole run would be unusable for setting an ordering.
@@ -683,6 +1025,19 @@ async function main() {
   const creds = await getCredentialsForApiKey(apiKey);
   const auth = { token: creds.idToken, uid: creds.uid };
 
+  // Timestamped by default. `--out` alone clobbered the previous run, so there was
+  // no way to see whether a model got better or worse between runs — which is the
+  // only way to catch a regression after an ordering is committed. --no-stamp
+  // restores the old single-file behavior for scripted use.
+  //
+  // Resolved BEFORE the run, not after it, because the checkpoint hangs off the same path. With
+  // the stamp applied only at write time, every run's checkpoint was `<out>.partial.jsonl` — so a
+  // second sweep appended to the first one's rows and --from-checkpoint would rebuild a payload
+  // silently blending two runs.
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const outPath = args.stamp ? args.out.replace(/(\.json)?$/, `-${stamp}.json`) : args.out;
+  const ckptPath = checkpointPath(outPath);
+
   const allRuns: RunResult[] = [];
   for (const lang of args.langs) {
     const cases = loadCases(args.setDir, lang);
@@ -693,9 +1048,23 @@ async function main() {
       const precomputed = (await getRelevantExamples({ prompt: c.prompt, lang, limit: args.limit, rid: null })) || [];
       for (const model of args.models) {
         for (let t = 0; t < args.trials; t++) {
-          const r = await runOne(auth, lang, model, c, t, precomputed, { thinking: args.thinking, effort: args.effort });
+          const r = await runOne(auth, lang, model, c, t, precomputed, { thinking: args.thinking, effort: args.effort }, args.converge);
           allRuns.push(r);
-          process.stderr.write(r.ok ? (r.firstPass ? "." : r.finalCompile ? "o" : r.stub ? "s" : "x") : "!");
+          try { appendFileSync(ckptPath, JSON.stringify(r) + "\n"); } catch { /* never fail a run over a checkpoint write */ }
+          // 'd' outranks '.'/'o': a drifted program compiled, but the stream should
+          // not read as a clean win when the design came out wrong. In converge mode a
+          // digit shows how many turns the session took, and 'w' marks one that ran out
+          // of turns (or got stuck) with the compiler still objecting.
+          process.stderr.write(
+            r.ok
+              ? (r.stub ? "s"
+                : !r.finalCompile ? "x"
+                : r.drift ? "d"
+                : !r.converged ? "w"
+                : args.converge > 1 ? String(Math.min(9, r.turns))
+                : r.firstPass ? "." : "o")
+              : "!",
+          );
         }
       }
     }
@@ -704,7 +1073,28 @@ async function main() {
 
   const summary = summarize(allRuns);
   printTable(summary);
-  console.log("Legend: '.' first-pass compile  'o' compiled after fixes  's' stub (parsed, authored nothing)  'x' never compiled  '!' error");
+  console.log(
+    args.converge > 1
+      ? "Legend: <n> converged in n turn(s)  'w' warnings remained (budget or stuck)  'd' off-design (facet drift)  's' stub (authored nothing)  'x' never compiled  '!' error"
+      : "Legend: '.' first-pass compile  'o' compiled after fixes  'w' compiled with warnings  'd' compiled but off-design (facet drift)  's' stub (parsed, authored nothing)  'x' never compiled  '!' error",
+  );
+
+  // Columns the table no longer prints must still be able to raise their hand, or dropping them
+  // from the layout would silently retire the signal they were added for.
+  const stubs = summary.reduce((s, r) => s + r.stubRate * r.runs, 0);
+  if (stubs > 0) console.log(`NOTE: ${stubs} run(s) emitted a stub (parsed, authored nothing) — see stubRate in the run payload.`);
+  // Scan EVERY turn, not the final state. An unclassified warning that a repair turn fixed leaves
+  // no trace in the final report, so the first version of this notice stayed silent through a
+  // sweep that hit two of them — the taxonomy gap only showed up as `unknown=2` in a breakdown.
+  const unknown = [...new Set(allRuns.flatMap((r) =>
+    (r.turnLog || []).flatMap((t) => (t.warnings || []).filter((w) => classifyWarning(w).bucket === "unknown")),
+  ))];
+  if (unknown.length) {
+    console.log(`NOTE: ${unknown.length} unclassified compiler warning(s) — counted as fixable; add them to scripts/eval-warning-taxonomy.ts:`);
+    for (const m of unknown.slice(0, 8)) console.log(`  · ${m.slice(0, 140)}`);
+  }
+  const stuckRuns = allRuns.filter((r) => r.stuck).length;
+  if (stuckRuns > 0) console.log(`NOTE: ${stuckRuns} session(s) stopped early on no-progress (a repair turn failed to reduce the fixable warning count).`);
 
   // ── Phase 2 (subjective) — LLM-as-judge, opt-in via --judge (keeps Phase 1 cheap). ──
   // Reference-free rubric (correctness / instruction-following / idiomaticity / overall) scored
@@ -717,14 +1107,6 @@ async function main() {
     printJudge(judgements.summary);
   }
 
-  // Timestamped by default. `--out` alone clobbered the previous run, so there was
-  // no way to see whether a model got better or worse between runs — which is the
-  // only way to catch a regression after an ordering is committed. --no-stamp
-  // restores the old single-file behavior for scripted use.
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const outPath = args.stamp
-    ? args.out.replace(/(\.json)?$/, `-${stamp}.json`)
-    : args.out;
   const payload = {
     generatedAt: new Date().toISOString(),
     // The exact ordering this run would justify, so the committed MODEL_PRIORITY
@@ -735,6 +1117,7 @@ async function main() {
   };
   writeFileSync(outPath, JSON.stringify(payload, null, 2));
   console.log(`\nWrote ${allRuns.length} runs${judgements ? " + judge scores" : ""} + summary → ${outPath}`);
+  console.log(`Checkpoint (per-run, written as the sweep ran): ${ckptPath}`);
   if (judgements && !args.panel) {
     console.log("NOTE: single-judge scores. Re-run with --panel before setting a cross-family ordering.");
   }

@@ -21,6 +21,7 @@ import "./eval-env"; // MUST be first: prod Firestore/auth bootstrap before app 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { getCredentialsForApiKey } from "../src/lib/api-credentials";
 import { getFirestore } from "../src/utils/db";
+import { anchorVersion } from "../src/lib/judge-service";
 
 const LANG = (() => {
   const i = process.argv.indexOf("--lang");
@@ -62,8 +63,12 @@ async function main() {
   for (const r of rows) {
     const lab = labels.find((l) => l.id === r.caseId && shortOf(l.model || "") === r.short);
     if (!lab) { unmatched.push(`${r.caseId} · ${r.short}`); continue; }
-    if (SKIP_DEFAULT && r.mark === 1) { lab.overall = null; skipped++; continue; }
+    if (SKIP_DEFAULT && r.mark === 1) { lab.overall = null; delete lab.anchorVersion; skipped++; continue; }
     lab.overall = r.overall;
+    // Stamp WHICH anchors this score was given against. The 4-5 band is dialect-specific and
+    // versioned, so a bare number is not self-describing: --calibrate needs to know whether a 4
+    // meant what a 4 means now, and skips the row when it didn't.
+    lab.anchorVersion = anchorVersion(LANG);
     matched++;
   }
 

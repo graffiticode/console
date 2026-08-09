@@ -11,7 +11,7 @@
  * Usage: npx tsx scripts/gen-label-worksheet.ts [--lang 0166]
  */
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { ANCHOR_DISCIPLINE, anchorTableMarkdown } from "../src/lib/judge-service";
+import { ANCHOR_DISCIPLINE, anchorTableMarkdown, anchorVersion } from "../src/lib/judge-service";
 
 const LANG = (() => {
   const i = process.argv.indexOf("--lang");
@@ -25,13 +25,22 @@ item mark in the console eval tab → \`pull-eval-labels\`).
 
 ${ANCHOR_DISCIPLINE}
 
-${anchorTableMarkdown()}
+${anchorTableMarkdown(LANG)}
 
-Rules of thumb: **1 broken · 2 runs-but-wrong · 3–5 on-intent quality gradient.** Label stricter than
-the judge and spread the range.
+Rules of thumb: **1 doesn't work · 2 wrong or incomplete · 3 correct and complete · 4–5 this
+dialect's soft qualities.** Scores 1–3 mean the same thing in every dialect; only 4 and 5 are
+dialect-specific. If a candidate is correct and complete and you cannot point at a specific soft
+quality above, it is a **3** — clustering at 3 is a legitimate result, not a failure to discriminate.
 
-<!-- Anchors render from OVERALL_ANCHORS in src/lib/judge-service.ts — the judge scores against the
-     same constant, so the human and the judge cannot drift onto different scales. Edit them there. -->
+Ranking tip: compare the candidates WITHIN a case before assigning absolute scores. Comparative
+judgment is more reliable on close items, and it keeps the rank variance --calibrate needs.
+
+Anchor version: **${anchorVersion(LANG)}** (record this on rows you score; \`--calibrate\` skips rows
+scored under a different version).
+
+<!-- Anchors render from overallAnchors(lang) in src/lib/judge-service.ts — the judge scores against
+     the same source, so the human and the judge cannot drift onto different scales. Edit them there,
+     and bump that dialect's \`version\` when you change a band's meaning. -->
 `;
 
 function main() {

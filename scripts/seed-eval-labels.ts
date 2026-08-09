@@ -108,9 +108,18 @@ function main() {
     labels.push({
       id: caseId, model, code: rep.code,
       overall: null, correctness: null, instructionFollowing: null, idiomaticity: null,
+      // Convergence context (present once a run came from --converge; absent on older run files).
+      // Recorded, NOT filtered on: a session that never converged still produced the program a
+      // user would receive, and dropping those would hand the labeler only the wins — the same
+      // inflation the anchors in labels/README.md exist to prevent. It also lets --calibrate
+      // slice judge-vs-human agreement by how much iteration the item took.
+      ...(rep.turns !== undefined ? { turns: rep.turns, converged: !!rep.converged, warningsFixable: rep.warningsFixable ?? null } : {}),
     });
     added++;
-    console.error(`  + ${caseId} · ${model}  (trial ${rep.trial}, ${(rep.latencyMs / 1000).toFixed(1)}s)`);
+    const conv = rep.turns !== undefined
+      ? `, ${rep.turns} turn(s)${rep.converged ? "" : `, ${rep.warningsFixable ?? "?"} warning(s) left`}`
+      : "";
+    console.error(`  + ${caseId} · ${model}  (trial ${rep.trial}, ${(rep.latencyMs / 1000).toFixed(1)}s${conv})`);
   }
 
   labels.sort((a, b) =>
