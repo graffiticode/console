@@ -68,26 +68,107 @@ export interface PairVerdict {
  * The worksheet now renders from this constant; the README points here as
  * canonical.
  */
-export const OVERALL_ANCHORS: Array<{ score: number; meaning: string }> = [
-  { score: 1, meaning: "Broken or off-task — doesn't render, or renders something unrelated to the intent." },
-  { score: 2, meaning: "Renders but **wrong** — misses the core ask, or the central logic is wrong." },
-  { score: 3, meaning: "On-intent but **materially flawed** — a requirement missing, or a formula a user would notice is wrong." },
-  { score: 4, meaning: "Correct and complete; only **minor** polish issues (formatting, numbers-as-text, awkward structure)." },
-  { score: 5, meaning: "Correct, complete, idiomatic — nothing to change." },
+/**
+ * SHARED BACKBONE, 1-3. Identical for every dialect, so a 3 means the same thing everywhere and
+ * scores stay commensurable across dialects (which is what lets --calibrate pool rows at all).
+ *
+ * 3 is "correct and complete" — the CEILING of what a compiler can verify, and the FLOOR of what
+ * is worth shipping. Everything above it is soft quality, which differs by dialect and is the
+ * only part a human adds over the objective columns.
+ */
+const BASE_ANCHORS: Array<{ score: number; meaning: string }> = [
+  { score: 1, meaning: "Doesn't work — no render, a stub that authored nothing, or the wrong kind of artifact entirely." },
+  { score: 2, meaning: "Works but **wrong or incomplete** — misses the core ask, a requirement is absent, or the central logic/key is wrong." },
+  { score: 3, meaning: "**Correct and complete** — every stated requirement met. Nothing a compiler could object to." },
 ];
+
+/**
+ * The soft band, 4-5, per dialect. Above correct-and-complete, every dialect is asking the same
+ * two questions — 4: will it still be right when the request changes slightly? 5: would you hand
+ * it to someone learning this dialect? — but the evidence for them is dialect-specific, so each
+ * entry names what to look at.
+ *
+ * A dialect with genuinely little soft quality SHOULD cluster at 3. That is a finding ("model
+ * choice barely matters here"), not a gap to be filled by inventing bands: a 4/5 distinction
+ * manufactured to keep Spearman computable measures the rubric, not the model.
+ *
+ * `version` is stamped onto every label row when it is scored. Change the wording of a band and
+ * you must bump it, so --calibrate can refuse rows scored against anchors that no longer exist
+ * rather than silently comparing a judge on one scale to a human on another.
+ */
+interface DialectAnchors {
+  version: number;
+  soft: Array<{ score: number; meaning: string }>;
+}
+
+const DEFAULT_SOFT: DialectAnchors = {
+  version: 2,
+  soft: [
+    { score: 4, meaning: "Correct **and robust** — derived values are actually computed rather than hardcoded, so it stays right when an input changes." },
+    { score: 5, meaning: "Correct, robust, **idiomatic and minimal** — nothing redundant; you would show it to someone learning the dialect." },
+  ],
+};
+
+const DIALECT_ANCHORS: Record<string, DialectAnchors> = {
+  // Spreadsheets. The soft band is thin on purpose — expect most correct sheets to sit at 3.
+  "0166": {
+    version: 2,
+    soft: [
+      { score: 4, meaning: "Correct **and robust** — every derived cell is a formula, not a literal (a typed-in 30 where `=SUM(A1:A2)` belongs is a 3); layout is usable (labels, widths, number formats) and formulas extend to new rows." },
+      { score: 5, meaning: "All of 4, **idiomatic and minimal** — no dead or redundant cells, formulas written the way the dialect intends; usable as a reference example." },
+    ],
+  },
+  // ELA assessment items. Correct-and-complete is a low bar here: an item can meet every stated
+  // requirement and still measure nothing, which is exactly what the compiler cannot see.
+  "0175": {
+    version: 2,
+    soft: [
+      { score: 4, meaning: "**Defensible as an assessment item** — each distractor encodes a distinct plausible misconception, the key requires the passage (not general knowledge), no length/position/stem-echo giveaway, stem taken from the catalog. A reviewer would accept it." },
+      { score: 5, meaning: "**Exemplar** — all of 4, plus real pool depth (viable foils beyond the ones used), Part B that discriminates on its own, and options matched in register and length." },
+    ],
+  },
+};
+
+/** Canonical 4-digit form, matching findLanguageById in languages.ts. */
+function normalizeLang(lang?: string | number | null): string {
+  return String(lang ?? "").trim().replace(/^L/i, "").padStart(4, "0");
+}
+
+export function dialectAnchors(lang?: string | number | null): DialectAnchors {
+  return DIALECT_ANCHORS[normalizeLang(lang)] || DEFAULT_SOFT;
+}
+
+/** The anchor VERSION a label row should record when scored for this dialect. */
+export function anchorVersion(lang?: string | number | null): number {
+  return dialectAnchors(lang).version;
+}
+
+/** Full 1-5 scale for a dialect: shared backbone + that dialect's soft band. */
+export function overallAnchors(lang?: string | number | null): Array<{ score: number; meaning: string }> {
+  return [...BASE_ANCHORS, ...dialectAnchors(lang).soft];
+}
+
+/**
+ * Back-compat export: the default scale. Prefer overallAnchors(lang) — a bare list cannot express
+ * that 4/5 differ by dialect, and callers that ignore the dialect will score 0175 items against a
+ * spreadsheet's notion of quality.
+ */
+export const OVERALL_ANCHORS = overallAnchors();
 
 /** Why the scale is anchored low — shared by the judge prompt and the human worksheet. */
 export const ANCHOR_DISCIPLINE =
-  "Compiling/rendering is saturated and is table stakes, NOT quality: \"it renders\" is a 2, not a " +
+  "Compiling/rendering is saturated and is table stakes, NOT quality: \"it works\" is a 2, not a " +
   "free 3. Correctness dominates presentation — a clean program that computes the wrong value is at " +
-  "most a 3. Do not default to high scores.";
+  "most a 2. **3 is correct and complete**, and it is the DEFAULT for anything a compiler would " +
+  "accept: do not treat correct-and-complete as a 4. Reserve 4-5 for the soft qualities below, and " +
+  "expect a dialect with few of them to cluster at 3.";
 
 /** Markdown table of the anchors, for the human labeling worksheet. */
-export function anchorTableMarkdown(): string {
+export function anchorTableMarkdown(lang?: string | number | null): string {
   return [
     "| overall | meaning |",
     "|---|---|",
-    ...OVERALL_ANCHORS.map((a) => `| **${a.score}** | ${a.meaning} |`),
+    ...overallAnchors(lang).map((a) => `| **${a.score}** | ${a.meaning} |`),
   ].join("\n");
 }
 
@@ -248,10 +329,13 @@ export async function judgeCode(args: JudgeCodeArgs): Promise<JudgeVerdict | nul
   const model = resolveJudgeModel(args.model || cfg.judgeModel);
   if (!model) return null;
 
+  // Anchors for THIS dialect: the 1-3 backbone is shared, but 4-5 are dialect-specific, so a
+  // judge handed the default list would score an assessment item against a spreadsheet's idea of
+  // quality — and --calibrate would then read that mismatch as judge error.
   const system = `${RUBRIC}
 
 Then an overall 1–5. ${ANCHOR_DISCIPLINE}
-${[...OVERALL_ANCHORS].reverse().map((a) => `  ${a.score} = ${a.meaning.replace(/\*\*/g, "")}`).join("\n")}
+${[...overallAnchors(args.lang)].reverse().map((a) => `  ${a.score} = ${a.meaning.replace(/\*\*/g, "")}`).join("\n")}
 
 First work through the Method in an <analysis>…</analysis> block: list the intent's requirements, then
 check EACH against the candidate — name the formula/value and say whether it is right. Reason to the
@@ -326,7 +410,14 @@ function flip(s: Side): Side {
 }
 
 async function judgeOnce(prompt: string, lang: string, first: string, second: string, spec: string | null | undefined, model: string, timeoutMs: number): Promise<{ winner: Side; dims: Record<string, Side> } | null> {
+  // The pairwise judge scores no absolute anchors, but it still needs to know what "better" MEANS
+  // once both candidates are correct and complete — which, on a saturated dialect, is most pairs.
+  // Without the dialect's soft band it falls back to generic code taste and the comparison drifts
+  // away from the axis the pointwise judge and the human are both using.
   const system = `${RUBRIC}
+
+Both candidates may be correct and complete. What separates them in this dialect, in order:
+${dialectAnchors(lang).soft.map((a) => `  - ${a.meaning.replace(/\*\*/g, "")}`).join("\n")}
 
 Two candidates, A and B. Decide which better realizes the intent overall and per dimension. Ties allowed.
 Return ONLY a JSON object, no prose, no code fences:

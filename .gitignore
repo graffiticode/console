@@ -84,3 +84,6 @@ cost-per-item.html
 model-eval.json
 # Timestamped run outputs (the default since runs must not clobber each other).
 model-eval-*.json
+# Append-as-you-go checkpoints written beside each run output, so an interrupted
+# sweep can be rebuilt with --from-checkpoint.
+*.partial.jsonl

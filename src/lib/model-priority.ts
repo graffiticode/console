@@ -48,6 +48,30 @@ export const MODEL_PRIORITY: Record<string, LlmProvider[]> = {
   // Sonnet's one failure was a stray `..` mid-program; fixing that would erase the
   // first-pass gap and leave only cost and latency behind this line.
   "0176": ["openai", "anthropic"],
+
+  // eval 2026-08-09 (model-eval-0175-converge-merged-from-checkpoint, 7 cases x 3 trials,
+  // --converge 5, hold-out enforced, 21 runs per variant, 0 errors):
+  //   ALL THREE converge 100% — every variant reaches a warning-free item, so compile-based
+  //   metrics are saturated and say nothing. What separates them is the cost of getting there:
+  //     turns-to-clean  sol 1.4   opus 1.1   sonnet 1.8
+  //     $/converged     sol .069  opus .103  sonnet .086
+  //     p50             sol 36.5s opus 40.4s sonnet 63.1s
+  //   Human labels, anchor v2, n=7 each: sol 3.86, opus 3.71, sonnet 2.71.
+  //   Judge NOT used: --calibrate (n=21) gives rho .32, CI [-.09,.66] — spans zero — and
+  //   rho -.26 on openai-authored candidates, so it is not a fair cross-family arbiter here.
+  //   Its LEVEL is fine (MAE .57, 95% within +-1); it is the RANKING that disagrees, which is
+  //   the part an ordering needs.
+  //
+  // HONEST BASIS: sol's 3.86 vs opus's 3.71 is a one-case difference and inside noise. This line
+  // rests on (a) cost and latency, which are unambiguous, and (b) the reviewer's judgment that
+  // sol's items are more nuanced in ways a 1-5 overall score does not capture — the labels are
+  // consistent with that read but do not establish it. Re-examine if the anchors gain a band for
+  // it, or if a larger label set moves the means apart.
+  //
+  // Note this also buys 0175 failover it did not have: it was falling through to
+  // DEFAULT_MODEL_PRIORITY (anthropic-only), so an OpenAI outage now degrades to opus instead of
+  // failing — and an OpenAI credit lapse mid-sweep is exactly the failure this eval hit.
+  "0175": ["openai", "anthropic"],
 };
 
 /**

@@ -33,31 +33,66 @@ label one generation each, or a mix of good and bad ones to spread the score ran
 
 ## Scoring anchors (be discriminating)
 
-Compile/render is **saturated** (~100%) — it is table stakes, not quality. So "it renders" earns a
+Compile/render is **saturated** (~100%) — it is table stakes, not quality. So "it works" earns a
 **2, not a free 3**; otherwise the usable scale collapses to 3–5 and every candidate starts
 "above average" — the exact generosity the judge already shows. Anchor `overall` to **intent
 satisfaction and correctness**, not to whether it runs. Correctness dominates: a clean sheet that
-computes the wrong tax is a 2–3, never a 4.
+computes the wrong tax is a 2, never a 4.
 
-> **Canonical source:** the table below is a copy for reading convenience. The anchors live in
-> `OVERALL_ANCHORS` in `src/lib/judge-service.ts`, which is what the judge scores against and what
-> `gen-label-worksheet.ts` renders. Edit them there — `--calibrate` compares judge to human, so a
-> drifted copy would show up as judge error rather than as the scale mismatch it actually is.
+For dialects with a convergence loop (`--converge`), the compiler's own warnings are already
+resolved before you ever see the candidate, so *warning-free* is likewise table stakes — it is part
+of reaching a 3, not evidence of a 4.
+
+> **Canonical source:** the tables below are a copy for reading convenience. The anchors live in
+> `src/lib/judge-service.ts` (`overallAnchors(lang)`), which is what the judge scores against and
+> what `gen-label-worksheet.ts` renders. Edit them there — `--calibrate` compares judge to human, so
+> a drifted copy would show up as judge error rather than as the scale mismatch it actually is.
+
+### The backbone (1–3) — identical in every dialect
 
 | overall | meaning |
 |---|---|
-| **1** | Broken or off-task — doesn't render, or renders something unrelated to the intent. |
-| **2** | Renders but **wrong** — misses the core ask, or the central logic is wrong. |
-| **3** | On-intent but **materially flawed** — a requirement missing, or a formula a user would notice is wrong. |
-| **4** | Correct and complete; only **minor** polish issues (formatting, numbers-as-text, awkward structure). |
-| **5** | Correct, complete, idiomatic — nothing to change. |
+| **1** | Doesn't work — no render, a stub that authored nothing, or the wrong artifact entirely. |
+| **2** | Works but **wrong or incomplete** — misses the core ask, a requirement is absent, or the central logic/key is wrong. |
+| **3** | **Correct and complete** — every stated requirement met. Nothing a compiler could object to. |
+
+**3 is the default for anything that compiles clean.** It is the ceiling of what the objective
+columns can verify and the floor of what is worth shipping. Getting to 3 is not an achievement worth
+a 4.
+
+### The soft band (4–5) — per dialect
+
+Above correct-and-complete, every dialect asks the same two questions: **4 — will it still be right
+when the request changes slightly?** and **5 — would you hand it to someone learning this dialect?**
+The evidence differs, so each dialect names its own. Two examples (see `DIALECT_ANCHORS`):
+
+- **0166 (spreadsheets):** 4 = derived cells are formulas, not literals (a typed-in `30` where
+  `=SUM(A1:A2)` belongs is a **3**), layout usable, formulas extend to new rows. 5 = idiomatic and
+  minimal, usable as a reference example.
+- **0175 (ELA items):** 4 = defensible as an assessment item — distinct plausible misconceptions per
+  distractor, key requires the passage, no giveaway, catalog stem. 5 = exemplar — real pool depth,
+  Part B discriminates alone, options matched in register.
+
+**A dialect with few soft qualities SHOULD cluster at 3.** That is a finding — model choice barely
+matters there — not a gap to fill. Inventing a 4/5 distinction to keep ρ computable measures the
+rubric instead of the model, and a dialect whose outputs all sit at 3 doesn't need a calibrated
+judge, because there is nothing for the judge to discriminate.
 
 Two rules of thumb:
-- **1 = broken, 2 = runs-but-wrong, 3–5 = on-intent quality gradient.**
+- **1 doesn't work · 2 wrong/incomplete · 3 correct and complete · 4–5 soft qualities.**
 - **Label stricter than the judge, and spread the range.** The human labels are the antidote to a
   generous judge — if you also anchor high, calibration can't detect the inflation (low MAE / stable
-  ρ hide it). Deliberately include weak generations so labels span 2–5; spread matters more than
-  volume. Don't tune the judge to match until *after* you've measured the gap.
+  ρ hide it). Compare the candidates *within* a case before assigning absolute scores: comparative
+  judgment is more reliable on close items and preserves the rank variance ρ needs.
+
+### Anchor versions
+
+Each dialect's anchors carry a `version`, and `pull-eval-labels` stamps it onto every row it scores
+as `anchorVersion`. **Bump it whenever a band's meaning changes** — `--calibrate` skips rows scored
+under a stale version and says so, rather than comparing a judge on today's anchors to a human on
+yesterday's and reporting the difference as judge error. Version 2 (2026-08-09) introduced the
+shared backbone and per-dialect soft band; the 0166 and 0176 scores from version 1 were cleared and
+need rescoring.
 
 ## Run
 
