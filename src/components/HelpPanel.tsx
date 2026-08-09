@@ -35,12 +35,42 @@ import {
 } from "../utils/helpPanelUtils";
 import { buildTranscriptRows, versionSourceLabel } from "../utils/itemVersions";
 import { useVersionSrc } from "../hooks/use-version-src";
+import { VersionDiff } from "./VersionDiff";
 import { elideCompoundId } from "../utils";
 
 // Add custom CSS for dropzone (removed duplicate overlay to prevent flashing)
 const dropzoneStyles = ``;
 
 const isNullOrEmptyObject = (obj) => !obj || Object.keys(obj).length === 0;
+
+// A row's "+N −M lines". When the pair is diffable it becomes the control that
+// opens the diff — the row itself is a click target that loads the version, so
+// the toggle has to stop the click from getting there.
+const StatsLine = ({ stats, diffKey, expanded, onToggle }) => {
+  if (!stats) return null;
+  if (!diffKey) return <div className="text-xs text-gray-500">{stats}</div>;
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+      title={expanded ? 'Hide changes' : 'Show changes'}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
+    >
+      <svg
+        className={`w-3 h-3 text-gray-400 transform transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+      {stats}
+    </button>
+  );
+};
 
 const getHelp = prompt => (
   prompt.indexOf("code:") >= 0 && {
@@ -1660,6 +1690,20 @@ export const HelpPanel = ({
     [help, itemVersions, itemId, versionSrc]
   );
 
+  // Which rows have their diff open. Keyed by row, not taskId: a version can
+  // appear as its prompt bubble, and the same id shouldn't open two rows.
+  const [expandedDiffs, setExpandedDiffs] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setExpandedDiffs(new Set());
+  }, [itemId]);
+  const toggleDiff = useCallback((rowKey) => {
+    setExpandedDiffs(prev => {
+      const next = new Set(prev);
+      if (!next.delete(rowKey)) next.add(rowKey);
+      return next;
+    });
+  }, []);
+
   // Calculate if there are any changes to send
   const hasChangesToSend = useMemo(() => {
     // Check for property changes
@@ -2485,6 +2529,7 @@ export const HelpPanel = ({
                 const isEditLabel = version.source === 'editor';
                 const description = isEditLabel ? null : version.label;
                 const stats = row.stats || (isEditLabel ? version.label : null);
+                const expanded = expandedDiffs.has(row.key);
                 return (
                   <div key={row.key} className="mb-2 w-full">
                     <div
@@ -2518,13 +2563,26 @@ export const HelpPanel = ({
                             {elideCompoundId(row.taskId)}
                           </div>
                         )}
-                        {stats && (
-                          <div className="text-xs text-gray-500">{stats}</div>
-                        )}
+                        <StatsLine
+                          stats={stats}
+                          diffKey={row.diffKey}
+                          expanded={expanded}
+                          onToggle={() => toggleDiff(row.key)}
+                        />
                         {row.collapsedCount > 1 && (
                           <div className="text-xs text-gray-500">{`${row.collapsedCount} edits`}</div>
                         )}
                       </div>
+
+                      {expanded && row.diffKey && (
+                        <div onClick={(event) => event.stopPropagation()}>
+                          <VersionDiff
+                            diffKey={row.diffKey}
+                            before={row.diffBase ? versionSrc.get(row.diffBase) ?? '' : ''}
+                            after={versionSrc.get(row.taskId) ?? ''}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -2540,9 +2598,11 @@ export const HelpPanel = ({
               // not generations.
               const sourceChip = message.role === 'system' ? null : 'Agent';
               const showHeader = message.timestamp || sourceChip;
+              const rowKey = `help-${row.index}`;
+              const expanded = expandedDiffs.has(rowKey);
 
               return (
-                <div key={`help-${row.index}`} className="mb-2 w-full">
+                <div key={rowKey} className="mb-2 w-full">
                   <div className="relative group">
                     {/* Delete button for each user message */}
                     {message.role !== 'system' && (
@@ -2596,9 +2656,26 @@ export const HelpPanel = ({
                         </div>
                         {/* What the generation this prompt produced changed */}
                         {row.stats && (
-                          <div className="text-xs text-gray-500 mt-1">{row.stats}</div>
+                          <div className="mt-1">
+                            <StatsLine
+                              stats={row.stats}
+                              diffKey={row.diffKey}
+                              expanded={expanded}
+                              onToggle={() => toggleDiff(rowKey)}
+                            />
+                          </div>
                         )}
                       </div>
+
+                      {expanded && row.diffKey && (
+                        <div onClick={(event) => event.stopPropagation()}>
+                          <VersionDiff
+                            diffKey={row.diffKey}
+                            before={row.diffBase ? versionSrc.get(row.diffBase) ?? '' : ''}
+                            after={versionSrc.get(row.taskId) ?? ''}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -13,6 +13,7 @@
 // that array is also the LLM's conversation context.
 
 import { isNonNullObject, summarizeSrcDiff } from './index';
+import { cachedDiff, formatDiffSummary } from './lineDiff';
 
 // Newest N versions of an item the transcript asks for. The server caps at 1000;
 // 200 is plenty of scrollback and keeps the per-item poll cheap. Lives here so
@@ -141,8 +142,15 @@ export const buildTranscriptRows = ({ help, versions, itemId, srcByTaskId, colla
   // delta it produced.
   const statsByTaskId = computeVersionStats(versionsByTaskId, srcByTaskId);
   for (const row of rows) {
-    const stats = row.taskId && statsByTaskId.get(row.taskId);
-    if (stats) row.stats = stats;
+    const stat = row.taskId && statsByTaskId.get(row.taskId);
+    if (!stat) continue;
+    row.stats = stat.summary;
+    // Set only when the pair is diffable, so the renderer can offer an expand
+    // toggle exactly when there is something to expand into.
+    if (stat.diffKey) {
+      row.diffKey = stat.diffKey;
+      row.diffBase = stat.diffBase;
+    }
   }
 
   // 6. Newest first. Fully deterministic: never rely on sort stability.
@@ -157,7 +165,8 @@ export const buildTranscriptRows = ({ help, versions, itemId, srcByTaskId, colla
   return { rows: collapsed, versionCount: versionsByTaskId.size };
 };
 
-// A "+N −M lines" label per version, diffed against the version before it.
+// A "+N −M lines" label per version, diffed against the version before it,
+// plus the handle the renderer needs to expand that same diff.
 //
 // The predecessor is the previous version in TIME, not the previous transcript
 // row: help rows without a version of their own sit between them, and a row's
@@ -176,7 +185,10 @@ function computeVersionStats(versionsByTaskId, srcByTaskId) {
   );
   const truncated = ordered.length >= ITEM_VERSIONS_LIMIT;
 
+  // "" is a real base — the empty file a genuine v1 was added to. null means
+  // there is no base to diff against.
   let prevSrc = truncated ? null : '';
+  let prevTaskId = '';
   for (const version of ordered) {
     const src = srcByTaskId.get(version.taskId);
     if (src === undefined) {
@@ -185,10 +197,23 @@ function computeVersionStats(versionsByTaskId, srcByTaskId) {
       continue;
     }
     if (prevSrc !== null) {
-      const summary = summarizeSrcDiff(prevSrc, src);
-      if (summary) stats.set(version.taskId, summary);
+      // The taskId pair identifies the diff — both sides are content-addressed,
+      // so the cache entry is valid for as long as the tab lives.
+      const diffKey = `${prevTaskId}->${version.taskId}`;
+      const diff = cachedDiff(diffKey, prevSrc, src);
+      const summary = diff.tooLarge
+        ? summarizeSrcDiff(prevSrc, src)
+        : formatDiffSummary(diff);
+      if (summary) {
+        // No diffKey when it's too large to diff: the row keeps its delta and
+        // simply doesn't offer an expand toggle.
+        stats.set(version.taskId, diff.tooLarge
+          ? { summary }
+          : { summary, diffKey, diffBase: prevTaskId });
+      }
     }
     prevSrc = src;
+    prevTaskId = version.taskId;
   }
   return stats;
 }
