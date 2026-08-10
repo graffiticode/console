@@ -236,10 +236,12 @@ export const SOFT_BAND_DISCIPLINE = [
  *   L0175 (confounded, see below):          MAE .57 -> .71,  rho .32 -> .13
  *
  * It did not fix the errors it was meant to fix and added new ones: on L0176 the judge kept faulting
- * `hot-text` for not being "token-highlight" (line 256 of that very document calls them synonyms)
- * and newly called `itembank-save-credentials` unsigned for code that matches the document's own
- * example line for line. More context did not inform it; it gave it more surface from which to build
- * confident, specific, wrong objections.
+ * `hot-text` for not being "token-highlight", which that document defined as synonyms AT THE TIME OF
+ * THE RUN (the synonym was retired shortly after, so do not expect today's copy to show it — the
+ * objection was invented against the contract as it then stood, not derived from it), and newly
+ * called `itembank-save-credentials` unsigned for code that matches the document's own example line
+ * for line. More context did not inform it; it gave it more surface from which to build confident,
+ * specific, wrong objections.
  *
  * The shape of every false negative was a claim about MECHANICS — does this construct work, would
  * this key resolve, is this wiring right — which the compiler and the convergence loop have already

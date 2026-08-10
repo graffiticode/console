@@ -114,6 +114,11 @@ function main() {
       // inflation the anchors in labels/README.md exist to prevent. It also lets --calibrate
       // slice judge-vs-human agreement by how much iteration the item took.
       ...(rep.turns !== undefined ? { turns: rep.turns, converged: !!rep.converged, warningsFixable: rep.warningsFixable ?? null } : {}),
+      // Which dialect version this program was verified against. A label is a judgment about an
+      // artifact, and an artifact is only valid against the compiler that accepted it — L0175
+      // tightened its c1-t10 validation and turned a clean candidate into four hard errors
+      // without a single character of the program changing.
+      ...(rep.dialect ? { dialect: rep.dialect } : {}),
     });
     added++;
     const conv = rep.turns !== undefined

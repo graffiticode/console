@@ -85,6 +85,7 @@ import { assertHoldout } from "./eval-holdout";
 import { pickRepresentative } from "./eval-representative";
 import { verifyExampleForPrompt } from "../src/lib/lang-embedding";
 import { warningsFromVerification, bucketCounts, classifyWarning } from "./eval-warning-taxonomy";
+import { dialectFingerprint, sameDialect, formatFingerprint, type DialectFingerprint } from "./eval-dialect-fingerprint";
 
 
 interface EvalCase { id: string; prompt: string; currentCode?: string | null }
@@ -117,6 +118,11 @@ interface RunResult {
   warningBuckets?: Record<string, number>;
   /** Messages the taxonomy didn't recognize — surfaced after the run so it can be extended. */
   unknownWarnings?: string[];
+  /**
+   * Which version of the dialect this was measured against. Stamped per RUN, not only on the
+   * payload, so a checkpoint rebuild keeps it and a label seeded from these rows can carry it.
+   */
+  dialect?: DialectFingerprint;
   alternativeClaims?: number | null; // compiler's own leftover-foil-depth measure; 0 ⇒ bare pool
 
   // ── Convergence (--converge N) ────────────────────────────────────────────
@@ -889,6 +895,20 @@ async function runCalibrate(args: any) {
     // scored against different anchor MEANINGS, so comparing it to a judge on the current ones
     // reports a scale mismatch as judge error — the one failure this gate exists to prevent.
     // Rows with no version predate versioning entirely and are equally unusable.
+    // Has the dialect moved since these candidates were generated? Unlike a stale anchor version
+    // (which changes what a SCORE means, so those rows are unusable), a moved dialect changes what
+    // the CODE means — the program may no longer compile. The score still describes the artifact
+    // the human saw, so warn rather than skip, and say how many.
+    const liveDialect = await dialectFingerprint(lang);
+    const staleDialect = labels.filter((l) => l.overall != null && l.dialect && !sameDialect(l.dialect, liveDialect));
+    if (staleDialect.length) {
+      console.error(
+        `\n[calibrate] L${lang}: ${staleDialect.length} row(s) were generated against dialect ` +
+        `${[...new Set(staleDialect.map((l) => l.dialect.hash))].join("/")}, now ${liveDialect.hash}. ` +
+        `Their code may no longer compile; re-sweep before treating this as current.`,
+      );
+    }
+
     const current = anchorVersion(lang);
     const stale = labels.filter((l) => l.overall != null && l.code && (l.anchorVersion ?? 0) !== current);
     if (stale.length) {
@@ -1072,6 +1092,10 @@ async function main() {
   for (const lang of args.langs) {
     const cases = loadCases(args.setDir, lang);
     if (!cases.length) continue;
+    // Fingerprint BEFORE generating: a dialect that ships mid-sweep would otherwise be recorded
+    // as whatever it happened to be when the run finished.
+    const fingerprint = await dialectFingerprint(lang);
+    console.error(`[${lang}] dialect ${formatFingerprint(fingerprint)}`);
     console.error(`\n[${lang}] ${cases.length} cases × ${args.models.length} models × ${args.trials} trials`);
     for (const c of cases) {
       // Retrieve RAG examples ONCE, reuse for every model (isolation).
@@ -1079,6 +1103,7 @@ async function main() {
       for (const model of args.models) {
         for (let t = 0; t < args.trials; t++) {
           const r = await runOne(auth, lang, model, c, t, precomputed, { thinking: args.thinking, effort: args.effort }, args.converge);
+          r.dialect = fingerprint;
           allRuns.push(r);
           try { appendFileSync(ckptPath, JSON.stringify(r) + "\n"); } catch { /* never fail a run over a checkpoint write */ }
           // 'd' outranks '.'/'o': a drifted program compiled, but the stream should
@@ -1142,6 +1167,10 @@ async function main() {
     // The exact ordering this run would justify, so the committed MODEL_PRIORITY
     // line can be traced back to the numbers behind it.
     holdout: args.allowLeak ? "LEAK-ALLOWED — do not use to set an ordering" : "enforced",
+    // One entry per dialect measured, so the payload answers "against what?" without walking runs.
+    dialects: Object.fromEntries(
+      [...new Set(allRuns.map((r) => r.lang))].map((l) => [l, allRuns.find((r) => r.lang === l)?.dialect ?? null]),
+    ),
     args, summary, runs: allRuns,
     ...(judgements ? { judgements } : {}),
   };
