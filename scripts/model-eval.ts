@@ -192,6 +192,7 @@ function parseArgs(argv: string[]) {
     // compiler's warnings up to N turns. Default 1 = today's single-shot behavior, so runs on
     // disk stay comparable and the new mode is always an explicit choice.
     converge: 1, fromCheckpoint: undefined as string | undefined,
+    calibrateOut: undefined as string | undefined,
     thinking: undefined as unknown, effort: undefined as string | undefined };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
@@ -202,6 +203,9 @@ function parseArgs(argv: string[]) {
     // Rebuild a run payload from a .partial.jsonl checkpoint — summarize and write the normal
     // output file for a sweep that was interrupted. Generates nothing, costs nothing.
     else if (v === "--from-checkpoint") a.fromCheckpoint = argv[++i];
+    // Per-row calibration dump (case, model, human, judge, rationale) for diagnosing WHICH
+    // candidates the judge misreads — the aggregate cannot say.
+    else if (v === "--calibrate-out") a.calibrateOut = argv[++i];
     else if (v === "--limit") a.limit = parseInt(argv[++i], 10);
     else if (v === "--out") a.out = argv[++i];
     else if (v === "--set-dir") a.setDir = argv[++i];
@@ -870,7 +874,10 @@ function scoreHist(vals: number[]): string {
 // Labels: data/model-eval/labels/<lang>.json = [{ id, code, overall, correctness?, ... }].
 async function runCalibrate(args: any) {
   if (!process.env.ANTHROPIC_API_KEY) { console.error("Set ANTHROPIC_API_KEY for --calibrate"); process.exit(1); }
-  const rows: { lang: string; id: string; human: number; judge: number; authorFamily: LlmProvider | null }[] = [];
+  // `model` and `rationale` ride along so a disagreement is DIAGNOSABLE. The aggregate alone
+  // says the judge and the human differ; it cannot say on which candidate or why, and the first
+  // question anyone asks of a calibration run is "did it catch the one that mattered?".
+  const rows: { lang: string; id: string; model: string | null; human: number; judge: number; rationale: string; authorFamily: LlmProvider | null }[] = [];
   let staleSkipped = 0;
   process.stderr.write("[calibrate] ");
   for (const lang of args.langs) {
@@ -903,7 +910,10 @@ async function runCalibrate(args: any) {
       const authorFamily = inferProviderFromModel(lab.model) ?? null;
       const v = await judgeCode({ prompt, code: lab.code, lang });
       process.stderr.write(v ? "." : "!");
-      if (v) rows.push({ lang, id: lab.id, human: Number(lab.overall), judge: v.overall, authorFamily });
+      if (v) rows.push({
+        lang, id: lab.id, model: lab.model ?? null, human: Number(lab.overall), judge: v.overall,
+        rationale: String(v.rationale || ""), authorFamily,
+      });
     }
   }
   process.stderr.write("\n");
@@ -964,6 +974,26 @@ async function runCalibrate(args: any) {
     console.log(`    fairness. Label some candidates from the other family before setting an ordering.`);
   } else {
     console.log(`\n  ⚠ labels carry no \`model\` field, so per-family calibration is unavailable.`);
+  }
+
+  // Per-row, so a run answers "did the judge catch THAT one?" rather than only "how well does it
+  // agree on average". Printed for small sets (the labeling sets are 14-21 rows); --calibrate-out
+  // dumps every row as JSON regardless, rationale included.
+  if (rows.length <= 40) {
+    console.log("\nPer candidate (▲ judge scored above the human, ▼ below):");
+    console.log(["case", "model", "human", "judge", ""].map((h, i) => h.padEnd([30, 16, 6, 6, 2][i])).join(""));
+    for (const r of [...rows].sort((a, b) => (a.human - a.judge) - (b.human - b.judge) || a.id.localeCompare(b.id))) {
+      const d = r.judge - r.human;
+      console.log([
+        r.id.slice(0, 28).padEnd(30), String(r.model || "?").slice(0, 14).padEnd(16),
+        String(r.human).padEnd(6), String(r.judge).padEnd(6),
+        (d > 0 ? "▲" : d < 0 ? "▼" : " ").padEnd(2),
+      ].join(""));
+    }
+  }
+  if (args.calibrateOut) {
+    writeFileSync(args.calibrateOut, JSON.stringify({ generatedAt: new Date().toISOString(), rows }, null, 2));
+    console.log(`\nWrote ${rows.length} judged row(s) → ${args.calibrateOut}`);
   }
 
   console.log("\nThis is the judge's trust gate — widen the CI read: label until it is tight enough for the decision it gates.");

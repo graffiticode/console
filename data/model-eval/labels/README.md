@@ -73,6 +73,13 @@ The evidence differs, so each dialect names its own. Two examples (see `DIALECT_
   distractor, key requires the passage, no giveaway, catalog stem. 5 = exemplar — real pool depth,
   Part B discriminates alone, options matched in register.
 
+**How to award 4 and 5** is dialect-independent and lives in `SOFT_BAND_DISCIPLINE`
+(`src/lib/judge-service.ts`), rendered into every worksheet and into the judge prompt. In short: 4 is
+judgment where the request was silent; 5 is headroom, not the absence of faults; presence of
+something the request asked for is 3, not 4; a 4 must be pointable at a specific authored thing; and
+a band the compiler could check is not a band — convergence already forced it to 3. Read the rules
+in the worksheet rather than copying them here, so there is no drift to keep in sync.
+
 **A dialect with few soft qualities SHOULD cluster at 3.** That is a finding — model choice barely
 matters there — not a gap to fill. Inventing a 4/5 distinction to keep ρ computable measures the
 rubric instead of the model, and a dialect whose outputs all sit at 3 doesn't need a calibrated

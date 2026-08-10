@@ -191,6 +191,66 @@ export function anchorTableMarkdown(lang?: string | number | null): string {
   ].join("\n");
 }
 
+/**
+ * How to award 4 and 5 in ANY dialect. Dialect-independent by construction: each entry in
+ * DIALECT_ANCHORS names only the EVIDENCE for its bands, and these rules say what the bands mean.
+ *
+ * Every rule here was learned by getting it wrong first:
+ *   1 came from L0176, whose cases request rationales and tags outright — rewarding their presence
+ *     would have collapsed band 4 into 3 on those cases and made it unreachable on the rest.
+ *   2 is what keeps calibration possible: an unpointable 4 is a mood, and Spearman cannot correlate
+ *     moods.
+ *   3 stops "did more than asked" from reading as excellence when instruction-following calls it a 2.
+ *   4 is the honest out. A dialect clustering at 3 is a finding about the dialect.
+ *   5 is the one that decides whether any of this pays for itself: the convergence loop already
+ *     forces every compiler-visible defect to be fixed before a human sees the candidate, so a band
+ *     the compiler could check is measuring nothing. The broken L0175 t10 item — warning-free,
+ *     drift-free, converged in one turn, scored 1 by a human — is the case in point.
+ */
+export const SOFT_BAND_DISCIPLINE = [
+  "4 = judgment where the request was SILENT: the same requirements executed with craft — the",
+  "choices made where the prompt did not specify, or where quality is a matter of degree. It is the",
+  "work a reviewer would otherwise send back.",
+  "5 = HEADROOM, not merely the absence of faults. \"Nothing wrong with it\" is a 4. A 5 has something",
+  "left over — depth beyond what was used, generality beyond what was asked — which is what makes it",
+  "worth showing to someone learning the dialect. Expect 5s to be rare.",
+  "",
+  "Rules, in every dialect:",
+  "1. PRESENCE IS 3, QUALITY IS 4. Anything the request explicitly asked for belongs to correct-and-",
+  "   complete. Band 4 asks whether it is any good.",
+  "2. A 4 MUST BE POINTABLE — name the specific authored thing that earns it. If the reason cannot",
+  "   survive \"point at it in the code\", it is a 3.",
+  "3. NEVER REWARD EXTRA SCOPE. Doing more than asked is not a 5; extraneous content is a 2.",
+  "   Headroom means depth in what WAS asked for.",
+  "4. IF YOU CANNOT NAME THE SOFT QUALITY, IT IS A 3. Clustering at 3 is a legitimate result.",
+  "5. EVERY BAND MUST BE INVISIBLE TO THE COMPILER. Anything the compiler can verify has already been",
+  "   forced to 3. If a proposed 4 would be caught by a warning, it is not a 4 — it is a bug.",
+].join("\n");
+
+/**
+ * MEASURED DEAD END, recorded so it is not retried on intuition: passing the dialect's full
+ * instructions.md into the judge's system prompt (as an authoritative "contract" block) made
+ * agreement WORSE on both dialects that have labels.
+ *
+ *   L0176 (clean A/B — only this changed):  MAE .21 -> .36,  rho .60 -> .45
+ *   L0175 (confounded, see below):          MAE .57 -> .71,  rho .32 -> .13
+ *
+ * It did not fix the errors it was meant to fix and added new ones: on L0176 the judge kept faulting
+ * `hot-text` for not being "token-highlight" (line 256 of that very document calls them synonyms)
+ * and newly called `itembank-save-credentials` unsigned for code that matches the document's own
+ * example line for line. More context did not inform it; it gave it more surface from which to build
+ * confident, specific, wrong objections.
+ *
+ * The shape of every false negative was a claim about MECHANICS — does this construct work, would
+ * this key resolve, is this wiring right — which the compiler and the convergence loop have already
+ * settled before the judge sees anything. The catch that kept working (a request asking for three
+ * accepted forms, code accepting one) was a REQUIREMENT-COUNT claim, checkable from the request with
+ * no dialect knowledge at all. If this is revisited, narrow the job rather than widen the context.
+ *
+ * Caveat on the L0175 number: SOFT_BAND_DISCIPLINE was added to this prompt between its baseline and
+ * that run, so two things changed. L0176 is the trustworthy comparison.
+ */
+
 const RUBRIC = `You are a strict, discriminating judge of Graffiticode DSL code — a family of domain-specific
 languages (spreadsheets, assessments, charts, …); each request targets one dialect. You are given the
 natural-language request (the author's INTENT) and one or more candidate programs. There is NO
@@ -355,6 +415,8 @@ export async function judgeCode(args: JudgeCodeArgs): Promise<JudgeVerdict | nul
 
 Then an overall 1–5. ${ANCHOR_DISCIPLINE}
 ${[...overallAnchors(args.lang)].reverse().map((a) => `  ${a.score} = ${a.meaning.replace(/\*\*/g, "")}`).join("\n")}
+
+${SOFT_BAND_DISCIPLINE}
 
 First work through the Method in an <analysis>…</analysis> block: list the intent's requirements, then
 check EACH against the candidate — name the formula/value and say whether it is right. Reason to the

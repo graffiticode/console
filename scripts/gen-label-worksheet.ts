@@ -11,7 +11,7 @@
  * Usage: npx tsx scripts/gen-label-worksheet.ts [--lang 0166]
  */
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { ANCHOR_DISCIPLINE, anchorTableMarkdown, anchorVersion } from "../src/lib/judge-service";
+import { ANCHOR_DISCIPLINE, SOFT_BAND_DISCIPLINE, anchorTableMarkdown, anchorVersion } from "../src/lib/judge-service";
 
 const LANG = (() => {
   const i = process.argv.indexOf("--lang");
@@ -26,6 +26,12 @@ item mark in the console eval tab → \`pull-eval-labels\`).
 ${ANCHOR_DISCIPLINE}
 
 ${anchorTableMarkdown(LANG)}
+
+## Awarding 4 and 5
+
+\`\`\`
+${SOFT_BAND_DISCIPLINE}
+\`\`\`
 
 Rules of thumb: **1 doesn't work · 2 wrong or incomplete · 3 correct and complete · 4–5 this
 dialect's soft qualities.** Scores 1–3 mean the same thing in every dialect; only 4 and 5 are
