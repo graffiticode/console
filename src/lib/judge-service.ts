@@ -118,6 +118,25 @@ const DIALECT_ANCHORS: Record<string, DialectAnchors> = {
       { score: 5, meaning: "All of 4, **idiomatic and minimal** — no dead or redundant cells, formulas written the way the dialect intends; usable as a reference example." },
     ],
   },
+  // Learnosity items. Bands are written against what instructions.md actually documents —
+  // `distractor-rationale` (a string, or one per option), the faceted `tags` the Author Site
+  // indexes (Difficulty, DOK, standards), and the per-type `partial-credit` rules — so scoring a
+  // 4 means pointing at a specific authored thing rather than at a general impression.
+  //
+  // The generic default band ("derived values are computed rather than hardcoded") described a
+  // spreadsheet and said nothing about an item bank, which would have put a labeler on an axis the
+  // dialect doesn't have.
+  "0176": {
+    version: 2,
+    soft: [
+      // NOTE the "asked for it" rule. Several 0176 cases request rationales and tags outright, so
+      // their PRESENCE is part of being correct and complete. Reward presence here and the band
+      // collapses into 3 on those cases while being unreachable on the ones that don't ask. What
+      // 4 measures is whether the authored metadata is any GOOD.
+      { score: 4, meaning: "**Bankable** — the authored metadata is right, not merely present: each `distractor-rationale` names the specific misconception that option catches rather than restating that it is wrong; scoring matches the item's structure (partial credit only on a type with several scorable responses, exact match otherwise, `valid-response` indices lined up with the options); any tags are accurate for the content. Anything the request explicitly asked for counts toward 3 — this band is about quality, not presence. A content team could import it unedited." },
+      { score: 5, meaning: "**Exemplar** — all of 4, plus distractors that discriminate (each one plausible to a specific partial understanding rather than obviously wrong), stimulus and options free of giveaways, the question type chosen for what it is best at rather than the nearest one that works, and bank-useful metadata the request never asked for." },
+    ],
+  },
   // ELA assessment items. Correct-and-complete is a low bar here: an item can meet every stated
   // requirement and still measure nothing, which is exactly what the compiler cannot see.
   "0175": {
