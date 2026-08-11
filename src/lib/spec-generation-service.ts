@@ -12,12 +12,26 @@ import axios from "axios";
 import { unparse } from "@graffiticode/parser";
 import { getApiTask, getLanguageLexicon, getLanguageHints, getLanguageSpecDirective } from "./api";
 import { readDialectInstructions, modelRejectsTemperature } from "./code-generation-service";
+import { modeTierFor } from "./model-priority";
+import { modelForProvider } from "./llm-models";
 
 // Translation is faithfulness-critical and constrained (annotated src + instructions + the
 // completeness contract fully determine the output), and get_spec sits in the hot path — so a
-// small, fast model is the right fit. assertCoverage is the elision guard. Override via SPEC_MODEL.
-const SPEC_MODEL = process.env.SPEC_MODEL || "claude-haiku-4-5-20251001";
+// small, fast model is the right DEFAULT. assertCoverage is the elision guard.
+//
+// Per-dialect, though, that reasoning can fail: a dialect shipping its own spec-directive.md may
+// ask for something other than verbalize-the-content, and then the constraints no longer determine
+// the output (L0177's recipe is the case — see its line in MODEL_PRIORITY). So the tier comes from
+// the same table that decides code-gen routing, which is also the only place you can read it.
+// Family is fixed: this calls the Anthropic Messages API directly.
+const DEFAULT_SPEC_TIER = "fast" as const;
 const SPEC_MAX_TOKENS = 8192;
+
+/** SPEC_MODEL still wins outright — an operator hatch that needs no deploy and no table edit. */
+function specModelFor(lang: string | null | undefined): string {
+  return process.env.SPEC_MODEL
+    || modelForProvider("anthropic", modeTierFor(lang, "spec") || DEFAULT_SPEC_TIER);
+}
 
 // A completeness contract, NOT a style example. A checklist enforces structure without biasing
 // the model toward an average level of detail (which would induce elision).
@@ -52,18 +66,19 @@ interface ClaudeCallArgs {
   system: string;
   user: string;
   apiKey: string;
+  model: string;
 }
 
-async function callClaudeForSpec({ system, user, apiKey }: ClaudeCallArgs): Promise<string> {
+async function callClaudeForSpec({ system, user, apiKey, model }: ClaudeCallArgs): Promise<string> {
   const resp = await axios.post(
     "https://api.anthropic.com/v1/messages",
     {
-      model: SPEC_MODEL,
+      model,
       system,
       messages: [{ role: "user", content: user }],
       max_tokens: SPEC_MAX_TOKENS,
       // Opus deprecated `temperature` — omit it there or the API 400s.
-      ...(modelRejectsTemperature(SPEC_MODEL) ? {} : { temperature: 0 }),
+      ...(modelRejectsTemperature(model) ? {} : { temperature: 0 }),
     },
     {
       headers: {
@@ -144,7 +159,8 @@ export async function generateSpec({ auth, taskId }: { auth: any; taskId: string
   // content description). Absent → fall back to SPEC_DIRECTIVE (unchanged behavior).
   const directive = specDirective?.trim() || SPEC_DIRECTIVE;
   const system = `${instructions}\n\n${directive}`;
-  const spec = (await callClaudeForSpec({ system, user: annSrc, apiKey })).trim();
+  const model = specModelFor(lang);
+  const spec = (await callClaudeForSpec({ system, user: annSrc, apiKey, model })).trim();
   const coverage = assertCoverage(spec, task.code);
 
   return { spec, lang, itemId: taskId, coverage };

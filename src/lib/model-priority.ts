@@ -49,18 +49,26 @@ import type { GenerationTier, LlmProvider } from "./llm-models";
 export type PriorityEntry = LlmProvider | `${LlmProvider}+${GenerationTier}`;
 
 /**
- * The four things a language generates for, and what each costs by default:
+ * The five things a language runs a model for, and what each costs by default:
  *
  *   create          the dialect's tier (its `gc:tier=`), or a `+tier` suffix below
  *   update          same as create — a revision is not assumed to be easier
  *   repair          always "balanced" — error correction is a narrow, mechanical task,
  *                   and it is pinned to the family that wrote the code
  *   propertyUpdate  always "fast" — the L0166 small-edit path
+ *   spec            always "fast" — get_spec, the INVERSE direction (item → English)
  *
  * Those defaults are unchanged and apply to every language. A language may override any of
- * the last three when it has evidence, which is what the object form of an entry is for.
+ * the last four when it has evidence, which is what the object form of an entry is for.
+ *
+ * `spec` is here rather than beside spec-generation-service's own constants because this table
+ * is meant to be the one place you can read what model runs where. It was the counter-example:
+ * get_spec resolved `process.env.SPEC_MODEL || "claude-haiku-…"` on its own, invisible from here,
+ * and for a dialect whose PRODUCT is the spec (L0177's recipe) that is the load-bearing model
+ * choice, not a detail. Note it takes only a TIER: spec-gen calls the Anthropic Messages API
+ * directly, so a `+tier` suffix or an openai entry in `order` has no effect on it.
  */
-export type GenerationMode = "create" | "update" | "repair" | "propertyUpdate";
+export type GenerationMode = "create" | "update" | "repair" | "propertyUpdate" | "spec";
 
 /**
  * A language's entry: either a bare ordering, or an ordering plus per-mode tier overrides.
@@ -71,11 +79,15 @@ export type GenerationMode = "create" | "update" | "repair" | "propertyUpdate";
  * whose initial authoring is heavy but whose revisions are not:
  *
  *   "0175": { order: ["openai+quality", "anthropic+quality"], update: "balanced" }
+ *
+ * `order` is optional so a language can state a tier opinion WITHOUT claiming a family ordering
+ * it has no eval for — an entry with no order falls through to DEFAULT_MODEL_PRIORITY exactly as
+ * an absent one does, and evaluatedLanguageIds() still does not count it as evaluated.
  */
 export type PriorityConfig =
   | PriorityEntry[]
   | {
-      order: PriorityEntry[];
+      order?: PriorityEntry[];
       /** Tier for fresh authoring. Defaults to the dialect's own `gc:tier=`, else balanced. */
       create?: GenerationTier;
       /** Tier for a revision (currentCode present). Defaults to the create tier. */
@@ -84,6 +96,8 @@ export type PriorityConfig =
       repair?: GenerationTier;
       /** Tier for the L0166 small-property-edit path. Defaults to "fast". */
       propertyUpdate?: GenerationTier;
+      /** Tier for get_spec. Defaults to "fast". Tier only — see GenerationMode. */
+      spec?: GenerationTier;
     };
 
 /** The ordering out of either entry form. */
@@ -169,6 +183,25 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
     update: "quality",
     repair: "balanced",
   },
+
+  // NOT AN EVAL RESULT — a decision, recorded here so it is visible. L0177 has no eval set, no
+  // labels, and (as of 2026-08-11) zero rows in `training_examples`, so nothing below is measured
+  // and this line must be replaced by a run, not extended by argument.
+  //
+  // No `order`/`create` on purpose: which family and tier WRITE an author-embed program is exactly
+  // what the eval has to answer (the output is a dozen property functions — structurally 0176,
+  // which went fast — while the empty corpus argues the other way), and balanced is the right
+  // hedge until it does. The only claim made here is about `spec`.
+  //
+  // `spec: "balanced"` because for this dialect get_spec IS the product: the compiled data is
+  // secondary and the recipe is what the caller implements. Its spec-directive.md is not the usual
+  // verbalize-the-content task the "fast" default was chosen for — it is negative-constraint
+  // reasoning (never assert the unverified widgetTypes config path; every config-behaviour check
+  // must be differential INCLUDING enabling keys; the Goal must not claim a restriction is in
+  // force), and assertCoverage cannot catch a violation because a recipe's substance is not in the
+  // source it covers. A confidently wrong recipe tells a developer a restriction holds when the
+  // Author API failed open, which is the specific hazard the directive exists to prevent.
+  "0177": { spec: "balanced" },
 };
 
 /**

@@ -54,6 +54,26 @@ deploying the provider layer changes no behavior. Adding a line is a reviewable
 data change, not a release. Do not add one before `--calibrate` shows the judge
 agrees with human labels for that dialect.
 
+## Per-mode tiers, including `get_spec`
+
+The object form of an entry sets the tier per mode: `create`, `update`, `repair`,
+`propertyUpdate`, and `spec`. Defaults are unchanged (`repair` balanced,
+`propertyUpdate` and `spec` fast, create/update from the dialect's `gc:tier=`),
+so an entry naming none of them behaves as before.
+
+`spec` is the odd one: it governs `get_spec` (item → English), the inverse
+direction, which calls Anthropic directly — so it takes a **tier only**, and the
+family ordering does not apply to it. It lives here anyway because otherwise
+there is no single place to read what model runs where; before this it resolved
+`SPEC_MODEL || claude-haiku-…` inside `spec-generation-service.ts`, invisible
+from the table. `SPEC_MODEL` still overrides everything, as the no-deploy hatch.
+
+```ts
+// Tier opinion without a family claim — `order` is optional.
+"0177": { spec: "balanced" },  // get_spec IS the product here; the recipe is not
+                               // a verbalize task and assertCoverage can't see it
+```
+
 ## Runtime configuration
 
 Both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` belong in `.env.local` or the
