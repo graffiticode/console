@@ -902,7 +902,7 @@ Do not include any explanatory text outside the code blocks unless specifically 
   let lastFailure: ProviderFailure | undefined;
   let lastProvider = providers[0];
   let lastModel =
-    route.model || modelForProvider(lastProvider, route.tier);
+    route.model || modelForProvider(lastProvider, route.tierByProvider?.[lastProvider] ?? route.tier);
 
   // At most one cross-family restart per logical call, however long the priority
   // list is: a request that has already burned a full generation on a dead
@@ -913,7 +913,9 @@ Do not include any explanatory text outside the code blocks unless specifically 
     const model =
       route.model && providers[0] === provider
         ? route.model
-        : modelForProvider(provider, route.tier);
+        // Per-family tier from the priority table, else the route-wide default. A language
+        // can run fast on its primary and balanced on its fallback.
+        : modelForProvider(provider, route.tierByProvider?.[provider] ?? route.tier);
     lastProvider = provider;
     lastModel = model;
     const startedAt = Date.now();
@@ -946,7 +948,10 @@ Do not include any explanatory text outside the code blocks unless specifically 
         chunks: result.chunks,
         provider,
         model,
-        tier: route.tier,
+        // The tier that actually ran, not the route-wide default: with per-family
+        // overrides those differ, and reporting the default would log `tier=balanced`
+        // while serving haiku — making the log unusable for confirming a deploy.
+        tier: route.tierByProvider?.[provider] ?? route.tier,
         routeSource: route.source,
         priority: providers,
         attempts,
@@ -985,7 +990,7 @@ Do not include any explanatory text outside the code blocks unless specifically 
     chunks: 0,
     provider: lastProvider,
     model: lastModel,
-    tier: route.tier,
+    tier: route.tierByProvider?.[lastProvider] ?? route.tier,
     routeSource: route.source,
     priority: providers,
     attempts,

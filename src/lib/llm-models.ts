@@ -1,4 +1,4 @@
-import { modelPriorityFor } from "./model-priority";
+import { modelPriorityFor, modelTiersFor, modeTierFor, type GenerationMode } from "./model-priority";
 
 export type LlmProvider = "anthropic" | "openai";
 export type ProviderMode = LlmProvider | "auto";
@@ -159,12 +159,24 @@ export interface GenerationRouteInput {
    * silently fell back to another family would be measuring the wrong thing.
    */
   model?: string;
+  /**
+   * What is being generated. Only "update" is read here; repair and propertyUpdate resolve
+   * their own tier at their call sites, where the defaults live. Defaults to "create".
+   */
+  mode?: GenerationMode;
 }
 
 export interface GenerationRoute {
   /** Family order to try, most preferred first. Never empty. */
   providers: LlmProvider[];
   tier: GenerationTier;
+  /**
+   * Per-family tier overrides from the priority table (`"anthropic+fast"`). Absent for
+   * every language whose entries carry no suffix, in which case `tier` applies to all.
+   * Callers must read `tierByProvider?.[provider] ?? tier` — using `tier` alone silently
+   * ignores the table and runs the wrong model.
+   */
+  tierByProvider?: Partial<Record<LlmProvider, GenerationTier>>;
   model?: string;
   /** Where the ordering came from, for telemetry and log lines. */
   source: "model_pin" | "operator_override" | "language_priority";
@@ -179,9 +191,22 @@ export interface GenerationRoute {
  *      canary and incident response
  *   3. the language's static priority list, else the default
  *
- * Tier is orthogonal: it picks the model WITHIN the chosen family via
- * modelForProvider. A language's `gc:tier=` directive and the small-edit fast
- * downgrade both act here, and neither changes which family serves the request.
+ * Tier picks the model WITHIN the chosen family via modelForProvider. A language's
+ * `gc:tier=` directive and the small-edit fast downgrade set the route-wide default; the
+ * priority table may override it PER FAMILY (`tierByProvider`), which is how a language
+ * runs fast on one provider and balanced on its fallback. Neither changes which family
+ * serves the request.
+ *
+ * Tier precedence, highest first:
+ *   1. an exact `model` pin — bypasses the table entirely (eval harness only)
+ *   2. a `+tier` suffix in MODEL_PRIORITY, for the family serving the request
+ *   3. the route-wide `tier`: the dialect's `gc:tier=` / `gc:model=opus`, or the
+ *      small-edit fast downgrade
+ * A table suffix therefore outranks a dialect's own directive, deliberately: the table is
+ * platform-owned and each line cites the eval behind it, while the directive is the
+ * dialect's default for when nobody has measured. It also outranks the small-edit
+ * downgrade, so a `+balanced` fallback stays balanced even on a trivial edit — currently
+ * only reachable via L0176's fallback, where it is the intent.
  */
 export function resolveGenerationRoute(
   input: GenerationRouteInput,
@@ -222,9 +247,26 @@ export function resolveGenerationRoute(
       ? [primary, ...priority.filter(provider => provider !== primary)]
       : priority;
 
+  // Only this path consults the table. A model pin (eval harness) and an operator override
+  // must keep bypassing it entirely.
+  //
+  // A mode override is LANGUAGE-WIDE and replaces the per-family tiers for that mode: a
+  // dialect saying "revisions are lighter" means lighter on whichever family serves it, and
+  // leaving the +tier suffixes in force would let them veto the very override being asked
+  // for. Absent an override (the normal case) the suffixes apply as before.
+  const modeTier = modeTierFor(input.lang, input.mode ?? "create");
+  if (modeTier) {
+    return {
+      providers: configuredFallbackEnabled() ? providers : providers.slice(0, 1),
+      tier: modeTier,
+      source: "language_priority",
+    };
+  }
+  const tierByProvider = modelTiersFor(input.lang);
   return {
     providers: configuredFallbackEnabled() ? providers : providers.slice(0, 1),
     tier,
+    ...(Object.keys(tierByProvider).length ? { tierByProvider } : {}),
     source: "language_priority",
   };
 }

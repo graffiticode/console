@@ -35,6 +35,7 @@ import {
   parseLanguageGenerationPolicy,
   resolveGenerationRoute,
 } from "./llm-models";
+import { modeTierFor } from "./model-priority";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
 import { findBestLanguages } from "./language-router";
 import { stripQueryPassage, queryFacets } from "./lang-embedding";
@@ -1186,11 +1187,17 @@ export async function generateCode({
     : {};
   let tierToUse: GenerationTier =
     options.tier || dialectPolicy.tier || "balanced";
+  // create vs update straight off the arguments: a revision has currentCode, a fresh
+  // authoring does not. No prompt heuristic is involved. Both resolve identically unless
+  // the language's table entry declares an `update` tier.
+  const generationMode = currentCode ? "update" : "create";
   let plannedRoute = resolveGenerationRoute({
     lang,
     tier: tierToUse,
     model: options.model,
+    mode: generationMode,
   });
+  tierToUse = plannedRoute.tier;
   let modelToUse =
     options.model ||
     modelForProvider(plannedRoute.providers[0], plannedRoute.tier);
@@ -1450,14 +1457,17 @@ export async function generateCode({
               // Re-resolving with the same lang keeps the family ordering intact:
               // only the tier changes, so an OpenAI-first language downgrades to
               // gpt-5.6-luna rather than jumping families to Haiku.
-              tierToUse = "fast";
+              tierToUse = modeTierFor(lang, "propertyUpdate") || "fast";
               plannedRoute = resolveGenerationRoute({
                 lang,
                 tier: tierToUse,
+                mode: "propertyUpdate",
               });
               modelToUse = modelForProvider(
                 plannedRoute.providers[0],
-                plannedRoute.tier,
+                // Per-family override wins, same as the generation path — otherwise this
+                // pre-flight estimate names a model the route will not actually use.
+                plannedRoute.tierByProvider?.[plannedRoute.providers[0]] ?? plannedRoute.tier,
               );
             }
           }
@@ -1599,6 +1609,10 @@ export async function generateCode({
     let verificationResult = null;
     let fixAttempts = 0;
     const MAX_FIX_ATTEMPTS = 2;
+    // Error correction is a narrow, mechanical task, so it runs balanced regardless of what
+    // the language spends on authoring — a dialect may override that in MODEL_PRIORITY when
+    // it has evidence its repairs need more (or less).
+    const repairTier: GenerationTier = modeTierFor(lang, "repair") || "balanced";
 
     // Preserve the original conversation so compile-error fixes are a genuine
     // continued turn (same system + history) rather than a stateless "repair
@@ -1751,7 +1765,7 @@ export async function generateCode({
             currentCode: generatedCode,
             options: {
               lang,
-              tier: "balanced",
+              tier: repairTier,
               // Pin the repair to the family that produced the program. A repair
               // is a continuation of that output, so handing it to another family
               // means asking a model to fix code it did not write against a
@@ -1759,7 +1773,7 @@ export async function generateCode({
               // that family with no failover.
               model:
                 options.model ||
-                modelForProvider(providerUsed, "balanced"),
+                modelForProvider(providerUsed, repairTier),
               temperature: 0.1, // Lower temperature for more deterministic fixes
               maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
               maxContinuations: 10,
