@@ -143,7 +143,12 @@ const DIALECT_ANCHORS: Record<string, DialectAnchors> = {
     version: 2,
     soft: [
       { score: 4, meaning: "**Defensible as an assessment item** — each distractor encodes a distinct plausible misconception, the key requires the passage (not general knowledge), no length/position/stem-echo giveaway, stem taken from the catalog. A reviewer would accept it." },
-      { score: 5, meaning: "**Exemplar** — all of 4, plus real pool depth (viable foils beyond the ones used), Part B that discriminates on its own, and options matched in register and length." },
+      // "Pool depth" is countable in the SOURCE, not in the compiled review: count the
+      // `claim status distractor … targets ["q1"]` entries and the non-supporting `source`s,
+      // against the three of each an EBSR draws. Do NOT read `review.alternativeClaims` for
+      // this — it counts other SUPPORTED claims of the same dimension, so a well-formed item
+      // reports 0 however deep its pool is, and reading it as depth marks every item thin.
+      { score: 5, meaning: "**Exemplar** — all of 4, plus a pool deeper than the item consumes (more targeted distractors than the three drawn, spanning distinct error types, and more non-supporting sources than Part B uses), Part B that discriminates on its own, and options matched in register and length." },
     ],
   },
 };

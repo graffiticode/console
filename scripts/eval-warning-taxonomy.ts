@@ -93,12 +93,18 @@ export interface WarningReport {
   all: ClassifiedWarning[];
   fixable: ClassifiedWarning[];
   unfixable: ClassifiedWarning[];
-  /** Leftover foil depth the compiler reports per item after composition; summed. Lower is thinner. */
+  /**
+   * The compiler's `review.alternativeClaims`: how many OTHER supported claims of the same
+   * dimension the item could have been built around (`supported claims - 1`). It is a
+   * multiple-correct-answer smell, NOT a measure of distractor depth — a well-formed EBSR
+   * has exactly one supported claim and reports 0 no matter how deep its foil pool is.
+   * Captured because the compiler emits it; do not read it as pool depth.
+   */
   alternativeClaims: number | null;
 }
 
 /**
- * Pull the compiler's warnings (and its own `review.alternativeClaims` pool-depth measure) out of
+ * Pull the compiler's warnings (and `review.alternativeClaims`, see above) out of
  * a `generateCode` result's `verification` field. Returns an empty report rather than throwing when
  * the language emits no such structure, so non-L0175 evals are unaffected.
  */

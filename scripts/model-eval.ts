@@ -123,7 +123,11 @@ interface RunResult {
    * payload, so a checkpoint rebuild keeps it and a label seeded from these rows can carry it.
    */
   dialect?: DialectFingerprint;
-  alternativeClaims?: number | null; // compiler's own leftover-foil-depth measure; 0 ⇒ bare pool
+  // Other supported claims of the same dimension (`supported - 1`), NOT foil depth: an EBSR
+  // with six authored distractors still reports 0. Kept in the payload, deliberately not a
+  // column — it reads as a quality number and is not one. Pool depth is the thin-pool
+  // WARNINGS, which the taxonomy already buckets.
+  alternativeClaims?: number | null;
 
   // ── Convergence (--converge N) ────────────────────────────────────────────
   // A run is one AGENT SESSION, not one generation: turn 1 plus repair turns driven by
@@ -481,7 +485,8 @@ function summarize(runs: RunResult[]) {
       avgWarningsFixable: rs.reduce((s, r) => s + (r.warningsFixable || 0), 0) / n,
       avgWarningsUnfixable: rs.reduce((s, r) => s + (r.warningsUnfixable || 0), 0) / n,
       stuckRate: rs.filter((r) => r.stuck).length / n,
-      // Compiler's own pool-depth measure; averaged over runs that reported one.
+      // See RunResult.alternativeClaims — other supported claims of the same dimension, not
+      // pool depth. Retained in the payload, not printed.
       avgAlternativeClaims: (() => {
         const xs = rs.map((r) => r.alternativeClaims).filter((x): x is number => typeof x === "number");
         return xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null;
@@ -529,8 +534,8 @@ function printTable(rows: any[]) {
   const ms = (x: number) => (x / 1000).toFixed(1) + "s";
   console.log(
     "\n" +
-    ["lang", "model", "runs", "err", "1st-pass", "final", "conv", "turns", "warn", "alt", "drift", "p50", "p90", "$/run", "$/conv"]
-      .map((h, i) => h.padEnd([6, 26, 5, 4, 9, 7, 6, 6, 6, 5, 7, 7, 7, 8, 8][i])).join(""));
+    ["lang", "model", "runs", "err", "1st-pass", "final", "conv", "turns", "warn", "drift", "p50", "p90", "$/run", "$/conv"]
+      .map((h, i) => h.padEnd([6, 26, 5, 4, 9, 7, 6, 6, 6, 7, 7, 7, 8, 8][i])).join(""));
   for (const r of rows) {
     console.log([
       r.lang.padEnd(6), r.model.padEnd(26), String(r.runs).padEnd(5), String(r.errors).padEnd(4),
@@ -540,7 +545,6 @@ function printTable(rows: any[]) {
       (r.avgTurnsToClean === null ? "—" : r.avgTurnsToClean.toFixed(1)).padEnd(6),
       // Residual fixable warnings per run: what the compiler still objected to at the end.
       r.avgWarningsFixable.toFixed(1).padEnd(6),
-      (r.avgAlternativeClaims === null ? "—" : r.avgAlternativeClaims.toFixed(1)).padEnd(5),
       // "—" = nothing judgeable (no embedding hook, or no target in the prompt).
       (r.driftRate === null ? "—" : pct(r.driftRate)).padEnd(7),
       ms(r.latencyP50).padEnd(7), ms(r.latencyP90).padEnd(7),

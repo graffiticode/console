@@ -70,7 +70,10 @@ The evidence differs, so each dialect names its own. Two examples (see `DIALECT_
   `=SUM(A1:A2)` belongs is a **3**), layout usable, formulas extend to new rows. 5 = idiomatic and
   minimal, usable as a reference example.
 - **0175 (ELA items):** 4 = defensible as an assessment item — distinct plausible misconceptions per
-  distractor, key requires the passage, no giveaway, catalog stem. 5 = exemplar — real pool depth,
+  distractor, key requires the passage, no giveaway, catalog stem. 5 = exemplar — a pool deeper
+  than the item consumes (count the targeted distractors and non-supporting sources in the source;
+  `review.alternativeClaims` is NOT this — it counts other supported claims and reads 0 on a
+  well-formed item),
   Part B discriminates alone, options matched in register.
 
 **How to award 4 and 5** is dialect-independent and lives in `SOFT_BAND_DISCIPLINE`
