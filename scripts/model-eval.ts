@@ -397,8 +397,11 @@ async function runOne(
       }
       if (next) code = next;
 
-      if (!report.fixable.length) { if (turnsToClean === null) turnsToClean = turn; break; }
+      // Order matters: a program that did not compile produces NO warnings, so testing
+      // "zero fixable warnings" first would read its silence as convergence and stamp a
+      // turnsToClean on a run that never worked.
       if (!compiled) break;                       // nothing to repair against
+      if (!report.fixable.length) { if (turnsToClean === null) turnsToClean = turn; break; }
       if (turn > 1 && report.fixable.length >= prevFixable) { stuck = true; break; }
       if (turn >= maxTurns) break;
 
@@ -416,8 +419,12 @@ async function runOne(
       warningBuckets: bucketCounts([report as any]),
       unknownWarnings: report.all.filter((w: any) => w.bucket === "unknown").map((w: any) => w.message),
       alternativeClaims: report.alternativeClaims,
-      converged: report.fixable.length === 0,
-      turnsToClean,
+      // Convergence is "the compiler has nothing left to say about a WORKING program".
+      // Without the finalCompile conjunct, a run that never compiled scores converged —
+      // luna's three parse failures reported converged:true and inflated its rate to 100%
+      // while its compile rate was 96%.
+      converged: acc.finalCompile && report.fixable.length === 0,
+      turnsToClean: acc.finalCompile ? turnsToClean : null,
       stuck,
       turnLog,
     };
@@ -523,10 +530,10 @@ function printTable(rows: any[]) {
   console.log(
     "\n" +
     ["lang", "model", "runs", "err", "1st-pass", "final", "conv", "turns", "warn", "alt", "drift", "p50", "p90", "$/run", "$/conv"]
-      .map((h, i) => h.padEnd([6, 20, 5, 4, 9, 7, 6, 6, 6, 5, 7, 7, 7, 8, 8][i])).join(""));
+      .map((h, i) => h.padEnd([6, 26, 5, 4, 9, 7, 6, 6, 6, 5, 7, 7, 7, 8, 8][i])).join(""));
   for (const r of rows) {
     console.log([
-      r.lang.padEnd(6), r.model.padEnd(20), String(r.runs).padEnd(5), String(r.errors).padEnd(4),
+      r.lang.padEnd(6), r.model.padEnd(26), String(r.runs).padEnd(5), String(r.errors).padEnd(4),
       pct(r.firstPassRate).padEnd(9), pct(r.finalRate).padEnd(7),
       pct(r.convergedRate).padEnd(6),
       // Mean turns among runs that DID converge — blank when none did.
