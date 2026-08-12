@@ -88,7 +88,33 @@ import { warningsFromVerification, bucketCounts, classifyWarning } from "./eval-
 import { dialectFingerprint, sameDialect, formatFingerprint, type DialectFingerprint } from "./eval-dialect-fingerprint";
 
 
-interface EvalCase { id: string; prompt: string; currentCode?: string | null }
+/**
+ * `design` is authored but not yet READ by this harness, and is here rather than in a sibling
+ * README because it is part of a case's meaning.
+ *
+ * Two 0177-shaped checks need it, and neither can be derived after the fact:
+ *   - Warning fixability is CASE-RELATIVE for a dialect whose docs say "do not invent `domain`,
+ *     `user-id`, or `reference`". A hole for a value the prompt never supplied is unfixable BY
+ *     DESIGN — the L0175 passage-level analog — so feeding it to the convergence loop asks the
+ *     model to hallucinate a serving domain and scores every variant as never-converged. The same
+ *     warning text for a value the prompt DID supply is a real defect. `supplies` is what separates
+ *     them; see the fixable/unfixable split in scripts/eval-warning-taxonomy.ts.
+ *   - Design capture / drift wants the intended view, and for this dialect the view IS the mode,
+ *     so it is a one-token comparison rather than an embedding hook.
+ * Recording it while authoring costs nothing; re-deriving it from prose later costs a re-read of
+ * every case, and `view: null` (deliberately no view stated) cannot be re-derived at all.
+ */
+interface EvalCaseDesign {
+  /** The view the prompt asks for, or null when it deliberately names none. */
+  view?: string | null;
+  /** Required properties the PROMPT actually supplies. A hole outside this set is unfixable. */
+  supplies?: string[];
+  /** Holes the compiler should legitimately report for a correct generation. */
+  expectHoles?: string[];
+  note?: string;
+}
+
+interface EvalCase { id: string; prompt: string; currentCode?: string | null; design?: EvalCaseDesign }
 
 /**
  * `variantId` is the thing under test, and `model` is only one KIND of variant.
