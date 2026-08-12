@@ -184,14 +184,42 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
     repair: "balanced",
   },
 
-  // NOT AN EVAL RESULT — a decision, recorded here so it is visible. L0177 has no eval set, no
-  // labels, and (as of 2026-08-11) zero rows in `training_examples`, so nothing below is measured
-  // and this line must be replaced by a run, not extended by argument.
+  // eval 2026-08-12 (model-eval-2026-08-12T18-09-04-986Z, 13 cases x 3 trials, --converge 3,
+  // hold-out enforced against a 21-example corpus, 39 runs per variant, 0 errors):
   //
-  // No `order`/`create` on purpose: which family and tier WRITE an author-embed program is exactly
-  // what the eval has to answer (the output is a dozen property functions — structurally 0176,
-  // which went fast — while the empty corpus argues the other way), and balanced is the right
-  // hedge until it does. The only claim made here is about `spec`.
+  //                        INVENTED   compile   p50    $/run
+  //   BALANCED  terra        0/39      39/39    2.8s   $0.0020   <- primary
+  //             sonnet       0/39      39/39    6.6s   $0.0049   <- failover
+  //   FAST      luna         1/39      39/39    4.5s   $0.0017
+  //             haiku        6/39      33/39    2.8s   $0.0020
+  //
+  // INVENTED is the metric this dialect turns on: the program asserted a `domain`, `user-id` or
+  // `reference` that its request never supplied. instructions.md forbids exactly that ("omit them
+  // and the compiler flags them as design holes for the client to supply"), because a fabricated
+  // serving domain yields a signed request that 401s and an editor nobody can debug.
+  //
+  // Two independent reads agree. Source-level: the counts above, from the emitted program.
+  // Compiler-level: `design-hole` warnings over the four hole cases x 3 trials = 12 available —
+  // sonnet 12, terra 12, luna 11, haiku 6. 12 minus the invention count, exactly, for every
+  // variant. A model that fabricates shows FEWER holes, which is the companion check that
+  // something was actually examined.
+  //
+  // Haiku fails on both axes and is not cheaper than terra (both $0.0020), so it wins on no axis
+  // here. Its 12 failures are systematic, not flaky — all 3 trials of `hole-no-domain` and
+  // `hole-no-author` invented; all 3 trials of `container-and-settings` (a section emitted after
+  // the view closes) and `update-switch-view` (`status [published]`, a bare identifier) never
+  // compiled. The fast tier is avoided for BOTH families: luna's single invention is one trial of
+  // `hole-no-author`, and 0-vs-not-0 on this metric is worth $0.0003.
+  //
+  // Judge NOT used, and no --panel: there are no human labels for this dialect yet, so nothing
+  // here ranks output QUALITY beyond "compiles and doesn't fabricate". That is enough to place
+  // haiku last and to prefer the cheaper of two variants that tie at zero, and it is NOT enough to
+  // claim terra writes better designs than sonnet. If labels later show a quality gap, this line
+  // should move on that evidence, not on the cost column.
+  //
+  // Corpus caveat for the next sweep: all four variants retrieved from the same 21 examples, of
+  // which 18 are `item-edit` and 2 demonstrate holes. Widen that and these numbers may move —
+  // especially for the three non-item-edit cases, which every variant ran under-served.
   //
   // `spec: "balanced"` because for this dialect get_spec IS the product: the compiled data is
   // secondary and the recipe is what the caller implements. Its spec-directive.md is not the usual
@@ -201,7 +229,7 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // force), and assertCoverage cannot catch a violation because a recipe's substance is not in the
   // source it covers. A confidently wrong recipe tells a developer a restriction holds when the
   // Author API failed open, which is the specific hazard the directive exists to prevent.
-  "0177": { spec: "balanced" },
+  "0177": { order: ["openai+balanced", "anthropic+balanced"], spec: "balanced" },
 };
 
 /**

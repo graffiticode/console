@@ -151,6 +151,33 @@ const DIALECT_ANCHORS: Record<string, DialectAnchors> = {
       { score: 5, meaning: "**Exemplar** — all of 4, plus a pool deeper than the item consumes (more targeted distractors than the three drawn, spanning distinct error types, and more non-supporting sources than Part B uses), Part B that discriminates on its own, and options matched in register and length." },
     ],
   },
+  // Learnosity Author API integration designs. This dialect's compiler is unusually strong — it
+  // reports design holes, drops members the chosen view doesn't accept, type-checks every property,
+  // and computes `complete` — so band 3 already means no hole, no dropped member, no bad value.
+  // What it cannot see is whether the design would DO anything in the running editor, which is
+  // where the soft band lives.
+  //
+  // TWO TRAPS TO KNOW BEFORE SCORING, both of which make the compiler's signals point the wrong way:
+  //
+  //   1. A program that INVENTS a `domain`, `user-id` or `reference` the request never supplied
+  //      compiles clean, reports `complete: true`, and emits FEWER warnings than the correct
+  //      answer. Every compiler-visible signal rewards it. It is still wrong — the recipe then
+  //      tells a developer to sign for a host they do not serve, which 401s with the Author API's
+  //      least debuggable error — so it is a 2 ("a requirement is absent; the central logic is
+  //      wrong"), not a 3. Do not let a clean warning count carry it. The 2026-08-12 sweep found
+  //      haiku doing this on 6 of 39 runs and luna on 1.
+  //   2. The Author API FAILS OPEN on config: an unrecognized or wrong-path key is silently
+  //      ignored, the editor still initializes, and the page looks correct while enforcing
+  //      nothing. So "the design says the picker is restricted" and "the picker is restricted"
+  //      are different claims, and only the first is visible to a compiler.
+  "0177": {
+    version: 1,
+    soft: [
+      // The 4/5 split is the fail-open distinction: does it hold in the editor, and is it minimal.
+      { score: 4, meaning: "**In force, not just on paper** — where the request asks for a behaviour, the design reaches for the mechanism Learnosity actually enforces rather than the one that merely records intent: a question-type restriction expressed as `question-type-groups` (verified to restrict the picker) rather than `allow-widgets` alone (names types, enforces nothing); permissions on the `widget` member the item editor reads, not on a view that will drop them. Nothing is attached to a view that doesn't accept it. A developer implementing this recipe would get the editor the client described." },
+      { score: 5, meaning: "**Exemplar** — all of 4, and MINIMAL: not one property set that the request neither asked for nor requires, so a reader can tell what the client actually wanted from the program alone (the `back`/`scoring`/`reference-prefix`/`widget` boilerplate that used to ride in from the starting template is the anti-pattern — it is inherited noise, and it makes every design look alike). The view is the one that fits the experience described rather than the nearest one that compiles, and options that only make sense together appear together. You would show it to someone learning the dialect." },
+    ],
+  },
 };
 
 /** Canonical 4-digit form, matching findLanguageById in languages.ts. */

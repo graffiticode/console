@@ -399,7 +399,10 @@ async function runOne(
       const fixRounds = res?.fixAttempts ?? 0;
       const next = typeof res?.code === "string" ? res.code : undefined;
       const prevFixable = report.fixable.length;
-      report = warningsFromVerification(res?.verification);
+      // The case's own `design.supplies` decides whether a design-hole warning is repairable:
+      // identical warning text means "the client still owes this value" when the prompt never
+      // gave it, and "you dropped what you were given" when it did. See eval-warning-taxonomy.
+      report = warningsFromVerification(res?.verification, { supplies: c.design?.supplies });
 
       acc.ok = true;
       acc.inputTokens += inputTokens;
