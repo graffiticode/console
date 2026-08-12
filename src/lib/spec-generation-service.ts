@@ -88,7 +88,15 @@ async function callClaudeForSpec({ system, user, apiKey, model }: ClaudeCallArgs
       },
     },
   );
-  return resp.data?.content?.[0]?.text ?? "";
+  // Join the TEXT blocks rather than reading content[0]. A thinking-capable model (Sonnet 5,
+  // Opus 5 — thinking is on by default there, unlike 4.8) leads with a `thinking` block, so
+  // content[0].text is undefined and the shortcut silently returned "" — a spec that was
+  // generated, paid for, and thrown away, with no error anywhere. Latent until L0177 became the
+  // first dialect to route get_spec off Haiku.
+  return (resp.data?.content ?? [])
+    .filter((block: any) => block?.type === "text")
+    .map((block: any) => block.text ?? "")
+    .join("");
 }
 
 // Collect substantial string literals from the AST pool. Short strings (keys, hex/encoding
