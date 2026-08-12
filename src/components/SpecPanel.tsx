@@ -1,8 +1,24 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getSpec } from '../utils/swr/fetchers';
+
+/**
+ * How long an item must stay selected before its spec is requested.
+ *
+ * Arriving on an item is not the same as wanting its spec. The tab choice persists in
+ * localStorage, so scrolling the item list with Spec open used to fire one request per item passed
+ * — and a request is a MODEL CALL on a cache miss (L0177 runs spec-gen on Sonnet against a ~30KB
+ * instructions.md, ~$0.05 an item), silently, with nothing in the UI to suggest arriving spent
+ * anything. Six items of scrolling did exactly that.
+ *
+ * 750ms is above a scroll-past and below deliberate reading. The cost is that a CACHED spec also
+ * waits, since the client cannot know it is cached without asking — a fixed delay on the hit path
+ * in exchange for not generating on the miss path, which is the trade worth making when one side
+ * costs milliseconds and the other costs money.
+ */
+const SETTLE_MS = 750;
 
 /**
  * `onLoaded` hands the RAW markdown up to the editor, which owns the Copy All button.
@@ -13,8 +29,18 @@ import { getSpec } from '../utils/swr/fetchers';
  * exactly the part that makes it followable.
  */
 export function SpecPanel({ id, user, onLoaded }: any) {
+  // Only this id is fetched, and only once it has held still. Deriving the SWR key from it rather
+  // than gating the fetcher means a passed-over item never becomes a cache entry at all.
+  const [settledId, setSettledId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!id) { setSettledId(null); return; }
+    const timer = setTimeout(() => setSettledId(id), SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [id]);
+
+  const ready = Boolean(user && id && settledId === id);
   const { data: spec, error, isLoading } = useSWR(
-    user && id ? [`getSpec-${id}`, { user, id }] : null,
+    ready ? [`getSpec-${id}`, { user, id }] : null,
     ([_, params]) => getSpec(params),
     { revalidateOnFocus: false }
   );
@@ -22,14 +48,24 @@ export function SpecPanel({ id, user, onLoaded }: any) {
   const remarkPlugins = useMemo(() => [remarkGfm], []);
 
   // Publish on every transition, including back to empty: the button must disappear while a
-  // different item is loading rather than stay live over the previous item's text.
-  const text = (!isLoading && !error && spec?.spec) || "";
+  // different item is settling or loading rather than stay live over the previous item's text.
+  const text = (ready && !isLoading && !error && spec?.spec) || "";
   useEffect(() => { onLoaded?.(text); }, [text, onLoaded]);
 
-  if (isLoading) {
+  // One spinner for both waits, but it turns BACKWARDS while settling and flips forward the moment
+  // the request actually goes out. Same shape, same place, no label — the only thing that changes
+  // is direction, which reads as "something just started" without claiming a word for it. Scrolling
+  // past several items shows a spinner that never flips, which is the honest picture: nothing was
+  // requested. `animationDirection: reverse` reuses Tailwind's existing `animate-spin` keyframes,
+  // so this needs no config and cannot drift from the forward state's timing.
+  if (!ready || isLoading) {
+    const settling = !ready;
     return (
       <div className="flex items-center justify-center h-full p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <div
+          className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"
+          style={settling ? { animationDirection: "reverse" } : undefined}
+        />
       </div>
     );
   }
