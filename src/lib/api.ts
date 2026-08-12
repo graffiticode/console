@@ -207,6 +207,27 @@ export const getApiTask = async ({ auth, id }) => {
   }
 };
 
+/**
+ * A task's COMPILED data — what the dialect's compiler produced, as opposed to `/task`, which
+ * returns only `{ lang, code }` (the AST).
+ *
+ * Same header auth as getApiTask. Returns null rather than throwing on any failure: the only
+ * caller is spec generation, where this is enrichment — a spec must still be produced when the
+ * data is unavailable, just without whatever the compiler computed.
+ */
+export const getApiData = async ({ auth, id }) => {
+  try {
+    const headers = { "Authorization": auth.token };
+    const { status, data } = await getApiJSON(`/data?id=${id}`, null, headers);
+    if (status !== "success") return null;
+    // The compile envelope nests the dialect's own data one level down.
+    return (data as any)?.data ?? data ?? null;
+  } catch (err) {
+    console.warn(`getApiData: could not fetch data for ${id}:`, (err as Error)?.message);
+    return null;
+  }
+};
+
 export const postApiCompile = async ({ accessToken, id, data }) => {
   try {
     // console.log(

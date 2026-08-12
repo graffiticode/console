@@ -10,7 +10,7 @@
 
 import axios from "axios";
 import { unparse } from "@graffiticode/parser";
-import { getApiTask, getLanguageLexicon, getLanguageHints, getLanguageSpecDirective } from "./api";
+import { getApiTask, getApiData, getLanguageLexicon, getLanguageHints, getLanguageSpecDirective } from "./api";
 import { readDialectInstructions, modelRejectsTemperature } from "./code-generation-service";
 import { modeTierFor } from "./model-priority";
 import { modelForProvider } from "./llm-models";
@@ -155,6 +155,30 @@ export function assertCoverage(spec: string, ast: any): CoverageReport {
 }
 
 /**
+ * Append the compiler's `paths` map to the prompt, when the dialect computes one.
+ *
+ * Source alone cannot carry it. `paths` maps each config key the design set to the exact
+ * destination path in the target platform, and the mapping is the COMPILER's — irrecoverable from
+ * the source text, because the flattening is ambiguous (L0177: `title-show` → `title.show`, but
+ * `enable-selection` → `enable_selection`).
+ *
+ * L0177's directive tells the recipe four separate times to transcribe paths verbatim and forbids
+ * hand-expanding kebab names — while the prompt carried only the unparsed AST, so there was nothing
+ * to transcribe FROM. An implementer reported reconstructing all six paths out of Learnosity's
+ * reference docs and SDK examples: the one operation the directive most wanted done by copying was
+ * the only one it forced them to derive. Under fail-open semantics a derived path is worse than an
+ * acknowledged unknown, since a wrong one enforces nothing and looks correct.
+ *
+ * Gated on the data actually having `paths`, so every dialect that computes none gets a
+ * byte-identical prompt and is unaffected.
+ */
+function withCompiledPaths(annSrc: string, compiled: any): string {
+  const paths = compiled?.paths;
+  if (!paths || typeof paths !== "object" || !Object.keys(paths).length) return annSrc;
+  return `${annSrc}\n\n<COMPILED_PATHS>\nThe compiler resolved each config key this design sets to its exact destination path. These are authoritative — reproduce them verbatim and never derive a path from a property name.\n${JSON.stringify(paths, null, 2)}\n`;
+}
+
+/**
  * Generate an English spec for a task. `taskId` may be a composition chain (`head+up1+...`);
  * we describe the head (the authored item).
  */
@@ -164,11 +188,13 @@ export async function generateSpec({ auth, taskId }: { auth: any; taskId: string
   const task = taskList[0] || apiTask;
   const lang = task.lang;
 
-  const [lexicon, hints, instructions, specDirective] = await Promise.all([
+  const [lexicon, hints, instructions, specDirective, compiled] = await Promise.all([
     getLanguageLexicon(lang, auth?.token),
     getLanguageHints(lang, auth?.token),
     readDialectInstructions(lang, auth?.token),
     getLanguageSpecDirective(lang, auth?.token),
+    // The COMPILED data, for the one thing source cannot carry: values the compiler DERIVED.
+    getApiData({ id: taskId, auth }),
   ]);
 
   const annSrc = unparse(task.code, lexicon || {}, { hints });
@@ -184,7 +210,7 @@ export async function generateSpec({ auth, taskId }: { auth: any; taskId: string
   const directive = specDirective?.trim() || SPEC_DIRECTIVE;
   const system = `${instructions}\n\n${directive}`;
   const model = specModelFor(lang);
-  const spec = (await callClaudeForSpec({ system, user: annSrc, apiKey, model })).trim();
+  const spec = (await callClaudeForSpec({ system, user: withCompiledPaths(annSrc, compiled), apiKey, model })).trim();
   const coverage = assertCoverage(spec, task.code);
 
   return { spec, lang, itemId: taskId, coverage, model };
