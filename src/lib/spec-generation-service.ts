@@ -27,8 +27,16 @@ import { modelForProvider } from "./llm-models";
 const DEFAULT_SPEC_TIER = "fast" as const;
 const SPEC_MAX_TOKENS = 8192;
 
+// Generated specs are cached on the item doc, keyed by the taskId they were derived from.
+// A taskId is content-addressed, so it covers every content change — but NOT a change to the
+// prompt assets that shape the output for unchanged content (this file's SPEC_DIRECTIVE, a
+// dialect's spec-directive.md, or its instructions.md). Bump this to invalidate every cached
+// spec at once; it's the lever that exists so those edits never need a purge script. A model
+// change needs no bump — the cache stamps the resolved model and compares it separately.
+export const SPEC_CACHE_VERSION = 1;
+
 /** SPEC_MODEL still wins outright — an operator hatch that needs no deploy and no table edit. */
-function specModelFor(lang: string | null | undefined): string {
+export function specModelFor(lang: string | null | undefined): string {
   return process.env.SPEC_MODEL
     || modelForProvider("anthropic", modeTierFor(lang, "spec") || DEFAULT_SPEC_TIER);
 }
@@ -55,6 +63,8 @@ export interface SpecResult {
   lang: string;
   itemId: string;
   coverage: CoverageReport;
+  /** The model that actually produced this spec, so a cache entry can stamp it. */
+  model: string;
 }
 
 export interface CoverageReport {
@@ -171,5 +181,5 @@ export async function generateSpec({ auth, taskId }: { auth: any; taskId: string
   const spec = (await callClaudeForSpec({ system, user: annSrc, apiKey, model })).trim();
   const coverage = assertCoverage(spec, task.code);
 
-  return { spec, lang, itemId: taskId, coverage };
+  return { spec, lang, itemId: taskId, coverage, model };
 }
