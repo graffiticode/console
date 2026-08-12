@@ -1,10 +1,18 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import useSWR from 'swr';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getSpec } from '../utils/swr/fetchers';
 
-export function SpecPanel({ id, user }: any) {
+/**
+ * `onLoaded` hands the RAW markdown up to the editor, which owns the Copy All button.
+ *
+ * Raw, not the rendered DOM: a spec is written to be pasted into another language's create_item
+ * (or an agent's context), and for a dialect whose spec is a developer recipe the headings and
+ * numbered verification steps are load-bearing structure. Copying the rendered text would flatten
+ * exactly the part that makes it followable.
+ */
+export function SpecPanel({ id, user, onLoaded }: any) {
   const { data: spec, error, isLoading } = useSWR(
     user && id ? [`getSpec-${id}`, { user, id }] : null,
     ([_, params]) => getSpec(params),
@@ -12,6 +20,11 @@ export function SpecPanel({ id, user }: any) {
   );
 
   const remarkPlugins = useMemo(() => [remarkGfm], []);
+
+  // Publish on every transition, including back to empty: the button must disappear while a
+  // different item is loading rather than stay live over the previous item's text.
+  const text = (!isLoading && !error && spec?.spec) || "";
+  useEffect(() => { onLoaded?.(text); }, [text, onLoaded]);
 
   if (isLoading) {
     return (

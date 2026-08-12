@@ -104,7 +104,21 @@ export default function Editor({
     return !isCodeEquivalent(newCode, codeRef.current);
   }, []);
 
+  // Raw spec markdown, published by SpecPanel. State rather than a ref because the Copy All button
+  // is only offered once there is something to copy, which needs a render.
+  const [specText, setSpecText] = React.useState("");
+  const handleSpecLoaded = React.useCallback((text: string) => setSpecText(text || ""), []);
+
   const handleCopy = () => {
+    // The Spec tab copies the raw markdown, not the rendered DOM — see SpecPanel. The Data tab
+    // keeps its existing select-and-execCommand behavior, which copies what is on screen.
+    if (tab === "Spec") {
+      if (!specText) return;
+      navigator.clipboard?.writeText(specText).catch((err) => {
+        console.error('Failed to copy spec: ', err);
+      });
+      return;
+    }
     if (dataPanelRef.current) {
       const selection = window.getSelection();
       const range = document.createRange();
@@ -240,7 +254,7 @@ export default function Editor({
             tab={tab}
             setTab={setTab}
             onCopy={handleCopy}
-            showCopyButton={tab === "Data"}
+            showCopyButton={tab === "Data" || (tab === "Spec" && !!specText)}
           />
         </div>
 
@@ -303,7 +317,7 @@ export default function Editor({
             />
           </div>
           {tab === "Spec" && (
-            <SpecPanel id={itemId} user={user} />
+            <SpecPanel id={itemId} user={user} onLoaded={handleSpecLoaded} />
           )}
           {tab === "Code" && (
             <CodePanel
