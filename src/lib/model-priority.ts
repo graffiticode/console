@@ -208,14 +208,24 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
  * Used by any language with no MODEL_PRIORITY entry, i.e. every language until an
  * eval says otherwise.
  *
- * Anthropic-only on purpose: this is the known-good default, and a single entry
- * means an unevaluated language never silently runs on a provider nobody measured
- * it against. The cost is that such a language has no failover — during an
- * Anthropic outage it fails rather than degrading. Making that trade differently
- * is an operator decision, so it is overridable at runtime (see
- * configuredDefaultPriority) rather than requiring a deploy.
+ * Anthropic first — the known-good default — with openai as a blind fallback so an
+ * unevaluated language DEGRADES instead of failing when Anthropic is down. This was
+ * anthropic-only until 2026-08-12, on the reasoning that a single entry means such a
+ * language never silently runs on a provider nobody measured it against. What that
+ * reasoning left out is what happens when the one family is unavailable: L0177
+ * create_item returned `Overloaded` three times running with nowhere to fall through
+ * to, and a dialect with no eval set is exactly the kind most likely to be in this
+ * position.
+ *
+ * The cost is unchanged and still real: a language that lands on openai here is
+ * running on a provider nothing has scored it against, and this applies to EVERY
+ * unevaluated language, not just the one that prompted it. A dialect that would
+ * rather fail than generate unmeasured must say so with its own `order`. An eval,
+ * not this constant, is what should eventually decide each language's ordering.
+ *
+ * Still overridable at runtime without a deploy — see configuredDefaultPriority.
  */
-export const DEFAULT_MODEL_PRIORITY: LlmProvider[] = ["anthropic"];
+export const DEFAULT_MODEL_PRIORITY: LlmProvider[] = ["anthropic", "openai"];
 
 /** Canonical 4-digit form. Matches findLanguageById in languages.ts. */
 function normalizeLangId(lang: string | number): string {
