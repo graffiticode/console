@@ -33,7 +33,13 @@ const SPEC_MAX_TOKENS = 8192;
 // dialect's spec-directive.md, or its instructions.md). Bump this to invalidate every cached
 // spec at once; it's the lever that exists so those edits never need a purge script. A model
 // change needs no bump — the cache stamps the resolved model and compares it separately.
-export const SPEC_CACHE_VERSION = 1;
+// 2 (2026-08-12): L0177 corrected three facts in instructions.md + spec-directive.md — the
+// `init()` argument order (the shipped one registered no listeners and produced a silently blank
+// editor), that `request.user` is an object, and that `errorListener` can fire after
+// `readyListener`. None of that moves a taskId, a lang, or the resolved model, so 14 cached specs
+// across two accounts would have kept serving instructions that cannot work. This is the case the
+// version stamp exists for.
+export const SPEC_CACHE_VERSION = 2;
 
 /** SPEC_MODEL still wins outright — an operator hatch that needs no deploy and no table edit. */
 export function specModelFor(lang: string | null | undefined): string {
