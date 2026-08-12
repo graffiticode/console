@@ -1477,9 +1477,13 @@ export async function generateCode({
       }
     }
 
+    // Size only, never content. `formattedPrompt` is the serialized {system, messages}: the
+    // system half is the dialect instructions, but `messages` carries the USER'S REQUEST, so
+    // dumping it logged prompts outright — which the privacy contract forbids (lengths only).
+    // Size is also what this line was actually diagnostic for: a context that suddenly doubles,
+    // or instructions that failed to load and left the prompt near-empty.
     console.log(
-      "generateCode()",
-      "formattedPrompt=" + formattedPrompt,
+      `[code-gen] rid=${requestId} lang=L${lang} promptBytes=${formattedPrompt?.length ?? 0}`,
     );
 
     // Start generation stage
