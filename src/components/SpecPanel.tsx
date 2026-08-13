@@ -28,19 +28,30 @@ const SETTLE_MS = 750;
  * numbered verification steps are load-bearing structure. Copying the rendered text would flatten
  * exactly the part that makes it followable.
  */
-export function SpecPanel({ id, user, onLoaded }: any) {
-  // Only this id is fetched, and only once it has held still. Deriving the SWR key from it rather
-  // than gating the fetcher means a passed-over item never becomes a cache entry at all.
-  const [settledId, setSettledId] = useState<string | null>(null);
+export function SpecPanel({ id, user, taskId, onLoaded }: any) {
+  // What is being described is the (item, task) pair, not the item — so both the settle timer and
+  // the SWR key are derived from both.
+  //
+  // The taskId is what makes the client's cache identity match the server's. The server validates
+  // its stored spec against the taskId (isSpecCacheHit in resolvers), so editing an item misses
+  // that cache and regenerates; but the client keyed only on the item id, which does not change
+  // when you edit, so SWR served its in-memory copy and the panel kept showing a spec of the
+  // PREVIOUS code — with revalidateOnFocus off, until a full reload. A taskId is content-addressed,
+  // so keying on it means any content change invalidates both caches and no content change
+  // invalidates either.
+  const target = id && taskId ? `${id}::${taskId}` : null;
+  const [settled, setSettled] = useState<string | null>(null);
   useEffect(() => {
-    if (!id) { setSettledId(null); return; }
-    const timer = setTimeout(() => setSettledId(id), SETTLE_MS);
+    if (!target) { setSettled(null); return; }
+    // Keyed on the pair, so a debounced re-post while typing restarts the wait instead of firing a
+    // generation per keystroke — the cost here is a model call, not just a fetch.
+    const timer = setTimeout(() => setSettled(target), SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [id]);
+  }, [target]);
 
-  const ready = Boolean(user && id && settledId === id);
+  const ready = Boolean(user && target && settled === target);
   const { data: spec, error, isLoading } = useSWR(
-    ready ? [`getSpec-${id}`, { user, id }] : null,
+    ready ? [`getSpec-${target}`, { user, id }] : null,
     ([_, params]) => getSpec(params),
     { revalidateOnFocus: false }
   );
@@ -51,6 +62,18 @@ export function SpecPanel({ id, user, onLoaded }: any) {
   // different item is settling or loading rather than stay live over the previous item's text.
   const text = (ready && !isLoading && !error && spec?.spec) || "";
   useEffect(() => { onLoaded?.(text); }, [text, onLoaded]);
+
+  // An item with no task has nothing to describe, and it never will until it compiles — so say so
+  // rather than spinning. Before the key included taskId this fell out for free: the fetch ran,
+  // failed, and hit the error branch below. Now `target` is null and `ready` never becomes true,
+  // which would spin forever.
+  if (id && !taskId) {
+    return (
+      <div className="p-4 text-sm text-gray-500">
+        No spec available — compile the item first.
+      </div>
+    );
+  }
 
   // One spinner for both waits, but it turns BACKWARDS while settling and flips forward the moment
   // the request actually goes out. Same shape, same place, no label — the only thing that changes

@@ -317,7 +317,7 @@ export default function Editor({
             />
           </div>
           {tab === "Spec" && (
-            <SpecPanel id={itemId} user={user} onLoaded={handleSpecLoaded} />
+            <SpecPanel id={itemId} user={user} taskId={taskId} onLoaded={handleSpecLoaded} />
           )}
           {tab === "Code" && (
             <CodePanel
