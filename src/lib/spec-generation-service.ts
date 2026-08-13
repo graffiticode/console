@@ -25,7 +25,17 @@ import { modelForProvider } from "./llm-models";
 // the same table that decides code-gen routing, which is also the only place you can read it.
 // Family is fixed: this calls the Anthropic Messages API directly.
 const DEFAULT_SPEC_TIER = "fast" as const;
-const SPEC_MAX_TOKENS = 8192;
+
+/**
+ * Headroom for thinking AND text, because `max_tokens` caps their SUM on a thinking-capable model.
+ *
+ * At 8192 this was marginal and failing silently. A measured L0177 recipe used 7990 output tokens —
+ * 3451 of them thinking — leaving ~200 to spare; runs where the model thought longer were cut off
+ * mid-document, losing the entire Verification steps section. The result still parsed, still looked
+ * like a recipe, and was cached as if complete. Nothing detected it, because the caller only ever
+ * read the text blocks.
+ */
+const SPEC_MAX_TOKENS = 24576;
 
 // Generated specs are cached on the item doc, keyed by the taskId they were derived from.
 // A taskId is content-addressed, so it covers every content change — but NOT a change to the
@@ -104,6 +114,19 @@ async function callClaudeForSpec({ system, user, apiKey, model }: ClaudeCallArgs
       },
     },
   );
+  // A truncated spec must never reach the caller, and must never be cached. Hitting the token
+  // ceiling ends the response mid-sentence, but the text that did arrive still looks like a
+  // recipe — headings, numbered steps, prose — just missing whatever came after the cut, which
+  // for L0177 was the entire Verification steps section. Throwing is right rather than returning
+  // partial text: getSpec's caller caches what it returns, so a silent truncation would be stored
+  // and served indefinitely.
+  if (resp.data?.stop_reason === "max_tokens") {
+    throw new Error(
+      `spec generation hit the ${SPEC_MAX_TOKENS}-token ceiling and was truncated ` +
+      `(thinking + text share that budget); raise SPEC_MAX_TOKENS rather than shipping a partial spec`,
+    );
+  }
+
   // Join the TEXT blocks rather than reading content[0]. A thinking-capable model (Sonnet 5,
   // Opus 5 — thinking is on by default there, unlike 4.8) leads with a `thinking` block, so
   // content[0].text is undefined and the shortcut silently returned "" — a spec that was
