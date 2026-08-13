@@ -193,6 +193,24 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   //   FAST      luna         1/39      39/39    4.5s   $0.0017
   //             haiku        6/39      33/39    2.8s   $0.0020
   //
+  // SECOND SWEEP 2026-08-13 (model-eval-2026-08-13T16-48-47-151Z, same 13 cases x 3 trials,
+  // dialect 77480abe7aa7, balanced tier only) — and it changes how to read the row above:
+  //   terra    0/39 invented, 39/39 compile, p50 3.4s, $0.0018
+  //   sonnet   3/39 invented, 38/39 compile, p50 5.4s, $0.0070
+  // Sonnet's inventions were hole-no-domain/t1 and hole-no-author/t0,t1 — the same two cases haiku
+  // fails, and the design-hole count corroborates independently (10 of 12 available, the missing
+  // two being the holes it filled).
+  //
+  // So **sonnet's 0/39 was a lucky sample, not a property**. Across two independent sweeps terra is
+  // 0/39 and 0/39 while sonnet is 0/39 and 3/39. That does not move the ordering — it reinforces
+  // terra as primary — but it does mean the FAILOVER is measurably weaker on the metric this
+  // dialect turns on, and an Anthropic-served L0177 request can fabricate a serving domain roughly
+  // one time in thirteen. There is no third balanced-tier option to fail over to, so this is
+  // recorded rather than acted on; revisit if a quality-tier failover is ever justified.
+  //
+  // The general lesson, since it keeps recurring here: a single sweep at n=39 cannot distinguish
+  // "never does this" from "does this occasionally". Read any 0/N in this table as an upper bound.
+  //
   // INVENTED is the metric this dialect turns on: the program asserted a `domain`, `user-id` or
   // `reference` that its request never supplied. instructions.md forbids exactly that ("omit them
   // and the compiler flags them as design holes for the client to supply"), because a fabricated
