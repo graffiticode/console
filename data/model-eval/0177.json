@@ -68,8 +68,8 @@
     "design": {
       "view": null,
       "supplies": ["domain", "user-id"],
-      "expectHoles": ["view"],
-      "note": "The prompt names no authoring experience. The failure worth catching is a guessed item-edit that then INVENTS a reference to go with it; leaving the view as a hole is the correct outcome."
+      "expectHoles": ["view", "reference"],
+      "note": "The prompt names no authoring experience, and TWO outcomes are correct. (a) Leave the view unstated, yielding a `view` hole. (b) Map 'authoring… add questions… delete widgets' to item-edit, which then requires a `reference` the prompt never gave, yielding a `reference` hole. All four models measured on 2026-08-12 took (b); the dialect's own instruction is to map the request to the right view, and asking for a concrete reference is better steering than asking which of four views was meant. Either hole passes. What fails is a guessed view accompanied by an INVENTED reference — a design that reports complete, which is the one outcome this case exists to catch."
     }
   },
   {

@@ -171,11 +171,17 @@ const DIALECT_ANCHORS: Record<string, DialectAnchors> = {
   //      nothing. So "the design says the picker is restricted" and "the picker is restricted"
   //      are different claims, and only the first is visible to a compiler.
   "0177": {
-    version: 1,
+    // v2 (2026-08-13): v1's band 4 was unreachable. It rewarded reaching for the ENFORCED
+    // mechanism (`question-type-groups`) over the intent-only one (`allow-widgets`) — but the
+    // compiler emits a `specificity` advisory when `question-type-groups` is absent, so that
+    // choice is compiler-visible and belongs to band 3 by rule 5 below. Measured on the first
+    // sweep: every model used it on every case that asked for a restriction, so the band never
+    // discriminated. The bands now split on the two things the compiler genuinely cannot see —
+    // whether the VIEW matches the experience described, and whether the design is MINIMAL.
+    version: 2,
     soft: [
-      // The 4/5 split is the fail-open distinction: does it hold in the editor, and is it minimal.
-      { score: 4, meaning: "**In force, not just on paper** — where the request asks for a behaviour, the design reaches for the mechanism Learnosity actually enforces rather than the one that merely records intent: a question-type restriction expressed as `question-type-groups` (verified to restrict the picker) rather than `allow-widgets` alone (names types, enforces nothing); permissions on the `widget` member the item editor reads, not on a view that will drop them. Nothing is attached to a view that doesn't accept it. A developer implementing this recipe would get the editor the client described." },
-      { score: 5, meaning: "**Exemplar** — all of 4, and MINIMAL: not one property set that the request neither asked for nor requires, so a reader can tell what the client actually wanted from the program alone (the `back`/`scoring`/`reference-prefix`/`widget` boilerplate that used to ride in from the starting template is the anti-pattern — it is inherited noise, and it makes every design look alike). The view is the one that fits the experience described rather than the nearest one that compiles, and options that only make sense together appear together. You would show it to someone learning the dialect." },
+      { score: 4, meaning: "**The right experience, and only what was asked** — the view matches the experience the client described rather than the nearest one that compiles (an \"authors browse and open items\" request answered with `item-list`, not `item-edit` with a reference invented to satisfy it), and the design sets what the request asked for WITHOUT riding along extras it never mentioned. The compiler cannot check either: it knows a view was named, not whether it is the right one, and it will happily accept configuration nobody asked for. A reviewer would send this to a developer as-is." },
+      { score: 5, meaning: "**Exemplar** — all of 4, and minimal to the point of being readable as a statement of intent: someone who has never seen the request could reconstruct it from the program, because nothing in it is unexplained by the request. Where the dialect offers an enforced mechanism and an intent-only one for the same goal, both are present and distinguishable (the enforced `question-type-groups` doing the work, `allow-widgets` recording the finer intent the API cannot enforce) so the recipe can carry the distinction to the developer. You would show it to someone learning the dialect." },
     ],
   },
 };
