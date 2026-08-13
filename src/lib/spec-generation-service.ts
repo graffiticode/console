@@ -27,15 +27,30 @@ import { modelForProvider } from "./llm-models";
 const DEFAULT_SPEC_TIER = "fast" as const;
 
 /**
- * Headroom for thinking AND text, because `max_tokens` caps their SUM on a thinking-capable model.
+ * Ceiling, and no thinking. Both were set by measurement on L0177, the longest spec this produces.
  *
- * At 8192 this was marginal and failing silently. A measured L0177 recipe used 7990 output tokens —
- * 3451 of them thinking — leaving ~200 to spare; runs where the model thought longer were cut off
- * mid-document, losing the entire Verification steps section. The result still parsed, still looked
- * like a recipe, and was cached as if complete. Nothing detected it, because the caller only ever
- * read the text blocks.
+ * 8192 was silently truncating: a run used 7990 output tokens, 3451 of them thinking, and anything
+ * that thought longer lost the tail of the document — including the entire Verification steps
+ * section — while still looking like a complete recipe and being cached as one.
+ *
+ * Raising it to 24576 fixed that and broke something worse: thinking expanded to fill the room, a
+ * generation took 82.7s, and `get_spec` is a SYNCHRONOUS call behind Cloudflare's 100s edge
+ * timeout. Real callers got a 524 while the work completed and cached server-side — an error for
+ * the agent, with the answer sitting in the cache it never saw.
+ *
+ * Measured 3 cases x {adaptive, disabled}, same prompt, scored on 12 content checks:
+ *   adaptive   86.3s   7663 output tokens   33/36
+ *   disabled   42.7s   3707 output tokens   33/36
+ * Identical quality, half the wall-clock, half the tokens. That is unsurprising for this task —
+ * spec generation is a constrained read-and-verbalize whose output is determined by the source
+ * plus the directive, which is the same reason there is no RAG layer here. Thinking had room to
+ * spend and nothing to buy.
+ *
+ * The one observed difference: a thinking-disabled run emitted `#` headings where the directive
+ * asks for `##`. Cosmetic, and cheap at 44 seconds.
  */
-const SPEC_MAX_TOKENS = 24576;
+const SPEC_MAX_TOKENS = 16384;
+const SPEC_THINKING = { type: "disabled" } as const;
 
 // Generated specs are cached on the item doc, keyed by the taskId they were derived from.
 // A taskId is content-addressed, so it covers every content change — but NOT a change to the
@@ -103,6 +118,7 @@ async function callClaudeForSpec({ system, user, apiKey, model }: ClaudeCallArgs
       system,
       messages: [{ role: "user", content: user }],
       max_tokens: SPEC_MAX_TOKENS,
+      thinking: SPEC_THINKING,
       // Opus deprecated `temperature` — omit it there or the API 400s.
       ...(modelRejectsTemperature(model) ? {} : { temperature: 0 }),
     },
