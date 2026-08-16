@@ -11,6 +11,11 @@ import { planSequence, classifyAndRoute, composesWithFor, fenceComposition, orch
 import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
+import {
+  adoptWorkspace,
+  adoptSiblingWorkspace,
+  isFreePlanItemExpired,
+} from "../../lib/workspace-adoption";
 import { reportItemUsage } from "../../lib/item-metering";
 import { checkItemCreateAllowed } from "../../lib/usage-service";
 import { emitEvent, actor } from "../../lib/funnel-events";
@@ -56,7 +61,7 @@ function isItemVisibleToFreePlan(
   // session per tool call) retrieve/refine an item it just created. LISTING still
   // requires the session match, so a session can never enumerate another's items.
   if (!opts.byId && data?.sessionNamespace !== auth.sessionNamespace) return false;
-  if (typeof data?.expiresAt === "number" && data.expiresAt <= now) return false;
+  if (isFreePlanItemExpired(data, now)) return false;
   return true;
 }
 
@@ -70,7 +75,7 @@ function isItemVisibleToFreePlan(
  */
 function isExpiredForFreePlan(data: any, auth: AuthArg, now = Date.now()): boolean {
   if (!auth.freePlan) return false;
-  return typeof data?.expiresAt === "number" && data.expiresAt <= now;
+  return isFreePlanItemExpired(data, now);
 }
 
 /**
@@ -148,29 +153,28 @@ async function assertRevisionsRemaining(auth: AuthArg, itemId?: string): Promise
 }
 
 /**
- * Rebind the caller's workspace to the one an existing item already belongs to.
+ * Look up a sibling item and adopt its workspace.
  *
- * An MCP "session" is not a durable thing — it dies on restart and on scale-out,
- * and ChatGPT mints a fresh one per tool call. Its namespace is therefore a bad
- * owner for an item that outlives it. What the client DOES re-present across all
- * that churn is the item id, which this codebase already treats as a capability
- * (see isItemVisibleToFreePlan's byId branch). So the item's namespace, not the
- * transport's, is the real workspace identity.
+ * The decision rules live in lib/workspace-adoption.ts so they can be asserted
+ * without a database (this module opens Firestore at import time). Only the
+ * lookup is here.
  *
- * Mutation only. A read must never pull the reader into someone else's
- * workspace; touching an item you were merely shown shouldn't enroll you in it.
- *
- * Mutates `auth` deliberately: resolveAuth builds a fresh object per request, so
- * the rebind is request-scoped, and everything downstream in this request
- * (expiresAt refresh, version stamping, the claim token in the response) has to
- * see the adopted value or it will write the ephemeral one back.
+ * Best-effort by design: an unknown, expired, or unreadable id leaves the caller
+ * in their own workspace rather than failing the create. The id arrives as a hint
+ * from a model, and a stale hint must never cost the user their item.
  */
-function adoptWorkspace(auth: AuthArg, itemData: any): void {
-  if (!auth.freePlan) return;
-  const owner = itemData?.sessionNamespace;
-  if (typeof owner !== "string" || !owner) return;
-  if (owner === auth.sessionNamespace) return;
-  auth.sessionNamespace = owner;
+export async function adoptWorkspaceFromSibling(
+  auth: AuthArg,
+  siblingId?: string,
+): Promise<void> {
+  if (!auth.freePlan || !siblingId) return;
+  try {
+    const doc = await db.doc(`users/${auth.uid}/items/${siblingId}`).get();
+    if (!doc.exists) return;
+    adoptSiblingWorkspace(auth, doc.data());
+  } catch (err) {
+    console.error("adoptWorkspaceFromSibling()", "ERROR", err);
+  }
 }
 
 /**

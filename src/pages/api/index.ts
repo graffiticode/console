@@ -31,6 +31,7 @@ import {
   deleteCredential,
   claimFreePlanSession,
   logClaimEvent,
+  adoptWorkspaceFromSibling,
 } from "./resolvers";
 import { verifyClaimToken } from "../../lib/claim-token";
 import { checkItemCreateAllowed } from "../../lib/usage-service";
@@ -156,6 +157,11 @@ const typeDefs = `
   type GenerationJob {
     itemId: String!
     status: String!
+    # The workspace the item actually landed in, as the same sha256 namespace the
+    # funnel already logs. NOT a credential — the console only ever accepts a
+    # *signed* session token — so it is safe to return and to log. Lets a caller
+    # see whether a siblingOf hint was honoured. Null for authenticated callers.
+    workspaceNamespace: String
   }
 
   type GeneratedCode {
@@ -297,7 +303,7 @@ const typeDefs = `
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
     generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
-    startCodeGeneration(itemId: String, lang: String!, name: String, client: String, clientKind: String, geoCountry: String, prompt: String!, modification: String!, currentSrc: String): GenerationJob!
+    startCodeGeneration(itemId: String, siblingOf: String, lang: String!, name: String, client: String, clientKind: String, geoCountry: String, prompt: String!, modification: String!, currentSrc: String): GenerationJob!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
@@ -471,6 +477,7 @@ const resolvers = {
     startCodeGeneration: async (_, args, ctx) => {
       const {
         itemId,
+        siblingOf,
         lang,
         name,
         client,
@@ -499,7 +506,12 @@ const resolvers = {
         clientKind: clientKind ?? ctx.clientKind,
         geoCountry: geoCountry ?? ctx.geoCountry,
       };
-      if (!itemId && ctx.freePlan && ctx.sessionNamespace) {
+      //
+      // Also gated on `!siblingOf`: a sibling create JOINS an existing workspace,
+      // so it is by definition not a new one. Without this, a transport-per-call
+      // client registers one "new creating workspace" per ITEM and the agent OMTM
+      // reports create volume as user growth.
+      if (!itemId && !siblingOf && ctx.freePlan && ctx.sessionNamespace) {
         await registerFirstCreateAttempt({
           key: ctx.sessionNamespace,
           auth: "free",
@@ -513,9 +525,21 @@ const resolvers = {
 
       const auth = await resolveAuth(ctx);
 
+      // Adopt BEFORE createItem: freePlanItemFields(auth) stamps the new item with
+      // auth.sessionNamespace, so the rebind has to land first or the item is
+      // written into the very workspace we are trying to escape.
+      if (!itemId) {
+        await adoptWorkspaceFromSibling(auth, siblingOf);
+      }
+
       // Authenticated has to wait for the uid. Keyed on sha256(uid) so a token
       // rotation doesn't invent a second workspace.
-      let workspaceKey = ctx.freePlan ? ctx.sessionNamespace : undefined;
+      //
+      // Free-plan reads the ADOPTED namespace, not the header's: resolveFirstOutcome
+      // has to land on the row this create actually belongs to.
+      let workspaceKey = ctx.freePlan
+        ? (auth.sessionNamespace ?? ctx.sessionNamespace)
+        : undefined;
       if (!ctx.freePlan && auth.uid) {
         workspaceKey = hashUid(auth.uid);
         if (!itemId) {
@@ -533,8 +557,16 @@ const resolvers = {
       // Credential the worker replays to act as this caller. For free-plan we
       // re-derive fresh credentials in the worker (idTokens are short-lived and
       // dispatch can lag), so carry the session, not a baked idToken.
+      //
+      // Carries the ADOPTED namespace: the item has just been written into the
+      // sibling's workspace, so a worker replaying the pre-adoption one would act
+      // as a different workspace than the item it is generating for.
       const authReplay = ctx.freePlan
-        ? { kind: "freePlan" as const, sessionNamespace: ctx.sessionNamespace, sessionUuid: ctx.sessionUuid }
+        ? {
+            kind: "freePlan" as const,
+            sessionNamespace: auth.sessionNamespace ?? ctx.sessionNamespace,
+            sessionUuid: ctx.sessionUuid,
+          }
         : { kind: "bearer" as const, token: ctx.token };
 
       let id = itemId;
@@ -568,7 +600,11 @@ const resolvers = {
         client,
       });
 
-      return { itemId: id, status: "generating" };
+      return {
+        itemId: id,
+        status: "generating",
+        workspaceNamespace: auth.freePlan ? (auth.sessionNamespace ?? null) : null,
+      };
     },
 
     postTask: async (_, args, ctx) => {

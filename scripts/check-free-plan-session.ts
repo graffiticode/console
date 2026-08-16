@@ -14,6 +14,7 @@ import {
 } from "../src/lib/free-plan-session-token";
 import { mintClaimToken, verifyClaimToken } from "../src/lib/claim-token";
 import { isFreePlanRequest, deriveSessionNamespace } from "../src/lib/free-plan-context";
+import { adoptSiblingWorkspace } from "../src/lib/workspace-adoption";
 
 let bad = 0;
 function check(label: string, ok: boolean, detail = "") {
@@ -92,6 +93,35 @@ async function main() {
     check("missing salt throws instead of hashing unsalted", true);
   }
   process.env.FREE_PLAN_NAMESPACE_SALT = salt;
+
+  // --- sibling workspace adoption ---
+  // A create names no item of its own, so without this a client that mints a
+  // fresh session per tool call opens a new workspace per item and no single
+  // claim link can save the conversation.
+  const OTHER = "b".repeat(64);
+  const live = { sessionNamespace: OTHER, expiresAt: Date.now() + 60_000 };
+
+  const joins = { freePlan: true, sessionNamespace: NS };
+  adoptSiblingWorkspace(joins, live);
+  check("adopts a live sibling's workspace", joins.sessionNamespace === OTHER);
+
+  const same = { freePlan: true, sessionNamespace: OTHER };
+  adoptSiblingWorkspace(same, live);
+  check("no-ops when already in the sibling's workspace", same.sessionNamespace === OTHER);
+
+  // An aged-out item is not a workspace to join, exactly as it is not one to read.
+  const viaExpired = { freePlan: true, sessionNamespace: NS };
+  adoptSiblingWorkspace(viaExpired, { sessionNamespace: OTHER, expiresAt: Date.now() - 1 });
+  check("declines an expired sibling", viaExpired.sessionNamespace === NS);
+
+  // Authenticated callers have a durable identity and must never be rebound.
+  const signedIn = { freePlan: false, sessionNamespace: NS };
+  adoptSiblingWorkspace(signedIn, live);
+  check("ignores a sibling for an authenticated caller", signedIn.sessionNamespace === NS);
+
+  const noOwner = { freePlan: true, sessionNamespace: NS };
+  adoptSiblingWorkspace(noOwner, { expiresAt: Date.now() + 60_000 });
+  check("declines a sibling with no workspace of its own", noOwner.sessionNamespace === NS);
 
   console.log(bad ? `\n${bad} failure(s)` : "\nall ok");
   process.exit(bad ? 1 : 0);
