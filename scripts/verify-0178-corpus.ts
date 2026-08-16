@@ -26,11 +26,26 @@ async function main() {
   const rows: Array<{ name: string; id: string; ok: boolean; why: string }> = [];
 
   for (const [name, prompt] of Object.entries(prompts)) {
-    const snap = await db.collection(`users/${UID}/items`).where("name", "==", name).get();
-    const doc = snap.docs.find(d => ["0178", "0177"].includes(String((d.data() as any).lang)));
-    if (!doc) { rows.push({ name, id: "-", ok: false, why: "no item with that name" }); continue; }
+    // Names are NOT unique across languages — the NNN convention repeats per dialect, so this
+    // account holds an L0177 "001" and an L0178 "001". Matching on name alone found the L0177 row
+    // and reported the L0178 item as misrouted, which was a lie about a perfectly good item and
+    // cost a round of misdiagnosis. Query by lang first; a name that matches nothing here is a
+    // miss to report, never a reason to fall back to another language's row.
+    const snap = await db.collection(`users/${UID}/items`)
+      .where("lang", "==", "0178").where("name", "==", name).get();
+    if (snap.empty) {
+      // Distinguish "never created" from "created but the router sent it elsewhere" — the second
+      // is a routing failure and deserves to say so.
+      const anywhere = await db.collection(`users/${UID}/items`).where("name", "==", name).get();
+      const elsewhere = anywhere.docs.map(x => String((x.data() as any).lang)).filter(l => l !== "0178");
+      rows.push({
+        name, id: "-", ok: false,
+        why: elsewhere.length ? `no L0178 item; a same-named item exists under ${[...new Set(elsewhere)].join(",")}` : "no item with that name",
+      });
+      continue;
+    }
+    const doc = snap.docs[0];
     const d = doc.data() as any;
-    if (String(d.lang) !== "0178") { rows.push({ name, id: doc.id, ok: false, why: `MISROUTED to ${d.lang}` }); continue; }
     if (!d.code) { rows.push({ name, id: doc.id, ok: false, why: `no code (${d.generationStatus ?? "?"})` }); continue; }
 
     const src = unparse(d.code, lex || {}, {}).replace(/\s+/g, " ");
