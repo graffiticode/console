@@ -15,6 +15,7 @@ import {
 import { mintClaimToken, verifyClaimToken } from "../src/lib/claim-token";
 import { isFreePlanRequest, deriveSessionNamespace } from "../src/lib/free-plan-context";
 import { adoptSiblingWorkspace } from "../src/lib/workspace-adoption";
+import { emitEvent } from "../src/lib/funnel-events";
 
 let bad = 0;
 function check(label: string, ok: boolean, detail = "") {
@@ -122,6 +123,34 @@ async function main() {
   const noOwner = { freePlan: true, sessionNamespace: NS };
   adoptSiblingWorkspace(noOwner, { expiresAt: Date.now() + 60_000 });
   check("declines a sibling with no workspace of its own", noOwner.sessionNamespace === NS);
+
+  // --- lang never carries a prompt into the logs ---
+  // emitEvent normalizes `lang` centrally because the call sites kept passing the
+  // raw `language` tool argument, which is free text. buildScopeError is the
+  // sharpest case: it fires when the language was NOT recognised, so its value is
+  // the one most likely to be a description.
+  const emitted = (fields: Record<string, unknown>) => {
+    const lines: string[] = [];
+    const orig = console.log;
+    console.log = (s: string) => void lines.push(s);
+    try {
+      emitEvent("wall_hit", fields as any);
+    } finally {
+      console.log = orig;
+    }
+    return JSON.parse(lines[0] ?? "{}");
+  };
+
+  const leak = emitted({ wall: "language_scope", lang: "create a green bar chart using mock data" });
+  check("a prompt in `lang` is replaced, not logged", leak.lang === "(invalid)");
+  check("and no fragment of it survives", !JSON.stringify(leak).includes("bar chart"));
+
+  const long = emitted({ wall: "language_scope", lang: "make me a quiz about ".repeat(40) });
+  check("a long prompt is not merely truncated to 200 chars", long.lang === "(invalid)");
+
+  check("real ids still pass through canonically", emitted({ lang: "0173" }).lang === "L0173");
+  check("case and prefix variants converge", emitted({ lang: "l0173" }).lang === "L0173");
+  check("an absent lang stays absent", emitted({ wall: "item_limit" }).lang === undefined);
 
   console.log(bad ? `\n${bad} failure(s)` : "\nall ok");
   process.exit(bad ? 1 : 0);

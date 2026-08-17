@@ -165,6 +165,19 @@ export function emitEvent(
     };
     for (const [key, value] of Object.entries(fields)) {
       if (value === undefined || value === null) continue;
+      // `lang` is normalized HERE rather than at each call site, because the
+      // call sites kept forgetting: item_created, item_updated,
+      // item_generation_failed and wall_hit all passed the raw `language` tool
+      // argument straight through. That argument is free text, so prompts
+      // reached the logs — and buildScopeError is the worst offender, since it
+      // fires exactly when the language was NOT recognised, which is precisely
+      // when the value is most likely to be a description. Truncating to 200
+      // chars is not a defence; the value has to be replaced, not shortened.
+      if (key === "lang") {
+        const normalized = langKey(value);
+        if (normalized !== undefined) payload[key] = normalized;
+        continue;
+      }
       payload[key] = typeof value === "string" ? value.slice(0, 200) : value;
     }
     console.log(JSON.stringify(payload));
