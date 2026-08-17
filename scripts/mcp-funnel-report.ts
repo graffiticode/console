@@ -18,10 +18,14 @@
  *                                        [--from YYYY-MM-DD] [--to YYYY-MM-DD]
  *                                        [--freshness 7d] [--output mcp-funnel.html]
  *
+ * Auth — one login covers both halves:
+ *   gcloud auth login                          (Cloud Logging, via the shell-out)
+ *   gcloud auth application-default login      (Firestore, via ADC)
+ * Set GRAFFITICODE_APP_CREDENTIALS to a service-account key path only if you
+ * need to override ADC; it is no longer required.
+ *
  * Requires in .env.local:
- *   GRAFFITICODE_APP_CREDENTIALS  — service-account key path (Firestore)
  *   FREE_PLAN_NAMESPACE_SALT      — to derive namespaces from claimedFrom
- * And: `gcloud auth login` (or ADC) with logging.read on graffiticode-app.
  */
 
 import admin from 'firebase-admin';
@@ -54,11 +58,16 @@ delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
 
 const PROJECT = 'graffiticode-app';
 
+// An explicit key wins; otherwise fall through to Application Default
+// Credentials, which `gcloud auth application-default login` provides.
+//
+// This used to hard-exit without the env var, which meant the report was
+// unrunnable on a machine that was already authenticated to the project for the
+// `gcloud logging read` half it shells out to — the two halves demanded
+// different credentials for the same data. Preferring ADC also avoids putting a
+// long-lived service-account key on disk just to read a report.
 if (process.env.GRAFFITICODE_APP_CREDENTIALS) {
   process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GRAFFITICODE_APP_CREDENTIALS;
-} else {
-  console.error('Error: GRAFFITICODE_APP_CREDENTIALS environment variable not set');
-  process.exit(1);
 }
 
 admin.initializeApp({
