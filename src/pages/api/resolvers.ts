@@ -18,7 +18,7 @@ import {
 } from "../../lib/workspace-adoption";
 import { reportItemUsage } from "../../lib/item-metering";
 import { checkItemCreateAllowed } from "../../lib/usage-service";
-import { emitEvent, actor } from "../../lib/funnel-events";
+import { emitEvent, actor, langKey } from "../../lib/funnel-events";
 import {
   assertWithinDailyPace,
   buildItemExpiredError,
@@ -980,6 +980,15 @@ export async function generateCode({
     await assertRevisionsRemaining(auth, itemId);
 
     prompt = prompt.trim();
+    // What every log line in this function must use in place of `language`.
+    //
+    // `language` is a free-text tool argument, so it is a prompt channel: clients
+    // really do send descriptions in it, and the routing/RAG lines below fire on
+    // the scope gate — precisely the path a non-language value takes. `language`
+    // itself stays raw because the router needs the real value; only the LOGS get
+    // the canonical form. Internally-derived ids (routedLang, permits, sequence,
+    // headLang) are ours and need no such treatment.
+    const langLog = langKey(language);
     let description = null;
     let changeSummary = null;
     let model = null;
@@ -989,7 +998,11 @@ export async function generateCode({
 
     ragLog(rid, "request.start", {
       promptLength: prompt.length,
-      language,
+      // langKey, not the raw value: `language` is a free-text tool argument and
+      // clients put prompts in it. Logging promptLength instead of prompt right
+      // above and then passing this through verbatim leaked the thing the line
+      // above is careful about.
+      language: langLog,
       hasCurrentSrc: !!currentSrc,
     });
 
@@ -1059,18 +1072,21 @@ export async function generateCode({
         const route = await classifyAndRoute({ userRequest: prompt, currentLang: language });
         // Log EVERY decision (in-scope included) so routing is observable — an in-scope verdict
         // is otherwise silent, which masks scope.json contracts that are too permissive.
-        console.log(`[routing] rid=${rid} scope-gate lang=L${language} inScope=${route.inScope} routedLang=${route.routedLang ? "L" + route.routedLang : "none"}${route.reason ? ` reason=${route.reason}` : ""}`);
-        ragLog(rid, "preflight.classify", { lang: language, inScope: route.inScope, routedLang: route.routedLang, reason: route.reason });
+        // `lang=${langKey(language)}` rather than `lang=L${language}`: this line
+        // fires on the scope gate, which is exactly the path a junk `language`
+        // reaches, so the raw interpolation printed whole prompts.
+        console.log(`[routing] rid=${rid} scope-gate lang=${langLog} inScope=${route.inScope} routedLang=${route.routedLang ? "L" + route.routedLang : "none"}${route.reason ? ` reason=${route.reason}` : ""}`);
+        ragLog(rid, "preflight.classify", { lang: langLog, inScope: route.inScope, routedLang: route.routedLang, reason: route.reason });
         if (route.inScope === false) {
           if (route.routedLang && route.routedLang !== language) {
-            console.log(`[routing] rid=${rid} preflight.reroute from=L${language} to=L${route.routedLang} reason=${route.reason}`);
-            ragLog(rid, "preflight.reroute", { from: language, to: route.routedLang, reason: route.reason });
+            console.log(`[routing] rid=${rid} preflight.reroute from=${langLog} to=L${route.routedLang} reason=${route.reason}`);
+            ragLog(rid, "preflight.reroute", { from: langLog, to: route.routedLang, reason: route.reason });
             language = route.routedLang;
             headLang = route.routedLang;
           } else if (!route.routedLang) {
             const reason = route.reason || `Request is out of scope for L${language}.`;
-            console.log(`[routing] rid=${rid} preflight.reject lang=L${language} reason=${reason}`);
-            ragLog(rid, "preflight.reject", { lang: language, reason });
+            console.log(`[routing] rid=${rid} preflight.reject lang=${langLog} reason=${reason}`);
+            ragLog(rid, "preflight.reject", { lang: langLog, reason });
             return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: `This request doesn't fit any available Graffiticode language. ${reason}` }], upstreamLangs: [] };
           }
         }
@@ -1098,8 +1114,8 @@ export async function generateCode({
         sequence = fenced.sequence;
         fromRagHit = planResult.fromRag;
       }
-      console.log(`[composition] rid=${rid} head=L${language} permits=[${permits.join(",")}] sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
-      ragLog(rid, "composition.gate", { head: language, permits, sequence });
+      console.log(`[composition] rid=${rid} head=${langLog} permits=[${permits.join(",")}] sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
+      ragLog(rid, "composition.gate", { head: langLog, permits, sequence });
 
       if (sequence.length > 1) {
         headLang = sequence[0];
