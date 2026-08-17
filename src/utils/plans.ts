@@ -49,7 +49,7 @@ const rate = (id: PlanId) => {
 // The framing that page settles on, and that these cards carry:
 //   - every tier is a FLAT per-item rate with a monthly minimum, so the included
 //     bucket costs the same per item as anything above it — no overage penalty;
-//   - Bronze's included 50 need no card at all. A card (and a required spend
+//   - Bronze's included 25 need no card at all. A card (and a required spend
 //     cap) buys ADDITIONAL items, nothing else;
 //   - you move up a tier exactly when it lowers your per-item cost.
 export const plans: Plan[] = [
@@ -85,9 +85,9 @@ export const plans: Plan[] = [
     annualPrice: PLANS.teams.basePriceAnnual,
     monthlyUnits: PLANS.teams.includedItems,
     additionalItem: PLANS.teams.overageRatePerItem,
-    // ~10,000 is the Silver/Gold crossover — derived from the two rates and
+    // ~5,000 is the Silver/Gold crossover — derived from the two rates and
     // minimums, not a field in plans-config. The pricing page states the same.
-    note: `Cheaper than ${PLANS.pro.displayName} above ~10,000 items/mo — ${rate('teams')}/item.`,
+    note: `Cheaper than ${PLANS.pro.displayName} above ~5,000 items/mo — ${rate('teams')}/item.`,
     cta: 'Choose Gold',
   },
   {

@@ -3,6 +3,11 @@
  *   - attach each paid tier's metered overage price to the subscription (so
  *     overage bills in arrears) if not already present
  *   - move straggler `starter` subs to Silver (pro) base + metered
+ *   - REPRICE: swap a subscription off a superseded metered price onto the
+ *     current one. A rate or included-bucket change mints a new price id
+ *     (prices are immutable), and existing subscriptions keep billing at the old
+ *     one until this runs. The swap is in place — appending the new price would
+ *     leave two metered lines billing the same items twice.
  *
  * The flat base amounts for Silver ($100) / Gold ($1000) are unchanged, so their
  * base prices are reused; only the metered line item is added. Uses
@@ -69,13 +74,38 @@ async function main() {
     if (!meterPriceId) { console.log(`  ${doc.id}: no meter price configured for ${plan}; skipping`); skipped++; continue; }
     const hasMeter = items.some(it => it?.price?.id === meterPriceId);
 
-    if (hasMeter && !baseSwap) { skipped++; continue; }
+    // A subscription already carrying a DIFFERENT metered price is on a
+    // superseded rate/bucket (Stripe prices are immutable, so a repricing mints
+    // a new price id — see setup-item-pricing.ts). It must be SWAPPED, not
+    // appended: two metered lines on one subscription bill the same items
+    // twice, once at each rate.
+    const staleMeters = items.filter(
+      it => it?.price?.recurring?.usage_type === 'metered' && it.price.id !== meterPriceId,
+    );
+
+    if (hasMeter && !baseSwap && !staleMeters.length) { skipped++; continue; }
 
     const updateItems: Stripe.SubscriptionUpdateParams.Item[] = [];
     if (baseSwap) updateItems.push({ id: baseSwap.fromItemId, price: baseSwap.toPriceId });
-    if (!hasMeter) updateItems.push({ price: meterPriceId });
+    if (!hasMeter && staleMeters.length) {
+      updateItems.push({ id: staleMeters[0].id, price: meterPriceId });
+      // Extra metered lines are double-billing that predates this run; remove
+      // them so the subscription ends up with exactly one.
+      for (const extra of staleMeters.slice(1)) updateItems.push({ id: extra.id, deleted: true });
+    } else if (!hasMeter) {
+      updateItems.push({ price: meterPriceId });
+    } else {
+      // Already on the current metered price, but a superseded one is still
+      // attached alongside it — drop the old lines.
+      for (const extra of staleMeters) updateItems.push({ id: extra.id, deleted: true });
+    }
 
-    console.log(`  ${doc.id}: ${plan} — ${baseSwap ? 'swap base + ' : ''}add metered ${meterPriceId}`);
+    const meterAction = hasMeter
+      ? `drop ${staleMeters.length} superseded metered line(s)`
+      : staleMeters.length
+        ? `swap metered ${staleMeters[0].price.id} -> ${meterPriceId}`
+        : `add metered ${meterPriceId}`;
+    console.log(`  ${doc.id}: ${plan} — ${baseSwap ? 'swap base + ' : ''}${meterAction}`);
     if (APPLY) {
       await stripe.subscriptions.update(sub.id, {
         items: updateItems,

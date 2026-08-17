@@ -148,7 +148,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // downgrade of a paying customer: a Gold->Silver change would read as a
       // Starter *upgrade* (isStarterUpgrade below), take the upgrade branch,
       // and therefore skip the preservedAllocation write entirely — dropping
-      // them from 20,000 items to 1,000 mid-period after they had paid for
+      // them from 10,000 items to 500 mid-period after they had paid for
       // Gold, and losing the proration credit too. Silently, with no error.
       //
       // A genuine Starter straggler resolves to 'starter' through
@@ -284,7 +284,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // overageLimitItems is what the gate enforces, converted at their plan's
     // rate. A plan change moves the rate, so carrying the item count across
     // silently changes the dollar ceiling they agreed to — Bronze→Silver
-    // ($0.20→$0.10) would halve a $20 cap to $10 of headroom while the UI kept
+    // ($0.40→$0.20) would halve a $20 cap to $10 of headroom while the UI kept
     // saying $20. Honor the dollars; recompute the items.
     const capUsd = userData?.subscription?.overageLimitUsd;
     if (typeof capUsd === 'number' && capUsd > 0) {

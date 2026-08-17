@@ -78,10 +78,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // NEVER fall back to DEFAULT_PLAN here. priceIdToPlan resolves against
       // the STRIPE_*_PRICE_ID env vars, so a rotated price (or an env whose
       // mode does not match STRIPE_SECRET_KEY) makes every paid price match
-      // nothing — and `?? DEFAULT_PLAN` then wrote preservedAllocation: 50
+      // nothing — and `?? DEFAULT_PLAN` then wrote preservedAllocation: 25
       // onto a customer who had just cancelled a Gold plan. The grace window
       // exists precisely because they paid through period end and should keep
-      // their 20,000-item bucket; 50 items under a hard-capped plan locks them
+      // their 10,000-item bucket; 25 items under a hard-capped plan locks them
       // out of a period they already paid for.
       //
       // The live Stripe price stays the primary source (the cached plan can be

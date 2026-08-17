@@ -11,9 +11,9 @@
  *
  * Usage:
  *   set -a; . ./.env.local; set +a
- *   npx tsx scripts/verify-item-invoice.ts [--plan pro] [--items 1100]
+ *   npx tsx scripts/verify-item-invoice.ts [--plan pro] [--items 600]
  *
- * Example: Silver (pro), 1100 items -> invoice $100 base + 100 x $0.10 = $110.
+ * Example: Silver (pro), 600 items -> invoice $100 base + 100 x $0.20 = $120.
  */
 import Stripe from 'stripe';
 import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, includedItemsFor, overageRateFor, type PlanId } from '../src/lib/plans-config';
@@ -25,7 +25,7 @@ const stripe = new Stripe(KEY, { apiVersion: STRIPE_API_VERSION });
 
 const arg = (name: string, def: string) => { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : def; };
 const plan = arg('plan', 'pro') as PlanId;
-const items = parseInt(arg('items', '1100'), 10);
+const items = parseInt(arg('items', '600'), 10);
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;

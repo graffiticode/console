@@ -14,8 +14,8 @@
  *
  * The cache is written by the Stripe webhook. When a delivery is missed — or an
  * upgrade happens outside the app — the two diverge, and the divergence is
- * silent and one-directional: the UI cheerfully reports "0 of 1,000 items used"
- * while the gate hard-blocks at the free plan's 50. A paying customer sees an
+ * silent and one-directional: the UI cheerfully reports "0 of 500 items used"
+ * while the gate hard-blocks at the free plan's 25. A paying customer sees an
  * empty usage bar and cannot create anything.
  *
  * It compounds, because a missing subscription also costs the gate the billing

@@ -13,6 +13,20 @@
  * Idempotent: prices are created with stable `lookup_key`s and reused if present;
  * the meter is matched by event_name. Prints the env vars to set afterwards.
  *
+ * REPRICING: Stripe prices are immutable, so when plans-config changes a rate or
+ * an included bucket the metered price cannot be edited — this script mints a
+ * NEW tiered price and moves the lookup key to it (`transfer_lookup_key`). Reuse
+ * is therefore value-based, not shape-based: a stale price is reported and
+ * replaced. Two things do NOT happen automatically and are on you:
+ *   1. setting the printed STRIPE_*_METER_PRICE_ID env vars and redeploying;
+ *   2. migrating EXISTING subscriptions onto the new metered price — until then
+ *      they keep billing at the old rate/bucket. Customer spend caps stored as
+ *      `overageLimitItems` are derived from the rate too and must be recomputed
+ *      from `overageLimitUsd` (see overageDollarsToItems).
+ * Base (flat) prices are only ever reused; a mismatch is warned about, never
+ * silently replaced, because their ids are what priceIdToPlan matches on every
+ * live subscription.
+ *
  * Usage:
  *   STRIPE_SECRET_KEY=sk_test_... npx tsx scripts/setup-item-pricing.ts [--dry-run] [--only demo,pro]
  *
@@ -104,6 +118,19 @@ async function ensureProduct(plan: PlanConfig): Promise<string> {
 async function ensurePrice(lookupKey: string, params: Stripe.PriceCreateParams): Promise<string> {
   const existing = await stripe.prices.list({ lookup_keys: [lookupKey], limit: 1 });
   if (existing.data[0]) {
+    // Stripe prices are IMMUTABLE: a base fee that moved in plans-config cannot
+    // be edited into this price. Reuse is still the right default here (the base
+    // price id is what priceIdToPlan matches on every live subscription), but it
+    // must never be silent — otherwise a repricing run prints "reusing" and the
+    // operator reads it as "provisioned".
+    const want = params.unit_amount;
+    const got = existing.data[0].unit_amount;
+    if (typeof want === 'number' && got !== want) {
+      console.warn(
+        `  price[${lookupKey}]: !! STALE — Stripe has $${(got ?? 0) / 100}, plans-config wants $${want / 100}. ` +
+        'Reusing the existing price (it carries live subscribers). Mint a replacement and migrate deliberately.',
+      );
+    }
     console.log(`  price[${lookupKey}]: reusing ${existing.data[0].id}`);
     return existing.data[0].id;
   }
@@ -116,15 +143,54 @@ async function ensurePrice(lookupKey: string, params: Stripe.PriceCreateParams):
   return price.id;
 }
 
+// Does a live tiered price carry exactly the graduated tiers plans-config asks
+// for — free up to includedItems, then the per-item rate? Compared in decimal
+// cents so $0.025/item (a sub-cent unit_amount) survives the round trip.
+function meteredTiersMatch(price: Stripe.Price, plan: PlanConfig): boolean {
+  const tiers = price.tiers;
+  if (!tiers || tiers.length !== 2) return false;
+  const [free, paid] = tiers;
+  const freeAmount = Number(free.unit_amount_decimal ?? free.unit_amount ?? 0);
+  const paidAmount = Number(paid.unit_amount_decimal ?? paid.unit_amount ?? 0);
+  return (
+    price.tiers_mode === 'graduated' &&
+    free.up_to === plan.includedItems &&
+    freeAmount === 0 &&
+    paid.up_to === null &&
+    paidAmount === Number(cents(plan.overageRatePerItem as number))
+  );
+}
+
+const describeTiers = (price: Stripe.Price): string => {
+  const tiers = price.tiers;
+  if (!tiers?.length) return `${price.tiers_mode ?? price.billing_scheme} (tiers not returned)`;
+  return tiers
+    .map(t => `${t.up_to ?? 'inf'}@${Number(t.unit_amount_decimal ?? t.unit_amount ?? 0) / 100}`)
+    .join(' / ');
+};
+
+const describeWanted = (plan: PlanConfig): string =>
+  `${plan.includedItems}@0 / inf@${plan.overageRatePerItem}`;
+
 // Metered overage price, TIERED so the included bucket is free (covered by the
 // flat base fee) and only items above `includedItems` are charged at the rate.
 // Reporting one meter event per item then yields base + (overage x rate).
 async function ensureMeteredPrice(lookupKey: string, productId: string, plan: PlanConfig, meterId: string): Promise<string> {
-  const existing = await stripe.prices.list({ lookup_keys: [lookupKey], limit: 1, active: true });
+  // `tiers` is only returned when explicitly expanded — without this the match
+  // check below would see an undefined tier list on every price and re-mint.
+  const existing = await stripe.prices.list({ lookup_keys: [lookupKey], limit: 1, active: true, expand: ['data.tiers'] });
   const found = existing.data[0];
-  if (found && found.billing_scheme === 'tiered') {
+  // Reuse only when the price actually MATCHES plans-config. Checking the shape
+  // alone (billing_scheme === 'tiered') was how a repricing could pass through
+  // this script untouched: the old price is tiered too, so the run reported
+  // "reusing" and printed the STALE id as the env var to set. Tiers are
+  // immutable, so a mismatch means minting a new price and moving the lookup key.
+  if (found && found.billing_scheme === 'tiered' && meteredTiersMatch(found, plan)) {
     console.log(`  price[${lookupKey}]: reusing tiered ${found.id}`);
     return found.id;
+  }
+  if (found) {
+    console.log(`  price[${lookupKey}]: STALE ${found.id} — ${describeTiers(found)} != wanted ${describeWanted(plan)}`);
   }
   if (DRY_RUN) {
     console.log(`  price[${lookupKey}]: WOULD create tiered (0 up to ${plan.includedItems}, then ${plan.overageRatePerItem}/item)`);

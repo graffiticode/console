@@ -63,10 +63,10 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     displayName: 'Bronze',
     basePriceMonthly: 0,
     basePriceAnnual: 0,
-    includedItems: 50,
-    // Deliberately dearer per item than Silver ($0.10): pay-as-you-go is the
+    includedItems: 25,
+    // Deliberately dearer per item than Silver ($0.20): pay-as-you-go is the
     // bridge past the wall, not a way to live below a subscription forever.
-    overageRatePerItem: 0.2,
+    overageRatePerItem: 0.4,
     // True = hard-capped *until enrolled*; see isHardCappedFor.
     hardCap: true,
     tier: 0,
@@ -75,7 +75,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       // a base line item that priceIdToPlan can match — without it the webhook
       // cannot resolve the plan and refuses to sync.
       baseMonthlyPriceIdEnv: 'STRIPE_FREE_MONTHLY_PRICE_ID',
-      // MUST be graduated: tier 1 = 0..includedItems at $0, tier 2 = $0.20.
+      // MUST be graduated: tier 1 = 0..includedItems at $0, tier 2 = $0.40.
       meterPriceIdEnv: 'STRIPE_FREE_METER_PRICE_ID',
       meterEventName: 'item_created',
     },
@@ -100,8 +100,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     displayName: 'Silver',
     basePriceMonthly: 100,
     basePriceAnnual: 1000,
-    includedItems: 1000,
-    overageRatePerItem: 0.1,
+    includedItems: 500,
+    overageRatePerItem: 0.2,
     hardCap: false,
     tier: 2,
     stripe: {
@@ -116,8 +116,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     displayName: 'Gold',
     basePriceMonthly: 1000,
     basePriceAnnual: 10000,
-    includedItems: 20000,
-    overageRatePerItem: 0.05,
+    includedItems: 10000,
+    overageRatePerItem: 0.1,
     hardCap: false,
     tier: 3,
     stripe: {
@@ -132,8 +132,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     displayName: 'Platinum',
     basePriceMonthly: 10000,
     basePriceAnnual: 100000,
-    includedItems: 400000,
-    overageRatePerItem: 0.025,
+    includedItems: 200000,
+    overageRatePerItem: 0.05,
     hardCap: false,
     tier: 4,
     stripe: {

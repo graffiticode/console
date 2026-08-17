@@ -97,8 +97,8 @@ export async function checkItemCreateAllowed(
 
     // An empty cache on a Stripe-linked account means "we don't know this
     // account's plan", NOT "this account is free". Treating the two as the same
-    // is how a paying customer gets hard-blocked at 50 items while the billing
-    // UI — which reads Stripe directly — shows 0 of 1,000 used. Repair from
+    // is how a paying customer gets hard-blocked at 25 items while the billing
+    // UI — which reads Stripe directly — shows 0 of 500 used. Repair from
     // Stripe once and write it back; subsequent creates are cache-only again.
     // Skipped for free-plan/anonymous callers, which have no Stripe customer.
     if (!options.skipSubscriptionRepair &&

@@ -12,10 +12,10 @@ changed (`starter` is retained but discontinued).
 
 | Display | Internal id | Base $/mo (advance) | Included items/mo | Overage (arrears) |
 |---|---|---:|---:|---:|
-| Bronze | `demo` | $0 | 50 | $0.20 / item — **requires enrollment**, see below |
-| Silver | `pro` | $100 | 1,000 | $0.10 / item |
-| Gold | `teams` | $1,000 | 20,000 | $0.05 / item |
-| Platinum | `platinum` | $10,000 | 400,000 | $0.025 / item |
+| Bronze | `demo` | $0 | 25 | $0.40 / item — **requires enrollment**, see below |
+| Silver | `pro` | $100 | 500 | $0.20 / item |
+| Gold | `teams` | $1,000 | 10,000 | $0.10 / item |
+| Platinum | `platinum` | $10,000 | 200,000 | $0.05 / item |
 
 Bronze was called "Free" until pay-as-you-go landed; the internal id stays `demo` (it is written into
 every `users/{uid}.subscription.plan` doc and the `PlanId` union). Its overage rate is deliberately the
@@ -26,9 +26,9 @@ every `users/{uid}.subscription.plan` doc and the `PlanId` union). Its overage r
 | State | Signal | Behavior |
 |---|---|---|
 | Unenrolled | no `subscription.stripeSubscriptionId` | hard cap at `includedItems` |
-| Pay-as-you-go | active `demo` subscription | 50 free, then $0.20/item up to the customer's cap |
+| Pay-as-you-go | active `demo` subscription | 25 free, then $0.40/item up to the customer's cap |
 
-**We capture payment details at exactly two moments, never earlier:** when the customer hits the 50-item
+**We capture payment details at exactly two moments, never earlier:** when the customer hits the 25-item
 wall, and when they set a spend cap (`POST /api/payments/overage-limit` answers **402
 `requiresPaymentMethod`** for an unenrolled tier rather than storing a number it could not enforce).
 
@@ -46,7 +46,7 @@ Read the state with `payAsYouGoEnabled(subscription)` / `isHardCappedFor(plan, s
 
 Stripe stamps `current_period_start` at the moment of enrollment. The gate counts usage from
 `currentPeriodStart`, so storing that verbatim would hide every item the customer already created this
-month — a user enrolling at item 50 on the 20th would receive 50 fresh included items, free, and again
+month — a user enrolling at item 25 on the 20th would receive 25 fresh included items, free, and again
 every month they re-enrolled. So:
 
 - Checkout sets `subscription_data.billing_cycle_anchor_config = { day_of_month: 1 }`, making Stripe's own
@@ -59,12 +59,12 @@ From the first renewal the stored and Stripe periods agree and the special case 
 ## Billing model
 
 Flat base billed **in advance** (on signup + each renewal) + **Stripe metered overage** billed in
-**arrears** on the next invoice — one clean monthly invoice. E.g. Silver + 1,100 items → renewal invoice
-`$100 base + 100 × $0.10 = $110`.
+**arrears** on the next invoice — one clean monthly invoice. E.g. Silver + 600 items → renewal invoice
+`$100 base + 100 × $0.20 = $120`.
 
 **The metered price MUST be tiered (graduated):** tier 1 = `0…includedItems` at $0 (covered by the base),
 tier 2 = the per-item rate above it. We report **one meter event per item** and Stripe applies the tiers.
-A *flat* metered price would bill every item (Silver 1,100 → $210, not $110). `setup-item-pricing.ts`
+A *flat* metered price would bill every item (Silver 600 → $220, not $120). `setup-item-pricing.ts`
 creates them tiered; don't change that.
 
 ## How metering works
@@ -141,7 +141,7 @@ STRIPE_SECRET_KEY=sk_... npx tsx scripts/setup-item-pricing.ts [--dry-run]
 
 # End-to-end invoice proof via a Stripe test clock (creates a sub, reports usage, advances a cycle).
 set -a; . ./.env.local; set +a
-npx tsx scripts/verify-item-invoice.ts --plan pro --items 1100     # expect $110
+npx tsx scripts/verify-item-invoice.ts --plan pro --items 600      # expect $120
 
 # Cutover: zero every account's usage counter + resync subscription.units to item allowances.
 # Runs against prod Firestore — unset FIRESTORE_EMULATOR_HOST.
@@ -150,6 +150,12 @@ env -u FIRESTORE_EMULATOR_HOST npx tsx scripts/reset-and-migrate-tiers.ts [--app
 # Re-derive Firestore subscription from live Stripe (needs the live price-id env vars set so
 # priceIdToPlan matches live subs).
 npx tsx scripts/reconcile-subscriptions.ts [--apply]
+
+# After a RATE change: re-derive every customer's spend cap (overageLimitItems) from the
+# dollars they agreed to (overageLimitUsd) at the new rate. Nothing else does this — a plan
+# change recomputes it, a rate change under a plan they never left does not.
+npx tsx scripts/recompute-overage-caps.ts [--apply] [--uid <uid>] [--allow-zero]
+  [--previous-rates demo=0.2,pro=0.1,teams=0.05,platinum=0.025]
 ```
 
 Notes / gotchas:
