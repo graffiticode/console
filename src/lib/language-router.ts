@@ -173,7 +173,7 @@ If none fit, return {"suggestions": []}`,
     // Record token usage if auth and rid are provided
     if (auth && rid && response.data?.usage) {
       const usage = response.data.usage;
-      recordTokenUsage({
+      await recordTokenUsage({
         auth,
         rid,
         stage: "route_rescope",
@@ -301,7 +301,7 @@ Be conservative: only route away when the request clearly belongs to a different
     // Record token usage if auth and rid are provided
     if (auth && rid && response.data?.usage) {
       const usage = response.data.usage;
-      recordTokenUsage({
+      await recordTokenUsage({
         auth,
         rid,
         stage: "route_scope_gate",
@@ -437,7 +437,7 @@ Rules:
     // Record token usage if auth and rid are provided
     if (auth && rid && response.data?.usage) {
       const usage = response.data.usage;
-      recordTokenUsage({
+      await recordTokenUsage({
         auth,
         rid,
         stage: "compose_plan",

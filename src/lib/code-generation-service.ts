@@ -1867,7 +1867,7 @@ export async function generateCode({
     // iterations are FREE (billing is per successful item via recordBillableItem),
     // so we record units: 0 and never touch the monthly item counter.
     if (auth?.uid && finalUsage.total_tokens > 0) {
-      const stage: Stage = fixAttempts > 0 ? "repair" : "code_gen";
+      const stage: Stage = "code_gen"; // fixAttempts distinguishes first-try vs repaired in the flat log
       const tokenUsage = {
         inputTokens: finalUsage.prompt_tokens,
         outputTokens: finalUsage.completion_tokens,

@@ -45,8 +45,14 @@ export async function recordTokenUsage({
   usage,
   extra,
 }: RecordTokenUsageArgs): Promise<void> {
-  // No-op if no tokens spent
-  if (usage.inputTokens + usage.outputTokens === 0) {
+  // No-op if no tokens spent (including cache reads, which bill at 0.1×)
+  if (
+    usage.inputTokens +
+    usage.outputTokens +
+    usage.cacheCreationInputTokens +
+    usage.cacheReadInputTokens ===
+    0
+  ) {
     return;
   }
 

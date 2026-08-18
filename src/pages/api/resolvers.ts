@@ -972,7 +972,7 @@ export async function generateCode({
 
   try {
     if (!language) {
-      return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: "language is required" }] };
+      return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: "language is required" }], upstreamLangs: [], rid };
     }
 
     // Free-plan revision budget, checked before any generation spend. Creation
@@ -1088,7 +1088,7 @@ export async function generateCode({
             const reason = route.reason || `Request is out of scope for L${language}.`;
             console.log(`[routing] rid=${rid} preflight.reject lang=${langLog} reason=${reason}`);
             ragLog(rid, "preflight.reject", { lang: langLog, reason });
-            return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: `This request doesn't fit any available Graffiticode language. ${reason}` }], upstreamLangs: [] };
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: `This request doesn't fit any available Graffiticode language. ${reason}` }], upstreamLangs: [], rid };
           }
         }
       }
@@ -1136,7 +1136,7 @@ export async function generateCode({
         });
 
         if (orch.errors) {
-          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: orch.headProvider ?? null, tier: orch.headTier ?? null, usage: null, errors: mapUsageLimit(orch.errors), upstreamLangs: [] };
+          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: orch.headProvider ?? null, tier: orch.headTier ?? null, usage: null, errors: mapUsageLimit(orch.errors), upstreamLangs: [], rid };
         }
 
         src = orch.headSrc;
@@ -1163,7 +1163,7 @@ export async function generateCode({
         });
 
         if ('errors' in result && result.errors) {
-          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: (result as any).provider ?? null, tier: (result as any).tier ?? null, usage: null, errors: mapUsageLimit(result.errors), upstreamLangs: [] };
+          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: (result as any).provider ?? null, tier: (result as any).tier ?? null, usage: null, errors: mapUsageLimit(result.errors), upstreamLangs: [], rid };
         }
 
         const successResult = result as {
@@ -1230,7 +1230,7 @@ export async function generateCode({
             return [];
           });
           if (upstreamErrors.length > 0) {
-            return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: upstreamErrors, upstreamLangs: [] };
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: upstreamErrors, upstreamLangs: [], rid };
           }
           upstreamTaskIds = upstreamResults.map((r: any) => r.taskId as string);
         }
@@ -1259,7 +1259,7 @@ export async function generateCode({
             prompt: `${prompt}\n\nIMPORTANT: This program is the HEAD of a composition pipeline and MUST bind its upstream by emitting a top-level \`data use "${expected}"\` so the upstream data flows at runtime. Do not omit it.`,
           });
           if (repair?.errors) {
-            return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: mapUsageLimit(repair.errors), upstreamLangs: [] };
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: mapUsageLimit(repair.errors), upstreamLangs: [], rid };
           }
           const reparsed = await parseCode({ lang: headLang, src: repair.code, privateValues, publicValues, accessToken: auth?.token });
           if (reparsed.errors) {
@@ -1333,14 +1333,14 @@ export async function generateCode({
       success: true,
     });
 
-    return { src: resolvedSrc, taskId, language: headLang, description, changeSummary, model, provider, tier, usage, errors: null, upstreamLangs };
+    return { src: resolvedSrc, taskId, language: headLang, description, changeSummary, model, provider, tier, usage, errors: null, upstreamLangs, rid };
   } catch (error) {
     console.error("generateCode()", "ERROR", error);
     ragLog(rid, "request.error", { error: error.message });
     // Outermost catch: sits outside the scope where model/provider/tier are
     // bound, and a throw this far out may predate generation entirely — so
     // nulls here are the honest answer, not a dropped field.
-    return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: null, tier: null, usage: null, errors: [{ message: error.message }], upstreamLangs: [] };
+    return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: null, tier: null, usage: null, errors: [{ message: error.message }], upstreamLangs: [], rid };
   }
 }
 
@@ -1398,6 +1398,7 @@ export async function createItem({
     }
     // If no taskId provided, create a minimal template task
     let generatedHelp = help || "[]";
+    let generatedRid: string | undefined;
     if (!taskId && !deferGeneration) {
       const result = await generateCode({
         auth,
@@ -1407,6 +1408,7 @@ export async function createItem({
         currentSrc: null,
         itemId: id,
       });
+      generatedRid = result.rid;
       taskId = result.taskId;
       if (!taskId) {
         // If generation returned errors (e.g., out-of-scope), surface them to the user
@@ -1457,6 +1459,13 @@ export async function createItem({
       Object.assign(item, freePlanItemFields(auth, timestamp));
     }
     await itemRef.set(item);
+
+    // Backfill token usage docs that were written before the item existed
+    // (routing, composition, spec_gen, etc. all run before itemId is known)
+    if (generatedRid) {
+      await backfillTokenUsageItemId({ auth, rid: generatedRid, itemId: id });
+    }
+
     if (taskId) {
       const resolvedSource = normalizeVersionSource(source) ?? defaultVersionSource(item.client);
       await recordVersion({

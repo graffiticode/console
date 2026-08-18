@@ -37,12 +37,12 @@ const MODEL_RATES: Record<string, ModelRate> = {
   "claude-opus-4-8": { provider: "anthropic", input: 5, output: 25 },
   "claude-opus-4-7": { provider: "anthropic", input: 5, output: 25 },
   "claude-opus-4-6": { provider: "anthropic", input: 5, output: 25 },
-  "claude-sonnet-5": {
-    provider: "anthropic",
-    input: 3,
-    output: 15,
-    intro: { input: 2, output: 10, until: "2026-08-31" },
-  },
+  // $2/$10 is the STANDING rate, not a promotion: Anthropic decided against
+  // letting the introductory price lapse to $3/$15, so there is no expiry to
+  // encode. Left as an `intro` window it would have self-expired on 2026-08-31
+  // and stepped every cost report up 50% overnight on the model carrying ~70%
+  // of generation spend — a rate-card artefact that reads as a cost regression.
+  "claude-sonnet-5": { provider: "anthropic", input: 2, output: 10 },
   "claude-sonnet-4-6": { provider: "anthropic", input: 3, output: 15 },
   "claude-haiku-4-5": { provider: "anthropic", input: 1, output: 5 },
   "gpt-5.6-sol": { provider: "openai", input: 5, output: 30 },
