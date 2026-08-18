@@ -141,6 +141,7 @@ function getPeriodEnd(to?: string, tz?: string): string {
 function getTimestampMs(r: UsageRecord): number | null {
   if (r.createdAt) {
     const ts = r.createdAt as any;
+    if (typeof ts === 'number') return ts;
     if (typeof ts.toMillis === 'function') return ts.toMillis();
     if (ts._seconds != null) return ts._seconds * 1000;
     if (ts.seconds != null) return ts.seconds * 1000;

@@ -1,4 +1,4 @@
-import { getFirestore, FieldValue, FieldPath } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, FieldPath, Timestamp } from "firebase-admin/firestore";
 import { TokenUsage } from "./llm-generation-service";
 
 export type Stage =
@@ -51,7 +51,7 @@ export async function recordTokenUsage({
   }
 
   try {
-    const now = Date.now();
+    const now = new Date();
     const doc = {
       userId: auth.uid,
       taskId: rid, // Pre-existing field name; holds the request id
@@ -60,8 +60,8 @@ export async function recordTokenUsage({
       generatedTaskId: generatedTaskId ?? null,
       stage,
       units: 0, // Always 0 for telemetry-only docs (never billed)
-      createdAt: now,
-      timestamp: new Date(now).toISOString(),
+      createdAt: Timestamp.now(),
+      timestamp: now.toISOString(),
       lang: lang ?? null,
       type: "ai_generation",
       provider,
@@ -101,87 +101,37 @@ async function updateItemTokenUsage(
   try {
     const itemRef = db.collection(`users/${uid}/items`).doc(itemId);
 
-    // Build FieldPath-safe paths for model/stage breakdown (handles models with dots like "gpt-5.6-terra")
-    const updates: Record<string, unknown> = {
-      "tokenUsage.updatedAt": Date.now(),
-    };
-
-    // totals
-    updates[
-      FieldPath.documentId().toString().replace("__name__", "tokenUsage.totals.input")
-    ] = FieldValue.increment(usage.inputTokens);
-
-    // Use dot notation for nested keys, but for model ids use FieldPath.of() to avoid splitting on dots
-    const totalsFields = [
-      { key: "input", value: usage.inputTokens },
-      { key: "output", value: usage.outputTokens },
-      { key: "cacheCreation", value: usage.cacheCreationInputTokens },
-      { key: "cacheRead", value: usage.cacheReadInputTokens },
-    ];
-
-    for (const { key, value } of totalsFields) {
-      updates[`tokenUsage.totals.${key}`] = FieldValue.increment(value);
-    }
-
-    // byModel (use FieldPath.of for model id to handle dots safely)
-    for (const { key, value } of totalsFields) {
-      const fieldPath = FieldPath.documentId().toString();
-      // Actually, FieldPath doesn't work like that. We need to use update with path strings
-      // Firestore's update() doesn't support FieldPath for increment operations in the way we need
-      // Let's use a custom approach that builds the path string safely
-    }
-
-    // For simplicity and correctness, rebuild the updates to use safe path construction
-    const safeUpdates: { [key: string]: FieldValue | number } = {};
-
-    // totals
-    safeUpdates["tokenUsage.totals.input"] = FieldValue.increment(usage.inputTokens);
-    safeUpdates["tokenUsage.totals.output"] = FieldValue.increment(usage.outputTokens);
-    safeUpdates["tokenUsage.totals.cacheCreation"] = FieldValue.increment(
-      usage.cacheCreationInputTokens
+    // Update with varargs form: FieldPath instances work here (not as object keys)
+    await itemRef.update(
+      "tokenUsage.totals.input",
+      FieldValue.increment(usage.inputTokens),
+      "tokenUsage.totals.output",
+      FieldValue.increment(usage.outputTokens),
+      "tokenUsage.totals.cacheCreation",
+      FieldValue.increment(usage.cacheCreationInputTokens),
+      "tokenUsage.totals.cacheRead",
+      FieldValue.increment(usage.cacheReadInputTokens),
+      // byModel — use FieldPath.of() to safely handle dots in model ids
+      new FieldPath("tokenUsage", "byModel", model, "input"),
+      FieldValue.increment(usage.inputTokens),
+      new FieldPath("tokenUsage", "byModel", model, "output"),
+      FieldValue.increment(usage.outputTokens),
+      new FieldPath("tokenUsage", "byModel", model, "cacheCreation"),
+      FieldValue.increment(usage.cacheCreationInputTokens),
+      new FieldPath("tokenUsage", "byModel", model, "cacheRead"),
+      FieldValue.increment(usage.cacheReadInputTokens),
+      // byStage
+      new FieldPath("tokenUsage", "byStage", stage, "input"),
+      FieldValue.increment(usage.inputTokens),
+      new FieldPath("tokenUsage", "byStage", stage, "output"),
+      FieldValue.increment(usage.outputTokens),
+      new FieldPath("tokenUsage", "byStage", stage, "cacheCreation"),
+      FieldValue.increment(usage.cacheCreationInputTokens),
+      new FieldPath("tokenUsage", "byStage", stage, "cacheRead"),
+      FieldValue.increment(usage.cacheReadInputTokens),
+      "tokenUsage.updatedAt",
+      Date.now()
     );
-    safeUpdates["tokenUsage.totals.cacheRead"] = FieldValue.increment(usage.cacheReadInputTokens);
-
-    // byModel — MUST use FieldPath.of() to safely handle dots in model ids
-    const modelPathInput = new FieldPath("tokenUsage", "byModel", model, "input");
-    const modelPathOutput = new FieldPath("tokenUsage", "byModel", model, "output");
-    const modelPathCacheCreation = new FieldPath(
-      "tokenUsage",
-      "byModel",
-      model,
-      "cacheCreation"
-    );
-    const modelPathCacheRead = new FieldPath("tokenUsage", "byModel", model, "cacheRead");
-
-    safeUpdates[modelPathInput as any] = FieldValue.increment(usage.inputTokens);
-    safeUpdates[modelPathOutput as any] = FieldValue.increment(usage.outputTokens);
-    safeUpdates[modelPathCacheCreation as any] = FieldValue.increment(
-      usage.cacheCreationInputTokens
-    );
-    safeUpdates[modelPathCacheRead as any] = FieldValue.increment(usage.cacheReadInputTokens);
-
-    // byStage
-    const stagePathInput = new FieldPath("tokenUsage", "byStage", stage, "input");
-    const stagePathOutput = new FieldPath("tokenUsage", "byStage", stage, "output");
-    const stagePathCacheCreation = new FieldPath(
-      "tokenUsage",
-      "byStage",
-      stage,
-      "cacheCreation"
-    );
-    const stagePathCacheRead = new FieldPath("tokenUsage", "byStage", stage, "cacheRead");
-
-    safeUpdates[stagePathInput as any] = FieldValue.increment(usage.inputTokens);
-    safeUpdates[stagePathOutput as any] = FieldValue.increment(usage.outputTokens);
-    safeUpdates[stagePathCacheCreation as any] = FieldValue.increment(
-      usage.cacheCreationInputTokens
-    );
-    safeUpdates[stagePathCacheRead as any] = FieldValue.increment(usage.cacheReadInputTokens);
-
-    // updatedAt
-    safeUpdates["tokenUsage.updatedAt"] = Date.now();
-
-    await itemRef.update(safeUpdates);
   } catch (error) {
     // Swallow not-found (item deleted mid-flight) and other errors
     if ((error as any)?.code !== "not-found") {

@@ -523,6 +523,7 @@ async function fetchOpenAiCost(start: Date, end: Date): Promise<OpenAiCost | nul
 
 function toMillis(v: any): number {
   if (!v) return 0;
+  if (typeof v === 'number') return v;
   if (typeof v.toMillis === 'function') return v.toMillis();
   if (typeof v.toDate === 'function') return v.toDate().getTime();
   if (typeof v._seconds === 'number') return v._seconds * 1000;
@@ -656,10 +657,10 @@ async function fetchPerItem(start: Date, end: Date, asOf: Date, langs: string[] 
       usd: Number.isFinite(usd) ? usd : 0,
       lang: d.lang ?? null,
       model: d.model ?? null,
-      // A record predating attribution has neither a priced cost nor a task id.
-      // Judged on the FROZEN value: re-pricing gives a legacy record a nonzero
-      // cost, which would quietly readmit the rows this check exists to exclude.
-      instrumented: frozen > 0 || Boolean(d.generatedTaskId) || Boolean(d.itemId),
+      // A record is instrumented if it has a priced cost (legacy pre-refactor docs)
+      // OR it carries the new token-usage shape (stage + tokens from the refactor).
+      // Legacy docs carry cost.total, new docs carry stage.
+      instrumented: frozen > 0 || Boolean(d.stage) || (d.tokens?.total ?? 0) > 0,
     });
   }
 
@@ -1209,12 +1210,12 @@ async function main() {
   if (opts.langs.length === 0 && denominator > 0) {
     const cpi = totalCost / denominator;
     console.log(`\nMargin at ${usd(cpi)}/item (rate card ${opts.asOf.toISOString().split('T')[0]})`);
-    console.log(`  ${'plan'.padEnd(12)}${'$/item'.padStart(9)}${'margin'.padStart(10)}${'breakeven cost'.padStart(16)}`);
+    console.log(`  ${'plan'.padEnd(12)}${'$/item'.padStart(9)}${'margin'.padStart(10)}${'profit/item'.padStart(13)}`);
     for (const id of ['demo', 'pro', 'teams', 'platinum'] as PlanId[]) {
       const rate = PLANS[id].overageRatePerItem;
       if (rate == null) continue;
       const margin = ((rate - cpi) / rate) * 100;
-      console.log(`  ${PLANS[id].displayName.padEnd(12)}${usd(rate).padStart(9)}${(margin.toFixed(1) + '%').padStart(10)}${usd(rate).padStart(16)}`);
+      console.log(`  ${PLANS[id].displayName.padEnd(12)}${usd(rate).padStart(9)}${(margin.toFixed(1) + '%').padStart(10)}${usd(rate - cpi).padStart(13)}`);
     }
     if (!openai && openaiFloor) {
       console.log(`  Margins are OPTIMISTIC: the OpenAI side is a lower bound (see above).`);
