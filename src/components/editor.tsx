@@ -18,7 +18,7 @@ function classNames(...classes) {
 
 // Compare two code strings ignoring whitespace changes and comments
 // Newlines are not significant in Graffiticode
-// Comments starting with | or / are ignored
+// Block comments /* */ are ignored
 function isCodeEquivalent(code1, code2) {
   // If both are the same reference or both are null/undefined
   if (code1 === code2) return true;
@@ -27,21 +27,14 @@ function isCodeEquivalent(code1, code2) {
   if (!code1 || !code2) return false;
 
   // Normalize by:
-  // 1. Removing line comments (starting with | or /)
+  // 1. Removing block comments /* */
   // 2. Replacing all newlines with spaces (not significant in Graffiticode)
   // 3. Replacing multiple whitespaces with single space
   // 4. Trimming leading/trailing whitespace
   const normalize = (str) => {
     return str
+      .replace(/\/\*[\s\S]*?\*\//g, '') // Remove block comments
       .split('\n')
-      .map(line => {
-        // Remove comments starting with | or /
-        const trimmed = line.trim();
-        if (trimmed.startsWith('|') || trimmed.startsWith('/')) {
-          return ''; // Remove the entire comment line
-        }
-        return line;
-      })
       .join(' ')
       .replace(/\s+/g, ' ')       // Replace multiple whitespaces with single space
       .trim();

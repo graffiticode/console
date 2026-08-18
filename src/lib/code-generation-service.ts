@@ -499,7 +499,7 @@ Use \`if condition then expr1 else expr2\`. Always return a value.
 - Recursion is allowed
 
 ## Comments
-Start with \`|\` and extend to the end of the line.
+Block comments: \`/* comment */\`
 
 ## Built-In Functions
 
@@ -952,11 +952,11 @@ Graffiticode is a minimal, prefix, expression-oriented language with these key f
 - Includes built-in functions: \`map\`, \`filter\`, \`reduce\`
 - Recursion is common; loops are not used
 - Whitespace separates tokens; no commas required
-- Line comments start with the pipe character: \`| This is a comment\`
+- Block comments: \`/* comment */\`
 - IMPORTANT: All let statements MUST end with a double dot (..)
 - IMPORTANT: Backslashes should NOT be escaped in generated code
 - IMPORTANT: Literal "\n" should not appear in the generated code; use proper newline characters instead
-- IMPORTANT: Only generate valid Graffiticode. Any commentary should be elided or in line comments
+- IMPORTANT: Only generate valid Graffiticode. Avoid comments; elide any commentary
 
 Common Graffiticode errors and solutions:
 1. Missing double dot (..) at the end of a let statement
@@ -969,7 +969,7 @@ When fixing code:
 2. Make minimal changes to fix the issues
 3. Return ONLY the corrected code with no additional commentary
 4. Ensure all code is syntactically valid
-5. Add helpful comments where appropriate with the pipe character |`,
+5. Avoid comments unless essential; use /* */ for block comments`,
       messages: [
         {
           role: "user",
