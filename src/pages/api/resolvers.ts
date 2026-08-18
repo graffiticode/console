@@ -1407,6 +1407,10 @@ export async function createItem({
       });
       taskId = result.taskId;
       if (!taskId) {
+        // If generation returned errors (e.g., out-of-scope), surface them to the user
+        if (result.errors && result.errors.length > 0) {
+          throw new Error(result.errors[0].message);
+        }
         throw new Error("Failed to generate template task");
       }
     }
