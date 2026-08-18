@@ -17,12 +17,15 @@
 //
 // Requires: ANTHROPIC_ADMIN_KEY, ANTHROPIC_API_KEY, GRAFFITICODE_APP_CREDENTIALS.
 // Optional: OPENAI_ADMIN_KEY (an `sk-admin-…` org key; a project key is rejected
-// by the costs endpoint). Without it, OpenAI spend is excluded and said so.
+// by the costs endpoint). Without it, OpenAI spend falls back to a LOWER BOUND
+// priced from our own ai_generation records — generation is routed across
+// providers, so reporting OpenAI as zero would understate cost per item by
+// whatever share went to ChatGPT.
 
 import admin from 'firebase-admin';
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
-import { usdCostFromReport } from '../src/lib/model-pricing';
+import { estimateUsdCost, usdCostFromReport } from '../src/lib/model-pricing';
 
 // Load .env.local
 const envPath = resolve(process.cwd(), '.env.local');
@@ -383,6 +386,55 @@ async function fetchAnthropicBilled(start: Date, end: Date, now = new Date()): P
 
 interface OpenAiCost { embeddings: number; other: number; daily: Record<string, number>; }
 
+/**
+ * A FLOOR on OpenAI generation spend, derived from our own `ai_generation`
+ * records, for when the costs endpoint is unavailable (no `sk-admin-…` key).
+ *
+ * Generation traffic is routed across providers, so leaving OpenAI at zero
+ * understates cost per item by whatever share went to ChatGPT — currently
+ * about a third of all calls. A floor is not the bill: these records omit
+ * cache tokens entirely, and OpenAI input tokens are barely recorded at all
+ * (single digits per call, against thousands for the Anthropic rows), so the
+ * input side is missing rather than small. Priced at list rates, it is a lower
+ * bound and is labelled as one everywhere it appears. Set OPENAI_ADMIN_KEY to
+ * replace it with the real figure.
+ */
+interface OpenAiFloor { cost: number; calls: number; inputTokens: number; outputTokens: number; }
+
+async function fetchOpenAiFloor(start: Date, end: Date): Promise<OpenAiFloor | null> {
+  const snap = await db.collection('usage').where('type', '==', 'ai_generation').get();
+  const floor: OpenAiFloor = { cost: 0, calls: 0, inputTokens: 0, outputTokens: 0 };
+  for (const doc of snap.docs) {
+    const r = doc.data() as any;
+    const at = r.createdAt?.toDate?.() ?? (r.timestamp ? new Date(r.timestamp) : null);
+    if (!at || at < start || at >= end) continue;
+    const model = String(r.model || '');
+    // The provider field is authoritative when present; the model prefix is the
+    // fallback for older records written before it existed.
+    const isOpenAi = r.provider === 'openai' || /^(gpt|o\d)/.test(model);
+    if (!isOpenAi) continue;
+    const t = r.tokens ?? {};
+    const inputTokens = Number(t.input ?? 0);
+    const outputTokens = Number(t.output ?? 0);
+    floor.calls++;
+    floor.inputTokens += inputTokens;
+    floor.outputTokens += outputTokens;
+    // Cache tokens are the bulk of the OpenAI rows — the adapter reports almost
+    // no plain input (single digits per call) against millions of cache reads,
+    // so pricing input+output alone loses most of the spend. Prefer the cost
+    // priced at write time; only fall back to re-pricing the full breakdown.
+    floor.cost += typeof r.cost?.usd === 'number'
+      ? r.cost.usd
+      : estimateUsdCost({
+          inputTokens,
+          outputTokens,
+          cacheCreationInputTokens: Number(t.cacheCreation ?? 0),
+          cacheReadInputTokens: Number(t.cacheRead ?? 0),
+        }, model, end, 'openai');
+  }
+  return floor.calls > 0 ? floor : null;
+}
+
 async function fetchOpenAiCost(start: Date, end: Date): Promise<OpenAiCost | null> {
   if (!OPENAI_KEY) return null;
 
@@ -646,13 +698,14 @@ interface HtmlInput {
   anthropicCost: number;
   billedOrgWide: number | null;
   openai: OpenAiCost | null;
+  openaiFloor: OpenAiFloor | null;
   openaiError: string | null;
   rows: DayRow[];
   warnings: string[];
 }
 
 function generateHtml(d: HtmlInput): string {
-  const totalCost = d.anthropicCost + (d.openai?.embeddings ?? 0);
+  const totalCost = d.anthropicCost + (d.openai?.embeddings ?? d.openaiFloor?.cost ?? 0);
   const perItem = d.denominator > 0 ? totalCost / d.denominator : null;
   const share = d.billedOrgWide && d.billedOrgWide > 0
     ? (d.anthropicCost / d.billedOrgWide) * 100 : null;
@@ -746,7 +799,8 @@ ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</di
 <div class="cards">
   ${card('Cost per item', perItem === null ? '—' : `$${perItem.toFixed(4)}`,
     d.excludeTrial ? 'paid items only' : 'all items incl. trial')}
-  ${card('Total AI cost', `$${totalCost.toFixed(2)}`, d.openai ? 'Anthropic + OpenAI' : 'Anthropic only')}
+  ${card('Total AI cost', `$${totalCost.toFixed(2)}`,
+    d.openai ? 'Anthropic + OpenAI' : d.openaiFloor ? 'Anthropic + OpenAI floor' : 'Anthropic only')}
   ${card('Items created', d.totalItems.toLocaleString(), `${d.paidItems} paid · ${d.trialItems} trial`)}
   ${card('Share of org bill', share === null ? '—' : `${share.toFixed(1)}%`,
     d.billedOrgWide === null ? 'run with --check' : `org billed $${d.billedOrgWide.toFixed(2)}`)}
@@ -776,7 +830,11 @@ ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</di
   Spend is scoped by <em>API key</em>, not by item, so this is a blended all-in average
   across every Claude call on the selected key (scope-gate routing, judge, spec generation
   included); it cannot be split per language or per item.
-  ${d.openai ? '' : `OpenAI spend excluded &mdash; ${esc(d.openaiError ?? 'no admin key set')}.`}
+  ${d.openai ? '' : d.openaiFloor
+    ? `OpenAI spend is a <strong>lower bound</strong> derived from ${d.openaiFloor.calls} <code>ai_generation</code>
+       records (${esc(d.openaiError ?? 'no admin key set')}); their input tokens are barely recorded, so the real
+       figure is higher. Set OPENAI_ADMIN_KEY for the billed number.`
+    : `OpenAI spend excluded &mdash; ${esc(d.openaiError ?? 'no admin key set')}.`}
   <br>Generated ${esc(new Date().toISOString())} by <code>scripts/cost-per-item.ts</code>.
 </footer>
 
@@ -832,6 +890,13 @@ async function main() {
   } catch (err: any) {
     openaiError = err.message;
   }
+  // Falling back to telemetry beats reporting OpenAI as $0, which reads as
+  // "we spend nothing there" rather than "we cannot see it".
+  let openaiFloor: OpenAiFloor | null = null;
+  if (!openai) {
+    console.error('OpenAI costs unavailable; deriving a floor from ai_generation records...');
+    openaiFloor = await fetchOpenAiFloor(start, end);
+  }
 
   let perItem: PerItem | null = null;
   if (opts.perItem) {
@@ -867,7 +932,7 @@ async function main() {
   }
 
   const anthropicCost = Object.values(costByModel).reduce((a, b) => a + b, 0);
-  const openaiCost = openai ? openai.embeddings : 0;
+  const openaiCost = openai ? openai.embeddings : (openaiFloor?.cost ?? 0);
   const totalCost = anthropicCost + openaiCost;
 
   const paidItems = Math.max(0, totalItems - trialItems);
@@ -920,7 +985,7 @@ async function main() {
       start, end,
       keyLabel: opts.allKeys ? 'all keys (org-wide)' : keys.map(k => k.name).join(', '),
       totalItems, trialItems, paidItems, denominator, excludeTrial: opts.excludeTrial,
-      tokens: totals, costByModel, anthropicCost, billedOrgWide, openai, openaiError,
+      tokens: totals, costByModel, anthropicCost, billedOrgWide, openai, openaiFloor, openaiError,
       rows, warnings,
     });
     writeFileSync(opts.output, html, 'utf-8');
@@ -943,6 +1008,7 @@ async function main() {
         anthropicBilledOrgWide: billedOrgWide,
         openaiEmbeddings: openai?.embeddings ?? null,
         openaiOther: openai?.other ?? null,
+        openaiFloor: openaiFloor ? { ...openaiFloor, isLowerBound: true } : null,
         openaiError,
         total: totalCost,
       },
@@ -1002,12 +1068,15 @@ async function main() {
     if (openai.other > 0) {
       console.log(`${pad('OpenAI (other)')}: ${usd(openai.other)}  (excluded from cost per item)`);
     }
+  } else if (openaiFloor) {
+    console.log(`${pad('OpenAI (floor)')}: ${usd(openaiFloor.cost)}  from ${num(openaiFloor.calls)} ai_generation calls`);
+    console.log(`${' '.repeat(25)}  LOWER BOUND — ${openaiError ?? 'no admin key set'}`);
   } else {
     console.log(`${pad('OpenAI')}: excluded — ${openaiError ?? 'no key set'}`);
   }
 
   console.log(`${' '.repeat(25)}--------`);
-  console.log(`${pad('Total AI cost')}: ${usd(totalCost)}${openai ? '' : ' (Anthropic only)'}`);
+  console.log(`${pad('Total AI cost')}: ${usd(totalCost)}${openai ? '' : (openaiFloor ? ' (Anthropic + OpenAI floor)' : ' (Anthropic only)')}`);
 
   if (opts.langs.length > 0) {
     console.log(`\n${pad('Cost per item')}: not computed for a language scope.`);
@@ -1018,6 +1087,7 @@ async function main() {
     console.log(`\n${pad('Cost per item')}: ${usd(totalCost / denominator)}${opts.excludeTrial ? '  (paid items only)' : ''}`);
     console.log(`${pad('  Anthropic')}: ${usd(anthropicCost / denominator)}`);
     if (openai) console.log(`${pad('  OpenAI')}: ${usd(openaiCost / denominator)}`);
+    else if (openaiFloor) console.log(`${pad('  OpenAI (floor)')}: ${usd(openaiCost / denominator)}`);
   } else {
     console.log(`\nNo items created in this window — cost per item undefined.`);
   }
