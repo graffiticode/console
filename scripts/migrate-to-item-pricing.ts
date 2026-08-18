@@ -27,6 +27,13 @@ import admin from 'firebase-admin';
 import { readFileSync } from 'fs';
 import { STRIPE_API_VERSION, priceIdToPlan, stripeMeterPriceId, stripeBasePriceId, type PlanId } from '../src/lib/plans-config';
 
+// This script pairs LIVE Stripe with PROD Firestore. A leftover
+// FIRESTORE_EMULATOR_HOST silently points the user lookup at an empty local
+// emulator, and the run then reports "checked=0" — a false all-clear on a
+// billing migration. Strip it, the way the other prod scripts do.
+delete process.env.FIRESTORE_EMULATOR_HOST;
+delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+
 const APPLY = process.argv.includes('--apply');
 const KEY = process.env.STRIPE_SECRET_KEY;
 if (!KEY) { console.error('STRIPE_SECRET_KEY is required'); process.exit(1); }
