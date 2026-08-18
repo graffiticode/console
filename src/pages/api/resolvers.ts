@@ -8,6 +8,7 @@ import { parser, unparse } from "@graffiticode/parser";
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
 import { generateSpec, specModelFor, SPEC_CACHE_VERSION } from "../../lib/spec-generation-service";
 import { planSequence, classifyAndRoute, composesWithFor, fenceComposition, orchestrateComposition, capturePlanForCuration } from "../../lib/language-router";
+import { backfillTokenUsageItemId } from "../../lib/token-usage-service";
 import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
@@ -1069,7 +1070,7 @@ export async function generateCode({
       // picked wrong (clients freelance). Fresh creates only — never relabel an edit. Independent
       // of client cooperation and of the generation LLM volunteering OUT_OF_SCOPE.
       if (process.env.SCOPE_GATE_ENABLED !== "false" && !currentSrc) {
-        const route = await classifyAndRoute({ userRequest: prompt, currentLang: language });
+        const route = await classifyAndRoute({ userRequest: prompt, currentLang: language, rid, itemId, auth });
         // Log EVERY decision (in-scope included) so routing is observable — an in-scope verdict
         // is otherwise silent, which masks scope.json contracts that are too permissive.
         // `lang=${langKey(language)}` rather than `lang=L${language}`: this line
@@ -1106,7 +1107,7 @@ export async function generateCode({
       let sequence: string[] = [language];
       const permits = process.env.COMPOSITION_ENABLED === "false" ? [] : composesWithFor(language);
       if (permits.length > 0) {
-        const planResult = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid, preferHaiku: true });
+        const planResult = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid, itemId, preferHaiku: true });
         const fenced = fenceComposition(planResult.sequence, permits);
         if (fenced.dropped.length > 0) {
           console.warn(`[composition] rid=${rid} fenced unpermitted upstreams=[${fenced.dropped.join(",")}] permits=[${permits.join(",")}]`);
@@ -1129,6 +1130,7 @@ export async function generateCode({
           options: codegenOptions,
           currentCode: currentSrc,
           rid,
+          itemId,
           conversationSummary,
           headExamples: headLang === language ? headExamples : null,
         });
@@ -1960,6 +1962,7 @@ async function cacheSpec({ auth, id, taskId, spec, lang, coverage, model }) {
 // plus the dialect's prompt assets and model. The cache rides along on share/claim copies,
 // which spread the whole doc and re-derive the same taskId.
 export async function getSpec({ auth, id }) {
+  const rid = generateRequestId();
   const item = await getItem({ auth, id, includeSpec: true });
   if (!item) {
     throw new Error(`Item not found: ${id}`);
@@ -1980,7 +1983,7 @@ export async function getSpec({ auth, id }) {
       },
     };
   }
-  const { spec, lang, coverage, model } = await generateSpec({ auth, taskId: item.taskId });
+  const { spec, lang, coverage, model } = await generateSpec({ auth, taskId: item.taskId, rid, itemId: id });
   // Never cache an empty spec: that was the silent failure mode of a thinking-capable model
   // leading with a `thinking` block, and caching it would make a transient bug permanent.
   if (spec.trim().length > 0) {

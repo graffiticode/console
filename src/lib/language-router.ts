@@ -4,6 +4,7 @@ import { CLAUDE_MODELS, generateCode as generateCodeService, extractSearchQuery 
 import { listLanguages, findLanguageById } from "./languages";
 import { hybridSearch } from "./embedding-service";
 import { parseCode } from "../pages/api/resolvers";
+import { recordTokenUsage, Stage } from "./token-usage-service";
 
 // Hard bound on composition depth: head + at most (MAX_STAGES-1) upstream
 // stages. Keeps planning cost and chain length sane.
@@ -113,10 +114,16 @@ export async function findBestLanguages({
   userRequest,
   outOfScopeReason,
   currentLang,
+  rid,
+  itemId,
+  auth,
 }: {
   userRequest: string;
   outOfScopeReason: string;
   currentLang: string;
+  rid?: string;
+  itemId?: string | null;
+  auth?: { uid: string };
 }): Promise<RoutingResult> {
   try {
     const { candidates, catalog } = await buildLanguageCatalog({ excludeLang: currentLang });
@@ -163,6 +170,29 @@ If none fit, return {"suggestions": []}`,
       }
     );
 
+    // Record token usage if auth and rid are provided
+    if (auth && rid && response.data?.usage) {
+      const usage = response.data.usage;
+      recordTokenUsage({
+        auth,
+        rid,
+        stage: "route_rescope",
+        itemId: itemId ?? null,
+        lang: currentLang,
+        provider: "anthropic",
+        model: CLAUDE_MODELS.HAIKU,
+        usage: {
+          inputTokens: usage.input_tokens || 0,
+          outputTokens: usage.output_tokens || 0,
+          cacheCreationInputTokens: usage.cache_creation_input_tokens || 0,
+          cacheReadInputTokens: usage.cache_read_input_tokens || 0,
+          reasoningTokens: 0,
+        },
+      }).catch(() => {
+        // Never throw from usage recording
+      });
+    }
+
     const text = response.data?.content?.[0]?.text || "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
@@ -207,9 +237,15 @@ export interface RouteResult {
 export async function classifyAndRoute({
   userRequest,
   currentLang,
+  rid,
+  itemId,
+  auth,
 }: {
   userRequest: string;
   currentLang: string;
+  rid?: string;
+  itemId?: string | null;
+  auth?: { uid: string };
 }): Promise<RouteResult> {
   const FAIL_OPEN: RouteResult = { inScope: true, routedLang: null, reason: "" };
   try {
@@ -262,6 +298,29 @@ Be conservative: only route away when the request clearly belongs to a different
       },
     );
 
+    // Record token usage if auth and rid are provided
+    if (auth && rid && response.data?.usage) {
+      const usage = response.data.usage;
+      recordTokenUsage({
+        auth,
+        rid,
+        stage: "route_scope_gate",
+        itemId: itemId ?? null,
+        lang: currentLang,
+        provider: "anthropic",
+        model: CLAUDE_MODELS.HAIKU,
+        usage: {
+          inputTokens: usage.input_tokens || 0,
+          outputTokens: usage.output_tokens || 0,
+          cacheCreationInputTokens: usage.cache_creation_input_tokens || 0,
+          cacheReadInputTokens: usage.cache_read_input_tokens || 0,
+          reasoningTokens: 0,
+        },
+      }).catch(() => {
+        // Never throw from usage recording
+      });
+    }
+
     const text = response.data?.content?.[0]?.text || "";
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) return FAIL_OPEN;
@@ -293,9 +352,15 @@ export type CompositionPlan = CompositionStage[];
 export async function planComposition({
   prompt,
   currentLang,
+  rid,
+  itemId,
+  auth,
 }: {
   prompt: string;
   currentLang: string;
+  rid?: string;
+  itemId?: string | null;
+  auth?: { uid: string };
 }): Promise<CompositionPlan> {
   const fallback: CompositionPlan = [{ lang: currentLang, prompt }];
   try {
@@ -368,6 +433,29 @@ Rules:
         },
       }
     );
+
+    // Record token usage if auth and rid are provided
+    if (auth && rid && response.data?.usage) {
+      const usage = response.data.usage;
+      recordTokenUsage({
+        auth,
+        rid,
+        stage: "compose_plan",
+        itemId: itemId ?? null,
+        lang: currentLang,
+        provider: "anthropic",
+        model: CLAUDE_MODELS.HAIKU,
+        usage: {
+          inputTokens: usage.input_tokens || 0,
+          outputTokens: usage.output_tokens || 0,
+          cacheCreationInputTokens: usage.cache_creation_input_tokens || 0,
+          cacheReadInputTokens: usage.cache_read_input_tokens || 0,
+          reasoningTokens: 0,
+        },
+      }).catch(() => {
+        // Never throw from usage recording
+      });
+    }
 
     const text = response.data?.content?.[0]?.text || "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -460,6 +548,7 @@ export async function orchestrateComposition({
   options,
   currentCode,
   rid,
+  itemId,
   conversationSummary,
   headExamples,
 }: {
@@ -469,6 +558,7 @@ export async function orchestrateComposition({
   options?: any;
   currentCode?: string | null;
   rid?: string | null;
+  itemId?: string | null;
   conversationSummary?: any;
   headExamples?: any[] | null; // precomputed head-lang retrieval to reuse for the head stage
 }): Promise<OrchestrationResult> {
@@ -488,11 +578,11 @@ export async function orchestrateComposition({
       // Head: carries currentCode/conversation + reuses the head retrieval;
       // returned unposted for the resolver to post with systemValues.
       return generateCodeService({
-        auth, prompt, lang, options, currentCode, rid, conversationSummary,
+        auth, prompt, lang, options, currentCode, rid, itemId, conversationSummary,
         upstreamContext, precomputedExamples: headExamples ?? null,
       });
     }
-    return generateCodeService({ auth, prompt, lang, options, rid, upstreamContext });
+    return generateCodeService({ auth, prompt, lang, options, rid, itemId, upstreamContext });
   });
 
   const results: any[] = await Promise.all(gens);
@@ -655,6 +745,7 @@ export async function planSequence({
   auth,
   options,
   rid,
+  itemId,
   preferHaiku = false,
 }: {
   prompt: string;
@@ -662,6 +753,7 @@ export async function planSequence({
   auth?: any;
   options?: any;
   rid?: string | null;
+  itemId?: string | null;
   // Skip the L0010 (Sonnet) codegen on a planRAG miss and go straight to the cheap
   // Haiku planner. Set when the gate was opened ONLY by capability (no RAG signal):
   // such requests are usually atomic (an agent inlined the data, or it's a plain
@@ -681,7 +773,7 @@ export async function planSequence({
 
   // Capability-only trigger → skip the Sonnet L0010 codegen entirely.
   if (preferHaiku) {
-    const plan = await planComposition({ prompt, currentLang: headLang });
+    const plan = await planComposition({ prompt, currentLang: headLang, rid, itemId, auth });
     return { sequence: pin(plan.map((s) => s.lang)), fromRag: false };
   }
 

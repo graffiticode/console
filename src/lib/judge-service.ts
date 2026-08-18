@@ -21,6 +21,7 @@
 import {
   completeOnce,
   type SystemPrompt,
+  type TokenUsage,
 } from "./llm-generation-service";
 import {
   inferProviderFromModel,
@@ -388,10 +389,10 @@ async function callJudge(
   user: string,
   model: string,
   timeoutMs: number,
-): Promise<string> {
+): Promise<{ content: string; usage: TokenUsage }> {
   const provider = inferProviderFromModel(model);
   if (!provider) throw new Error(`Unrecognized judge model "${model}"`);
-  const { content, failure } = await completeOnce({
+  const { content, usage, failure } = await completeOnce({
     provider,
     model,
     systemPrompt: system,
@@ -399,7 +400,7 @@ async function callJudge(
     options: { maxTokens: JUDGE_MAX_TOKENS, temperature: 0, timeoutMs },
   });
   if (failure) throw new Error(failure.message);
-  return content;
+  return { content, usage };
 }
 
 /**
@@ -437,13 +438,18 @@ interface JudgeCodeArgs {
   currentCode?: string | null;
   /** Judge model id; its provider is inferred. Defaults to JUDGE_MODEL. */
   model?: string;
+  /** Optional request id and item id for token usage recording (only used in inline mode, not in offline eval). */
+  rid?: string;
+  itemId?: string | null;
 }
 
 /**
- * Pointwise: score one candidate against the intent. Returns null on any failure (missing key,
- * API error, unparseable verdict) so callers never have to guard against a throw.
+ * Pointwise: score one candidate against the intent. Returns { verdict, usage } or null on any failure
+ * (missing key, API error, unparseable verdict) so callers never have to guard against a throw.
+ * When rid/itemId are provided (inline mode only), usage is captured for token recording; offline eval
+ * simply ignores the usage field.
  */
-export async function judgeCode(args: JudgeCodeArgs): Promise<JudgeVerdict | null> {
+export async function judgeCode(args: JudgeCodeArgs): Promise<{ verdict: JudgeVerdict; usage?: TokenUsage } | null> {
   const cfg = getJudgeConfig();
   const model = resolveJudgeModel(args.model || cfg.judgeModel);
   if (!model) return null;
@@ -491,7 +497,7 @@ ${args.code}`;
         ? system
         : `${system}\n\nRETRY: your previous response was cut off before the verdict. Skip the ` +
           `<analysis> block entirely and output ONLY the single JSON object, nothing else.`;
-      const text = await callJudge(sys, user, model, cfg.judgeTimeoutMs);
+      const { content: text, usage } = await callJudge(sys, user, model, cfg.judgeTimeoutMs);
       const o = parseJson(text);
       if (!o) { note(attempt, "no verdict-shaped JSON", `len=${text?.length ?? 0} tail=${(text || "").slice(-200)}`); continue; }
       const correctness = score5(pick(o, "correctness"));
@@ -505,7 +511,7 @@ ${args.code}`;
       // The judge intermittently omits `overall`; repair from the dimension mean
       // instead of recording a spurious 0 that would floor the aggregate.
       const overall = score5(pick(o, "overall")) ?? Math.round((correctness + instructionFollowing + idiomaticity) / 3);
-      return {
+      const verdict: JudgeVerdict = {
         correctness,
         instructionFollowing,
         idiomaticity,
@@ -514,6 +520,7 @@ ${args.code}`;
         model,
         latencyMs: Math.round(performance.now() - t0),
       };
+      return { verdict, usage: args.rid ? usage : undefined };
     } catch (e: any) {
       note(attempt, "call threw", e?.message || String(e));
     }
@@ -551,7 +558,7 @@ ${first}
 CANDIDATE B:
 ${second}`;
   try {
-    const text = await callJudge(system, user, model, timeoutMs);
+    const { content: text } = await callJudge(system, user, model, timeoutMs);
     const o = parseJson(text);
     if (!o) return null;
     return {
@@ -671,7 +678,7 @@ export async function judgePanel(args: {
 
   for (const family of families) {
     const model = judgeModelForFamily(family);
-    const verdict = await judgeCode({
+    const result = await judgeCode({
       prompt: args.prompt,
       code: args.code,
       lang: args.lang,
@@ -679,7 +686,7 @@ export async function judgePanel(args: {
       currentCode: args.currentCode,
       model,
     });
-    entries.push({ judge: family, model, verdict });
+    entries.push({ judge: family, model, verdict: result?.verdict ?? null });
   }
 
   const scored = entries.filter((e) => e.verdict);

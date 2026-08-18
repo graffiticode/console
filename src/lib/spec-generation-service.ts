@@ -14,6 +14,7 @@ import { getApiTask, getApiData, getLanguageLexicon, getLanguageHints, getLangua
 import { readDialectInstructions, modelRejectsTemperature } from "./code-generation-service";
 import { modeTierFor } from "./model-priority";
 import { modelForProvider } from "./llm-models";
+import { recordTokenUsage } from "./token-usage-service";
 
 // Translation is faithfulness-critical and constrained (annotated src + instructions + the
 // completeness contract fully determine the output), and get_spec sits in the hot path — so a
@@ -108,9 +109,12 @@ interface ClaudeCallArgs {
   user: string;
   apiKey: string;
   model: string;
+  rid?: string;
+  itemId?: string | null;
+  auth?: { uid: string };
 }
 
-async function callClaudeForSpec({ system, user, apiKey, model }: ClaudeCallArgs): Promise<string> {
+async function callClaudeForSpec({ system, user, apiKey, model, rid, itemId, auth }: ClaudeCallArgs): Promise<{ content: string; usage?: any }> {
   const resp = await axios.post(
     "https://api.anthropic.com/v1/messages",
     {
@@ -143,15 +147,39 @@ async function callClaudeForSpec({ system, user, apiKey, model }: ClaudeCallArgs
     );
   }
 
+  // Record token usage if auth and rid are provided
+  if (auth && rid && resp.data?.usage) {
+    const usage = resp.data.usage;
+    recordTokenUsage({
+      auth,
+      rid,
+      stage: "spec_gen",
+      itemId: itemId ?? null,
+      provider: "anthropic",
+      model,
+      usage: {
+        inputTokens: usage.input_tokens || 0,
+        outputTokens: usage.output_tokens || 0,
+        cacheCreationInputTokens: usage.cache_creation_input_tokens || 0,
+        cacheReadInputTokens: usage.cache_read_input_tokens || 0,
+        reasoningTokens: 0,
+      },
+    }).catch(() => {
+      // Never throw from usage recording
+    });
+  }
+
   // Join the TEXT blocks rather than reading content[0]. A thinking-capable model (Sonnet 5,
   // Opus 5 — thinking is on by default there, unlike 4.8) leads with a `thinking` block, so
   // content[0].text is undefined and the shortcut silently returned "" — a spec that was
   // generated, paid for, and thrown away, with no error anywhere. Latent until L0177 became the
   // first dialect to route get_spec off Haiku.
-  return (resp.data?.content ?? [])
+  const content = (resp.data?.content ?? [])
     .filter((block: any) => block?.type === "text")
     .map((block: any) => block.text ?? "")
     .join("");
+
+  return { content, usage: resp.data?.usage };
 }
 
 // Collect substantial string literals from the AST pool. Short strings (keys, hex/encoding
@@ -221,7 +249,7 @@ function withCompiledPaths(annSrc: string, compiled: any): string {
  * Generate an English spec for a task. `taskId` may be a composition chain (`head+up1+...`);
  * we describe the head (the authored item).
  */
-export async function generateSpec({ auth, taskId }: { auth: any; taskId: string }): Promise<SpecResult> {
+export async function generateSpec({ auth, taskId, rid, itemId }: { auth: any; taskId: string; rid?: string; itemId?: string | null }): Promise<SpecResult> {
   const apiTask = await getApiTask({ id: taskId, auth });
   const taskList = Array.isArray(apiTask) ? apiTask : [apiTask];
   const task = taskList[0] || apiTask;
@@ -249,8 +277,8 @@ export async function generateSpec({ auth, taskId }: { auth: any; taskId: string
   const directive = specDirective?.trim() || SPEC_DIRECTIVE;
   const system = `${instructions}\n\n${directive}`;
   const model = specModelFor(lang);
-  const spec = (await callClaudeForSpec({ system, user: withCompiledPaths(annSrc, compiled), apiKey, model })).trim();
+  const { content: spec } = await callClaudeForSpec({ system, user: withCompiledPaths(annSrc, compiled), apiKey, model, rid, itemId, auth });
   const coverage = assertCoverage(spec, task.code);
 
-  return { spec, lang, itemId: taskId, coverage, model };
+  return { spec: spec.trim(), lang, itemId: taskId, coverage, model };
 }

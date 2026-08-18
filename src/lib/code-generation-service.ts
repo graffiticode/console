@@ -64,6 +64,7 @@ import { checkBurstLimit } from "./free-plan-throttle";
 import { recordSpend } from "./free-plan-quota";
 import { estimateUsdCost } from "./model-pricing";
 import { FreePlanError, buildSignupUrl } from "./free-plan-context";
+import { recordTokenUsage, Stage } from "./token-usage-service";
 
 // Sentinel itemId injected during code-generation verification. Side-effecting
 // dialects MUST treat a compile whose itemId (e.g. L0158's `lrn-id`) equals this
@@ -1585,7 +1586,7 @@ export async function generateCode({
     if (outOfScopeMatch) {
       const reason = outOfScopeMatch[1].trim();
       console.log(`[code-gen] rid=${rid} lang=${lang} out-of-scope: ${reason}`);
-      const routing = await findBestLanguages({ userRequest: prompt, outOfScopeReason: reason, currentLang: lang });
+      const routing = await findBestLanguages({ userRequest: prompt, outOfScopeReason: reason, currentLang: lang, rid, itemId, auth });
 
       let errorMessage = `Out of scope: ${reason}`;
       if (routing.suggestions.length > 0) {
@@ -1862,69 +1863,41 @@ export async function generateCode({
     // Ensure the code is properly processed one final time before returning
     const finalProcessedCode = await processGeneratedCode(generatedCode, lang, rid, accessToken);
 
-    // Token/cost telemetry. Under item-based billing, code generation and its
+    // Token telemetry. Under item-based billing, code generation and its
     // iterations are FREE (billing is per successful item via recordBillableItem),
-    // so we record units: 0 and never touch the monthly item counter. The tokens
-    // and cost fields are retained for margin/cost reporting (revenue-vs-cost.ts).
+    // so we record units: 0 and never touch the monthly item counter.
     if (auth?.uid && finalUsage.total_tokens > 0) {
-      try {
-        const db = getFirestoreDb();
-        const userDoc = await db.doc(`users/${auth.uid}`).get();
-        const plan = userDoc.data()?.subscription?.plan || 'demo';
-        const now = new Date();
+      const stage: Stage = fixAttempts > 0 ? "repair" : "code_gen";
+      const tokenUsage = {
+        inputTokens: finalUsage.prompt_tokens,
+        outputTokens: finalUsage.completion_tokens,
+        cacheCreationInputTokens: finalUsage.cache_creation_tokens,
+        cacheReadInputTokens: finalUsage.cache_read_tokens,
+        reasoningTokens: finalUsage.reasoning_tokens,
+      };
+      const userDoc = await getFirestoreDb().doc(`users/${auth.uid}`).get();
+      const plan = userDoc.data()?.subscription?.plan || "demo";
 
-        const costUsd = totalCostUsd;
-
-        await db.collection('usage').add({
-          userId: auth.uid,
-          // Pre-existing field, kept as-is: it holds the RAG request id, not a
-          // Graffiticode task id, and existing readers depend on that. `rid` and
-          // `generatedTaskId` below are the unambiguous replacements.
-          taskId: requestId,
-          rid: requestId,
-          // The two attribution keys. `itemId` is set when the item already
-          // exists (an edit); on a fresh create it is null and
-          // `generatedTaskId` is the join — `users/{uid}/versions` carries both
-          // `taskId` and `itemId`, so cost resolves to an item either way.
-          itemId: itemId ?? null,
-          generatedTaskId: verificationResult?.taskId ?? null,
-          units: 0,
-          createdAt: now,
-          timestamp: now.toISOString(),
-          lang: lang,
-          type: 'ai_generation',
-          provider: providerUsed,
+      await recordTokenUsage({
+        auth,
+        rid: requestId,
+        stage,
+        itemId: itemId ?? null,
+        generatedTaskId: verificationResult?.taskId ?? null,
+        lang,
+        provider: providerUsed,
+        model: modelToUse,
+        tier: tierToUse,
+        usage: tokenUsage,
+        extra: {
           routeSource: streamResult.routeSource,
           priority: streamResult.priority,
-          tier: tierToUse,
-          model: modelToUse,
           providerAttempts,
           fallbackReason: streamResult.fallbackReason ?? null,
-          tokens: {
-            input: finalUsage.prompt_tokens,
-            output: finalUsage.completion_tokens,
-            total: finalUsage.total_tokens,
-            cacheCreation: finalUsage.cache_creation_tokens,
-            cacheRead: finalUsage.cache_read_tokens,
-            // Subset of `output`, not additive — see TokenUsage.reasoningTokens.
-            reasoning: finalUsage.reasoning_tokens,
-          },
-          cost: {
-            // Priced at write time rather than left to the reader: the rate for
-            // a model can change (intro rates expire), and what this generation
-            // actually cost is a fact about the moment it ran.
-            total: costUsd,
-            usd: costUsd,
-            provider: providerUsed,
-            model: modelToUse,
-          },
-          plan: plan,
-          fixAttempts: fixAttempts,
-        });
-      } catch (error) {
-        console.error("[generateCode] Failed to record token telemetry:", error);
-        // Don't throw - we still want to return the result even if telemetry fails
-      }
+          plan,
+          fixAttempts,
+        },
+      });
     }
 
     // Complete analytics tracking — mark as failed if compilation had errors
@@ -1961,8 +1934,26 @@ export async function generateCode({
     // so trackJudge uses a Firestore update, not the already-deleted in-memory record). Zero
     // user-facing latency; flag-gated (JUDGE_MODE=async), default off.
     if (getJudgeMode() === "async" && finalProcessedCode) {
-      judgeCode({ prompt, code: finalProcessedCode, lang, currentCode })
-        .then((verdict) => (verdict ? ragAnalytics.trackJudge(requestId, verdict) : undefined))
+      judgeCode({ prompt, code: finalProcessedCode, lang, currentCode, rid: requestId, itemId })
+        .then((result) => {
+          if (!result) return;
+          const { verdict, usage } = result;
+          ragAnalytics.trackJudge(requestId, verdict);
+          if (usage) {
+            recordTokenUsage({
+              auth,
+              rid: requestId,
+              stage: "judge",
+              itemId: itemId ?? null,
+              lang,
+              provider: verdict.model.includes("gpt") ? "openai" : "anthropic",
+              model: verdict.model,
+              usage,
+            }).catch(() => {
+              // Never throw from usage recording
+            });
+          }
+        })
         .catch(() => { /* judge failures must never surface */ });
     }
 

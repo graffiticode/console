@@ -26,6 +26,7 @@ import admin from 'firebase-admin';
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { estimateUsdCost, usdCostFromReport } from '../src/lib/model-pricing';
+import { PLANS, type PlanId } from '../src/lib/plans-config';
 
 // Load .env.local
 const envPath = resolve(process.cwd(), '.env.local');
@@ -87,6 +88,15 @@ Average AI cost to produce one item, for a period.
                             Implies --per-item, and SUPPRESSES the blended figure:
                             provider-reported spend cannot be split by language,
                             so only the attributed path can answer per-language.
+  --as-of YYYY-MM-DD        Price the SAME tokens on the SAME models at this
+                            date's rate card (default: today). Rates move on
+                            their own — intro pricing expires, list prices fall —
+                            so this asks "are these prices profitable against
+                            today's costs", holding usage constant. It is not
+                            what we were billed.
+  --by-lang                 Average item cost broken down by language. Implies
+                            --per-item; only the attributed path can answer it,
+                            since provider spend cannot be split by language.
   --output <file.html>      Also write an HTML report (open it in a browser)
   --json                    Emit JSON to stdout (progress goes to stderr)
   --help, -h                Show this
@@ -112,6 +122,13 @@ interface Opts {
   langs: string[];
   output?: string;
   json: boolean;
+  /**
+   * Rate card to price with. The report answers "what would these same tokens,
+   * on these same models, cost at this date's prices" — a forward-looking
+   * pricing question, not an accounting one. Defaults to today.
+   */
+  asOf: Date;
+  byLang: boolean;
 }
 
 /** Records store a bare 4-digit id ("0176"); accept the L-prefixed and unpadded forms too. */
@@ -131,6 +148,8 @@ function parseArgs(argv: string[]): Opts {
     perItem: false,
     langs: [],
     json: false,
+    asOf: new Date(),
+    byLang: false,
   };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -145,6 +164,16 @@ function parseArgs(argv: string[]): Opts {
     else if (a === '--lang' && args[i + 1]) { opts.langs.push(normalizeLang(args[++i])); }
     else if (a === '--output' && args[i + 1]) { opts.output = args[++i]; }
     else if (a === '--json') { opts.json = true; }
+    else if (a === '--by-lang') { opts.byLang = true; opts.perItem = true; }
+    else if (a === '--as-of' && args[i + 1]) {
+      const raw = args[++i];
+      const d = new Date(`${raw}T00:00:00Z`);
+      if (Number.isNaN(d.getTime())) {
+        console.error(`Error: --as-of must be YYYY-MM-DD (got "${raw}")`);
+        process.exit(1);
+      }
+      opts.asOf = d;
+    }
     else if (a === '--help' || a === '-h') {
       console.log(USAGE);
       process.exit(0);
@@ -401,7 +430,7 @@ interface OpenAiCost { embeddings: number; other: number; daily: Record<string, 
  */
 interface OpenAiFloor { cost: number; calls: number; inputTokens: number; outputTokens: number; }
 
-async function fetchOpenAiFloor(start: Date, end: Date): Promise<OpenAiFloor | null> {
+async function fetchOpenAiFloor(start: Date, end: Date, asOf: Date): Promise<OpenAiFloor | null> {
   const snap = await db.collection('usage').where('type', '==', 'ai_generation').get();
   const floor: OpenAiFloor = { cost: 0, calls: 0, inputTokens: 0, outputTokens: 0 };
   for (const doc of snap.docs) {
@@ -423,14 +452,14 @@ async function fetchOpenAiFloor(start: Date, end: Date): Promise<OpenAiFloor | n
     // no plain input (single digits per call) against millions of cache reads,
     // so pricing input+output alone loses most of the spend. Prefer the cost
     // priced at write time; only fall back to re-pricing the full breakdown.
-    floor.cost += typeof r.cost?.usd === 'number'
-      ? r.cost.usd
-      : estimateUsdCost({
-          inputTokens,
-          outputTokens,
-          cacheCreationInputTokens: Number(t.cacheCreation ?? 0),
-          cacheReadInputTokens: Number(t.cacheRead ?? 0),
-        }, model, end, 'openai');
+    // Always re-priced at `asOf`, never the frozen cost: the report's question
+    // is what these tokens cost at a given rate card, not what we paid.
+    floor.cost += estimateUsdCost({
+      inputTokens,
+      outputTokens,
+      cacheCreationInputTokens: Number(t.cacheCreation ?? 0),
+      cacheReadInputTokens: Number(t.cacheRead ?? 0),
+    }, model, asOf, 'openai');
   }
   return floor.calls > 0 ? floor : null;
 }
@@ -575,6 +604,8 @@ interface GenRecord {
   instrumented: boolean;
 }
 
+interface LangCost { lang: string; items: number; usd: number; gens: number; }
+
 interface PerItem {
   records: number;
   instrumented: number;
@@ -595,10 +626,10 @@ interface PerItem {
  * exists: use `itemId` when the record has one (an edit), otherwise map
  * `generatedTaskId` through `users/{uid}/versions`, which stores both.
  */
-async function fetchPerItem(start: Date, end: Date, langs: string[] = []): Promise<PerItem> {
+async function fetchPerItem(start: Date, end: Date, asOf: Date, langs: string[] = []): Promise<PerItem> {
   const snap = await db.collection('usage')
     .where('type', '==', 'ai_generation')
-    .select('createdAt', 'userId', 'itemId', 'generatedTaskId', 'cost', 'lang', 'model')
+    .select('createdAt', 'userId', 'itemId', 'generatedTaskId', 'cost', 'lang', 'model', 'tokens', 'provider')
     .get();
 
   const records: GenRecord[] = [];
@@ -607,7 +638,17 @@ async function fetchPerItem(start: Date, end: Date, langs: string[] = []): Promi
     if (langs.length > 0 && !langs.includes(normalizeLang(String(d.lang ?? '')))) continue;
     const ms = toMillis(d.createdAt);
     if (ms < start.getTime() || ms >= end.getTime()) continue;
-    const usd = Number(d.cost?.usd ?? d.cost?.total ?? 0);
+    // The frozen figure is kept only to detect legacy records; the cost this
+    // report divides is the SAME tokens on the SAME model re-priced at `asOf`.
+    const frozen = Number(d.cost?.usd ?? d.cost?.total ?? 0);
+    const t = (d.tokens ?? {}) as any;
+    const provider = d.provider ?? (/^(gpt|o\d)/.test(String(d.model ?? '')) ? 'openai' : 'anthropic');
+    const usd = estimateUsdCost({
+      inputTokens: Number(t.input ?? 0),
+      outputTokens: Number(t.output ?? 0),
+      cacheCreationInputTokens: Number(t.cacheCreation ?? 0),
+      cacheReadInputTokens: Number(t.cacheRead ?? 0),
+    }, d.model, asOf, provider);
     records.push({
       userId: String(d.userId || ''),
       itemId: d.itemId ?? null,
@@ -616,7 +657,9 @@ async function fetchPerItem(start: Date, end: Date, langs: string[] = []): Promi
       lang: d.lang ?? null,
       model: d.model ?? null,
       // A record predating attribution has neither a priced cost nor a task id.
-      instrumented: usd > 0 || Boolean(d.generatedTaskId) || Boolean(d.itemId),
+      // Judged on the FROZEN value: re-pricing gives a legacy record a nonzero
+      // cost, which would quietly readmit the rows this check exists to exclude.
+      instrumented: frozen > 0 || Boolean(d.generatedTaskId) || Boolean(d.itemId),
     });
   }
 
@@ -895,13 +938,13 @@ async function main() {
   let openaiFloor: OpenAiFloor | null = null;
   if (!openai) {
     console.error('OpenAI costs unavailable; deriving a floor from ai_generation records...');
-    openaiFloor = await fetchOpenAiFloor(start, end);
+    openaiFloor = await fetchOpenAiFloor(start, end, opts.asOf);
   }
 
   let perItem: PerItem | null = null;
   if (opts.perItem) {
     console.error('Attributing cost per item...');
-    perItem = await fetchPerItem(start, end, opts.langs);
+    perItem = await fetchPerItem(start, end, opts.asOf, opts.langs);
   }
 
   console.error('Counting items...');
@@ -922,7 +965,7 @@ async function main() {
   const costByModel: Record<string, number> = {};
   const totals = emptyTokens();
   for (const [model, t] of Object.entries(byModel)) {
-    costByModel[model] = usdCostFromReport(t, model, end);
+    costByModel[model] = usdCostFromReport(t, model, opts.asOf);
     totals.uncachedInput += t.uncachedInput;
     totals.cacheWrite5m += t.cacheWrite5m;
     totals.cacheWrite1h += t.cacheWrite1h;
@@ -1140,6 +1183,41 @@ async function main() {
     } else {
       console.log(`  No attributed items yet. Per-item attribution only sees generations`);
       console.log(`  recorded after it shipped — run some generations, then re-run this.`);
+    }
+  }
+
+  if (opts.byLang && perItem) {
+    // Only the attributed path can answer this: provider-reported spend is
+    // scoped to an API key and carries no language dimension.
+    const byLang = new Map<string, { items: number; usd: number; gens: number }>();
+    for (const v of perItem.byItem.values()) {
+      const key = v.lang ? `L${normalizeLang(String(v.lang))}` : '(unrecorded)';
+      const e = byLang.get(key) ?? { items: 0, usd: 0, gens: 0 };
+      e.items++; e.usd += v.usd; e.gens += v.gens;
+      byLang.set(key, e);
+    }
+    const rows = [...byLang.entries()].sort((a, b) => b[1].usd / b[1].items - a[1].usd / a[1].items);
+    console.log(`\nAverage item cost by language (attributed items only)`);
+    console.log(`  ${'lang'.padEnd(14)}${'items'.padStart(7)}${'mean'.padStart(11)}${'total'.padStart(11)}${'gens/item'.padStart(11)}`);
+    for (const [lang, e] of rows) {
+      console.log(`  ${lang.padEnd(14)}${String(e.items).padStart(7)}${usd(e.usd / e.items).padStart(11)}${usd(e.usd).padStart(11)}${(e.gens / e.items).toFixed(2).padStart(11)}`);
+    }
+  }
+
+  // Are the current prices profitable against this cost? The rates come from
+  // plans-config, so the table cannot drift from what customers are billed.
+  if (opts.langs.length === 0 && denominator > 0) {
+    const cpi = totalCost / denominator;
+    console.log(`\nMargin at ${usd(cpi)}/item (rate card ${opts.asOf.toISOString().split('T')[0]})`);
+    console.log(`  ${'plan'.padEnd(12)}${'$/item'.padStart(9)}${'margin'.padStart(10)}${'breakeven cost'.padStart(16)}`);
+    for (const id of ['demo', 'pro', 'teams', 'platinum'] as PlanId[]) {
+      const rate = PLANS[id].overageRatePerItem;
+      if (rate == null) continue;
+      const margin = ((rate - cpi) / rate) * 100;
+      console.log(`  ${PLANS[id].displayName.padEnd(12)}${usd(rate).padStart(9)}${(margin.toFixed(1) + '%').padStart(10)}${usd(rate).padStart(16)}`);
+    }
+    if (!openai && openaiFloor) {
+      console.log(`  Margins are OPTIMISTIC: the OpenAI side is a lower bound (see above).`);
     }
   }
 
