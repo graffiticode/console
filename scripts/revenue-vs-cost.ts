@@ -3,6 +3,7 @@
 import admin from 'firebase-admin';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
+import { estimateUsdCost, usdCostFromReport } from '../src/lib/model-pricing';
 
 // Load .env.local
 const envPath = resolve(process.cwd(), '.env.local');
@@ -31,27 +32,6 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
-// Claude API pricing (per million tokens)
-const CLAUDE_PRICING: Record<string, { input: number; output: number }> = {
-  'claude-opus-4-8':           { input: 5.00, output: 25.00 },
-  'claude-opus-4-6':           { input: 5.00, output: 25.00 },
-  'claude-opus-4-20250115':    { input: 15.00, output: 75.00 },
-  'claude-sonnet-5':           { input: 3.00, output: 15.00 }, // intro $2/$10 through 2026-08-31
-  'claude-sonnet-4-6':         { input: 3.00, output: 15.00 },
-  'claude-sonnet-4-20250514':  { input: 3.00, output: 15.00 },
-  'claude-sonnet-4-5-20241022': { input: 3.00, output: 15.00 },
-  'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 },
-  'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
-  'claude-3-5-sonnet-20240620': { input: 3.00, output: 15.00 },
-  'claude-3-haiku-20240307':   { input: 0.25, output: 1.25 },
-};
-
-const DEFAULT_PRICING = { input: 3.00, output: 15.00 };
-
-function getModelCost(model: string, inputTokens: number, outputTokens: number): number {
-  const pricing = CLAUDE_PRICING[model] || DEFAULT_PRICING;
-  return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
-}
 
 function parseArgs(argv: string[]): { period: string; output: string; lang?: string; from?: string; to?: string; tz?: string; group: 'day' | 'week'; avg: boolean } {
   const args = argv.slice(2);
@@ -219,9 +199,10 @@ interface ActualDailyData {
   usage: {
     uncached_input_tokens: number;
     cached_input_tokens: number;
+    cache_creation_input_tokens: number;
     output_tokens: number;
   } | null;
-  usageByModel: Record<string, { input: number; cached_input: number; output: number }>;
+  usageByModel: Record<string, { input: number; cached_input: number; cache_creation: number; output: number }>;
 }
 
 function ensureYesterdayData(): void {
@@ -268,9 +249,15 @@ function loadDailyData(startDate: string | null, endDate: string): ActualDailyDa
           entry.usageByModel[model] = {
             input: stats.input || 0,
             cached_input: stats.cached_input || 0,
+            cache_creation: stats.cache_creation || 0,
             output: stats.output || 0,
           };
-          entry.estimatedCost += getModelCost(model, stats.input || 0, stats.output || 0);
+          entry.estimatedCost += usdCostFromReport({
+            uncachedInput: stats.input || 0,
+            cacheRead: stats.cached_input || 0,
+            cacheWrite5m: stats.cache_creation || 0,
+            output: stats.output || 0,
+          }, model);
         }
       }
     } catch {}
@@ -600,9 +587,14 @@ async function main() {
 
   for (const r of aiRecords) {
     const model = r.model || 'unknown';
-    const input = r.tokens?.input || 0;
+    const cost = estimateUsdCost({
+      inputTokens: r.tokens?.input || 0,
+      outputTokens: r.tokens?.output || 0,
+      cacheCreationInputTokens: r.tokens?.cacheCreation || 0,
+      cacheReadInputTokens: r.tokens?.cacheRead || 0,
+    }, model);
+    const input = (r.tokens?.input || 0) + (r.tokens?.cacheRead || 0) + (r.tokens?.cacheCreation || 0);
     const output = r.tokens?.output || 0;
-    const cost = getModelCost(model, input, output);
     totalProjectedCost += cost;
     totalInputTokens += input;
     totalOutputTokens += output;
@@ -644,7 +636,7 @@ async function main() {
     ? dailyData.reduce((sum, d) => sum + d.estimatedCost, 0)
     : null;
   const actualCostByModel: Record<string, number> = {};
-  const actualUsageByModel: Record<string, { input: number; cached_input: number; output: number }> = {};
+  const actualUsageByModel: Record<string, { input: number; cached_input: number; cache_creation: number; output: number }> = {};
   let totalActualInputTokens = 0;
   let totalActualOutputTokens = 0;
   let totalActualCachedInputTokens = 0;
@@ -652,17 +644,23 @@ async function main() {
 
   for (const d of dailyData) {
     if (d.usage) {
-      totalActualInputTokens += d.usage.uncached_input_tokens + d.usage.cached_input_tokens;
+      totalActualInputTokens += d.usage.uncached_input_tokens + d.usage.cached_input_tokens + d.usage.cache_creation_input_tokens;
       totalActualOutputTokens += d.usage.output_tokens;
       totalActualCachedInputTokens += d.usage.cached_input_tokens;
       totalActualUncachedInputTokens += d.usage.uncached_input_tokens;
     }
     for (const [model, stats] of Object.entries(d.usageByModel)) {
-      if (!actualUsageByModel[model]) actualUsageByModel[model] = { input: 0, cached_input: 0, output: 0 };
+      if (!actualUsageByModel[model]) actualUsageByModel[model] = { input: 0, cached_input: 0, cache_creation: 0, output: 0 };
       actualUsageByModel[model].input += stats.input;
       actualUsageByModel[model].cached_input += stats.cached_input;
+      actualUsageByModel[model].cache_creation += stats.cache_creation;
       actualUsageByModel[model].output += stats.output;
-      actualCostByModel[model] = (actualCostByModel[model] || 0) + getModelCost(model, stats.input, stats.output);
+      actualCostByModel[model] = (actualCostByModel[model] || 0) + usdCostFromReport({
+        uncachedInput: stats.input,
+        cacheRead: stats.cached_input,
+        cacheWrite5m: stats.cache_creation,
+        output: stats.output,
+      }, model);
     }
   }
   if (totalEstimatedCost != null) {
@@ -687,14 +685,19 @@ async function main() {
     if (!ms) continue;
     const date = msToDateStr(ms, tz);
     if (!dailyMap[date]) dailyMap[date] = emptyBucket(date);
-    dailyMap[date].projectedCost += getModelCost(r.model || 'unknown', r.tokens?.input || 0, r.tokens?.output || 0);
+    dailyMap[date].projectedCost += estimateUsdCost({
+      inputTokens: r.tokens?.input || 0,
+      outputTokens: r.tokens?.output || 0,
+      cacheCreationInputTokens: r.tokens?.cacheCreation || 0,
+      cacheReadInputTokens: r.tokens?.cacheRead || 0,
+    }, r.model || 'unknown');
   }
   // Add actual costs and usage to daily buckets
   for (const d of dailyData) {
     if (!dailyMap[d.date]) dailyMap[d.date] = emptyBucket(d.date);
     dailyMap[d.date].estimatedCost = d.estimatedCost;
     if (d.usage) {
-      dailyMap[d.date].actualInputTokens = d.usage.uncached_input_tokens + d.usage.cached_input_tokens;
+      dailyMap[d.date].actualInputTokens = d.usage.uncached_input_tokens + d.usage.cached_input_tokens + d.usage.cache_creation_input_tokens;
       dailyMap[d.date].actualOutputTokens = d.usage.output_tokens;
       dailyMap[d.date].actualCachedInputTokens = d.usage.cached_input_tokens;
       dailyMap[d.date].actualUncachedInputTokens = d.usage.uncached_input_tokens;

@@ -148,13 +148,28 @@ async function fetchUsageInfo(requestIds: string[]): Promise<Map<string, UsageIn
     if (data.taskId && requestIds.includes(data.taskId)) {
       const cacheRead = data.tokens?.cacheRead || 0;
       const cacheCreation = data.tokens?.cacheCreation || 0;
-      info.set(data.taskId, {
+      const newRecord = {
         units: data.units || 0,
         inputTokens: (data.tokens?.input || 0) + cacheRead + cacheCreation,
         outputTokens: data.tokens?.output || 0,
         cacheReadTokens: cacheRead,
         cacheCreationTokens: cacheCreation,
-      });
+      };
+      const existing = info.get(data.taskId);
+      if (existing) {
+        // Multiple ai_generation docs can share one rid (e.g. head+upstream composition,
+        // or now more common with routing/spec/judge also recording under the same rid).
+        // Accumulate rather than overwrite so all their tokens are counted.
+        info.set(data.taskId, {
+          units: existing.units + newRecord.units,
+          inputTokens: existing.inputTokens + newRecord.inputTokens,
+          outputTokens: existing.outputTokens + newRecord.outputTokens,
+          cacheReadTokens: existing.cacheReadTokens + newRecord.cacheReadTokens,
+          cacheCreationTokens: existing.cacheCreationTokens + newRecord.cacheCreationTokens,
+        });
+      } else {
+        info.set(data.taskId, newRecord);
+      }
     }
   });
 
