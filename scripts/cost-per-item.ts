@@ -68,6 +68,13 @@ Average AI cost to produce one item, for a period.
   --period day|week|month   Window ending now, UTC-aligned (default: week)
   --from YYYY-MM-DD         Explicit window start (overrides --period)
   --to YYYY-MM-DD           Explicit window end, inclusive
+  --env prod|local|all      Which environment's generations to count
+                            (default: prod). Local development writes to the
+                            same Firestore as production; without this filter a
+                            window heavy with development reads several times
+                            too expensive. Records written before the marker
+                            existed carry no env and are counted under prod —
+                            the run says how many.
   --exclude-trial           Divide by paid items only, not free-plan trial items
   --per-item                Also show the per-item cost distribution
                             (mean/median/p90). Only sees generations recorded
@@ -111,6 +118,7 @@ interface Opts {
    */
   asOf: Date;
   byLang: boolean;
+  env: 'prod' | 'local' | 'all';
 }
 
 /** Records store a bare 4-digit id ("0176"); accept the L-prefixed and unpadded forms too. */
@@ -129,6 +137,7 @@ function parseArgs(argv: string[]): Opts {
     json: false,
     asOf: new Date(),
     byLang: false,
+    env: 'prod',
   };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -141,6 +150,14 @@ function parseArgs(argv: string[]): Opts {
     else if (a === '--output' && args[i + 1]) { opts.output = args[++i]; }
     else if (a === '--json') { opts.json = true; }
     else if (a === '--by-lang') { opts.byLang = true; opts.perItem = true; }
+    else if (a === '--env' && args[i + 1]) {
+      const v = args[++i];
+      if (v !== 'prod' && v !== 'local' && v !== 'all') {
+        console.error(`Error: --env must be prod, local or all (got "${v}")`);
+        process.exit(1);
+      }
+      opts.env = v;
+    }
     else if (a === '--as-of' && args[i + 1]) {
       const raw = args[++i];
       const d = new Date(`${raw}T00:00:00Z`);
@@ -339,6 +356,8 @@ interface PerItem {
   costByProvider: { anthropic: number; openai: number };
   tokens: TokenTotals;
   byDay: Record<string, { anthropic: number; openai: number; tokens: number }>;
+  /** Counted records that predate the env marker (meaningful under --env prod). */
+  unmarked: number;
 }
 
 /**
@@ -352,18 +371,31 @@ interface PerItem {
  * exists: use `itemId` when the record has one (an edit), otherwise map
  * `generatedTaskId` through `users/{uid}/versions`, which stores both.
  */
-async function fetchPerItem(start: Date, end: Date, asOf: Date, langs: string[] = []): Promise<PerItem> {
+async function fetchPerItem(
+  start: Date, end: Date, asOf: Date, langs: string[] = [], env: 'prod' | 'local' | 'all' = 'prod',
+): Promise<PerItem> {
   const snap = await db.collection('usage')
     .where('type', '==', 'ai_generation')
-    .select('createdAt', 'userId', 'itemId', 'generatedTaskId', 'cost', 'lang', 'model', 'tokens', 'provider')
+    .select('createdAt', 'userId', 'itemId', 'generatedTaskId', 'cost', 'lang', 'model', 'tokens', 'provider', 'env')
     .get();
 
   const records: GenRecord[] = [];
+  let unmarked = 0;
   for (const doc of snap.docs) {
     const d = doc.data();
     if (langs.length > 0 && !langs.includes(normalizeLang(String(d.lang ?? '')))) continue;
     const ms = toMillis(d.createdAt);
     if (ms < start.getTime() || ms >= end.getTime()) continue;
+    // No `env` means the record predates the marker. Counting those under prod
+    // keeps history readable — dropping them would silently empty every window
+    // older than this change — but the count is surfaced so the dilution is
+    // visible. Counted AFTER the window filter, or it tallies the whole
+    // collection and reports more pre-marker records than generations.
+    const recordEnv: string | null = d.env ?? null;
+    if (env !== 'all') {
+      if (env === 'prod' ? recordEnv === 'local' : recordEnv !== 'local') continue;
+      if (recordEnv === null) unmarked++;
+    }
     // The frozen figure is kept only to detect legacy records; the cost this
     // report divides is the SAME tokens on the SAME model re-priced at `asOf`.
     const frozen = Number(d.cost?.usd ?? d.cost?.total ?? 0);
@@ -422,6 +454,7 @@ async function fetchPerItem(start: Date, end: Date, asOf: Date, langs: string[] 
     costByProvider: { anthropic: 0, openai: 0 },
     tokens: emptyTokens(),
     byDay: {},
+    unmarked,
   };
 
   for (const r of records) {
@@ -483,6 +516,7 @@ interface HtmlInput {
   start: Date;
   end: Date;
   asOf: Date;
+  env: string;
   totalItems: number;
   trialItems: number;
   paidItems: number;
@@ -604,7 +638,7 @@ function generateHtml(d: HtmlInput): string {
 </style></head><body><main>
 
 <h1>Cost per item</h1>
-<div class="sub">${esc(d.start.toISOString())} → ${esc(d.end.toISOString())} (UTC) · priced at the ${esc(d.asOf.toISOString().split('T')[0])} rate card</div>
+<div class="sub">${esc(d.start.toISOString())} → ${esc(d.end.toISOString())} (UTC) · env ${esc(d.env)} · priced at the ${esc(d.asOf.toISOString().split('T')[0])} rate card</div>
 
 ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</div>`).join('\n')}
 
@@ -671,7 +705,7 @@ async function main() {
   // One scan over our own ai_generation records supplies everything: the window
   // total, the per-model and per-provider split, and the per-item attribution.
   console.error('Reading token usage...');
-  const perItem = await fetchPerItem(start, end, opts.asOf, opts.langs);
+  const perItem = await fetchPerItem(start, end, opts.asOf, opts.langs, opts.env);
 
   console.error('Counting items...');
   const [items, trial] = await Promise.all([
@@ -699,6 +733,14 @@ async function main() {
   // token-usage refactor carry no tokens, so they price at nothing. Excluding
   // them is right — they cannot be priced — but it must not be silent.
   const warnings: string[] = [];
+  if (opts.env === 'prod' && perItem.unmarked > 0 && perItem.instrumented > 0
+      && perItem.unmarked / perItem.instrumented > 0.5) {
+    warnings.push(
+      `${perItem.unmarked} of ${perItem.instrumented} counted generation(s) predate the env marker, ` +
+      `so --env prod cannot exclude local development from most of this window. Treat the figure as ` +
+      `an upper bound until the window falls entirely after the marker shipped.`,
+    );
+  }
   const legacy = perItem.records - perItem.instrumented;
   if (legacy > 0) {
     warnings.push(
@@ -734,6 +776,7 @@ async function main() {
     const html = generateHtml({
       start, end,
       asOf: opts.asOf,
+      env: opts.env,
       totalItems, trialItems, paidItems, denominator, excludeTrial: opts.excludeTrial,
       tokens: totals, costByModel, costByProvider, totalCost,
       rows, langRows, warnings,
@@ -747,6 +790,8 @@ async function main() {
       window: { start: start.toISOString(), end: end.toISOString() },
       daily: rows,
       asOf: opts.asOf.toISOString(),
+      env: opts.env,
+      unmarkedRecords: perItem.unmarked,
       warnings,
       langs: opts.langs.length > 0 ? opts.langs : null,
       items: { total: totalItems, trial: trialItems, paid: paidItems, denominator },
@@ -788,11 +833,14 @@ async function main() {
   console.log(`${pad('  paid accounts')}: ${num(paidItems)}`);
   console.log(`${pad('  free-plan trial')}: ${num(trialItems)}`);
 
-  console.log(`\nTokens recorded (ours, priced at the ${opts.asOf.toISOString().split('T')[0]} rate card)`);
+  console.log(`\nTokens recorded — env ${opts.env}, priced at the ${opts.asOf.toISOString().split('T')[0]} rate card`);
   console.log(`${pad('  input')}: ${num(totals.input)} tok`);
   console.log(`${pad('  cache write / read')}: ${num(totals.cacheCreation)} / ${num(totals.cacheRead)} tok`);
   console.log(`${pad('  output')}: ${num(totals.output)} tok`);
   console.log(`${pad('  generations')}: ${num(perItem.instrumented)}`);
+  if (opts.env === 'prod' && perItem.unmarked > 0) {
+    console.log(`${pad('  pre-marker records')}: ${num(perItem.unmarked)}  (no env field — counted here, may include local work)`);
+  }
   console.log(`${pad('  Anthropic')}: ${usd(costByProvider.anthropic)}`);
   console.log(`${pad('  OpenAI')}: ${usd(costByProvider.openai)}`);
   console.log(`${' '.repeat(25)}--------`);

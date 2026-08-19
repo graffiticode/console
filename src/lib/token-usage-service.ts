@@ -1,6 +1,33 @@
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { TokenUsage } from "./llm-generation-service";
 
+export type Env = "prod" | "local";
+
+/**
+ * Which environment produced this record.
+ *
+ * Local development and production write to the SAME prod Firestore, and until
+ * this field existed nothing told them apart — which is how a cost-per-item
+ * figure came out 2-3x too high, with a developer's key billing $63 against the
+ * deployed key's $26 in one window.
+ *
+ * Prod is the DEFAULT, so nothing has to be configured on Cloud Run. We only
+ * step down to "local" on a positive signal that this is a developer's process.
+ * Defaulting the other way would risk labelling production spend as local and
+ * silently dropping it from the report; failing this way round merely lets some
+ * dev spend through, which is exactly the status quo it replaces.
+ *
+ * `GC_TELEMETRY_ENV` overrides both signals — needed for the one ambiguous case,
+ * a local `npm run start`, which sets NODE_ENV=production with no K_SERVICE.
+ */
+export function currentEnv(): Env {
+  const override = process.env.GC_TELEMETRY_ENV;
+  if (override === "prod" || override === "local") return override;
+  if (process.env.K_SERVICE) return "prod"; // Cloud Run injects this; nothing to set
+  if (process.env.NODE_ENV !== "production") return "local"; // next dev, tsx scripts
+  return "prod";
+}
+
 export type Stage =
   | "code_gen"
   | "repair"
@@ -70,6 +97,7 @@ export async function recordTokenUsage({
       timestamp: now.toISOString(),
       lang: lang ?? null,
       type: "ai_generation",
+      env: currentEnv(),
       provider,
       tier: tier ?? null,
       model,
