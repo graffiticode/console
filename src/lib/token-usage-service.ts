@@ -1,4 +1,4 @@
-import { getFirestore, FieldValue, FieldPath, Timestamp } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { TokenUsage } from "./llm-generation-service";
 
 export type Stage =
@@ -107,36 +107,38 @@ async function updateItemTokenUsage(
   try {
     const itemRef = db.collection(`users/${uid}/items`).doc(itemId);
 
-    // Update with varargs form: FieldPath instances work here (not as object keys)
-    await itemRef.update(
-      "tokenUsage.totals.input",
-      FieldValue.increment(usage.inputTokens),
-      "tokenUsage.totals.output",
-      FieldValue.increment(usage.outputTokens),
-      "tokenUsage.totals.cacheCreation",
-      FieldValue.increment(usage.cacheCreationInputTokens),
-      "tokenUsage.totals.cacheRead",
-      FieldValue.increment(usage.cacheReadInputTokens),
-      // byModel — use FieldPath.of() to safely handle dots in model ids
-      new FieldPath("tokenUsage", "byModel", model, "input"),
-      FieldValue.increment(usage.inputTokens),
-      new FieldPath("tokenUsage", "byModel", model, "output"),
-      FieldValue.increment(usage.outputTokens),
-      new FieldPath("tokenUsage", "byModel", model, "cacheCreation"),
-      FieldValue.increment(usage.cacheCreationInputTokens),
-      new FieldPath("tokenUsage", "byModel", model, "cacheRead"),
-      FieldValue.increment(usage.cacheReadInputTokens),
-      // byStage
-      new FieldPath("tokenUsage", "byStage", stage, "input"),
-      FieldValue.increment(usage.inputTokens),
-      new FieldPath("tokenUsage", "byStage", stage, "output"),
-      FieldValue.increment(usage.outputTokens),
-      new FieldPath("tokenUsage", "byStage", stage, "cacheCreation"),
-      FieldValue.increment(usage.cacheCreationInputTokens),
-      new FieldPath("tokenUsage", "byStage", stage, "cacheRead"),
-      FieldValue.increment(usage.cacheReadInputTokens),
-      "tokenUsage.updatedAt",
-      Date.now()
+    // Use set with merge: true to create the doc if absent (needed for items created via
+    // generation, where the doc ref is allocated before the doc exists). Nested objects inside
+    // a map are not parsed for dots, so model ids like "gpt-5.6-terra" work as literal keys.
+    await itemRef.set(
+      {
+        tokenUsage: {
+          totals: {
+            input: FieldValue.increment(usage.inputTokens),
+            output: FieldValue.increment(usage.outputTokens),
+            cacheCreation: FieldValue.increment(usage.cacheCreationInputTokens),
+            cacheRead: FieldValue.increment(usage.cacheReadInputTokens),
+          },
+          byModel: {
+            [model]: {
+              input: FieldValue.increment(usage.inputTokens),
+              output: FieldValue.increment(usage.outputTokens),
+              cacheCreation: FieldValue.increment(usage.cacheCreationInputTokens),
+              cacheRead: FieldValue.increment(usage.cacheReadInputTokens),
+            },
+          },
+          byStage: {
+            [stage]: {
+              input: FieldValue.increment(usage.inputTokens),
+              output: FieldValue.increment(usage.outputTokens),
+              cacheCreation: FieldValue.increment(usage.cacheCreationInputTokens),
+              cacheRead: FieldValue.increment(usage.cacheReadInputTokens),
+            },
+          },
+          updatedAt: Date.now(),
+        },
+      },
+      { merge: true }
     );
   } catch (error) {
     // Swallow not-found (item deleted mid-flight) and other errors

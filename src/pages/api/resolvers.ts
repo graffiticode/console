@@ -1458,10 +1458,12 @@ export async function createItem({
     if (auth.freePlan) {
       Object.assign(item, freePlanItemFields(auth, timestamp));
     }
-    await itemRef.set(item);
+    // Use merge: true so the tokenUsage that was accumulated during generation is preserved
+    await itemRef.set(item, { merge: true });
 
-    // Backfill token usage docs that were written before the item existed
-    // (routing, composition, spec_gen, etc. all run before itemId is known)
+    // Backfill token usage docs that were written with itemId: null (deferred generation).
+    // On the generation path, all docs have itemId set, so this is a no-op; it covers
+    // other paths and provides safety against async late arrivals (e.g., judgeCode).
     if (generatedRid) {
       await backfillTokenUsageItemId({ auth, rid: generatedRid, itemId: id });
     }
