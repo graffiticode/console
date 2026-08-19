@@ -299,6 +299,24 @@ const addTokens = (into: TokenTotals, t: TokenTotals) => {
 
 interface LangCost { lang: string; items: number; usd: number; gens: number; }
 
+/**
+ * Average item cost per language, dearest first. Attributed items only — a
+ * generation that never became an item has no language to charge it to.
+ * Shared by the text and HTML views so the two cannot drift apart.
+ */
+function costByLang(byItem: PerItem['byItem']): LangCost[] {
+  const acc = new Map<string, { items: number; usd: number; gens: number }>();
+  for (const v of byItem.values()) {
+    const key = v.lang ? `L${normalizeLang(String(v.lang))}` : '(unrecorded)';
+    const e = acc.get(key) ?? { items: 0, usd: 0, gens: 0 };
+    e.items++; e.usd += v.usd; e.gens += v.gens;
+    acc.set(key, e);
+  }
+  return [...acc.entries()]
+    .map(([lang, e]) => ({ lang, ...e }))
+    .sort((a, b) => b.usd / b.items - a.usd / a.items);
+}
+
 interface PerItem {
   records: number;
   instrumented: number;
@@ -462,6 +480,7 @@ interface HtmlInput {
   costByProvider: { anthropic: number; openai: number };
   totalCost: number;
   rows: DayRow[];
+  langRows: LangCost[];
   warnings: string[];
 }
 
@@ -501,6 +520,21 @@ function generateHtml(d: HtmlInput): string {
       <td class="num">${totalCost > 0 ? ((cost / totalCost) * 100).toFixed(1) : '0.0'}%
         <span class="bar"><span style="width:${totalCost > 0 ? (cost / totalCost) * 100 : 0}%"></span></span></td>
     </tr>`).join('\n');
+
+  // Bars scale to the dearest language, so the column reads as a ranking of
+  // per-item cost rather than of volume.
+  const maxLangMean = Math.max(...d.langRows.map(l => l.usd / l.items), 0.000001);
+  const langRows = d.langRows.map(l => {
+    const mean = l.usd / l.items;
+    return `<tr>
+      <td class="mono">${esc(l.lang)}</td>
+      <td class="num">${l.items.toLocaleString()}</td>
+      <td class="num">$${mean.toFixed(4)}
+        <span class="bar"><span style="width:${(mean / maxLangMean) * 100}%"></span></span></td>
+      <td class="num">$${l.usd.toFixed(4)}</td>
+      <td class="num">${(l.gens / l.items).toFixed(2)}</td>
+    </tr>`;
+  }).join('\n');
 
   const tokenRows = ([
     ['Input', d.tokens.input],
@@ -574,6 +608,13 @@ ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</di
   ${modelRows || '<tr><td colspan="3" class="dim">No Anthropic usage in this window.</td></tr>'}
 </table></div>
 
+<h2>By language</h2>
+<div class="sub">Attributed items only — a generation that never became an item has no language to charge it to.</div>
+<div class="scroll"><table>
+  <tr><th>Language</th><th class="num">Items</th><th class="num">Cost / item</th><th class="num">Total</th><th class="num">Gens / item</th></tr>
+  ${langRows || '<tr><td colspan="5" class="dim">No attributed items in this window.</td></tr>'}
+</table></div>
+
 <h2>Tokens</h2>
 <div class="scroll"><table>
   <tr><th>Class</th><th class="num">Tokens</th></tr>
@@ -632,6 +673,7 @@ async function main() {
   const totalCost = perItem.attributedCost + perItem.unattributedCost;
   const paidItems = Math.max(0, totalItems - trialItems);
   const denominator = opts.excludeTrial ? paidItems : totalItems;
+  const langRows = costByLang(perItem.byItem);
 
   // The one way this can read plausibly but be wrong: records that predate the
   // token-usage refactor carry no tokens, so they price at nothing. Excluding
@@ -673,7 +715,7 @@ async function main() {
       asOf: opts.asOf,
       totalItems, trialItems, paidItems, denominator, excludeTrial: opts.excludeTrial,
       tokens: totals, costByModel, costByProvider, totalCost,
-      rows, warnings,
+      rows, langRows, warnings,
     });
     writeFileSync(opts.output, html, 'utf-8');
     console.error(`Wrote ${opts.output}`);
@@ -780,21 +822,11 @@ async function main() {
     }
   }
 
-  if (opts.byLang && perItem) {
-    // Only the attributed path can answer this: provider-reported spend is
-    // scoped to an API key and carries no language dimension.
-    const byLang = new Map<string, { items: number; usd: number; gens: number }>();
-    for (const v of perItem.byItem.values()) {
-      const key = v.lang ? `L${normalizeLang(String(v.lang))}` : '(unrecorded)';
-      const e = byLang.get(key) ?? { items: 0, usd: 0, gens: 0 };
-      e.items++; e.usd += v.usd; e.gens += v.gens;
-      byLang.set(key, e);
-    }
-    const rows = [...byLang.entries()].sort((a, b) => b[1].usd / b[1].items - a[1].usd / a[1].items);
+  if (opts.byLang) {
     console.log(`\nAverage item cost by language (attributed items only)`);
     console.log(`  ${'lang'.padEnd(14)}${'items'.padStart(7)}${'mean'.padStart(11)}${'total'.padStart(11)}${'gens/item'.padStart(11)}`);
-    for (const [lang, e] of rows) {
-      console.log(`  ${lang.padEnd(14)}${String(e.items).padStart(7)}${usd(e.usd / e.items).padStart(11)}${usd(e.usd).padStart(11)}${(e.gens / e.items).toFixed(2).padStart(11)}`);
+    for (const e of langRows) {
+      console.log(`  ${e.lang.padEnd(14)}${String(e.items).padStart(7)}${usd(e.usd / e.items).padStart(11)}${usd(e.usd).padStart(11)}${(e.gens / e.items).toFixed(2).padStart(11)}`);
     }
   }
 
