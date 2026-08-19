@@ -290,6 +290,9 @@ interface TokenTotals {
 
 const emptyTokens = (): TokenTotals => ({ input: 0, output: 0, cacheCreation: 0, cacheRead: 0 });
 
+/** Every token the call touched, cache included — cache reads usually dominate. */
+const sumTokens = (t: TokenTotals): number => t.input + t.output + t.cacheCreation + t.cacheRead;
+
 const addTokens = (into: TokenTotals, t: TokenTotals) => {
   into.input += t.input;
   into.output += t.output;
@@ -297,15 +300,16 @@ const addTokens = (into: TokenTotals, t: TokenTotals) => {
   into.cacheRead += t.cacheRead;
 };
 
-interface LangCost { lang: string; items: number; usd: number; }
+interface LangCost { lang: string; items: number; usd: number; tokens: number; }
 
 /**
- * Average item cost per language, dearest first. Attributed items only — a
- * generation that never became an item has no language to charge it to.
- * Shared by the text and HTML views so the two cannot drift apart.
+ * Average item cost per language, ascending by language id. Attributed items
+ * only — a
+ * generation that never became an item has no language to charge it to. Shared
+ * by the text and HTML views so the two cannot drift apart.
  */
 function costByLang(byItem: PerItem['byItem']): LangCost[] {
-  const acc = new Map<string, { items: number; usd: number }>();
+  const acc = new Map<string, { items: number; usd: number; tokens: number }>();
   for (const v of byItem.values()) {
     // A stored `lang` is not guaranteed to be a language id — one record in prod
     // holds a bare newline, which is truthy, survives normalizeLang unchanged
@@ -314,13 +318,13 @@ function costByLang(byItem: PerItem['byItem']): LangCost[] {
     // the (unrecorded) bucket rather than inventing a language.
     const normalized = v.lang ? normalizeLang(String(v.lang)) : '';
     const key = /^\d{4}$/.test(normalized) ? `L${normalized}` : '(unrecorded)';
-    const e = acc.get(key) ?? { items: 0, usd: 0 };
-    e.items++; e.usd += v.usd;
+    const e = acc.get(key) ?? { items: 0, usd: 0, tokens: 0 };
+    e.items++; e.usd += v.usd; e.tokens += v.tokens;
     acc.set(key, e);
   }
   return [...acc.entries()]
     .map(([lang, e]) => ({ lang, ...e }))
-    .sort((a, b) => b.usd / b.items - a.usd / a.items);
+    .sort((a, b) => a.lang.localeCompare(b.lang));
 }
 
 interface PerItem {
@@ -329,12 +333,12 @@ interface PerItem {
   attributedCost: number;
   unattributedCost: number;
   unattributedRecords: number;
-  byItem: Map<string, { usd: number; gens: number; lang: string | null }>;
+  byItem: Map<string, { usd: number; gens: number; tokens: number; lang: string | null }>;
   /** Everything below is the window total, attributed or not — the headline's numerator. */
   costByModel: Record<string, number>;
   costByProvider: { anthropic: number; openai: number };
   tokens: TokenTotals;
-  byDay: Record<string, { anthropic: number; openai: number }>;
+  byDay: Record<string, { anthropic: number; openai: number; tokens: number }>;
 }
 
 /**
@@ -430,8 +434,9 @@ async function fetchPerItem(start: Date, end: Date, asOf: Date, langs: string[] 
     out.costByModel[model] = (out.costByModel[model] ?? 0) + r.usd;
     out.costByProvider[r.provider] += r.usd;
     addTokens(out.tokens, r.tokens);
-    const day = (out.byDay[r.day] ??= { anthropic: 0, openai: 0 });
+    const day = (out.byDay[r.day] ??= { anthropic: 0, openai: 0, tokens: 0 });
     day[r.provider] += r.usd;
+    day.tokens += sumTokens(r.tokens);
 
     const itemId = r.itemId ?? (r.taskId ? taskToItem.get(`${r.userId}:${r.taskId}`) : undefined);
     if (!itemId) {
@@ -442,9 +447,10 @@ async function fetchPerItem(start: Date, end: Date, asOf: Date, langs: string[] 
       continue;
     }
     out.attributedCost += r.usd;
-    const cur = out.byItem.get(itemId) ?? { usd: 0, gens: 0, lang: r.lang };
+    const cur = out.byItem.get(itemId) ?? { usd: 0, gens: 0, tokens: 0, lang: r.lang };
     cur.usd += r.usd;
     cur.gens++;
+    cur.tokens += sumTokens(r.tokens);
     out.byItem.set(itemId, cur);
   }
 
@@ -470,6 +476,7 @@ interface DayRow {
   trial: number;
   anthropic: number;
   openai: number;
+  tokens: number;
 }
 
 interface HtmlInput {
@@ -504,17 +511,19 @@ function generateHtml(d: HtmlInput): string {
     `<div class="card"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div>${
       note ? `<div class="note">${esc(note)}</div>` : ''}</div>`;
 
+  const maxDayTokPer = Math.max(...d.rows.map(r => (r.items > 0 ? r.tokens / r.items : 0)), 1);
   const dayRows = d.rows.map(r => {
     const cost = r.anthropic + r.openai;
     const per = r.items > 0 ? cost / r.items : null;
+    const tokPer = r.items > 0 ? r.tokens / r.items : null;
     return `<tr>
       <td class="mono">${esc(r.day)}</td>
       <td class="num">${r.items.toLocaleString()}${r.trial ? ` <span class="dim">(${r.trial} trial)</span>` : ''}
         <span class="bar"><span style="width:${(r.items / maxItems) * 100}%"></span></span></td>
-      <td class="num">$${cost.toFixed(4)}
-        <span class="bar"><span style="width:${(cost / maxCost) * 100}%"></span></span></td>
       <td class="num">${per === null ? '<span class="dim">—</span>' : `$${per.toFixed(4)}`}
         <span class="bar"><span style="width:${per === null ? 0 : (per / maxPer) * 100}%"></span></span></td>
+      <td class="num">${tokPer === null ? '<span class="dim">—</span>' : Math.round(tokPer).toLocaleString()}
+        <span class="bar"><span style="width:${tokPer === null ? 0 : (tokPer / maxDayTokPer) * 100}%"></span></span></td>
     </tr>`;
   }).join('\n');
 
@@ -531,18 +540,19 @@ function generateHtml(d: HtmlInput): string {
   // two read as one view sliced two ways. Each bar scales to its own column's
   // maximum.
   const maxLangItems = Math.max(...d.langRows.map(l => l.items), 1);
-  const maxLangCost = Math.max(...d.langRows.map(l => l.usd), 0.000001);
   const maxLangPer = Math.max(...d.langRows.map(l => l.usd / l.items), 0.000001);
+  const maxLangTokPer = Math.max(...d.langRows.map(l => l.tokens / l.items), 1);
   const langRows = d.langRows.map(l => {
     const per = l.usd / l.items;
+    const tokPer = l.tokens / l.items;
     return `<tr>
       <td class="mono">${esc(l.lang)}</td>
       <td class="num">${l.items.toLocaleString()}
         <span class="bar"><span style="width:${(l.items / maxLangItems) * 100}%"></span></span></td>
-      <td class="num">$${l.usd.toFixed(4)}
-        <span class="bar"><span style="width:${(l.usd / maxLangCost) * 100}%"></span></span></td>
       <td class="num">$${per.toFixed(4)}
         <span class="bar"><span style="width:${(per / maxLangPer) * 100}%"></span></span></td>
+      <td class="num">${Math.round(tokPer).toLocaleString()}
+        <span class="bar"><span style="width:${(tokPer / maxLangTokPer) * 100}%"></span></span></td>
     </tr>`;
   }).join('\n');
 
@@ -608,14 +618,14 @@ ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</di
 
 <h2>By day</h2>
 <div class="scroll"><table>
-  <tr><th>Day</th><th class="num">Items</th><th class="num">AI cost</th><th class="num">Cost / item</th></tr>
+  <tr><th>Day</th><th class="num">Items</th><th class="num">Cost / item</th><th class="num">Tokens / item</th></tr>
   ${dayRows || '<tr><td colspan="4" class="dim">No data in this window.</td></tr>'}
 </table></div>
 
 <h2>By language</h2>
 <div class="sub">Attributed items only — a generation that never became an item has no language to charge it to.</div>
 <div class="scroll"><table>
-  <tr><th>Language</th><th class="num">Items</th><th class="num">AI cost</th><th class="num">Cost / item</th></tr>
+  <tr><th>Language</th><th class="num">Items</th><th class="num">Cost / item</th><th class="num">Tokens / item</th></tr>
   ${langRows || '<tr><td colspan="4" class="dim">No attributed items in this window.</td></tr>'}
 </table></div>
 
@@ -717,6 +727,7 @@ async function main() {
     trial: trial.byDay[day] || 0,
     anthropic: perItem.byDay[day]?.anthropic ?? 0,
     openai: perItem.byDay[day]?.openai ?? 0,
+    tokens: perItem.byDay[day]?.tokens ?? 0,
   }));
 
   if (opts.output) {
@@ -834,9 +845,9 @@ async function main() {
 
   if (opts.byLang) {
     console.log(`\nAverage item cost by language (attributed items only)`);
-    console.log(`  ${'lang'.padEnd(14)}${'items'.padStart(7)}${'AI cost'.padStart(11)}${'cost/item'.padStart(11)}`);
+    console.log(`  ${'lang'.padEnd(14)}${'items'.padStart(7)}${'cost/item'.padStart(11)}${'tokens/item'.padStart(13)}`);
     for (const e of langRows) {
-      console.log(`  ${e.lang.padEnd(14)}${String(e.items).padStart(7)}${usd(e.usd).padStart(11)}${usd(e.usd / e.items).padStart(11)}`);
+      console.log(`  ${e.lang.padEnd(14)}${String(e.items).padStart(7)}${usd(e.usd / e.items).padStart(11)}${num(Math.round(e.tokens / e.items)).padStart(13)}`);
     }
   }
 
