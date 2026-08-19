@@ -1,26 +1,28 @@
 #!/usr/bin/env node
 
-// What does it cost us in AI spend to produce one item?
+// What would it cost to produce one item at today's prices?
 //
 //   npx tsx scripts/cost-per-item.ts --period week
 //
-// Numerator comes from the providers, not from our own telemetry. The Firestore
-// `ai_generation` usage records omit cache tokens entirely and never saw an
-// OpenAI embedding, so anything derived from them understates the bill by an
-// amount nobody can quantify. The Anthropic Admin API reports the full cache
-// breakdown per model, and OpenAI's costs endpoint reports actual dollars.
+// Cost is OUR recorded token counts priced with MODEL_RATES — never what a
+// provider billed. The question is forward-looking: the same tokens, on the
+// same models, at the `--as-of` rate card (today by default), because rates
+// move on their own and the decision this informs is whether the current
+// per-item rates are profitable. What we were billed historically answers a
+// different question and is deliberately absent.
 //
-// The cost is therefore scoped by API KEY, not by item: it is a true blended
-// all-in average, and it cannot be broken down per language or per item. It
-// includes every Claude call on the console's key — scope-gate routing, judge,
-// spec generation — which is the intent.
+// Every `ai_generation` doc in the window is priced and divided by the items
+// created in it, so numerator and denominator come from the SAME population.
+// An earlier version took the numerator from one API key's provider-reported
+// spend and the denominator from all items; that mismatch reported cost per
+// item as $0.0632 and then $0.1950 when the defensible figure was $0.0503.
 //
-// Requires: ANTHROPIC_ADMIN_KEY, ANTHROPIC_API_KEY, GRAFFITICODE_APP_CREDENTIALS.
-// Optional: OPENAI_ADMIN_KEY (an `sk-admin-…` org key; a project key is rejected
-// by the costs endpoint). Without it, OpenAI spend falls back to a LOWER BOUND
-// priced from our own ai_generation records — generation is routed across
-// providers, so reporting OpenAI as zero would understate cost per item by
-// whatever share went to ChatGPT.
+// Consequently this script calls NO provider API and needs no admin keys.
+// Nothing here checks whether our token counts are COMPLETE — that is a
+// separate measurement audit against the provider's metered totals, designed
+// under "Known follow-ups" in docs/item-based-pricing.md.
+//
+// Requires: GRAFFITICODE_APP_CREDENTIALS.
 
 import admin from 'firebase-admin';
 import { readFileSync, writeFileSync } from 'fs';
@@ -53,13 +55,6 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
-const ANTHROPIC_ADMIN_KEY = process.env.ANTHROPIC_ADMIN_KEY;
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-// Prefer a dedicated admin key; fall back to the project key so the failure is
-// a legible 401 rather than a silent omission.
-const OPENAI_KEY = process.env.OPENAI_ADMIN_KEY || process.env.OPENAI_API_KEY;
-const OPENAI_KEY_IS_ADMIN = Boolean(process.env.OPENAI_ADMIN_KEY);
-
 // ---------------------------------------------------------------- args
 
 type Period = 'day' | 'week' | 'month';
@@ -73,21 +68,14 @@ Average AI cost to produce one item, for a period.
   --period day|week|month   Window ending now, UTC-aligned (default: week)
   --from YYYY-MM-DD         Explicit window start (overrides --period)
   --to YYYY-MM-DD           Explicit window end, inclusive
-  --key <name|id>           Anthropic API key to scope spend to; repeatable.
-                            Defaults to ANTHROPIC_CONSOLE_KEY_IDS, else the key
-                            matching ANTHROPIC_API_KEY.
   --exclude-trial           Divide by paid items only, not free-plan trial items
-  --all-keys                Use ORG-WIDE Anthropic spend instead of specific keys
-  --check                   Also fetch what Anthropic actually billed the org and
-                            show what share of it the selected keys account for
-  --per-item                Per-item cost distribution from ai_generation records
+  --per-item                Also show the per-item cost distribution
                             (mean/median/p90). Only sees generations recorded
                             after per-item attribution shipped.
   --lang <id>               Restrict to a language (0176, L0176 and 176 all work);
                             repeatable, so --lang 0158 --lang 0176 pools a family.
-                            Implies --per-item, and SUPPRESSES the blended figure:
-                            provider-reported spend cannot be split by language,
-                            so only the attributed path can answer per-language.
+                            Both the cost and the item count are narrowed to it,
+                            so cost per item stays a like-for-like ratio.
   --as-of YYYY-MM-DD        Price the SAME tokens on the SAME models at this
                             date's rate card (default: today). Rates move on
                             their own — intro pricing expires, list prices fall —
@@ -95,29 +83,23 @@ Average AI cost to produce one item, for a period.
                             today's costs", holding usage constant. It is not
                             what we were billed.
   --by-lang                 Average item cost broken down by language. Implies
-                            --per-item; only the attributed path can answer it,
-                            since provider spend cannot be split by language.
+                            --per-item, since it reads the per-item attribution.
   --output <file.html>      Also write an HTML report (open it in a browser)
   --json                    Emit JSON to stdout (progress goes to stderr)
   --help, -h                Show this
 
-Anthropic's usage report lags by hours, so today's spend is usually absent while
-today's items are already counted. The script warns when the window runs past the
-last reported bucket; for a settled number, end the window at yesterday.
+Cost is our own recorded tokens priced with MODEL_RATES; no provider API is
+called. Records written before per-item attribution shipped carry no tokens and
+are excluded — the script says how many it skipped.
 
-Env: ANTHROPIC_ADMIN_KEY, ANTHROPIC_API_KEY, GRAFFITICODE_APP_CREDENTIALS.
-     ANTHROPIC_CONSOLE_KEY_IDS optional, comma-separated key ids or names.
-     OPENAI_ADMIN_KEY optional; without it OpenAI spend is excluded and reported as such.
+Env: GRAFFITICODE_APP_CREDENTIALS.
 `.trim();
 
 interface Opts {
   period: Period;
   from?: string;
   to?: string;
-  keys: string[];
   excludeTrial: boolean;
-  allKeys: boolean;
-  check: boolean;
   perItem: boolean;
   langs: string[];
   output?: string;
@@ -141,10 +123,7 @@ function parseArgs(argv: string[]): Opts {
   const args = argv.slice(2);
   const opts: Opts = {
     period: 'week',
-    keys: (process.env.ANTHROPIC_CONSOLE_KEY_IDS || '').split(',').map(s => s.trim()).filter(Boolean),
     excludeTrial: false,
-    allKeys: false,
-    check: false,
     perItem: false,
     langs: [],
     json: false,
@@ -156,10 +135,7 @@ function parseArgs(argv: string[]): Opts {
     if (a === '--period' && args[i + 1]) { opts.period = args[++i] as Period; }
     else if (a === '--from' && args[i + 1]) { opts.from = args[++i]; }
     else if (a === '--to' && args[i + 1]) { opts.to = args[++i]; }
-    else if (a === '--key' && args[i + 1]) { opts.keys.push(args[++i]); }
     else if (a === '--exclude-trial') { opts.excludeTrial = true; }
-    else if (a === '--all-keys') { opts.allKeys = true; }
-    else if (a === '--check') { opts.check = true; }
     else if (a === '--per-item') { opts.perItem = true; }
     else if (a === '--lang' && args[i + 1]) { opts.langs.push(normalizeLang(args[++i])); }
     else if (a === '--output' && args[i + 1]) { opts.output = args[++i]; }
@@ -213,310 +189,6 @@ function resolveWindow(opts: Opts): { start: Date; end: Date } {
     process.exit(1);
   }
   return { start, end };
-}
-
-// ---------------------------------------------------------------- anthropic
-
-async function anthropicFetch(url: string): Promise<any> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const resp = await fetch(url, {
-      headers: { 'anthropic-version': '2023-06-01', 'x-api-key': ANTHROPIC_ADMIN_KEY! },
-    });
-    if (resp.status === 429) {
-      const wait = (attempt + 1) * 15;
-      console.error(`  rate limited, waiting ${wait}s...`);
-      await new Promise(r => setTimeout(r, wait * 1000));
-      continue;
-    }
-    if (!resp.ok) throw new Error(`Anthropic API error (${resp.status}): ${await resp.text()}`);
-    return await resp.json();
-  }
-  throw new Error('Anthropic API failed after 3 retries');
-}
-
-interface OrgKey { id: string; name: string; hint: string; }
-
-async function listApiKeys(): Promise<OrgKey[]> {
-  const out: OrgKey[] = [];
-  let afterId: string | undefined;
-  do {
-    const params = new URLSearchParams({ limit: '100' });
-    if (afterId) params.set('after_id', afterId);
-    const data = await anthropicFetch(`https://api.anthropic.com/v1/organizations/api_keys?${params}`);
-    for (const k of data.data || []) {
-      out.push({ id: k.id, name: k.name || '', hint: k.partial_key_hint || '' });
-    }
-    afterId = data.has_more ? data.last_id : undefined;
-  } while (afterId);
-  return out;
-}
-
-/**
- * Which API keys count as "the console".
- *
- * Hint-matching ANTHROPIC_API_KEY is only a fallback, not the answer: .env.local
- * holds whichever key this machine develops against, which is not necessarily
- * the one the deployed service uses. Getting that wrong doesn't fail loudly — it
- * quietly reports a fraction of the real spend. Name the keys explicitly via
- * --key or ANTHROPIC_CONSOLE_KEY_IDS whenever production and local differ.
- */
-function selectKeys(all: OrgKey[], wanted: string[]): OrgKey[] {
-  if (wanted.length > 0) {
-    return wanted.map(w => {
-      const norm = w.trim().toLowerCase();
-      const hit = all.find(k => k.id === w || k.name.toLowerCase() === norm);
-      if (!hit) {
-        throw new Error(
-          `No org API key matches ${JSON.stringify(w)}. Available:\n` +
-          all.map(k => `  ${k.id}  ${JSON.stringify(k.name)}`).join('\n'),
-        );
-      }
-      return hit;
-    });
-  }
-
-  // Fallback: match ANTHROPIC_API_KEY against `partial_key_hint`
-  // ("sk-ant-api03-mR3...sQAA") — prefix before "...", suffix after.
-  const hit = all.find(k => {
-    const dot = k.hint.indexOf('...');
-    if (dot === -1) return false;
-    return ANTHROPIC_API_KEY!.startsWith(k.hint.slice(0, dot)) &&
-           ANTHROPIC_API_KEY!.endsWith(k.hint.slice(dot + 3));
-  });
-  if (!hit) {
-    throw new Error(
-      'Could not match ANTHROPIC_API_KEY to an org API key, so spend cannot be scoped.\n' +
-      'Pass --key <name|id> (repeatable), or --all-keys for org-wide spend. Available:\n' +
-      all.map(k => `  ${k.id}  ${JSON.stringify(k.name)}`).join('\n'),
-    );
-  }
-  return [hit];
-}
-
-interface ModelTokens {
-  uncachedInput: number;
-  cacheWrite5m: number;
-  cacheWrite1h: number;
-  cacheRead: number;
-  output: number;
-  webSearches: number;
-}
-
-const emptyTokens = (): ModelTokens => ({
-  uncachedInput: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0, webSearches: 0,
-});
-
-async function fetchAnthropicUsage(
-  start: Date, end: Date, apiKeyIds: string[],
-): Promise<{
-  byModel: Record<string, ModelTokens>;
-  daily: Record<string, Record<string, ModelTokens>>;
-  reportedThrough: Date | null;
-}> {
-  const byModel: Record<string, ModelTokens> = {};
-  const daily: Record<string, Record<string, ModelTokens>> = {};
-  let reportedThrough: Date | null = null;
-  let page: string | undefined;
-
-  do {
-    const params = new URLSearchParams({
-      starting_at: start.toISOString(),
-      ending_at: end.toISOString(),
-      bucket_width: '1d',
-      'group_by[]': 'model',
-      limit: '31', // max for 1d buckets; default is 7, which would silently truncate
-    });
-    for (const id of apiKeyIds) params.append('api_key_ids[]', id);
-    if (page) params.set('page', page);
-
-    const report = await anthropicFetch(
-      `https://api.anthropic.com/v1/organizations/usage_report/messages?${params}`,
-    );
-
-    for (const bucket of report.data || []) {
-      // Track how far the report actually reaches. Buckets are returned even
-      // when empty, so this is the report's own coverage, not ours.
-      const bucketEnd = new Date(bucket.ending_at);
-      if (!reportedThrough || bucketEnd > reportedThrough) reportedThrough = bucketEnd;
-
-      const day = String(bucket.starting_at).split('T')[0];
-      const dayModels = (daily[day] ??= {});
-
-      for (const r of bucket.results || []) {
-        const model = r.model || 'unknown';
-        for (const t of [(byModel[model] ??= emptyTokens()), (dayModels[model] ??= emptyTokens())]) {
-          t.uncachedInput += r.uncached_input_tokens || 0;
-          t.cacheWrite5m += r.cache_creation?.ephemeral_5m_input_tokens || 0;
-          t.cacheWrite1h += r.cache_creation?.ephemeral_1h_input_tokens || 0;
-          t.cacheRead += r.cache_read_input_tokens || 0;
-          t.output += r.output_tokens || 0;
-          t.webSearches += r.server_tool_use?.web_search_requests || 0;
-        }
-      }
-    }
-    page = report.has_more ? report.next_page : undefined;
-  } while (page);
-
-  return { byModel, daily, reportedThrough };
-}
-
-/**
- * What Anthropic actually billed the org over the window, in USD.
- *
- * A cross-check on two things at once: that our per-token math (including the
- * cache tiers) is right, and that we picked the right API key. cost_report
- * can't be filtered by key, so it's necessarily org-wide — our scoped figure
- * must come in at or under it, and the share tells you how much of the bill the
- * selected keys actually account for. A share near zero means the wrong key.
- *
- * `amount` is a decimal string in the currency's LOWEST unit — cents for USD,
- * so "366.00043" is $3.66, not $366.
- */
-async function fetchAnthropicBilled(start: Date, end: Date, now = new Date()): Promise<number | null> {
-  // cost_report does 1d buckets only, snaps both ends to UTC days, and won't
-  // report a day that hasn't closed. A window inside today therefore collapses
-  // to a zero-length range and 400s with "ending date must be after starting
-  // date". Bound it to completed days and say it's unavailable rather than
-  // erroring — billed cost genuinely doesn't exist yet for today.
-  const todayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const dayStart = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
-  const endDay = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
-  const dayEnd = new Date(Math.min(
-    end.getTime() > endDay ? endDay + 86_400_000 : endDay,
-    todayStart,
-  ));
-  if (dayEnd.getTime() <= dayStart.getTime()) return null;
-
-  let cents = 0;
-  let page: string | undefined;
-  do {
-    const params = new URLSearchParams({
-      starting_at: dayStart.toISOString(),
-      ending_at: dayEnd.toISOString(),
-      bucket_width: '1d',
-      limit: '31',
-    });
-    if (page) params.set('page', page);
-    const report = await anthropicFetch(
-      `https://api.anthropic.com/v1/organizations/cost_report?${params}`,
-    );
-    for (const bucket of report.data || []) {
-      for (const r of bucket.results || []) {
-        const amt = Number(r.amount);
-        if (Number.isFinite(amt)) cents += amt;
-      }
-    }
-    page = report.has_more ? report.next_page : undefined;
-  } while (page);
-  return cents / 100;
-}
-
-// ---------------------------------------------------------------- openai
-
-interface OpenAiCost { embeddings: number; other: number; daily: Record<string, number>; }
-
-/**
- * A FLOOR on OpenAI generation spend, derived from our own `ai_generation`
- * records, for when the costs endpoint is unavailable (no `sk-admin-…` key).
- *
- * Generation traffic is routed across providers, so leaving OpenAI at zero
- * understates cost per item by whatever share went to ChatGPT — currently
- * about a third of all calls. A floor is not the bill: these records omit
- * cache tokens entirely, and OpenAI input tokens are barely recorded at all
- * (single digits per call, against thousands for the Anthropic rows), so the
- * input side is missing rather than small. Priced at list rates, it is a lower
- * bound and is labelled as one everywhere it appears. Set OPENAI_ADMIN_KEY to
- * replace it with the real figure.
- */
-interface OpenAiFloor { cost: number; calls: number; inputTokens: number; outputTokens: number; }
-
-async function fetchOpenAiFloor(start: Date, end: Date, asOf: Date): Promise<OpenAiFloor | null> {
-  const snap = await db.collection('usage').where('type', '==', 'ai_generation').get();
-  const floor: OpenAiFloor = { cost: 0, calls: 0, inputTokens: 0, outputTokens: 0 };
-  for (const doc of snap.docs) {
-    const r = doc.data() as any;
-    const at = r.createdAt?.toDate?.() ?? (r.timestamp ? new Date(r.timestamp) : null);
-    if (!at || at < start || at >= end) continue;
-    const model = String(r.model || '');
-    // The provider field is authoritative when present; the model prefix is the
-    // fallback for older records written before it existed.
-    const isOpenAi = r.provider === 'openai' || /^(gpt|o\d)/.test(model);
-    if (!isOpenAi) continue;
-    const t = r.tokens ?? {};
-    const inputTokens = Number(t.input ?? 0);
-    const outputTokens = Number(t.output ?? 0);
-    floor.calls++;
-    floor.inputTokens += inputTokens;
-    floor.outputTokens += outputTokens;
-    // Cache tokens are the bulk of the OpenAI rows — the adapter reports almost
-    // no plain input (single digits per call) against millions of cache reads,
-    // so pricing input+output alone loses most of the spend. Prefer the cost
-    // priced at write time; only fall back to re-pricing the full breakdown.
-    // Always re-priced at `asOf`, never the frozen cost: the report's question
-    // is what these tokens cost at a given rate card, not what we paid.
-    floor.cost += estimateUsdCost({
-      inputTokens,
-      outputTokens,
-      cacheCreationInputTokens: Number(t.cacheCreation ?? 0),
-      cacheReadInputTokens: Number(t.cacheRead ?? 0),
-    }, model, asOf, 'openai');
-  }
-  return floor.calls > 0 ? floor : null;
-}
-
-async function fetchOpenAiCost(start: Date, end: Date): Promise<OpenAiCost | null> {
-  if (!OPENAI_KEY) return null;
-
-  const result: OpenAiCost = { embeddings: 0, other: 0, daily: {} };
-  let page: string | undefined;
-
-  do {
-    const params = new URLSearchParams({
-      start_time: String(Math.floor(start.getTime() / 1000)),
-      end_time: String(Math.ceil(end.getTime() / 1000)),
-      bucket_width: '1d',
-      'group_by[]': 'line_item',
-      limit: '180', // max; default is 7, which would silently truncate
-    });
-    if (page) params.set('page', page);
-
-    const resp = await fetch(`https://api.openai.com/v1/organization/costs?${params}`, {
-      headers: { Authorization: `Bearer ${OPENAI_KEY}` },
-    });
-
-    if (resp.status === 401 || resp.status === 403) {
-      throw new Error(
-        `OpenAI costs endpoint rejected the key (${resp.status}). It requires an ` +
-        `organization admin key ("sk-admin-…"), created at platform.openai.com > ` +
-        `Organization > Admin keys. ` +
-        (OPENAI_KEY_IS_ADMIN
-          ? 'OPENAI_ADMIN_KEY is set but was not accepted.'
-          : 'Set OPENAI_ADMIN_KEY in .env.local; OPENAI_API_KEY is a project key and will not work here.'),
-      );
-    }
-    if (!resp.ok) throw new Error(`OpenAI API error (${resp.status}): ${await resp.text()}`);
-
-    const data = await resp.json();
-    for (const bucket of data.data || []) {
-      // Buckets are unix seconds here, unlike Anthropic's RFC 3339.
-      const day = new Date((Number(bucket.start_time) || 0) * 1000).toISOString().split('T')[0];
-      for (const r of bucket.results || []) {
-        // `amount` is documented as {value, currency}; tolerate a bare number.
-        const amount = typeof r.amount === 'number' ? r.amount : Number(r.amount?.value ?? 0);
-        if (!Number.isFinite(amount)) continue;
-        const lineItem = String(r.line_item ?? '');
-        if (/embed/i.test(lineItem)) {
-          result.embeddings += amount;
-          result.daily[day] = (result.daily[day] || 0) + amount;
-        } else {
-          result.other += amount;
-        }
-      }
-    }
-    page = data.has_more ? data.next_page : undefined;
-  } while (page);
-
-  return result;
 }
 
 // ---------------------------------------------------------------- firestore
@@ -602,8 +274,28 @@ interface GenRecord {
   usd: number;
   lang: string | null;
   model: string | null;
+  provider: 'anthropic' | 'openai';
+  day: string;
+  tokens: TokenTotals;
   instrumented: boolean;
 }
+
+/** Our own record shape — not the provider's. Cache is split two ways, not by TTL. */
+interface TokenTotals {
+  input: number;
+  output: number;
+  cacheCreation: number;
+  cacheRead: number;
+}
+
+const emptyTokens = (): TokenTotals => ({ input: 0, output: 0, cacheCreation: 0, cacheRead: 0 });
+
+const addTokens = (into: TokenTotals, t: TokenTotals) => {
+  into.input += t.input;
+  into.output += t.output;
+  into.cacheCreation += t.cacheCreation;
+  into.cacheRead += t.cacheRead;
+};
 
 interface LangCost { lang: string; items: number; usd: number; gens: number; }
 
@@ -614,6 +306,11 @@ interface PerItem {
   unattributedCost: number;
   unattributedRecords: number;
   byItem: Map<string, { usd: number; gens: number; lang: string | null }>;
+  /** Everything below is the window total, attributed or not — the headline's numerator. */
+  costByModel: Record<string, number>;
+  costByProvider: { anthropic: number; openai: number };
+  tokens: TokenTotals;
+  byDay: Record<string, { anthropic: number; openai: number }>;
 }
 
 /**
@@ -657,6 +354,14 @@ async function fetchPerItem(start: Date, end: Date, asOf: Date, langs: string[] 
       usd: Number.isFinite(usd) ? usd : 0,
       lang: d.lang ?? null,
       model: d.model ?? null,
+      provider,
+      day: new Date(ms).toISOString().slice(0, 10),
+      tokens: {
+        input: Number(t.input ?? 0),
+        output: Number(t.output ?? 0),
+        cacheCreation: Number(t.cacheCreation ?? 0),
+        cacheRead: Number(t.cacheRead ?? 0),
+      },
       // A record is instrumented if it has a priced cost (legacy pre-refactor docs)
       // OR it carries the new token-usage shape (stage + tokens from the refactor).
       // Legacy docs carry cost.total, new docs carry stage.
@@ -685,10 +390,25 @@ async function fetchPerItem(start: Date, end: Date, asOf: Date, langs: string[] 
     unattributedCost: 0,
     unattributedRecords: 0,
     byItem: new Map(),
+    costByModel: {},
+    costByProvider: { anthropic: 0, openai: 0 },
+    tokens: emptyTokens(),
+    byDay: {},
   };
 
   for (const r of records) {
     if (!r.instrumented) continue;
+
+    // Window totals first: these count every instrumented record, whether or not
+    // it resolves to an item, so the headline's numerator and denominator come
+    // from one population.
+    const model = r.model ?? '(unrecorded)';
+    out.costByModel[model] = (out.costByModel[model] ?? 0) + r.usd;
+    out.costByProvider[r.provider] += r.usd;
+    addTokens(out.tokens, r.tokens);
+    const day = (out.byDay[r.day] ??= { anthropic: 0, openai: 0 });
+    day[r.provider] += r.usd;
+
     const itemId = r.itemId ?? (r.taskId ? taskToItem.get(`${r.userId}:${r.taskId}`) : undefined);
     if (!itemId) {
       // A generation that never became an item: it failed, or the item was
@@ -731,28 +451,23 @@ interface DayRow {
 interface HtmlInput {
   start: Date;
   end: Date;
-  keyLabel: string;
+  asOf: Date;
   totalItems: number;
   trialItems: number;
   paidItems: number;
   denominator: number;
   excludeTrial: boolean;
-  tokens: ModelTokens;
+  tokens: TokenTotals;
   costByModel: Record<string, number>;
-  anthropicCost: number;
-  billedOrgWide: number | null;
-  openai: OpenAiCost | null;
-  openaiFloor: OpenAiFloor | null;
-  openaiError: string | null;
+  costByProvider: { anthropic: number; openai: number };
+  totalCost: number;
   rows: DayRow[];
   warnings: string[];
 }
 
 function generateHtml(d: HtmlInput): string {
-  const totalCost = d.anthropicCost + (d.openai?.embeddings ?? d.openaiFloor?.cost ?? 0);
+  const totalCost = d.totalCost;
   const perItem = d.denominator > 0 ? totalCost / d.denominator : null;
-  const share = d.billedOrgWide && d.billedOrgWide > 0
-    ? (d.anthropicCost / d.billedOrgWide) * 100 : null;
 
   // Bars are scaled to the largest value in their own column, so each column
   // reads as a shape rather than being flattened by an unrelated maximum.
@@ -783,14 +498,13 @@ function generateHtml(d: HtmlInput): string {
     .map(([model, cost]) => `<tr>
       <td class="mono">${esc(model)}</td>
       <td class="num">$${cost.toFixed(4)}</td>
-      <td class="num">${d.anthropicCost > 0 ? ((cost / d.anthropicCost) * 100).toFixed(1) : '0.0'}%
-        <span class="bar"><span style="width:${d.anthropicCost > 0 ? (cost / d.anthropicCost) * 100 : 0}%"></span></span></td>
+      <td class="num">${totalCost > 0 ? ((cost / totalCost) * 100).toFixed(1) : '0.0'}%
+        <span class="bar"><span style="width:${totalCost > 0 ? (cost / totalCost) * 100 : 0}%"></span></span></td>
     </tr>`).join('\n');
 
   const tokenRows = ([
-    ['Uncached input', d.tokens.uncachedInput],
-    ['Cache write (5m)', d.tokens.cacheWrite5m],
-    ['Cache write (1h)', d.tokens.cacheWrite1h],
+    ['Input', d.tokens.input],
+    ['Cache write', d.tokens.cacheCreation],
     ['Cache read', d.tokens.cacheRead],
     ['Output', d.tokens.output],
   ] as [string, number][]).map(([label, n]) =>
@@ -836,7 +550,7 @@ function generateHtml(d: HtmlInput): string {
 </style></head><body><main>
 
 <h1>Cost per item</h1>
-<div class="sub">${esc(d.start.toISOString())} → ${esc(d.end.toISOString())} (UTC) · ${esc(d.keyLabel)}</div>
+<div class="sub">${esc(d.start.toISOString())} → ${esc(d.end.toISOString())} (UTC) · priced at the ${esc(d.asOf.toISOString().split('T')[0])} rate card</div>
 
 ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</div>`).join('\n')}
 
@@ -844,10 +558,8 @@ ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</di
   ${card('Cost per item', perItem === null ? '—' : `$${perItem.toFixed(4)}`,
     d.excludeTrial ? 'paid items only' : 'all items incl. trial')}
   ${card('Total AI cost', `$${totalCost.toFixed(2)}`,
-    d.openai ? 'Anthropic + OpenAI' : d.openaiFloor ? 'Anthropic + OpenAI floor' : 'Anthropic only')}
+    `Anthropic $${d.costByProvider.anthropic.toFixed(2)} · OpenAI $${d.costByProvider.openai.toFixed(2)}`)}
   ${card('Items created', d.totalItems.toLocaleString(), `${d.paidItems} paid · ${d.trialItems} trial`)}
-  ${card('Share of org bill', share === null ? '—' : `${share.toFixed(1)}%`,
-    d.billedOrgWide === null ? 'run with --check' : `org billed $${d.billedOrgWide.toFixed(2)}`)}
 </div>
 
 <h2>By day</h2>
@@ -871,14 +583,11 @@ ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</di
 <footer>
   Cost is read from the provider APIs, not from our own telemetry &mdash; the Firestore
   <code>ai_generation</code> records omit cache tokens entirely and never saw an embedding.
-  Spend is scoped by <em>API key</em>, not by item, so this is a blended all-in average
-  across every Claude call on the selected key (scope-gate routing, judge, spec generation
-  included); it cannot be split per language or per item.
-  ${d.openai ? '' : d.openaiFloor
-    ? `OpenAI spend is a <strong>lower bound</strong> derived from ${d.openaiFloor.calls} <code>ai_generation</code>
-       records (${esc(d.openaiError ?? 'no admin key set')}); their input tokens are barely recorded, so the real
-       figure is higher. Set OPENAI_ADMIN_KEY for the billed number.`
-    : `OpenAI spend excluded &mdash; ${esc(d.openaiError ?? 'no admin key set')}.`}
+  Cost is <em>our</em> recorded token counts priced with <code>MODEL_RATES</code> &mdash; not what a
+  provider billed. It covers every recorded stage (scope-gate routing, composition, spec generation,
+  generation, repair, judge) and can be split per language, per item and per stage.
+  Nothing here checks whether those counts are <em>complete</em>; that is a separate audit against the
+  provider's metered totals.
   <br>Generated ${esc(new Date().toISOString())} by <code>scripts/cost-per-item.ts</code>.
 </footer>
 
@@ -895,58 +604,13 @@ async function main() {
   const opts = parseArgs(process.argv);
   const { start, end } = resolveWindow(opts);
 
-  if (!ANTHROPIC_ADMIN_KEY) throw new Error('ANTHROPIC_ADMIN_KEY not set');
-  if (!ANTHROPIC_API_KEY && !opts.allKeys) {
-    throw new Error('ANTHROPIC_API_KEY not set (needed to scope usage to the console key; pass --all-keys to skip)');
-  }
-
   console.error(`Window: ${start.toISOString()} → ${end.toISOString()}`);
+  console.error(`Rate card: ${opts.asOf.toISOString().split('T')[0]}`);
 
-  // Resolve which keys count as the console. Deliberately no silent fall-back
-  // to org-wide usage: that would swap console spend for everything the org
-  // spends and inflate cost-per-item with no visible signal.
-  let keys: OrgKey[] = [];
-  if (!opts.allKeys) {
-    console.error('Resolving Anthropic API key(s)...');
-    keys = selectKeys(await listApiKeys(), opts.keys);
-    for (const k of keys) console.error(`  key: ${k.name} (${k.id})`);
-  } else {
-    console.error('WARNING: --all-keys — using ORG-WIDE Anthropic spend, not just the console.');
-  }
-
-  console.error('Fetching Anthropic usage...');
-  const { byModel, daily, reportedThrough } = await fetchAnthropicUsage(start, end, keys.map(k => k.id));
-
-  let billedOrgWide: number | null = null;
-  if (opts.check) {
-    console.error('Fetching org-wide billed cost...');
-    billedOrgWide = await fetchAnthropicBilled(start, end);
-    if (billedOrgWide === null) {
-      console.error('  unavailable — cost_report only covers completed UTC days');
-    }
-  }
-
-  console.error('Fetching OpenAI costs...');
-  let openai: OpenAiCost | null = null;
-  let openaiError: string | null = null;
-  try {
-    openai = await fetchOpenAiCost(start, end);
-  } catch (err: any) {
-    openaiError = err.message;
-  }
-  // Falling back to telemetry beats reporting OpenAI as $0, which reads as
-  // "we spend nothing there" rather than "we cannot see it".
-  let openaiFloor: OpenAiFloor | null = null;
-  if (!openai) {
-    console.error('OpenAI costs unavailable; deriving a floor from ai_generation records...');
-    openaiFloor = await fetchOpenAiFloor(start, end, opts.asOf);
-  }
-
-  let perItem: PerItem | null = null;
-  if (opts.perItem) {
-    console.error('Attributing cost per item...');
-    perItem = await fetchPerItem(start, end, opts.asOf, opts.langs);
-  }
+  // One scan over our own ai_generation records supplies everything: the window
+  // total, the per-model and per-provider split, and the per-item attribution.
+  console.error('Reading token usage...');
+  const perItem = await fetchPerItem(start, end, opts.asOf, opts.langs);
 
   console.error('Counting items...');
   const [items, trial] = await Promise.all([
@@ -961,75 +625,54 @@ async function main() {
   const totalItems = items.total;
   const trialItems = trial.total;
 
-  // Price each model at its own rate against the same window, so an intro rate
-  // that expires mid-window is applied as of the window's end.
-  const costByModel: Record<string, number> = {};
-  const totals = emptyTokens();
-  for (const [model, t] of Object.entries(byModel)) {
-    costByModel[model] = usdCostFromReport(t, model, opts.asOf);
-    totals.uncachedInput += t.uncachedInput;
-    totals.cacheWrite5m += t.cacheWrite5m;
-    totals.cacheWrite1h += t.cacheWrite1h;
-    totals.cacheRead += t.cacheRead;
-    totals.output += t.output;
-    totals.webSearches += t.webSearches;
-  }
-
-  const anthropicCost = Object.values(costByModel).reduce((a, b) => a + b, 0);
-  const openaiCost = openai ? openai.embeddings : (openaiFloor?.cost ?? 0);
-  const totalCost = anthropicCost + openaiCost;
-
+  // Every record we priced, attributed to an item or not. Both halves are real
+  // spend, so the headline divides the whole window's cost by the whole window's
+  // items rather than silently dropping the unattributed part.
+  const { costByModel, costByProvider, tokens: totals } = perItem;
+  const totalCost = perItem.attributedCost + perItem.unattributedCost;
   const paidItems = Math.max(0, totalItems - trialItems);
   const denominator = opts.excludeTrial ? paidItems : totalItems;
 
-  // Two ways this report can read plausibly but be wrong; both are silent
-  // unless called out, and both produce an understated cost per item.
+  // The one way this can read plausibly but be wrong: records that predate the
+  // token-usage refactor carry no tokens, so they price at nothing. Excluding
+  // them is right — they cannot be priced — but it must not be silent.
   const warnings: string[] = [];
-  if (!reportedThrough) {
+  const legacy = perItem.records - perItem.instrumented;
+  if (legacy > 0) {
     warnings.push(
-      `Anthropic returned no usage buckets at all for this window. The usage report ` +
-      `lags by hours, so a window covering only today is normally empty — end the ` +
-      `window at yesterday for a settled figure.`,
-    );
-  } else if (end.getTime() - reportedThrough.getTime() > 3_600_000) {
-    warnings.push(
-      `Anthropic usage is only reported through ${reportedThrough.toISOString()}, ` +
-      `but the window runs to ${end.toISOString()}. The report lags by hours, so ` +
-      `recent spend is missing while recent items are already counted — this ` +
-      `understates cost per item. End the window at yesterday for a settled figure.`,
+      `${legacy} of ${perItem.records} ai_generation record(s) in this window predate the ` +
+      `token-usage refactor: they carry no token counts and are excluded from the total, ` +
+      `so cost per item is understated for windows reaching back before it shipped.`,
     );
   }
-  if (anthropicCost === 0 && totalItems > 0) {
+  if (totalCost === 0 && totalItems > 0) {
     warnings.push(
-      `${totalItems} item(s) were created but the selected key(s) show no Anthropic ` +
-      `spend. Either the window is entirely inside the reporting lag, or the ` +
-      `deployed service uses a different API key than the one selected — check ` +
-      `--key / ANTHROPIC_CONSOLE_KEY_IDS against --all-keys.`,
+      `${totalItems} item(s) were created but no token usage was recorded for them. ` +
+      `Either the generations happened outside this window, or recordTokenUsage is ` +
+      `not firing — check that the deployed revision carries the token-usage layer.`,
     );
   }
 
   // Per-day series for the HTML view. Built from the union of every day that
   // has either spend or items, so a day with one and not the other still shows.
   const dayKeys = Array.from(new Set([
-    ...Object.keys(daily),
+    ...Object.keys(perItem.byDay),
     ...Object.keys(items.byDay),
-    ...Object.keys(openai?.daily ?? {}),
   ])).sort();
   const rows: DayRow[] = dayKeys.map(day => ({
     day,
     items: items.byDay[day] || 0,
     trial: trial.byDay[day] || 0,
-    anthropic: Object.entries(daily[day] || {})
-      .reduce((sum, [model, t]) => sum + usdCostFromReport(t, model, end), 0),
-    openai: openai?.daily[day] || 0,
+    anthropic: perItem.byDay[day]?.anthropic ?? 0,
+    openai: perItem.byDay[day]?.openai ?? 0,
   }));
 
   if (opts.output) {
     const html = generateHtml({
       start, end,
-      keyLabel: opts.allKeys ? 'all keys (org-wide)' : keys.map(k => k.name).join(', '),
+      asOf: opts.asOf,
       totalItems, trialItems, paidItems, denominator, excludeTrial: opts.excludeTrial,
-      tokens: totals, costByModel, anthropicCost, billedOrgWide, openai, openaiFloor, openaiError,
+      tokens: totals, costByModel, costByProvider, totalCost,
       rows, warnings,
     });
     writeFileSync(opts.output, html, 'utf-8');
@@ -1040,20 +683,14 @@ async function main() {
     console.log(JSON.stringify({
       window: { start: start.toISOString(), end: end.toISOString() },
       daily: rows,
-      reportedThrough: reportedThrough?.toISOString() ?? null,
+      asOf: opts.asOf.toISOString(),
       warnings,
-      apiKeys: opts.allKeys ? 'all' : keys.map(k => ({ id: k.id, name: k.name })),
       langs: opts.langs.length > 0 ? opts.langs : null,
       items: { total: totalItems, trial: trialItems, paid: paidItems, denominator },
       tokens: totals,
       cost: {
-        anthropic: anthropicCost,
-        anthropicByModel: costByModel,
-        anthropicBilledOrgWide: billedOrgWide,
-        openaiEmbeddings: openai?.embeddings ?? null,
-        openaiOther: openai?.other ?? null,
-        openaiFloor: openaiFloor ? { ...openaiFloor, isLowerBound: true } : null,
-        openaiError,
+        byModel: costByModel,
+        byProvider: costByProvider,
         total: totalCost,
       },
       perItem: perItem ? (() => {
@@ -1074,8 +711,8 @@ async function main() {
       })() : null,
       costPerItem: denominator > 0 ? {
         total: totalCost / denominator,
-        anthropic: anthropicCost / denominator,
-        openai: openaiCost / denominator,
+        anthropic: costByProvider.anthropic / denominator,
+        openai: costByProvider.openai / denominator,
       } : null,
     }, null, 2));
     process.exit(0);
@@ -1088,60 +725,30 @@ async function main() {
   console.log(`${pad('  paid accounts')}: ${num(paidItems)}`);
   console.log(`${pad('  free-plan trial')}: ${num(trialItems)}`);
 
-  const keyLabel = opts.allKeys
-    ? 'ALL KEYS — org-wide'
-    : `key${keys.length > 1 ? 's' : ''}: ${keys.map(k => k.name).join(', ')}`;
-  console.log(`\nAnthropic (${keyLabel})${opts.langs.length > 0 ? ' — ALL languages, not just the selected ones' : ''}`);
-  console.log(`${pad('  uncached input')}: ${num(totals.uncachedInput)} tok`);
-  console.log(`${pad('  cache write 5m/1h')}: ${num(totals.cacheWrite5m)} / ${num(totals.cacheWrite1h)} tok`);
-  console.log(`${pad('  cache read')}: ${num(totals.cacheRead)} tok`);
+  console.log(`\nTokens recorded (ours, priced at the ${opts.asOf.toISOString().split('T')[0]} rate card)`);
+  console.log(`${pad('  input')}: ${num(totals.input)} tok`);
+  console.log(`${pad('  cache write / read')}: ${num(totals.cacheCreation)} / ${num(totals.cacheRead)} tok`);
   console.log(`${pad('  output')}: ${num(totals.output)} tok`);
-  if (totals.webSearches > 0) {
-    console.log(`${pad('  web searches')}: ${num(totals.webSearches)} (not priced here)`);
-  }
-  console.log(`${pad('  cost')}: ${usd(anthropicCost)}`);
-  if (billedOrgWide !== null) {
-    const share = billedOrgWide > 0 ? ((anthropicCost / billedOrgWide) * 100).toFixed(1) : '—';
-    console.log(`${pad('  org-wide billed')}: ${usd(billedOrgWide)}  (selected keys = ${share}% of the bill)`);
-  } else if (opts.check) {
-    console.log(`${pad('  org-wide billed')}: unavailable — cost_report covers completed UTC days only`);
-  }
-
-  if (openai) {
-    console.log(`${pad('OpenAI (embeddings)')}: ${usd(openai.embeddings)}`);
-    if (openai.other > 0) {
-      console.log(`${pad('OpenAI (other)')}: ${usd(openai.other)}  (excluded from cost per item)`);
-    }
-  } else if (openaiFloor) {
-    console.log(`${pad('OpenAI (floor)')}: ${usd(openaiFloor.cost)}  from ${num(openaiFloor.calls)} ai_generation calls`);
-    console.log(`${' '.repeat(25)}  LOWER BOUND — ${openaiError ?? 'no admin key set'}`);
-  } else {
-    console.log(`${pad('OpenAI')}: excluded — ${openaiError ?? 'no key set'}`);
-  }
-
+  console.log(`${pad('  generations')}: ${num(perItem.instrumented)}`);
+  console.log(`${pad('  Anthropic')}: ${usd(costByProvider.anthropic)}`);
+  console.log(`${pad('  OpenAI')}: ${usd(costByProvider.openai)}`);
   console.log(`${' '.repeat(25)}--------`);
-  console.log(`${pad('Total AI cost')}: ${usd(totalCost)}${openai ? '' : (openaiFloor ? ' (Anthropic + OpenAI floor)' : ' (Anthropic only)')}`);
+  console.log(`${pad('Total AI cost')}: ${usd(totalCost)}`);
 
-  if (opts.langs.length > 0) {
-    console.log(`\n${pad('Cost per item')}: not computed for a language scope.`);
-    console.log(`  Provider-reported spend covers the whole API key and cannot be split by`);
-    console.log(`  language, so dividing it by one language's items would be meaningless.`);
-    console.log(`  Use the per-item attribution below.`);
-  } else if (denominator > 0) {
+  if (denominator > 0) {
     console.log(`\n${pad('Cost per item')}: ${usd(totalCost / denominator)}${opts.excludeTrial ? '  (paid items only)' : ''}`);
-    console.log(`${pad('  Anthropic')}: ${usd(anthropicCost / denominator)}`);
-    if (openai) console.log(`${pad('  OpenAI')}: ${usd(openaiCost / denominator)}`);
-    else if (openaiFloor) console.log(`${pad('  OpenAI (floor)')}: ${usd(openaiCost / denominator)}`);
+    console.log(`${pad('  Anthropic')}: ${usd(costByProvider.anthropic / denominator)}`);
+    console.log(`${pad('  OpenAI')}: ${usd(costByProvider.openai / denominator)}`);
   } else {
     console.log(`\nNo items created in this window — cost per item undefined.`);
   }
 
   const ranked = Object.entries(costByModel).sort((a, b) => b[1] - a[1]);
-  if (ranked.length > 0 && anthropicCost > 0) {
+  if (ranked.length > 0 && totalCost > 0) {
     console.log(`\nBy model`);
     const w = Math.max(...ranked.map(([m]) => m.length));
     for (const [model, cost] of ranked) {
-      const share = ((cost / anthropicCost) * 100).toFixed(1).padStart(5);
+      const share = ((cost / totalCost) * 100).toFixed(1).padStart(5);
       console.log(`  ${model.padEnd(w)}: ${usd(cost).padStart(9)}  (${share}%)`);
     }
   }
@@ -1158,20 +765,6 @@ async function main() {
     if (perItem.unattributedRecords > 0) {
       console.log(`${pad('  unattributed')}: ${num(perItem.unattributedRecords)} gen(s) · ${usd(perItem.unattributedCost)}` +
         `  (never became an item — failed, or created outside the window)`);
-    }
-    // Per-item costs are counted client-side off the SSE stream, whereas the
-    // headline figure comes from the provider's own usage report. They measure
-    // the same spend two different ways, so their ratio is a live check on the
-    // instrumentation: far from 100% means the stream accounting is off (double
-    // counting message_start and message_delta, or missing the fix passes) —
-    // not that the provider is wrong.
-    const recorded = perItem.attributedCost + perItem.unattributedCost;
-    if (opts.langs.length > 0) {
-      console.log(`${pad('  recorded (this lang)')}: ${usd(recorded)}  (not comparable to the provider total — that covers all languages)`);
-    } else if (recorded > 0 && anthropicCost > 0) {
-      const ratio = (recorded / anthropicCost) * 100;
-      const flag = ratio > 115 || ratio < 60 ? '  <-- CHECK: stream accounting may be off' : '';
-      console.log(`${pad('  recorded vs provider')}: ${usd(recorded)} vs ${usd(anthropicCost)} = ${ratio.toFixed(1)}%${flag}`);
     }
 
     if (costs.length > 0) {
@@ -1216,9 +809,6 @@ async function main() {
       if (rate == null) continue;
       const margin = ((rate - cpi) / rate) * 100;
       console.log(`  ${PLANS[id].displayName.padEnd(12)}${usd(rate).padStart(9)}${(margin.toFixed(1) + '%').padStart(10)}${usd(rate - cpi).padStart(13)}`);
-    }
-    if (!openai && openaiFloor) {
-      console.log(`  Margins are OPTIMISTIC: the OpenAI side is a lower bound (see above).`);
     }
   }
 

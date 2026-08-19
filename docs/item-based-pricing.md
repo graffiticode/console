@@ -169,3 +169,20 @@ Notes / gotchas:
 - 3DS/SCA: `invoice.payment_intent` is cast-to-`any` in `quick-subscribe` (removed from the v22 Invoice
   type) — validate the confirmation flow with an SCA test card.
 - `scripts/revenue-vs-cost.ts` predates item pricing; its revenue figures need reworking.
+- **Token-count audit (`scripts/audit-token-counts.ts`) — designed, not built.** `cost-per-item.ts` now
+  prices our *own* recorded tokens with `MODEL_RATES` and calls no provider API, so nothing checks
+  whether those counts are **complete**. A separate, occasional audit should answer only that: sum our
+  `ai_generation` tokens by model for a window, fetch Anthropic's `usage_report/messages` **org-wide**
+  (empty `api_key_ids[]`), and print a per-model table of ours vs theirs for input, output, cache read
+  and cache write — **token counts, not dollars** — with one dollar-weighted total as a summary.
+
+  Org-wide is the load-bearing detail. Our telemetry records every call we make, from a laptop and from
+  Cloud Run alike, so the only like-for-like counterpart is the whole org. Scoping to one key is what
+  made the old `recorded vs provider` line read 175.7% and sent us chasing a stream double-counting bug
+  that did not exist — the gap was a dev key ($63.33) sitting outside the deployed key ($25.74).
+
+  Reading it: near parity means instrumentation captures everything; materially low means some call
+  path is not wired to `recordTokenUsage`; materially high means double counting. Anthropic only —
+  OpenAI's usage endpoint needs an `sk-admin-…` org key we do not have, and the script should say so
+  rather than imply that third of our calls was checked. Run it on a window ending at a settled UTC
+  day; the usage report lags hours, so including today always looks like over-counting.
