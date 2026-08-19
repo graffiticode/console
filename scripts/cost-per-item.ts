@@ -307,7 +307,13 @@ interface LangCost { lang: string; items: number; usd: number; }
 function costByLang(byItem: PerItem['byItem']): LangCost[] {
   const acc = new Map<string, { items: number; usd: number }>();
   for (const v of byItem.values()) {
-    const key = v.lang ? `L${normalizeLang(String(v.lang))}` : '(unrecorded)';
+    // A stored `lang` is not guaranteed to be a language id — one record in prod
+    // holds a bare newline, which is truthy, survives normalizeLang unchanged
+    // (it fails the /^\d+$/ test and passes through), and would render as a
+    // blank "L" row. Anything that is not four digits after normalising joins
+    // the (unrecorded) bucket rather than inventing a language.
+    const normalized = v.lang ? normalizeLang(String(v.lang)) : '';
+    const key = /^\d{4}$/.test(normalized) ? `L${normalized}` : '(unrecorded)';
     const e = acc.get(key) ?? { items: 0, usd: 0 };
     e.items++; e.usd += v.usd;
     acc.set(key, e);
