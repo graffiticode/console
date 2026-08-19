@@ -297,7 +297,7 @@ const addTokens = (into: TokenTotals, t: TokenTotals) => {
   into.cacheRead += t.cacheRead;
 };
 
-interface LangCost { lang: string; items: number; usd: number; gens: number; }
+interface LangCost { lang: string; items: number; usd: number; }
 
 /**
  * Average item cost per language, dearest first. Attributed items only — a
@@ -305,11 +305,11 @@ interface LangCost { lang: string; items: number; usd: number; gens: number; }
  * Shared by the text and HTML views so the two cannot drift apart.
  */
 function costByLang(byItem: PerItem['byItem']): LangCost[] {
-  const acc = new Map<string, { items: number; usd: number; gens: number }>();
+  const acc = new Map<string, { items: number; usd: number }>();
   for (const v of byItem.values()) {
     const key = v.lang ? `L${normalizeLang(String(v.lang))}` : '(unrecorded)';
-    const e = acc.get(key) ?? { items: 0, usd: 0, gens: 0 };
-    e.items++; e.usd += v.usd; e.gens += v.gens;
+    const e = acc.get(key) ?? { items: 0, usd: 0 };
+    e.items++; e.usd += v.usd;
     acc.set(key, e);
   }
   return [...acc.entries()]
@@ -521,18 +521,22 @@ function generateHtml(d: HtmlInput): string {
         <span class="bar"><span style="width:${totalCost > 0 ? (cost / totalCost) * 100 : 0}%"></span></span></td>
     </tr>`).join('\n');
 
-  // Bars scale to the dearest language, so the column reads as a ranking of
-  // per-item cost rather than of volume.
-  const maxLangMean = Math.max(...d.langRows.map(l => l.usd / l.items), 0.000001);
+  // Same columns, same order, same bar treatment as the By day table, so the
+  // two read as one view sliced two ways. Each bar scales to its own column's
+  // maximum.
+  const maxLangItems = Math.max(...d.langRows.map(l => l.items), 1);
+  const maxLangCost = Math.max(...d.langRows.map(l => l.usd), 0.000001);
+  const maxLangPer = Math.max(...d.langRows.map(l => l.usd / l.items), 0.000001);
   const langRows = d.langRows.map(l => {
-    const mean = l.usd / l.items;
+    const per = l.usd / l.items;
     return `<tr>
       <td class="mono">${esc(l.lang)}</td>
-      <td class="num">${l.items.toLocaleString()}</td>
-      <td class="num">$${mean.toFixed(4)}
-        <span class="bar"><span style="width:${(mean / maxLangMean) * 100}%"></span></span></td>
-      <td class="num">$${l.usd.toFixed(4)}</td>
-      <td class="num">${(l.gens / l.items).toFixed(2)}</td>
+      <td class="num">${l.items.toLocaleString()}
+        <span class="bar"><span style="width:${(l.items / maxLangItems) * 100}%"></span></span></td>
+      <td class="num">$${l.usd.toFixed(4)}
+        <span class="bar"><span style="width:${(l.usd / maxLangCost) * 100}%"></span></span></td>
+      <td class="num">$${per.toFixed(4)}
+        <span class="bar"><span style="width:${(per / maxLangPer) * 100}%"></span></span></td>
     </tr>`;
   }).join('\n');
 
@@ -602,17 +606,17 @@ ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</di
   ${dayRows || '<tr><td colspan="4" class="dim">No data in this window.</td></tr>'}
 </table></div>
 
+<h2>By language</h2>
+<div class="sub">Attributed items only — a generation that never became an item has no language to charge it to.</div>
+<div class="scroll"><table>
+  <tr><th>Language</th><th class="num">Items</th><th class="num">AI cost</th><th class="num">Cost / item</th></tr>
+  ${langRows || '<tr><td colspan="4" class="dim">No attributed items in this window.</td></tr>'}
+</table></div>
+
 <h2>By model</h2>
 <div class="scroll"><table>
   <tr><th>Model</th><th class="num">Cost</th><th class="num">Share</th></tr>
   ${modelRows || '<tr><td colspan="3" class="dim">No Anthropic usage in this window.</td></tr>'}
-</table></div>
-
-<h2>By language</h2>
-<div class="sub">Attributed items only — a generation that never became an item has no language to charge it to.</div>
-<div class="scroll"><table>
-  <tr><th>Language</th><th class="num">Items</th><th class="num">Cost / item</th><th class="num">Total</th><th class="num">Gens / item</th></tr>
-  ${langRows || '<tr><td colspan="5" class="dim">No attributed items in this window.</td></tr>'}
 </table></div>
 
 <h2>Tokens</h2>
@@ -824,9 +828,9 @@ async function main() {
 
   if (opts.byLang) {
     console.log(`\nAverage item cost by language (attributed items only)`);
-    console.log(`  ${'lang'.padEnd(14)}${'items'.padStart(7)}${'mean'.padStart(11)}${'total'.padStart(11)}${'gens/item'.padStart(11)}`);
+    console.log(`  ${'lang'.padEnd(14)}${'items'.padStart(7)}${'AI cost'.padStart(11)}${'cost/item'.padStart(11)}`);
     for (const e of langRows) {
-      console.log(`  ${e.lang.padEnd(14)}${String(e.items).padStart(7)}${usd(e.usd / e.items).padStart(11)}${usd(e.usd).padStart(11)}${(e.gens / e.items).toFixed(2).padStart(11)}`);
+      console.log(`  ${e.lang.padEnd(14)}${String(e.items).padStart(7)}${usd(e.usd).padStart(11)}${usd(e.usd / e.items).padStart(11)}`);
     }
   }
 
