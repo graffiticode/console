@@ -17,6 +17,8 @@
  *   npx tsx scripts/mcp-funnel-report.ts [--period all|month|week|day]
  *                                        [--from YYYY-MM-DD] [--to YYYY-MM-DD]
  *                                        [--freshness 7d] [--output mcp-funnel.html]
+ *   (--freshness Nd sets how far back the LOG half reads; logs are fetched in
+ *    3-day slices because Cloud Logging 500s on wider scans.)
  *
  * Auth — one login covers both halves:
  *   gcloud auth login                          (Cloud Logging, via the shell-out)
@@ -127,14 +129,21 @@ function windowBounds(opts: { period: string; from: string; to: string }) {
   return { start: new Date(today.getTime() - 30 * 864e5), end }; // month
 }
 
-// gcloud --freshness only accepts a duration; derive one that covers the window.
-function deriveFreshness(opts: { period: string; freshness: string; start: Date | null }): string {
-  if (opts.freshness) return opts.freshness;
-  if (opts.start) {
-    const days = Math.ceil((Date.now() - opts.start.getTime()) / 864e5) + 1;
-    return `${Math.min(days, 30)}d`;
+// How far back to read logs. Reads are sliced by explicit `timestamp` bounds
+// (see readLogChunked), so this is a real start DATE, not a gcloud --freshness
+// duration. `--freshness Nd` is still accepted — it now shifts this start —
+// because it is the documented escape hatch for widening or trimming the log
+// half independently of the Firestore window.
+//
+// Cloud Logging retention is ~30 days, so an `all`-time window still floors here.
+function deriveLogStart(opts: { freshness: string; start: Date | null }, end: Date): Date {
+  const m = opts.freshness.match(/^(\d+)\s*d$/i);
+  if (m) return new Date(end.getTime() - parseInt(m[1], 10) * 864e5);
+  if (opts.freshness) {
+    console.warn(`WARN: --freshness "${opts.freshness}" not understood (expected e.g. "7d") — ignoring.`);
   }
-  return '30d'; // Cloud Logging default retention ~30d
+  if (opts.start) return opts.start;
+  return new Date(end.getTime() - 30 * 864e5);
 }
 
 function toMillis(v: any): number | null {
@@ -174,11 +183,139 @@ function pct(n: number, d: number): string {
   return ((n / d) * 100).toFixed(1) + '%';
 }
 
+// listed→called is only a conversion where the client actually calls
+// tools/list once per session. ChatGPT/Codex does not — it mints a fresh
+// transport per tool call, so most of its tool sessions never emit
+// `mcp_listed` and the naive ratio came out at 508.7%, which reads as
+// spectacular engagement when it is really a transport artifact. Anything
+// above 100% means "this client does not list per session"; say so.
+function listedConv(toolSessions: number, listed: number): string {
+  if (!listed) return toolSessions ? 'n/a †' : '—';
+  if (toolSessions > listed) return 'n/a †';
+  return pct(toolSessions, listed);
+}
+
 const READ_TOOLS = new Set(['list_languages', 'get_language_info', 'get_item']);
+
+// --- Client classification --------------------------------------------------
+// Session counts are NOT comparable across clients, and the two distortions run
+// in OPPOSITE directions, so a single blended number is worse than no number:
+//
+//   - Claude surfaces open a transport and call tools/list at connector
+//     STARTUP, whether or not the user ever invokes us. "Connected" fills up
+//     with installed-base handshakes. (2026-08-13→20: 1666 Claude sessions
+//     listed tools; 2 ever called one, and both were an authenticated dev key.)
+//   - ChatGPT/Codex mints a NEW transport per tool call. One continuous
+//     24-minute conversation on 2026-08-14 logged 58 calls across 58 distinct
+//     sessions, so its "sessions" overcounts real conversations ~9x.
+//
+// Everything downstream segments by these buckets. `bucketOf` is keyed on the
+// self-declared clientInfo.name, which is the only client identity we have.
+type ClientBucket = 'claude' | 'openai' | 'other' | 'internal' | 'scanner' | 'unknown';
+
+const BUCKET_LABEL: Record<ClientBucket, string> = {
+  claude: 'Claude family',
+  openai: 'OpenAI family',
+  other: 'Other named',
+  internal: 'Internal (our own testing)',
+  scanner: 'Scanner / validator',
+  unknown: 'Unknown',
+};
+
+// Order matters only for display; `unknown` last.
+const BUCKET_ORDER: ClientBucket[] = ['claude', 'openai', 'other', 'internal', 'scanner', 'unknown'];
+
+// Substrings marking automated catalogue crawlers, uptime probes and security
+// scanners. These are not users: they call tools with junk item ids on purpose,
+// so counting them tanks the reliability guardrail. In the 2026-08-13→20 week,
+// 20 of 24 non-ok outcomes were ONE scanner (`alpic-beacon-ai-review`) probing
+// get_item/get_spec/render_item/get_language_info with 5 bad ids each, which
+// alone moved overall tool success from ~99% to the 92.7% the report printed.
+//
+// This list is necessarily open-ended — the name is whatever the client says it
+// is. Prefer false-negatives (a missed scanner shows up as `other`, which is
+// already excluded from the user-facing success rate) over false-positives.
+const SCANNER_PATTERNS = [
+  'scanner', 'probe', 'beacon', 'detector', 'inspect', 'measurement', 'audit',
+  'survey', 'dump', 'verifier', 'health', 'profiler', 'nuclei', 'censys',
+  'atlas', 'catalogue', 'catalog-', 'connectability', 'reputation', 'leaktest',
+  'adoptsignal', 'adoption-verify', 'research', 'dark-mcp', 'orb-',
+];
+
+// MCP Inspector is the project's standard manual-testing app (see the repo's
+// CLAUDE.md), so every session from it is US exercising the server, not demand.
+// Left unclassified it lands in `other` and counts as user traffic: over
+// 2026-07-21→08-20 that was 24 creates, ~7% of all creates in the window.
+const INTERNAL_PATTERNS = ['inspector'];
+
+function bucketOf(kind: string | undefined): ClientBucket {
+  if (!kind) return 'unknown';
+  const k = kind.toLowerCase();
+  if (INTERNAL_PATTERNS.some((pat) => k.includes(pat))) return 'internal';
+  if (SCANNER_PATTERNS.some((pat) => k.includes(pat))) return 'scanner';
+  if (k.includes('claude') || k.includes('anthropic')) return 'claude';
+  if (k.includes('openai') || k.includes('codex')) return 'openai';
+  return 'other';
+}
+
+// --- Chunked log reads ------------------------------------------------------
+// Cloud Logging returns HTTP 500 INTERNAL — consistently ~9s in — on any scan
+// wider than roughly a week, REGARDLESS of how selective the filter is. Pinning
+// `resource.labels.service_name` was tried and does not help; the constraint is
+// query duration, not breadth. A `--freshness 30d` read therefore always failed,
+// which is how a 30-day run came to report "0 sessions, 0 artifact views, 0
+// claims" — three dead queries reading exactly like three empty funnels.
+//
+// Slicing the window into explicit `timestamp` ranges keeps each query short
+// enough to finish, and localises a failure to one slice instead of the report.
+const LOG_CHUNK_DAYS = 3;
+
+function readLogSlice(filter: string): any[] | null {
+  try {
+    const raw = execFileSync('gcloud', [
+      'logging', 'read', filter,
+      '--project', PROJECT,
+      '--format', 'json',
+      '--limit', '50000',
+    ], { encoding: 'utf-8', maxBuffer: 256 * 1024 * 1024 });
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function readLogChunked(baseFilter: string, start: Date, end: Date, label: string): any[] {
+  const out: any[] = [];
+  const step = LOG_CHUNK_DAYS * 864e5;
+  let slices = 0, failed = 0;
+  for (let t = start.getTime(); t < end.getTime(); t += step) {
+    const a = new Date(t);
+    const b = new Date(Math.min(t + step, end.getTime()));
+    const range = (x: Date, y: Date) =>
+      `${baseFilter} AND timestamp>="${x.toISOString()}" AND timestamp<"${y.toISOString()}"`;
+    slices++;
+    let res = readLogSlice(range(a, b));
+    if (res === null) {
+      // Halve once: a slice straddling a traffic spike can still be too heavy.
+      const mid = new Date((a.getTime() + b.getTime()) / 2);
+      const l = readLogSlice(range(a, mid));
+      const r = readLogSlice(range(mid, b));
+      if (l === null || r === null) { failed++; continue; }
+      res = [...l, ...r];
+    }
+    out.push(...res);
+  }
+  if (failed) {
+    // Loud and specific. The whole point of chunking is that a partial failure
+    // must never masquerade as a zero.
+    console.warn(`WARN: ${failed}/${slices} log slice(s) failed for ${label} — that stage is UNDER-COUNTED, not empty.`);
+  }
+  return out;
+}
 
 // --- A. Cloud Logging events ------------------------------------------------
 interface McpEvent {
-  ev: 'mcp_connect' | 'mcp_tool';
+  ev: 'mcp_connect' | 'mcp_listed' | 'mcp_resource' | 'mcp_tool';
   t: string;
   auth: string;
   session: string;
@@ -192,27 +329,19 @@ interface McpEvent {
   geo_region?: string;
 }
 
-function fetchEvents(freshness: string): McpEvent[] {
-  const filter = 'jsonPayload.ev=("mcp_connect" OR "mcp_tool")';
-  let raw: string;
-  try {
-    raw = execFileSync('gcloud', [
-      'logging', 'read', filter,
-      '--project', PROJECT,
-      '--format', 'json',
-      '--freshness', freshness,
-      '--limit', '50000',
-    ], { encoding: 'utf-8', maxBuffer: 256 * 1024 * 1024 });
-  } catch (err: any) {
-    console.warn('WARN: gcloud logging read failed — funnel top (connect/browse/success) will be empty.');
-    console.warn('      ' + (err?.shortMessage || err?.message || String(err)).split('\n')[0]);
-    return [];
-  }
-  let entries: any[];
-  try { entries = JSON.parse(raw); } catch { return []; }
-  return entries
+function fetchEvents(start: Date, end: Date): McpEvent[] {
+  // `mcp_listed` and `mcp_resource` are included alongside connect/tool: they
+  // are the stages between "a transport opened" and "someone asked for
+  // something". Without them a directory validator that loaded the catalogue
+  // and a user who actually worked are the same event — and the listed→called
+  // drop-off is the sharpest signal in this report.
+  const filter =
+    'resource.labels.service_name="mcp-service" AND ' +
+    'jsonPayload.ev=("mcp_connect" OR "mcp_listed" OR "mcp_resource" OR "mcp_tool")';
+  return readLogChunked(filter, start, end, 'MCP events')
     .map((e) => e.jsonPayload as McpEvent)
-    .filter((p) => p && (p.ev === 'mcp_connect' || p.ev === 'mcp_tool'));
+    .filter((p) => p && (p.ev === 'mcp_connect' || p.ev === 'mcp_listed'
+      || p.ev === 'mcp_resource' || p.ev === 'mcp_tool'));
 }
 
 interface SlowError {
@@ -223,9 +352,26 @@ interface SlowError {
   lang?: string;
 }
 
+interface SegmentStats {
+  bucket: ClientBucket;
+  label: string;
+  sessions: number;       // distinct `session` values — see the unit caveat below
+  listed: number;         // sessions that issued a tools/list-family request
+  resource: number;       // sessions that read a graffiticode:// resource
+  toolSessions: number;   // sessions that called ANY tool
+  createSessions: number;
+  updateSessions: number;
+  calls: number;
+  ok: number;
+  nonOk: number;
+  freePlanSessions: number;
+}
+
 interface LogStats {
   connects: number;
   distinctSessions: number;
+  listedSessions: number;    // reached tools/list — the real top of the funnel
+  resourceSessions: number;  // read one of our own resources
   browseCalls: number;
   createCalls: number;
   updateCalls: number;
@@ -235,40 +381,90 @@ interface LogStats {
   toolOk: number;
   toolGenFailed: number;
   toolError: number;
+  // Same counters with NON-USER traffic removed — automated scanners and our
+  // own MCP Inspector sessions. Scanners probe tools with junk ids by design
+  // and Inspector only ever exercises happy paths, so a blended rate measures
+  // those two harnesses rather than the service.
+  userToolTotal: number;
+  userToolOk: number;
+  userSessionsWithCreate: number;
+  userFirstTrySuccess: number;
+  nonUserCalls: number;
+  nonUserSessions: number;
   slowMs: number;            // threshold used
   slowErrors: number;        // errors with ms >= slowMs (likely timeouts)
   maxErrorMs: number;        // slowest error seen (0 if none)
   slowErrorSamples: SlowError[];
   langCounts: Record<string, number>;
+  segments: SegmentStats[];
   // Distinct sessions attributed to each agent kind / country. Attributed
   // per session (one session = many events) from the first event that carries
-  // the field; "unknown" buckets sessions with no value yet (e.g. connect-only
-  // sessions, which don't carry client_kind).
+  // the field; "unknown" buckets sessions with no value yet.
   clientKindSessions: Record<string, number>;
   geoCountrySessions: Record<string, number>;
 }
 
 function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slowMs: number): LogStats {
   const inWin = events.filter((e) => inWindow(toMillis(e.t), start, end));
-  const sessions = new Set<string>();
-  const firstCreateBySession: Record<string, McpEvent> = {};
-  const langCounts: Record<string, number> = {};
-  // session → first-seen client kind / country (attribute per session, not per event)
+
+  // Pass 1 — session identity. Attribute per SESSION, not per event: one
+  // session emits many events and only some carry client_kind/geo.
   const sessionKind: Record<string, string> = {};
   const sessionCountry: Record<string, string> = {};
+  const sessionAuth: Record<string, string> = {};
+  const sessions = new Set<string>();
+  for (const e of inWin) {
+    if (!e.session) continue;
+    sessions.add(e.session);
+    if (e.client_kind && !sessionKind[e.session]) sessionKind[e.session] = e.client_kind;
+    if (e.geo_country && !sessionCountry[e.session]) sessionCountry[e.session] = e.geo_country;
+    if (e.auth && !sessionAuth[e.session]) sessionAuth[e.session] = e.auth;
+  }
+  const bucketOfSession = (s: string): ClientBucket => bucketOf(sessionKind[s]);
+  // "Not a user": automated probes and our own test harness. Both call tools
+  // for reasons unrelated to demand, and both distort the reliability guardrail
+  // — scanners by failing on purpose, Inspector by succeeding on purpose.
+  const isNonUser = (s: string): boolean => {
+    const b = bucketOfSession(s);
+    return b === 'scanner' || b === 'internal';
+  };
+
+  // Pass 2 — stages and counts.
+  const seg = new Map<ClientBucket, SegmentStats>();
+  const segOf = (b: ClientBucket): SegmentStats => {
+    let x = seg.get(b);
+    if (!x) {
+      x = {
+        bucket: b, label: BUCKET_LABEL[b], sessions: 0, listed: 0, resource: 0,
+        toolSessions: 0, createSessions: 0, updateSessions: 0,
+        calls: 0, ok: 0, nonOk: 0, freePlanSessions: 0,
+      };
+      seg.set(b, x);
+    }
+    return x;
+  };
+  const stageSessions: Record<string, Set<string>> = {
+    listed: new Set(), resource: new Set(), tool: new Set(),
+    create: new Set(), update: new Set(),
+  };
+
+  const firstCreateBySession: Record<string, McpEvent> = {};
+  const langCounts: Record<string, number> = {};
   let connects = 0, browseCalls = 0, createCalls = 0, updateCalls = 0;
   let toolTotal = 0, toolOk = 0, toolGenFailed = 0, toolError = 0;
+  let userToolTotal = 0, userToolOk = 0, nonUserCalls = 0;
   let slowErrors = 0, maxErrorMs = 0;
   const slowErrorSamples: SlowError[] = [];
 
   for (const e of inWin) {
-    if (e.session) sessions.add(e.session);
-    if (e.session && e.client_kind && !sessionKind[e.session]) sessionKind[e.session] = e.client_kind;
-    if (e.session && e.geo_country && !sessionCountry[e.session]) sessionCountry[e.session] = e.geo_country;
+    const nonUser = e.session ? isNonUser(e.session) : false;
     if (e.ev === 'mcp_connect') { connects++; continue; }
+    if (e.ev === 'mcp_listed') { if (e.session) stageSessions.listed.add(e.session); continue; }
+    if (e.ev === 'mcp_resource') { if (e.session) stageSessions.resource.add(e.session); continue; }
     // mcp_tool
     toolTotal++;
-    if (e.outcome === 'ok') toolOk++;
+    if (nonUser) nonUserCalls++; else userToolTotal++;
+    if (e.outcome === 'ok') { toolOk++; if (!nonUser) userToolOk++; }
     else if (e.outcome === 'generation_failed') toolGenFailed++;
     else if (e.outcome === 'error') {
       toolError++;
@@ -281,33 +477,63 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
         slowErrorSamples.push({ tool: e.tool ?? '?', ms, t: e.t, session: e.session, lang: e.lang });
       }
     }
+    if (e.session) stageSessions.tool.add(e.session);
     if (e.tool && READ_TOOLS.has(e.tool)) browseCalls++;
     if (e.tool === 'create_item') {
       createCalls++;
+      if (e.session) stageSessions.create.add(e.session);
       const prev = firstCreateBySession[e.session];
       if (!prev || toMillis(e.t)! < toMillis(prev.t)!) firstCreateBySession[e.session] = e;
     }
-    if (e.tool === 'update_item') updateCalls++;
+    if (e.tool === 'update_item') {
+      updateCalls++;
+      if (e.session) stageSessions.update.add(e.session);
+    }
     if (e.lang) langCounts[e.lang] = (langCounts[e.lang] || 0) + 1;
+  }
+
+  // Roll every session into its segment.
+  for (const sess of sessions) {
+    const x = segOf(bucketOfSession(sess));
+    x.sessions++;
+    if (sessionAuth[sess] === 'freePlan') x.freePlanSessions++;
+    if (stageSessions.listed.has(sess)) x.listed++;
+    if (stageSessions.resource.has(sess)) x.resource++;
+    if (stageSessions.tool.has(sess)) x.toolSessions++;
+    if (stageSessions.create.has(sess)) x.createSessions++;
+    if (stageSessions.update.has(sess)) x.updateSessions++;
+  }
+  for (const e of inWin) {
+    if (e.ev !== 'mcp_tool' || !e.session) continue;
+    const x = segOf(bucketOfSession(e.session));
+    x.calls++;
+    if (e.outcome === 'ok') x.ok++; else x.nonOk++;
   }
 
   const createSessions = Object.values(firstCreateBySession);
   const firstTrySuccess = createSessions.filter((e) => e.outcome === 'ok').length;
+  const userCreateSessions = createSessions.filter((e) => !isNonUser(e.session));
+  const userFirstTrySuccess = userCreateSessions.filter((e) => e.outcome === 'ok').length;
   slowErrorSamples.sort((a, b) => b.ms - a.ms);
 
   // Tally distinct sessions per kind/country; bucket the rest as "unknown".
   const clientKindSessions: Record<string, number> = {};
   const geoCountrySessions: Record<string, number> = {};
-  for (const s of sessions) {
-    const k = sessionKind[s] || 'unknown';
+  for (const sess of sessions) {
+    const k = sessionKind[sess] || 'unknown';
     clientKindSessions[k] = (clientKindSessions[k] || 0) + 1;
-    const c = sessionCountry[s] || 'unknown';
+    const c = sessionCountry[sess] || 'unknown';
     geoCountrySessions[c] = (geoCountrySessions[c] || 0) + 1;
   }
+
+  const segments = BUCKET_ORDER.map((b) => seg.get(b)).filter(Boolean) as SegmentStats[];
+  const nonUserSessions = (seg.get('scanner')?.sessions ?? 0) + (seg.get('internal')?.sessions ?? 0);
 
   return {
     connects,
     distinctSessions: sessions.size,
+    listedSessions: stageSessions.listed.size,
+    resourceSessions: stageSessions.resource.size,
     browseCalls,
     createCalls,
     updateCalls,
@@ -317,11 +543,18 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
     toolOk,
     toolGenFailed,
     toolError,
+    userToolTotal,
+    userToolOk,
+    userSessionsWithCreate: userCreateSessions.length,
+    userFirstTrySuccess,
+    nonUserCalls,
+    nonUserSessions,
     slowMs,
     slowErrors,
     maxErrorMs,
     slowErrorSamples,
     langCounts,
+    segments,
     clientKindSessions,
     geoCountrySessions,
   };
@@ -340,22 +573,11 @@ interface ClaimEvent {
   err?: string;
 }
 
-function fetchClaimEvents(freshness: string): ClaimEvent[] {
-  let raw: string;
-  try {
-    raw = execFileSync('gcloud', [
-      'logging', 'read', 'jsonPayload.ev="claim"',
-      '--project', PROJECT,
-      '--format', 'json',
-      '--freshness', freshness,
-      '--limit', '50000',
-    ], { encoding: 'utf-8', maxBuffer: 256 * 1024 * 1024 });
-  } catch {
-    return [];
-  }
-  let entries: any[];
-  try { entries = JSON.parse(raw); } catch { return []; }
-  return entries.map((e) => e.jsonPayload as ClaimEvent).filter((p) => p && p.ev === 'claim');
+function fetchClaimEvents(start: Date, end: Date): ClaimEvent[] {
+  return readLogChunked(
+    'resource.labels.service_name="console" AND jsonPayload.ev="claim"',
+    start, end, 'claim events',
+  ).map((e) => e.jsonPayload as ClaimEvent).filter((p) => p && p.ev === 'claim');
 }
 
 interface ClaimStats {
@@ -398,22 +620,11 @@ interface ArtifactViewEvent {
   allowed: boolean;
 }
 
-function fetchArtifactViewEvents(freshness: string): ArtifactViewEvent[] {
-  let raw: string;
-  try {
-    raw = execFileSync('gcloud', [
-      'logging', 'read', 'jsonPayload.ev="artifact_view"',
-      '--project', PROJECT,
-      '--format', 'json',
-      '--freshness', freshness,
-      '--limit', '50000',
-    ], { encoding: 'utf-8', maxBuffer: 256 * 1024 * 1024 });
-  } catch {
-    return [];
-  }
-  let entries: any[];
-  try { entries = JSON.parse(raw); } catch { return []; }
-  return entries.map((e) => e.jsonPayload as ArtifactViewEvent).filter((p) => p && p.ev === 'artifact_view');
+function fetchArtifactViewEvents(start: Date, end: Date): ArtifactViewEvent[] {
+  return readLogChunked(
+    'resource.labels.service_name="app" AND jsonPayload.ev="artifact_view"',
+    start, end, 'artifact_view events',
+  ).map((e) => e.jsonPayload as ArtifactViewEvent).filter((p) => p && p.ev === 'artifact_view');
 }
 
 interface ArtifactViewStats {
@@ -583,10 +794,14 @@ function generateHtml(data: {
   const { log, fs, claims, av } = data;
 
   const claimConversion = pct(fs.accounts, fs.anonSessions);
-  const firstAttemptSuccess = pct(log.firstTrySuccess, log.sessionsWithCreate);
-  const overallSuccess = pct(log.toolOk, log.toolTotal);
-  const callsPerSession = log.distinctSessions
-    ? (log.toolTotal / log.distinctSessions).toFixed(1) : '—';
+  const firstAttemptSuccess = pct(log.userFirstTrySuccess, log.userSessionsWithCreate);
+  const overallSuccess = pct(log.userToolOk, log.userToolTotal);
+  const toolSessionsTotal = log.segments.reduce((a, g) => a + g.toolSessions, 0);
+  // "Calls per session" is meaningless blended: ChatGPT mints a session per
+  // call (pinning it near 1.0) while Claude contributes thousands of zero-call
+  // startup handshakes. Depth is now expressed as listed→called instead, which
+  // is a real behavioural step rather than an artifact of transport policy.
+  const listedToCalled = listedConv(toolSessionsTotal, log.listedSessions);
   const costPerAccount = fs.accounts ? `$${(fs.spendUsd / fs.accounts).toFixed(3)}` : '—';
 
   const langRows = Object.entries(log.langCounts)
@@ -630,7 +845,7 @@ function generateHtml(data: {
   .banner-red { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
 </style></head><body>
 <h1>MCP Funnel Report</h1>
-<p class="subtitle">Period: ${data.periodLabel} · logs freshness: ${data.freshness} · generated ${now}</p>
+<p class="subtitle">Period: ${data.periodLabel} · logs read: ${data.freshness} · generated ${now}</p>
 
 <div class="banner">
   <b>Two views, two sources, two time-coverages.</b> The <b>Engagement</b> table is the live MCP
@@ -691,8 +906,8 @@ ${data.omtm.isClockStartWeek ? `<div class="banner banner-red">
 <div class="cards">
   ${card('First-attempt success', firstAttemptSuccess, `${log.firstTrySuccess} ok / ${log.sessionsWithCreate} first creates — guardrail`)}
   ${card('Claim conversion', claimConversion, `${fs.accounts} accounts / ${fs.anonSessions} anon sessions — diagnostic`)}
-  ${card('Overall tool success', overallSuccess, `${log.toolOk}/${log.toolTotal} calls (logs)`)}
-  ${card('Calls / session', callsPerSession, 'engagement depth (logs)')}
+  ${card('Tool success (users)', overallSuccess, `${log.userToolOk}/${log.userToolTotal} calls — ${log.nonUserCalls} non-user call(s) excluded`)}
+  ${card('Listed → called a tool', listedToCalled, `${toolSessionsTotal} of ${log.listedSessions} sessions that loaded the catalogue`)}
   ${card('Free-plan spend', `$${fs.spendUsd.toFixed(2)}`, costPerAccount + ' / account')}
   ${card('Paid (from claim)', `${fs.paidFromClaim}`, `${fs.paidGlobal} paid overall`)}
 </div>
@@ -703,13 +918,41 @@ ${data.omtm.isClockStartWeek ? `<div class="banner banner-red">
   <i>opened</i> — a create nobody looked at is not activation (contract §2).
 </p>
 
-<h2>Engagement — MCP event logs <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(since instrumentation deployed)</span></h2>
+<h2>Engagement by client <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(MCP event logs, since instrumentation deployed)</span></h2>
+<div class="banner banner-red">
+  <b>Do not add these session columns up.</b> A "session" is one MCP transport, and
+  clients mint transports on incompatible policies, so the number means something
+  different in each row — in opposite directions:
+  <ul style="margin:6px 0 0 18px;">
+    <li><b>Claude surfaces</b> open a transport and call <code>tools/list</code> at connector
+        <i>startup</i>, whether or not the user ever invokes us. Their session count is an
+        installed-base &times; sessions figure, not intent.</li>
+    <li><b>ChatGPT / Codex</b> opens a <i>new transport per tool call</i> — one continuous
+        24-minute conversation was observed as 58 calls across 58 sessions — so its session
+        count overstates real conversations by roughly an order of magnitude.</li>
+    <li><b>Free-plan</b> sessions are keyed per transport; <b>authenticated</b> sessions are keyed
+        by API-key hash and so collapse a whole week of work into one row.</li>
+  </ul>
+  The behavioural step that <i>is</i> comparable is <b>listed &rarr; called a tool</b>: every client
+  loads the catalogue, so the drop-off after it is a real signal about the client's users.
+</div>
+<table>
+  <thead><tr><th>Client</th><th class="num">Sessions</th><th class="num">Listed</th><th class="num">Read resource</th><th class="num">Called a tool</th><th class="num">Listed→called</th><th class="num">Created</th><th class="num">Updated</th><th class="num">Calls</th><th class="num">Free-plan</th></tr></thead>
+  <tbody>
+    ${log.segments.map((g) => `<tr><td>${g.label}</td><td class="num">${g.sessions}</td><td class="num">${g.listed}</td><td class="num">${g.resource}</td><td class="num">${g.toolSessions}</td><td class="num">${listedConv(g.toolSessions, g.listed)}</td><td class="num">${g.createSessions}</td><td class="num">${g.updateSessions}</td><td class="num">${g.calls}</td><td class="num">${g.freePlanSessions}</td></tr>`).join('\n    ') || '<tr><td colspan="10" class="note">no events in window</td></tr>'}
+  </tbody>
+</table>
+<p class="note" style="margin-top:8px;"><b>Listed</b> = the session issued a <code>tools/list</code>-family request (<code>mcp_listed</code>). <b>Read resource</b> = it read a <code>graffiticode://</code> resource (<code>mcp_resource</code>). Both stages sit between "a transport opened" and "someone asked for something" — without them a directory validator that loaded the catalogue and a user who actually worked are indistinguishable.<br>
+<b>† n/a</b> = this client had more tool-calling sessions than listing sessions, so it does not call <code>tools/list</code> once per session and the ratio is not a conversion. ChatGPT/Codex is the standing example: a new transport per tool call means most of its tool sessions never list at all.</p>
+
+<h2>Engagement — call volume <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(calls, not sessions — safe to total)</span></h2>
 <table>
   <thead><tr><th>Stage</th><th class="num">Count</th><th class="num">Conv. from prev</th><th>Note</th></tr></thead>
   <tbody>
-    ${funnelRow('Connected (sessions)', log.distinctSessions, '—', 'mcp_connect events')}
+    ${funnelRow('Loaded the catalogue (sessions)', log.listedSessions, '—', 'mcp_listed — the real top of the funnel')}
+    ${funnelRow('Called any tool (sessions)', toolSessionsTotal, listedToCalled + ' of listed', 'the step that separates intent from installation')}
     ${funnelRow('Browsed (read-route calls)', log.browseCalls, '—', 'list_languages · get_language_info · get_item')}
-    ${funnelRow('Create calls', log.createCalls, pct(log.sessionsWithCreate, log.distinctSessions) + ' of sessions', `${log.sessionsWithCreate} sessions created an item`)}
+    ${funnelRow('Create calls', log.createCalls, pct(log.sessionsWithCreate, toolSessionsTotal) + ' of tool sessions', `${log.sessionsWithCreate} sessions created an item`)}
     ${funnelRow('Update calls (iterate)', log.updateCalls, pct(log.updateCalls, log.createCalls) + ' of creates', 'create → revisit')}
   </tbody>
 </table>
@@ -719,7 +962,7 @@ ${data.omtm.isClockStartWeek ? `<div class="banner banner-red">
   <thead><tr><th>Stage</th><th class="num">Count</th><th class="num">Conv. from prev</th><th>Note</th></tr></thead>
   <tbody>
     ${funnelRow('Anonymous sessions', fs.anonSessions, '—', 'distinct namespaces, free-plan ∪ claimed')}
-    ${funnelRow('Free-plan items created', fs.freePlanItems, pct(fs.freePlanItems, fs.anonSessions) + ' items/session', `${fs.freePlanSessions} sessions still hold free-plan items`)}
+    ${funnelRow('Free-plan items created', fs.freePlanItems, (fs.anonSessions ? (fs.freePlanItems / fs.anonSessions).toFixed(2) : '—') + ' items/session', `${fs.freePlanSessions} sessions still hold free-plan items`)}
     ${funnelRow('Iterated (≥2 turns)', fs.iteratedItems, pct(fs.iteratedItems, fs.freePlanItems) + ' of items', 'help has more than the create turn')}
     ${funnelRow('Artifact viewed (free-plan)', av.viewedSessions, pct(av.viewedSessions, fs.freePlanSessions) + ' of free-plan sessions', `${av.distinctItemsViewed} items · ${av.viewEvents} raw views (P5-09; logs ∩ Firestore)`)}
     ${funnelRow('Claimed', fs.claimedSessions, pct(fs.claimedSessions, fs.anonSessions) + ' of anon sessions', 'distinct claimed namespaces')}
@@ -747,6 +990,12 @@ ${claims.errors ? `<div class="banner" style="background:#fef2f2;border-color:#f
 </table>` : ''}` : `<p class="note">No claim events in window. (Requires the console deploy that emits <code>claim</code> events — until then this stays empty even if claims occur.)</p>`}
 
 <h2>Tool-call outcomes</h2>
+<p class="note" style="margin:-4px 0 10px;">Shares below are over <b>all</b> ${log.toolTotal} calls including
+scanners. The reliability guardrail above deliberately uses the user-only rate
+(<b>${overallSuccess}</b>, ${log.userToolOk}/${log.userToolTotal}): automated crawlers call tools with
+junk item ids on purpose, so counting them measures the scanner, not the service. In the
+2026-08-13→20 week, 20 of 24 non-ok outcomes came from a single beacon and dragged the
+blended rate from ~99% to 92.7%.</p>
 <table>
   <thead><tr><th>Outcome</th><th class="num">Count</th><th class="num">Share</th><th>Note</th></tr></thead>
   <tbody>
@@ -790,7 +1039,8 @@ ${log.slowErrors > 30 ? `<p class="note">… and ${log.slowErrors - 30} more.</p
 async function main() {
   const opts = parseArgs(process.argv);
   const { start, end } = windowBounds(opts);
-  const freshness = deriveFreshness({ period: opts.period, freshness: opts.freshness, start });
+  const logStart = deriveLogStart({ freshness: opts.freshness, start }, end);
+  const logRangeLabel = `${logStart.toISOString().split('T')[0]} → ${end.toISOString().split('T')[0]}`;
   const periodLabel = start
     ? `${start.toISOString().split('T')[0]} → ${end.toISOString().split('T')[0]}`
     : `all time → ${end.toISOString().split('T')[0]}`;
@@ -799,11 +1049,11 @@ async function main() {
     console.warn('WARN: FREE_PLAN_NAMESPACE_SALT not set — claimed-namespace join key will not match logged sessions.');
   }
 
-  console.log(`Reading MCP events (gcloud logging, freshness=${freshness})...`);
-  const events = fetchEvents(freshness);
+  console.log(`Reading MCP events (gcloud logging, ${logRangeLabel}, ${LOG_CHUNK_DAYS}d slices)...`);
+  const events = fetchEvents(logStart, end);
   const log = summarizeEvents(events, start, end, opts.slowMs);
 
-  const claims = summarizeClaims(fetchClaimEvents(freshness), start, end);
+  const claims = summarizeClaims(fetchClaimEvents(logStart, end), start, end);
 
   console.log('Reading Firestore conversion tail...');
   const fs = await fetchFirestore(start, end);
@@ -811,7 +1061,7 @@ async function main() {
   // Artifact views join the app render-host logs to the Firestore tail, so they
   // need fs (item→namespace map + claimed namespaces) computed first.
   const av = summarizeArtifactViews(
-    fetchArtifactViewEvents(freshness), fs.itemToNamespace, fs.claimedNamespaces, start, end,
+    fetchArtifactViewEvents(logStart, end), fs.itemToNamespace, fs.claimedNamespaces, start, end,
   );
 
   console.log('Reading workspace registry (OMTM)...');
@@ -824,7 +1074,7 @@ async function main() {
   });
 
   const html = generateHtml({
-    periodLabel, freshness, log, fs, claims, av,
+    periodLabel, freshness: logRangeLabel, log, fs, claims, av,
     omtm, agentMetric, partnerMetric, cumulativeWorkspaces,
   });
   writeFileSync(opts.output, html);
@@ -844,11 +1094,26 @@ async function main() {
   // Terminal summary (handy even though the artifact is HTML). Two sources kept
   // visually separate — they cover different time windows during fill-in.
   console.log('\n=== MCP Funnel — ' + periodLabel + ' ===');
-  console.log('-- Engagement (event logs, since deploy) --');
-  console.log(`Sessions connected     : ${log.distinctSessions}`);
+  console.log('-- Engagement by client (event logs, since deploy) --');
+  // Segmented, and deliberately WITHOUT a blended session total: Claude inflates
+  // sessions with connector-startup handshakes it never follows up on, and
+  // ChatGPT mints a fresh session per tool call. Summing them measures nothing.
+  const hdr = 'client'.padEnd(21) + ['sess', 'listed', 'res', 'tool', 'create', 'update', 'calls']
+    .map((h) => h.padStart(7)).join('');
+  console.log('  ' + hdr);
+  console.log('  ' + '-'.repeat(hdr.length));
+  for (const g of log.segments) {
+    console.log('  ' + g.label.padEnd(21) + [g.sessions, g.listed, g.resource, g.toolSessions,
+      g.createSessions, g.updateSessions, g.calls].map((n) => String(n).padStart(7)).join(''));
+  }
+  console.log('-- Engagement totals --');
+  const toolSessTotal = log.segments.reduce((a, g) => a + g.toolSessions, 0);
+  console.log(`Listed tools (sessions): ${log.listedSessions}  → called a tool: ${toolSessTotal} (${listedConv(toolSessTotal, log.listedSessions)})`);
+  console.log(`Resource reads (sess)  : ${log.resourceSessions}`);
   console.log(`Browse (read) calls    : ${log.browseCalls}`);
   console.log(`Create / update calls  : ${log.createCalls} / ${log.updateCalls}`);
-  console.log(`Overall tool success   : ${pct(log.toolOk, log.toolTotal)} (${log.toolOk}/${log.toolTotal})`);
+  console.log(`Tool success (users)   : ${pct(log.userToolOk, log.userToolTotal)} (${log.userToolOk}/${log.userToolTotal}) — excl. ${log.nonUserCalls} non-user call(s) (scanners + our own Inspector) from ${log.nonUserSessions} session(s)`);
+  console.log(`Tool success (blended) : ${pct(log.toolOk, log.toolTotal)} (${log.toolOk}/${log.toolTotal}) — incl. scanners + internal; not a reliability signal`);
   console.log(`Errors / slow (timeouts): ${log.toolError} / ${log.slowErrors} (≥${(log.slowMs / 1000).toFixed(0)}s${log.maxErrorMs ? `, slowest ${(log.maxErrorMs / 1000).toFixed(0)}s` : ''})`);
   const topN = (counts: Record<string, number>) => Object.entries(counts)
     .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ') || '—';
@@ -864,7 +1129,7 @@ async function main() {
   console.log(`Paid (from claim/all)  : ${fs.paidFromClaim} / ${fs.paidGlobal}`);
   console.log(`Free-plan spend        : $${fs.spendUsd.toFixed(2)}`);
   console.log('-- Guardrails & diagnostics (never an OMTM) --');
-  console.log(`First-attempt success  : ${pct(log.firstTrySuccess, log.sessionsWithCreate)} (${log.firstTrySuccess}/${log.sessionsWithCreate}) — reliability guardrail`);
+  console.log(`First-attempt success  : ${pct(log.userFirstTrySuccess, log.userSessionsWithCreate)} (${log.userFirstTrySuccess}/${log.userSessionsWithCreate}) — reliability guardrail, scanners + internal excluded`);
   console.log(`Claim conversion       : ${pct(fs.accounts, fs.anonSessions)} (${fs.accounts}/${fs.anonSessions}) — downstream of activation`);
   console.log(`\nWrote ${opts.output}`);
   process.exit(0);
