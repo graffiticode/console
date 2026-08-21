@@ -70,7 +70,7 @@ revenue-vs-cost.html
 user-report.html
 funnel-report.html
 mcp-funnel.html
-cost-per-item.html
+cost-per-item*.html
 
 # generated training data
 *-training-examples.md
