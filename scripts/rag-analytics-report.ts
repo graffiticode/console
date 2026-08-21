@@ -87,6 +87,35 @@ function getModel(d: AnalyticsDoc): string {
   return (d.generation?.model || d.metadata?.model || 'unrecorded').toString();
 }
 
+const normText = (v: unknown) => String(v ?? '').trim().replace(/\s+/g, ' ');
+
+/**
+ * The best retrieved example for a request, and whether it is the request's own
+ * prompt coming back.
+ *
+ * A training prompt that was downloaded into the corpus retrieves ITSELF at
+ * similarity 1.0. That is corpus contamination, not retrieval quality, and it
+ * dominates any window with training traffic in it: on one L0176 day, 61 of 205
+ * requests matched an example whose stored prompt was byte-identical to the
+ * query, pulling the mean top-1 from 0.718 to 0.802.
+ *
+ * Identical text embeds identically, so the prompt comparison is the real test;
+ * the >= 0.999 arm catches the same case when the corpus entry's prompt was not
+ * stored alongside the match.
+ */
+function topMatchOf(d: AnalyticsDoc): { doc: RetrievalDoc; similarity: number; selfMatch: boolean } | null {
+  const documents = d.retrieval?.documents ?? [];
+  if (documents.length === 0) return null;
+  const best = [...documents].sort((a, b) => b.similarity - a.similarity)[0];
+  const query = normText(d.query?.text ?? d.query?.embeddingText);
+  const matched = normText(best.prompt ?? best.embeddingText);
+  return {
+    doc: best,
+    similarity: best.similarity,
+    selfMatch: (query.length > 0 && matched === query) || best.similarity >= 0.999,
+  };
+}
+
 function getTimestampMs(d: AnalyticsDoc): number | null {
   // Try the Firestore timestamp first
   const ts = d.timestamp as any;
@@ -209,11 +238,37 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
   const latencies = docs.map(d => d.performance?.totalLatencyMs).filter((v): v is number => v != null);
   const avgLatency = latencies.length > 0 ? latencies.reduce((a, b) => a + b, 0) / latencies.length : 0;
 
-  const topSimilarities = docs.map(d => {
-    const sims = d.retrieval?.documents?.map(doc => doc.similarity) || [];
-    return sims.length > 0 ? Math.max(...sims) : null;
-  }).filter((v): v is number => v != null);
-  const avgTopSimilarity = topSimilarities.length > 0 ? topSimilarities.reduce((a, b) => a + b, 0) / topSimilarities.length : 0;
+  // Top-1 similarity, with the two distortions of a training-heavy window taken
+  // out. Both matter, and they compound:
+  //
+  //   1. Self-matches (see topMatchOf) are the prompt retrieving itself. Excluded.
+  //   2. The harness replays the same prompts, and the replayed ones are the easy
+  //      ones — on that same L0176 day, prompts seen more than once averaged 0.858
+  //      against 0.744 for prompts seen once. Averaging per RECORD weights every
+  //      prompt by how many times it was rerun, so each DISTINCT QUERY gets one
+  //      vote instead.
+  //
+  // The raw per-record figure is kept and shown beside it, because a divergence
+  // between the two IS the signal that the window is mostly replayed training.
+  const topMatches = docs.map(d => ({ d, m: topMatchOf(d) }))
+    .filter((x): x is { d: AnalyticsDoc; m: NonNullable<ReturnType<typeof topMatchOf>> } => x.m != null);
+  const avgTopSimilarityRaw = topMatches.length > 0
+    ? topMatches.reduce((a, x) => a + x.m.similarity, 0) / topMatches.length : 0;
+  const selfMatchCount = topMatches.filter(x => x.m.selfMatch).length;
+
+  // Group the surviving records by query text. A record with no query text can't
+  // be grouped, so it keeps its own bucket rather than merging with every other
+  // untexted record into one vote.
+  const byQuery = new Map<string, number[]>();
+  topMatches.filter(x => !x.m.selfMatch).forEach((x, i) => {
+    const key = normText(x.d.query?.text ?? x.d.query?.embeddingText) || `\u0000untexted:${i}`;
+    if (!byQuery.has(key)) byQuery.set(key, []);
+    byQuery.get(key)!.push(x.m.similarity);
+  });
+  const perQuery = [...byQuery.values()].map(v => v.reduce((a, b) => a + b, 0) / v.length);
+  const avgTopSimilarity = perQuery.length > 0 ? perQuery.reduce((a, b) => a + b, 0) / perQuery.length : 0;
+  const similarityRecords = topMatches.length;
+  const distinctQueries = byQuery.size;
 
   const feedbacks = docs.map(d => d.feedback?.score).filter((v): v is number => v != null);
   const avgFeedback = feedbacks.length > 0 ? feedbacks.reduce((a, b) => a + b, 0) / feedbacks.length : 0;
@@ -316,7 +371,8 @@ function computeMetrics(docs: AnalyticsDoc[], usageInfo?: Map<string, UsageInfo>
   }
   const cacheHitRate = totalInputTokens > 0 ? totalCacheReadTokens / totalInputTokens : null;
 
-  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgFeedback, feedbackCount: feedbacks.length, avgJudgeOverall, judgeCount: judgeScores.length, errorBreakdown, languageBreakdown, modelBreakdown, totalCompileUnits, totalInputTokens, totalOutputTokens, totalCacheReadTokens, cacheHitRate };
+  return { total, successful, successRate, avgLatency, avgTopSimilarity, avgTopSimilarityRaw,
+    similarityRecords, distinctQueries, selfMatchCount, avgFeedback, feedbackCount: feedbacks.length, avgJudgeOverall, judgeCount: judgeScores.length, errorBreakdown, languageBreakdown, modelBreakdown, totalCompileUnits, totalInputTokens, totalOutputTokens, totalCacheReadTokens, cacheHitRate };
 }
 
 function escapeHtml(str: string): string {
@@ -367,8 +423,10 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     const query = escapeHtml((d.query?.text || '—').substring(0, 60));
     const success = d.response?.success ? 'Yes' : 'No';
     const latency = d.performance?.totalLatencyMs != null ? `${Math.round(d.performance.totalLatencyMs)}ms` : '—';
-    const topSim = d.retrieval?.documents?.length
-      ? Math.max(...d.retrieval.documents.map(doc => doc.similarity)).toFixed(3)
+    const best = topMatchOf(d);
+    // Flagged inline so a row reading 1.000 is not mistaken for a good retrieval.
+    const topSim = best
+      ? `${best.similarity.toFixed(3)}${best.selfMatch ? ' <span class="self-match" title="Top match is this request\'s own prompt — the corpus contains the query">self</span>' : ''}`
       : '—';
     const retries = d.compilation?.retryCount ? `${d.compilation.retryCount}` : '0';
     const info = usageInfo?.get(d.requestId);
@@ -383,9 +441,7 @@ function generateHtml(docs: AnalyticsDoc[], metrics: ReturnType<typeof computeMe
     const embeddingText = escapeHtml(d.query?.embeddingText || '—');
 
     // Top match from retrieval
-    const topMatch = d.retrieval?.documents?.length
-      ? [...d.retrieval.documents].sort((a, b) => b.similarity - a.similarity)[0]
-      : null;
+    const topMatch = best?.doc ?? null;
     const matchPrompt = topMatch ? escapeHtml(topMatch.prompt || '—') : '—';
     const matchSim = topMatch ? topMatch.similarity.toFixed(4) : '—';
 
@@ -449,6 +505,7 @@ ${embeddingText !== fullQuery ? `<div class="detail-section"><div class="detail-
   .card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
   .card .label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
   .card .value { font-size: 1.5rem; font-weight: 600; margin-top: 4px; }
+  .card .note { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
   .section { margin-bottom: 32px; }
   .section h2 { font-size: 1.1rem; margin-bottom: 12px; }
   table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.85rem; }
@@ -461,6 +518,7 @@ ${embeddingText !== fullQuery ? `<div class="detail-section"><div class="detail-
   /* Model ids are long and hyphenated; give the card two columns so the common
      single-model case fits on one line, and break at hyphens rather than mid-token. */
   .card.model-card { grid-column: span 2; }
+  .self-match { font-size: 0.65rem; color: #b45309; background: #fef3c7; border-radius: 3px; padding: 1px 4px; vertical-align: middle; }
   .model-value { font-size: 1rem; font-weight: 500; overflow-wrap: break-word; word-break: normal; }
   .model-name { font-family: monospace; }
   .model-split { display: flex; justify-content: space-between; gap: 12px; font-size: 0.9rem; line-height: 1.5; }
@@ -513,7 +571,8 @@ function copyMd(btn) {
   <div class="card"><div class="label">Success Rate</div><div class="value">${(metrics.successRate * 100).toFixed(1)}%</div></div>
   <div class="card model-card"><div class="label">Model</div><div class="value model-value">${modelCard}</div></div>
   <div class="card"><div class="label">Avg Latency</div><div class="value">${Math.round(metrics.avgLatency)}ms</div></div>
-  <div class="card"><div class="label">Avg Top Similarity</div><div class="value">${metrics.avgTopSimilarity.toFixed(3)}</div></div>
+  <div class="card"><div class="label" title="One vote per distinct query, self-matches excluded. ${metrics.distinctQueries} distinct queries from ${metrics.similarityRecords} retrievals.">Avg Top Similarity</div><div class="value">${metrics.avgTopSimilarity.toFixed(3)}</div><div class="note">${metrics.distinctQueries} distinct queries${metrics.similarityRecords > 0 ? ` · ${metrics.avgTopSimilarityRaw.toFixed(3)} raw` : ''}</div></div>
+  <div class="card"><div class="label" title="Requests whose top match was their own prompt — the corpus contains the query. Excluded from Avg Top Similarity.">Self-Matches</div><div class="value">${metrics.selfMatchCount}</div><div class="note">${metrics.similarityRecords > 0 ? `${((metrics.selfMatchCount / metrics.similarityRecords) * 100).toFixed(0)}% of ${metrics.similarityRecords} retrievals` : '—'}</div></div>
   <div class="card"><div class="label">Compile Units</div><div class="value">${metrics.totalCompileUnits > 0 ? metrics.totalCompileUnits.toLocaleString() : '—'}</div></div>
   <div class="card"><div class="label" title="Uncached input + cache reads + cache writes">Input Tokens</div><div class="value">${metrics.totalInputTokens > 0 ? metrics.totalInputTokens.toLocaleString() : '—'}</div></div>
   <div class="card"><div class="label" title="Share of input tokens served from cache">Cached Input</div><div class="value">${metrics.cacheHitRate != null ? (metrics.cacheHitRate * 100).toFixed(1) + '%' : '—'}</div></div>
