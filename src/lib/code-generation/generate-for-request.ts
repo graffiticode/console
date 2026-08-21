@@ -108,6 +108,10 @@ export async function generateCodeForRequest({
     let provider = null;
     let tier = null;
     let usage = { input_tokens: 0, output_tokens: 0 };
+    // Repair turns the head generation needed to reach a clean compile. Reported
+    // by generateCode but dropped here, so callers (the training harness, the
+    // analytics) could only infer "did this need fixing?" from token counts.
+    let fixAttempts: number | null = null;
 
     ragLog(rid, "request.start", {
       promptLength: prompt.length,
@@ -287,6 +291,7 @@ export async function generateCodeForRequest({
           usage: any;
           description: string | null;
           changeSummary: string | null;
+          fixAttempts?: number;
         };
         src = successResult.code;
         model = successResult.model;
@@ -295,6 +300,7 @@ export async function generateCodeForRequest({
         usage = successResult.usage;
         description = successResult.description;
         changeSummary = successResult.changeSummary;
+        fixAttempts = successResult.fixAttempts ?? null;
       }
     }
 
@@ -445,7 +451,7 @@ export async function generateCodeForRequest({
       success: true,
     });
 
-    return { src: resolvedSrc, taskId, language: headLang, description, changeSummary, model, provider, tier, usage, errors: null, upstreamLangs, rid };
+    return { src: resolvedSrc, taskId, language: headLang, description, changeSummary, model, provider, tier, usage, fixAttempts, errors: null, upstreamLangs, rid };
   } catch (error) {
     console.error("generateCodeForRequest()", "ERROR", error);
     ragLog(rid, "request.error", { error: error.message });

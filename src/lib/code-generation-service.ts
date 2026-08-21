@@ -472,8 +472,8 @@ const DIALECT_PROMPT_STATIC_TAIL = `
   - Quotes inside strings should NEVER be escaped
   - For nested quotes, use different quote types: \`"He said 'hello'"\` or \`'She said "goodbye"'\`
   - Supports interpolation: \` \\\`hello, \${name}!\\\` \`
-  - IMPORTANT: Backslashes should NOT be escaped in generated code
-  - IMPORTANT: Literal "\n" should not appear in the generated code; use proper newline characters instead
+  - IMPORTANT: A literal backslash inside a string must be written DOUBLED — "\\times", "\\(", "\\frac{1}{2}". A single backslash is read as an escape, so "\times" is a TAB and "\frac" is a formfeed
+  - IMPORTANT: Write real newlines; never emit the two characters \n as a stand-in
 - **Booleans**: \`true\`, \`false\`; **Null**: \`null\`
 - **Lists**: \`[1 2 3]\`; support pattern matching
 - **Records**: \`{name: "Alice" age: 30}\`; access via \`get\`, support destructuring
@@ -857,6 +857,43 @@ function verificationSucceeded(vr: any): boolean {
 }
 
 /**
+ * Render a list of compiler errors as the text a repair turn reads.
+ */
+function formatErrorList(errors) {
+  return errors
+    .map((err) => {
+      if (typeof err === "string") {
+        return err;
+      }
+
+      let errMsg = "";
+
+      if (err.message) {
+        errMsg += err.message;
+      }
+
+      if (err.line) {
+        errMsg += ` at line ${err.line}`;
+      }
+
+      if (err.col) {
+        errMsg += `, column ${err.col}`;
+      }
+
+      if (err.expected) {
+        errMsg += `\nExpected: ${err.expected}`;
+      }
+
+      if (err.found) {
+        errMsg += `\nFound: ${err.found}`;
+      }
+
+      return errMsg;
+    })
+    .join("\n\n");
+}
+
+/**
  * Parse error information from Graffiticode compilation results
  * @param {Object} errorInfo - Error information from the API
  * @returns {string} - Formatted error details
@@ -864,8 +901,14 @@ function verificationSucceeded(vr: any): boolean {
 function parseGraffiticodeErrors(errorInfo) {
   let formattedErrors = "";
 
-  // Handle different error formats
-  if (errorInfo.error && errorInfo.error.message) {
+  // Handle different error formats. The FIRST shape here is the one a real
+  // compile failure arrives in: the language server answers
+  // `{ data: null, errors: [...] }` and getData hands that envelope straight
+  // back. Without this branch it fell through to the JSON.stringify catch-all,
+  // and the repair turn got a serialized blob where the error messages belong.
+  if (Array.isArray(errorInfo.errors) && errorInfo.errors.length > 0) {
+    formattedErrors = formatErrorList(errorInfo.errors);
+  } else if (errorInfo.error && errorInfo.error.message) {
     formattedErrors = errorInfo.error.message;
   } else if (errorInfo.data && errorInfo.data.errors) {
     // Extract and format each error
@@ -873,37 +916,7 @@ function parseGraffiticodeErrors(errorInfo) {
       ? errorInfo.data.errors
       : [errorInfo.data.errors];
 
-    formattedErrors = errors
-      .map((err) => {
-        let errMsg = "";
-
-        if (typeof err === "string") {
-          return err;
-        }
-
-        if (err.message) {
-          errMsg += err.message;
-        }
-
-        if (err.line) {
-          errMsg += ` at line ${err.line}`;
-        }
-
-        if (err.col) {
-          errMsg += `, column ${err.col}`;
-        }
-
-        if (err.expected) {
-          errMsg += `\nExpected: ${err.expected}`;
-        }
-
-        if (err.found) {
-          errMsg += `\nFound: ${err.found}`;
-        }
-
-        return errMsg;
-      })
-      .join("\n\n");
+    formattedErrors = formatErrorList(errors);
   } else if (typeof errorInfo === "string") {
     formattedErrors = errorInfo;
   } else {
@@ -955,8 +968,8 @@ Graffiticode is a minimal, prefix, expression-oriented language with these key f
 - Whitespace separates tokens; no commas required
 - Block comments: \`/* comment */\`
 - IMPORTANT: All let statements MUST end with a double dot (..)
-- IMPORTANT: Backslashes should NOT be escaped in generated code
-- IMPORTANT: Literal "\n" should not appear in the generated code; use proper newline characters instead
+- IMPORTANT: A literal backslash inside a string must be written DOUBLED — "\\times", "\\(", "\\frac{1}{2}". A single backslash is read as an escape, so "\times" is a TAB and "\frac" is a formfeed
+- IMPORTANT: Write real newlines; never emit the two characters \n as a stand-in
 - IMPORTANT: Only generate valid Graffiticode. Avoid comments; elide any commentary
 
 Common Graffiticode errors and solutions:
@@ -1004,6 +1017,57 @@ function extractSummaryTags(content) {
   };
 }
 
+/**
+ * Decide whether a repair turn actually answered with a program, and return the
+ * text to treat as source.
+ *
+ * The guard here used to be "does the response contain a ``` fence". It doesn't
+ * hold: a repair is a CONTINUATION of the generation conversation, and the model
+ * frequently answers by just emitting the corrected program, unfenced. Those
+ * responses were discarded — measured on L0176, a repair that had correctly
+ * rewritten `stimulus "What is 3 × 4?"` to `\\(3 \\times 4\\)` was thrown away,
+ * the loop re-reported the identical error, and the broken program shipped.
+ *
+ * So test the thing the guard was really after — prose vs program — by handing
+ * the body to the dialect's own parser. A chatty non-answer won't reformat; a
+ * bare program will, errors and all (they're semantic, not syntactic).
+ *
+ * @returns the source to process, or null when the response carried no program
+ */
+async function fixResponseToSource(content, lang, accessToken?: string): Promise<string | null> {
+  if (!content) return null;
+  // Fenced: hand it back whole — processGeneratedCode extracts the block.
+  if (/```[\s\S]*```/.test(content)) return content;
+
+  const body = content
+    .replace(/<DESCRIPTION>[\s\S]*?<\/DESCRIPTION>/g, "")
+    .replace(/<CHANGE_SUMMARY>[\s\S]*?<\/CHANGE_SUMMARY>/g, "")
+    .trim();
+  if (!body) return null;
+
+  try {
+    const lexicon = await getLanguageLexicon(lang, accessToken);
+    const reformatted = await parser.reformat(lang, body, lexicon, {});
+    return /^\/\*\s*ERROR:/.test(reformatted) ? null : body;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Undo the escaping a model applies when it returns its program as if it were a
+ * JSON string: every backslash doubled, every newline written as a literal `\n`.
+ *
+ * This MUST NOT be applied to source that is already well-formed. A literal
+ * backslash in a Graffiticode string is written doubled — `"\\times"` — so
+ * halving it yields `"\times"`, where `\t` is an escape and the value becomes a
+ * TAB. That silently destroys most LaTeX: `\times \theta \text` (\t),
+ * `\frac` (\f), `\newline` (\n), `\right` (\r), `\begin \binom` (\b), `\vec` (\v).
+ */
+function unescapeJsonStyle(text: string): string {
+  return text.replace(/\\\\/g, "\\").replace(/\\n/g, "\n");
+}
+
 async function processGeneratedCode(content, lang = "0000", rid = null, accessToken?: string) {
   if (!content) return content;
 
@@ -1018,7 +1082,11 @@ async function processGeneratedCode(content, lang = "0000", rid = null, accessTo
   let processed = src;
   const codeBlockExtracted = !!match;
 
-  // Try to reformat the src using the parser
+  // Try to reformat the src using the parser. Reformat is also the ORACLE for
+  // the un-escape below: source the dialect's parser can read is well-formed and
+  // must be left alone.
+  let parsedCleanly = false;
+  let recoveredByUnescape = false;
   try {
     const lexicon = await getLanguageLexicon(lang, accessToken);
     const reformatted = await parser.reformat(lang, processed, lexicon, {});
@@ -1034,12 +1102,30 @@ async function processGeneratedCode(content, lang = "0000", rid = null, accessTo
       console.warn(`Failed to reformat src for L${lang}: reformat produced error comment`);
     } else {
       processed = reformatted;
+      parsedCleanly = true;
       if (rid) {
         ragLog(rid, "reformat.success", {
           lang: `L${lang}`,
           lengthBefore: src.length,
           lengthAfter: processed.length,
         });
+      }
+    }
+
+    // It didn't parse. The classic cause is a model that returned the program as
+    // if it were a JSON string. Try that un-escape, and keep it ONLY if it is
+    // what makes the program parse — never on the strength of the pattern alone.
+    if (!parsedCleanly) {
+      const unescaped = unescapeJsonStyle(processed);
+      if (unescaped !== processed) {
+        const retry = await parser.reformat(lang, unescaped, lexicon, {});
+        if (!/^\/\*\s*ERROR:/.test(retry)) {
+          processed = retry;
+          recoveredByUnescape = true;
+          if (rid) {
+            ragLog(rid, "unescape.recovered", { lang: `L${lang}` });
+          }
+        }
       }
     }
   } catch (reformatError) {
@@ -1053,15 +1139,26 @@ async function processGeneratedCode(content, lang = "0000", rid = null, accessTo
     console.warn(`Failed to reformat src for L${lang}:`, reformatError.message);
   }
 
-  // Replace all double backslashes with single backslashes
-  processed = processed.replace(/\\\\/g, "\\");
-
-  // Replace literal "\n" with actual newlines
-  processed = processed.replace(/\\n/g, "\n");
+  // Last resort. This un-escape used to run unconditionally, and it was the
+  // single largest source of broken LaTeX in generated items: the model wrote
+  // the correct `"\\times"`, this halved it to `"\\t..."` — a TAB — and the
+  // compiler then reported a raw \t that the model had never written. Worse, the
+  // repair loop could not win: the compiler's own message says "write every
+  // backslash doubled", the model complied, and this undid it again, so every
+  // attempt produced the identical error.
+  //
+  // Now it only runs when the parser could neither read the source nor be
+  // consulted (no lexicon, reformat threw) — where the old blind behavior is
+  // still the best guess available.
+  if (!parsedCleanly && !recoveredByUnescape) {
+    processed = unescapeJsonStyle(processed);
+  }
 
   if (rid) {
     ragLog(rid, "postprocess", {
       codeBlockExtracted,
+      parsedCleanly,
+      recoveredByUnescape,
       lengthBefore: originalLength,
       lengthAfter: processed.length,
     });
@@ -1613,7 +1710,15 @@ export async function generateCode({
     let generatedCode = await processGeneratedCode(streamResult.code, lang, rid, accessToken);
     let verificationResult = null;
     let fixAttempts = 0;
-    const MAX_FIX_ATTEMPTS = 2;
+    // A compiler reports the FIRST violation it hits, so a program with stacked
+    // errors reveals them one turn at a time: fix the stimulus and the next
+    // compile complains about the template. A flat 2 could therefore never
+    // converge on a three-error program — it burned both turns making real
+    // progress and returned code that still failed. The ceiling is now high
+    // enough to walk a chain, and the loop exits the moment a turn stops making
+    // progress (see errorSignature below), so a stuck repair still costs two
+    // turns rather than five.
+    const MAX_FIX_ATTEMPTS = 5;
     // Error correction is a narrow, mechanical task, so it runs balanced regardless of what
     // the language spends on authoring — a dialect may override that in MODEL_PRIORITY when
     // it has evidence its repairs need more (or less).
@@ -1632,6 +1737,9 @@ export async function generateCode({
     }
     const conversationMessages: any[] = basePrompt ? [...basePrompt.messages] : [];
     let lastRawOutput = streamResult.code; // model's most recent raw output
+    // The errors the previous attempt was asked to fix. A repair that produces
+    // the identical error made no progress, and another turn won't either.
+    let lastErrorSignature: string | null = null;
     let finalUsage = {
       prompt_tokens: streamResult.usage.inputTokens,
       completion_tokens: streamResult.usage.outputTokens,
@@ -1680,6 +1788,25 @@ export async function generateCode({
           // Classify the error type
           const errorType = classifyCompilerError(verificationResult);
           const structuredErrors = parseStructuredErrors(verificationResult);
+
+          // Progress check. Errors that CHANGE between turns mean the repair is
+          // walking down a chain of violations and deserves another turn;
+          // errors that repeat mean the model is stuck on one it can't see, and
+          // every further turn is spend for nothing.
+          const errorSignature = structuredErrors.length > 0
+            ? structuredErrors.map((e) => e.message).sort().join("\n")
+            : parseGraffiticodeErrors(verificationResult);
+          if (errorSignature === lastErrorSignature) {
+            if (requestId) {
+              ragLog(requestId, "fix.stalled", {
+                attemptNumber: fixAttempts + 1,
+                errorCount: structuredErrors.length,
+                errorSummary: errorSignature.substring(0, 300),
+              });
+            }
+            break;
+          }
+          lastErrorSignature = errorSignature;
 
           if (requestId) {
             ragLog(requestId, "fix.attempt", {
@@ -1827,14 +1954,18 @@ export async function generateCode({
           // correct assistant turn (even if this fix lacked a code block).
           lastRawOutput = fixResult.code;
 
-          // Update the generated code with the fixed version and process to fix escaping issues
-          // Only accept the fix if it contains a code block; otherwise retry
-          const hasCodeBlock = /```[\s\S]*```/.test(fixResult.code);
-          if (hasCodeBlock) {
-            generatedCode = await processGeneratedCode(fixResult.code, lang, requestId, accessToken);
+          // Update the generated code with the fixed version and process to fix escaping issues.
+          // Accept the fix if it carries a program at all — see fixResponseToSource.
+          const fixedSource = await fixResponseToSource(fixResult.code, lang, accessToken);
+          if (fixedSource) {
+            generatedCode = await processGeneratedCode(fixedSource, lang, requestId, accessToken);
           } else {
             if (requestId) {
-              ragLog(requestId, "fix.skipped", { reason: "no code block in fix response", attempt: fixAttempts });
+              ragLog(requestId, "fix.skipped", {
+                reason: "fix response carried no program",
+                attempt: fixAttempts,
+                responseLength: fixResult.code ? fixResult.code.length : 0,
+              });
             }
           }
         } else {
@@ -1843,8 +1974,11 @@ export async function generateCode({
         }
       }
 
-      // Track final compilation result if we exited due to max attempts
-      if (fixAttempts >= MAX_FIX_ATTEMPTS && verificationResult) {
+      // Track the final compilation result whenever we leave the loop with code
+      // that still doesn't compile — max attempts, a stalled repair, or a failed
+      // fix call. Keying this on max-attempts alone recorded nothing for the
+      // other two exits, so a stuck repair vanished from the analytics.
+      if (verificationResult && !verificationSucceeded(verificationResult)) {
         safeRAGAnalytics.endStage(requestId, "compilation");
         safeRAGAnalytics.trackCompilation(requestId, {
           success: false,

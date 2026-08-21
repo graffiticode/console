@@ -21,7 +21,10 @@
  *   --limit <number>     Maximum examples to process (default: all)
  *   --start <index>      Start from example index (default: 0)
  *   --refresh            Delete existing items of same lang/mark before creating new ones
+ *   --only <n,n,...>     Re-run only these example numbers (labels from examples.md);
+ *                        with --refresh, deletes only those examples' items
  *   --scope-gate         Allow the scope gate to re-route out-of-scope prompts (default: pinned to --lang)
+ *   --timeout <seconds>  Per-step wall-clock cap; a stalled request fails that example (default: 300)
  *   --dry-run            Extract and print prompts only, no generation/creation
  *   --output <path>      Output audit log file (default: training/data/{lang}-codegen-mapping.json)
  *
@@ -40,6 +43,7 @@ import { generateCodeForRequest } from "../src/lib/code-generation/generate-for-
 import { getCredentialsForApiKey } from "../src/lib/api-credentials";
 import { getBaseUrlForApi } from "../src/lib/api";
 import { createItem, parseCode, postTask } from "../src/pages/api/resolvers";
+import { getSecretsForUser, getPublicValuesForUser } from "../src/lib/user-credentials";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -74,6 +78,20 @@ const startIdx = args.includes("--start")
 
 const refresh = args.includes("--refresh");
 
+// Re-run named examples rather than a slice. --start/--limit index the extracted
+// LIST, which is not the example's label, so repairing "example 66" meant
+// counting entries in examples.md by hand. Takes labels: --only 11,66,109.
+// With --refresh, only those examples' items are deleted; the rest of the
+// corpus is left alone.
+const only: Set<number> | null = args.includes("--only")
+  ? new Set(
+      args[args.indexOf("--only") + 1]
+        .split(",")
+        .map((s) => Number.parseInt(s.trim(), 10))
+        .filter((n) => Number.isFinite(n)),
+    )
+  : null;
+
 // The request orchestrator re-routes a fresh create whose prompt reads as
 // out-of-scope for --lang. For a training harness that is wrong: a re-routed
 // example silently lands in another language's corpus. Pin the head by default;
@@ -82,6 +100,14 @@ if (!args.includes("--scope-gate")) {
   process.env.SCOPE_GATE_ENABLED = "false";
 }
 const dryRun = args.includes("--dry-run");
+
+// Wall-clock cap per network step. Nothing in this script timed out, so a single
+// stalled request blocked the whole run indefinitely — observed hanging a batch
+// driver for 14 minutes with the process asleep on 0.4s of CPU. A timed-out
+// example is recorded as an error and the run moves on.
+const stepTimeoutMs = (args.includes("--timeout")
+  ? parseInt(args[args.indexOf("--timeout") + 1], 10)
+  : 300) * 1000;
 
 const outputPath = args.includes("--output")
   ? args[args.indexOf("--output") + 1]
@@ -102,6 +128,9 @@ interface AuditLogEntry {
   normalizedCode?: string;
   compiled: boolean;
   usage?: { input_tokens?: number; output_tokens?: number } | null;
+  // Repair turns the generator needed. 0 = compiled first try. Without it, "did
+  // this need fixing?" was only inferable from an inflated token count.
+  fixAttempts?: number | null;
   taskId?: string | null;
   upstreamLangs?: string[];
   created?: boolean;
@@ -126,10 +155,18 @@ function extractExamples(markdownPath: string, langCode: string): TrainingExampl
       exampleCount++;
       const prompt = match[2];
 
+      // Number the example by the LABEL written in examples.md, not by scan
+      // order. A sub-lettered entry ("86a.") advances the counter without
+      // advancing the label, and the two then disagree for every example after
+      // it — which silently misnames items and misreports which prompt failed.
+      // Fall back to the counter only for a label we can't read as a number.
+      const label = Number.parseInt(match[1], 10);
+      const exampleNumber = Number.isFinite(label) ? label : exampleCount;
+
       examples.push({
-        id: `${langCode}-example-${exampleCount}`,
+        id: `${langCode}-example-${exampleNumber}`,
         prompt,
-        exampleNumber: exampleCount,
+        exampleNumber,
       });
     }
   }
@@ -148,20 +185,62 @@ function normalizeCode(code: string, exampleId: string): string {
 }
 
 /**
+ * Reject if `work` outruns the step budget.
+ *
+ * The underlying request is NOT cancelled — an in-flight LLM or Firestore call
+ * has no abort handle here — so a timed-out step may still be running when we
+ * move on. That is why main() exits explicitly: an abandoned socket would
+ * otherwise keep the event loop alive after the audit log is written.
+ */
+function withTimeout<T>(work: Promise<T>, label: string, ms = stepTimeoutMs): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const bell = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)),
+      ms,
+    );
+  });
+  return Promise.race([work, bell]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
+
+/**
  * Ask the api to evaluate a task and report whether it actually compiled.
  *
  * postTask returning an id only means the AST was stored. Gating `compiled` on
  * a posted id reported a "compilation rate" that was really a post-success rate.
+ *
+ * The status code is no better: /data answers 200 unconditionally
+ * (routes/data.js `res.status(200).json(createSuccessResponse({ data }))`) and
+ * a compile failure rides inside that 200 as `{ data: null, errors: [...] }`.
+ * Read the envelope: compiled means no errors AND a non-null payload.
  */
-async function taskCompiles(taskId: string, accessToken: string): Promise<boolean> {
+async function taskCompiles(
+  taskId: string,
+  accessToken: string,
+): Promise<{ compiled: boolean; error?: string }> {
   try {
     const resp = await fetch(
       `${getBaseUrlForApi()}/data?id=${encodeURIComponent(taskId)}`,
-      { headers: { Authorization: accessToken } },
+      { headers: { Authorization: accessToken }, signal: AbortSignal.timeout(stepTimeoutMs) },
     );
-    return resp.status === 200;
-  } catch {
-    return false;
+    if (resp.status !== 200) {
+      return { compiled: false, error: `/data returned ${resp.status}` };
+    }
+    const body: any = await resp.json();
+    const obj = body?.data;
+    const errors = Array.isArray(obj?.errors) ? obj.errors : [];
+    if (errors.length > 0) {
+      const message = errors
+        .map((e: any) => (typeof e === "string" ? e : e?.message || JSON.stringify(e)))
+        .join("; ");
+      return { compiled: false, error: `Compile error: ${message}` };
+    }
+    if (obj?.data == null) {
+      return { compiled: false, error: "/data returned no compile output" };
+    }
+    return { compiled: true };
+  } catch (x: any) {
+    return { compiled: false, error: `/data fetch failed: ${x?.message || x}` };
   }
 }
 
@@ -181,9 +260,15 @@ async function deleteExistingItems(db: admin.firestore.Firestore, userId: string
   const snapshot = await query.get();
   let deleted = 0;
 
-  console.log(`Found ${snapshot.size} existing items to delete`);
+  // Under --only, a re-run replaces just the named examples. Deleting the whole
+  // mark would throw away the corpus we're repairing.
+  const docs = only
+    ? snapshot.docs.filter((d) => only.has(Number(d.data().exampleNumber)))
+    : snapshot.docs;
 
-  for (const doc of snapshot.docs) {
+  console.log(`Found ${docs.length} existing items to delete`);
+
+  for (const doc of docs) {
     if (!dryRun) {
       await doc.ref.delete();
     }
@@ -216,16 +301,19 @@ async function processExample(
     // its permission fence, generates any upstream stages, and returns a
     // `head+upstream` chained taskId. Importing the per-stage generator here is
     // what silently made every generated item atomic.
-    const genResult: any = await generateCodeForRequest({
-      auth,
-      prompt: example.prompt,
-      language: langCode,
-      options: {
-        maxTokens: 4096,
-      },
-      currentSrc: null,
-      itemId: example.id,
-    });
+    const genResult: any = await withTimeout(
+      generateCodeForRequest({
+        auth,
+        prompt: example.prompt,
+        language: langCode,
+        options: {
+          maxTokens: 4096,
+        },
+        currentSrc: null,
+        itemId: example.id,
+      }),
+      `generate ${example.id}`,
+    );
 
     if (genResult.errors && genResult.errors.length > 0) {
       entry.error = genResult.errors[0].message;
@@ -234,6 +322,7 @@ async function processExample(
 
     entry.generatedCode = genResult.src || "";
     entry.usage = genResult.usage || null;
+    entry.fixAttempts = genResult.fixAttempts ?? null;
     entry.upstreamLangs = Array.isArray(genResult.upstreamLangs) ? genResult.upstreamLangs : [];
 
     if (!genResult.src) {
@@ -251,27 +340,44 @@ async function processExample(
     // hand-edit path (src/components/editor.tsx).
     const upstreamSegments = String(genResult.taskId || "").split("+").slice(1);
 
-    const parseResult = await parseCode({
-      lang: langCode,
-      src: normalizedCode,
-      publicValues: { itemId: example.id },
-      accessToken: auth.token,
-    });
+    // Same credential wiring the resolver uses (generate-for-request.ts). Without
+    // the private store a program that reads `get-val-private "learnosity-secret"`
+    // bakes an empty secret here and fails the compile with "key and secret must
+    // both be set together" — after passing generation-time verification, which
+    // compiles under the `verify-itemid` sentinel and is exempt from the
+    // credential gate. Generation is not the place that difference shows up.
+    const privateValues: Record<string, string> = await getSecretsForUser(auth.uid);
+    const publicValues: Record<string, string> = await getPublicValuesForUser(auth.uid);
+    publicValues.itemId = example.id;
+
+    const parseResult = await withTimeout(
+      parseCode({
+        lang: langCode,
+        src: normalizedCode,
+        privateValues,
+        publicValues,
+        accessToken: auth.token,
+      }),
+      `parse ${example.id}`,
+    );
 
     if (parseResult.errors && parseResult.errors.length > 0) {
       entry.error = `Parse error: ${parseResult.errors[0].message}`;
       return entry;
     }
 
-    const postResult = await postTask({
-      auth,
-      task: {
-        lang: langCode,
-        code: JSON.parse(parseResult.code),
-      },
-      ephemeral: false,
-      isPublic: false,
-    });
+    const postResult = await withTimeout(
+      postTask({
+        auth,
+        task: {
+          lang: langCode,
+          code: JSON.parse(parseResult.code),
+        },
+        ephemeral: false,
+        isPublic: false,
+      }),
+      `postTask ${example.id}`,
+    );
 
     if (!postResult || !postResult.id) {
       entry.error = "postTask returned no taskId";
@@ -284,9 +390,10 @@ async function processExample(
 
     // Step 3b: A posted task is not a compiled one. Ask the api to actually
     // evaluate the chain — that is the only thing that proves the program runs.
-    entry.compiled = await taskCompiles(entry.taskId, auth.token);
+    const compileCheck = await taskCompiles(entry.taskId, auth.token);
+    entry.compiled = compileCheck.compiled;
     if (!entry.compiled) {
-      entry.error = "task posted but /data did not return 200";
+      entry.error = compileCheck.error || "task posted but did not compile";
       return entry;
     }
 
@@ -300,7 +407,7 @@ async function processExample(
         timestamp: new Date().toISOString(),
       },
     ]);
-    const newItem = await createItem({
+    const newItem = await withTimeout(createItem({
       auth,
       lang: langCode,
       name: itemName,
@@ -312,7 +419,7 @@ async function processExample(
       // Without this the item and its version record lose the chain, and the
       // first compile with form data slices the upstream off (buildLayerCount).
       upstreamLangs: entry.upstreamLangs,
-    });
+    }), `createItem ${example.id}`);
 
     entry.firestoreItemId = newItem.id;
     entry.created = true;
@@ -355,7 +462,17 @@ async function main() {
   }
 
   const examples = extractExamples(trainingFile, langCode);
-  const slice = examples.slice(startIdx, Math.min(startIdx + limit, examples.length));
+  const slice = only
+    ? examples.filter((ex) => only.has(ex.exampleNumber))
+    : examples.slice(startIdx, Math.min(startIdx + limit, examples.length));
+
+  if (only) {
+    const missing = [...only].filter((n) => !slice.some((ex) => ex.exampleNumber === n));
+    if (missing.length > 0) {
+      console.error(`Error: --only names examples not in examples.md: ${missing.join(", ")}`);
+      process.exit(1);
+    }
+  }
 
   console.log(`Extracted ${examples.length} examples, processing ${slice.length}${dryRun ? " (dry run)" : ""}`);
 
@@ -451,7 +568,14 @@ async function main() {
   console.log(`  Compilation rate: ${((compiledCount / slice.length) * 100).toFixed(1)}%`);
 }
 
-main().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    // Exit explicitly. A step that timed out is still in flight — its socket
+    // would otherwise hold the event loop open long after the audit log landed,
+    // which is indistinguishable from the hang the timeouts exist to prevent.
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error("Fatal error:", error);
+    process.exit(1);
+  });

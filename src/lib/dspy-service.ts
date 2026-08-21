@@ -554,7 +554,14 @@ export function parseStructuredErrors(
   // Handle different error formats
   let rawErrors: any[] = [];
 
-  if (verificationResult.data?.errors) {
+  // A real compile failure arrives as `{ data: null, errors: [...] }` — the
+  // envelope the language server returns, passed through by getData. That shape
+  // matched none of the branches below, so every genuine compiler error parsed
+  // as zero structured errors: the repair path saw an empty list and the
+  // fix.attempt log reported errorCount 0.
+  if (Array.isArray(verificationResult.errors) && verificationResult.errors.length > 0) {
+    rawErrors = verificationResult.errors;
+  } else if (verificationResult.data?.errors) {
     rawErrors = Array.isArray(verificationResult.data.errors)
       ? verificationResult.data.errors
       : [verificationResult.data.errors];
