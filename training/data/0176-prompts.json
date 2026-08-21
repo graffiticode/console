@@ -1,0 +1,852 @@
+[
+  {
+    "id": "0176-example-1",
+    "exampleNumber": 1,
+    "prompt": "Create a multiple choice question asking \"What is the capital of France?\" with options \"Paris\", \"London\", \"Berlin\", \"Madrid\" where Paris is correct."
+  },
+  {
+    "id": "0176-example-2",
+    "exampleNumber": 2,
+    "prompt": "Create a multiple choice question asking \"Which planet is largest?\" with options \"Earth\", \"Jupiter\", \"Mars\", \"Saturn\" where Jupiter is correct."
+  },
+  {
+    "id": "0176-example-3",
+    "exampleNumber": 3,
+    "prompt": "Create a multiple choice question with instant feedback asking \"What is 2 + 2?\" with options \"3\", \"4\", \"5\", \"6\" where 4 is correct."
+  },
+  {
+    "id": "0176-example-4",
+    "exampleNumber": 4,
+    "prompt": "Create a multiple choice question allowing multiple responses asking \"Which are prime numbers?\" with options \"2\", \"4\", \"7\", \"9\" where 2 and 7 are correct."
+  },
+  {
+    "id": "0176-example-5",
+    "exampleNumber": 5,
+    "prompt": "Create a multiple choice question with shuffled options asking \"What color is the sky?\" with options \"Blue\", \"Green\", \"Red\" where Blue is correct."
+  },
+  {
+    "id": "0176-example-6",
+    "exampleNumber": 6,
+    "prompt": "Create a multiple choice question asking \"Which season comes after spring?\" with options \"Summer\", \"Fall\", \"Winter\" where Summer is correct."
+  },
+  {
+    "id": "0176-example-7",
+    "exampleNumber": 7,
+    "prompt": "Create a multiple choice question asking \"Which is a mammal?\" with options \"Shark\", \"Eagle\", \"Dolphin\", \"Lizard\" where Dolphin is correct, with instant feedback enabled."
+  },
+  {
+    "id": "0176-example-8",
+    "exampleNumber": 8,
+    "prompt": "Create a multiple choice question asking \"Select all even numbers\" with options \"1\", \"2\", \"3\", \"4\" where 2 and 4 are correct, allowing multiple responses."
+  },
+  {
+    "id": "0176-example-9",
+    "exampleNumber": 9,
+    "prompt": "Create a multiple choice question asking \"What is the boiling point of water?\" with options \"50°C\", \"100°C\", \"150°C\", \"200°C\" where 100°C is correct."
+  },
+  {
+    "id": "0176-example-10",
+    "exampleNumber": 10,
+    "prompt": "Create a multiple choice question asking \"Which language is L0176 built for?\" with options \"Learnosity\", \"Canvas\", \"Moodle\", \"Blackboard\" where Learnosity is correct."
+  },
+  {
+    "id": "0176-example-11",
+    "exampleNumber": 11,
+    "prompt": "Create an items assessment with a single MCQ asking \"What is 3 × 4?\" with options \"7\", \"10\", \"12\", \"15\" where 12 is correct."
+  },
+  {
+    "id": "0176-example-12",
+    "exampleNumber": 12,
+    "prompt": "Create an items assessment with an MCQ asking \"What is the largest continent?\" with options \"Asia\", \"Africa\", \"Europe\", \"Antarctica\" where Asia is correct."
+  },
+  {
+    "id": "0176-example-13",
+    "exampleNumber": 13,
+    "prompt": "Create a multiple choice true/false question asking \"The Earth is flat\" with options \"True\", \"False\" where False is correct."
+  },
+  {
+    "id": "0176-example-14",
+    "exampleNumber": 14,
+    "prompt": "Create a multiple choice question asking \"Which element has atomic number 1?\" with options \"Helium\", \"Hydrogen\", \"Lithium\", \"Carbon\" where Hydrogen is correct, with shuffled options."
+  },
+  {
+    "id": "0176-example-15",
+    "exampleNumber": 15,
+    "prompt": "Create a multiple choice question asking \"What is the square root of 144?\" with options \"10\", \"11\", \"12\", \"13\" where 12 is correct, with instant feedback."
+  },
+  {
+    "id": "0176-example-16",
+    "exampleNumber": 16,
+    "prompt": "Create a short text question asking \"What is the chemical symbol for water?\" with the correct answer \"H2O\"."
+  },
+  {
+    "id": "0176-example-17",
+    "exampleNumber": 17,
+    "prompt": "Create a short text question asking \"Spell the number 4\" with the correct answer \"four\", case insensitive."
+  },
+  {
+    "id": "0176-example-18",
+    "exampleNumber": 18,
+    "prompt": "Create a short text question asking \"What is the capital of Japan?\" with the correct answer \"Tokyo\"."
+  },
+  {
+    "id": "0176-example-19",
+    "exampleNumber": 19,
+    "prompt": "Create a short text question asking \"Type the missing word: The quick brown ___\" with the correct answer \"fox\", with a maximum length of 20 characters."
+  },
+  {
+    "id": "0176-example-20",
+    "exampleNumber": 20,
+    "prompt": "Create a short text question asking \"What is 7 × 8?\" with the correct answer \"56\"."
+  },
+  {
+    "id": "0176-example-21",
+    "exampleNumber": 21,
+    "prompt": "Create a short text question with a placeholder \"Enter your answer here\" asking \"Name the largest ocean\" with the correct answer \"Pacific\"."
+  },
+  {
+    "id": "0176-example-22",
+    "exampleNumber": 22,
+    "prompt": "Create a short text question asking \"What gas do plants absorb?\" with the correct answer \"carbon dioxide\", case insensitive."
+  },
+  {
+    "id": "0176-example-23",
+    "exampleNumber": 23,
+    "prompt": "Create a short text question asking \"What is the abbreviation for Doctor?\" with the correct answer \"Dr.\", case sensitive."
+  },
+  {
+    "id": "0176-example-24",
+    "exampleNumber": 24,
+    "prompt": "Create an items assessment with a short text question asking \"What year did World War II end?\" with the correct answer \"1945\"."
+  },
+  {
+    "id": "0176-example-25",
+    "exampleNumber": 25,
+    "prompt": "Create a short text question asking \"What is the opposite of hot?\" with the correct answer \"cold\", case insensitive."
+  },
+  {
+    "id": "0176-example-26",
+    "exampleNumber": 26,
+    "prompt": "Create a long text essay question asking \"Describe the water cycle in your own words\" with a 300-word limit."
+  },
+  {
+    "id": "0176-example-27",
+    "exampleNumber": 27,
+    "prompt": "Create a long text essay question asking \"Write about your favorite book\" with placeholder text \"Start writing here...\"."
+  },
+  {
+    "id": "0176-example-28",
+    "exampleNumber": 28,
+    "prompt": "Create a plain text essay question asking \"Explain your reasoning\" with a 200-word limit."
+  },
+  {
+    "id": "0176-example-29",
+    "exampleNumber": 29,
+    "prompt": "Create a long text essay question asking \"Discuss the causes of climate change\" with a 500-word limit and placeholder \"Begin your essay...\"."
+  },
+  {
+    "id": "0176-example-30",
+    "exampleNumber": 30,
+    "prompt": "Create a plain text essay question asking \"Summarize the main argument\" with a 150-word limit."
+  },
+  {
+    "id": "0176-example-31",
+    "exampleNumber": 31,
+    "prompt": "Create a long text essay question asking \"Explain how gravity works\" with a 400-word limit and placeholder \"Begin your explanation...\"."
+  },
+  {
+    "id": "0176-example-32",
+    "exampleNumber": 32,
+    "prompt": "Create a plain text essay question asking \"List three things you learned today\" with a 100-word limit."
+  },
+  {
+    "id": "0176-example-33",
+    "exampleNumber": 33,
+    "prompt": "Create an items assessment with a long text essay asking \"Compare and contrast two historical events\" with a 400-word limit."
+  },
+  {
+    "id": "0176-example-34",
+    "exampleNumber": 34,
+    "prompt": "Create a plain text question asking \"Write a brief biography\" with a 250-word limit and placeholder \"Name, birth date, achievements...\"."
+  },
+  {
+    "id": "0176-example-35",
+    "exampleNumber": 35,
+    "prompt": "Create a long text essay asking \"Analyze the themes in the poem\" with a 600-word limit."
+  },
+  {
+    "id": "0176-example-36",
+    "exampleNumber": 36,
+    "prompt": "Create a cloze text question with the template \"The {{response}} is the powerhouse of the cell\" with the correct answer \"mitochondria\"."
+  },
+  {
+    "id": "0176-example-37",
+    "exampleNumber": 37,
+    "prompt": "Create a cloze text question with the template \"Water is made of {{response}} and oxygen\" with the correct answer \"hydrogen\", case insensitive."
+  },
+  {
+    "id": "0176-example-38",
+    "exampleNumber": 38,
+    "prompt": "Create a cloze text question with the template \"The {{response}} of the United States is Washington, D.C.\" with the correct answer \"capital\", case insensitive."
+  },
+  {
+    "id": "0176-example-39",
+    "exampleNumber": 39,
+    "prompt": "Create a cloze text question with the template \"{{response}} is the chemical symbol for gold\" with the correct answer \"Au\"."
+  },
+  {
+    "id": "0176-example-40",
+    "exampleNumber": 40,
+    "prompt": "Create a cloze text question with two blanks: \"The {{response}} is in the {{response}} system\" with correct answers \"Sun\" and \"solar\"."
+  },
+  {
+    "id": "0176-example-41",
+    "exampleNumber": 41,
+    "prompt": "Create a cloze text with instant feedback and the template \"Plants convert {{response}} into oxygen\" with the correct answer \"carbon dioxide\"."
+  },
+  {
+    "id": "0176-example-42",
+    "exampleNumber": 42,
+    "prompt": "Create a cloze text question with the template \"Photosynthesis occurs in the {{response}} of plant cells\" with the correct answer \"chloroplast\", case insensitive."
+  },
+  {
+    "id": "0176-example-43",
+    "exampleNumber": 43,
+    "prompt": "Create a cloze text question with the template \"The {{response}} of the United States is Washington, D.C.\" with the correct answer \"capital\" and also accept \"seat of government\" as an alternate."
+  },
+  {
+    "id": "0176-example-44",
+    "exampleNumber": 44,
+    "prompt": "Create an items assessment with a cloze text question: \"The {{response}} War ended in {{response}}\" with correct answers \"Civil\" and \"1865\"."
+  },
+  {
+    "id": "0176-example-45",
+    "exampleNumber": 45,
+    "prompt": "Create a cloze text question with the template \"DNA stands for {{response}} acid\" with the correct answer \"deoxyribonucleic\", case insensitive."
+  },
+  {
+    "id": "0176-example-46",
+    "exampleNumber": 46,
+    "prompt": "Create a cloze text question with the template \"The speed of {{response}} is approximately 300,000 km/s\" with the correct answer \"light\"."
+  },
+  {
+    "id": "0176-example-47",
+    "exampleNumber": 47,
+    "prompt": "Create a multiple-choice question asking \"What is the capital of France?\" with options \"Paris\", \"London\", \"Berlin\", \"Madrid\" where Paris is correct, and add a check answer button."
+  },
+  {
+    "id": "0176-example-48",
+    "exampleNumber": 48,
+    "prompt": "Create a cloze association question with the template \"Drag the correct answer: {{response}} is the largest planet\" with possible responses \"Jupiter\", \"Saturn\", \"Earth\" where Jupiter is correct."
+  },
+  {
+    "id": "0176-example-49",
+    "exampleNumber": 49,
+    "prompt": "Create a cloze association question with the template \"{{response}} wrote Romeo and Juliet\" with possible responses \"Shakespeare\", \"Dickens\", \"Austen\" where Shakespeare is correct."
+  },
+  {
+    "id": "0176-example-50",
+    "exampleNumber": 50,
+    "prompt": "Create a cloze association question with two blanks: \"{{response}} is to hot as {{response}} is to cold\" with possible responses \"fire\", \"ice\", \"water\" where fire and ice are correct."
+  },
+  {
+    "id": "0176-example-51",
+    "exampleNumber": 51,
+    "prompt": "Create a cloze association question with the template \"The chemical formula for water is {{response}}\" with possible responses \"H2O\", \"CO2\", \"NaCl\" where H2O is correct."
+  },
+  {
+    "id": "0176-example-52",
+    "exampleNumber": 52,
+    "prompt": "Create an items assessment with a cloze association: \"The {{response}} is the closest star to Earth\" with possible responses \"Sun\", \"Moon\", \"Mars\" where Sun is correct."
+  },
+  {
+    "id": "0176-example-53",
+    "exampleNumber": 53,
+    "prompt": "Create a cloze association with instant feedback: \"{{response}} discovered gravity\" with possible responses \"Newton\", \"Einstein\", \"Galileo\" where Newton is correct."
+  },
+  {
+    "id": "0176-example-54",
+    "exampleNumber": 54,
+    "prompt": "Create a cloze association: \"{{response}} is the capital of {{response}}\" with possible responses \"Paris\", \"France\", \"Germany\", \"Berlin\" where Paris and France are correct."
+  },
+  {
+    "id": "0176-example-55",
+    "exampleNumber": 55,
+    "prompt": "Create a cloze dropdown question with the template \"The sky is {{response}}\" with dropdown options \"blue\", \"red\", \"green\" where blue is correct."
+  },
+  {
+    "id": "0176-example-56",
+    "exampleNumber": 56,
+    "prompt": "Create a cloze dropdown with two blanks: \"{{response}} are mammals and {{response}} are reptiles\" with dropdown options [\"Dogs\", \"Cats\", \"Fish\"] and [\"Snakes\", \"Birds\", \"Frogs\"] where Dogs and Snakes are correct."
+  },
+  {
+    "id": "0176-example-57",
+    "exampleNumber": 57,
+    "prompt": "Create a cloze dropdown question with the template \"The largest mammal is the {{response}}\" with options \"blue whale\", \"elephant\", \"giraffe\" where blue whale is correct."
+  },
+  {
+    "id": "0176-example-58",
+    "exampleNumber": 58,
+    "prompt": "Create a cloze dropdown: \"Water boils at {{response}} degrees Celsius\" with options \"50\", \"100\", \"150\" where 100 is correct."
+  },
+  {
+    "id": "0176-example-59",
+    "exampleNumber": 59,
+    "prompt": "Create an items assessment with a cloze dropdown: \"The Earth revolves around the {{response}}\" with options \"Sun\", \"Moon\", \"Mars\" where Sun is correct."
+  },
+  {
+    "id": "0176-example-60",
+    "exampleNumber": 60,
+    "prompt": "Create a cloze dropdown with instant feedback: \"HTML stands for {{response}}\" with options \"HyperText Markup Language\", \"High Tech Modern Language\", \"Home Tool Markup Language\" where the first is correct."
+  },
+  {
+    "id": "0176-example-61",
+    "exampleNumber": 61,
+    "prompt": "Create a cloze formula question asking \"Solve: x + 3 = 7. x = {{response}}\" with the correct answer \"4\" using equivLiteral method."
+  },
+  {
+    "id": "0176-example-62",
+    "exampleNumber": 62,
+    "prompt": "Create a cloze formula question asking \"Simplify: {{response}}\" with the correct answer \"2x + 3\" using equivSymbolic method."
+  },
+  {
+    "id": "0176-example-63",
+    "exampleNumber": 63,
+    "prompt": "Create a cloze formula question asking \"What is the derivative of x²? {{response}}\" with the correct answer \"2x\" using equivSymbolic method."
+  },
+  {
+    "id": "0176-example-64",
+    "exampleNumber": 64,
+    "prompt": "Create a cloze formula question asking \"What is 5 × 6? {{response}}\" with the correct answer \"30\" using equivLiteral method."
+  },
+  {
+    "id": "0176-example-65",
+    "exampleNumber": 65,
+    "prompt": "Create a cloze formula question asking \"Factor: x² - 4 = {{response}}\" with the correct answer \"(x-2)(x+2)\" using equivSymbolic method."
+  },
+  {
+    "id": "0176-example-66",
+    "exampleNumber": 66,
+    "prompt": "Create a cloze formula question asking \"Evaluate: 2³ = {{response}}\" with the correct answer \"8\" using equivValue method."
+  },
+  {
+    "id": "0176-example-67",
+    "exampleNumber": 67,
+    "prompt": "Create an items assessment with a cloze formula: \"Solve for y: 2y = 10. y = {{response}}\" with the correct answer \"5\"."
+  },
+  {
+    "id": "0176-example-68",
+    "exampleNumber": 68,
+    "prompt": "Create a cloze formula question with instant feedback asking \"√16 = {{response}}\" with the correct answer \"4\" using equivLiteral method."
+  },
+  {
+    "id": "0176-example-69",
+    "exampleNumber": 69,
+    "prompt": "Create a cloze formula question asking \"Express as a fraction: 0.5 = {{response}}\" with the correct answer \"\\\\frac{1}{2}\" using equivValue method."
+  },
+  {
+    "id": "0176-example-70",
+    "exampleNumber": 70,
+    "prompt": "Create a cloze formula question asking \"Simplify: {{response}}\" with the correct answer \"x\" for the expression \"x²/x\" using isSimplified method."
+  },
+  {
+    "id": "0176-example-71",
+    "exampleNumber": 71,
+    "prompt": "Create a choice matrix question asking \"Classify each statement\" with rows \"The sun is a star\" and \"The moon is a planet\" and columns \"True\" and \"False\" where the answers are True and False."
+  },
+  {
+    "id": "0176-example-72",
+    "exampleNumber": 72,
+    "prompt": "Create a choice matrix question asking \"Rate your agreement\" with rows \"Exercise is important\", \"Sleep is optional\" and columns \"Agree\", \"Disagree\" where answers are Agree and Disagree."
+  },
+  {
+    "id": "0176-example-73",
+    "exampleNumber": 73,
+    "prompt": "Create a choice matrix asking \"Is each statement a fact or opinion?\" with rows \"The Earth orbits the Sun\", \"Pizza is the best food\" and columns \"Fact\", \"Opinion\" where answers are Fact and Opinion."
+  },
+  {
+    "id": "0176-example-74",
+    "exampleNumber": 74,
+    "prompt": "Create a choice matrix asking \"Identify the part of speech\" with rows \"run\", \"beautiful\", \"quickly\" and columns \"Noun\", \"Verb\", \"Adjective\", \"Adverb\" where answers are Verb, Adjective, and Adverb."
+  },
+  {
+    "id": "0176-example-75",
+    "exampleNumber": 75,
+    "prompt": "Create an items assessment with a choice matrix: \"Is each number even or odd?\" with rows \"2\", \"3\", \"4\", \"5\" and columns \"Even\", \"Odd\" where answers are Even, Odd, Even, Odd."
+  },
+  {
+    "id": "0176-example-76",
+    "exampleNumber": 76,
+    "prompt": "Create a choice matrix with shuffled options asking \"Match each country to its continent\" with rows \"Brazil\", \"Japan\", \"Egypt\" and columns \"South America\", \"Asia\", \"Africa\" where each matches respectively."
+  },
+  {
+    "id": "0176-example-77",
+    "exampleNumber": 77,
+    "prompt": "Create a choice matrix asking \"Classify each animal\" with rows \"Whale\", \"Cobra\", \"Eagle\" and columns \"Mammal\", \"Reptile\", \"Bird\" where each matches respectively."
+  },
+  {
+    "id": "0176-example-78",
+    "exampleNumber": 78,
+    "prompt": "Create an order list question asking \"Arrange in chronological order\" with items \"World War II\", \"World War I\", \"Moon Landing\", \"Internet\" where the correct order is WWI, WWII, Moon Landing, Internet."
+  },
+  {
+    "id": "0176-example-79",
+    "exampleNumber": 79,
+    "prompt": "Create an order list question asking \"Order from smallest to largest\" with items \"Jupiter\", \"Earth\", \"Mars\", \"Mercury\" where the correct order is Mercury, Mars, Earth, Jupiter."
+  },
+  {
+    "id": "0176-example-80",
+    "exampleNumber": 80,
+    "prompt": "Create an order list question asking \"Order these fractions from least to greatest\" with items \"1/2\", \"1/4\", \"3/4\", \"1/8\" where the correct order is 1/8, 1/4, 1/2, 3/4."
+  },
+  {
+    "id": "0176-example-81",
+    "exampleNumber": 81,
+    "prompt": "Create an order list asking \"Arrange the steps of the scientific method\" with items \"Hypothesis\", \"Experiment\", \"Observation\", \"Conclusion\" where the correct order is Observation, Hypothesis, Experiment, Conclusion."
+  },
+  {
+    "id": "0176-example-82",
+    "exampleNumber": 82,
+    "prompt": "Create an items assessment with an order list: \"Order these numbers\" with items \"5\", \"2\", \"8\", \"1\" where the correct order is 1, 2, 5, 8."
+  },
+  {
+    "id": "0176-example-83",
+    "exampleNumber": 83,
+    "prompt": "Create an order list with instant feedback asking \"Arrange alphabetically\" with items \"Cherry\", \"Apple\", \"Banana\", \"Date\" where the correct order is Apple, Banana, Cherry, Date."
+  },
+  {
+    "id": "0176-example-84",
+    "exampleNumber": 84,
+    "prompt": "Create an order list asking \"Order from coldest to hottest\" with items \"Boiling water\", \"Room temperature\", \"Ice\", \"Body temperature\" where the correct order is Ice, Room temperature, Body temperature, Boiling water."
+  },
+  {
+    "id": "0176-example-85",
+    "exampleNumber": 85,
+    "prompt": "Create a classification question asking \"Sort the animals\" with categories \"Mammals\" and \"Reptiles\" and items \"Dog\", \"Snake\", \"Cat\", \"Lizard\" where Dog and Cat are Mammals and Snake and Lizard are Reptiles."
+  },
+  {
+    "id": "0176-example-86",
+    "exampleNumber": 86,
+    "prompt": "Create a classification question asking \"Sort by state of matter\" with categories \"Solid\", \"Liquid\", \"Gas\" and items \"Ice\", \"Water\", \"Steam\", \"Rock\", \"Juice\", \"Helium\" where Ice and Rock are Solid, Water and Juice are Liquid, and Steam and Helium are Gas."
+  },
+  {
+    "id": "0176-example-87",
+    "exampleNumber": 87,
+    "prompt": "Create a classification question asking \"Sort by type of energy\" with categories \"Renewable\", \"Non-renewable\" and items \"Solar\", \"Coal\", \"Wind\", \"Natural Gas\" where Solar and Wind are Renewable and Coal and Natural Gas are Non-renewable."
+  },
+  {
+    "id": "0176-example-88",
+    "exampleNumber": 88,
+    "prompt": "Create a classification asking \"Sort by food group\" with categories \"Fruits\", \"Vegetables\" and items \"Apple\", \"Carrot\", \"Banana\", \"Broccoli\" where Apple and Banana are Fruits and Carrot and Broccoli are Vegetables."
+  },
+  {
+    "id": "0176-example-89",
+    "exampleNumber": 89,
+    "prompt": "Create an items assessment with a classification: \"Sort by type\" with categories \"Even\", \"Odd\" and items \"1\", \"2\", \"3\", \"4\" where 2 and 4 are Even and 1 and 3 are Odd."
+  },
+  {
+    "id": "0176-example-90",
+    "exampleNumber": 90,
+    "prompt": "Create a classification asking \"Classify the words\" with categories \"Nouns\", \"Verbs\" and items \"run\", \"cat\", \"jump\", \"house\" where cat and house are Nouns and run and jump are Verbs."
+  },
+  {
+    "id": "0176-example-91",
+    "exampleNumber": 91,
+    "prompt": "Create a classification with instant feedback asking \"Sort by era\" with categories \"Ancient\", \"Modern\" and items \"Pyramids\", \"Internet\", \"Roman Empire\", \"Space Station\" where Pyramids and Roman Empire are Ancient and Internet and Space Station are Modern."
+  },
+  {
+    "id": "0176-example-92",
+    "exampleNumber": 92,
+    "prompt": "Create a classification asking \"Sort instruments\" with categories \"String\", \"Wind\", \"Percussion\" and items \"Guitar\", \"Flute\", \"Drum\", \"Violin\", \"Trumpet\", \"Cymbal\" where Guitar and Violin are String, Flute and Trumpet are Wind, and Drum and Cymbal are Percussion."
+  },
+  {
+    "id": "0176-example-93",
+    "exampleNumber": 93,
+    "prompt": "Create an items assessment with an MCQ asking \"What is 2+2?\" with options \"3\", \"4\", \"5\" where 4 is correct, and a short text question asking \"Spell the answer\" with correct answer \"four\"."
+  },
+  {
+    "id": "0176-example-94",
+    "exampleNumber": 94,
+    "prompt": "Create an items assessment with a cloze text \"The {{response}} is the largest organ\" with correct answer \"skin\", and an MCQ asking \"Which system does it belong to?\" with options \"Nervous\", \"Digestive\", \"Integumentary\" where Integumentary is correct."
+  },
+  {
+    "id": "0176-example-95",
+    "exampleNumber": 95,
+    "prompt": "Create an items assessment with a long text essay asking \"Describe photosynthesis\" with a 300-word limit, and an MCQ asking \"What gas do plants produce?\" with options \"CO2\", \"O2\", \"N2\" where O2 is correct."
+  },
+  {
+    "id": "0176-example-96",
+    "exampleNumber": 96,
+    "prompt": "Create an items assessment with three MCQ questions about geography: capital of France (Paris), capital of Japan (Tokyo), and capital of Australia (Canberra)."
+  },
+  {
+    "id": "0176-example-97",
+    "exampleNumber": 97,
+    "prompt": "Create an items assessment with a cloze formula \"Solve: 2x = 10. x = {{response}}\" with correct answer \"5\", and a short text question asking \"Is this equation linear?\" with correct answer \"yes\"."
+  },
+  {
+    "id": "0176-example-98",
+    "exampleNumber": 98,
+    "prompt": "Create an items assessment with an order list asking \"Order the planets from the Sun\" with items \"Earth\", \"Mars\", \"Venus\", \"Mercury\" in correct order Mercury, Venus, Earth, Mars, and a classification sorting them into \"Inner\" and \"Outer\" categories."
+  },
+  {
+    "id": "0176-example-99",
+    "exampleNumber": 99,
+    "prompt": "Create an items assessment with a choice matrix about weather: rows \"Rain\", \"Snow\", \"Sunshine\" with columns \"Warm\", \"Cold\" where Rain is Warm, Snow is Cold, and Sunshine is Warm."
+  },
+  {
+    "id": "0176-example-100",
+    "exampleNumber": 100,
+    "prompt": "Create an items assessment with a cloze dropdown \"Water is {{response}}\" with options \"solid\", \"liquid\", \"gas\" where liquid is correct, and a cloze association \"Ice is {{response}}\" with possible responses \"solid\", \"liquid\", \"gas\" where solid is correct."
+  },
+  {
+    "id": "0176-example-101",
+    "exampleNumber": 101,
+    "prompt": "Create an items assessment with a plain text essay asking \"Reflect on what you learned\" with a 200-word limit, and an MCQ asking \"How confident are you?\" with options \"Very\", \"Somewhat\", \"Not at all\" where Very is correct."
+  },
+  {
+    "id": "0176-example-102",
+    "exampleNumber": 102,
+    "prompt": "Create an items assessment combining all question types: an MCQ, a short text, a cloze text, and an order list, all related to basic math facts."
+  },
+  {
+    "id": "0176-example-103",
+    "exampleNumber": 103,
+    "prompt": "Create a bow-tie question with the scenario \"A 65-year-old male presents with chest pain and diaphoresis\". Columns are \"Actions to Take\", \"Condition Most Likely\", \"Parameters to Monitor\". Actions options: \"give aspirin\", \"give nitro\", \"call cardiology\", \"obtain 12-lead ECG\". Condition options: \"myocardial infarction\", \"pulmonary embolism\", \"pericarditis\". Monitor options: \"ST segment changes\", \"blood pressure\", \"troponin\", \"respiratory rate\". Correct actions: \"give aspirin\" and \"obtain 12-lead ECG\". Correct condition: \"myocardial infarction\". Correct monitors: \"ST segment changes\" and \"troponin\"."
+  },
+  {
+    "id": "0176-example-104",
+    "exampleNumber": 104,
+    "prompt": "Create a bow-tie question for a patient with dyspnea and lower-extremity edema. Columns: \"Actions\", \"Condition\", \"Monitor\". Actions: \"administer furosemide\", \"elevate head of bed\", \"start CPR\", \"place in Trendelenburg\". Condition: \"acute heart failure\", \"pneumothorax\", \"sepsis\". Monitor: \"daily weight\", \"oxygen saturation\", \"blood glucose\", \"urine output\". Correct actions: \"administer furosemide\", \"elevate head of bed\". Correct condition: \"acute heart failure\". Correct monitors: \"daily weight\", \"urine output\"."
+  },
+  {
+    "id": "0176-example-105",
+    "exampleNumber": 105,
+    "prompt": "Create a bow-tie for a toddler with a high fever and stiff neck. Columns: \"Actions to Take\", \"Condition Most Likely\", \"Parameters to Monitor\". Actions: \"draw blood cultures\", \"give ibuprofen\", \"isolate the patient\", \"consult neurology\". Condition: \"bacterial meningitis\", \"febrile seizure\", \"viral URI\". Monitor: \"level of consciousness\", \"temperature\", \"weight\", \"skin turgor\". Correct actions: \"draw blood cultures\", \"isolate the patient\". Correct condition: \"bacterial meningitis\". Correct monitors: \"level of consciousness\", \"temperature\"."
+  },
+  {
+    "id": "0176-example-106",
+    "exampleNumber": 106,
+    "prompt": "Create a bow-tie for a post-op patient with sudden tachycardia and low oxygen saturation. Columns: \"Actions\", \"Condition\", \"Monitor\". Actions: \"administer oxygen\", \"notify provider\", \"encourage oral fluids\", \"ambulate the patient\". Condition: \"pulmonary embolism\", \"myocardial infarction\", \"atelectasis\". Monitor: \"oxygen saturation\", \"respiratory rate\", \"dietary intake\", \"capillary refill\". Correct actions: \"administer oxygen\", \"notify provider\". Correct condition: \"pulmonary embolism\". Correct monitors: \"oxygen saturation\", \"respiratory rate\"."
+  },
+  {
+    "id": "0176-example-107",
+    "exampleNumber": 107,
+    "prompt": "Create a bow-tie for a diabetic patient found confused and diaphoretic. Columns: \"Actions\", \"Condition\", \"Monitor\". Actions: \"give 15 g oral glucose\", \"check finger-stick glucose\", \"administer insulin\", \"start normal saline\". Condition: \"hypoglycemia\", \"diabetic ketoacidosis\", \"stroke\". Monitor: \"blood glucose\", \"level of consciousness\", \"weight\", \"urine ketones\". Correct actions: \"give 15 g oral glucose\", \"check finger-stick glucose\". Correct condition: \"hypoglycemia\". Correct monitors: \"blood glucose\", \"level of consciousness\"."
+  },
+  {
+    "id": "0176-example-108",
+    "exampleNumber": 108,
+    "prompt": "Create a bow-tie for a patient with severe abdominal pain and rebound tenderness. Columns: \"Actions to Take\", \"Condition Most Likely\", \"Parameters to Monitor\". Actions: \"keep NPO\", \"administer pain medication\", \"encourage ambulation\", \"insert nasogastric tube\". Condition: \"appendicitis\", \"gastroenteritis\", \"kidney stones\". Monitor: \"temperature\", \"bowel sounds\", \"skin integrity\", \"hydration status\". Correct actions: \"keep NPO\", \"insert nasogastric tube\". Correct condition: \"appendicitis\". Correct monitors: \"temperature\", \"bowel sounds\"."
+  },
+  {
+    "id": "0176-example-109",
+    "exampleNumber": 109,
+    "prompt": "Create an order list question asking \"Arrange the planets by distance from the Sun\" with items \"Mercury\", \"Venus\", \"Earth\", \"Mars\", tagged with difficulty easy and DOK 1."
+  },
+  {
+    "id": "0176-example-110",
+    "exampleNumber": 110,
+    "prompt": "Create a multiple choice question asking \"What is the primary function of the mitochondria?\" with four options where \"ATP production\" is correct, tagged with NGSS MS-LS1-2 and difficulty medium."
+  },
+  {
+    "id": "0176-example-111",
+    "exampleNumber": 111,
+    "prompt": "Create a short text question asking \"What is the chemical symbol for water?\" with the correct answer \"H2O\", tagged with CCSS 5-PS1-1, difficulty easy, DOK 1."
+  },
+  {
+    "id": "0176-example-112",
+    "exampleNumber": 112,
+    "prompt": "Create a cloze dropdown question with the template \"The {{response}} is the powerhouse of the cell\" with options \"mitochondria\", \"nucleus\", \"ribosome\" where mitochondria is correct, tagged with difficulty medium and DOK 2."
+  },
+  {
+    "id": "0176-example-113",
+    "exampleNumber": 113,
+    "prompt": "Create a multiple choice question asking \"What is the function of the cell membrane?\" with four options where \"control what enters and exits\" is correct, and add a one-line distractor rationale per option explaining each misconception."
+  },
+  {
+    "id": "0176-example-114",
+    "exampleNumber": 114,
+    "prompt": "Create a multiple choice question asking \"Who painted the Mona Lisa?\" with four options where \"Leonardo da Vinci\" is correct, with question-level acknowledgements \"Image courtesy Louvre Museum, public domain\"."
+  },
+  {
+    "id": "0176-example-115",
+    "exampleNumber": 115,
+    "prompt": "Create a multiple choice question asking \"What gas do plants primarily absorb during photosynthesis?\" with options \"Oxygen\", \"Carbon dioxide\", \"Nitrogen\", \"Helium\" where Carbon dioxide is correct, with a one-line distractor rationale per option, tagged with NGSS MS-LS1-6, difficulty medium, DOK 2."
+  },
+  {
+    "id": "0176-example-116",
+    "exampleNumber": 116,
+    "prompt": "Create a choice matrix question asking \"Classify each statement\" with rows \"The sun is a star\" and \"The moon is a planet\" and columns \"True\" and \"False\", tagged with NGSS MS-ESS1-2 and difficulty easy, with per-row rationale explaining the correct classification."
+  },
+  {
+    "id": "0176-example-117",
+    "exampleNumber": 117,
+    "prompt": "Create a classification question asking \"Sort animals by class\" with categories \"Mammals\" and \"Reptiles\" and items \"dog, snake, cat, lizard\", tagged with NGSS MS-LS4-2 and difficulty medium, with an item-level note \"Variant for the genetics unit; pair with the inheritance MCQ\"."
+  },
+  {
+    "id": "0176-example-118",
+    "exampleNumber": 118,
+    "prompt": "Update the existing item with id <ITEM_ID>: change the stem to be shorter and clearer, but keep all the existing tags, difficulty, DOK, and per-option distractor rationale unchanged."
+  },
+  {
+    "id": "0176-example-119",
+    "exampleNumber": 119,
+    "prompt": "Update the existing item with id <ITEM_ID>: keep the stem and options unchanged, but change the difficulty tag from medium to hard and update DOK from 2 to 3 — leave the distractor rationale alone."
+  },
+  {
+    "id": "0176-example-120",
+    "exampleNumber": 120,
+    "prompt": "Create a custom spreadsheet question that embeds the L0166 interaction. Stem: \"Use the spreadsheet below to compute the column totals for the first quarter.\" Read the spreadsheet model from the upstream pipeline task using `data {}`."
+  },
+  {
+    "id": "0176-example-121",
+    "exampleNumber": 121,
+    "prompt": "Create a custom spreadsheet question backed by L0166 with the stem \"Complete the SUM formula in cell A6.\" The embedded spreadsheet has the values 10, 20, 30, 40, 50 in cells A1 through A5, and an assessed cell A6 expecting the student to enter `=SUM(A1:A5)` using the formula method."
+  },
+  {
+    "id": "0176-example-122",
+    "exampleNumber": 122,
+    "prompt": "Create a custom spreadsheet question with the stem \"Fill in the 3 by 3 multiplication table.\" Embed an L0166 spreadsheet containing a 3 by 3 grid of assessed input cells whose expected values are 1 through 9, reading left to right, top to bottom."
+  },
+  {
+    "id": "0176-example-123",
+    "exampleNumber": 123,
+    "prompt": "Create a custom spreadsheet question with the stem \"Compute the line totals and grand total for the order below.\" The embedded L0166 spreadsheet has a header row (Product, Qty, Unit Price, Line Total), 3 data rows with `=B*C` line-total formulas in column D, and a SUM grand total in D5. Bold the header row and right-align the numeric columns."
+  },
+  {
+    "id": "0176-example-124",
+    "exampleNumber": 124,
+    "prompt": "Create a custom spreadsheet question that embeds a parameterized L0166 sheet. Stem: \"Add the two values shown and enter the total in A3.\" The spreadsheet uses params to populate A1 and A2 and assesses cell A3 with the formula method expecting the correct SUM formula across the param values."
+  },
+  {
+    "id": "0176-example-125",
+    "exampleNumber": 125,
+    "prompt": "Create a custom spreadsheet question that reads its model from the upstream pipeline task. Stem: \"Use the supplied worksheet to enter the missing values in column B.\" Save the item to the item bank — the snapshot freezes the upstream payload at compile time."
+  },
+  {
+    "id": "0176-example-126",
+    "exampleNumber": 126,
+    "prompt": "Create an items assessment with two questions. First, a custom L0166 spreadsheet with stem \"Enter the average of the listed test scores in cell B7.\" The embedded sheet has scores 85, 92, 78, 95, 88 in B2 through B6 and an assessed cell B7 expecting `=AVERAGE(B2:B6)`. Second, a short text question asking \"Which spreadsheet function did you use?\" with the correct answer \"AVERAGE\", case insensitive."
+  },
+  {
+    "id": "0176-example-127",
+    "exampleNumber": 127,
+    "prompt": "Create a custom spreadsheet question with the stem \"Label each row in column B as Positive or Negative based on the value in column A.\" Embed an L0166 spreadsheet with 5 numeric values in column A (mix of positive and negative numbers) and 5 assessed blank cells in column B expecting the labels Positive or Negative reading top to bottom."
+  },
+  {
+    "id": "0176-example-128",
+    "exampleNumber": 128,
+    "prompt": "Create a custom spreadsheet question with the stem \"Use the monthly budget worksheet to compute the total in cell B7.\" The embedded L0166 spreadsheet has category labels in column A (Rent, Groceries, Utilities, Transportation, Other), dollar amounts in column B right-aligned with two decimal places, and an assessed `=SUM(B2:B6)` cell in B7. Tag the item with difficulty medium, DOK 2, and CCSS 6.RP.A.3c."
+  },
+  {
+    "id": "0176-example-129",
+    "exampleNumber": 129,
+    "prompt": "Create a custom spreadsheet question with the stem \"Solve each arithmetic problem in column B.\" Embed an L0166 spreadsheet where column A has display-only labels \"2+3=\", \"7-4=\", and \"3×2=\" and column B has blank assessed cells expecting the values 5, 3, and 6 respectively. Tag the item with difficulty easy and DOK 1."
+  },
+  {
+    "id": "0176-example-130",
+    "exampleNumber": 130,
+    "prompt": "Create a custom spreadsheet question that reads the upstream task model via `data {}`. Stem: \"Use the spreadsheet supplied above to answer the prompt.\" Do not emit a `valid-response` — scoring is handled by the embedded L0166 widget."
+  },
+  {
+    "id": "0176-example-131",
+    "exampleNumber": 131,
+    "prompt": "Create a custom spreadsheet question with the stem \"Enter the correct multiplication formula in each cell of column C.\" Embed an L0166 spreadsheet with prices in column A (10, 20, 30), quantities in column B (2, 3, 1), and three assessed cells in column C using the formula method expecting `=A1*B1`, `=A2*B2`, and `=A3*B3` row by row."
+  },
+  {
+    "id": "0176-example-132",
+    "exampleNumber": 132,
+    "prompt": "Create a custom spreadsheet question with the stem \"Compute each section subtotal and the grand total.\" The embedded L0166 spreadsheet has two sections of 3 data rows each in column A, an assessed SUM subtotal cell at the bottom of each section, and a final assessed cell summing the two subtotals. Bold the subtotal and total rows. Tag the item with difficulty hard and DOK 3."
+  },
+  {
+    "id": "0176-example-133",
+    "exampleNumber": 133,
+    "prompt": "Create a cloze formula question with a dynamic data table so each student sees different numbers: stem \"Compute {{a}} + {{b}} = {{response}}\". Provide rows {a: 2, b: 3, ans: 5}, {a: 7, b: 5, ans: 12}, {a: 14, b: 8, ans: 22}, and set the correct answer to {{ans}} using equivValue."
+  },
+  {
+    "id": "0176-example-134",
+    "exampleNumber": 134,
+    "prompt": "Create a cloze formula question with the stem \"Solve for x: {{m}}x = {{p}}. x = {{response}}\" and a params table {m: 2, p: 10, x: 5}, {m: 3, p: 12, x: 4}, {m: 5, p: 45, x: 9}, with the correct answer {{x}} using equivLiteral."
+  },
+  {
+    "id": "0176-example-135",
+    "exampleNumber": 135,
+    "prompt": "Create a cloze formula question with the stem \"Find the area of a {{w}} by {{h}} rectangle: {{response}}\" and rows {w: 4, h: 5, area: 20}, {w: 6, h: 3, area: 18}, {w: 7, h: 2, area: 14}, with the correct answer {{area}} using equivValue."
+  },
+  {
+    "id": "0176-example-136",
+    "exampleNumber": 136,
+    "prompt": "Create a cloze formula question with instant feedback and a dynamic table: \"Evaluate {{a}}^{{n}} = {{response}}\" with rows {a: 2, n: 3, ans: 8}, {a: 3, n: 2, ans: 9}, {a: 5, n: 2, ans: 25}, and the correct answer {{ans}} using equivValue."
+  },
+  {
+    "id": "0176-example-137",
+    "exampleNumber": 137,
+    "prompt": "Create a cloze formula question with two blanks driven by a params table: \"{{a}} + {{b}} = {{response}} and {{a}} − {{b}} = {{response}}\" with rows {a: 8, b: 3, sum: 11, diff: 5}, {a: 10, b: 6, sum: 16, diff: 4}, {a: 9, b: 4, sum: 13, diff: 5}, with correct answers {{sum}} and {{diff}} using equivValue."
+  },
+  {
+    "id": "0176-example-138",
+    "exampleNumber": 138,
+    "prompt": "Create a multiple choice question with a dynamic table asking \"Which value equals {{a}} + {{b}}?\" with options \"{{sum}}\", \"{{d1}}\", \"{{d2}}\", \"{{d3}}\" where the first option is correct, with options shuffled. Rows: {a: 12, b: 7, sum: 19, d1: 17, d2: 21, d3: 18}, {a: 9, b: 6, sum: 15, d1: 13, d2: 16, d3: 14}, {a: 14, b: 8, sum: 22, d1: 20, d2: 24, d3: 21}."
+  },
+  {
+    "id": "0176-example-139",
+    "exampleNumber": 139,
+    "prompt": "Create a multiple choice question with a dynamic table asking \"What is {{a}} × {{b}}?\" with options \"{{prod}}\", \"{{near}}\", \"{{far}}\", \"{{off}}\" where the first option is correct and options are shuffled. Rows: {a: 6, b: 7, prod: 42, near: 48, far: 36, off: 49}, {a: 8, b: 4, prod: 32, near: 28, far: 36, off: 24}, {a: 9, b: 6, prod: 54, near: 56, far: 45, off: 63}."
+  },
+  {
+    "id": "0176-example-140",
+    "exampleNumber": 140,
+    "prompt": "Create a cloze formula question with the stem \"Round {{x}} to the nearest ten: {{response}}\" and rows {x: 47, ans: 50}, {x: 83, ans: 80}, {x: 25, ans: 30}, with the correct answer {{ans}} using equivValue."
+  },
+  {
+    "id": "0176-example-141",
+    "exampleNumber": 141,
+    "prompt": "Create an items assessment with two dynamically parameterized questions, each with its own params table. First, a cloze formula \"Add {{a}} + {{b}} = {{response}}\" with rows {a: 5, b: 6, ans: 11}, {a: 8, b: 9, ans: 17}, {a: 13, b: 4, ans: 17} and correct answer {{ans}}. Second, a multiple choice \"Which value equals {{a}} − {{b}}?\" with options \"{{diff}}\", \"{{d1}}\", \"{{d2}}\" where the first is correct, shuffled, with rows {a: 20, b: 8, diff: 12, d1: 28, d2: 13}, {a: 15, b: 9, diff: 6, d1: 24, d2: 7}."
+  },
+  {
+    "id": "0176-example-142",
+    "exampleNumber": 142,
+    "prompt": "Create a cloze formula question with a dynamic table and save it to the item bank so the parameter table is persisted with the saved item: stem \"Compute {{a}} ÷ {{b}} = {{response}}\" with rows {a: 12, b: 4, ans: 3}, {a: 20, b: 5, ans: 4}, {a: 18, b: 6, ans: 3}, correct answer {{ans}} using equivValue."
+  },
+  {
+    "id": "0176-example-143",
+    "exampleNumber": 143,
+    "prompt": "Create a multiple choice question with a dynamic table asking \"Is {{a}} + {{b}} equal to {{claimed}}?\" with options \"True\" and \"False\" where False is correct, and add a one-line distractor rationale per option. Rows: {a: 7, b: 8, claimed: 14}, {a: 9, b: 6, claimed: 16}, {a: 12, b: 5, claimed: 18}."
+  },
+  {
+    "id": "0176-example-144",
+    "exampleNumber": 144,
+    "prompt": "Create a cloze formula question with a dynamic table asking \"Simplify {{a}}x + {{b}}x = {{response}}\" with rows {a: 3, b: 4, ans: \"7x\"}, {a: 5, b: 2, ans: \"7x\"}, {a: 6, b: 9, ans: \"15x\"}, with the correct answer {{ans}} using equivSymbolic, tagged with CCSS 7.EE.A.1, difficulty medium, DOK 2."
+  },
+  {
+    "id": "0176-example-145",
+    "exampleNumber": 145,
+    "prompt": "Create a token highlight question asking \"Highlight the verbs.\" with the passage \"The cat runs then jumps high.\" where \"runs\" and \"jumps\" are correct and \"cat\" and \"high\" are clickable distractors."
+  },
+  {
+    "id": "0176-example-146",
+    "exampleNumber": 146,
+    "prompt": "Create a token highlight question asking \"Click the two nouns.\" with the passage \"A small dog chased the red ball across the yard.\" where \"dog\" and \"ball\" are correct, and \"small\", \"red\", and \"yard\" are distractors."
+  },
+  {
+    "id": "0176-example-147",
+    "exampleNumber": 147,
+    "prompt": "Create a token highlight question asking \"Highlight every word spelled incorrectly.\" with the passage \"She recieved a seperate letter in the libary.\" where \"recieved\", \"seperate\", and \"libary\" are correct and \"letter\" is a distractor."
+  },
+  {
+    "id": "0176-example-148",
+    "exampleNumber": 148,
+    "prompt": "Create a token highlight question asking \"Select the adjectives.\" with the passage \"The bright sun warmed the cold sand on the quiet beach.\" where \"bright\", \"cold\", and \"quiet\" are correct and \"sun\", \"sand\", and \"beach\" are distractors, and let the student pick at most three."
+  },
+  {
+    "id": "0176-example-149",
+    "exampleNumber": 149,
+    "prompt": "Create a token highlight question asking \"Highlight the sentence's subject and verb.\" with the passage \"The energetic puppy barked loudly at the mail carrier.\" where \"puppy\" and \"barked\" are correct and \"energetic\", \"loudly\", and \"carrier\" are distractors."
+  },
+  {
+    "id": "0176-example-150",
+    "exampleNumber": 150,
+    "prompt": "Create a token highlight question asking \"Click each time the word 'run' appears.\" with the passage \"I run to school, then run back, and run again at night.\" where every \"run\" is correct and \"school\" and \"night\" are distractors."
+  },
+  {
+    "id": "0176-example-151",
+    "exampleNumber": 151,
+    "prompt": "Create a token highlight question asking \"Highlight the sentence that states an opinion.\" with the passage \"The sky is blue. I think blue is the most beautiful color. Water boils at 100 degrees.\" where the sentence \"I think blue is the most beautiful color.\" is correct and the sentences \"The sky is blue.\" and \"Water boils at 100 degrees.\" are distractors."
+  },
+  {
+    "id": "0176-example-152",
+    "exampleNumber": 152,
+    "prompt": "Create a token highlight question asking \"Click the topic sentence.\" with the passage \"Recycling helps the environment in many ways. It reduces the amount of trash sent to landfills. It also saves energy and raw materials.\" where the sentence \"Recycling helps the environment in many ways.\" is correct and the other two sentences are distractors."
+  },
+  {
+    "id": "0176-example-153",
+    "exampleNumber": 153,
+    "prompt": "Create a token highlight question asking \"Highlight every sentence written in the past tense.\" with the passage \"The team practices every morning. They won the championship last spring. The coach praised their effort.\" where the sentences \"They won the championship last spring.\" and \"The coach praised their effort.\" are correct and \"The team practices every morning.\" is a distractor, and let the student pick at most two."
+  },
+  {
+    "id": "0176-example-154",
+    "exampleNumber": 154,
+    "prompt": "Create a token highlight question asking \"Highlight the paragraph that summarizes the passage.\" with the passage \"Dogs are loyal animals. They have lived alongside humans for thousands of years.\\n\\nCats are independent pets. They groom themselves and hunt small prey.\\n\\nIn short, both dogs and cats make wonderful companions for different reasons.\" where the paragraph \"In short, both dogs and cats make wonderful companions for different reasons.\" is correct and the first two paragraphs are distractors."
+  },
+  {
+    "id": "0176-example-155",
+    "exampleNumber": 155,
+    "prompt": "Create a token highlight question asking \"Click the paragraph that describes the problem.\" with the passage \"Our town's library closes at five o'clock every day. Many students finish school and arrive only after it has shut.\\n\\nOne solution is to keep the library open until eight in the evening. Volunteers could staff the extra hours.\\n\\nWith longer hours, more students would have a quiet place to study.\" where the first paragraph is correct and the other two paragraphs are distractors."
+  },
+  {
+    "id": "0176-example-156",
+    "exampleNumber": 156,
+    "prompt": "Create a token highlight question asking \"Highlight each paragraph that gives a reason to exercise.\" with the passage \"Regular exercise strengthens the heart and improves circulation.\\n\\nSome people prefer to exercise in the morning, while others prefer the evening.\\n\\nExercise also lifts your mood by releasing endorphins.\" where the paragraphs \"Regular exercise strengthens the heart and improves circulation.\" and \"Exercise also lifts your mood by releasing endorphins.\" are correct and the middle paragraph is a distractor."
+  },
+  {
+    "id": "0176-example-157",
+    "exampleNumber": 157,
+    "prompt": "Create a multiple choice question asking \"Select all the prime numbers.\" with options \"2\", \"4\", \"7\", \"9\" where 2 and 7 are correct, allowing multiple responses, and give partial credit for each correct selection."
+  },
+  {
+    "id": "0176-example-158",
+    "exampleNumber": 158,
+    "prompt": "Create a multiple choice question asking \"Which of these are mammals?\" with options \"Dolphin\", \"Shark\", \"Bat\", \"Eagle\" where Dolphin and Bat are correct, allowing multiple responses, scoring each correct answer separately."
+  },
+  {
+    "id": "0176-example-159",
+    "exampleNumber": 159,
+    "prompt": "Create a choice matrix question asking \"Mark each statement true or false.\" with rows \"Water boils at 100°C\", \"The sun orbits the Earth\", \"Sound travels faster in water than in air\" and columns \"True\" and \"False\" where the answers are True, False, True, awarding partial credit per row."
+  },
+  {
+    "id": "0176-example-160",
+    "exampleNumber": 160,
+    "prompt": "Create a cloze text question with the template \"The capital of France is {{response}} and the capital of Japan is {{response}}.\" where the answers are \"Paris\" and \"Tokyo\", giving partial credit for each blank filled correctly."
+  },
+  {
+    "id": "0176-example-161",
+    "exampleNumber": 161,
+    "prompt": "Create a cloze dropdown question asking students to complete \"A {{response}} has {{response}} sides.\" with dropdown choices \"triangle/square\" and \"three/four\" where the answers are \"triangle\" and \"three\", with partial credit per blank."
+  },
+  {
+    "id": "0176-example-162",
+    "exampleNumber": 162,
+    "prompt": "Create an order list question asking \"Put these events in chronological order.\" with the items \"Declaration of Independence\", \"Civil War\", \"World War I\", \"Moon landing\" in that correct order, with partial credit."
+  },
+  {
+    "id": "0176-example-163",
+    "exampleNumber": 163,
+    "prompt": "Create a classification question asking \"Sort these animals by class.\" with categories \"Mammals\" and \"Reptiles\" and items \"dog\", \"snake\", \"cat\", \"lizard\", giving partial credit per correctly placed item."
+  },
+  {
+    "id": "0176-example-164",
+    "exampleNumber": 164,
+    "prompt": "Create a token highlight question asking \"Highlight the verbs.\" with the passage \"The cat runs then jumps high.\" where \"runs\" and \"jumps\" are correct and \"cat\" and \"high\" are distractors, scoring each correct token separately."
+  },
+  {
+    "id": "0176-example-165",
+    "exampleNumber": 165,
+    "prompt": "Create a cloze formula question asking \"Simplify 4/8 to lowest terms: {{response}}\" that accepts \"1/2\", \"0.5\", or \"2/4\" as correct, but not \"4/8\", using equivLiteral method."
+  },
+  {
+    "id": "0176-example-166",
+    "exampleNumber": 166,
+    "prompt": "Create a cloze formula question asking \"What fraction of the circle is shaded? {{response}}\" that accepts \"3/4\" or \"0.75\" using equivLiteral method."
+  },
+  {
+    "id": "0176-example-167",
+    "exampleNumber": 167,
+    "prompt": "Create a cloze formula question asking \"Write the slope of the line: {{response}}\" that accepts \"-2\" or \"-2/1\" using equivLiteral method."
+  },
+  {
+    "id": "0176-example-168",
+    "exampleNumber": 168,
+    "prompt": "Create a cloze formula question asking \"Factor completely: x² - 4 = {{response}}\" that accepts \"(x-2)(x+2)\" or \"(x+2)(x-2)\" using equivLiteral method."
+  },
+  {
+    "id": "0176-example-169",
+    "exampleNumber": 169,
+    "prompt": "Create a cloze formula question with two blanks asking \"Give the value of x and its decimal form: x = {{response}}, or {{response}} as a decimal\" where the first blank accepts \"1/4\" or \"2/8\" and the second accepts \"0.25\", using equivLiteral method."
+  },
+  {
+    "id": "0176-example-170",
+    "exampleNumber": 170,
+    "prompt": "Create a cloze formula question asking \"Express 2 × 2 × 2 in exponential form: {{response}}\" that accepts \"2^3\" or \"2³\" using equivLiteral method."
+  }
+]
