@@ -17,7 +17,7 @@ import {
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
 import { generateSpec, specModelFor, SPEC_CACHE_VERSION } from "../../lib/spec-generation-service";
 import { planSequence, classifyAndRoute, composesWithFor, fenceComposition, orchestrateComposition, capturePlanForCuration } from "../../lib/language-router";
-import { backfillTokenUsageItemId } from "../../lib/token-usage-service";
+import { backfillTokenUsageItemId, currentEnv } from "../../lib/token-usage-service";
 import { resolveUpstreams } from "../../lib/composition-discovery";
 import { ragLog, generateRequestId } from "../../lib/logger";
 import { FREE_PLAN_ITEM_TTL_MS } from "../../lib/free-plan-context";
@@ -429,6 +429,10 @@ export async function recordBillableItem({
       timestamp: now.toISOString(),
       lang: lang ?? null,
       client: client ?? "console",
+      // Same marker the ai_generation records carry. Without it the item count
+      // could not be scoped to the same environment as the spend that produced
+      // it, and cost-per-item divided prod-only generations by all-env items.
+      env: currentEnv(),
       type: "item_created",
     });
 

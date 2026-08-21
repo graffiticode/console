@@ -129,7 +129,6 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
   const includedPct = barTotal > 0 ? (includedUsed / barTotal) * 100 : (used > 0 ? 100 : 0);
   const overagePct = barTotal > 0 ? (overageItems / barTotal) * 100 : 0;
 
-  const remainingIncluded = Math.max(0, included - used);
   const isAtIncludedLimit = used >= included;
   const planName = planDetails[usage.plan as PlanId]?.name ?? usage.plan;
 
@@ -156,14 +155,15 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
           </div>
 
           <div className="mt-2">
-            <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>{used.toLocaleString()} items used</span>
-              <span className="font-medium">
-                {usage.hardCap
-                  ? `${remainingIncluded.toLocaleString()} of ${included.toLocaleString()} remaining`
-                  : overageItems > 0
-                    ? `${included.toLocaleString()} included + ${overageItems.toLocaleString()} overage`
-                    : `${included.toLocaleString()} included`}
+            <div className="flex justify-end text-sm text-gray-600 mb-1">
+              <span>
+                {/* A hard-capped account is counting down to a wall, so show what
+                    is left. Once the cap is reached "0 of 50 remaining" says
+                    nothing useful — fall back to the total, same as every other
+                    plan. */}
+                {usage.hardCap && used < included
+                  ? `${(included - used).toLocaleString()} of ${included.toLocaleString()} remaining`
+                  : `${used.toLocaleString()} items used`}
               </span>
             </div>
             <div className="w-full bg-gray-200 h-8 relative overflow-hidden">

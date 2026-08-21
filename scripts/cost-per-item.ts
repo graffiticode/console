@@ -17,6 +17,15 @@
 // spend and the denominator from all items; that mismatch reported cost per
 // item as $0.0632 and then $0.1950 when the defensible figure was $0.0503.
 //
+// The same mismatch reappeared on the `env` axis: generations were filtered to
+// prod while items were not, so a window with 2,165 local training generations
+// divided prod-only spend by all-env items and read 7x too cheap. Both sides now
+// take the SAME `--env`, and the default is `all` — a training run is a real
+// generation producing a real item, and its cost is as good a measure as
+// production's. Scope with --env prod only for windows that postdate the marker;
+// the run refuses to print a blended figure when the two sides cannot be scoped
+// alike.
+//
 // Consequently this script calls NO provider API and needs no admin keys.
 // Nothing here checks whether our token counts are COMPLETE — that is a
 // separate measurement audit against the provider's metered totals, designed
@@ -68,13 +77,16 @@ Average AI cost to produce one item, for a period.
   --period day|week|month   Window ending now, UTC-aligned (default: week)
   --from YYYY-MM-DD         Explicit window start (overrides --period)
   --to YYYY-MM-DD           Explicit window end, inclusive
-  --env prod|local|all      Which environment's generations to count
-                            (default: prod). Local development writes to the
-                            same Firestore as production; without this filter a
-                            window heavy with development reads several times
-                            too expensive. Records written before the marker
-                            existed carry no env and are counted under prod —
-                            the run says how many.
+  --env prod|local|all      Which environment's generations AND items to count
+                            (default: all — training and local runs are real
+                            generations producing real items, so their cost is
+                            as good a measure as production's). Both sides take
+                            this filter, so the ratio stays like-for-like.
+                            Records written before the marker existed carry no
+                            env and are counted under prod — the run says how
+                            many, and suppresses the blended figure when the
+                            generation side can be scoped but the item side
+                            cannot.
   --exclude-trial           Divide by paid items only, not free-plan trial items
   --per-item                Also show the per-item cost distribution
                             (mean/median/p90). Only sees generations recorded
@@ -137,7 +149,10 @@ function parseArgs(argv: string[]): Opts {
     json: false,
     asOf: new Date(),
     byLang: false,
-    env: 'prod',
+    // `all`, not `prod`: the numerator and denominator are both scoped by this,
+    // and excluding training runs would throw away real generations that
+    // produced real items.
+    env: 'all',
   };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -231,25 +246,38 @@ function toMillis(v: any): number {
  * index — the established convention in these scripts.
  */
 async function countItems(
-  start: Date, end: Date, langs: string[] = [],
-): Promise<{ total: number; byDay: Record<string, number> }> {
+  start: Date, end: Date, langs: string[] = [], env: 'prod' | 'local' | 'all' = 'all',
+): Promise<{ total: number; byDay: Record<string, number>; unmarked: number }> {
   const snap = await db.collection('usage')
     .where('type', '==', 'item_created')
-    .select('createdAt', 'lang')
+    .select('createdAt', 'lang', 'env')
     .get();
 
   let total = 0;
+  let unmarked = 0;
   const byDay: Record<string, number> = {};
   for (const doc of snap.docs) {
     const d = doc.data();
     if (langs.length > 0 && !langs.includes(normalizeLang(String(d.lang ?? '')))) continue;
     const ms = toMillis(d.createdAt);
     if (ms < start.getTime() || ms >= end.getTime()) continue;
+    // Same convention as the generation side: no `env` means the record predates
+    // the marker, counted under prod so history stays readable, and surfaced so
+    // the dilution is visible. `recordBillableItem` stamps it going forward.
+    //
+    // `unmarked` counts every pre-marker doc in the window, whether the filter
+    // keeps it or not: it answers "can this side be scoped by env at all", which
+    // is what the like-for-like guard needs. Counting only the KEPT ones missed
+    // the --env local mirror of the bug (all pre-marker items dropped from the
+    // denominator while local generations stayed in the numerator).
+    const recordEnv: string | null = d.env ?? null;
+    if (recordEnv === null) unmarked++;
+    if (env !== 'all' && (env === 'prod' ? recordEnv === 'local' : recordEnv !== 'local')) continue;
     total++;
     const day = new Date(ms).toISOString().split('T')[0];
     byDay[day] = (byDay[day] || 0) + 1;
   }
-  return { total, byDay };
+  return { total, byDay, unmarked };
 }
 
 /**
@@ -358,6 +386,8 @@ interface PerItem {
   byDay: Record<string, { anthropic: number; openai: number; tokens: number }>;
   /** Counted records that predate the env marker (meaningful under --env prod). */
   unmarked: number;
+  /** Generations excluded by the --env filter. Drives the like-for-like guard. */
+  envDropped: number;
 }
 
 /**
@@ -372,7 +402,7 @@ interface PerItem {
  * `generatedTaskId` through `users/{uid}/versions`, which stores both.
  */
 async function fetchPerItem(
-  start: Date, end: Date, asOf: Date, langs: string[] = [], env: 'prod' | 'local' | 'all' = 'prod',
+  start: Date, end: Date, asOf: Date, langs: string[] = [], env: 'prod' | 'local' | 'all' = 'all',
 ): Promise<PerItem> {
   const snap = await db.collection('usage')
     .where('type', '==', 'ai_generation')
@@ -381,6 +411,7 @@ async function fetchPerItem(
 
   const records: GenRecord[] = [];
   let unmarked = 0;
+  let envDropped = 0;
   for (const doc of snap.docs) {
     const d = doc.data();
     if (langs.length > 0 && !langs.includes(normalizeLang(String(d.lang ?? '')))) continue;
@@ -393,7 +424,7 @@ async function fetchPerItem(
     // collection and reports more pre-marker records than generations.
     const recordEnv: string | null = d.env ?? null;
     if (env !== 'all') {
-      if (env === 'prod' ? recordEnv === 'local' : recordEnv !== 'local') continue;
+      if (env === 'prod' ? recordEnv === 'local' : recordEnv !== 'local') { envDropped++; continue; }
       if (recordEnv === null) unmarked++;
     }
     // The frozen figure is kept only to detect legacy records; the cost this
@@ -455,6 +486,7 @@ async function fetchPerItem(
     tokens: emptyTokens(),
     byDay: {},
     unmarked,
+    envDropped,
   };
 
   for (const r of records) {
@@ -529,11 +561,13 @@ interface HtmlInput {
   rows: DayRow[];
   langRows: LangCost[];
   warnings: string[];
+  /** The two sides could not be scoped to the same env — no blended figure. */
+  blendedBlocked: boolean;
 }
 
 function generateHtml(d: HtmlInput): string {
   const totalCost = d.totalCost;
-  const perItem = d.denominator > 0 ? totalCost / d.denominator : null;
+  const perItem = d.denominator > 0 && !d.blendedBlocked ? totalCost / d.denominator : null;
 
   // Bars are scaled to the largest value in their own column, so each column
   // reads as a shape rather than being flattened by an unrelated maximum.
@@ -644,7 +678,8 @@ ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</di
 
 <div class="cards">
   ${card('Cost per item', perItem === null ? '—' : `$${perItem.toFixed(4)}`,
-    d.excludeTrial ? 'paid items only' : 'all items incl. trial')}
+    d.blendedBlocked ? 'withheld — see warning'
+      : d.excludeTrial ? 'paid items only' : 'all items incl. trial')}
   ${card('Total AI cost', `$${totalCost.toFixed(2)}`,
     `Anthropic $${d.costByProvider.anthropic.toFixed(2)} · OpenAI $${d.costByProvider.openai.toFixed(2)}`)}
   ${card('Items created', d.totalItems.toLocaleString(), `${d.paidItems} paid · ${d.trialItems} trial`)}
@@ -709,7 +744,7 @@ async function main() {
 
   console.error('Counting items...');
   const [items, trial] = await Promise.all([
-    countItems(start, end, opts.langs),
+    countItems(start, end, opts.langs, opts.env),
     // The trial counter is a per-day tally with no language dimension, so it
     // can't be narrowed. Zeroed under --lang rather than reported as a subset
     // of a different population.
@@ -733,6 +768,22 @@ async function main() {
   // token-usage refactor carry no tokens, so they price at nothing. Excluding
   // them is right — they cannot be priced — but it must not be silent.
   const warnings: string[] = [];
+  // The like-for-like guard. Cost per item is only meaningful when the two sides
+  // cover the same population. `--env prod` can scope the generations (they were
+  // marked first) while leaving pre-marker items unscoped, which is exactly how
+  // this read 7x too cheap: 2,165 local training generations dropped from the
+  // numerator, their 873 items kept in the denominator. When that asymmetry is
+  // present the blended figure is withheld rather than printed with a caveat —
+  // a wrong number with a footnote still gets quoted.
+  const blendedBlocked = opts.env !== 'all' && perItem.envDropped > 0 && items.unmarked > 0;
+  if (blendedBlocked) {
+    warnings.push(
+      `Cost per item withheld: --env ${opts.env} dropped ${num(perItem.envDropped)} generation(s), but ` +
+      `${num(items.unmarked)} of the ${num(totalItems)} item(s) in this window predate the env marker on ` +
+      `item_created and cannot be scoped the same way. Dividing one population by another is how this ` +
+      `report has been wrong before. Use --env all, or pick a window that postdates the marker.`,
+    );
+  }
   if (opts.env === 'prod' && perItem.unmarked > 0 && perItem.instrumented > 0
       && perItem.unmarked / perItem.instrumented > 0.5) {
     warnings.push(
@@ -778,6 +829,7 @@ async function main() {
       asOf: opts.asOf,
       env: opts.env,
       totalItems, trialItems, paidItems, denominator, excludeTrial: opts.excludeTrial,
+      blendedBlocked,
       tokens: totals, costByModel, costByProvider, totalCost,
       rows, langRows, warnings,
     });
@@ -794,7 +846,9 @@ async function main() {
       unmarkedRecords: perItem.unmarked,
       warnings,
       langs: opts.langs.length > 0 ? opts.langs : null,
-      items: { total: totalItems, trial: trialItems, paid: paidItems, denominator },
+      items: { total: totalItems, trial: trialItems, paid: paidItems, denominator, unmarked: items.unmarked },
+      envDroppedGenerations: perItem.envDropped,
+      blendedBlocked,
       tokens: totals,
       cost: {
         byModel: costByModel,
@@ -817,7 +871,7 @@ async function main() {
           max: costs.length ? costs[costs.length - 1] : null,
         };
       })() : null,
-      costPerItem: denominator > 0 ? {
+      costPerItem: denominator > 0 && !blendedBlocked ? {
         total: totalCost / denominator,
         anthropic: costByProvider.anthropic / denominator,
         openai: costByProvider.openai / denominator,
@@ -838,7 +892,7 @@ async function main() {
   console.log(`${pad('  cache write / read')}: ${num(totals.cacheCreation)} / ${num(totals.cacheRead)} tok`);
   console.log(`${pad('  output')}: ${num(totals.output)} tok`);
   console.log(`${pad('  generations')}: ${num(perItem.instrumented)}`);
-  if (opts.env === 'prod' && perItem.unmarked > 0) {
+  if (opts.env !== 'all' && perItem.unmarked > 0) {
     console.log(`${pad('  pre-marker records')}: ${num(perItem.unmarked)}  (no env field — counted here, may include local work)`);
   }
   console.log(`${pad('  Anthropic')}: ${usd(costByProvider.anthropic)}`);
@@ -846,7 +900,9 @@ async function main() {
   console.log(`${' '.repeat(25)}--------`);
   console.log(`${pad('Total AI cost')}: ${usd(totalCost)}`);
 
-  if (denominator > 0) {
+  if (blendedBlocked) {
+    console.log(`\n${pad('Cost per item')}: withheld — see WARNING below`);
+  } else if (denominator > 0) {
     console.log(`\n${pad('Cost per item')}: ${usd(totalCost / denominator)}${opts.excludeTrial ? '  (paid items only)' : ''}`);
     console.log(`${pad('  Anthropic')}: ${usd(costByProvider.anthropic / denominator)}`);
     console.log(`${pad('  OpenAI')}: ${usd(costByProvider.openai / denominator)}`);
@@ -901,7 +957,7 @@ async function main() {
 
   // Are the current prices profitable against this cost? The rates come from
   // plans-config, so the table cannot drift from what customers are billed.
-  if (opts.langs.length === 0 && denominator > 0) {
+  if (opts.langs.length === 0 && denominator > 0 && !blendedBlocked) {
     const cpi = totalCost / denominator;
     console.log(`\nMargin at ${usd(cpi)}/item (rate card ${opts.asOf.toISOString().split('T')[0]})`);
     console.log(`  ${'plan'.padEnd(12)}${'$/item'.padStart(9)}${'margin'.padStart(10)}${'profit/item'.padStart(13)}`);
