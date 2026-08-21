@@ -118,12 +118,16 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
     return <div>Error loading usage data</div>;
   }
 
-  // The bar fills against the included bucket; overage extends past 100%.
+  // Within the included bucket the bar is scaled to it. Once usage spills over,
+  // the bar rescales to included + overage so both segments together fill it —
+  // the included share shrinks as the overage grows.
   const included = usage.includedItems;
   const used = usage.itemsUsed;
   const includedUsed = Math.min(used, included);
-  const includedPct = included > 0 ? (includedUsed / included) * 100 : (used > 0 ? 100 : 0);
-  const overagePct = included > 0 ? Math.min((usage.overageItems / included) * 100, 100) : 0;
+  const overageItems = usage.overageItems;
+  const barTotal = Math.max(included, includedUsed + overageItems);
+  const includedPct = barTotal > 0 ? (includedUsed / barTotal) * 100 : (used > 0 ? 100 : 0);
+  const overagePct = barTotal > 0 ? (overageItems / barTotal) * 100 : 0;
 
   const remainingIncluded = Math.max(0, included - used);
   const isAtIncludedLimit = used >= included;
@@ -157,7 +161,9 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
               <span className="font-medium">
                 {usage.hardCap
                   ? `${remainingIncluded.toLocaleString()} of ${included.toLocaleString()} remaining`
-                  : `${included.toLocaleString()} included`}
+                  : overageItems > 0
+                    ? `${included.toLocaleString()} included + ${overageItems.toLocaleString()} overage`
+                    : `${included.toLocaleString()} included`}
               </span>
             </div>
             <div className="w-full bg-gray-200 h-8 relative overflow-hidden">
@@ -166,15 +172,15 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
                 className={`h-8 absolute left-0 top-0 transition-all duration-300 ${
                   isAtIncludedLimit ? 'bg-gray-600' : 'bg-gray-500'
                 }`}
-                style={{ width: `${Math.min(includedPct, 100)}%` }}
+                style={{ width: `${includedPct}%` }}
                 title={`Included: ${includedUsed.toLocaleString()} / ${included.toLocaleString()}`}
               />
               {/* Overage usage (past the included bucket) */}
-              {usage.overageItems > 0 && (
+              {overageItems > 0 && (
                 <div
                   className={`h-8 absolute top-0 transition-all duration-300 ${atCap ? 'bg-red-600' : 'bg-yellow-500'}`}
-                  style={{ left: `${Math.min(includedPct, 100) - overagePct}%`, width: `${overagePct}%` }}
-                  title={`Overage: ${usage.overageItems.toLocaleString()} items`}
+                  style={{ left: `${includedPct}%`, width: `${overagePct}%` }}
+                  title={`Overage: ${overageItems.toLocaleString()} items`}
                 />
               )}
             </div>
@@ -193,7 +199,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
               <div>
                 <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Overage</dt>
                 <dd className="mt-1">
-                  <div className="text-2xl font-semibold text-gray-900">{usage.overageItems.toLocaleString()}</div>
+                  <div className="text-2xl font-semibold text-gray-900">{overageItems.toLocaleString()}</div>
                   <div className="text-xs text-gray-500">
                     {usage.overageRatePerItem
                       ? `items · ${money(usage.overageCostUsd)} so far`

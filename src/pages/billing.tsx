@@ -29,11 +29,27 @@ const tabs = [
   { name: 'Payment Methods', icon: CreditCardIcon },
 ];
 
+const TAB_STORAGE_KEY = 'graffiticode:billing:tab';
+
 export default function Billing() {
   const router = useRouter();
   const { user, loading } = useGraffiticodeAuth();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [subscriptionKey, setSubscriptionKey] = useState(0); // Force refresh of subscription components
+
+  // Restore the last tab after mount (not during render) so the server and
+  // client agree on the first paint.
+  useEffect(() => {
+    const saved = Number(localStorage.getItem(TAB_STORAGE_KEY));
+    if (Number.isInteger(saved) && saved >= 0 && saved < tabs.length) {
+      setSelectedIndex(saved);
+    }
+  }, []);
+
+  const selectTab = (index: number) => {
+    setSelectedIndex(index);
+    localStorage.setItem(TAB_STORAGE_KEY, String(index));
+  };
 
   const refreshSubscription = () => {
     setSubscriptionKey(prev => prev + 1); // Increment to trigger re-render
@@ -94,7 +110,7 @@ export default function Billing() {
             </p>
           </div>
 
-          <Tab.Group selectedIndex={selectedIndex} onChange={setSelectedIndex}>
+          <Tab.Group selectedIndex={selectedIndex} onChange={selectTab}>
             <Tab.List className="flex space-x-1 rounded-none bg-gray-200 p-1">
               {tabs.map((tab) => (
                 <Tab
