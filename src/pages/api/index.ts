@@ -1,4 +1,5 @@
 import { makeExecutableSchema } from "@graphql-tools/schema";
+import { generateCodeForRequest } from "../../lib/code-generation/generate-for-request";
 import {
   getGraphQLParameters,
   processRequest,
@@ -14,7 +15,6 @@ import {
   getTask,
   postTask,
   getData,
-  generateCode,
   createItem,
   updateItem,
   getItems,
@@ -462,7 +462,7 @@ const resolvers = {
       const auth = await resolveAuth(ctx);
       const { prompt, language, options, currentSrc, conversationSummary, itemId } = args;
       try {
-        return await generateCode({ auth, prompt, language, options, currentSrc, conversationSummary, itemId });
+        return await generateCodeForRequest({ auth, prompt, language, options, currentSrc, conversationSummary, itemId });
       } catch (error) {
         if (error instanceof FreePlanError) throw error;
         console.error("Error in generateCode mutation:", error);

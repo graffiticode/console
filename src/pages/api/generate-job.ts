@@ -7,8 +7,8 @@
 // allocated throughout) — the console already sustains requests this long via
 // the synchronous /api path, so no special runtime config is needed.
 import type { NextApiRequest, NextApiResponse } from "next";
+import { generateCodeForRequest } from "../../lib/code-generation/generate-for-request";
 import {
-  generateCode,
   updateItem,
   getItem,
   setItemGenerationStatus,
@@ -108,7 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const workspaceKey = (actor(auth) as { session?: string }).session;
 
   try {
-    const result = await generateCode({
+    const result = await generateCodeForRequest({
       auth,
       prompt,
       language: lang,
