@@ -324,6 +324,9 @@ interface McpEvent {
   lang?: string;
   desc_len?: number;
   ms?: number;
+  // Truncated backend error (200 chars, server-side). On a scope rejection this
+  // is the backend's own English summary of what the user asked for.
+  err?: string;
   client_kind?: string; // MCP clientInfo.name (e.g. "claude-ai"); on tool events
   geo_country?: string; // ISO-3166 alpha-2, coarse (no IP); on connect + tool
   geo_region?: string;
@@ -358,6 +361,54 @@ interface SlowError {
   lang?: string;
 }
 
+/**
+ * A request the catalogue accepted and the backend then refused as out of
+ * scope — someone asked for something Graffiticode does not do, and only found
+ * out after describing it in full.
+ *
+ * Named for the shape that produces it: a keyword search matches ONE language,
+ * the agent reads that as the answer rather than as a near miss, and settles.
+ * Observed 2026-08-23 — a user wanting staff scheduling and payroll validation
+ * searched "spreadsheet", got L0166 alone, and spent ~2.9k chars of description
+ * across a create and an update before the rejection landed.
+ *
+ * Deliberately NOT the same signal as `catalogEmpty`. A zero-result search is
+ * the agent asking for the missing capability by name, which is the easy case;
+ * this is the agent translating the need into a term that DOES match first, so
+ * the miss never appears as a miss.
+ */
+interface ScopeRejection {
+  t: string;
+  tool: string;
+  lang?: string;
+  clientKind?: string;
+  session: string;
+  err: string;
+  /** The narrow search that preceded it, when one can be attributed. */
+  search?: { t: string; searchLen: number; results: number; sameSession: boolean };
+  /**
+   * How many rejection events this one unmet request produced. One refusal is
+   * replayed by every retrieval of the failed item — the 2026-08-23 case fired
+   * three times (an update and two render_items) for a single user asking for a
+   * single thing. Counting events would treat one person as three data points,
+   * which is exactly backwards for a demand signal.
+   */
+  repeats: number;
+}
+
+/** A search matching at most this many languages reads to an agent as "the answer". */
+const NARROW_RESULTS = 2;
+
+/** How far back to look for the search that led to a rejection. */
+const SCOPE_LOOKBACK_MS = 15 * 60 * 1000;
+
+/**
+ * Backend refusals that mean "no language covers this", as opposed to a
+ * malformed request or a cap. Matched on the message because the console does
+ * not give this class its own code; both wordings below are live in the logs.
+ */
+const SCOPE_REJECTION = /doesn't fit any available graffiticode language|out of scope:/i;
+
 interface SegmentStats {
   bucket: ClientBucket;
   label: string;
@@ -388,6 +439,9 @@ interface LogStats {
   catalogSearches: number;
   catalogEmpty: number;        // a non-empty search that matched NOTHING
   catalogDomains: Record<string, number>;
+  catalogNarrow: number;       // a search matching 1-NARROW_RESULTS languages
+  scopeRejections: ScopeRejection[];
+  scopeAfterNarrow: number;    // …of those, ones a narrow search precedes
   sessionsWithCreate: number;
   firstTrySuccess: number;
   toolTotal: number;
@@ -470,8 +524,25 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
   let userToolTotal = 0, userToolOk = 0, nonUserCalls = 0;
   let slowErrors = 0, maxErrorMs = 0;
   const slowErrorSamples: SlowError[] = [];
+  let catalogNarrow = 0;
+  const scopeRejections: ScopeRejection[] = [];
+  // Recent narrow searches, newest last, for attributing a rejection to the
+  // search that led to it. Keyed by client kind because the stateless hosts
+  // (ChatGPT mints a fresh MCP session PER CALL) put the search and the create
+  // in different sessions — a session-keyed join would attribute nothing at all
+  // for exactly the clients this signal comes from.
+  const recentNarrow: { t: number; searchLen: number; results: number; session: string; clientKind?: string }[] = [];
+  // The language a caller was last steered into. A render_item that reports the
+  // refusal carries no `lang` of its own — the language was chosen back at the
+  // create, which for a stateless host is a different session entirely — so the
+  // "routed to" column has to be recovered the same way the search is.
+  const recentLang: { t: number; lang: string; session: string; clientKind?: string }[] = [];
 
-  for (const e of inWin) {
+  // Chronological: attribution looks BACKWARD from a rejection, so the searches
+  // have to have been seen already. gcloud returns newest-first.
+  const chron = [...inWin].sort((a, b) => (toMillis(a.t) ?? 0) - (toMillis(b.t) ?? 0));
+
+  for (const e of chron) {
     const nonUser = e.session ? isNonUser(e.session) : false;
     if (e.ev === 'mcp_connect') { connects++; continue; }
     if (e.ev === 'mcp_listed') { if (e.session) stageSessions.listed.add(e.session); continue; }
@@ -493,8 +564,39 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
       }
     }
     if (e.session) stageSessions.tool.add(e.session);
+    if (e.outcome === 'generation_failed' && e.err && SCOPE_REJECTION.test(e.err) && !nonUser) {
+      const at = toMillis(e.t) ?? 0;
+      // Prefer the same session (session-stable hosts give a real join); fall
+      // back to the most recent narrow search from the same client kind inside
+      // the lookback. The fallback is a CORRELATION, not a causal link — it is
+      // flagged as such in the output so nobody reads it as a traced path.
+      const candidates = recentNarrow.filter((n) => at - n.t >= 0 && at - n.t <= SCOPE_LOOKBACK_MS);
+      const hit =
+        candidates.filter((n) => n.session === e.session).pop() ??
+        candidates.filter((n) => n.clientKind && n.clientKind === e.client_kind).pop();
+      const langPool = recentLang.filter((n) => at - n.t >= 0 && at - n.t <= SCOPE_LOOKBACK_MS);
+      const langHit =
+        langPool.filter((n) => n.session === e.session).pop() ??
+        langPool.filter((n) => n.clientKind && n.clientKind === e.client_kind).pop();
+      scopeRejections.push({
+        repeats: 1,
+        t: e.t,
+        tool: e.tool ?? '?',
+        lang: e.lang ?? langHit?.lang,
+        clientKind: e.client_kind,
+        session: e.session,
+        err: e.err,
+        search: hit
+          ? { t: new Date(hit.t).toISOString(), searchLen: hit.searchLen, results: hit.results, sameSession: hit.session === e.session }
+          : undefined,
+      });
+    }
     if (e.tool && READ_TOOLS.has(e.tool)) browseCalls++;
-    if (e.tool === 'list_languages') {
+    // Catalogue shape counts real callers only — same rule as the tool-success
+    // rates above. Scanners search for junk by design and our own probes search
+    // for known-missing terms to test the instrumentation; both land as
+    // zero-result searches and would otherwise BE the discovery signal.
+    if (e.tool === 'list_languages' && !nonUser) {
       catalogCalls++;
       if (e.domain) catalogDomains[e.domain] = (catalogDomains[e.domain] || 0) + 1;
       if (typeof e.search_len === 'number' && e.search_len > 0) {
@@ -502,7 +604,20 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
         // results is absent on the error path and on pre-instrumentation events;
         // only an explicit 0 counts as "asked for something we don't have".
         if (e.results === 0) catalogEmpty++;
+        if (typeof e.results === 'number' && e.results > 0 && e.results <= NARROW_RESULTS) {
+          catalogNarrow++;
+          recentNarrow.push({
+            t: toMillis(e.t) ?? 0,
+            searchLen: e.search_len,
+            results: e.results,
+            session: e.session,
+            clientKind: e.client_kind,
+          });
+        }
       }
+    }
+    if (e.lang && (e.tool === 'create_item' || e.tool === 'update_item')) {
+      recentLang.push({ t: toMillis(e.t) ?? 0, lang: e.lang, session: e.session, clientKind: e.client_kind });
     }
     if (e.tool === 'create_item') {
       createCalls++;
@@ -541,6 +656,29 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
   const userFirstTrySuccess = userCreateSessions.filter((e) => e.outcome === 'ok').length;
   slowErrorSamples.sort((a, b) => b.ms - a.ms);
 
+  // Collapse repeats of one refusal into one request. The message is the
+  // backend's own summary of what was asked for, so identical text is the same
+  // ask; keep the EARLIEST event, which is the one carrying the search that led
+  // to it.
+  const byAsk = new Map<string, ScopeRejection>();
+  for (const r of scopeRejections) {
+    // Keyed on the refusal text ALONE. `lang` is recovered from a nearby create
+    // and `search` from a nearby search, so both are absent on whichever repeat
+    // falls outside the lookback — keying on either splits one person's single
+    // request into two rows and doubles the demand count.
+    const key = r.err.slice(0, 160);
+    const prev = byAsk.get(key);
+    if (!prev) { byAsk.set(key, r); continue; }
+    prev.repeats++;
+    // Keep whatever attribution any repeat managed to recover.
+    prev.lang ??= r.lang;
+    prev.search ??= r.search;
+    if ((toMillis(r.t) ?? 0) < (toMillis(prev.t) ?? 0)) {
+      prev.t = r.t; prev.tool = r.tool; prev.session = r.session;
+    }
+  }
+  const asks = [...byAsk.values()].sort((a, b) => (toMillis(b.t) ?? 0) - (toMillis(a.t) ?? 0));
+
   // Tally distinct sessions per kind/country; bucket the rest as "unknown".
   const clientKindSessions: Record<string, number> = {};
   const geoCountrySessions: Record<string, number> = {};
@@ -566,6 +704,9 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
     catalogSearches,
     catalogEmpty,
     catalogDomains,
+    catalogNarrow,
+    scopeRejections: asks,
+    scopeAfterNarrow: asks.filter((r) => r.search).length,
     sessionsWithCreate: createSessions.length,
     firstTrySuccess,
     toolTotal,
@@ -1044,6 +1185,16 @@ ${log.slowErrorSamples.length ? `<table>
 </table>
 ${log.slowErrors > 30 ? `<p class="note">… and ${log.slowErrors - 30} more.</p>` : ''}` : `<p class="note">None in window. (Adjust the threshold with <code>--slow-ms</code>; default 60000.)</p>`}
 
+<h2>Unmet requests <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(the backend refused as out of scope — what people wanted that Graffiticode does not do)</span></h2>
+<p class="note">Each row is one ask, not one event: a refusal is replayed by every retrieval of the failed item, so repeats are collapsed and counted. The text is the backend's own summary of the request. These are <strong>candidate languages</strong> — the demand arrived, described itself, and left.</p>
+${log.scopeRejections.length ? `<table>
+  <thead><tr><th>Time (UTC)</th><th>Client</th><th>Routed to</th><th class="num">Seen</th><th>What was asked for</th><th>Reached it via</th></tr></thead>
+  <tbody>
+    ${log.scopeRejections.slice(0, 30).map((r) => `<tr><td>${r.t.slice(0, 16).replace('T', ' ')}</td><td>${r.clientKind ?? '?'}</td><td>${r.lang ?? '?'}</td><td class="num">${r.repeats}</td><td>${r.err.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] as string))}</td><td class="note">${r.search ? `search ${r.search.searchLen}ch → ${r.search.results} match${r.search.results === 1 ? '' : 'es'}${r.search.sameSession ? '' : ' <em>(same client, different session — correlation)</em>'}` : '—'}</td></tr>`).join('\n    ')}
+  </tbody>
+</table>
+<p class="note">${log.scopeAfterNarrow} of ${log.scopeRejections.length} followed a search matching ≤${NARROW_RESULTS} languages. That is the settle-for-the-nearest-match path: one hit reads to an agent as the answer rather than as a near miss, so the user describes the whole thing before the refusal lands. A zero-result search (${log.catalogEmpty} in window) is the easier case — there the agent named the gap directly.</p>` : `<p class="note">None in window.</p>`}
+
 <h2>Language distribution (interest signal)</h2>
 <table>
   <thead><tr><th>Language</th><th class="num">Calls</th></tr></thead>
@@ -1143,8 +1294,20 @@ async function main() {
   console.log(`Browse (read) calls    : ${log.browseCalls}`);
   const topN = (counts: Record<string, number>) => Object.entries(counts)
     .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ') || '—';
+  const asks = log.scopeRejections;
+  console.log(`Unmet requests (scope) : ${asks.length}` +
+    `${asks.length ? ` — ${log.scopeAfterNarrow} preceded by a narrow search (\u2264${NARROW_RESULTS} matches)` : ' — none in window'}`);
+  for (const r of asks.slice(0, 8)) {
+    const via = r.search
+      ? `search ${r.search.searchLen}ch\u2192${r.search.results}${r.search.sameSession ? '' : ' (same client, not same session)'}`
+      : 'no search attributed';
+    console.log(`  ${r.t.slice(5, 16)}  ${(r.clientKind ?? '?').slice(0, 18).padEnd(18)} ${(r.lang ?? '?').padEnd(6)} x${r.repeats}  [${via}]`);
+    console.log(`      ${r.err.slice(0, 150)}`);
+  }
+  if (asks.length > 8) console.log(`  … and ${asks.length - 8} more.`);
   console.log(`Catalog calls / search : ${log.catalogCalls} / ${log.catalogSearches}` +
     `${log.catalogSearches ? ` — ${pct(log.catalogEmpty, log.catalogSearches)} matched NOTHING (${log.catalogEmpty})` : ''}` +
+    `${log.catalogNarrow ? `; ${log.catalogNarrow} narrow (\u2264${NARROW_RESULTS})` : ''}` +
     `${Object.keys(log.catalogDomains).length ? `; domains ${topN(log.catalogDomains)}` : ''}`);
   console.log(`Create / update calls  : ${log.createCalls} / ${log.updateCalls}`);
   console.log(`Tool success (users)   : ${pct(log.userToolOk, log.userToolTotal)} (${log.userToolOk}/${log.userToolTotal}) — excl. ${log.nonUserCalls} non-user call(s) (scanners + our own Inspector) from ${log.nonUserSessions} session(s)`);
