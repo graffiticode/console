@@ -327,6 +327,12 @@ interface McpEvent {
   client_kind?: string; // MCP clientInfo.name (e.g. "claude-ai"); on tool events
   geo_country?: string; // ISO-3166 alpha-2, coarse (no IP); on connect + tool
   geo_region?: string;
+  // list_languages only. The search STRING is never logged — see the privacy
+  // contract in the MCP server's src/events.ts — so `search_len` is all we get
+  // of what was asked, and `results` is what the catalogue gave back.
+  search_len?: number;
+  domain?: string;
+  results?: number;
 }
 
 function fetchEvents(start: Date, end: Date): McpEvent[] {
@@ -375,6 +381,13 @@ interface LogStats {
   browseCalls: number;
   createCalls: number;
   updateCalls: number;
+  // Catalog discovery shape (list_languages). `search` itself is never logged —
+  // only its length, the allowlisted domain, and the result count — so these are
+  // the whole picture of what agents ask the catalog for and what it gives back.
+  catalogCalls: number;
+  catalogSearches: number;
+  catalogEmpty: number;        // a non-empty search that matched NOTHING
+  catalogDomains: Record<string, number>;
   sessionsWithCreate: number;
   firstTrySuccess: number;
   toolTotal: number;
@@ -451,6 +464,8 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
   const firstCreateBySession: Record<string, McpEvent> = {};
   const langCounts: Record<string, number> = {};
   let connects = 0, browseCalls = 0, createCalls = 0, updateCalls = 0;
+  let catalogCalls = 0, catalogSearches = 0, catalogEmpty = 0;
+  const catalogDomains: Record<string, number> = {};
   let toolTotal = 0, toolOk = 0, toolGenFailed = 0, toolError = 0;
   let userToolTotal = 0, userToolOk = 0, nonUserCalls = 0;
   let slowErrors = 0, maxErrorMs = 0;
@@ -479,6 +494,16 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
     }
     if (e.session) stageSessions.tool.add(e.session);
     if (e.tool && READ_TOOLS.has(e.tool)) browseCalls++;
+    if (e.tool === 'list_languages') {
+      catalogCalls++;
+      if (e.domain) catalogDomains[e.domain] = (catalogDomains[e.domain] || 0) + 1;
+      if (typeof e.search_len === 'number' && e.search_len > 0) {
+        catalogSearches++;
+        // results is absent on the error path and on pre-instrumentation events;
+        // only an explicit 0 counts as "asked for something we don't have".
+        if (e.results === 0) catalogEmpty++;
+      }
+    }
     if (e.tool === 'create_item') {
       createCalls++;
       if (e.session) stageSessions.create.add(e.session);
@@ -537,6 +562,10 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
     browseCalls,
     createCalls,
     updateCalls,
+    catalogCalls,
+    catalogSearches,
+    catalogEmpty,
+    catalogDomains,
     sessionsWithCreate: createSessions.length,
     firstTrySuccess,
     toolTotal,
@@ -952,6 +981,7 @@ ${data.omtm.isClockStartWeek ? `<div class="banner banner-red">
     ${funnelRow('Loaded the catalogue (sessions)', log.listedSessions, '—', 'mcp_listed — the real top of the funnel')}
     ${funnelRow('Called any tool (sessions)', toolSessionsTotal, listedToCalled + ' of listed', 'the step that separates intent from installation')}
     ${funnelRow('Browsed (read-route calls)', log.browseCalls, '—', 'list_languages · get_language_info · get_item')}
+    ${funnelRow('Catalogue searches', log.catalogSearches, pct(log.catalogSearches, log.catalogCalls) + ' of catalogue calls', `${log.catalogEmpty} matched nothing — a capability asked for and not advertised`)}
     ${funnelRow('Create calls', log.createCalls, pct(log.sessionsWithCreate, toolSessionsTotal) + ' of tool sessions', `${log.sessionsWithCreate} sessions created an item`)}
     ${funnelRow('Update calls (iterate)', log.updateCalls, pct(log.updateCalls, log.createCalls) + ' of creates', 'create → revisit')}
   </tbody>
@@ -1111,12 +1141,15 @@ async function main() {
   console.log(`Listed tools (sessions): ${log.listedSessions}  → called a tool: ${toolSessTotal} (${listedConv(toolSessTotal, log.listedSessions)})`);
   console.log(`Resource reads (sess)  : ${log.resourceSessions}`);
   console.log(`Browse (read) calls    : ${log.browseCalls}`);
+  const topN = (counts: Record<string, number>) => Object.entries(counts)
+    .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ') || '—';
+  console.log(`Catalog calls / search : ${log.catalogCalls} / ${log.catalogSearches}` +
+    `${log.catalogSearches ? ` — ${pct(log.catalogEmpty, log.catalogSearches)} matched NOTHING (${log.catalogEmpty})` : ''}` +
+    `${Object.keys(log.catalogDomains).length ? `; domains ${topN(log.catalogDomains)}` : ''}`);
   console.log(`Create / update calls  : ${log.createCalls} / ${log.updateCalls}`);
   console.log(`Tool success (users)   : ${pct(log.userToolOk, log.userToolTotal)} (${log.userToolOk}/${log.userToolTotal}) — excl. ${log.nonUserCalls} non-user call(s) (scanners + our own Inspector) from ${log.nonUserSessions} session(s)`);
   console.log(`Tool success (blended) : ${pct(log.toolOk, log.toolTotal)} (${log.toolOk}/${log.toolTotal}) — incl. scanners + internal; not a reliability signal`);
   console.log(`Errors / slow (timeouts): ${log.toolError} / ${log.slowErrors} (≥${(log.slowMs / 1000).toFixed(0)}s${log.maxErrorMs ? `, slowest ${(log.maxErrorMs / 1000).toFixed(0)}s` : ''})`);
-  const topN = (counts: Record<string, number>) => Object.entries(counts)
-    .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ') || '—';
   console.log(`Agent kind (sessions)  : ${topN(log.clientKindSessions)}`);
   console.log(`Geo country (sessions) : ${topN(log.geoCountrySessions)}`);
   console.log('-- Items & conversion (Firestore, incl. history) --');
