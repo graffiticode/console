@@ -129,6 +129,13 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   //   Human labels (anchor v2): all 28 candidates scored 3 — 7 per model across BOTH tiers,
   //   so quality is tied and cost is the only live variable. Behavior check on the case with
   //   a known silent-failure mode (clozeformula accepted-answer set): 20/20.
+  //     ^ RETRACTED 2026-08-24. That case (`clozeformula-equivalence`, "simplify 4/8", accepting
+  //     1/2 · 0.5 · 2/4 but not 4/8) has a near-twin in the RAG corpus carrying the code AND the
+  //     scoring method, which retrieval supplied to every variant on every run. The 20/20 measured
+  //     transcription, not authoring, so it is not evidence for what it claims. The hold-out gate
+  //     passed it because the wording differs — the gate checks membership, not proximity. See
+  //     scripts/eval-case-proximity.ts, which reports what retrieval would actually hand a case.
+  //     Replaced by the 2026-08-24 clean-set result below.
   //   Judge NOT used: zero label variance leaves Spearman undefined, and a dialect at
   //   ceiling has nothing for a judge to discriminate.
   //
@@ -160,6 +167,27 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   //
   // --converge is still inert here: 0 compiler warnings across all 84 runs, as across the earlier
   // 250+. Convergence and single-shot measure the same thing on this dialect.
+  //
+  // CLEAN-SET CONFIRMATION 2026-08-24 (model-eval-mcp-2026-08-24T21-29-06-818Z, 192 runs over
+  // data/model-eval/mcp/0176.json — 16 cases authored from L0176's public MCP surface by
+  // scripts/eval-cases-from-mcp.ts, which cannot read the corpus). Proximity, measured through the
+  // generator's own retrieval path: 13 of 16 cases retrieve NOTHING above the 0.50 gate (mean top1
+  // .435), against 4 of 7 fed 1-3 examples in the corpus-seeded set (mean .546).
+  //   haiku 48/48 first-pass $0.0017 p50 4.8s · luna 48/48 $0.0032 7.0s
+  //   terra 48/48 $0.0039 4.1s · sonnet 46/48 first-pass, 48/48 final, $0.0068 7.2s
+  // Every variant still reaches 100% compile with 0 warnings and 0 drift on cases nobody was
+  // handed the answer to, so the ordering above rests on the dialect being at ceiling, not on
+  // retrieval propping it up. haiku stays cheapest by better than 2x.
+  //
+  // The retracted behavior check is replaced by this: the three clozeformula cases in the clean
+  // set (symbolic equivalence, syntax+value, tolerance — top1 .27-.39, zero examples supplied)
+  // went 36/36 first-pass across all four variants.
+  //
+  // Sonnet's 2 misses are one case (clozetext-two-blanks-long-answer, 2 of 3 trials): it put
+  // `{{response}}` in `stimulus`, which compiles to a prompt with an orphaned input box — the
+  // failure l0176's docs.test.ts guards its own examples against. The compiler caught it and
+  // repair fixed it in one round. It surfaced only on a case with no retrieved example to
+  // imitate, which is the argument for corpus-independent cases in one line.
   "0176": ["anthropic+fast", "openai+balanced"],
 
   // eval 2026-08-09 (model-eval-0175-converge-merged-from-checkpoint, 7 cases x 3 trials,

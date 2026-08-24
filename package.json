@@ -31,7 +31,9 @@
     "eval:label-items": "npx tsx scripts/create-eval-items.ts",
     "eval:label-pull": "npx tsx scripts/pull-eval-labels.ts",
     "eval:label-sheet": "npx tsx scripts/gen-label-worksheet.ts",
-    "eval:judge-smoke": "npx tsx scripts/judge-smoke.ts"
+    "eval:judge-smoke": "npx tsx scripts/judge-smoke.ts",
+    "eval:cases": "npx tsx scripts/eval-cases-from-mcp.ts",
+    "eval:proximity": "npx tsx scripts/eval-case-proximity.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",
