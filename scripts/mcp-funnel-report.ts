@@ -666,7 +666,14 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
     // and `search` from a nearby search, so both are absent on whichever repeat
     // falls outside the lookback — keying on either splits one person's single
     // request into two rows and doubles the demand count.
-    const key = r.err.slice(0, 160);
+    //
+    // 400 chars, tracking the server's 500-char cap. The refusal opens with 87
+    // characters of fixed preamble ("This request doesn't fit any available
+    // Graffiticode language. This request describes a "), so a short key spends
+    // most of itself on boilerplate — at the previous 160 only 73 characters
+    // actually distinguished one ask from another, and two unrelated requests
+    // in the same area would have merged into one row and understated demand.
+    const key = r.err.slice(0, 400);
     const prev = byAsk.get(key);
     if (!prev) { byAsk.set(key, r); continue; }
     prev.repeats++;
