@@ -139,6 +139,27 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // Failover is +balanced ON PURPOSE. The cheapest openai model (luna) is the one variant
   // measured here that fails outright, so the fallback trades a little cost for terra's
   // 21/21 rather than inheriting `fast` from the primary.
+  //
+  // RE-MEASURED 2026-08-24 (model-eval-2026-08-24T19-35-00-883Z, 7 cases x 3 trials, single-shot,
+  // hold-out enforced, 21 runs per variant, 0 errors). NOT a reproduction of the above: the dialect
+  // moved underneath it, 2bf6bf310261 (37KB) -> aa0b77403d8c (49.6KB), and the costs moved with it.
+  //   FAST      haiku-4.5    18/21 first-pass, 21/21 final, $0.0028, p50 5.5s
+  //             gpt-5.6-luna 21/21 first-pass,              $0.0027, p50 7.0s
+  //   BALANCED  terra 21/21 $0.0037 p50 3.9s · sonnet 21/21 $0.0082 p50 7.7s
+  //   Every variant still ends at 100% compile with 0 warnings, 0 stubs, 0 drift.
+  //
+  // Line UNCHANGED, on two readings of that haiku result. (a) Its three misses are one case
+  // (choicematrix-partial-credit) in 3 of 3 trials — deterministic, and a dialect-doc gap rather
+  // than a model limit: it hoisted `scoring-type` out of `validation`, the repair pass fixed it in
+  // one round, and the repaired code is structurally identical to terra's first-pass. The
+  // instructions.md imperative it was reading named the attribute without its wrapper; correcting
+  // it (l0176 1417bd0, deployed 2026-08-24) took that case from 0/3 to 10/10 first-pass, and
+  // `scoring-type` sits inside `validation` in 40/40 generations across all four variants with
+  // partialMatch preserved. (b) luna's 21/21 does not overturn its 3-in-70 from 2026-08-11 — at a 4% rate,
+  // 21 clean runs happen ~42% of the time, so the +balanced failover keeps its basis.
+  //
+  // --converge is still inert here: 0 compiler warnings across all 84 runs, as across the earlier
+  // 250+. Convergence and single-shot measure the same thing on this dialect.
   "0176": ["anthropic+fast", "openai+balanced"],
 
   // eval 2026-08-09 (model-eval-0175-converge-merged-from-checkpoint, 7 cases x 3 trials,
