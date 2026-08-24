@@ -211,7 +211,7 @@ const READ_TOOLS = new Set(['list_languages', 'get_language_info', 'get_item']);
 //
 // Everything downstream segments by these buckets. `bucketOf` is keyed on the
 // self-declared clientInfo.name, which is the only client identity we have.
-type ClientBucket = 'claude' | 'openai' | 'other' | 'internal' | 'scanner' | 'unknown';
+type ClientBucket = 'claude' | 'openai' | 'other' | 'internal' | 'scanner' | 'crawl' | 'unknown';
 
 const BUCKET_LABEL: Record<ClientBucket, string> = {
   claude: 'Claude family',
@@ -219,11 +219,32 @@ const BUCKET_LABEL: Record<ClientBucket, string> = {
   other: 'Other named',
   internal: 'Internal (our own testing)',
   scanner: 'Scanner / validator',
+  crawl: 'Automated catalog crawl',
   unknown: 'Unknown',
 };
 
 // Order matters only for display; `unknown` last.
-const BUCKET_ORDER: ClientBucket[] = ['claude', 'openai', 'other', 'internal', 'scanner', 'unknown'];
+const BUCKET_ORDER: ClientBucket[] = ['claude', 'openai', 'other', 'internal', 'scanner', 'crawl', 'unknown'];
+
+/**
+ * Catalogue crawls: many sessions that connect, list, and never ask for
+ * anything, arriving back to back from one client and one country.
+ *
+ * Detected by BEHAVIOUR, not by name, because the name is the problem. On
+ * 2026-08-24 a job began fetching the tool catalogue from GB reporting itself
+ * as `claude-ai` — the same clientInfo Claude.ai's own connector sends — in
+ * bursts of ~40 sessions at ~2s intervals, every ~16 minutes. Filtering on the
+ * name would have deleted the real Claude.ai segment along with it, and the
+ * next crawler would pick a different name anyway.
+ *
+ * The "connect, list, never call" shape ALONE cannot be the test: that
+ * describes most legitimate traffic too — it is exactly the 4% listed→called
+ * conversion this report exists to measure. The cadence is what separates a
+ * population of people who each opened one conversation from one machine
+ * working through a list.
+ */
+const CRAWL_MAX_GAP_MS = 10_000;  // consecutive sessions closer than this are one run
+const CRAWL_MIN_RUN = 10;         // …and a run this long is not a population of humans
 
 // Substrings marking automated catalogue crawlers, uptime probes and security
 // scanners. These are not users: they call tools with junk item ids on purpose,
@@ -427,7 +448,12 @@ interface SegmentStats {
 interface LogStats {
   connects: number;
   distinctSessions: number;
-  listedSessions: number;    // reached tools/list — the real top of the funnel
+  // Reached tools/list — the real top of the funnel. EXCLUDES catalogue crawls:
+  // the listed→called rate is the question this report exists to answer, and a
+  // machine that lists 3,600 times a day and never calls anything drives it to
+  // zero while saying nothing about whether people find the tools useful.
+  listedSessions: number;
+  crawlSessions: number;     // …how many were held out, so the volume stays visible
   resourceSessions: number;  // read one of our own resources
   browseCalls: number;
   createCalls: number;
@@ -487,13 +513,51 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
     if (e.geo_country && !sessionCountry[e.session]) sessionCountry[e.session] = e.geo_country;
     if (e.auth && !sessionAuth[e.session]) sessionAuth[e.session] = e.auth;
   }
-  const bucketOfSession = (s: string): ClientBucket => bucketOf(sessionKind[s]);
+  // Pass 1b — find catalogue crawls. Needs each session's start time and
+  // whether it ever asked for anything, so it runs after the identity pass and
+  // before the counting pass that consumes the bucket.
+  const sessionStart: Record<string, number> = {};
+  const sessionAsked = new Set<string>();
+  for (const e of inWin) {
+    if (!e.session) continue;
+    const at = toMillis(e.t) ?? 0;
+    if (!(e.session in sessionStart) || at < sessionStart[e.session]) sessionStart[e.session] = at;
+    if (e.ev === 'mcp_tool' || e.ev === 'mcp_resource') sessionAsked.add(e.session);
+  }
+  const crawlSessions = new Set<string>();
+  {
+    // Group the never-asked sessions by who and where, then look for runs of
+    // back-to-back arrivals. One country is part of the signature: a real
+    // population spread across timezones does not arrive 2s apart all night.
+    const byOrigin = new Map<string, string[]>();
+    for (const sess of sessions) {
+      if (sessionAsked.has(sess)) continue;
+      const key = `${sessionKind[sess] ?? '?'}|${sessionCountry[sess] ?? '?'}`;
+      (byOrigin.get(key) ?? byOrigin.set(key, []).get(key)!).push(sess);
+    }
+    for (const group of byOrigin.values()) {
+      group.sort((a, b) => sessionStart[a] - sessionStart[b]);
+      let run: string[] = [];
+      const flush = () => {
+        if (run.length >= CRAWL_MIN_RUN) for (const x of run) crawlSessions.add(x);
+        run = [];
+      };
+      for (const sess of group) {
+        if (run.length && sessionStart[sess] - sessionStart[run[run.length - 1]] > CRAWL_MAX_GAP_MS) flush();
+        run.push(sess);
+      }
+      flush();
+    }
+  }
+
+  const bucketOfSession = (s: string): ClientBucket =>
+    crawlSessions.has(s) ? 'crawl' : bucketOf(sessionKind[s]);
   // "Not a user": automated probes and our own test harness. Both call tools
   // for reasons unrelated to demand, and both distort the reliability guardrail
   // — scanners by failing on purpose, Inspector by succeeding on purpose.
   const isNonUser = (s: string): boolean => {
     const b = bucketOfSession(s);
-    return b === 'scanner' || b === 'internal';
+    return b === 'scanner' || b === 'internal' || b === 'crawl';
   };
 
   // Pass 2 — stages and counts.
@@ -702,7 +766,8 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
   return {
     connects,
     distinctSessions: sessions.size,
-    listedSessions: stageSessions.listed.size,
+    listedSessions: [...stageSessions.listed].filter((x) => !crawlSessions.has(x)).length,
+    crawlSessions: crawlSessions.size,
     resourceSessions: stageSessions.resource.size,
     browseCalls,
     createCalls,
@@ -1126,7 +1191,7 @@ ${data.omtm.isClockStartWeek ? `<div class="banner banner-red">
 <table>
   <thead><tr><th>Stage</th><th class="num">Count</th><th class="num">Conv. from prev</th><th>Note</th></tr></thead>
   <tbody>
-    ${funnelRow('Loaded the catalogue (sessions)', log.listedSessions, '—', 'mcp_listed — the real top of the funnel')}
+    ${funnelRow('Loaded the catalogue (sessions)', log.listedSessions, '—', `mcp_listed — the real top of the funnel${log.crawlSessions ? `; ${log.crawlSessions} automated crawl session(s) excluded` : ''}`)}
     ${funnelRow('Called any tool (sessions)', toolSessionsTotal, listedToCalled + ' of listed', 'the step that separates intent from installation')}
     ${funnelRow('Browsed (read-route calls)', log.browseCalls, '—', 'list_languages · get_language_info · get_item')}
     ${funnelRow('Catalogue searches', log.catalogSearches, pct(log.catalogSearches, log.catalogCalls) + ' of catalogue calls', `${log.catalogEmpty} matched nothing — a capability asked for and not advertised`)}
@@ -1298,6 +1363,9 @@ async function main() {
   const toolSessTotal = log.segments.reduce((a, g) => a + g.toolSessions, 0);
   console.log(`Listed tools (sessions): ${log.listedSessions}  → called a tool: ${toolSessTotal} (${listedConv(toolSessTotal, log.listedSessions)})`);
   console.log(`Resource reads (sess)  : ${log.resourceSessions}`);
+  if (log.crawlSessions) {
+    console.log(`Catalog crawl (excl.)  : ${log.crawlSessions} session(s) — connect+list in back-to-back runs, never called anything; held out of the rate above`);
+  }
   console.log(`Browse (read) calls    : ${log.browseCalls}`);
   const topN = (counts: Record<string, number>) => Object.entries(counts)
     .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ') || '—';
