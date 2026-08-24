@@ -12,6 +12,17 @@ export interface Language {
   // console recognizes it and can show its items for curation, but excluded
   // from the planner's candidate catalog (it must never propose itself).
   internal?: boolean;
+  // Withheld from the CATALOG — the `languages` query and the planner's candidate
+  // list — while still registered everywhere else. A language lands here when it
+  // works well enough to keep authoring but not well enough to be recruited for:
+  // its output can't be finished from a chat (L0172 needs a human to wire up the
+  // Figma side) or it isn't done (L0174).
+  //
+  // Deliberately NOT `selectLanguages()`, which drives the console's own signed-in
+  // picker and tools gallery — hiding a language from discovery must not take it
+  // away from the person still building it. findLanguageById also keeps answering,
+  // so existing items render and `language(id)` still resolves.
+  hidden?: boolean;
   // Populated at runtime by listLanguages() from each lang server's
   // scope.json. The static `description` and `routingHint` above remain as
   // cold-start / unreachable-server fallbacks; once scope.json is universal
@@ -80,9 +91,9 @@ export const LANGUAGES: Language[] = [
   { id: "0169", name: "L0169", description: "Concept web assessments", routingHint: "Interactive concept web diagrams with central anchor, radial connections, custom edges, drag-and-drop concepts and relation labels, and node styling.", domains: ["assessments", "diagrams"] },
   { id: "0170", name: "L0170", description: "Fetch & transform data", routingHint: "The go-to provider for data acquisition and transformation. Fetches JSON/CSV from external/public web URLs (or accepts inline data) and transforms it (dplyr/jq-style): navigate nested data, filter/select/mutate/group/sort/take(top-N)/join/flatten/unique. Use as the upstream data source whenever another language (e.g. a chart) needs data fetched from the web or filtered/sorted/aggregated before use.", domains: [] },
   { id: "0171", name: "L0171", description: "Venn diagrams", routingHint: "Venn diagrams with named sets, intersections, elements, configurable overlap, and styling.", domains: ["diagrams"], status: "Beta" },
-  { id: "0172", name: "L0172", description: "FigJam content", routingHint: "FigJam board content authoring.", domains: [] },
+  { id: "0172", name: "L0172", description: "FigJam content", routingHint: "FigJam board content authoring.", domains: [], hidden: true },
   { id: "0173", name: "L0173", description: "Charts", routingHint: "Apache ECharts visualizations (bar, line, pie/donut/nightingale rose, scatter). Supports multi-series and dual-axis compositions. Plots data given inline, or binds external data from an upstream data task via `data` — compose with an upstream data-providing language when the values must be fetched or transformed before plotting.", domains: [], composesWith: ["0170"] },
-  { id: "0174", name: "L0174", description: "Web forms", routingHint: "Single-page web forms — ordered fields (text, email, number, tel, url, textarea, select, radio, checkbox, date), per-field validation (min/max, length, pattern, required), light/dark theming, and a submit affordance with thank-you/redirect. Submissions deliver to a bound webhook.", domains: [], status: "Beta" },
+  { id: "0174", name: "L0174", description: "Web forms", routingHint: "Single-page web forms — ordered fields (text, email, number, tel, url, textarea, select, radio, checkbox, date), per-field validation (min/max, length, pattern, required), light/dark theming, and a submit affordance with thank-you/redirect. Submissions deliver to a bound webhook.", domains: [], status: "Beta", hidden: true },
   { id: "0175", name: "L0175", description: "Grade 5 ELA assessments (SBAC Claim 1, Reasoning & Evidence): Target 4 literary texts and Target 11 informational texts", routingHint: "Composes 5th-grade English Language Arts assessment items (Smarter Balanced · Grade 5 · Claim 1 · Reasoning & Evidence) as EBSR, Hot Text, or Short Text. Supports two learning targets, selected by a top-level `target`: Target 4 (c1-t4) over LITERARY passages — character, setting, event, point of view, theme, narrator's feelings, character relationships (RL standards); and Target 11 (c1-t11) over INFORMATIONAL passages — relationships/interactions between ideas, the author's use of information and evidence, point of view, purpose, the author's opinion (RI standards). Authors, inline, candidate inference claims and evidence sources for a single passage (literary or informational).", domains: ["assessments"], status: "Beta" },
   { id: "0176", name: "L0176", description: "Learnosity assessment items — Learnosity-shaped JSON for a Learnosity Item Bank, Items API, or Learnosity-integrated LMS. Use ONLY when the user names Learnosity; not a general quiz language.", routingHint: "Do NOT use for generic quizzes, tests, or practice items that don't name Learnosity. Learnosity assessment items from natural language — MCQ, cloze/fill-in-the-blank, short/long text, choice matrix, ordering, classification, NGN/NCLEX bowtie, token-highlight (hot text), math fill-in, and custom items that embed another Graffiticode dialect (e.g. L0166 spreadsheets) as a `custom` question. Emits valid Learnosity item JSON.", domains: ["learnosity"], gatedBy: ["learnosity"], composesWith: ["0166"] },
   { id: "0177", name: "L0177", description: "Learnosity Author API integration — recipes for embedding/configuring an item/activity authoring UX. The UX view of a Learnosity Item bank; for programmatic access to the same data, see L0178.", routingHint: "Pick on this axis: L0177 is \"I want a UX of the data\" (a person authoring in a browser); L0178 is \"I want the data\" (a program reading or writing the bank server-to-server). Same Item bank, two views. Developer integration oracle for the Learnosity Author API. The client describes an authoring-experience integration design — embed the item editor (item_edit), item browser (item_list), activity editor (activity_edit), or activity list (activity_list), configured with allowed widget types, editor permissions, item bank, locked mode. L0177 validates the design, flags holes (missing serving domain, author user id, item reference) as steering warnings, and via get_spec returns a host-language-neutral recipe: goal, preconditions, procedure, gotchas, and verification steps. Does NOT author item content (that is L0176, which composes the payload), and does NOT do programmatic item-bank access — extraction, bulk load, or any server-to-server read/write is L0178. Does NOT emit runnable code.", domains: ["learnosity", "integration"], gatedBy: ["learnosity"], status: "Beta" },
@@ -101,7 +112,9 @@ export function selectLanguages(domain?: string): Language[] {
 }
 
 export async function listLanguages({ search, domain }: { search?: string; domain?: string }): Promise<Language[]> {
-  let results = selectLanguages(domain);
+  // `hidden` is applied here rather than in selectLanguages() so the console's own
+  // picker keeps showing these while the catalog stops offering them. See the field.
+  let results = selectLanguages(domain).filter(lang => !lang.hidden);
 
   // Enrich each entry from the lang server in parallel:
   //   - scope.json → summary / inScope / outOfScope (routing-only descriptor)
