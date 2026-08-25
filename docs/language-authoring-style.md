@@ -44,41 +44,69 @@ Nothing here is chained. `stimulus`, `stems`, `options`, `validation`, `scoring-
 `valid-response`, `score`, `value` are all `arity: 1` members, and the same word means the same
 thing at any depth.
 
-**The style is a hybrid, and that is deliberate.** A word is `arity: 2` when it needs *the rest
-of the program*, and there are two distinct reasons for that:
+**The style is a hybrid, and arity 2 is not vestigial.** Two roles genuinely need a second
+argument, and they are different from each other.
 
-**Containment** — the word's list is the content and its continuation is the chained tail, which
-is what the trailing `{}` is. In L0176 these are `items` and `questions`:
+**A container with configuration.** This is the case that earns arity 2 in this style: a word
+that takes *a list of child elements* **and** *its own configuration attributes*.
+
+```
+questions [q1 q2 q3] {a1 a2 a3}
+```
+
+The list is the children; the braces are a record of attributes belonging to the container
+itself. L0176's `QUESTIONS` merges the two, with computed fields winning:
+
+```js
+const continuation = toPlainObject(v1);                 // the {…} record
+const val = { ...continuation, ...questionsResult };    // merged into the result
+```
+
+So `{}` is the *empty* configuration, not a terminator — which is why real programs are full of
+`items [...] {}` and `questions [...] {}`. A member list cannot express this shape: a member is
+one key applied to one value, and here the word needs two argument roles that mean different
+things.
+
+**Binding into the environment.** `set-var` takes a name and a value and writes
+`options[name] = value`:
+
+```js
+SET_VAR(node, options, resume) {
+  this.visit(node.elts[0], options, (e0, v0) => {       // the name
+    this.visit(node.elts[1], options, (e1, v1) => {     // the value
+      options[v0] = v1;
+      resume([...e0, ...e1], v1);
+    });
+  });
+}
+```
+
+Note where the scope comes from: `options` is one mutable object threaded through the entire
+traversal, and a program is a *sequence* of expressions. The binding is visible to everything
+that follows because of that, not because the word swallows the rest of the program as an
+argument.
 
 ```
 set-var "lrn-id" get-val-public "itemId"
 items [ item [ questions [ mcq [ … ] ] {} ] ] {}..
 ```
 
-**Binding** — the word puts something in the environment, scoped over everything that follows,
-and contributes nothing to the output itself. `set-var` is the base language's form, and the
-line above is the shape: `set-var "lrn-id" <value> <rest-of-program>`. Its transformer is
+Descendants read `options["lrn-id"]`. You will need this for anything the whole program must
+see — ids, credentials, render-time parameters — and it cannot be a member, because a member's
+value lands in the record its list merges into, never in the environment. Prefer reusing the
+base language's `set-var` over minting a dialect-specific binding word: L0176 carried an `id`
+alias for exactly this key, and it went unused in all 169 training examples before being
+removed.
 
-```js
-SET_VAR(node, options, resume) {
-  this.visit(node.elts[0], options, (e0, v0) => {        // the name
-    this.visit(node.elts[1], options, (e1, v1) => {      // the value
-      options[v0] = v1;                                  // bind it...
-      resume([...e0, ...e1], v1);                        // ...visible to everything downstream
-    });
-  });
-}
-```
+**The rule.** A word is a member (arity 1) unless it needs a second argument role — children
+*plus* configuration, or a name *plus* a value to bind. Everything that merely describes a
+value is a member.
 
-Descendants then read `options["lrn-id"]`. You will need a binding form for anything the whole
-program must see — ids, credentials, render-time parameters — and it cannot be a member, because
-a member evaluates to a record and never sees what follows it. Prefer reusing the base
-language's `set-var` over minting a dialect-specific word: L0176 had an `id` alias for exactly
-this, and it went unused in all 169 training examples before being removed.
-
-Everything *inside* a container is members. The rule: a word takes a continuation only if it
-contains the rest of the program or binds something over it; a word that describes a value is
-a member.
+Worth seeing how the older style differs, since the two look identical in the grammar. In
+L0166 the second argument is the *accumulating record*: `TEXT` returns `{ ...v1, text: v0 }`,
+so each attribute prepends itself onto the record built by the words after it, and `{}` closes
+the chain. Same `(value, record)` shape, entirely different meaning — and it is why every
+attribute word in that dialect has to be arity 2.
 
 ---
 
@@ -251,9 +279,10 @@ effort here: the "misplaced, and here is where it goes" hint is the highest-leve
 
 ## 6. Checklist for a new language
 
-1. Decide the split: which words need the rest of the program (`arity: 2` — containment, or
-   binding into the environment) and which describe a value (`arity: 1`, members). Default to
-   member; reuse the base language's `set-var` rather than minting your own binding word.
+1. Decide the split. A word is `arity: 2` only if it needs two argument roles: a child list
+   *plus* configuration (`questions [q1 q2 q3] {a1 a2 a3}`), or a name *plus* a value to bind.
+   Everything else is `arity: 1` — a member. Default to member, and reuse the base language's
+   `set-var` rather than minting your own binding word.
 2. Name every member word as the kebab-case spelling of the field it emits. Do not invent
    friendlier names — the 1:1 mapping is the feature.
 3. Write the member table (`field` + `shape`); generate Checker and Transformer methods from
