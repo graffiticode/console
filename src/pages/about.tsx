@@ -37,7 +37,7 @@ export default function About() {
       </p>
       <p>
         After signing in, you can start building by navigating to the&nbsp;
-        <Link href="/languages"><b>Languages</b></Link>
+        <Link href="/tools"><b>Tools</b></Link>
         &nbsp;tab, selecting a language, and start writing code.
       </p>
       <div className="bg-gray-50 p-4 font-normal border border-1 rounded-none grid grid-cols-12">
