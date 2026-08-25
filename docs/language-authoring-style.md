@@ -178,10 +178,11 @@ This is the form the whole style is built on, and the one to reach for by defaul
 and returns the continuation's record with its own key added:
 
 ```js
-PARAMS(node, options, resume) {
+// L0166's TEXT, the canonical shape.
+TEXT(node, options, resume) {
   this.visit(node.elts[0], options, (e0, v0) => {       // the value
     this.visit(node.elts[1], options, (e1, v1) => {     // the rest of the chain
-      resume([...e0, ...e1], { ...v1, params: v0 });    // prepend onto the accumulating record
+      resume([...e0, ...e1], { ...v1, text: v0 });      // prepend onto the accumulating record
     });
   });
 }
@@ -197,10 +198,17 @@ sheets [ sheet "s1" [ … ] ] params {
 }..
 ```
 
-Read that as `sheets(list, params({…}, {v: "0.0.1"}))`. The chain terminates in a record
-literal, so the whole tail computes `{ v: "0.0.1", params: {…} }` — the configuration record the
-member list takes as its second argument. `cells [...] {}` is the same shape with an empty
-literal and no chain.
+Read that as `sheets(list, params({…}, {v: "0.0.1"}))`: the chain terminates in a record literal,
+and the whole tail computes the configuration record the member list takes as its second
+argument. `cells [...] {}` is the same shape with an empty literal and no chain.
+
+**A chaining attribute is not obliged to merge, and one in L0166 does not.** Its contract is
+only "compute a record from your value and your continuation"; merging is the normal way to
+honour it. `PARAMS` instead visits `elts[0]` alone and returns `{templateVariablesRecords: …}`,
+discarding the continuation entirely — which is why the trailing `{v: "0.0.1"}` never reaches
+the output. That is a deliberate transform (params expand into generated rows), but it means a
+reader cannot assume the tail of a chain survives. If a chaining attribute in your language
+replaces rather than merges, say so where it is documented.
 
 **This is the chained style, surviving in one place.** In L0166 every attribute word is arity 2
 and the entire program is one such chain. Here it is confined to the configuration slot, where
