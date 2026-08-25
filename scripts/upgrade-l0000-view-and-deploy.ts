@@ -31,14 +31,16 @@ const LANGS = parseLangs();
 
 function run(cmd: string, cwd: string, timeoutMs = 10 * 60 * 1000): Promise<string> {
   return new Promise((resolve, reject) => {
-    const stdio = VERBOSE ? 'inherit' as const : 'pipe' as const;
-    const child = spawn('bash', ['-c', cmd], { cwd, stdio });
+    // ALWAYS pipe, and tee to our own streams when verbose. `stdio: 'inherit'` hands the
+    // child our terminal directly, so nothing reaches the `data` handlers and `output`
+    // resolves as the empty string. That is not merely a logging quirk: callers branch on
+    // what they read back, and `git status --porcelain` returning '' reads as "clean". Under
+    // --verbose the upgrade was therefore deployed but never committed or pushed, silently.
+    const child = spawn('bash', ['-c', cmd], { cwd, stdio: 'pipe' });
     const timer = setTimeout(() => { child.kill(); reject(new Error('Timed out')); }, timeoutMs);
     let output = '';
-    if (!VERBOSE) {
-      child.stdout?.on('data', d => output += d);
-      child.stderr?.on('data', d => output += d);
-    }
+    child.stdout?.on('data', d => { output += d; if (VERBOSE) process.stdout.write(d); });
+    child.stderr?.on('data', d => { output += d; if (VERBOSE) process.stderr.write(d); });
     child.on('close', code => {
       clearTimeout(timer);
       if (code !== 0) reject(new Error(output.slice(-500) || `Exit code ${code}`));
