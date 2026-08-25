@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import { randomUUID } from "crypto";
 import bent from "bent";
 import { buildTaskDaoFactory } from "../../utils/storage/index";
 import { buildGetTaskDaoForStorageType } from "./utils";
@@ -1725,14 +1726,37 @@ export function logClaimView(fields: { session: string; src: string }) {
   }
 }
 
-export function logClaimEvent(fields: { outcome: "ok" | "error"; transferred?: number; session: string; err?: string }) {
+/**
+ * `claim_id` and `items` are what make a claim joinable to the rest of an item's
+ * life. The MCP stream logs an item id at create and on every update; without the
+ * ids here, a claim could only be matched to a session, so "this specific item was
+ * made, revised twice, then claimed" was not a question the logs could answer.
+ *
+ * `items` carries the SOURCE (free-plan) ids — the ones the MCP server logged —
+ * paired with the new ids in the account, since a claim copies rather than moves.
+ * Capped: a claim of hundreds of items is a report, not an event.
+ */
+const CLAIM_ITEMS_LOGGED_MAX = 50;
+
+export function logClaimEvent(fields: {
+  outcome: "ok" | "error";
+  transferred?: number;
+  session: string;
+  err?: string;
+  claimId?: string;
+  items?: { from: string; to: string }[];
+}) {
   try {
     console.log(JSON.stringify({
       ev: "claim",
       t: new Date().toISOString(),
       outcome: fields.outcome,
       session: fields.session,
+      claim_id: fields.claimId,
       transferred: fields.transferred,
+      items: fields.items?.slice(0, CLAIM_ITEMS_LOGGED_MAX),
+      items_truncated:
+        fields.items && fields.items.length > CLAIM_ITEMS_LOGGED_MAX ? fields.items.length : undefined,
       err: fields.err ? fields.err.slice(0, 300) : undefined,
     }));
   } catch {
@@ -1753,6 +1777,12 @@ export async function claimFreePlanSession({
 }) {
   const db = getFirestore();
   const now = Date.now();
+  // One id for this whole claim, stamped on every doc it creates and logged with
+  // it. Without it a claimed item can be traced back to a session but not to the
+  // single act that moved it, and a session that claims four times (which the
+  // logs show happening) collapses into one indistinguishable blur. Declared
+  // outside the try so a failed claim is still identifiable in the logs.
+  const claimId = randomUUID();
 
   try {
   const snapshot = await db
@@ -1763,6 +1793,7 @@ export async function claimFreePlanSession({
 
   let transferred = 0;
   const items: { id: string; lang: string; created: number }[] = [];
+  const claimedPairs: { from: string; to: string }[] = [];
   for (const doc of snapshot.docs) {
     const data = doc.data();
     if (typeof data.expiresAt === "number" && data.expiresAt <= now) continue;
@@ -1801,6 +1832,9 @@ export async function claimFreePlanSession({
       // yields the wrong namespace and the funnel report loses the join back to
       // the originating session's events.
       claimedFromNamespace: sessionNamespace,
+      // The claim that produced this doc — the same id logged on the claim event,
+      // so an item in the console can be walked back to its MCP lifecycle.
+      claimId,
       // Surface claimed items in the default /items view (which filters to
       // client=='console'). Provenance is preserved in `claimedFrom`.
       client: "console",
@@ -1819,18 +1853,19 @@ export async function claimFreePlanSession({
 
     await targetRef.set(claimedItem);
     transferred += 1;
+    claimedPairs.push({ from: doc.id, to: newId });
     items.push({ id: newId, lang: String(data.lang || ""), created: timestamp });
   }
 
   items.sort((a, b) => b.created - a.created);
-  logClaimEvent({ outcome: "ok", transferred, session: sessionNamespace });
+  logClaimEvent({ outcome: "ok", transferred, session: sessionNamespace, claimId, items: claimedPairs });
   return {
     transferred,
     sessionNamespace,
     items: items.map(({ id, lang }) => ({ id, lang })),
   };
   } catch (err: any) {
-    logClaimEvent({ outcome: "error", session: sessionNamespace, err: String(err?.message ?? err) });
+    logClaimEvent({ outcome: "error", session: sessionNamespace, claimId, err: String(err?.message ?? err) });
     throw err;
   }
 }
