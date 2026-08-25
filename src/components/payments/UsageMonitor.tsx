@@ -12,6 +12,8 @@ interface UsageData {
   sponsoredItems?: number;
   /** Which languages those came from, e.g. ["L0179"]. */
   sponsoredLanguages?: string[];
+  /** Who is paying, e.g. ["Artcompiler Inc."]. */
+  sponsors?: string[];
   includedItems: number;
   overageItems: number;
   overageRatePerItem: number | null;
@@ -141,6 +143,7 @@ export default function UsageMonitor() {
   const overagePct = pct(overageItems);
   const sponsoredPct = pct(sponsoredItems);
   const sponsoredLangs = usage.sponsoredLanguages ?? [];
+  const sponsors = usage.sponsors ?? [];
 
   const isAtIncludedLimit = used >= included;
   const planName = planDetails[usage.plan as PlanId]?.name ?? usage.plan;
@@ -223,6 +226,7 @@ export default function UsageMonitor() {
                 <span>
                   {sponsoredItems.toLocaleString()} free
                   {sponsoredLangs.length > 0 && ` · ${sponsoredLangs.join(', ')}`}
+                  {sponsors.length > 0 && ` · sponsored by ${sponsors.join(', ')}`}
                 </span>
               </div>
             )}
@@ -255,7 +259,7 @@ export default function UsageMonitor() {
                   <dd className="mt-1">
                     <div className="text-2xl font-semibold text-emerald-700">{sponsoredItems.toLocaleString()}</div>
                     <div className="text-xs text-gray-500">
-                      {sponsoredLangs.length > 0 ? `free · ${sponsoredLangs.join(', ')}` : 'items · free'}
+                      {sponsors.length > 0 ? `sponsored by ${sponsors.join(', ')}` : 'items · free'}
                     </div>
                   </dd>
                 </div>

@@ -100,7 +100,7 @@ the Stripe meter. They are told apart by `nonBillableReason`, because they are s
 | `nonBillableReason` | What it is | Customer sees it? |
 |---|---|---|
 | `'local-script'` | `currentEnv() === 'local'` — a tsx script (corpus generation, evals). Writes to **prod** Firestore but carries `.env.local`'s **test** Stripe key, so its meter events can never reach the live customer. | **No.** Ours, not theirs. |
-| `'sponsored'` | The item's language is marked `sponsored` in `src/lib/languages.ts`. We carry the cost. Also stamps `sponsorId: 'lang:0179'`. | **Yes** — own bar on the Usage tab, own column in Usage History. |
+| `'sponsored'` | The item's language carries `sponsored: { by }` in `src/lib/languages.ts`. Also stamps `sponsorId: 'lang:0000'`. | **Yes** — own bar on the Usage tab, own column in Usage History, attributed to `by`. |
 
 Order matters in `recordBillableItem`: a local run in a sponsored language is **both**, and `local`
 wins. Labelling it `sponsored` would put a training run on the customer's usage page.
@@ -110,6 +110,10 @@ scope gate re-routes a mis-labelled request), so a caller cannot elect into it. 
 straight from `item.client` / `data.client` in the create/update payloads — keying free items on it
 would be a billing bypass. Same reason `scripts/backfill-nonbillable-usage.ts` may only trust
 `client` below a pinned date ceiling, while `env: 'local'` (server-stamped) it trusts at any date.
+
+The sponsor's display name is resolved from config at read time (`languageSponsor()`), not stored on
+the row, so renaming a sponsor needs no migration. **Currently sponsored: L0000, by Artcompiler Inc.**
+Marking a language does NOT change items already created in it — sponsorship applies to new items only.
 
 Sponsorship is **uncapped**: while the flag is set every item in that language is free, and ending a
 sponsorship is a flag flip after which items bill normally with no wall and no notice. `sponsorId` is

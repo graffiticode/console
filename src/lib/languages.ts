@@ -77,11 +77,16 @@ export interface Language {
   // language (the scope gate re-routes a mis-labelled request), so a caller
   // cannot elect into it. The same idea keyed on `client` would be a billing
   // bypass — `client` is caller-supplied. See isLanguageSponsored().
-  sponsored?: boolean;
+  //
+  // `by` is the sponsor's display name, shown to the customer on the Usage tab —
+  // attribution is most of the point of sponsoring. An object rather than a bare
+  // boolean because that is also where a budget lands if sponsorship ever gains
+  // one (`{ by, items }`), with no call-site churn.
+  sponsored?: { by: string };
 }
 
 export const LANGUAGES: Language[] = [
-  { id: "0000", name: "L0000", description: "Root language", domains: [] },
+  { id: "0000", name: "L0000", description: "Root language", domains: [], sponsored: { by: "Artcompiler Inc." } },
   // L0001 is DEPRECATED — retained as a repo for historical reference only. Do not re-enable.
   // { id: "0002", name: "L0002", description: "Core language", domains: [] },
   { id: "0003", name: "L0003", description: "Hello, image, theme, and print", domains: [] },
@@ -308,8 +313,17 @@ export function sponsoredLanguageIds(): string[] {
  * would zero out every bill.
  */
 export function isLanguageSponsored(lang: string | undefined | null): boolean {
-  if (!lang) return false;
+  return languageSponsor(lang) !== null;
+}
+
+/**
+ * Who is paying for items in this language, or null when nobody is.
+ *
+ * Customer-facing text, so it is a display name and not an id.
+ */
+export function languageSponsor(lang: string | undefined | null): string | null {
+  if (!lang) return null;
   // Callers pass either "0166" or "L0166".
   const id = String(lang).replace(/^L/i, "");
-  return sponsoredLanguageIds().includes(id);
+  return LANGUAGES.find(l => l.id === id)?.sponsored?.by ?? null;
 }
