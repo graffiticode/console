@@ -91,6 +91,58 @@ creates them tiered; don't change that.
   telemetry). **The gate and usage endpoint sum only `type==='item_created'` records** — otherwise
   lingering pre-migration compile-unit records would inflate item counts.
 
+### Non-billable items: `units: 0` + `nonBillableReason`
+
+Two kinds of item are real but never invoiced, and both ride the same `units: 0` primitive — which
+keeps them out of `checkItemCreateAllowed`'s sum and, via the `if (!billable)` short-circuit, out of
+the Stripe meter. They are told apart by `nonBillableReason`, because they are shown very differently:
+
+| `nonBillableReason` | What it is | Customer sees it? |
+|---|---|---|
+| `'local-script'` | `currentEnv() === 'local'` — a tsx script (corpus generation, evals). Writes to **prod** Firestore but carries `.env.local`'s **test** Stripe key, so its meter events can never reach the live customer. | **No.** Ours, not theirs. |
+| `'sponsored'` | The item's language is marked `sponsored` in `src/lib/languages.ts`. We carry the cost. Also stamps `sponsorId: 'lang:0179'`. | **Yes** — own bar on the Usage tab, own column in Usage History. |
+
+Order matters in `recordBillableItem`: a local run in a sponsored language is **both**, and `local`
+wins. Labelling it `sponsored` would put a training run on the customer's usage page.
+
+**Sponsorship is keyed on LANGUAGE, never on `client`.** The server decides an item's language (the
+scope gate re-routes a mis-labelled request), so a caller cannot elect into it. `client` flows
+straight from `item.client` / `data.client` in the create/update payloads — keying free items on it
+would be a billing bypass. Same reason `scripts/backfill-nonbillable-usage.ts` may only trust
+`client` below a pinned date ceiling, while `env: 'local'` (server-stamped) it trusts at any date.
+
+Sponsorship is **uncapped**: while the flag is set every item in that language is free, and ending a
+sponsorship is a flag flip after which items bill normally with no wall and no notice. `sponsorId` is
+namespaced so a per-user or global cap — or a `client:acme` partner sponsorship — can be added later
+and evaluated against rows that already exist.
+
+## Usage history (past cycles)
+
+`/api/payments/usage-history` → `src/lib/usage-history.ts` → the Usage tab's second table.
+
+There is **no per-cycle summary anywhere in Firestore** — `usage/{uid}` is destructively zeroed by
+the `invoice.paid` webhook with no read-before-write. So history is reassembled per request:
+
+- **Boundaries and money from Stripe invoices.** A paid sub has a base price billed **in advance**
+  and a metered price billed **in arrears**, so on a renewal invoice created at T the base line
+  covers the cycle *starting* and the metered line covers the cycle that just *closed*. A cycle is
+  therefore `[baseStart(invoice N), baseStart(invoice N+1))`, and its money spans two invoices.
+  **Never use `invoice.period_start`/`period_end`** — degenerate on renewals.
+- **Line classification** reads `usage_type` off the resolved `Price`. An `InvoiceLineItem` has no
+  `price` property in SDK v22 (it moved to `pricing.price_details.price`), so the obvious
+  `line.price.recurring.usage_type` silently yields `undefined`. There is a fallback expressed purely
+  in advance-vs-arrears period semantics, independent of env price ids.
+- **Plan per cycle** comes from that cycle's own base price, never the current cached
+  `subscription.plan`. `priceIdToPlan()` only knows price ids currently in env, so a cycle billed on
+  a **retired** price falls back to matching the charged amount against `PLANS`.
+- **Item counts from Firestore**, `ITEM_DATA_START` (2026-07-23, the item-pricing cutover) onward.
+  Cycles before it — or straddling it — render `—`, never `0`.
+- **Items Used excludes Sponsored.** That invariant is what keeps the column equal to the invoiced
+  quantity.
+
+Tests: `npx tsx scripts/verify-usage-history.ts --fixtures` (no network; covers plan change, void
+invoice, cutover straddle, annual, unresolvable price) or `--uid <uid>` against a live account.
+
 ## Gating + overage spend cap
 
 - `checkItemCreateAllowed()` (`src/lib/usage-service.ts`) runs at **item creation** entry (`createItem` /
@@ -136,6 +188,12 @@ service (graffiticode-app).
 ## Operational scripts
 
 ```bash
+# One-time: zero out historical script-created item rows (dry run by default).
+npx tsx scripts/backfill-nonbillable-usage.ts [--apply] [--uid <uid>] [--verbose]
+
+# Firestore item counts vs what Stripe was actually told, per closed cycle.
+npx tsx scripts/reconcile-item-metering.ts --cycle last|current [--uid <uid>] [--quiet]
+
 # Provision Stripe (meter + tiered prices + Platinum base). Idempotent. Run in TEST first, then live.
 STRIPE_SECRET_KEY=sk_... npx tsx scripts/setup-item-pricing.ts [--dry-run]
 

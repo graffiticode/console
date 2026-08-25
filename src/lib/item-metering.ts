@@ -42,6 +42,21 @@ export async function reportItemUsage({
     if (planConfig.hardCap && !payAsYouGoEnabled(subscription)) return;
     const client = getStripe();
     if (!client) return;
+
+    // A test-mode key cannot see a live customer, so every meter event below
+    // would 404 into the catch and vanish. That is exactly how a month of items
+    // got counted in prod Firestore and never reported to Stripe. It is not a
+    // transient failure and retrying will not fix it, so say so once, loudly,
+    // instead of letting it read as ordinary best-effort noise.
+    if (process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')) {
+      console.error(
+        'reportItemUsage()', 'KEY_MODE_MISMATCH',
+        'test-mode STRIPE_SECRET_KEY cannot meter live customer',
+        stripeCustomerId, 'item', identifier,
+      );
+      return;
+    }
+
     await client.billing.meterEvents.create({
       event_name: eventName,
       payload: { stripe_customer_id: stripeCustomerId, value: '1' },

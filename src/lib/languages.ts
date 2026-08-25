@@ -58,6 +58,26 @@ export interface Language {
   // enabling it is then a reversible data change (mark the set) rather than a
   // release. See freePlanLanguageIds() / isLanguageInFreePlanScope().
   freePlan?: boolean;
+  // Sponsored: items created in this language are free to the customer — not
+  // metered to Stripe and not counted against the plan allowance. Used to carry
+  // the cost of a language we're promoting.
+  //
+  // Distinct from `freePlan` above, and the two answer different questions:
+  // `freePlan` asks "may an ANONYMOUS caller create this at all", `sponsored`
+  // asks "who pays for it once created". They compose without interacting — an
+  // anonymous trial item in a sponsored language is simply free twice over.
+  //
+  // Uncapped by design: while this is set, every item in the language is free,
+  // and ending a sponsorship is a flag flip after which items bill normally with
+  // no wall and no notice. There is deliberately no per-user or global budget
+  // yet; usage rows carry a `sponsorId` so one can be added later and evaluated
+  // against history that already exists.
+  //
+  // Safe as a LANGUAGE flag specifically because the server decides an item's
+  // language (the scope gate re-routes a mis-labelled request), so a caller
+  // cannot elect into it. The same idea keyed on `client` would be a billing
+  // bypass — `client` is caller-supplied. See isLanguageSponsored().
+  sponsored?: boolean;
 }
 
 export const LANGUAGES: Language[] = [
@@ -270,4 +290,26 @@ export function isLanguageInFreePlanScope(lang: string | undefined | null): bool
   // Callers pass either "0166" or "L0166".
   const id = String(lang).replace(/^L/i, "");
   return allowed.includes(id);
+}
+
+/**
+ * Language ids whose items are currently sponsored — see `sponsored` on the
+ * Language type. Empty when no sponsorship is running, which is the default.
+ */
+export function sponsoredLanguageIds(): string[] {
+  return LANGUAGES.filter(l => l.sponsored).map(l => l.id);
+}
+
+/**
+ * Whether items in this language are sponsored (free to the customer).
+ *
+ * Note the polarity is the opposite of isLanguageInFreePlanScope: an empty set
+ * means nothing is sponsored, never "everything is". A permissive default here
+ * would zero out every bill.
+ */
+export function isLanguageSponsored(lang: string | undefined | null): boolean {
+  if (!lang) return false;
+  // Callers pass either "0166" or "L0166".
+  const id = String(lang).replace(/^L/i, "");
+  return sponsoredLanguageIds().includes(id);
 }

@@ -138,6 +138,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const usageDoc = await usageRef.get();
 
     let itemsUsed = 0;
+    let sponsoredItems = 0;
+    let sponsoredLanguages: string[] = [];
     let dailyUsage: DailyUsage[] = [];
     let lastUpdate: string | null = null;
 
@@ -147,29 +149,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const needsReset = lastReset && lastReset < firstDayOfPeriod;
       itemsUsed = needsReset ? 0 : (data?.currentMonthTotal || 0);
       lastUpdate = data?.lastUpdate || null;
+    }
 
-      try {
-        const usageRecordsSnapshot = await db
-          .collection('usage')
-          .where('userId', '==', userId)
-          .where('createdAt', '>=', firstDayOfPeriod)
-          .where('createdAt', '<=', lastDayOfPeriod)
-          .get();
+    // One range query serves both numbers, and it runs whether or not the rollup
+    // doc exists: sponsored items never touch currentMonthTotal, so an account
+    // whose only usage is sponsored has no rollup doc at all and would otherwise
+    // report nothing.
+    try {
+      const usageRecordsSnapshot = await db
+        .collection('usage')
+        .where('userId', '==', userId)
+        .where('createdAt', '>=', firstDayOfPeriod)
+        .where('createdAt', '<=', lastDayOfPeriod)
+        .get();
 
-        // Count only billable item records (pre-migration compile/ai_generation
-        // records carry compile-unit `units` and are not items).
-        let calculatedTotal = 0;
-        usageRecordsSnapshot.docs.forEach(doc => {
-          const r = doc.data();
-          if (r.type === 'item_created') calculatedTotal += r.units || 0;
-        });
-        if (calculatedTotal !== itemsUsed) {
-          itemsUsed = calculatedTotal;
+      // Count only billable item records (pre-migration compile/ai_generation
+      // records carry compile-unit `units` and are not items).
+      let calculatedTotal = 0;
+      const langs = new Set<string>();
+      usageRecordsSnapshot.docs.forEach(doc => {
+        const r = doc.data();
+        if (r.type !== 'item_created') return;
+        calculatedTotal += r.units || 0;
+        // Disjoint from the sum above by construction: a sponsored row is
+        // units: 0. Local-script rows are neither — they are our runs, not the
+        // customer's usage, and must never surface here.
+        if (r.nonBillableReason === 'sponsored') {
+          sponsoredItems += 1;
+          if (r.lang) langs.add(`L${String(r.lang).replace(/^L/i, '')}`);
         }
-      } catch (breakdownError) {
-        console.error('Error fetching usage breakdown (may need Firestore index):', breakdownError);
-      }
+      });
+      itemsUsed = calculatedTotal;
+      sponsoredLanguages = Array.from(langs).sort();
+    } catch (breakdownError) {
+      console.error('Error fetching usage breakdown (may need Firestore index):', breakdownError);
+    }
 
+    if (usageDoc.exists) {
       // Optional daily breakdown (best-effort)
       try {
         const dailyRef = await db
@@ -227,6 +243,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({
       plan,
       itemsUsed,
+      sponsoredItems,
+      sponsoredLanguages,
       includedItems,
       overageItems,
       overageRatePerItem,

@@ -8,6 +8,10 @@ import { planDetails, type PlanId } from '../../utils/plans';
 interface UsageData {
   plan: string;
   itemsUsed: number;
+  /** Free items in a sponsored language. Outside the allowance, never invoiced. */
+  sponsoredItems?: number;
+  /** Which languages those came from, e.g. ["L0179"]. */
+  sponsoredLanguages?: string[];
   includedItems: number;
   overageItems: number;
   overageRatePerItem: number | null;
@@ -124,8 +128,19 @@ export default function UsageMonitor() {
   const overageItems = usage.overageItems;
   const barTotal = Math.max(included, includedUsed + overageItems);
 
-  const includedPct = barTotal > 0 ? (includedUsed / barTotal) * 100 : (used > 0 ? 100 : 0);
-  const overagePct = barTotal > 0 ? (overageItems / barTotal) * 100 : 0;
+  // Sponsored usage sits OUTSIDE the allowance, so it cannot be another segment
+  // of the plan track — that track's denominator is the allowance itself. It
+  // gets its own track, on a shared scale so the two lengths are comparable:
+  // stacking bars with different denominators invites exactly the misreading
+  // that comparing their lengths would produce. Every track is labelled, so
+  // nothing depends on pixel length alone.
+  const sponsoredItems = usage.sponsoredItems ?? 0;
+  const scale = Math.max(barTotal, sponsoredItems);
+  const pct = (n: number) => (scale > 0 ? (n / scale) * 100 : 0);
+  const includedPct = scale > 0 ? pct(includedUsed) : (used > 0 ? 100 : 0);
+  const overagePct = pct(overageItems);
+  const sponsoredPct = pct(sponsoredItems);
+  const sponsoredLangs = usage.sponsoredLanguages ?? [];
 
   const isAtIncludedLimit = used >= included;
   const planName = planDetails[usage.plan as PlanId]?.name ?? usage.plan;
@@ -164,29 +179,58 @@ export default function UsageMonitor() {
                   : `${used.toLocaleString()} items used`}
               </span>
             </div>
-            <div className="w-full bg-gray-200 h-8 relative overflow-hidden">
-              {/* Included usage */}
-              <div
-                className={`h-8 absolute left-0 top-0 transition-all duration-300 ${
-                  isAtIncludedLimit ? 'bg-gray-600' : 'bg-gray-500'
-                }`}
-                style={{ width: `${includedPct}%` }}
-                title={`Included: ${includedUsed.toLocaleString()} / ${included.toLocaleString()}`}
-              />
-              {/* Overage usage (past the included bucket) */}
-              {overageItems > 0 && (
-                <div
-                  className={`h-8 absolute top-0 transition-all duration-300 ${atCap ? 'bg-red-600' : 'bg-yellow-500'}`}
-                  style={{ left: `${includedPct}%`, width: `${overagePct}%` }}
-                  title={`Overage: ${overageItems.toLocaleString()} items`}
-                />
+            {/* Labels only appear once there is a second track to tell apart. */}
+            <div className={sponsoredItems > 0 ? 'flex items-center gap-3' : ''}>
+              {sponsoredItems > 0 && (
+                <span className="w-20 shrink-0 text-xs text-gray-500">Plan</span>
               )}
+              <div className="w-full bg-gray-200 h-8 relative overflow-hidden">
+                {/* Included usage */}
+                <div
+                  className={`h-8 absolute left-0 top-0 transition-all duration-300 ${
+                    isAtIncludedLimit ? 'bg-gray-600' : 'bg-gray-500'
+                  }`}
+                  style={{ width: `${includedPct}%` }}
+                  title={`Included: ${includedUsed.toLocaleString()} / ${included.toLocaleString()}`}
+                />
+                {/* Overage usage (past the included bucket) */}
+                {overageItems > 0 && (
+                  <div
+                    className={`h-8 absolute top-0 transition-all duration-300 ${atCap ? 'bg-red-600' : 'bg-yellow-500'}`}
+                    style={{ left: `${includedPct}%`, width: `${overagePct}%` }}
+                    title={`Overage: ${overageItems.toLocaleString()} items`}
+                  />
+                )}
+              </div>
             </div>
+
+            {/* Sponsored: free items, outside the plan. Rendered only when there
+                are some, so the common case looks exactly as it did before. */}
+            {sponsoredItems > 0 && (
+              <div className="mt-2 flex items-center gap-3">
+                <span className="w-20 shrink-0 text-xs text-gray-500">Sponsored</span>
+                <div className="w-full bg-gray-200 h-8 relative overflow-hidden">
+                  <div
+                    className="h-8 absolute left-0 top-0 bg-emerald-600 transition-all duration-300"
+                    style={{ width: `${sponsoredPct}%` }}
+                    title={`Sponsored: ${sponsoredItems.toLocaleString()} free items`}
+                  />
+                </div>
+              </div>
+            )}
+            {sponsoredItems > 0 && (
+              <div className="mt-1 flex justify-end text-xs text-gray-500">
+                <span>
+                  {sponsoredItems.toLocaleString()} free
+                  {sponsoredLangs.length > 0 && ` · ${sponsoredLangs.join(', ')}`}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 border-t pt-4">
             <h4 className="text-sm font-medium text-gray-700 mb-3">Usage Statistics</h4>
-            <div className="grid grid-cols-3 gap-4">
+            <div className={`grid gap-4 ${sponsoredItems > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
               <div>
                 <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Included</dt>
                 <dd className="mt-1">
@@ -205,6 +249,17 @@ export default function UsageMonitor() {
                   </div>
                 </dd>
               </div>
+              {sponsoredItems > 0 && (
+                <div>
+                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Sponsored</dt>
+                  <dd className="mt-1">
+                    <div className="text-2xl font-semibold text-emerald-700">{sponsoredItems.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">
+                      {sponsoredLangs.length > 0 ? `free · ${sponsoredLangs.join(', ')}` : 'items · free'}
+                    </div>
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Resets</dt>
                 <dd className="mt-1">

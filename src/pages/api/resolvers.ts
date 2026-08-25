@@ -39,7 +39,7 @@ import {
   maybeAlertBudget,
   recordTrialItem,
 } from "../../lib/free-plan-quota";
-import { freePlanLanguageIds, isLanguageInFreePlanScope } from "../../lib/languages";
+import { freePlanLanguageIds, isLanguageInFreePlanScope, isLanguageSponsored } from "../../lib/languages";
 import { trialItemRevisionLimit } from "../../lib/plans-config";
 import { mintSessionToken, isSessionTokenConfigured } from "../../lib/free-plan-session-token";
 import { mintClaimToken } from "../../lib/claim-token";
@@ -382,6 +382,10 @@ export async function recordVersion({
  * Effects: writes a `type: 'item_created'` usage record (units: 1), increments
  * the monthly counter (mirroring logCompile's period reset), and reports one
  * Stripe meter event for paid tiers. Best-effort: never throws into the caller.
+ *
+ * Local runs (tsx scripts) record the usage row at units: 0 and stop there —
+ * they write to prod Firestore but cannot reach the live Stripe customer, so
+ * counting them would consume a real allowance nothing could ever invoice.
  */
 export async function recordBillableItem({
   auth,
@@ -419,13 +423,49 @@ export async function recordBillableItem({
     if (!shouldCount) return;
 
     const now = new Date();
+    const env = currentEnv();
+
+    // A tsx script (corpus generation, evals, backfills) writes to PROD
+    // Firestore but carries .env.local's TEST Stripe key, so its meter events
+    // can never reach the live customer — reportItemUsage() just swallows the
+    // error. That divergence went unnoticed for a month: 906 items counted
+    // against a live account's allowance that Stripe was never told about.
+    // Local items stay in `usage` for cost telemetry (training runs are real
+    // spend) but carry units: 0 — the same "recorded, never billed" shape
+    // logCompile and the token meter already use, which is what keeps them out
+    // of checkItemCreateAllowed's self-heal sum.
+    //
+    // A sponsored language is the other reason an item is real usage but not
+    // billable: we carry its cost deliberately. Keyed on the LANGUAGE, which the
+    // server decides (the scope gate re-routes a mis-labelled request), never on
+    // `client`, which is caller-supplied and would therefore be a bypass.
+    const sponsored = isLanguageSponsored(lang);
+    const billable = env !== "local" && !sponsored;
 
     // Audit record for the billable item.
+    //
+    // `nonBillableReason` separates the two kinds of units: 0 row, because they
+    // are shown very differently — sponsored usage is the customer's and belongs
+    // on their usage page, a local script run is ours and must never appear
+    // there. Absent on rows written before this existed, which reads correctly
+    // as "billable".
     await db.collection("usage").add({
       userId: auth.uid,
       itemId,
       taskId,
-      units: 1,
+      units: billable ? 1 : 0,
+      // Order matters: a local run in a sponsored language is BOTH, and "local"
+      // has to win. Labelling it "sponsored" would put a training run on the
+      // customer's usage page as though it were their own free usage.
+      ...(billable ? {} : {
+        nonBillableReason: env === "local" ? "local-script" : "sponsored",
+      }),
+      // Namespaced so a client/partner sponsor (`client:acme`) can be added
+      // later without a migration, and so a cap can be derived retroactively.
+      // Only on rows that are actually the customer's sponsored usage.
+      ...(sponsored && env !== "local"
+        ? { sponsorId: `lang:${String(lang).replace(/^L/i, "")}` }
+        : {}),
       createdAt: now,
       timestamp: now.toISOString(),
       lang: lang ?? null,
@@ -433,7 +473,7 @@ export async function recordBillableItem({
       // Same marker the ai_generation records carry. Without it the item count
       // could not be scoped to the same environment as the spend that produced
       // it, and cost-per-item divided prod-only generations by all-env items.
-      env: currentEnv(),
+      env,
       type: "item_created",
     });
 
@@ -450,28 +490,30 @@ export async function recordBillableItem({
     const periodStart = subscription.currentPeriodStart
       ? new Date(subscription.currentPeriodStart)
       : new Date(now.getFullYear(), now.getMonth(), 1);
-    if (usageDoc.exists) {
-      const currentData = usageDoc.data();
-      const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
-      const isNewBillingPeriod = !lastReset || lastReset < periodStart;
-      if (isNewBillingPeriod) {
+    if (billable) {
+      if (usageDoc.exists) {
+        const currentData = usageDoc.data();
+        const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
+        const isNewBillingPeriod = !lastReset || lastReset < periodStart;
+        if (isNewBillingPeriod) {
+          await usageDocRef.set({
+            currentMonthTotal: 1,
+            lastReset: periodStart.toISOString(),
+            lastUpdated: now.toISOString(),
+          });
+        } else {
+          await usageDocRef.update({
+            currentMonthTotal: admin.firestore.FieldValue.increment(1),
+            lastUpdated: now.toISOString(),
+          });
+        }
+      } else {
         await usageDocRef.set({
           currentMonthTotal: 1,
           lastReset: periodStart.toISOString(),
           lastUpdated: now.toISOString(),
         });
-      } else {
-        await usageDocRef.update({
-          currentMonthTotal: admin.firestore.FieldValue.increment(1),
-          lastUpdated: now.toISOString(),
-        });
       }
-    } else {
-      await usageDocRef.set({
-        currentMonthTotal: 1,
-        lastReset: periodStart.toISOString(),
-        lastUpdated: now.toISOString(),
-      });
     }
 
     emitEvent("item_created", {
@@ -482,15 +524,27 @@ export async function recordBillableItem({
       source,
     });
 
+    // A local run stops here. It is not the customer's usage at all: no
+    // allowance consumed, no meter event, no trial pace. Its stdout never
+    // reaches Cloud Logging, so the emitEvent above cannot reach the funnel
+    // digest either.
+    if (env === "local") return;
+
     // Anonymous free-plan (MCP trial) items are COUNTED — the writes above are
     // what checkItemCreateAllowed reads, so the trial account's own plan
     // allowance becomes the monthly budget — but never INVOICED. Stop here,
     // before the meter report, and record the day's tally for the derived
-    // daily pace.
+    // daily pace. A sponsored trial item still counts toward pace: it is real
+    // trial activity, it just isn't paid for by anyone.
     if (auth.freePlan) {
       await recordTrialItem(now);
       return;
     }
+
+    // A sponsored item IS the customer's usage — it reached the funnel above and
+    // it shows on their usage page — but nobody is invoiced for it, so it must
+    // not reach the meter.
+    if (!billable) return;
 
     // Report to the Stripe metered price (metered tiers only — paid, or Bronze
     // enrolled in pay-as-you-go). Best-effort.

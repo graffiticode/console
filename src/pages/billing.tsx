@@ -17,6 +17,7 @@ import PricingPlans from '../components/payments/PricingPlans';
 import BillingHistory from '../components/payments/BillingHistory';
 import PaymentMethods from '../components/payments/PaymentMethods';
 import UsageMonitor from '../components/payments/UsageMonitor';
+import UsageHistory from '../components/payments/UsageHistory';
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
@@ -144,7 +145,10 @@ export default function Billing() {
               </Tab.Panel>
 
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
-                <UsageMonitor />
+                <div className="space-y-8">
+                  <UsageMonitor />
+                  <UsageHistory />
+                </div>
               </Tab.Panel>
 
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
