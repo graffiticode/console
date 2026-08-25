@@ -84,16 +84,24 @@ full of `items [...] {}` and `questions [...] {}`.
 
 **The two nest freely, and usually do.** A member list's elements are very often attribute
 lists — `options [ [label "Mercury" value "0"] [label "Venus" value "1"] ]` is a homogeneous
-list of children, each of which is a heterogeneous attribute list. Note `options` is arity 1
-here: a member list needs arity 2 only when its container also carries configuration. Children
-alone fit in one argument.
+list of children, each of which is a heterogeneous attribute list.
 
 | | attribute list | member list |
 | :--- | :--- | :--- |
 | elements | heterogeneous — different named properties | homogeneous — the same kind of child |
 | computes | one merged object | a sequence |
-| enclosing word | arity 1 | arity 1, or arity 2 when it also takes configuration |
+| enclosing word | arity 1 | arity 2 |
+| second argument | — | an expression computing a configuration record |
 | example | `validation [scoring-type "…" valid-response […]]` | `questions [q1 q2 q3] {…}` |
+
+**A member list always takes a configuration record; an attribute list never does.** Keep this
+uniform even where the record is empty — `cells [...] {}` reads as "these children, no
+configuration", and a word that sometimes takes the slot and sometimes does not is a rule the
+generator has to remember rather than apply. (L0176 predates this convention and has arity-1
+member lists such as `options [...]`; new languages should adopt the uniform rule.)
+
+That second argument is *any expression computing a record*, not only a literal — see §3, where
+a chain of arity-2 attribute functions builds one without brackets.
 
 Naming note for anyone reading the reference implementation: L0176's code calls the attribute
 machinery `memberFields` and `mergeMembers`, which predates this distinction. In a new
@@ -128,8 +136,22 @@ attribute's value lands in the record its list merges into, never in the environ
 base language's `set-var` rather than minting a dialect word: L0176 carried an `id` alias for
 exactly this key, it went unused in all 169 training examples, and it has been removed.
 
-**The rule.** A word is arity 1 unless it needs a second argument role — children *plus*
-configuration, or a name *plus* a value to bind.
+**A keyed entry is the third reason for arity 2.** A member list of addressable things needs
+each element to carry both its key and its attributes, which is a positional key plus an
+attribute list:
+
+```
+cells [
+  cell A1 [text "Total" font-weight "bold"]
+  cell B1 [text "" assess [method "value" expected "836"]]
+]
+```
+
+`cell` is arity 2 — `(address, attribute list)`. Nothing merges the address into the attributes;
+the container keys the entry by it.
+
+**The rule.** A word is arity 1 unless it needs a second argument role, and there are three:
+children *plus* configuration, a key *plus* its attribute list, or a name *plus* a value to bind.
 
 For contrast, in the chained style the second argument is the *accumulating record*: L0166's
 `TEXT` returns `{ ...v1, text: v0 }`, so each attribute prepends itself onto the record built
@@ -138,7 +160,67 @@ different meaning — and it is why every attribute word in that dialect must be
 
 ---
 
-## 3. The whole surface syntax, in three rules
+## 3. Attribute functions, and their two forms
+
+An **attribute function** computes one named property. It has two forms, and which one a word
+takes is decided by where the word is used.
+
+**Arity 1 — an element of an attribute list.** It evaluates to a single-key record, and the
+enclosing container merges the list:
+
+```
+text "Total"        ->  { text: "Total" }
+```
+
+This is the form the whole style is built on, and the one to reach for by default.
+
+**Arity 2 — chaining into a configuration record.** It takes its value *and a continuation*,
+and returns the continuation's record with its own key added:
+
+```js
+PARAMS(node, options, resume) {
+  this.visit(node.elts[0], options, (e0, v0) => {       // the value
+    this.visit(node.elts[1], options, (e1, v1) => {     // the rest of the chain
+      resume([...e0, ...e1], { ...v1, params: v0 });    // prepend onto the accumulating record
+    });
+  });
+}
+```
+
+which is what lets a record be accumulated without brackets:
+
+```
+sheets [ sheet "s1" [ … ] ] params {
+  A1: "Fees earned"
+} {
+  v: "0.0.1"
+}..
+```
+
+Read that as `sheets(list, params({…}, {v: "0.0.1"}))`. The chain terminates in a record
+literal, so the whole tail computes `{ v: "0.0.1", params: {…} }` — the configuration record the
+member list takes as its second argument. `cells [...] {}` is the same shape with an empty
+literal and no chain.
+
+**This is the chained style, surviving in one place.** In L0166 every attribute word is arity 2
+and the entire program is one such chain. Here it is confined to the configuration slot, where
+there is no container to merge an attribute list and a chain is the natural way to build the
+record. Everywhere else, attributes are arity 1.
+
+**Choosing.** The lexicon gives a word exactly one arity, so an attribute belongs to one form or
+the other — decide by position, not taste:
+
+- Does it describe the thing its container is building? Arity 1, inside an attribute list.
+- Does it configure the program or a whole member list, sitting outside any attribute list?
+  Arity 2, chaining.
+
+Keep the set of arity-2 attributes small and stated. Each one is a word the generator must
+place outside the brackets, which is exactly the kind of thing it gets wrong — and a misplaced
+one lands in a record nothing reads, which §7.2 covers.
+
+---
+
+## 4. The whole surface syntax, in three rules
 
 An author (usually an LLM) needs exactly this much to write any attribute:
 
@@ -154,7 +236,7 @@ shape per word, and the generator's job collapses to "name the field, give it it
 
 ---
 
-## 4. Why this style
+## 5. Why this style
 
 - **One word, any depth.** `value` inside `valid-response` and `value` inside an mcq option are
   the same arity-1 word. Under chaining they would be separate positional constructs.
@@ -166,20 +248,20 @@ shape per word, and the generator's job collapses to "name the field, give it it
   way; hand-writing pairs for them would be 264 near-identical methods.
 - **It makes attribute legality checkable.** Because every attribute is a single-key record
   keyed by field name, a container can compare the keys it received against the set it
-  accepts. That check is the single highest-value thing in this document — see §6.
+  accepts. That check is the single highest-value thing in this document — see §7.
 
 ---
 
-## 5. The machinery
+## 6. The machinery
 
 Reference implementation: `l0176/packages/core/`. Four pieces.
 
-**5.1 Lexicon — a flat global vocabulary.** Every attribute is
+**6.1 Lexicon — a flat global vocabulary.** Every attribute is
 `{ tk: 1, name: "UPPER_SNAKE", cls: "function", length: 1, arity: 1 }`. The lexicon is *not*
 where you scope which container accepts which word; it is global on purpose, so the same word
 works everywhere it legitimately appears. (`lexicon.ts`)
 
-**5.2 An attribute table — name → field + shape.** One row per word:
+**6.2 An attribute table — name → field + shape.** One row per word:
 
 ```ts
 export const attributeFields: Record<string, { field: string; shape?: Shape }> = {
@@ -195,10 +277,10 @@ it for `options` and `value`; the readings are mutually exclusive by element typ
 one object, attribute lists → array, lists of attribute lists → array of arrays), so nothing is
 guessed. Reach for it only when the target forced your hand. (`question-types.ts`)
 
-**5.3 Generated handlers.** Loop the table and install both methods:
+**6.3 Generated handlers.** Loop the table and install both methods:
 
 ```ts
-// Checker: walk the child expression only. Value validation does NOT go here — see §6.1.
+// Checker: walk the child expression only. Value validation does NOT go here — see §7.1.
 for (const name of Object.keys(attributeFields)) {
   Checker.prototype[name] = function (node, options, resume) {
     this.visit(node.elts[0], options, (e0) => resume([].concat(e0 || []), node));
@@ -216,7 +298,7 @@ for (const [name, meta] of Object.entries(attributeFields)) {
 }
 ```
 
-**5.4 `mergeAttributes` — merge, or throw.** Containers fold an attribute list into one object.
+**6.4 `mergeAttributes` — merge, or throw.** Containers fold an attribute list into one object.
 Malformed entries must be a compile error, never a silent drop:
 
 ```ts
@@ -244,12 +326,12 @@ list. L0176's `isMemberList` does exactly this, and the readings do not overlap.
 
 ---
 
-## 6. The three traps
+## 7. The three traps
 
 Each of these has actually bitten a shipped language. They are properties of the style, not
 mistakes anyone made twice.
 
-### 6.1 `Checker.LIST` visits only the first element
+### 7.1 `Checker.LIST` visits only the first element
 
 In the base compiler (`basis/src/compiler.js`, and identically in L0000):
 
@@ -275,7 +357,7 @@ Do not override `LIST` globally to visit all elements: it will newly surface err
 previously swallowed everywhere else in the language, and existing programs that compiled will
 stop compiling.
 
-### 6.2 Open records swallow misplaced attributes
+### 7.2 Open records swallow misplaced attributes
 
 An attribute list merges whatever it is handed. An attribute written one level too high lands
 in the wrong object, and most targets ignore unknown fields silently — so it compiles, renders,
@@ -296,7 +378,7 @@ function assertKnownAttributes(type, key, attrs) {
 
 Do this for block levels too, not just leaf containers — that is where it was missed.
 
-### 6.3 The compiler's error message is a product surface
+### 7.3 The compiler's error message is a product surface
 
 The generator is an LLM that reads your compiler's output and tries again. A message that
 names what is legal, and where the misplaced attribute belongs, is worth more than any amount
@@ -312,30 +394,35 @@ effort here: the "misplaced, and here is where it goes" hint is the highest-leve
 
 ---
 
-## 7. Checklist for a new language
+## 8. Checklist for a new language
 
 1. For each word, decide which list it takes: heterogeneous attributes (arity 1, merged) or
-   homogeneous children (a sequence). Then decide arity — a word is arity 1 unless it needs a
-   second argument role: children *plus* configuration, or a name *plus* a value to bind.
-   Reuse the base language's `set-var` rather than minting your own binding word.
-2. Name every attribute word as the kebab-case spelling of the field it emits. Do not invent
+   homogeneous children (a sequence). Then decide arity — a word is arity 1 unless it needs one
+   of the three second-argument roles: children *plus* configuration, a key *plus* its attribute
+   list, or a name *plus* a value to bind. Reuse the base language's `set-var` rather than
+   minting your own binding word.
+2. Decide which attributes chain (§3). Keep that set small, state it in `instructions.md`, and
+   default everything else to the arity-1 form inside an attribute list.
+3. Name every attribute word as the kebab-case spelling of the field it emits. Do not invent
    friendlier names — the 1:1 mapping is the feature.
-3. Write the attribute table (`field` + `shape`); generate Checker and Transformer methods from
+4. Write the attribute table (`field` + `shape`); generate Checker and Transformer methods from
    it. Do not hand-write per-attribute pairs.
-4. Put value validation in the Transformer (§6.1).
-5. Define an allowed-attribute set for every container, blocks included, and make the
-   violation message name the legal set and the likely correct location (§6.2, §6.3).
-6. Document the three shape rules once in `instructions.md`, then document per-word meaning —
+5. Put value validation in the Transformer (§7.1).
+6. Define an allowed-attribute set for every container, blocks included, and make the
+   violation message name the legal set and the likely correct location (§7.2, §7.3).
+7. Document the three shape rules once in `instructions.md`, then document per-word meaning —
    not per-word syntax.
-7. Add a spec test that compiles (not merely parses) every program fragment in your docs.
+8. Add a spec test that compiles (not merely parses) every program fragment in your docs.
    L0176's `docs.test.ts` catches stale examples before the generator learns them; a wrong
    example in `instructions.md` is reproduced verbatim into generated programs.
 
 ---
 
-## 8. When the chained style is still right
+## 9. When the chained style is still right
 
-This is not a blanket deprecation. Chaining suits a **flat stream of positioned elements**,
+This is not a blanket deprecation, and note the new style keeps chaining in one place already:
+the configuration slot of a member list (§3). Beyond that, chaining suits a **flat stream of
+positioned elements**,
 which is what L0166 is: cells, rows, and columns in sequence, each with a handful of
 presentation attributes and no deep nesting. Twenty-five chained words there are perfectly
 legible.
