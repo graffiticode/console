@@ -69,6 +69,9 @@ rag-analytics-report*.html
 !/data/model-eval/mcp/
 /data/model-eval/mcp/*
 !/data/model-eval/mcp/*.json
+!/data/model-eval/cross/
+/data/model-eval/cross/*
+!/data/model-eval/cross/*.json
 revenue-vs-cost.html
 user-report.html
 funnel-report.html

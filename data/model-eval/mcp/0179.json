@@ -1,0 +1,50 @@
+[
+  {
+    "id": "display-grid-bold-header-sum-column",
+    "prompt": "Build a spreadsheet for a bike shop parts order with header row Part, Quantity, Unit Cost, Extended Cost in A1:D1 and three data rows: Brake Cable / 12 / 3.50, Chain Link / 40 / 0.75, Handlebar Grip / 8 / 6.25. Column D should hold =B2*C2, =B3*C3, =B4*C4, and D5 should hold =SUM(D2:D4) with the label Order Total in C5. Bold the header row."
+  },
+  {
+    "id": "column-widths-alignment-fonts",
+    "prompt": "Make a display spreadsheet of national park entrance fees: A1 Park, B1 Vehicle Fee, C1 Season. Rows for Zion / 35 / All year, Acadia / 30 / May-Oct, Big Bend / 30 / All year. Set column A to 200 pixels wide and left aligned, column B to 90 pixels wide and right aligned in a monospace font, and column C centered."
+  },
+  {
+    "id": "region-borders-background-color",
+    "prompt": "Create a spreadsheet showing a soil test log with headers Sample ID, Nitrogen ppm, Phosphorus ppm in row 1 and four sample rows (S-01/42/18, S-02/37/22, S-03/55/15, S-04/29/31). Give the header row a dark blue background with white bold text, and put a thin black border around the whole region A1:C5."
+  },
+  {
+    "id": "average-and-round-formulas",
+    "prompt": "Build a worksheet of weekly rehearsal hours for a choir. A1 through A6 hold the labels Week 1 through Week 6, and B1 through B6 hold 4.5, 6, 5.25, 7, 3.75, 6.5. Put the label Average Hours in A7 and the formula =ROUND(AVERAGE(B1:B6),2) in B7, right aligned."
+  },
+  {
+    "id": "if-formula-status-column",
+    "prompt": "Create a worksheet tracking freezer temperature checks. Headers in row 1: Time, Temp C, Result. Data rows: 06:00 / -19, 12:00 / -15, 18:00 / -21, 00:00 / -17. In column C use an IF formula that displays Safe when the temperature is at or below -18 and Check Unit otherwise."
+  },
+  {
+    "id": "single-cell-display",
+    "prompt": "Make a single-cell spreadsheet whose only cell A1 reads \"Kiln firing schedule: cone 6, 8 hour ramp\" in bold 16 point text, centered, with a light gray background and a column width of 320 pixels."
+  },
+  {
+    "id": "assessed-value-cells-grid",
+    "prompt": "Create an assessment spreadsheet for metric conversions. A1:A4 hold 1 kilometer, 1 meter, 1 centimeter, 1 millimeter and B1 is the header-free answer column: assess B1 through B4 by value expecting 1000, 1, 0.01, 0.001 respectively, top to bottom."
+  },
+  {
+    "id": "assessed-formula-cell-sum",
+    "prompt": "Put the monthly water usage readings 3200, 2875, and 3410 in cells B1, B2, and B3, with labels June, July, August in A1:A3. Make B4 an assessed cell expecting the learner to type the formula =SUM(B1:B3), checked by formula equivalence."
+  },
+  {
+    "id": "assessed-cells-custom-points",
+    "prompt": "Build an assessed invoice sheet with headers Service, Hours, Rate, Subtotal in row 1 and three rows: Wiring inspection / 3 / 85, Panel upgrade / 6 / 110, Outlet install / 2 / 65. Leave column D blank for rows 2 through 4 and assess each by value against the computed subtotal, worth 3 points per cell."
+  },
+  {
+    "id": "assessed-mixed-value-and-formula",
+    "prompt": "Create an assessment spreadsheet for a lemonade stand ledger. A1:A3 hold Cups Sold, Price Per Cup, Revenue; B1 holds 240 and B2 holds 1.75. Assess B3 by formula equivalence expecting =B1*B2, and assess B4 by value expecting the text Profitable, with B4 labeled Verdict in A4."
+  },
+  {
+    "id": "parameterized-range-assessed-total",
+    "prompt": "Create a parameterized spreadsheet for a delivery mileage log. Cell B1 draws from a parameter ranging 20 to 60 step 5 and B2 draws from a parameter ranging 15 to 45 step 5, with labels Morning Route and Afternoon Route in A1 and A2. Label A3 Total Miles and assess B3 expecting the formula =B1+B2."
+  },
+  {
+    "id": "parameterized-choice-list-round",
+    "prompt": "Build a parameterized spreadsheet for currency exchange practice. A1 holds the label Amount USD and B1 draws from a parameter with the choices 50, 125, 300, 480. A2 holds Rate and B2 draws from a parameter with the choices 0.92, 1.27, 1.34. Label A3 Converted and assess B3 expecting the formula =ROUND(B1*B2,2), worth 2 points."
+  }
+]
