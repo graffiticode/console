@@ -3,6 +3,7 @@ import { getFirestore } from '../../../utils/db';
 import Stripe from 'stripe';
 import { STRIPE_API_VERSION, priceIdToPlan, effectiveIncludedItems, overageRateFor, isHardCappedFor, payAsYouGoEnabled, DEFAULT_PLAN, type PlanId } from '../../../lib/plans-config';
 import { subscriptionPeriodStart, subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
+import { requireUser } from '../../../lib/api-auth';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -23,11 +24,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId } = req.query;
-
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({ error: 'User ID is required' });
+    const auth = await requireUser(req);
+    if (!auth) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+    const userId = auth.uid;
+
 
     const db = getFirestore();
     const now = new Date();

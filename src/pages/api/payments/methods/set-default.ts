@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { STRIPE_API_VERSION } from '../../../../lib/plans-config';
 import { getFirestore } from '../../../../utils/db';
+import { requireUser } from '../../../../lib/api-auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -13,10 +14,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId, methodId } = req.body;
+    const auth = await requireUser(req);
+    if (!auth) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = auth.uid;
+    const { methodId } = req.body;
 
-    if (!userId || !methodId) {
-      return res.status(400).json({ error: 'User ID and Method ID are required' });
+    if (!methodId) {
+      return res.status(400).json({ error: 'Method ID is required' });
     }
 
     const db = getFirestore();

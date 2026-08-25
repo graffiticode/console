@@ -5,10 +5,9 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
 interface UsageWarningProps {
-  userId: string;
 }
 
-export default function UsageWarning({ userId }: UsageWarningProps) {
+export default function UsageWarning({}: UsageWarningProps) {
   const {
     isOverLimit,
     isNearLimit,
@@ -18,7 +17,7 @@ export default function UsageWarning({ userId }: UsageWarningProps) {
     usedItems,
     hardCap,
     loading
-  } = useUsageStatus(userId);
+  } = useUsageStatus();
 
   const [showPopup, setShowPopup] = useState(false);
 

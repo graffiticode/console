@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
 import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, type PlanId, type BillingInterval } from '../../../lib/plans-config';
 import { emitEvent, actor } from '../../../lib/funnel-events';
+import { requireUser } from '../../../lib/api-auth';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -18,11 +19,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId, planId, interval, overageLimitUsd } = req.body;
+    const auth = await requireUser(req);
+    if (!auth) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = auth.uid;
+    const { planId, interval, overageLimitUsd } = req.body;
 
-    console.log('Create checkout session request:', { userId, planId, interval, overageLimitUsd });
+    // uid omitted deliberately: these uids are wallet addresses, and the
+    // privacy contract keeps them out of the logs (see hashUid in funnel-events).
+    console.log('Create checkout session request:', { planId, interval, overageLimitUsd });
 
-    if (!userId || !planId || !interval) {
+    if (!planId || !interval) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 

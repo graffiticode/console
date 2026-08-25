@@ -1,12 +1,13 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '../../../utils/db';
+import { requireUser } from '../../../lib/api-auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { userId } = req.query;
-
-  if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({ error: 'User ID is required' });
+  const auth = await requireUser(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+  const userId = auth.uid;
 
   const db = getFirestore();
 

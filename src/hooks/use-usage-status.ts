@@ -1,5 +1,6 @@
 import useSWR from 'swr';
-import axios from 'axios';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
+import { paymentsGet } from '../utils/payments-client';
 
 interface UsageData {
   itemsUsed: number;
@@ -31,15 +32,14 @@ interface UsageStatus {
   error: any;
 }
 
-const fetcher = async (url: string) => {
-  const response = await axios.get(url);
-  return response.data;
-};
-
-export function useUsageStatus(userId: string | undefined): UsageStatus {
+export function useUsageStatus(): UsageStatus {
+  const { user } = useGraffiticodeAuth();
+  // Key on the uid, not a URL: identity now travels in the Authorization
+  // header, so the request path is the same for every account and would
+  // collide in SWR's cache.
   const { data, error } = useSWR<UsageData>(
-    userId ? `/api/payments/usage?userId=${userId}` : null,
-    fetcher,
+    user ? `payments-usage:${user.uid}` : null,
+    () => paymentsGet(user, 'usage').then((r) => r.data),
     {
       refreshInterval: (data) => {
         if (!data) return 60000;

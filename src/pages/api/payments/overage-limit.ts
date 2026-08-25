@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getFirestore } from '../../../utils/db';
 import { getPlan, overageDollarsToItems, payAsYouGoEnabled, DEFAULT_PLAN } from '../../../lib/plans-config';
 import { emitEvent, actor } from '../../../lib/funnel-events';
+import { requireUser } from '../../../lib/api-auth';
 
 // Set (or clear) a customer's overage spend cap. The client sends a dollar
 // budget; we store it as a number of items using the plan's per-item rate. A
@@ -12,10 +13,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId, limitUsd } = req.body ?? {};
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({ error: 'User ID is required' });
+    const auth = await requireUser(req);
+    if (!auth) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+    const userId = auth.uid;
+    const { limitUsd } = req.body ?? {};
 
     const db = getFirestore();
     const userDoc = await db.collection('users').doc(userId).get();

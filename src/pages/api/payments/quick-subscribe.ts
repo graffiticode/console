@@ -14,9 +14,10 @@ import {
   type BillingInterval,
 } from '../../../lib/plans-config';
 import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
-import { emitPlanChanged } from '../../../lib/funnel-events';
+import { emitPlanChanged, hashUid } from '../../../lib/funnel-events';
 import { getFirestore } from '../../../utils/db';
 import * as admin from 'firebase-admin';
+import { requireUser } from '../../../lib/api-auth';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -44,9 +45,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId, planId, interval } = req.body;
+    const auth = await requireUser(req);
+    if (!auth) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = auth.uid;
+    const { planId, interval } = req.body;
 
-    if (!userId || !planId || !interval) {
+    if (!planId || !interval) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
@@ -166,7 +172,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (!existingPlan) {
         console.error(
-          `[quick-subscribe] REFUSING plan change for user ${userId}: subscription ` +
+          `[quick-subscribe] REFUSING plan change for user ${hashUid(userId)}: subscription ` +
           `${existingSub.id} carries base price ${base?.price?.id}, which maps to no known ` +
           `plan, and the cached plan ${JSON.stringify(cachedPlan)} is not a known plan ` +
           `either. This is a configuration problem (a rotated price, or STRIPE_*_PRICE_ID ` +

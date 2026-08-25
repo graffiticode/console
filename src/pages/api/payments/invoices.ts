@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { STRIPE_API_VERSION } from '../../../lib/plans-config';
 import { getFirestore } from '../../../utils/db';
+import { requireUser } from '../../../lib/api-auth';
 
 // Initialize Stripe only if secret key is available
 let stripe: Stripe | null = null;
@@ -32,11 +33,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId, limit = 12, startingAfter } = req.query;
-
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({ error: 'User ID is required' });
+    const auth = await requireUser(req);
+    if (!auth) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+    const userId = auth.uid;
+    const { limit = 12, startingAfter } = req.query;
+
 
     const db = getFirestore();
 

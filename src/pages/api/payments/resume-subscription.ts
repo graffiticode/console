@@ -4,6 +4,7 @@ import { STRIPE_API_VERSION } from '../../../lib/plans-config';
 import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
 import { emitPlanChanged } from '../../../lib/funnel-events';
 import { getFirestore } from '../../../utils/db';
+import { requireUser } from '../../../lib/api-auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -15,11 +16,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' });
+    const auth = await requireUser(req);
+    if (!auth) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+    const userId = auth.uid;
+
 
     const db = getFirestore();
 

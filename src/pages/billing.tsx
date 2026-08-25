@@ -8,7 +8,7 @@ import {
   CurrencyDollarIcon,
   ChartBarIcon
 } from '@heroicons/react/24/outline';
-import axios from 'axios';
+import { paymentsPost } from '../utils/payments-client';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { getPageTitle } from '../lib/utils';
 import SignIn from '../components/SignIn';
@@ -59,7 +59,7 @@ export default function Billing() {
   useEffect(() => {
     if (router.query.resumed === 'true' && user) {
       // Call resume API - payment method now exists so it should succeed
-      axios.post('/api/payments/resume-subscription', { userId: user.uid })
+      paymentsPost(user, 'resume-subscription')
         .then(() => {
           refreshSubscription();
         })
@@ -136,23 +136,23 @@ export default function Billing() {
             <Tab.Panels className="mt-6">
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
                 <div className="space-y-6">
-                  <SubscriptionCard key={subscriptionKey} userId={user.uid} />
+                  <SubscriptionCard key={subscriptionKey} />
                   <div className="border-t pt-6">
-                    <PricingPlans userId={user.uid} onSubscriptionChange={refreshSubscription} />
+                    <PricingPlans onSubscriptionChange={refreshSubscription} />
                   </div>
                 </div>
               </Tab.Panel>
 
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
-                <UsageMonitor userId={user.uid} />
+                <UsageMonitor />
               </Tab.Panel>
 
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
-                <BillingHistory userId={user.uid} />
+                <BillingHistory />
               </Tab.Panel>
 
               <Tab.Panel className="rounded-none bg-white p-6 shadow">
-                <PaymentMethods userId={user.uid} />
+                <PaymentMethods />
               </Tab.Panel>
             </Tab.Panels>
           </Tab.Group>

@@ -2,9 +2,10 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { STRIPE_API_VERSION, includedItemsFor, priceIdToPlan, DEFAULT_PLAN, PLANS, type PlanId } from '../../../lib/plans-config';
 import { subscriptionPeriodEnd } from '../../../lib/stripe-helpers';
-import { emitPlanChanged } from '../../../lib/funnel-events';
+import { emitPlanChanged, hashUid } from '../../../lib/funnel-events';
 import { getFirestore } from '../../../utils/db';
 import * as admin from 'firebase-admin';
+import { requireUser } from '../../../lib/api-auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -16,11 +17,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId, reason, feedback, immediately = false } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' });
+    const auth = await requireUser(req);
+    if (!auth) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+    const userId = auth.uid;
+    const { reason, feedback, immediately = false } = req.body;
+
 
     const db = getFirestore();
 
@@ -105,7 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // omitting it is recoverable (scripts/set-preserved-allocation.ts)
         // whereas a written 50 looks deliberate and would not be noticed.
         console.error(
-          `[cancel-subscription] Cancelling ${subscription.id} for user ${userId} WITHOUT a ` +
+          `[cancel-subscription] Cancelling ${subscription.id} for user ${hashUid(userId)} WITHOUT a ` +
           `preserved allocation: price ${priceId} maps to no known plan and the cached plan ` +
           `${JSON.stringify(cachedPlan)} is not a known plan either. This is a configuration ` +
           `problem (a rotated price, or STRIPE_*_PRICE_ID not matching the mode of ` +

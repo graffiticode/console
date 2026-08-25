@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
-import axios from 'axios';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
+import { paymentsGet, paymentsPost } from '../../utils/payments-client';
 import { planDetails } from '@/utils/plans';
 
 interface SubscriptionData {
@@ -17,22 +18,19 @@ interface SubscriptionData {
   };
 }
 
-interface SubscriptionCardProps {
-  userId: string;
-}
-
-export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
+export default function SubscriptionCard() {
+  const { user } = useGraffiticodeAuth();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
-    fetchSubscription();
-  }, [userId]);
+    if (user) fetchSubscription();
+  }, [user]);
 
   const fetchSubscription = async () => {
     try {
-      const response = await axios.get(`/api/payments/subscription?userId=${userId}`);
+      const response = await paymentsGet(user, 'subscription');
       setSubscription(response.data);
     } catch (error) {
       console.error('Error fetching subscription:', error);
@@ -50,7 +48,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
   const handleCancelSubscription = async () => {
     setCancelling(true);
     try {
-      await axios.post('/api/payments/cancel-subscription', { userId });
+      await paymentsPost(user, 'cancel-subscription');
       await fetchSubscription();
     } catch (error) {
       console.error('Error cancelling subscription:', error);
@@ -63,7 +61,7 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
   const handleResumeSubscription = async () => {
     setCancelling(true);
     try {
-      const response = await axios.post('/api/payments/resume-subscription', { userId });
+      const response = await paymentsPost(user, 'resume-subscription');
 
       // If payment method required, redirect to checkout
       if (response.data.requiresPaymentMethod && response.data.checkoutUrl) {

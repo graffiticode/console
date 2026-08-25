@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import axios from 'axios';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
+import { paymentsGet, paymentsPost } from '../../utils/payments-client';
 import { planDetails, type PlanId } from '../../utils/plans';
 
 interface UsageData {
@@ -22,10 +23,6 @@ interface UsageData {
   currentPeriodEnd: string;
 }
 
-interface UsageMonitorProps {
-  userId: string;
-}
-
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // Prefilled enrollment cap. Deliberately a round, small number: the point of
@@ -33,7 +30,8 @@ const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigi
 // a card goes on file, not that they accept ours.
 const DEFAULT_ENROLL_CAP_USD = 20;
 
-export default function UsageMonitor({ userId }: UsageMonitorProps) {
+export default function UsageMonitor() {
+  const { user } = useGraffiticodeAuth();
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingCap, setSavingCap] = useState(false);
@@ -42,12 +40,12 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
   const [enrollCapInput, setEnrollCapInput] = useState(String(DEFAULT_ENROLL_CAP_USD));
 
   useEffect(() => {
-    fetchUsageData();
-  }, [userId]);
+    if (user) fetchUsageData();
+  }, [user]);
 
   const fetchUsageData = async () => {
     try {
-      const usageResponse = await axios.get(`/api/payments/usage?userId=${userId}`);
+      const usageResponse = await paymentsGet(user, 'usage');
       setUsage(usageResponse.data);
       setCapInput(
         typeof usageResponse.data?.overageLimitUsd === 'number'
@@ -68,8 +66,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
     if (enrolling) return;
     setEnrolling(true);
     try {
-      const response = await axios.post('/api/payments/create-checkout-session', {
-        userId,
+      const response = await paymentsPost(user, 'create-checkout-session', {
         planId: usage?.plan ?? 'demo',
         interval: 'monthly',
         overageLimitUsd: limitUsd,
@@ -87,7 +84,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
     if (savingCap) return;
     setSavingCap(true);
     try {
-      await axios.post('/api/payments/overage-limit', { userId, limitUsd });
+      await paymentsPost(user, 'overage-limit', { limitUsd });
       await fetchUsageData();
     } catch (error: any) {
       // Setting a cap on a tier that hasn't enrolled is the OTHER moment we ask
@@ -126,6 +123,7 @@ export default function UsageMonitor({ userId }: UsageMonitorProps) {
   const includedUsed = Math.min(used, included);
   const overageItems = usage.overageItems;
   const barTotal = Math.max(included, includedUsed + overageItems);
+
   const includedPct = barTotal > 0 ? (includedUsed / barTotal) * 100 : (used > 0 ? 100 : 0);
   const overagePct = barTotal > 0 ? (overageItems / barTotal) * 100 : 0;
 

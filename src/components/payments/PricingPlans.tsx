@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
+import { paymentsGet, paymentsPost } from '../../utils/payments-client';
 import { plans, PlanId, BillingInterval, isUpgrade } from '@/utils/plans';
 import PlanCard from './PlanCard';
 
 interface PricingPlansProps {
-  userId: string;
   onSubscriptionChange?: () => void;
 }
 
@@ -26,7 +26,8 @@ const defaultSubState: SubscriptionState = {
   hasPaymentMethod: false,
 };
 
-export default function PricingPlans({ userId, onSubscriptionChange }: PricingPlansProps) {
+export default function PricingPlans({ onSubscriptionChange }: PricingPlansProps) {
+  const { user } = useGraffiticodeAuth();
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -36,14 +37,14 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
   const [sub, setSub] = useState<SubscriptionState>(defaultSubState);
 
   useEffect(() => {
-    fetchUserData();
-  }, [userId]);
+    if (user) fetchUserData();
+  }, [user]);
 
   const fetchUserData = async () => {
     try {
       const [subscriptionResponse, methodsResponse] = await Promise.all([
-        axios.get(`/api/payments/subscription?userId=${userId}`),
-        axios.get(`/api/payments/methods?userId=${userId}`)
+        paymentsGet(user, 'subscription'),
+        paymentsGet(user, 'methods')
       ]);
 
       const subscription = subscriptionResponse.data;
@@ -82,8 +83,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
     setSelectedPlan(planId);
 
     try {
-      const response = await axios.post('/api/payments/cancel-subscription', {
-        userId,
+      const response = await paymentsPost(user, 'cancel-subscription', {
         immediately: false
       });
 
@@ -107,8 +107,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
     setProcessing(true);
     setSelectedPlan('demo');
     try {
-      const response = await axios.post('/api/payments/cancel-subscription', {
-        userId,
+      const response = await paymentsPost(user, 'cancel-subscription', {
         immediately: true
       });
       if (response.data.success) {
@@ -145,8 +144,7 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
     }
 
     try {
-      const quickResponse = await axios.post('/api/payments/quick-subscribe', {
-        userId,
+      const quickResponse = await paymentsPost(user, 'quick-subscribe', {
         planId,
         interval: billingInterval
       });
@@ -221,9 +219,8 @@ export default function PricingPlans({ userId, onSubscriptionChange }: PricingPl
         if (handled) return;
       }
 
-      console.log('Falling back to Stripe Checkout:', { userId, planId, interval: billingInterval });
-      const response = await axios.post('/api/payments/create-checkout-session', {
-        userId,
+      console.log('Falling back to Stripe Checkout:', { planId, interval: billingInterval });
+      const response = await paymentsPost(user, 'create-checkout-session', {
         planId,
         interval: billingInterval
       });

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DocumentArrowDownIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import axios from 'axios';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
+import { paymentsGet } from '../../utils/payments-client';
 
 interface Invoice {
   id: string;
@@ -12,22 +13,19 @@ interface Invoice {
   type: 'subscription' | 'overage' | 'one-time';
 }
 
-interface BillingHistoryProps {
-  userId: string;
-}
-
-export default function BillingHistory({ userId }: BillingHistoryProps) {
+export default function BillingHistory() {
+  const { user } = useGraffiticodeAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'subscription' | 'overage'>('all');
 
   useEffect(() => {
-    fetchInvoices();
-  }, [userId]);
+    if (user) fetchInvoices();
+  }, [user]);
 
   const fetchInvoices = async () => {
     try {
-      const response = await axios.get(`/api/payments/invoices?userId=${userId}`);
+      const response = await paymentsGet(user, 'invoices');
       // Extract invoices array from response object
       setInvoices(response.data.invoices || []);
     } catch (error) {

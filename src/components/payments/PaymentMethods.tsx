@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { CreditCardIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import axios from 'axios';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
+import { paymentsGet, paymentsPost, paymentsDelete } from '../../utils/payments-client';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_PwlNxtmtkJ5hH6Ze0eMPsOaS');
 
@@ -16,10 +17,10 @@ interface PaymentMethod {
 }
 
 interface PaymentMethodsProps {
-  userId: string;
 }
 
-function AddPaymentMethodForm({ userId, onSuccess, onCancel }: { userId: string; onSuccess: () => void; onCancel: () => void }) {
+function AddPaymentMethodForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
+  const { user } = useGraffiticodeAuth();
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +63,7 @@ function AddPaymentMethodForm({ userId, onSuccess, onCancel }: { userId: string;
     } else if (paymentMethod) {
       // Save the payment method to our backend
       try {
-        const response = await axios.post(`/api/payments/methods?userId=${userId}`, {
+        const response = await paymentsPost(user, 'methods', {
           paymentMethodId: paymentMethod.id,
           setAsDefault: false
         });
@@ -151,7 +152,8 @@ function AddPaymentMethodForm({ userId, onSuccess, onCancel }: { userId: string;
   );
 }
 
-export default function PaymentMethods({ userId }: PaymentMethodsProps) {
+export default function PaymentMethods({}: PaymentMethodsProps) {
+  const { user } = useGraffiticodeAuth();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -160,11 +162,11 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
   useEffect(() => {
     fetchPaymentMethods();
     fetchSubscriptionStatus();
-  }, [userId]);
+  }, [user]);
 
   const fetchPaymentMethods = async () => {
     try {
-      const response = await axios.get(`/api/payments/methods?userId=${userId}`);
+      const response = await paymentsGet(user, 'methods');
       // Extract paymentMethods array from response object
       const methods = response.data.paymentMethods || response.data || [];
       // Ensure it's always an array
@@ -180,7 +182,7 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
 
   const fetchSubscriptionStatus = async () => {
     try {
-      const response = await axios.get(`/api/payments/subscription?userId=${userId}`);
+      const response = await paymentsGet(user, 'subscription');
       const subscription = response.data;
       // Check if user has an active paid subscription
       setHasActiveSubscription(
@@ -204,7 +206,7 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
     }
 
     try {
-      await axios.delete(`/api/payments/methods/${methodId}`, { data: { userId } });
+      await paymentsDelete(user, `methods/${methodId}`);
       await fetchPaymentMethods();
     } catch (error: any) {
       console.error('Error removing payment method:', error);
@@ -215,7 +217,7 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
 
   const handleSetDefault = async (methodId: string) => {
     try {
-      await axios.post('/api/payments/methods/set-default', { userId, methodId });
+      await paymentsPost(user, 'methods/set-default', { methodId });
       await fetchPaymentMethods();
     } catch (error) {
       console.error('Error setting default payment method:', error);
@@ -262,7 +264,6 @@ export default function PaymentMethods({ userId }: PaymentMethodsProps) {
           <h4 className="text-sm font-medium text-gray-900 mb-4">Add New Payment Method</h4>
           <Elements stripe={stripePromise}>
             <AddPaymentMethodForm
-              userId={userId}
               onSuccess={() => {
                 setShowAddForm(false);
                 fetchPaymentMethods();
