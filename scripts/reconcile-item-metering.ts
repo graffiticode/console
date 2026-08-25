@@ -58,7 +58,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 import { STRIPE_API_VERSION, includedItemsFor, overageRateFor, getPlan } from '../src/lib/plans-config';
-import { classifyLine, linePriceId } from '../src/lib/usage-history';
+import { classifyLine, linePriceId } from '../src/lib/stripe-invoice-lines';
 
 const arg = (name: string, def?: string) => {
   const i = process.argv.indexOf(`--${name}`);

@@ -100,7 +100,7 @@ the Stripe meter. They are told apart by `nonBillableReason`, because they are s
 | `nonBillableReason` | What it is | Customer sees it? |
 |---|---|---|
 | `'local-script'` | `currentEnv() === 'local'` — a tsx script (corpus generation, evals). Writes to **prod** Firestore but carries `.env.local`'s **test** Stripe key, so its meter events can never reach the live customer. | **No.** Ours, not theirs. |
-| `'sponsored'` | The item's language carries `sponsored: { by }` in `src/lib/languages.ts`. Also stamps `sponsorId: 'lang:0000'`. | **Yes** — own bar on the Usage tab, own column in Usage History, attributed to `by`. |
+| `'sponsored'` | The item's language carries `sponsored: { by }` in `src/lib/languages.ts`. Also stamps `sponsorId: 'lang:0000'`. | **Yes** — own bar on the Usage tab, attributed to `by`. |
 
 Order matters in `recordBillableItem`: a local run in a sponsored language is **both**, and `local`
 wins. Labelling it `sponsored` would put a training run on the customer's usage page.
@@ -119,33 +119,6 @@ Sponsorship is **uncapped**: while the flag is set every item in that language i
 sponsorship is a flag flip after which items bill normally with no wall and no notice. `sponsorId` is
 namespaced so a per-user or global cap — or a `client:acme` partner sponsorship — can be added later
 and evaluated against rows that already exist.
-
-## Usage history (past cycles)
-
-`/api/payments/usage-history` → `src/lib/usage-history.ts` → the Usage tab's second table.
-
-There is **no per-cycle summary anywhere in Firestore** — `usage/{uid}` is destructively zeroed by
-the `invoice.paid` webhook with no read-before-write. So history is reassembled per request:
-
-- **Boundaries and money from Stripe invoices.** A paid sub has a base price billed **in advance**
-  and a metered price billed **in arrears**, so on a renewal invoice created at T the base line
-  covers the cycle *starting* and the metered line covers the cycle that just *closed*. A cycle is
-  therefore `[baseStart(invoice N), baseStart(invoice N+1))`, and its money spans two invoices.
-  **Never use `invoice.period_start`/`period_end`** — degenerate on renewals.
-- **Line classification** reads `usage_type` off the resolved `Price`. An `InvoiceLineItem` has no
-  `price` property in SDK v22 (it moved to `pricing.price_details.price`), so the obvious
-  `line.price.recurring.usage_type` silently yields `undefined`. There is a fallback expressed purely
-  in advance-vs-arrears period semantics, independent of env price ids.
-- **Plan per cycle** comes from that cycle's own base price, never the current cached
-  `subscription.plan`. `priceIdToPlan()` only knows price ids currently in env, so a cycle billed on
-  a **retired** price falls back to matching the charged amount against `PLANS`.
-- **Item counts from Firestore**, `ITEM_DATA_START` (2026-07-23, the item-pricing cutover) onward.
-  Cycles before it — or straddling it — render `—`, never `0`.
-- **Items Used excludes Sponsored.** That invariant is what keeps the column equal to the invoiced
-  quantity.
-
-Tests: `npx tsx scripts/verify-usage-history.ts --fixtures` (no network; covers plan change, void
-invoice, cutover straddle, annual, unresolvable price) or `--uid <uid>` against a live account.
 
 ## Gating + overage spend cap
 
