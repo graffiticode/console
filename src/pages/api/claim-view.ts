@@ -2,7 +2,13 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { verifyClaimToken } from "../../lib/claim-token";
 import { logClaimView } from "./resolvers";
 
-const ALLOWED_SRC = new Set(["chat", "footer", "unknown"]);
+// Three surfaces can offer a claim, and each mints its own value:
+//   chat    the claim_url an agent prints in the conversation
+//   widget  the MCP widget's in-host footer button (mcp-server, claim_url_widget)
+//   footer  the app's /form attribution bar (app, FormFooter, via view_url's ?claim=)
+// `unknown` is the honest answer for a link that carried no src — which is what
+// the app footer sent for its first three months.
+const ALLOWED_SRC = new Set(["chat", "widget", "footer", "unknown"]);
 
 /**
  * Records that a claim link was opened.
