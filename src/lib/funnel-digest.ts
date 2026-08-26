@@ -902,9 +902,44 @@ export function formatDigest(d: Digest): string {
 
 // --- Cursor + novelty state -------------------------------------------------
 
+/**
+ * One previously-reported window, kept so the next report has something to
+ * judge itself against.
+ *
+ * Strangers only, and only the counts a narration would compare — this is a
+ * baseline, not an archive. The full history of any window is re-derivable from
+ * Cloud Logging and rendered by /r/<token>; what cannot be re-derived is which
+ * windows were actually REPORTED, since they stretch across skipped runs and
+ * swallow the whole overnight at 8am. That is why `hours` rides along: two
+ * windows are only comparable through their durations.
+ */
+export interface RecentWindow {
+  /** End of the window, ISO. Ordered oldest first in state. */
+  to: string;
+  hours: number;
+  calls: number;
+  workspaces: number;
+  items: number;
+  claims: number;
+}
+
+/** The baseline row for a window, from its anonymous digest. */
+export function recentOf(d: Digest): RecentWindow {
+  return {
+    to: d.to.toISOString(),
+    hours: Math.max(0, (d.to.getTime() - d.from.getTime()) / 3_600_000),
+    calls: d.context.toolCalls,
+    workspaces: d.workspaces.total,
+    items: d.items.ok,
+    claims: d.claims.count,
+  };
+}
+
 export interface DigestState {
   cursor?: string;
   lastSentAt?: string;
+  /** Baseline for the narrated SMS — see src/lib/funnel-narrator.ts. */
+  recent?: RecentWindow[];
 }
 
 export async function readState(): Promise<DigestState> {
