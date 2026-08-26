@@ -24,6 +24,10 @@
  *     warnings         = what the compiler objected to, split fixable/unfixable by
  *                        scripts/eval-warning-taxonomy.ts
  *     fixRounds, latencyMs, cost (priced via src/lib/model-pricing.ts)
+ *     agreement       = whether the variants wrote the SAME program on a case, at three levels
+ *                       (layout / invented literals / shape) with a same-variant across-trials
+ *                       control — see scripts/eval-code-agreement.ts. Free, from code already
+ *                       retained, and the only objective signal left once compile rate saturates.
  *
  *   subjective (--judge, costs judge calls):
  *     pointwise 1-5 on the shared rubric; pairwise blind + order-controlled
@@ -86,6 +90,7 @@ import { pickRepresentative } from "./eval-representative";
 import { verifyExampleForPrompt } from "../src/lib/lang-embedding";
 import { warningsFromVerification, bucketCounts, classifyWarning } from "./eval-warning-taxonomy";
 import { dialectFingerprint, sameDialect, formatFingerprint, type DialectFingerprint } from "./eval-dialect-fingerprint";
+import { codeAgreement, canonicalizeRuns, printAgreement } from "./eval-code-agreement";
 
 
 /**
@@ -1059,6 +1064,24 @@ async function runCalibrate(args: any) {
   console.log("\nThis is the judge's trust gate — widen the CI read: label until it is tight enough for the decision it gates.");
 }
 
+/**
+ * Agreement, measured on CANONICAL source: every program is round-tripped through the dialect's
+ * own parser first, so a re-indented attribute list stops counting as a delta. The round-trip is
+ * local (lexicon fetch aside) and cached, so this adds nothing to a sweep's cost.
+ *
+ * Says so out loud when it could not canonicalize. Comparing raw source is still a usable report,
+ * but it inflates the delta with layout, and a reader who is not told will read that as content.
+ */
+async function agreementFor(runs: RunResult[]) {
+  const { runs: canonical, failed, langsUnavailable } = await canonicalizeRuns(runs);
+  if (langsUnavailable.length) {
+    console.log(`NOTE: agreement compared RAW source for L${langsUnavailable.join(", L")} — no lexicon, so layout differences count as deltas.`);
+  } else if (failed) {
+    console.log(`NOTE: ${failed} run(s) would not parse for canonicalization and were compared as raw source.`);
+  }
+  return codeAgreement(canonical);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
@@ -1073,6 +1096,11 @@ async function main() {
     if (!runs.length) { console.error(`Checkpoint is empty: ${args.fromCheckpoint}`); process.exit(1); }
     const summary = summarize(runs);
     printTable(summary);
+    // Recomputed from the stored code rather than read off the payload, so an agreement fix
+    // applies retroactively to sweeps already on disk (the same reason defectsFirstTurn
+    // re-derives its buckets from the raw messages).
+    const ckptAgreement = await agreementFor(runs);
+    printAgreement(ckptAgreement);
     const out = args.out.replace(/(\.json)?$/, "-from-checkpoint.json");
     writeFileSync(out, JSON.stringify({
       generatedAt: new Date().toISOString(),
@@ -1080,7 +1108,7 @@ async function main() {
       // Loud, because a partial sweep is not a balanced design: whichever variants the loop had
       // reached have more runs than the rest, so cross-variant rates are not directly comparable.
       partial: `rebuilt from ${args.fromCheckpoint} — ${runs.length} runs; the sweep did not finish`,
-      args, summary, runs,
+      args, summary, agreement: ckptAgreement, runs,
     }, null, 2));
     console.log(`\nRebuilt ${runs.length} runs → ${out}`);
     // Only warn when the design is actually unbalanced. A checkpoint rebuild is not inherently
@@ -1191,6 +1219,13 @@ async function main() {
   const stuckRuns = allRuns.filter((r) => r.stuck).length;
   if (stuckRuns > 0) console.log(`NOTE: ${stuckRuns} session(s) stopped early on no-progress (a repair turn failed to reduce the fixable warning count).`);
 
+  // How much the variants' programs actually differ, at three levels, with a self-agreement
+  // control. Costs nothing (the code is already retained for the judge) and is unconditional:
+  // on a saturated dialect every other objective column ties, and "they all wrote the same
+  // program" vs "they wrote four different ones" is the only thing left that separates them.
+  const agreement = await agreementFor(allRuns);
+  printAgreement(agreement);
+
   // ── Phase 2 (subjective) — LLM-as-judge, opt-in via --judge (keeps Phase 1 cheap). ──
   // Reference-free rubric (correctness / instruction-following / idiomaticity / overall) scored
   // against the prompt intent. Pointwise per (case, model); pairwise blind + order-controlled
@@ -1211,7 +1246,7 @@ async function main() {
     dialects: Object.fromEntries(
       [...new Set(allRuns.map((r) => r.lang))].map((l) => [l, allRuns.find((r) => r.lang === l)?.dialect ?? null]),
     ),
-    args, summary, runs: allRuns,
+    args, summary, agreement, runs: allRuns,
     ...(judgements ? { judgements } : {}),
   };
   writeFileSync(outPath, JSON.stringify(payload, null, 2));
