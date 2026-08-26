@@ -46,6 +46,18 @@
  * its raw source, and two such programs can still differ by layout alone. When the round-trip
  * worked, `formatting` is unreachable by construction.
  *
+ * NOISE FLOOR — read this before calling any movement a result. Two L0179 sweeps run a day apart
+ * against the IDENTICAL dialect (fingerprint a3552541, 12 cases x 4 variants x 3 trials, 2026-08-25
+ * and 2026-08-26) differed by up to 9 points of cross-model agreement (sonnet 42% -> 33%) and 19
+ * points of self-agreement (sonnet 75% -> 56%). At this sample size a single sweep's number is not
+ * a measurement of anything; only a move larger than that, or one that shows up in every variant at
+ * once, is. The four-sweep series that followed cleared it by moving all four variants together
+ * (agreement 28-44% across both baselines -> 47-53%), which trial noise does not do.
+ *
+ * The cheap guard is to hold a same-dialect baseline: fingerprint every sweep (model-eval.ts stamps
+ * it per run) and compare like against like. A dialect that shipped mid-series is the one thing that
+ * makes two sweeps incomparable, and the fingerprint is what catches it.
+ *
  * WHAT IT COMPARES: the same median-latency representative the judge scores (pickRepresentative),
  * over runs that compiled — a failed run is absent from its case rather than counted as agreement.
  * In --converge mode `code` is the session's ENDPOINT, so agreement there is about where the
