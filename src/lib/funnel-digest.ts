@@ -26,6 +26,7 @@ import { getAccessToken } from "./gcp-token";
 // other. Shared with the workspace registry so both bucket a language alike.
 import { langKey } from "./funnel-events";
 import { isExcludedSession } from "./funnel-exclusions";
+import { classifyConnect, isProbeKind } from "./funnel-clients";
 
 const PROJECT =
   process.env.GENERATION_QUEUE_PROJECT ||
@@ -355,47 +356,10 @@ export interface Digest {
   };
 }
 
-/**
- * Which side of the noise line a connect falls on.
- *
- * `crawler` is only ever a client that SAYS it is one — directory audits,
- * reputation scanners, `Mozilla/`-shaped user agents pasted into clientInfo.
- * Everything else that gives a name is an `agent`, including names we suspect
- * are automated: `Anthropic/ClaudeAI` is far and away the largest bucket and
- * has never produced a tool call, but guessing it into the bin would delete the
- * evidence either way. It gets its own row, and the mcp_listed column settles
- * it — a validator handshakes and stops, a host lists our tools.
- *
- * `unnamed` is its own bucket rather than folded into `agent`. Connects carried
- * no client_kind until 2026-07-28, so merging them would invent demand out of
- * data that predates the field.
- */
-export function classifyConnect(kind?: string): "crawler" | "agent" | "unnamed" {
-  if (!kind) return "unnamed";
-  if (CRAWLER_NAMES.has(kind)) return "crawler";
-  return CRAWLER_PATTERN.test(kind) ? "crawler" : "agent";
-}
-
-const CRAWLER_NAMES = new Set([
-  "agent-tools.cloud",
-  "forge-catalog-audit",
-  "catalog-health",
-  "census-probe",
-  "mcp-reputation-scanner",
-  "probe",
-]);
-
-/**
- * Whole words only, and no bare "catalog" or "health".
- *
- * This pattern's job is to catch the NEXT crawler, not to re-catch the ones
- * already named above, and a loose substring match is how a real client called
- * something like "healthcare-tutor" would disappear into the automated line.
- * Misfiling is visible either way — the footnote names what it collapsed — but
- * the default should be to leave a client in the table.
- */
-const CRAWLER_PATTERN =
-  /\b(scanner|crawler|spider|censys|probe|audit|healthcheck|uptime|monitor)\b|^Mozilla\//i;
+// The client-classification vocabulary lives in ./funnel-clients (a leaf module
+// with no imports, so scripts can read it without pulling Firestore in).
+// Re-exported here because this is where callers already look for it.
+export { classifyClient, classifyConnect, isProbeKind, type ClientClass } from "./funnel-clients";
 
 function langSafeKind(v: unknown): string | undefined {
   return typeof v === "string" && v ? v : undefined;
@@ -511,6 +475,36 @@ export function aggregate(
   // they were plainly active.
   const active = new Map<string, { kind: string; geo?: string }>();
 
+  // Which sessions belong to crawlers, probes, and our own tooling.
+  //
+  // A PRE-PASS, for the same reason usedKeys/listedKeys are sets applied at the
+  // end: a single pass can only classify an event whose own payload names the
+  // client, and item_created carries `app` but no client_kind. Its session is
+  // named by the mcp_tool call that produced it, which may be read after it.
+  // Flagging as we go would let a scanner's items through whenever the log
+  // arrived in a different order — and `gcloud logging read` defaults to
+  // descending, so offline analysis would disagree with the live path.
+  const probeKeys = new Set<string>();
+  for (const e of events) {
+    if (!isProbeKind(langSafeKind(e.client_kind))) continue;
+    const k = reachKey(e);
+    if (k) probeKeys.add(k);
+    if (typeof e.session === "string" && e.session) probeKeys.add(e.session);
+  }
+  /**
+   * Probe traffic is excluded from the DEMAND counters (workspaces, tool calls,
+   * items, languages) and kept in `reach`, which exists to report exactly this.
+   * Dropping it at fetchEvents instead would have emptied the crawler rows —
+   * the evidence and the noise are the same events, told apart only here.
+   */
+  const isProbe = (e: LogEvent): boolean => {
+    const kind = langSafeKind(e.client_kind);
+    if (kind) return isProbeKind(kind);
+    const k = reachKey(e);
+    if (k && probeKeys.has(k)) return true;
+    return typeof e.session === "string" && probeKeys.has(e.session);
+  };
+
   for (const e of events) {
     const session = typeof e.session === "string" ? e.session : undefined;
     switch (e.ev) {
@@ -541,8 +535,11 @@ export function aggregate(
         break;
 
       case "mcp_tool":
-        d.context.toolCalls++;
+        // usedKeys is marked for probes too: reach reports what a crawler did,
+        // and a scanner that called a tool is not a connect "without use".
         mark(usedKeys, e);
+        if (isProbe(e)) break;
+        d.context.toolCalls++;
         if (session) {
           const kind = langSafeKind(e.client_kind);
           if (kind && !active.has(session)) {
@@ -565,15 +562,17 @@ export function aggregate(
         // Run scaling, a host that re-binds mid-conversation). Deduping by
         // session id downstream makes the count right either way, where
         // incrementing here would report the same person twice.
+        mark(usedKeys, e);
+        if (isProbe(e)) break;
         active.set(session ?? `anon:${active.size}`, {
           kind: langSafeKind(e.client_kind) ?? "unknown",
           geo: geoOf(e),
         });
-        mark(usedKeys, e);
         break;
       }
 
       case "item_created":
+        if (isProbe(e)) break;
         d.items.ok++;
         bump(d.items.byApp, typeof e.app === "string" ? e.app : "console");
         bump(d.languages.created, langKey(e.lang));
@@ -581,10 +580,12 @@ export function aggregate(
         break;
 
       case "item_updated":
+        if (isProbe(e)) break;
         d.context.edits++;
         break;
 
       case "item_generation_failed":
+        if (isProbe(e)) break;
         d.items.failed++;
         break;
 

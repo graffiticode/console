@@ -45,6 +45,7 @@ import {
   type WeeklyNewCreatingWorkspaces,
 } from '../src/lib/omtm';
 import { OMTM_CLOCK_START } from '../src/lib/workspace-week';
+import { classifyClient } from '../src/lib/funnel-clients';
 
 // --- Load .env.local (same pattern as user-report.ts) -----------------------
 const envPath = resolve(process.cwd(), '.env.local');
@@ -246,34 +247,27 @@ const BUCKET_ORDER: ClientBucket[] = ['claude', 'openai', 'other', 'internal', '
 const CRAWL_MAX_GAP_MS = 10_000;  // consecutive sessions closer than this are one run
 const CRAWL_MIN_RUN = 10;         // …and a run this long is not a population of humans
 
-// Substrings marking automated catalogue crawlers, uptime probes and security
-// scanners. These are not users: they call tools with junk item ids on purpose,
-// so counting them tanks the reliability guardrail. In the 2026-08-13→20 week,
-// 20 of 24 non-ok outcomes were ONE scanner (`alpic-beacon-ai-review`) probing
-// get_item/get_spec/render_item/get_language_info with 5 bad ids each, which
-// alone moved overall tool success from ~99% to the 92.7% the report printed.
+// Crawler / probe / internal names now live in ONE place: classifyClient() in
+// src/lib/funnel-digest.ts, which the hourly SMS, the /r/<token> page and
+// scripts/funnel-report.ts all read. They were duplicated here as loose
+// substrings until 2026-08-26, and the digest's not knowing them is how
+// `adoption-verify`'s 40 tool calls were reported as anonymous demand.
 //
-// This list is necessarily open-ended — the name is whatever the client says it
-// is. Prefer false-negatives (a missed scanner shows up as `other`, which is
-// already excluded from the user-facing success rate) over false-positives.
-const SCANNER_PATTERNS = [
-  'scanner', 'probe', 'beacon', 'detector', 'inspect', 'measurement', 'audit',
-  'survey', 'dump', 'verifier', 'health', 'profiler', 'nuclei', 'censys',
-  'atlas', 'catalogue', 'catalog-', 'connectability', 'reputation', 'leaktest',
-  'adoptsignal', 'adoption-verify', 'research', 'dark-mcp', 'orb-',
-];
-
-// MCP Inspector is the project's standard manual-testing app (see the repo's
-// CLAUDE.md), so every session from it is US exercising the server, not demand.
-// Left unclassified it lands in `other` and counts as user traffic: over
-// 2026-07-21→08-20 that was 24 creates, ~7% of all creates in the window.
-const INTERNAL_PATTERNS = ['inspector'];
+// The reason it matters here specifically: scanners call tools with junk item
+// ids on purpose, so counting them tanks the reliability guardrail. In the
+// 2026-08-13→20 week, 20 of 24 non-ok outcomes were ONE scanner
+// (`alpic-beacon-ai-review`) probing get_item/get_spec/render_item/
+// get_language_info with 5 bad ids each, which alone moved overall tool success
+// from ~99% to the 92.7% the report printed.
+//
+// Adding a newly-seen scanner means editing funnel-digest.ts, not this file.
 
 function bucketOf(kind: string | undefined): ClientBucket {
   if (!kind) return 'unknown';
+  const cls = classifyClient(kind);
+  if (cls === 'internal') return 'internal';
+  if (cls === 'crawler') return 'scanner';
   const k = kind.toLowerCase();
-  if (INTERNAL_PATTERNS.some((pat) => k.includes(pat))) return 'internal';
-  if (SCANNER_PATTERNS.some((pat) => k.includes(pat))) return 'scanner';
   if (k.includes('claude') || k.includes('anthropic')) return 'claude';
   if (k.includes('openai') || k.includes('codex')) return 'openai';
   return 'other';
