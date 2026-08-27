@@ -504,6 +504,24 @@ export async function planComposition({
     const { candidates, catalog } = await buildLanguageCatalog();
     if (candidates.length === 0) return fallback;
 
+    // The head's composesWith allowlist, stated to the planner rather than left for
+    // fenceComposition to discover afterwards. A proposal outside the allowlist is not a
+    // near-miss — the fence drops the WHOLE chain to atomic, so the user silently gets an
+    // item with no embedded widget at all. Naming the permitted set up front is also what
+    // keeps this prompt from having to hardcode "the spreadsheet dialect is L____", which
+    // is exactly how it froze on a dialect that has since been deprecated.
+    const permits = composesWithFor(currentLang);
+    const permitBlock = permits.includes("*")
+      ? `L${currentLang} may compose with any non-internal language in the catalog.`
+      : permits.length > 0
+        ? `L${currentLang} may compose ONLY with these upstreams: ${permits
+            .map((id) => {
+              const l = candidates.find((c) => c.id === id);
+              return `L${id}${l?.status === "Deprecated" ? " (DEPRECATED — choose only if the request explicitly names it)" : ""}`;
+            })
+            .join(", ")}. Proposing any other upstream causes the entire chain to be discarded, so if none of these authors what the request needs, return a SINGLE stage.`
+        : `L${currentLang} is ATOMIC — it may not compose with any upstream. Return a single stage.`;
+
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       console.warn("[language-router] ANTHROPIC_API_KEY not set");
@@ -526,13 +544,15 @@ ${catalog}
 
 Composition is a LINEAR PIPELINE: a head program may consume a data model produced by an upstream program, which may itself consume one from a further upstream, and so on. Decompose the request into an ORDERED sequence of stages from the head (what the user ultimately gets) down to the deepest data source. Stage i consumes the data model produced by stage i+1.
 
-Add a downstream stage whenever a stage describes-but-does-not-author a content type produced by another dialect — e.g. a host language (L0158) embeds an interactive widget authored by another (L0166 spreadsheets, L0159 flashcards). Stop when a stage can author its content directly (a leaf). If the active language alone can fulfil the request, return a single stage.
+${permitBlock}
 
-Heuristics:
+Add a downstream stage whenever a stage describes-but-does-not-author a content type produced by another dialect — a host language embedding an interactive widget that another dialect authors. Stop when a stage can author its content directly (a leaf). If the active language alone can fulfil the request, return a single stage.
+
+Heuristics — decide from the catalog and the permitted list above, never from a dialect id you remember:
 - If a stage's routing hint says it "embeds" or "hosts" another dialect for a content type the user asked for, add that dialect as the next stage.
-- A "spreadsheet question", "spreadsheet assessment", or "use the spreadsheet" prompt under an embedding host (e.g. L0158) ⇒ next stage is the spreadsheet dialect (L0166).
-- A pure question-form prompt (MCQ, short text, fill-in-the-blank) under L0158 ⇒ single stage, no upstream.
-- If the user is already in the dialect that authors the content directly (e.g. currentLang=0166 asking for a spreadsheet) ⇒ single stage.
+- If the request asks a host for an interactive widget it does not author itself (a spreadsheet, a chart, a deck), the next stage is whichever PERMITTED upstream's routing hint says it authors that content. If two could, and one is marked deprecated, choose the one that is not.
+- A pure question-form prompt (MCQ, short text, fill-in-the-blank) under an assessment-item host ⇒ single stage, no upstream.
+- If the active language already authors the content directly ⇒ single stage.
 - If the data or content a downstream stage would supply is ALREADY present inline in the prompt (the user pasted the actual numbers, rows, or values), do NOT add that upstream stage — the request is self-contained. Only add a data-providing upstream when the values must be FETCHED or TRANSFORMED from a source not in the prompt.
 
 Return JSON only:
@@ -543,15 +563,15 @@ Return JSON only:
   ]
 }
 
-Examples:
-- prompt: "create a simple spreadsheet assessment for learnosity", currentLang: 0158 →
+Examples of SHAPE only — the ids below are placeholders, never real choices. Take real ids from the catalog and the permitted list above:
+- a request asking an item host for an embedded widget, currentLang: <HOST> →
   { "stages": [
-    { "lang": "0158", "prompt": "Build a Learnosity assessment item that embeds a spreadsheet interaction via its custom question type." },
-    { "lang": "0166", "prompt": "Create a small interactive spreadsheet with a few rows and columns of data and one or two assessed cells the learner must fill in." } ] }
-- prompt: "make an MCQ about France", currentLang: 0158 →
-  { "stages": [ { "lang": "0158", "prompt": "Build a Learnosity MCQ item about France." } ] }
-- prompt: "make a budget tracker spreadsheet", currentLang: 0166 →
-  { "stages": [ { "lang": "0166", "prompt": "Author a budget-tracker spreadsheet." } ] }
+    { "lang": "<HOST>", "prompt": "Build the item that embeds the widget via its custom question type." },
+    { "lang": "<WIDGET>", "prompt": "Author the widget itself, carrying every concrete value the request gave." } ] }
+- a plain question-form request, currentLang: <HOST> →
+  { "stages": [ { "lang": "<HOST>", "prompt": "Build the question item." } ] }
+- a request the active language authors directly, currentLang: <LEAF> →
+  { "stages": [ { "lang": "<LEAF>", "prompt": "Author it directly." } ] }
 
 Rules:
 - stages[0].lang MUST be "${currentLang}". You decide ONLY the upstream chain it consumes; never
