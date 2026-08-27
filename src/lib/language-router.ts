@@ -519,7 +519,7 @@ export async function planComposition({
               const l = candidates.find((c) => c.id === id);
               return `L${id}${l?.status === "Deprecated" ? " (DEPRECATED — choose only if the request explicitly names it)" : ""}`;
             })
-            .join(", ")}. Proposing any other upstream causes the entire chain to be discarded, so if none of these authors what the request needs, return a SINGLE stage.`
+            .join(", ")}. This list is authoritative: do NOT propose an upstream outside it even if the request names a different dialect by id — that naming is a hint about intent, not a permission. Proposing any other upstream causes the entire chain to be discarded, so if none of these authors what the request needs, return a SINGLE stage.`
         : `L${currentLang} is ATOMIC — it may not compose with any upstream. Return a single stage.`;
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -939,8 +939,18 @@ export async function planSequence({
   const pin = (seq: string[]) =>
     seq[0] === headLang ? seq : [headLang, ...seq.filter((l) => l !== headLang)];
 
+  // A curated plan is only applicable to the head it was curated FOR. pin() exists to
+  // override a *planner* that proposed the wrong head; applying it to a RAG hit instead
+  // rewrites a stored composition onto a head that may permit none of its upstreams —
+  // and fenceComposition then drops the whole chain to atomic, silently producing an item
+  // with no embedded widget. (Concretely: every curated plan is ["0176","0179"], and only
+  // L0176 permits 0179, so ANY other head hitting one of them collapses.) A head mismatch
+  // is not a near-match, so treat it as a miss and let the planner decide for this head.
   const hit = await lookupPlanRAG({ prompt, rid });
-  if (hit && hit.length > 0) return { sequence: pin(hit), fromRag: true };
+  if (hit && hit.length > 0) {
+    if (hit[0] === headLang) return { sequence: hit, fromRag: true };
+    console.log(`[language-router] planRAG: hit ${hit.map((l) => `L${l}`).join("->")} is for head L${hit[0]}, not L${headLang} — treating as miss`);
+  }
 
   // Capability-only trigger → skip the Sonnet L0010 codegen entirely.
   if (preferHaiku) {
