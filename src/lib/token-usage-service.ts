@@ -34,6 +34,7 @@ export type Stage =
   | "route_scope_gate"
   | "route_rescope"
   | "compose_plan"
+  | "compose_split"
   | "spec_gen"
   | "judge";
 

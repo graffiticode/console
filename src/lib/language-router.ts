@@ -336,6 +336,143 @@ Be conservative: only route away when the request clearly belongs to a different
   }
 }
 
+/**
+ * Split one user request into a per-stage prompt for each language in an already-decided
+ * sequence.
+ *
+ * Every stage of a composition used to be generated from the ORIGINAL prompt verbatim, on the
+ * theory that "content always comes from the original prompt; the sequence only fixes order."
+ * That works until a dialect has a sharp scope boundary: an upstream then receives the host's
+ * framing (a stem, difficulty tags, an answer key, a second unrelated question) and a dialect
+ * whose instructions say "if the request is for one of these, say so instead of emitting a
+ * program" refuses a request it was correctly chosen for. Telling the upstream to ignore the
+ * noise treats the symptom; not sending it is the fix.
+ *
+ * This runs AFTER the sequence is decided, so it is uniform across all three plan sources —
+ * planRAG hits and L0010 plans carry only lang ids, and planComposition's own per-stage prompts
+ * are not available on those paths. One Haiku call, fail-open.
+ *
+ * FIDELITY IS THE WHOLE RISK HERE. A vague sub-prompt ("a spreadsheet with some test scores")
+ * is WORSE than the noise it replaces: the noise made a stage refuse loudly, while a lossy
+ * sub-prompt compiles clean and authors the wrong content. So the split is a PARTITION, not a
+ * summary — every concrete value in the request must reach exactly one stage verbatim, and on
+ * any doubt the caller falls back to the original prompt rather than a paraphrase.
+ *
+ * Returns null (caller uses the original prompt for every stage) on any failure, malformed
+ * output, or length mismatch.
+ */
+export async function splitRequest({
+  prompt,
+  sequence,
+  rid,
+  itemId,
+  auth,
+}: {
+  prompt: string;
+  sequence: string[];
+  rid?: string | null;
+  itemId?: string | null;
+  auth?: any;
+}): Promise<string[] | null> {
+  if (sequence.length <= 1) return null;
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return null;
+
+    const all = await listLanguages({});
+    const roster = sequence
+      .map((id, i) => {
+        const l = all.find((x) => x.id === id);
+        const scope = l?.summary || l?.routingHint || l?.description || `L${id}`;
+        const role = i === 0 ? "HEAD — what the user ultimately gets" : `upstream stage ${i}`;
+        return `L${id} (${role}): ${scope}`;
+      })
+      .join("\n\n");
+
+    const response = await axios.post(
+      "https://api.anthropic.com/v1/messages",
+      {
+        model: CLAUDE_MODELS.HAIKU,
+        max_tokens: 1500,
+        temperature: 0,
+        messages: [
+          {
+            role: "user",
+            content: `A user asked for this:
+"${prompt}"
+
+It will be built as a pipeline of ${sequence.length} stages, already decided:
+
+${roster}
+
+Write one prompt per stage, saying what THAT stage must author and nothing else.
+
+Rules — the first is the one that matters:
+1. PARTITION, DO NOT SUMMARIZE. Copy every concrete detail into the stage that owns it, VERBATIM: numbers, cell references, formulas, labels, option text, stems, tags, standards codes, answer keys. Never replace a value with a description of it — "85, 92, 78, 95, 88 in B2 through B6" must stay those digits and those cells, never "some test scores". If you cannot tell which stage owns a detail, put it in BOTH.
+2. Each stage prompt must stand alone. It is read by a generator that sees ONLY that prompt — no other stage's text, no knowledge that a pipeline exists.
+3. Give each stage only what its own description above says it authors. Do not hand a stage another stage's content.
+4. Do not invent content the user did not ask for. If a stage's share is not described in the request, say plainly what little is known rather than inventing values.
+5. Phrase each as a direct instruction ("Create ...", "Author ..."), not as a description of the request.
+
+Return JSON only, exactly ${sequence.length} stages, in the same order:
+{"stages": [${sequence.map((id) => `{"lang": "${id}", "prompt": "<what L${id} authors>"}`).join(", ")}]}`,
+          },
+        ],
+      },
+      {
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+      },
+    );
+
+    if (auth && rid && response.data?.usage) {
+      const usage = response.data.usage;
+      await recordTokenUsage({
+        auth,
+        rid,
+        stage: "compose_split",
+        itemId: itemId ?? null,
+        lang: sequence[0],
+        provider: "anthropic",
+        model: CLAUDE_MODELS.HAIKU,
+        usage: {
+          inputTokens: usage.input_tokens || 0,
+          outputTokens: usage.output_tokens || 0,
+          cacheCreationInputTokens: usage.cache_creation_input_tokens || 0,
+          cacheReadInputTokens: usage.cache_read_input_tokens || 0,
+          reasoningTokens: 0,
+        },
+      }).catch(() => {
+        // Never throw from usage recording
+      });
+    }
+
+    const text = response.data?.content?.[0]?.text || "";
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const stages = JSON.parse(m[0])?.stages;
+    if (!Array.isArray(stages) || stages.length !== sequence.length) return null;
+
+    // Order and langs must match the decided sequence exactly — a split that
+    // disagrees about which lang is which would silently swap two stages' content.
+    const prompts: string[] = [];
+    for (let i = 0; i < sequence.length; i++) {
+      const st = stages[i];
+      if (String(st?.lang || "").replace(/^L/i, "") !== sequence[i]) return null;
+      const p = String(st?.prompt || "").trim();
+      if (!p) return null;
+      prompts.push(p);
+    }
+    return prompts;
+  } catch (err) {
+    console.warn(`[composition] splitRequest failed; using original prompt for every stage: ${(err as Error)?.message}`);
+    return null;
+  }
+}
+
 // Proactive composition planner. A plan is an ORDERED linear pipeline of
 // stages: stages[0] is the head (what the user ultimately gets), and each
 // stage consumes the data model produced by the next (stages[i] consumes
@@ -565,6 +702,20 @@ export async function orchestrateComposition({
   const headLang = sequence[0];
   const tail = sequence.slice(1); // langs consumed downstream, head→deepest order
 
+  // Per-stage prompts. The HEAD deliberately keeps the ORIGINAL prompt: it is the
+  // language the user chose, its output is the user-visible artifact, and on an edit
+  // it carries currentCode/conversation that only the verbatim request lines up with.
+  // Only the upstreams — the stages that never asked for the host's framing — get a
+  // scoped share. Null (split unavailable or malformed) restores the previous
+  // behavior of sending the original prompt everywhere.
+  const stagePrompts = await splitRequest({ prompt, sequence, rid, itemId, auth });
+  if (stagePrompts) {
+    console.log(`[composition] rid=${rid} split=${sequence.map((l, i) => `L${l}:${stagePrompts[i].length}c`).join(" ")}`);
+  } else if (sequence.length > 1) {
+    console.log(`[composition] rid=${rid} split=none (original prompt to every stage)`);
+  }
+  const promptFor = (i: number) => (i === 0 ? prompt : stagePrompts?.[i] ?? prompt);
+
   // Generate ALL stages CONCURRENTLY. No stage needs another's compiled output
   // at gen time — each just emits `data use "<next>"` (its dialect knows how) and
   // api merges the upstream data at runtime via depth-first chain eval. So each
@@ -578,11 +729,11 @@ export async function orchestrateComposition({
       // Head: carries currentCode/conversation + reuses the head retrieval;
       // returned unposted for the resolver to post with systemValues.
       return generateCodeService({
-        auth, prompt, lang, options, currentCode, rid, itemId, conversationSummary,
+        auth, prompt: promptFor(0), lang, options, currentCode, rid, itemId, conversationSummary,
         upstreamContext, precomputedExamples: headExamples ?? null,
       });
     }
-    return generateCodeService({ auth, prompt, lang, options, rid, itemId, upstreamContext });
+    return generateCodeService({ auth, prompt: promptFor(i), lang, options, rid, itemId, upstreamContext });
   });
 
   const results: any[] = await Promise.all(gens);
