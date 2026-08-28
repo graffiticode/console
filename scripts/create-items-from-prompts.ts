@@ -26,7 +26,7 @@
  *   --scope-gate         Allow the scope gate to re-route out-of-scope prompts (default: pinned to --lang)
  *   --timeout <seconds>  Per-step wall-clock cap; a stalled request fails that example (default: 300)
  *   --dry-run            Extract and print prompts only, no generation/creation
- *   --output <path>      Output audit log file (default: training/data/{lang}-codegen-mapping.json)
+ *   --output <path>      Write a JSON audit log here (default: none — nothing reads it back)
  *
  * Note: Items are created under the authenticated user's own account (auth.uid);
  * there is no --user override. Every item created counts as one billable item and
@@ -109,9 +109,14 @@ const stepTimeoutMs = (args.includes("--timeout")
   ? parseInt(args[args.indexOf("--timeout") + 1], 10)
   : 300) * 1000;
 
+// Opt-in. This script creates the items itself — the audit log is a diagnostic,
+// not an input, and nothing reads it back (the two-step run-codegen ->
+// upload-codegen-mapping pipeline that consumed a mapping file is retired). It
+// used to be written on every run, which left training/data/ accumulating
+// hundreds of KB of superseded logs. Pass --output to get one.
 const outputPath = args.includes("--output")
   ? args[args.indexOf("--output") + 1]
-  : `training/data/${langCode}-codegen-mapping.json`;
+  : null;
 
 interface TrainingExample {
   id: string;
@@ -552,14 +557,17 @@ async function main() {
   }
 
   // Write audit log
-  const outputDir = path.dirname(outputPath);
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
+  if (outputPath) {
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    fs.writeFileSync(outputPath, JSON.stringify(auditLog, null, 2));
+
+    console.log(`\n✓ Audit log written to: ${outputPath}`);
   }
 
-  fs.writeFileSync(outputPath, JSON.stringify(auditLog, null, 2));
-
-  console.log(`\n✓ Audit log written to: ${outputPath}`);
   console.log(`Summary:`);
   console.log(`  Processed: ${slice.length}`);
   console.log(`  Compiled: ${compiledCount}`);
