@@ -1245,6 +1245,82 @@ export async function setItemGenerationStatus({
   await itemRef.update(updates);
 }
 
+// --- Generation lease (idempotency for the Cloud Tasks worker) --------------
+//
+// Cloud Tasks re-dispatches a task whenever it doesn't see a response within the
+// dispatch window, and it cannot tell a dead attempt from a slow one. A
+// generation that outruns that window is therefore re-dispatched WHILE the first
+// attempt is still running, and both do a full LLM run against the same item.
+// Observed 2026-08-28: three dispatches per job, a uniform 125s apart, every one
+// of them generating.
+//
+// The lease makes the worker idempotent — the first attempt to claim an item
+// wins and later attempts return without generating. It is held only for the
+// life of an attempt and released on every terminal path, so a user's next
+// update_item on the same item is never blocked by it. The expiry is the
+// backstop for a worker that dies without releasing: it must outlive the longest
+// possible attempt (Cloud Run caps the request at 300s) so that an UNEXPIRED
+// lease always means a live attempt rather than a stuck one.
+const GENERATION_LEASE_MS = 5 * 60_000;
+
+export type GenerationClaim = "claimed" | "busy" | "missing";
+
+export async function claimGeneration({
+  auth,
+  id,
+  owner,
+}: {
+  auth: AuthArg;
+  id: string;
+  owner: string;
+}): Promise<GenerationClaim> {
+  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(itemRef);
+    if (!snap.exists) return "missing" as GenerationClaim;
+    const data = snap.data() || {};
+    const holder = data.generationLeaseOwner;
+    const expires = Number(data.generationLeaseExpires) || 0;
+    if (holder && holder !== owner && expires > Date.now()) {
+      return "busy" as GenerationClaim;
+    }
+    tx.update(itemRef, {
+      generationLeaseOwner: owner,
+      generationLeaseExpires: Date.now() + GENERATION_LEASE_MS,
+    });
+    return "claimed" as GenerationClaim;
+  });
+}
+
+// Release only what we still hold: if the lease already expired and another
+// attempt took it, clearing it here would hand the item to a third.
+export async function releaseGeneration({
+  auth,
+  id,
+  owner,
+}: {
+  auth: AuthArg;
+  id: string;
+  owner: string;
+}): Promise<void> {
+  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(itemRef);
+      if (!snap.exists) return;
+      if ((snap.data() || {}).generationLeaseOwner !== owner) return;
+      tx.update(itemRef, {
+        generationLeaseOwner: null,
+        generationLeaseExpires: null,
+      });
+    });
+  } catch (err) {
+    // Best-effort: the lease expires on its own, and failing to release must
+    // never turn a successful generation into a failed request.
+    console.error("releaseGeneration()", "ERROR", id, err);
+  }
+}
+
 export async function getItems({ auth, lang, mark, client }) {
   try {
     // Build the base query (lang + optional mark + free-plan). Client filtering

@@ -20,6 +20,16 @@ const LOCATION = process.env.GENERATION_QUEUE_LOCATION || "us-central1";
 const QUEUE = process.env.GENERATION_QUEUE_NAME || "generation-jobs";
 const SECRET = process.env.INTERNAL_JOB_SECRET || "";
 const CONSOLE_URL = process.env.CONSOLE_URL || "https://console.graffiticode.org";
+// Where Cloud Tasks dispatches the worker. This MUST be the service's own
+// origin, not the public hostname: console.graffiticode.org is proxied by
+// Cloudflare, which cuts an origin connection at ~100s and returns 524 to the
+// caller while the origin keeps running. Cloud Tasks reads that 524 as a failed
+// attempt and re-dispatches, so every generation slower than ~100s ran up to
+// maxAttempts times CONCURRENTLY, each doing a full LLM run, and the attempt
+// that eventually answered had its response thrown away by the proxy. Observed
+// 2026-08-28: three dispatches per job, a uniform 125s apart. Going direct puts
+// the task's own dispatchDeadline (300s) and Cloud Run's request timeout (300s)
+// back in charge of when an attempt is considered failed.
 const WORKER_URL = process.env.GENERATION_JOB_URL || `${CONSOLE_URL}/api/generate-job`;
 // Fire the worker directly (un-awaited fetch) instead of via Cloud Tasks. Set
 // for local dev, where the dev server stays running and there's no queue.

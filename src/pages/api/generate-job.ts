@@ -7,11 +7,14 @@
 // allocated throughout) — the console already sustains requests this long via
 // the synchronous /api path, so no special runtime config is needed.
 import type { NextApiRequest, NextApiResponse } from "next";
+import { randomUUID } from "crypto";
 import { generateCodeForRequest } from "../../lib/code-generation/generate-for-request";
 import {
   updateItem,
   getItem,
   setItemGenerationStatus,
+  claimGeneration,
+  releaseGeneration,
 } from "./resolvers";
 import { client } from "../../lib/auth";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
@@ -107,6 +110,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // all but the workspace's first attempt no-op.
   const workspaceKey = (actor(auth) as { session?: string }).session;
 
+  // Claim the item before doing any work. A Cloud Tasks re-dispatch that lands
+  // while the first attempt is still generating must NOT generate again — see
+  // claimGeneration in resolvers.ts. The owner is per-ATTEMPT, not per-task,
+  // because retries of one task carry the same task name and are exactly what
+  // we are deduplicating.
+  const attemptId = randomUUID();
+  const claim = await claimGeneration({ auth, id: itemId, owner: attemptId });
+  if (claim === "missing") {
+    // Nothing to generate into; retrying will not conjure the item.
+    console.error("[generate-job] item missing", itemId);
+    return res.status(200).json({ status: "missing" });
+  }
+  if (claim === "busy") {
+    // Another attempt holds the lease and is still running. 2xx so the queue
+    // stops retrying: if that attempt dies, the item stays "generating" and the
+    // MCP staleness guard reports it — the same contract as exhausted retries.
+    console.warn("[generate-job] duplicate dispatch ignored", itemId);
+    return res.status(200).json({ status: "duplicate" });
+  }
+
   try {
     const result = await generateCodeForRequest({
       auth,
@@ -130,6 +153,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // it is what lets the MCP-only report keep this event (isMcpOrigin).
       emitEvent("item_generation_failed", { ...actor(auth), lang, app: client ?? "console", err: message });
       await resolveFirstOutcome(workspaceKey, "generation_failed");
+      await releaseGeneration({ auth, id: itemId, owner: attemptId });
       // Handled outcome — 2xx so the queue does NOT retry.
       return res.status(200).json({ status: "failed", error: message });
     }
@@ -153,6 +177,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     await setItemGenerationStatus({ auth, id: itemId, status: "ready" });
     await resolveFirstOutcome(workspaceKey, "ok");
+    await releaseGeneration({ auth, id: itemId, owner: attemptId });
 
     return res.status(200).json({ status: "ready", taskId: result.taskId });
   } catch (err: any) {
@@ -161,6 +186,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // the item stays "generating" and the MCP staleness guard reports it failed
     // — avoids flapping the status to "failed" between retries.
     console.error("[generate-job] generation failed", itemId, err);
+    // Release so the Cloud Tasks retry can claim it: this attempt is genuinely
+    // over, and a retry is the point of returning 5xx here.
+    await releaseGeneration({ auth, id: itemId, owner: attemptId });
     return res.status(500).json({ error: "generation_error" });
   }
 }
