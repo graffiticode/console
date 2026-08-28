@@ -116,6 +116,27 @@ interface DSPyResponse<T> {
 
 /**
  * Get the DSPy service URL from configuration
+ *
+ * DO NOT "FIX" A 404 FROM THIS URL BY REPOINTING IT AT THE LIVE SERVICE.
+ *
+ * The deployed dspy-service is an unfinished Phase-1 scaffold: it imports no
+ * dspy at all (dspy-ai is an optional extra, commented out of requirements.txt
+ * as "Phase 4"), and it answers every dialect with one generic base-Graffiticode
+ * template that string-substitutes L{dialect} into a sentence. Last deployed
+ * 2026-01-20 and untouched since — it predates several dialects it would be
+ * asked about.
+ *
+ * That matters because a returned PromptSpec REPLACES formattedPrompt outright
+ * (see the isDSPyEnabled branch in code-generation-service.ts): the
+ * dialect-specific system block from getSystemPromptForDialect — the per-language
+ * guide that makes up the bulk of a real prompt — is discarded in favour of the
+ * generic one. Enabling this against the scaffold makes generation WORSE, for
+ * every language.
+ *
+ * Production has been pointed at a hostname that 404s, so DSPY_FALLBACK_TO_LEGACY
+ * has silently kept the legacy path in service. Keep ENABLE_DSPY_SERVICE=false
+ * until the service is actually built out; the reason it looks broken is that it
+ * is not finished.
  */
 function getDSPyServiceUrl(): string {
   return process.env.DSPY_SERVICE_URL || "http://localhost:8080";
