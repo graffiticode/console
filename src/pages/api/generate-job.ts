@@ -115,6 +115,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       options: {},
       currentSrc: currentSrc ?? null,
       itemId,
+      // Already on the job payload (see generation-queue.ts); passed down so the
+      // language gate's funnel event can be qualified as MCP activity.
+      client,
     });
 
     if (result.errors?.length || !result.taskId) {

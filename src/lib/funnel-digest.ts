@@ -94,6 +94,7 @@ const SURFACE_QUALIFIED_EVENTS = new Set([
   "item_created",
   "item_updated",
   "item_generation_failed",
+  "non_english_request",
 ]);
 
 /**
@@ -305,6 +306,18 @@ export interface Digest {
    * (item docs store "0166", MCP tool args pass "L0166").
    */
   languages: { created: Record<string, number>; attempted: Record<string, number> };
+  /**
+   * Requests whose PROMPT was not written in English — demand we currently
+   * refuse. Distinct from `languages` above in every way: that one counts the
+   * GRAFFITICODE DIALECT ("L0166"), this one the NATURAL language the request
+   * was typed in ("cyrillic", "fr").
+   *
+   * `blocked` counts those actually refused; total - blocked were observed with
+   * NON_ENGLISH_GATE=shadow, where the gate measures but does not refuse. Keys
+   * are `plang ?? script`, so granularity is mixed on purpose — see
+   * src/lib/prompt-language.ts.
+   */
+  nonEnglish: { total: number; blocked: number; byLang: Record<string, number> };
   walls: Record<string, number>;
   claims: { count: number; transferred: number };
   signups: { direct: number; viaClaim: number };
@@ -403,6 +416,7 @@ export function aggregate(
     workspaces: { total: 0, byClient: {}, newClientKinds: [], newGeos: [] },
     items: { ok: 0, failed: 0, byApp: {}, firstForAccount: 0 },
     languages: { created: {}, attempted: {} },
+    nonEnglish: { total: 0, blocked: 0, byLang: {} },
     walls: {},
     claims: { count: 0, transferred: 0 },
     signups: { direct: 0, viaClaim: 0 },
@@ -588,6 +602,21 @@ export function aggregate(
         if (isProbe(e)) break;
         d.items.failed++;
         break;
+
+      case "non_english_request": {
+        if (isProbe(e)) break;
+        d.nonEnglish.total++;
+        if (e.blocked) d.nonEnglish.blocked++;
+        // `plang ?? script`, mirroring promptLanguageKey(). Never `lang` — that
+        // field is the dialect and is normalized through langKey().
+        const key = typeof e.plang === "string" && e.plang
+          ? e.plang
+          : typeof e.script === "string" && e.script
+            ? e.script
+            : "unknown";
+        bump(d.nonEnglish.byLang, key);
+        break;
+      }
 
       case "wall_hit":
         bump(d.walls, typeof e.wall === "string" ? e.wall : "unknown");
@@ -841,6 +870,16 @@ export function formatDigest(d: Digest): string {
     const parts = breakdown(d.items.byApp);
     if (parts) line += ` — ${parts}`;
     if (d.items.firstForAccount > 0) line += ` ⚑${d.items.firstForAccount} first-ever`;
+    lines.push(line);
+  }
+
+  // Demand we can't serve. Guarded like every other line so a quiet hour omits
+  // it rather than printing a false zero. "(N blocked)" is the whole tell
+  // between shadow mode (measuring) and enforce (refusing) — without it the
+  // same number means two very different things.
+  if (d.nonEnglish.total > 0) {
+    let line = `🌐 ${d.nonEnglish.total} non-English — ${breakdown(d.nonEnglish.byLang)}`;
+    if (d.nonEnglish.blocked > 0) line += ` (${d.nonEnglish.blocked} blocked)`;
     lines.push(line);
   }
 

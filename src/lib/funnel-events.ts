@@ -37,6 +37,16 @@ export type FunnelEventName =
   // move, so plan_changed can never report it.
   | "payg_enabled"
   | "overage_limit_raised"
+  // A request whose PROMPT was not written in English. Headline because it is
+  // demand we are currently unable to serve, and the only record of it: the
+  // request is refused before an item exists, so item_created/item_updated
+  // never fire for one.
+  //
+  // Emitted in BOTH shadow and enforce mode (see NON_ENGLISH_GATE), carrying
+  // `blocked` to tell them apart. That is the point — during the shadow window
+  // nothing is refused, so a wall_hit would report zero for exactly the period
+  // the measurement exists to cover.
+  | "non_english_request"
   // context
   | "item_updated"
   | "item_generation_failed"
@@ -56,6 +66,18 @@ export interface FunnelEventFields {
   first_for_account?: boolean;
   /** wall_hit: which limit was hit. */
   wall?: string;
+  /**
+   * non_english_request: the NATURAL language of the prompt — a dominant script
+   * name ("cyrillic"), or a language tag ("fr") when marker words identified
+   * one. See src/lib/prompt-language.ts on why the granularity is mixed.
+   *
+   * These are deliberately NOT `lang`, which is normalized through langKey()
+   * below and means the Graffiticode dialect: langKey("ru") is "(invalid)".
+   */
+  script?: string;
+  plang?: string;
+  /** non_english_request: whether the gate actually refused it. */
+  blocked?: boolean;
   /** signup: whether the account was born from a claim link or on its own. */
   via?: "claim" | "direct";
   /** plan_changed: internal plan ids, e.g. "demo" → "pro". */

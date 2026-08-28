@@ -18,7 +18,7 @@
 // export through either of those recreates that cycle. Import the deep path.
 import { unparse } from "@graffiticode/parser";
 import { getLanguageAsset, getLanguageLexicon, isLangOverridden } from "../api";
-import { generateCode as codeGenerationService, getRelevantExamples } from "../code-generation-service";
+import { generateCode as codeGenerationService, getRelevantExamples, extractSearchQuery } from "../code-generation-service";
 import {
   planSequence,
   classifyAndRoute,
@@ -30,7 +30,8 @@ import {
 } from "../language-router";
 import { resolveUpstreams } from "../composition-discovery";
 import { ragLog, generateRequestId } from "../logger";
-import { langKey } from "../funnel-events";
+import { langKey, emitEvent, actor } from "../funnel-events";
+import { classifyPromptLanguage, promptLanguageKey } from "../prompt-language";
 import { buildRevisionLimitError } from "../free-plan-quota";
 import { trialItemRevisionLimit } from "../plans-config";
 import { getFirestore } from "../../utils/db";
@@ -80,6 +81,13 @@ export async function generateCodeForRequest({
   currentSrc,
   conversationSummary = null,
   itemId = undefined,
+  // The surface this request came from ("mcp" | "console" | "front"), threaded
+  // in solely so funnel events emitted HERE can be attributed. Without it the
+  // language gate's event carries no `app`, fails isMcpOrigin in funnel-digest,
+  // and silently vanishes from all three report surfaces — which looks exactly
+  // like "no non-English traffic". Scripts pass nothing and land as "console",
+  // correctly dropping out of the MCP-scoped report.
+  client = undefined,
 }) {
   const rid = generateRequestId();
 
@@ -182,6 +190,49 @@ export async function generateCodeForRequest({
     //   2. Otherwise PLAN: planSequence() (L0010 planning-RAG hit, else Haiku);
     //      a length>1 sequence runs the tail-first executor.
     if (!src) {
+      // GUARDRAIL 0 — is this request even written in English?
+      //
+      // Ahead of the scope gate because it is free and deterministic where that
+      // one is an LLM call, and because a non-English prompt degrades every
+      // stage BELOW here silently rather than failing (see prompt-language.ts).
+      // Unlike GUARDRAIL 1 this is NOT `!currentSrc`-gated: an update in Russian
+      // breaks retrieval exactly as a create does.
+      //
+      // Fed extractSearchQuery(prompt), never the raw prompt. On the update path
+      // the MCP server sends a windowed conversation (buildContextualPrompt), so
+      // judging the whole thing would let prior English turns outvote a Russian
+      // request. extractSearchQuery isolates the latest turn — which is the very
+      // text that gets embedded, so the gate judges what actually breaks.
+      const gateMode = process.env.NON_ENGLISH_GATE || "shadow";
+      if (gateMode !== "off") {
+        const plr = classifyPromptLanguage(extractSearchQuery(prompt, language));
+        if (plr.verdict === "non_english") {
+          const blocked = gateMode === "enforce";
+          console.log(`[routing] rid=${rid} language-gate lang=${langLog} verdict=${plr.verdict} key=${promptLanguageKey(plr)} latinRatio=${plr.latinRatio} blocked=${blocked}`);
+          ragLog(rid, "preflight.language", { lang: langLog, script: plr.script, plang: plr.plang, latinRatio: plr.latinRatio, blocked });
+          emitEvent("non_english_request", {
+            ...actor(auth),
+            app: client ?? "console",
+            lang: langLog,
+            script: plr.script,
+            plang: plr.plang,
+            blocked,
+          });
+          if (blocked) {
+            // A wall in the taxonomy sense, recorded for consistency with the
+            // other seven. It does NOT reach the digest/report/SMS: wall_hit
+            // carries no `app`, so isMcpOrigin drops it. non_english_request
+            // above is what those surfaces actually read.
+            emitEvent("wall_hit", { ...actor(auth), wall: "non_english_request", lang: langLog, script: plr.script });
+            const message =
+              "Graffiticode does not yet support requests written in languages other than English. " +
+              "Please restate the request in English and try again. Text that should appear inside " +
+              "the item itself — vocabulary, names, quoted passages — may stay in its original language.";
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message }], upstreamLangs: [], rid };
+          }
+        }
+      }
+
       // GUARDRAIL 1 — authoritative pre-flight head routing. The server validates the request
       // against the chosen language's scope and re-routes to the correct language if the client
       // picked wrong (clients freelance). Fresh creates only — never relabel an edit. Independent

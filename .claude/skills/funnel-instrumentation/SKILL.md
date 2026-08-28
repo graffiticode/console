@@ -13,7 +13,7 @@ One structured JSON line per lifecycle event to stdout → Cloud Logging via `em
 
 ## Wall taxonomy
 
-A **`wall_hit`** is a request refused by a limit — the headline signal for "demand we turned away", rendered in the digest as `⛔ N walls — <breakdown by kind>`. Seven kinds:
+A **`wall_hit`** is a request refused by a limit — the headline signal for "demand we turned away", rendered in the digest as `⛔ N walls — <breakdown by kind>`. Eight kinds:
 
 | `wall` | Raised by | Meaning |
 |---|---|---|
@@ -24,6 +24,9 @@ A **`wall_hit`** is a request refused by a limit — the headline signal for "de
 | `item_expired` | `buildItemExpiredError` | Free-plan item aged past its 48h TTL |
 | `plan_item_limit` | `checkItemCreateAllowed` → `assertItemCreateAllowed` | Hard-capped plan spent its included items |
 | `overage_cap` | same | Customer's own overage spend cap reached |
+| `non_english_request` | GUARDRAIL 0 in `generate-for-request.ts` | Prompt not written in English (only when `NON_ENGLISH_GATE=enforce`) |
+
+`non_english_request` is the one wall with a **separate reporting event**, and the reason generalizes: `wall_hit` carries no `app`, so `isMcpOrigin` drops it from all three surfaces (see below). It also fires only in enforce mode, which would report zero during the shadow window that exists to measure it. So the demand signal is the headline event **`non_english_request`** — emitted in both modes, carrying `blocked`, `script`/`plang`, and an `app` stamp — and the `wall_hit` exists only to keep the refusal taxonomy complete. Any future wall that needs to show up in a report has the same two problems to solve.
 
 **Emission point differs by path, deliberately.** The five free-plan walls are emitted **inside the `FreePlanError` builders** in `free-plan-quota.ts`, because every builder is called directly inside a `throw` — the one choke point that can't drift as call sites move. The cost is that a builder has no auth context, so those walls are counted **by kind but not attributed to a session**; the digest only reports counts, so that's sufficient. The two paid walls are emitted at the gate in `resolvers.ts` instead, where `auth` *is* in scope, so they carry `session` and `lang`. When adding a free-plan limit, emit from the builder, not the call site — and note `assertItemCreateAllowed` skips its own emit on the free-plan branch precisely because `buildMonthlyQuotaError` already fired.
 
@@ -42,7 +45,7 @@ Events are aggregated hourly by `src/lib/funnel-digest.ts` and out-of-band by `s
 
 **What that cost, deliberately:** `wall_hit`, `signup`, `plan_changed`, `checkout_started`, `api_key_created`, `overage_limit_raised` and `free_plan_budget` carry no `app` field, so they drop. The SMS's ⛔ and $ lines can no longer fire and ★ narrows to claims only. Every SMS line is `> 0`-guarded so they omit rather than print a false zero; the report page's walls/signups tiles were **removed** for the same reason — "walls 0" claims nothing was refused, which is a stronger and different statement than "not measured here".
 
-**Bringing an excluded event back** — stamp `app` at its emitter, then add it to `SURFACE_QUALIFIED_EVENTS`. `item_generation_failed` did this on 2026-08-05 and is the worked example: it is emitted from the *queued worker* (`generate-job.ts`), not the resolver, so `client` had to be threaded onto `GenerationJob` and through `enqueueGenerationJob`. That field is **optional and did NOT bump `GENERATION_JOB_VERSION`** — adding a field is backward compatible, while a bump would 400 every job already in the queue at deploy. In-flight v1 jobs land as `"console"`, under-counting MCP failures for one deploy's worth of work rather than inventing any. Historical events stay dropped: `app` cannot be inferred retroactively. (`genFailures` is a different number — it reads `mcp_tool`'s `outcome`, was never affected, and counts *attempts* where `items.failed` counts terminal failures.)
+**Bringing an excluded event back** — stamp `app` at its emitter, then add it to `SURFACE_QUALIFIED_EVENTS`. `non_english_request` did this on 2026-08-28: `generateCodeForRequest` took a new optional `client` param so the gate's event could be attributed, which was one more hop on a field `GenerationJob` already carried — **no `GENERATION_JOB_VERSION` bump**. `item_generation_failed` did it on 2026-08-05 and is the fuller worked example: it is emitted from the *queued worker* (`generate-job.ts`), not the resolver, so `client` had to be threaded onto `GenerationJob` and through `enqueueGenerationJob`. That field is **optional and did NOT bump `GENERATION_JOB_VERSION`** — adding a field is backward compatible, while a bump would 400 every job already in the queue at deploy. In-flight v1 jobs land as `"console"`, under-counting MCP failures for one deploy's worth of work rather than inventing any. Historical events stay dropped: `app` cannot be inferred retroactively. (`genFailures` is a different number — it reads `mcp_tool`'s `outcome`, was never affected, and counts *attempts* where `items.failed` counts terminal failures.)
 
 `DAY_CACHE_VERSION` was bumped 2 → 3: cached `funnel-daily` days counted console authoring, and leaving them would draw a trend whose old bars mean something different from its new ones.
 

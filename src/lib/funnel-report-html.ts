@@ -84,6 +84,23 @@ function rows(map: Record<string, number>): string {
     .join("")}</table>`;
 }
 
+/**
+ * Requests we refused (or, in shadow mode, merely noticed) because the PROMPT
+ * was not written in English.
+ *
+ * Titled "Prompt language" and kept apart from "By language" deliberately —
+ * that section means the Graffiticode DIALECT, this one the natural language the
+ * request was typed in. Same word, two different axes; one shared section title
+ * would make the report lie.
+ */
+function promptLanguageRows(d: Digest): string {
+  if (d.nonEnglish.total === 0) return `<p class="none">none</p>`;
+  const note = d.nonEnglish.blocked > 0
+    ? `${d.nonEnglish.blocked} of ${d.nonEnglish.total} refused`
+    : `${d.nonEnglish.total} observed, none refused (shadow)`;
+  return `${rows(d.nonEnglish.byLang)}<p class="none">${esc(note)}</p>`;
+}
+
 function section(title: string, body: string): string {
   return `<section><h2>${esc(title)}</h2>${body}</section>`;
 }
@@ -240,6 +257,7 @@ function digestBlock(d: Digest): string {
   ${section("Reach", reachRows(d))}
   ${section("By client", rows(d.workspaces.byClient))}
   ${section("By language", languageRows(d))}
+  ${section("Prompt language", promptLanguageRows(d))}
   ${section(
     "Conversion",
     conv ? `<p class="big">${esc(conv)}</p>` : `<p class="none">none</p>`,
