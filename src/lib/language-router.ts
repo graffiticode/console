@@ -91,8 +91,27 @@ async function buildLanguageCatalog(opts?: { excludeLang?: string }) {
   const languages = await listLanguages({});
   // Exclude internal dialects (e.g. the L0010 planner itself) so the planner
   // never proposes itself as a composition stage; also honor excludeLang.
+  //
+  // Deprecated dialects are excluded too. This catalog feeds the two paths that
+  // pick a language for NEW work — the scope gate's reroute and the composition
+  // planner's upstreams — and neither should ever land on a dialect we have
+  // superseded. languages.ts notes that `status` "is only a label and filters
+  // nothing", with the steer left in the routingHint text; on 2026-08-29 that
+  // steer lost. A concept-web request was rerouted to L0166, whose hint reads
+  // "Deprecated in favor of L0179 — prefer L0179 for all new spreadsheet
+  // content", and the reviewer got a spreadsheet in the dead dialect. Prose in a
+  // catalog entry is a suggestion to a model; this is the fence.
+  //
+  // Deliberately narrow. Existing items still render, `language(id)` still
+  // resolves, findLanguageById still answers, and composesWith still PERMITS a
+  // deprecated upstream (L0158/L0176 keep composing with 0166) — a chain already
+  // authored against one keeps working. Only the act of choosing one for
+  // something new is blocked.
   const candidates = languages.filter(
-    (l) => !l.internal && (!opts?.excludeLang || l.id !== opts.excludeLang),
+    (l) =>
+      !l.internal &&
+      l.status !== "Deprecated" &&
+      (!opts?.excludeLang || l.id !== opts.excludeLang),
   );
   const catalog = candidates
     .map((l) => {
@@ -248,6 +267,28 @@ export async function classifyAndRoute({
   auth?: { uid: string };
 }): Promise<RouteResult> {
   const FAIL_OPEN: RouteResult = { inScope: true, routedLang: null, reason: "" };
+  // Separate the ASK from source material pasted under it.
+  //
+  // get_spec is the platform's sanctioned cross-language bridge, and create_item
+  // tells agents in so many words to pass its output "as this description, adding
+  // only your intent/target framing". The resulting prompt is one instruction
+  // followed by a wall of the OTHER language's content — so the sanctioned bridge
+  // hands this classifier a request whose bulk argues for the language being
+  // converted AWAY from. On 2026-08-29 a reviewer's "Create a concept web from the
+  // following content" lost to the 1100 characters of column widths and hex fills
+  // pasted beneath it, and the concept web came back a spreadsheet.
+  //
+  // Splitting on the first blank line is deterministic and reversible, which prose
+  // guidance is not: telling the model to disregard quoted material was tried and
+  // lost to sheer volume — a 3:1 ratio of spreadsheet vocabulary still routed to a
+  // spreadsheet. Structure beats instruction when the instruction is outnumbered.
+  //
+  // No blank line means nothing to separate, and the whole prompt stays the ask.
+  // The tail is kept (truncated) rather than dropped: it is real evidence about
+  // subject matter, and a classifier that cannot see it would be guessing.
+  const splitAt = userRequest.indexOf("\n\n");
+  const askText = splitAt > 0 ? userRequest.slice(0, splitAt).trim() : userRequest;
+  const sourceText = splitAt > 0 ? userRequest.slice(splitAt).trim().slice(0, 1200) : "";
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -273,8 +314,15 @@ export async function classifyAndRoute({
           {
             role: "user",
             content: `A user asked language L${currentLang} to create this:
-"${userRequest}"
-
+"${askText}"
+${sourceText ? `
+The user also pasted the following SOURCE MATERIAL below that request. It is
+content to be CONVERTED, not a description of what to build — classify on the
+request above, never on this:
+"""
+${sourceText}
+"""
+` : ""}
 L${currentLang} scope:
 ${curScope}
 
