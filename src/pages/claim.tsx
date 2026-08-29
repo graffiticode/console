@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useAuth } from 'reactfire';
@@ -67,6 +67,14 @@ export default function Claim() {
   // The sign-in flow remounts this page, so without a guard one visit would
   // report several views and overstate the top of the funnel.
   const viewLoggedRef = useRef(false);
+  // Same guard, one stage later: the dialog re-renders freely (wallet picker
+  // opening and closing, auth state settling), and "was it shown" is a per-visit
+  // fact, not a per-render one.
+  const authShownLoggedRef = useRef(false);
+  // Held in a ref so the later stages attribute to the same surface as the view.
+  // Only the URL-param visit carries `src`; a reload off the stashed token has
+  // genuinely lost it, and 'unknown' is the honest answer there.
+  const srcRef = useRef('unknown');
 
   // Resolve the claim token once the router is ready and persist it. Prefer the
   // URL param; fall back to the stashed copy after a sign-in remount.
@@ -87,14 +95,14 @@ export default function Claim() {
       setToken(fromQuery);
       // Report the open on the URL-param visit only: that's the real arrival.
       // The stashed-token branch is the post-sign-in remount of the same visit.
+      srcRef.current = typeof router.query.src === 'string' ? router.query.src : 'unknown';
       if (!viewLoggedRef.current) {
         viewLoggedRef.current = true;
-        const src = typeof router.query.src === 'string' ? router.query.src : 'unknown';
         // Fire-and-forget: telemetry must never delay or break a claim.
         fetch('/api/claim-view', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: fromQuery, src }),
+          body: JSON.stringify({ token: fromQuery, src: srcRef.current, stage: 'view' }),
         }).catch(() => {});
       }
     } else {
@@ -102,6 +110,43 @@ export default function Claim() {
     }
     setTokenChecked(true);
   }, [router.isReady, router.query.token, router.query.agent]);
+
+  // Post a later funnel stage for this same visit. Reads the stashed token when
+  // state hasn't caught up, since these fire from render-driven effects that can
+  // run before the resolving effect's setToken has landed.
+  const postClaimStage = useCallback((stage: 'auth_shown' | 'email_submitted') => {
+    const claimToken = token || sessionStorage.getItem(CLAIM_TOKEN_KEY);
+    if (!claimToken) return;
+    // Fire-and-forget: telemetry must never delay or break a claim.
+    fetch('/api/claim-view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: claimToken, src: srcRef.current, stage }),
+    }).catch(() => {});
+  }, [token]);
+
+  // The sign-in dialog is now in front of them. These are exactly the conditions
+  // the dialog branch renders under (see the final return) — recorded from an
+  // effect rather than that branch so it fires once per visit, not once per
+  // render. Without this stage, a visit that got here and one that never
+  // rendered anything are the same single claim_view.
+  useEffect(() => {
+    if (!router.isReady || loading || !tokenChecked) return;
+    if (!token || user) return;
+    if (authShownLoggedRef.current) return;
+    authShownLoggedRef.current = true;
+    postClaimStage('auth_shown');
+  }, [router.isReady, loading, tokenChecked, token, user, postClaimStage]);
+
+  // Records the ATTEMPT, never the address — see logClaimStage in resolvers.ts.
+  // Deliberately fires before the send rather than after it succeeds: a send that
+  // fails is still someone who agreed to hand over an email, and that is the
+  // conversion question. It fires per attempt, so a second submission in one
+  // visit reads as the first not arriving.
+  const handleSubmitEmail = useCallback(async (email: string) => {
+    postClaimStage('email_submitted');
+    return sendCode(email);
+  }, [postClaimStage, sendCode]);
 
   // The copy is an explicit user action (Save button) on a stable, signed-in
   // page — not a passive effect racing the sign-in remount.
@@ -379,7 +424,7 @@ export default function Claim() {
           router.push('/');
         }}
         onSelectEthereum={handleSelectEthereum}
-        onSubmitEmail={sendCode}
+        onSubmitEmail={handleSubmitEmail}
         onSubmitCode={verifyAndSignIn}
         emailSending={emailSending}
         emailError={emailError}

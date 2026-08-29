@@ -1843,10 +1843,41 @@ export async function shareItem({ auth, itemId, targetUserId }) {
  * view_url). Those two convert very differently and the copy for each is tuned
  * separately, so a blended rate is not actionable.
  */
-export function logClaimView(fields: { session: string; src: string }) {
+/**
+ * The pre-sign-in claim funnel: three stages, one shape.
+ *
+ *   claim_view             the claim link was opened
+ *   claim_auth_shown       the sign-in dialog was put in front of them
+ *   claim_email_submitted  they entered an address and asked for a code
+ *
+ * All three fire before an account exists, so none can ride the authenticated
+ * GraphQL path, and together they are the only view we have of WHERE a claim is
+ * abandoned. That distinction is the point: a drop between view and auth_shown
+ * is a page that failed to render something; a drop between auth_shown and
+ * email_submitted is the ask itself being declined, which is a copy and
+ * positioning problem and not a bug. Before these existed the two were
+ * indistinguishable — establishing which one had happened meant cross-checking
+ * the auth service's request log in a different GCP project, and only because
+ * someone thought to look.
+ *
+ * `claim_email_submitted` NEVER carries the address. What the funnel needs to
+ * know is that someone got that far; the address itself is the user's, is not
+ * needed to answer the question, and would turn a counter into personal data.
+ * The attempt is recorded even when the send subsequently fails, so a repeated
+ * submission in one visit reads as a delivery problem rather than vanishing.
+ */
+export type ClaimStage = "view" | "auth_shown" | "email_submitted";
+
+const CLAIM_STAGE_EVENTS: Record<ClaimStage, string> = {
+  view: "claim_view",
+  auth_shown: "claim_auth_shown",
+  email_submitted: "claim_email_submitted",
+};
+
+export function logClaimStage(fields: { stage: ClaimStage; session: string; src: string }) {
   try {
     console.log(JSON.stringify({
-      ev: "claim_view",
+      ev: CLAIM_STAGE_EVENTS[fields.stage],
       t: new Date().toISOString(),
       session: fields.session,
       src: fields.src,

@@ -81,7 +81,12 @@ const MCP_SERVER_EVENTS = new Set([
  * an anonymous MCP workspace into an account — there is no console-surface way
  * to reach it — so a claim is MCP activity no matter who writes the log line.
  */
-const MCP_FUNNEL_EVENTS = new Set(["claim", "claim_view"]);
+const MCP_FUNNEL_EVENTS = new Set([
+  "claim",
+  "claim_view",
+  "claim_auth_shown",
+  "claim_email_submitted",
+]);
 
 /**
  * Console-emitted events that describe authoring and therefore have to be
@@ -157,7 +162,8 @@ export function isExcludedAccount(e: LogEvent): boolean {
  * isn't filed as anonymous.
  *
  * Everything else is anonymous: free-plan trial traffic, and the account-less
- * events (claim_view, claim) that carry no auth field at all because there is no
+ * events (claim_view, claim_auth_shown, claim_email_submitted, claim) that carry
+ * no auth field at all because there is no
  * account yet — they ARE the anonymous funnel. Defaulting the unmarked case to
  * anonymous rather than a third bucket keeps `anon + authed == total` exactly,
  * so the two report sections can't quietly lose events between them.
@@ -336,6 +342,8 @@ export interface Digest {
     toolCalls: number;
     connectsWithoutUse: number;
     claimViews: number;
+    claimAuthShown: number;
+    claimEmailSubmitted: number;
     checkoutAbandoned: number;
     genFailures: number;
     budgetThreshold?: number;
@@ -430,6 +438,8 @@ export function aggregate(
       toolCalls: 0,
       connectsWithoutUse: 0,
       claimViews: 0,
+      claimAuthShown: 0,
+      claimEmailSubmitted: 0,
       checkoutAbandoned: 0,
       genFailures: 0,
     },
@@ -631,6 +641,14 @@ export function aggregate(
 
       case "claim_view":
         d.context.claimViews++;
+        break;
+
+      case "claim_auth_shown":
+        d.context.claimAuthShown++;
+        break;
+
+      case "claim_email_submitted":
+        d.context.claimEmailSubmitted++;
         break;
 
       case "artifact_view":
@@ -926,7 +944,18 @@ export function formatDigest(d: Digest): string {
   // A claim-driven signup is the same happening the ★ line already reports, so
   // it's noted here rather than counted twice — but never dropped silently.
   if (d.signups.viaClaim) ctx.push(`${d.signups.viaClaim} signup via claim`);
-  if (d.context.claimViews && !d.claims.count) ctx.push(`${d.context.claimViews} claim views, 0 claimed`);
+  // Report WHERE an unconverted claim stopped, not just that it did. The three
+  // stages narrow the drop to a step, which is the difference between "the page
+  // isn't working" and "the ask is being declined" — two findings with nothing
+  // in common as fixes. Stages that didn't happen are omitted rather than
+  // printed as zero: the last one shown IS the drop-off point.
+  if (d.context.claimViews && !d.claims.count) {
+    const steps = [`${d.context.claimViews} claim view${plural(d.context.claimViews)}`];
+    if (d.context.claimAuthShown) steps.push(`${d.context.claimAuthShown} saw sign-in`);
+    if (d.context.claimEmailSubmitted) steps.push(`${d.context.claimEmailSubmitted} submitted email`);
+    steps.push("0 claimed");
+    ctx.push(steps.join(" → "));
+  }
   if (d.context.checkoutAbandoned) ctx.push(`${d.context.checkoutAbandoned} checkout abandoned`);
   if (d.context.genFailures) ctx.push(`${d.context.genFailures} gen fail${plural(d.context.genFailures)}`);
   if (d.context.budgetThreshold) ctx.push(`trial budget ${d.context.budgetThreshold}%`);

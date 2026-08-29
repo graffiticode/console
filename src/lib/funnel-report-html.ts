@@ -237,9 +237,10 @@ function sparkTable(series: DayPoint[]): string {
  * drops them (see isMcpOrigin) and every one of them would be a structural zero.
  * A tile reading "walls 0" is a claim that no request was refused, which is a
  * different and stronger statement than "this report does not measure that" — so
- * the tiles are gone rather than pinned at zero. Claims survive because
- * claim/claim_view are MCP-funnel events, and item failures survive because
- * item_generation_failed now carries `app`.
+ * the tiles are gone rather than pinned at zero. Claims survive because the
+ * claim events (claim_view, claim_auth_shown, claim_email_submitted, claim) are
+ * MCP-funnel events, and item failures survive because item_generation_failed
+ * now carries `app`.
  */
 function digestBlock(d: Digest): string {
   const conv = d.claims.count
