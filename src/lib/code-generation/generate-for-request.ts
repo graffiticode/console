@@ -256,7 +256,12 @@ export async function generateCodeForRequest({
             const reason = route.reason || `Request is out of scope for L${language}.`;
             console.log(`[routing] rid=${rid} preflight.reject lang=${langLog} reason=${reason}`);
             ragLog(rid, "preflight.reject", { lang: langLog, reason });
-            return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: `This request doesn't fit any available Graffiticode language. ${reason}` }], upstreamLangs: [], rid };
+            // `code` is additive and nothing branches on it today. It exists so a
+            // non-human caller can tell "the platform correctly refused an out-of-scope
+            // request" apart from "generation broke" without matching on prose — the
+            // distinction the daily corpus ping needs (src/lib/corpus-ping.ts), where the
+            // former is a stale corpus prompt and the latter is an outage.
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: `This request doesn't fit any available Graffiticode language. ${reason}`, code: "out_of_scope" }], upstreamLangs: [], rid };
           }
         }
       }
@@ -283,8 +288,17 @@ export async function generateCodeForRequest({
         sequence = fenced.sequence;
         fromRagHit = planResult.fromRag;
       }
-      console.log(`[composition] rid=${rid} head=${langLog} permits=[${permits.join(",")}] sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
-      ragLog(rid, "composition.gate", { head: langLog, permits, sequence });
+      // `head` is the EFFECTIVE head — `language` after any preflight reroute —
+      // not the one the caller asked for. langLog is the pre-reroute value, and
+      // printing it here made a reroute look like a composition failure: the
+      // 2026-08-29 L0169→L0166 misroute logged `head=L0169 sequence=["0166"]`,
+      // which reads as the planner emitting a foreign head under an empty
+      // permits list — a bug in a component that had not run. The requested
+      // language is already recorded by preflight.classify/preflight.reroute, so
+      // nothing is lost by making this line agree with what actually generated.
+      const headLog = langKey(language);
+      console.log(`[composition] rid=${rid} head=${headLog} requested=${langLog} permits=[${permits.join(",")}] sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
+      ragLog(rid, "composition.gate", { head: headLog, requested: langLog, permits, sequence });
 
       if (sequence.length > 1) {
         headLang = sequence[0];
