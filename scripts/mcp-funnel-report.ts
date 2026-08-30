@@ -184,16 +184,31 @@ function pct(n: number, d: number): string {
   return ((n / d) * 100).toFixed(1) + '%';
 }
 
-// listed→called is only a conversion where the client actually calls
-// tools/list once per session. ChatGPT/Codex does not — it mints a fresh
-// transport per tool call, so most of its tool sessions never emit
-// `mcp_listed` and the naive ratio came out at 508.7%, which reads as
-// spectacular engagement when it is really a transport artifact. Anything
-// above 100% means "this client does not list per session"; say so.
-function listedConv(toolSessions: number, listed: number): string {
-  if (!listed) return toolSessions ? 'n/a †' : '—';
-  if (toolSessions > listed) return 'n/a †';
-  return pct(toolSessions, listed);
+// listed→called is a conversion only when the SAME session did both. It is
+// computed from `listedAndCalled` for that reason: `toolSessions / listed`
+// divides two populations that, for every client we actually have, barely
+// intersect — and the failure is silent in one direction.
+//
+//   - ChatGPT/Codex mints a fresh transport per tool call, so its tool sessions
+//     never emit `mcp_listed`. The naive ratio came out at 508.7%, which is at
+//     least obviously wrong.
+//   - Claude surfaces list at connector startup and (overwhelmingly) never
+//     call. Blend the two and Claude's listings become the denominator for
+//     OpenAI's calls: on 2026-08-30 that printed "187 → 11 (5.9%)" for a window
+//     in which no session anywhere did both. 5.9% is not obviously wrong, and
+//     it reads as "94% of people who saw the catalogue bounced" — a much worse
+//     story than the one in the data.
+//
+// So: `n/a ‡` when listers and callers are disjoint (the ratio has no
+// same-session meaning), `n/a †` when the client demonstrably does not list
+// once per session, and a real percentage otherwise. A 0.0% is meaningful and
+// is NOT suppressed — a segment that listed 178 times and never called is the
+// single most informative cell in the table.
+function listedConv(g: { listed: number; toolSessions: number; listedAndCalled: number }): string {
+  if (!g.listed) return g.toolSessions ? 'n/a †' : '—';
+  if (g.toolSessions > g.listed) return 'n/a †';
+  if (g.toolSessions && !g.listedAndCalled) return 'n/a ‡';
+  return pct(g.listedAndCalled, g.listed);
 }
 
 const READ_TOOLS = new Set(['list_languages', 'get_language_info', 'get_item']);
@@ -431,6 +446,10 @@ interface SegmentStats {
   listed: number;         // sessions that issued a tools/list-family request
   resource: number;       // sessions that read a graffiticode:// resource
   toolSessions: number;   // sessions that called ANY tool
+  // Sessions that listed AND called — the only honest numerator for a
+  // listed→called rate. Kept separate from `toolSessions` because for the two
+  // clients that matter these are near-disjoint sets, not nested ones.
+  listedAndCalled: number;
   createSessions: number;
   updateSessions: number;
   calls: number;
@@ -561,7 +580,7 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
     if (!x) {
       x = {
         bucket: b, label: BUCKET_LABEL[b], sessions: 0, listed: 0, resource: 0,
-        toolSessions: 0, createSessions: 0, updateSessions: 0,
+        toolSessions: 0, listedAndCalled: 0, createSessions: 0, updateSessions: 0,
         calls: 0, ok: 0, nonOk: 0, freePlanSessions: 0,
       };
       seg.set(b, x);
@@ -698,6 +717,7 @@ function summarizeEvents(events: McpEvent[], start: Date | null, end: Date, slow
     if (stageSessions.listed.has(sess)) x.listed++;
     if (stageSessions.resource.has(sess)) x.resource++;
     if (stageSessions.tool.has(sess)) x.toolSessions++;
+    if (stageSessions.listed.has(sess) && stageSessions.tool.has(sess)) x.listedAndCalled++;
     if (stageSessions.create.has(sess)) x.createSessions++;
     if (stageSessions.update.has(sess)) x.updateSessions++;
   }
@@ -1037,7 +1057,24 @@ function generateHtml(data: {
   // call (pinning it near 1.0) while Claude contributes thousands of zero-call
   // startup handshakes. Depth is now expressed as listed→called instead, which
   // is a real behavioural step rather than an artifact of transport policy.
-  const listedToCalled = listedConv(toolSessionsTotal, log.listedSessions);
+  // Aggregate the SAME-SESSION rate, and only over segments that represent
+  // people: crawl/scanner/internal are held out here for the reason
+  // `log.listedSessions` already holds crawls out — a machine that lists
+  // thousands of times and never calls drives the rate to zero while saying
+  // nothing about whether people find the tools useful.
+  const realSegments = log.segments.filter(
+    (g) => g.bucket !== 'crawl' && g.bucket !== 'scanner' && g.bucket !== 'internal');
+  const agg = realSegments.reduce((a, g) => ({
+    listed: a.listed + g.listed,
+    toolSessions: a.toolSessions + g.toolSessions,
+    listedAndCalled: a.listedAndCalled + g.listedAndCalled,
+  }), { listed: 0, toolSessions: 0, listedAndCalled: 0 });
+  const listedToCalled = listedConv(agg);
+  // Tool sessions the rate above CANNOT see, because they never listed. This is
+  // not a rounding detail: it is most of OpenAI's traffic, and quoting the rate
+  // without it is how the blended number used to imply a bounce that never
+  // happened.
+  const unlistedToolSessions = agg.toolSessions - agg.listedAndCalled;
   const costPerAccount = fs.accounts ? `$${(fs.spendUsd / fs.accounts).toFixed(3)}` : '—';
 
   const langRows = Object.entries(log.langCounts)
@@ -1143,7 +1180,8 @@ ${data.omtm.isClockStartWeek ? `<div class="banner banner-red">
   ${card('First-attempt success', firstAttemptSuccess, `${log.firstTrySuccess} ok / ${log.sessionsWithCreate} first creates — guardrail`)}
   ${card('Claim conversion', claimConversion, `${fs.accounts} accounts / ${fs.anonSessions} anon sessions — diagnostic`)}
   ${card('Tool success (users)', overallSuccess, `${log.userToolOk}/${log.userToolTotal} calls — ${log.nonUserCalls} non-user call(s) excluded`)}
-  ${card('Listed → called a tool', listedToCalled, `${toolSessionsTotal} of ${log.listedSessions} sessions that loaded the catalogue`)}
+  ${card('Listed → called a tool', listedToCalled, `${agg.listedAndCalled} of ${agg.listed} sessions did both` +
+    (unlistedToolSessions ? ` — ${unlistedToolSessions} tool session(s) never listed and are not in this rate` : ''))}
   ${card('Free-plan spend', `$${fs.spendUsd.toFixed(2)}`, costPerAccount + ' / account')}
   ${card('Paid (from claim)', `${fs.paidFromClaim}`, `${fs.paidGlobal} paid overall`)}
 </div>
@@ -1169,24 +1207,29 @@ ${data.omtm.isClockStartWeek ? `<div class="banner banner-red">
     <li><b>Free-plan</b> sessions are keyed per transport; <b>authenticated</b> sessions are keyed
         by API-key hash and so collapse a whole week of work into one row.</li>
   </ul>
-  The behavioural step that <i>is</i> comparable is <b>listed &rarr; called a tool</b>: every client
-  loads the catalogue, so the drop-off after it is a real signal about the client's users.
+  The behavioural step that <i>is</i> comparable is <b>listed &rarr; called a tool</b> &mdash; but only
+  counted <i>within one session</i>, which is how the column below is computed. Not every client
+  loads the catalogue once per session (ChatGPT/Codex mostly never lists at all), so a rate blended
+  across clients divides one client's calls by another's listings and invents a drop-off. Read the
+  column per row; the &dagger;/&Dagger; footnotes say when even that has no meaning.
 </div>
 <table>
-  <thead><tr><th>Client</th><th class="num">Sessions</th><th class="num">Listed</th><th class="num">Read resource</th><th class="num">Called a tool</th><th class="num">Listed→called</th><th class="num">Created</th><th class="num">Updated</th><th class="num">Calls</th><th class="num">Free-plan</th></tr></thead>
+  <thead><tr><th>Client</th><th class="num">Sessions</th><th class="num">Listed</th><th class="num">Read resource</th><th class="num">Called a tool</th><th class="num">Listed <i>and</i> called</th><th class="num">Listed→called</th><th class="num">Created</th><th class="num">Updated</th><th class="num">Calls</th><th class="num">Free-plan</th></tr></thead>
   <tbody>
-    ${log.segments.map((g) => `<tr><td>${g.label}</td><td class="num">${g.sessions}</td><td class="num">${g.listed}</td><td class="num">${g.resource}</td><td class="num">${g.toolSessions}</td><td class="num">${listedConv(g.toolSessions, g.listed)}</td><td class="num">${g.createSessions}</td><td class="num">${g.updateSessions}</td><td class="num">${g.calls}</td><td class="num">${g.freePlanSessions}</td></tr>`).join('\n    ') || '<tr><td colspan="10" class="note">no events in window</td></tr>'}
+    ${log.segments.map((g) => `<tr><td>${g.label}</td><td class="num">${g.sessions}</td><td class="num">${g.listed}</td><td class="num">${g.resource}</td><td class="num">${g.toolSessions}</td><td class="num">${g.listedAndCalled}</td><td class="num">${listedConv(g)}</td><td class="num">${g.createSessions}</td><td class="num">${g.updateSessions}</td><td class="num">${g.calls}</td><td class="num">${g.freePlanSessions}</td></tr>`).join('\n    ') || '<tr><td colspan="11" class="note">no events in window</td></tr>'}
   </tbody>
 </table>
 <p class="note" style="margin-top:8px;"><b>Listed</b> = the session issued a <code>tools/list</code>-family request (<code>mcp_listed</code>). <b>Read resource</b> = it read a <code>graffiticode://</code> resource (<code>mcp_resource</code>). Both stages sit between "a transport opened" and "someone asked for something" — without them a directory validator that loaded the catalogue and a user who actually worked are indistinguishable.<br>
-<b>† n/a</b> = this client had more tool-calling sessions than listing sessions, so it does not call <code>tools/list</code> once per session and the ratio is not a conversion. ChatGPT/Codex is the standing example: a new transport per tool call means most of its tool sessions never list at all.</p>
+<b>Listed&rarr;called</b> counts only sessions that did <i>both</i>, so it is a real per-client conversion and never divides one client's listings by another's calls.<br>
+<b>† n/a</b> = this client had more tool-calling sessions than listing sessions, so it does not call <code>tools/list</code> once per session and the ratio is not a conversion. ChatGPT/Codex is the standing example: a new transport per tool call means most of its tool sessions never list at all.<br>
+<b>‡ n/a</b> = this client both listed and called, but never in the same session, so there is no conversion to measure &mdash; the two counts describe different transports.</p>
 
 <h2>Engagement — call volume <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(calls, not sessions — safe to total)</span></h2>
 <table>
   <thead><tr><th>Stage</th><th class="num">Count</th><th class="num">Conv. from prev</th><th>Note</th></tr></thead>
   <tbody>
     ${funnelRow('Loaded the catalogue (sessions)', log.listedSessions, '—', `mcp_listed — the real top of the funnel${log.crawlSessions ? `; ${log.crawlSessions} automated crawl session(s) excluded` : ''}`)}
-    ${funnelRow('Called any tool (sessions)', toolSessionsTotal, listedToCalled + ' of listed', 'the step that separates intent from installation')}
+    ${funnelRow('Called any tool (sessions)', toolSessionsTotal, listedToCalled + ' of listed (same session)', 'the step that separates intent from installation')}
     ${funnelRow('Browsed (read-route calls)', log.browseCalls, '—', 'list_languages · get_language_info · get_item')}
     ${funnelRow('Catalogue searches', log.catalogSearches, pct(log.catalogSearches, log.catalogCalls) + ' of catalogue calls', `${log.catalogEmpty} matched nothing — a capability asked for and not advertised`)}
     ${funnelRow('Create calls', log.createCalls, pct(log.sessionsWithCreate, toolSessionsTotal) + ' of tool sessions', `${log.sessionsWithCreate} sessions created an item`)}
@@ -1345,17 +1388,39 @@ async function main() {
   // Segmented, and deliberately WITHOUT a blended session total: Claude inflates
   // sessions with connector-startup handshakes it never follows up on, and
   // ChatGPT mints a fresh session per tool call. Summing them measures nothing.
-  const hdr = 'client'.padEnd(21) + ['sess', 'listed', 'res', 'tool', 'create', 'update', 'calls']
+  const hdr = 'client'.padEnd(21) + ['sess', 'listed', 'res', 'tool', 'both', 'l→call', 'create', 'update', 'calls']
     .map((h) => h.padStart(7)).join('');
   console.log('  ' + hdr);
   console.log('  ' + '-'.repeat(hdr.length));
   for (const g of log.segments) {
     console.log('  ' + g.label.padEnd(21) + [g.sessions, g.listed, g.resource, g.toolSessions,
-      g.createSessions, g.updateSessions, g.calls].map((n) => String(n).padStart(7)).join(''));
+      g.listedAndCalled, listedConv(g), g.createSessions, g.updateSessions, g.calls]
+      .map((n) => String(n).padStart(7)).join(''));
   }
   console.log('-- Engagement totals --');
   const toolSessTotal = log.segments.reduce((a, g) => a + g.toolSessions, 0);
-  console.log(`Listed tools (sessions): ${log.listedSessions}  → called a tool: ${toolSessTotal} (${listedConv(toolSessTotal, log.listedSessions)})`);
+  // Per family, because there is no single population to quote. `both` is the
+  // numerator: sessions that listed AND called. Dividing the blended tool
+  // sessions by the blended listings answers a question nobody asked — for most
+  // windows it is OpenAI's calls over Claude's listings.
+  const realSegs = log.segments.filter(
+    (g) => g.bucket !== 'crawl' && g.bucket !== 'scanner' && g.bucket !== 'internal');
+  const aggT = realSegs.reduce((a, g) => ({
+    listed: a.listed + g.listed,
+    toolSessions: a.toolSessions + g.toolSessions,
+    listedAndCalled: a.listedAndCalled + g.listedAndCalled,
+  }), { listed: 0, toolSessions: 0, listedAndCalled: 0 });
+  console.log('Listed → called a tool (same session, per family):');
+  console.log('  († client does not list once per session — its tool sessions mostly never list at all;');
+  console.log('   ‡ it listed and it called, but never in the same session, so there is no rate to quote)');
+  for (const g of realSegs) {
+    if (!g.listed && !g.toolSessions) continue;
+    console.log(`  ${g.label.padEnd(21)} ${listedConv(g).padStart(7)}  (${g.listedAndCalled}/${g.listed} listed; ${g.toolSessions} tool session(s))`);
+  }
+  const unlisted = aggT.toolSessions - aggT.listedAndCalled;
+  console.log(`  ${'All families'.padEnd(21)} ${listedConv(aggT).padStart(7)}  (${aggT.listedAndCalled}/${aggT.listed} listed)` +
+    (unlisted ? ` — excludes ${unlisted} tool session(s) that never listed` : ''));
+  console.log(`Listed tools (sessions): ${log.listedSessions}   tool sessions: ${toolSessTotal}   (counts, not a ratio)`);
   console.log(`Resource reads (sess)  : ${log.resourceSessions}`);
   if (log.crawlSessions) {
     console.log(`Catalog crawl (excl.)  : ${log.crawlSessions} session(s) — connect+list in back-to-back runs, never called anything; held out of the rate above`);
