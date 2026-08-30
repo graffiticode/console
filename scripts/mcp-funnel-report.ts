@@ -244,6 +244,34 @@ const BUCKET_LABEL: Record<ClientBucket, string> = {
 const BUCKET_ORDER: ClientBucket[] = ['claude', 'claude_ua', 'openai', 'other', 'internal', 'scanner', 'crawl', 'unknown'];
 
 /**
+ * Not a prospect: crawlers, probes, and our own tools. These are shown as rows
+ * but never counted anywhere a rate is quoted.
+ */
+const isProbeSegment = (g: { bucket: ClientBucket }): boolean =>
+  g.bucket === 'crawl' || g.bucket === 'scanner' || g.bucket === 'internal';
+
+/**
+ * Whether a segment belongs in the blended listed→called rate.
+ *
+ * `claude_ua` is DISPLAYED like a real client — it keeps its row and its own
+ * per-family rate, because that row is the evidence for what it is — but it is
+ * held OUT of the aggregate. Over 2026-07-31→08-30 it carried 3085 of 6454
+ * catalogue loads and one tool session, so leaving it in makes the blended rate
+ * a statement about a UA-shaped client that is very likely directory
+ * infrastructure, not about whether people find the tools useful. Same reason
+ * `log.listedSessions` already holds catalogue crawls out.
+ *
+ * Both exclusions are DISCLOSED in the output rather than silent: the volume
+ * held out is printed next to the rate, so nothing disappears.
+ *
+ * These two predicates are defined once because the HTML and terminal halves
+ * each built the set inline and would drift — the same duplication that made
+ * scanner names wrong in the digest until 2026-08-26.
+ */
+const countsTowardAggregate = (g: { bucket: ClientBucket }): boolean =>
+  !isProbeSegment(g) && g.bucket !== 'claude_ua';
+
+/**
  * Catalogue crawls: many sessions that connect, list, and never ask for
  * anything, arriving back to back from one client and one country.
  *
@@ -300,9 +328,9 @@ const CRAWL_MIN_RUN = 10;         // …and a run this long is not a population 
  * It gets its OWN ROW rather than the scanner bin, deliberately — see the same
  * argument in src/lib/funnel-clients.ts. Binning it would delete the evidence
  * either way, and the row plus the listed/tool columns let a reader settle what
- * it is. It is still counted as a real (non-probe) segment, so it remains in the
- * "All families" aggregate; splitting the row is what makes that visible, and
- * whether to hold it out of the aggregate too is a separate call.
+ * it is. It keeps a full row and its own per-family rate, and is held out of the
+ * blended "All families" rate only — see `countsTowardAggregate`. The held-out
+ * volume is printed beside the rate, so the exclusion is disclosed, not silent.
  */
 const ANTHROPIC_UA = /^anthropic(\/|$)/i;
 
@@ -1092,8 +1120,10 @@ function generateHtml(data: {
   // `log.listedSessions` already holds crawls out — a machine that lists
   // thousands of times and never calls drives the rate to zero while saying
   // nothing about whether people find the tools useful.
-  const realSegments = log.segments.filter(
-    (g) => g.bucket !== 'crawl' && g.bucket !== 'scanner' && g.bucket !== 'internal');
+  const realSegments = log.segments.filter(countsTowardAggregate);
+  const heldOut = log.segments.filter((g) => g.bucket === 'claude_ua');
+  const heldOutSessions = heldOut.reduce((a, g) => a + g.sessions, 0);
+  const heldOutListed = heldOut.reduce((a, g) => a + g.listed, 0);
   const agg = realSegments.reduce((a, g) => ({
     listed: a.listed + g.listed,
     toolSessions: a.toolSessions + g.toolSessions,
@@ -1211,7 +1241,8 @@ ${data.omtm.isClockStartWeek ? `<div class="banner banner-red">
   ${card('Claim conversion', claimConversion, `${fs.accounts} accounts / ${fs.anonSessions} anon sessions — diagnostic`)}
   ${card('Tool success (users)', overallSuccess, `${log.userToolOk}/${log.userToolTotal} calls — ${log.nonUserCalls} non-user call(s) excluded`)}
   ${card('Listed → called a tool', listedToCalled, `${agg.listedAndCalled} of ${agg.listed} sessions did both` +
-    (unlistedToolSessions ? ` — ${unlistedToolSessions} tool session(s) never listed and are not in this rate` : ''))}
+    (unlistedToolSessions ? ` — ${unlistedToolSessions} tool session(s) never listed and are not in this rate` : '') +
+    (heldOutListed ? `; excludes ${heldOutListed} Anthropic/ClaudeAI UA listing(s)` : ''))}
   ${card('Free-plan spend', `$${fs.spendUsd.toFixed(2)}`, costPerAccount + ' / account')}
   ${card('Paid (from claim)', `${fs.paidFromClaim}`, `${fs.paidGlobal} paid overall`)}
 </div>
@@ -1252,7 +1283,8 @@ ${data.omtm.isClockStartWeek ? `<div class="banner banner-red">
 <p class="note" style="margin-top:8px;"><b>Listed</b> = the session issued a <code>tools/list</code>-family request (<code>mcp_listed</code>). <b>Read resource</b> = it read a <code>graffiticode://</code> resource (<code>mcp_resource</code>). Both stages sit between "a transport opened" and "someone asked for something" — without them a directory validator that loaded the catalogue and a user who actually worked are indistinguishable.<br>
 <b>Listed&rarr;called</b> counts only sessions that did <i>both</i>, so it is a real per-client conversion and never divides one client's listings by another's calls.<br>
 <b>† n/a</b> = this client had more tool-calling sessions than listing sessions, so it does not call <code>tools/list</code> once per session and the ratio is not a conversion. ChatGPT/Codex is the standing example: a new transport per tool call means most of its tool sessions never list at all.<br>
-<b>‡ n/a</b> = this client both listed and called, but never in the same session, so there is no conversion to measure &mdash; the two counts describe different transports.</p>
+<b>‡ n/a</b> = this client both listed and called, but never in the same session, so there is no conversion to measure &mdash; the two counts describe different transports.<br>
+<b>Anthropic/ClaudeAI UA</b> is a UA-shaped name (capitalised, slash-separated), not the lowercase hyphenated <code>clientInfo.name</code> every real Claude host sends. It keeps its row and its own rate, but is held out of the blended rate: it carries roughly half of all catalogue loads and almost no calls, so including it would make the blended number a statement about it rather than about people. Probes, scanners and our own tooling are held out for the same reason.</p>
 
 <h2>Engagement — call volume <span style="font-weight:400;color:#94a3b8;font-size:.8rem;">(calls, not sessions — safe to total)</span></h2>
 <table>
@@ -1433,8 +1465,10 @@ async function main() {
   // numerator: sessions that listed AND called. Dividing the blended tool
   // sessions by the blended listings answers a question nobody asked — for most
   // windows it is OpenAI's calls over Claude's listings.
-  const realSegs = log.segments.filter(
-    (g) => g.bucket !== 'crawl' && g.bucket !== 'scanner' && g.bucket !== 'internal');
+  // Displayed per-family: everything that is not a probe, INCLUDING claude_ua —
+  // its row is the evidence for what it is. Aggregated: a narrower set.
+  const shownSegs = log.segments.filter((g) => !isProbeSegment(g));
+  const realSegs = log.segments.filter(countsTowardAggregate);
   const aggT = realSegs.reduce((a, g) => ({
     listed: a.listed + g.listed,
     toolSessions: a.toolSessions + g.toolSessions,
@@ -1443,15 +1477,20 @@ async function main() {
   console.log('Listed → called a tool (same session, per family):');
   console.log('  († client does not list once per session — its tool sessions mostly never list at all;');
   console.log('   ‡ it listed and it called, but never in the same session, so there is no rate to quote)');
-  for (const g of realSegs) {
+  for (const g of shownSegs) {
     if (!g.listed && !g.toolSessions) continue;
-    console.log(`  ${g.label.padEnd(21)} ${listedConv(g).padStart(7)}  (${g.listedAndCalled}/${g.listed} listed; ${g.toolSessions} tool session(s))`);
+    const excl = countsTowardAggregate(g) ? '' : '  [not in All families]';
+    console.log(`  ${g.label.padEnd(21)} ${listedConv(g).padStart(7)}  (${g.listedAndCalled}/${g.listed} listed; ${g.toolSessions} tool session(s))${excl}`);
   }
   const unlisted = aggT.toolSessions - aggT.listedAndCalled;
   console.log(`  ${'All families'.padEnd(21)} ${listedConv(aggT).padStart(7)}  (${aggT.listedAndCalled}/${aggT.listed} listed)` +
     (unlisted ? ` — excludes ${unlisted} tool session(s) that never listed` : ''));
   console.log(`Listed tools (sessions): ${log.listedSessions}   tool sessions: ${toolSessTotal}   (counts, not a ratio)`);
   console.log(`Resource reads (sess)  : ${log.resourceSessions}`);
+  const uaSeg = log.segments.find((g) => g.bucket === 'claude_ua');
+  if (uaSeg?.sessions) {
+    console.log(`Anthropic UA (excl.)   : ${uaSeg.sessions} session(s), ${uaSeg.listed} listed, ${uaSeg.toolSessions} tool session(s) — UA-shaped name, not a Claude host; held out of the rate above`);
+  }
   if (log.crawlSessions) {
     console.log(`Catalog crawl (excl.)  : ${log.crawlSessions} session(s) — connect+list in back-to-back runs, never called anything; held out of the rate above`);
   }
