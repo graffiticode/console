@@ -227,10 +227,11 @@ const READ_TOOLS = new Set(['list_languages', 'get_language_info', 'get_item']);
 //
 // Everything downstream segments by these buckets. `bucketOf` is keyed on the
 // self-declared clientInfo.name, which is the only client identity we have.
-type ClientBucket = 'claude' | 'openai' | 'other' | 'internal' | 'scanner' | 'crawl' | 'unknown';
+type ClientBucket = 'claude' | 'claude_ua' | 'openai' | 'other' | 'internal' | 'scanner' | 'crawl' | 'unknown';
 
 const BUCKET_LABEL: Record<ClientBucket, string> = {
   claude: 'Claude family',
+  claude_ua: 'Anthropic/ClaudeAI UA',
   openai: 'OpenAI family',
   other: 'Other named',
   internal: 'Internal (our own testing)',
@@ -240,7 +241,7 @@ const BUCKET_LABEL: Record<ClientBucket, string> = {
 };
 
 // Order matters only for display; `unknown` last.
-const BUCKET_ORDER: ClientBucket[] = ['claude', 'openai', 'other', 'internal', 'scanner', 'crawl', 'unknown'];
+const BUCKET_ORDER: ClientBucket[] = ['claude', 'claude_ua', 'openai', 'other', 'internal', 'scanner', 'crawl', 'unknown'];
 
 /**
  * Catalogue crawls: many sessions that connect, list, and never ask for
@@ -277,12 +278,41 @@ const CRAWL_MIN_RUN = 10;         // …and a run this long is not a population 
 //
 // Adding a newly-seen scanner means editing funnel-digest.ts, not this file.
 
+/**
+ * `Anthropic/ClaudeAI` and bare `Anthropic` — User-Agent-SHAPED names, kept apart
+ * from the Claude clients proper.
+ *
+ * Every real Claude host sends a lowercase hyphenated clientInfo.name
+ * (`claude-ai`, `claude-code`). These two are capitalised and slash-separated,
+ * i.e. the shape of a User-Agent header rather than an MCP client identity, and
+ * they behave nothing like the hosts they were being counted with. Over
+ * 2026-07-31→08-30 this bucket was 4036 of the 7391 sessions in the old combined
+ * `claude` row — over half the denominator — on 3085 catalogue loads, and
+ * produced exactly ONE tool-calling session in the whole window. It connects in
+ * 43 of 43 hours with no diurnal curve at all, lists `tools` and `resources`
+ * once each, and stops. Splitting it leaves `claude` at 3103 listed / 2 tool
+ * sessions, both of which are an authenticated dev key.
+ *
+ * Folding that into "Claude family" is what made the Claude-side conversion look
+ * catastrophic: it is a denominator of installed base and (most likely) directory
+ * infrastructure checking on a listed server, not of people who wanted something.
+ *
+ * It gets its OWN ROW rather than the scanner bin, deliberately — see the same
+ * argument in src/lib/funnel-clients.ts. Binning it would delete the evidence
+ * either way, and the row plus the listed/tool columns let a reader settle what
+ * it is. It is still counted as a real (non-probe) segment, so it remains in the
+ * "All families" aggregate; splitting the row is what makes that visible, and
+ * whether to hold it out of the aggregate too is a separate call.
+ */
+const ANTHROPIC_UA = /^anthropic(\/|$)/i;
+
 function bucketOf(kind: string | undefined): ClientBucket {
   if (!kind) return 'unknown';
   const cls = classifyClient(kind);
   if (cls === 'internal') return 'internal';
   if (cls === 'crawler') return 'scanner';
   const k = kind.toLowerCase();
+  if (ANTHROPIC_UA.test(kind)) return 'claude_ua';
   if (k.includes('claude') || k.includes('anthropic')) return 'claude';
   if (k.includes('openai') || k.includes('codex')) return 'openai';
   return 'other';
