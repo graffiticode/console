@@ -150,6 +150,21 @@ export const LANGUAGES: Language[] = [
   // found the style neither helps nor hurts generation rate; what it buys is correctness a
   // compile-rate sweep cannot see.
   { id: "0179", name: "L0179", description: "Spreadsheets", routingHint: "Interactive spreadsheet authoring with tabular cell data, cell-level formatting, formulas (SUM, AVERAGE, ROUND, IF), parameterized values, and optional assessment validation with per-cell points. Supersedes L0166 — prefer this for all new spreadsheet content.", domains: ["assessments", "sheets"], status: "Beta" },
+  // The ungated general assessment language. Until this entry existed the catalog had none:
+  // L0176 authors the item types generically but is gatedBy learnosity, and L0175 is
+  // Grade-5-ELA-only, so a plain "make me a five-question quiz" had nowhere to route and the
+  // routing eval recorded 9 no-calls across 9 runs — correct behaviour against a catalog with
+  // no match, not a routing bug. L0180 is the match.
+  //
+  // Deliberately NOT gatedBy anything: being reachable from a generic quiz request is the
+  // whole point, and it is where L0176's `when_to_use` has always been steering generic asks.
+  //
+  // COVERAGE IS ONE INTERACTION. Choice only — single-select, multi-select and true/false,
+  // with per-option points, weighted answers and penalized distractors. Text entry, ordering,
+  // matching, classification, hot text, hotspot and sliders are NOT built, and neither are
+  // multi-part items. The routingHint says so, because a model that routes an ordering item
+  // here gets a compile error rather than an approximation.
+  { id: "0180", name: "L0180", description: "Quizzes and assessment items", routingHint: "The general-purpose assessment language: use it for quizzes, tests, practice questions, comprehension checks and self-checks whenever no particular vendor or platform is named. Authors a single assessment item that renders and scores in a browser with no assessment platform behind it — multiple choice, multi-select (\"select all that apply\") and true/false, with per-option points, weighted answers, partial credit, penalized distractors, shuffled options, and unscored polls. Compiles the presentation and the answer key as separate halves, so a graded delivery can withhold the key and score server-side. EARLY: choice interactions ONLY. Text entry / fill-in-the-blank, ordering, matching, classification, hot text, hotspot and sliders are not built yet, and neither are multi-part items such as cloze passages with several blanks — do not route those here; say no dialect covers them yet rather than substituting a choice item. If the user names Learnosity, that is L0176, not this.", domains: ["assessments"], status: "Beta" },
 ];
 
 export function findLanguageById(id: string): Language | undefined {
