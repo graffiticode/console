@@ -88,6 +88,19 @@ export async function generateCodeForRequest({
   // like "no non-English traffic". Scripts pass nothing and land as "console",
   // correctly dropping out of the MCP-scoped report.
   client = undefined,
+  // Pin the request to `language` and skip GUARDRAIL 1 (the scope gate) for this call only.
+  //
+  // For REPLAYING A CORPUS PROMPT, not for user traffic. The corpus is generated with the gate
+  // off (scripts/create-items-from-prompts.ts sets SCOPE_GATE_ENABLED=false), so its prompts were
+  // authored with the language already chosen and never have to justify it — most visibly for a
+  // vendor-gated language like L0176, whose prompts do not name Learnosity because nothing made
+  // them. Replaying such a prompt with the gate ON is refused every time, which says nothing
+  // about whether the language can still generate.
+  //
+  // A PARAMETER rather than the env var the script uses: that script owns its process, while this
+  // runs inside the server, where mutating process.env.SCOPE_GATE_ENABLED would disable the gate
+  // for every concurrent user request.
+  skipScopeGate = false,
 }) {
   const rid = generateRequestId();
 
@@ -253,7 +266,7 @@ export async function generateCodeForRequest({
       // against the chosen language's scope and re-routes to the correct language if the client
       // picked wrong (clients freelance). Fresh creates only — never relabel an edit. Independent
       // of client cooperation and of the generation LLM volunteering OUT_OF_SCOPE.
-      if (process.env.SCOPE_GATE_ENABLED !== "false" && !currentSrc) {
+      if (process.env.SCOPE_GATE_ENABLED !== "false" && !skipScopeGate && !currentSrc) {
         const tRoute = Date.now();
         const route = await classifyAndRoute({ userRequest: prompt, currentLang: language, rid, itemId, auth });
         mark("route", tRoute);
