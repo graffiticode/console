@@ -33,7 +33,8 @@
     "eval:label-sheet": "npx tsx scripts/gen-label-worksheet.ts",
     "eval:judge-smoke": "npx tsx scripts/judge-smoke.ts",
     "eval:cases": "npx tsx scripts/eval-cases-from-mcp.ts",
-    "eval:proximity": "npx tsx scripts/eval-case-proximity.ts"
+    "eval:proximity": "npx tsx scripts/eval-case-proximity.ts",
+    "corpus-sweep": "npx tsx scripts/corpus-sweep.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",
