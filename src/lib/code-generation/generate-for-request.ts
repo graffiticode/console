@@ -177,9 +177,30 @@ export async function generateCodeForRequest({
     // No model/provider/tier here on purpose: the language's static priority list
     // decides which family serves the request, so there is nothing for a caller to
     // pass. See src/lib/model-priority.ts.
+    // `effort` controls how much the model THINKS before answering, and it is the
+    // dominant term in generation latency for this workload.
+    //
+    // claude-sonnet-5 runs adaptive thinking when `thinking` is omitted, which is
+    // what codegen has always done — and Anthropic bills thinking inside
+    // output_tokens without breaking it out, so it never appeared in our own
+    // numbers. A 2026-08-31 L0179 sheet logged 15,278 output tokens over 149s for a
+    // program whose source is roughly 4,000 tokens: the rest was invisible
+    // reasoning. The spec service measured the same effect from the other side —
+    // 42.7s with thinking disabled against 86.3s adaptive.
+    //
+    // Lowering effort is preferred to disabling thinking outright: it keeps the
+    // model on its normal path while cutting the depth. Authoring a spreadsheet
+    // from an explicit layout spec is closer to transcription than reasoning, which
+    // is the workload shape that loses least at low effort.
+    //
+    // Env-driven and unset by default, so the current behaviour is unchanged until
+    // it is turned on deliberately, and it can be tuned or reverted on a live
+    // service without a rebuild.
+    const codegenEffort = process.env.CODEGEN_EFFORT || undefined;
     const codegenOptions = {
       temperature: options?.temperature,
       maxTokens: options?.maxTokens,
+      ...(codegenEffort ? { effort: codegenEffort } : {}),
     };
     const mapUsageLimit = (errs: any[]) => errs.map(err => ({
       ...err,
