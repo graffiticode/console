@@ -107,8 +107,15 @@ export async function enqueueGenerationJob(job: GenerationJob): Promise<void> {
           headers: { "Content-Type": "application/json", "X-Internal-Job-Secret": SECRET },
           body: Buffer.from(body).toString("base64"),
         },
-        // Worker generation runs well under this; bounds a stuck dispatch.
-        dispatchDeadline: "300s",
+        // Must be >= the worker's own Cloud Run request timeout, or Cloud Tasks
+        // gives up and re-dispatches while the first attempt is still generating
+        // — the duplicate-generation failure this queue already had once, from the
+        // other direction (Cloudflare cutting at 100s). Raised to 900s with the
+        // service on 2026-08-31: an L0179 sheet was observed taking 6m22s and
+        // producing 39,694 output tokens across continuation chunks, so 300s was
+        // killing the worker a minute and a half before the model finished.
+        // Cloud Tasks permits up to 30 minutes for HTTP targets.
+        dispatchDeadline: "900s",
       },
     }),
   });
