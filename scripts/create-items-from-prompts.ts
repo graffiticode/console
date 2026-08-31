@@ -4,7 +4,8 @@
  * Generate code examples and create them as items in Firestore.
  *
  * Single-pass script combining code generation + item creation:
- * 1. Extracts prompts from ../l{lang}/packages/core/spec/examples.md
+ * 1. Extracts prompts from the language's examples.md (served asset, or a local checkout —
+ *    see scripts/lang-examples.ts)
  * 2. Generates code for each prompt via generateCode()
  * 3. Normalizes lrn-id references to the example id
  * 4. Recompiles the normalized source to get a real taskId
@@ -44,6 +45,7 @@ import { getCredentialsForApiKey } from "../src/lib/api-credentials";
 import { getBaseUrlForApi } from "../src/lib/api";
 import { createItem, parseCode, postTask } from "../src/pages/api/resolvers";
 import { getSecretsForUser, getPublicValuesForUser } from "../src/lib/user-credentials";
+import { readExamplesMarkdown } from "./lang-examples";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -144,10 +146,10 @@ interface AuditLogEntry {
 }
 
 /**
- * Extract examples from markdown file in the language repo
+ * Extract examples from the language's examples.md content (see scripts/lang-examples.ts for
+ * where that content comes from — a local checkout, or the served asset).
  */
-function extractExamples(markdownPath: string, langCode: string): TrainingExample[] {
-  const content = fs.readFileSync(markdownPath, "utf-8");
+function extractExamples(content: string, langCode: string): TrainingExample[] {
   const examples: TrainingExample[] = [];
 
   const lines = content.split("\n");
@@ -454,19 +456,15 @@ async function processExample(
  * Main execution
  */
 async function main() {
-  console.log(`Extracting L${langCode} examples from language repo...`);
-
-  const trainingFile = path.resolve(
-    __dirname,
-    `../../l${langCode}/packages/core/spec/examples.md`
-  );
-
-  if (!fs.existsSync(trainingFile)) {
-    console.error(`Error: Examples file not found: ${trainingFile}`);
+  let examplesMd: string;
+  try {
+    examplesMd = (await readExamplesMarkdown(langCode)).text;
+  } catch (err: any) {
+    console.error(`Error: ${err.message}`);
     process.exit(1);
   }
 
-  const examples = extractExamples(trainingFile, langCode);
+  const examples = extractExamples(examplesMd, langCode);
   const slice = only
     ? examples.filter((ex) => only.has(ex.exampleNumber))
     : examples.slice(startIdx, Math.min(startIdx + limit, examples.length));

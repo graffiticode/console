@@ -4,7 +4,8 @@
  * Script to run code generation over language examples from the language repo and create a mapping file.
  *
  * This script:
- * 1. Extracts prompts from ../l{lang}/packages/core/spec/examples.md
+ * 1. Extracts prompts from the language's examples.md (served asset, or a local checkout —
+ *    see scripts/lang-examples.ts)
  * 2. Runs code generation on each prompt using the code-generation-service
  * 3. Creates a mapping file in training/data/{lang}-codegen-mapping.json with results
  *
@@ -24,6 +25,7 @@ import "./eval-env"; // Production bootstrap (MUST be first)
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { readExamplesMarkdown } from "./lang-examples";
 import { generateCode } from "../src/lib/code-generation-service";
 import { getCredentialsForApiKey } from "../src/lib/api-credentials";
 
@@ -74,8 +76,7 @@ interface CodeGenResult {
 /**
  * Extract examples from markdown file in the language repo
  */
-function extractExamples(markdownPath: string): TrainingExample[] {
-  const content = fs.readFileSync(markdownPath, "utf-8");
+function extractExamples(content: string): TrainingExample[] {
   const examples: TrainingExample[] = [];
 
   // Split by lines and extract numbered prompts
@@ -167,20 +168,15 @@ async function generateCodeForExample(
  * Main execution
  */
 async function main() {
-  console.log(`Extracting L${langCode} examples from language repo...`);
-
-  // Path relative to console repo
-  const trainingFile = path.resolve(
-    __dirname,
-    `../../l${langCode}/packages/core/spec/examples.md`
-  );
-
-  if (!fs.existsSync(trainingFile)) {
-    console.error(`Error: Examples file not found: ${trainingFile}`);
+  let examplesMd: string;
+  try {
+    examplesMd = (await readExamplesMarkdown(langCode)).text;
+  } catch (err: any) {
+    console.error(`Error: ${err.message}`);
     process.exit(1);
   }
 
-  const examples = extractExamples(trainingFile);
+  const examples = extractExamples(examplesMd);
   const slice = examples.slice(startIdx, Math.min(startIdx + limit, examples.length));
 
   console.log(`Extracted ${examples.length} examples, processing ${slice.length}${dryRun ? " (dry run)" : ""}`);
