@@ -46,6 +46,7 @@ import { getBaseUrlForApi } from "../src/lib/api";
 import { createItem, parseCode, postTask } from "../src/pages/api/resolvers";
 import { getSecretsForUser, getPublicValuesForUser } from "../src/lib/user-credentials";
 import { readExamplesMarkdown } from "./lang-examples";
+import { dialectFingerprint, formatFingerprint, type DialectFingerprint } from "./eval-dialect-fingerprint";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -79,6 +80,20 @@ const startIdx = args.includes("--start")
   : 0;
 
 const refresh = args.includes("--refresh");
+
+/**
+ * PROVENANCE — what produced this corpus entry, recorded ON the item.
+ *
+ * A corpus row is evidence about a (prompt, MODEL, DIALECT) triple, and it was recording only the
+ * prompt. That makes a later regeneration uninterpretable: when a re-run differs from the stored
+ * code, nothing distinguishes "the pipeline regressed" from "MODEL_PRIORITY moved months ago" —
+ * and it has moved (L0175 routes to gpt-5.6-sol today, L0177 to gpt-5.6-terra, the rest
+ * Sonnet/Haiku). The corpus health sweep cannot tell drift from a routing change without this.
+ *
+ * The dialect fingerprint is resolved ONCE per run, not per example: it is one HTTP fetch of the
+ * language's instructions.md, identical for every example in the run.
+ */
+let runDialect: DialectFingerprint | null = null;
 
 // Re-run named examples rather than a slice. --start/--limit index the extracted
 // LIST, which is not the example's label, so repairing "example 66" meant
@@ -140,6 +155,8 @@ interface AuditLogEntry {
   fixAttempts?: number | null;
   taskId?: string | null;
   upstreamLangs?: string[];
+  /** Which model actually wrote this. See PROVENANCE below. */
+  model?: string | null;
   created?: boolean;
   error?: string;
   timestamp: string;
@@ -329,6 +346,7 @@ async function processExample(
 
     entry.generatedCode = genResult.src || "";
     entry.usage = genResult.usage || null;
+    entry.model = genResult.model || null;
     entry.fixAttempts = genResult.fixAttempts ?? null;
     entry.upstreamLangs = Array.isArray(genResult.upstreamLangs) ? genResult.upstreamLangs : [];
 
@@ -441,6 +459,11 @@ async function processExample(
         {
           prompt: example.prompt,
           exampleNumber: example.exampleNumber,
+          // Provenance — see the note at runDialect. Written here rather than passed through
+          // createItem so the shared resolver keeps one shape for every caller.
+          model: entry.model ?? null,
+          dialect: runDialect ? { hash: runDialect.hash, revised: runDialect.revised ?? null } : null,
+          generatedAt: new Date().toISOString(),
         },
         { merge: true }
       );
@@ -463,6 +486,11 @@ async function main() {
     console.error(`Error: ${err.message}`);
     process.exit(1);
   }
+
+  // One fetch for the whole run; a failure costs attribution, never the run (dialectFingerprint
+  // returns {hash:"unknown"} rather than throwing).
+  runDialect = await dialectFingerprint(langCode);
+  console.log(`[provenance] L${langCode} dialect ${formatFingerprint(runDialect)}`);
 
   const examples = extractExamples(examplesMd, langCode);
   const slice = only
