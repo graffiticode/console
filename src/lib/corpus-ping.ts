@@ -54,21 +54,29 @@ const CONCURRENCY = 4;
  *  the run — one hung language must not cost the other ten their result. */
 const STEP_TIMEOUT_MS = 180_000;
 
-export type PingStage = "no-corpus" | "generate" | "empty" | "compile" | "out-of-scope";
+export type PingStage = "no-corpus" | "generate" | "empty" | "compile";
 
 /**
- * Three outcomes, not two — the distinction the first multi-language run forced.
+ * Two outcomes: it generated a compiling program, or it did not.
  *
- *   ok      — generated and compiled. The pipeline works for this language.
- *   stale   — the SCOPE GATE refused the prompt. The pipeline behaved perfectly; the
- *             CORPUS is wrong. L0173's corpus still holds a scatter-plot prompt that
- *             L0173 v1 explicitly puts out of scope, so RAG is serving an example the
- *             language will now refuse. Real rot, worth reporting — but calling it an
- *             outage would page for something that is working as designed.
- *   failed  — generation errored, returned nothing, or the program did not compile.
- *             This is the outage signal.
+ * There WAS a third, `stale`, for a scope-gate refusal — on the theory that the platform had
+ * behaved correctly and the corpus was wrong. The first scheduled run retired it. Three of eleven
+ * languages came back stale, and the reason was this ping, not the corpus: the corpus is generated
+ * with the scope gate OFF, so its prompts never have to justify their language. L0176 is the clean
+ * proof — it is gatedBy ["learnosity"], and its corpus prompts do not name Learnosity because
+ * nothing ever made them, so every replay is refused. That is a permanent false alarm on a daily
+ * check, which is the one thing a daily check cannot afford.
+ *
+ * So the ping now pins the language and skips the gate (`skipScopeGate`), matching the regime the
+ * prompts were authored under. `out_of_scope` cannot come back, and an outcome that cannot occur
+ * has no business being in the type.
+ *
+ * The question it answered — does the corpus still agree with each language's scope.json? — is
+ * real, and L0173 (scatter plots) and L0172 are real instances. It belongs to the weekly sweep,
+ * which can ask it across a whole corpus instead of one sampled prompt, and which must exempt
+ * vendor-gated languages or inherit this same false alarm.
  */
-export type PingOutcome = "ok" | "stale" | "failed";
+export type PingOutcome = "ok" | "failed";
 
 export interface PingResult {
   lang: string;
@@ -88,7 +96,6 @@ export interface PingRun {
   dayIndex: number;
   results: PingResult[];
   ok: number;
-  stale: number;
   failed: number;
 }
 
@@ -195,6 +202,9 @@ async function pingLang(lang: string, day: number, auth: { uid: string; token: s
         // Creates nothing: the id is never written, and the only lookup keyed on it
         // (assertRevisionsRemaining) is free-plan-only, which this eval account is not.
         itemId: `corpus-ping-${lang}`,
+        // Replay the prompt under the regime it was authored in — see PingOutcome. Without this
+        // a vendor-gated language (L0176) is refused on every single run.
+        skipScopeGate: true,
       }),
       `generate L${lang}`,
     );
@@ -203,17 +213,7 @@ async function pingLang(lang: string, day: number, auth: { uid: string; token: s
 
     if (gen?.errors?.length > 0) {
       const first = gen.errors[0];
-      // The scope gate refusing this prompt means the platform worked and the corpus is
-      // stale — see PingOutcome. Keyed on the structured `code` set in
-      // generate-for-request.ts, never on the message prose.
-      const stale = first?.code === "out_of_scope";
-      return {
-        ...out,
-        outcome: stale ? "stale" : "failed",
-        stage: stale ? "out-of-scope" : "generate",
-        error: String(first?.message || first),
-        latencyMs: Date.now() - started,
-      };
+      return { ...out, stage: "generate", error: String(first?.message || first), latencyMs: Date.now() - started };
     }
     if (!gen?.src) {
       return { ...out, stage: "empty", error: "generation returned empty source", latencyMs: Date.now() - started };
@@ -272,25 +272,22 @@ export async function runPing(langs: string[] = PING_LANGUAGES, now: Date = new 
     dayIndex: day,
     results,
     ok: count("ok"),
-    stale: count("stale"),
     failed: count("failed"),
   };
 }
 
 /**
- * SMS text. Failures first and named, because that is the only part worth reading on a
- * phone; stale trails as a secondary clause so corpus rot is visible without competing
- * with an outage for attention. The all-clear is deliberately one short line.
+ * SMS text. Failures named with the stage they broke at, because that is the only part worth
+ * reading on a phone. The all-clear is deliberately one short line.
  */
 export function formatPingSms(run: PingRun): string {
   const total = run.results.length;
-  const named = (o: PingOutcome) =>
-    run.results.filter((r) => r.outcome === o).map((r) => `L${r.lang} ${r.stage}`).join(", ");
-
-  const stalePart = run.stale > 0 ? ` · ${run.stale} stale: ${named("stale")}` : "";
-
-  if (run.failed === 0) return `corpus ping: ${run.ok}/${total} ok${stalePart}`;
-  return `corpus ping: ${run.failed}/${total} FAILED — ${named("failed")}${stalePart}`;
+  if (run.failed === 0) return `corpus ping: ${run.ok}/${total} ok`;
+  const broken = run.results
+    .filter((r) => r.outcome === "failed")
+    .map((r) => `L${r.lang} ${r.stage}`)
+    .join(", ");
+  return `corpus ping: ${run.failed}/${total} FAILED — ${broken}`;
 }
 
 /**
