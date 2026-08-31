@@ -16,6 +16,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { readExamplesMarkdown } from "./lang-examples";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,8 +41,7 @@ const outputPath = args.includes("--output")
 /**
  * Extract examples from markdown file in the language repo
  */
-function extractPrompts(markdownPath: string, lang: string): Prompt[] {
-  const content = fs.readFileSync(markdownPath, "utf-8");
+function extractPrompts(content: string, lang: string): Prompt[] {
   const prompts: Prompt[] = [];
 
   // Split by lines and extract numbered prompts
@@ -71,19 +71,16 @@ function extractPrompts(markdownPath: string, lang: string): Prompt[] {
 /**
  * Main execution
  */
-function main() {
-  const trainingFile = path.resolve(
-    __dirname,
-    `../../l${langCode}/packages/core/spec/examples.md`
-  );
-
-  if (!fs.existsSync(trainingFile)) {
-    console.error(`Error: Examples file not found: ${trainingFile}`);
+async function main() {
+  let examplesMd: string;
+  try {
+    examplesMd = (await readExamplesMarkdown(langCode)).text;
+  } catch (err: any) {
+    console.error(`Error: ${err.message}`);
     process.exit(1);
   }
 
-  console.log(`Extracting prompts from ${trainingFile}...`);
-  const prompts = extractPrompts(trainingFile, langCode);
+  const prompts = extractPrompts(examplesMd, langCode);
 
   // Ensure output directory exists
   const outputDir = path.dirname(outputPath);
@@ -97,4 +94,7 @@ function main() {
   console.log(`✓ Extracted ${prompts.length} prompts to: ${outputPath}`);
 }
 
-main();
+main().catch((err) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});
