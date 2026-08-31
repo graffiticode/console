@@ -50,6 +50,19 @@ export type FunnelEventName =
   // context
   | "item_updated"
   | "item_generation_failed"
+  // Per-stage timing for one generateCodeForRequest run. Context, and read by
+  // nothing in the digest — it exists so the MCP path's latency is attributable.
+  //
+  // The MCP path runs a pipeline (route → retrieve → plan → compose → generate →
+  // parse → repair) where the console UI runs the generate step alone, and it
+  // showed: worker p50 was 23.8s against a console UI that returns in under 10s,
+  // and 29% of runs exceeded the MCP server's 45s poll deadline, which is what
+  // makes render_item return "still generating" and the agent call again. No
+  // per-stage timing existed, so which stage owns that gap was unanswerable.
+  //
+  // Durations only — never prompt text, never source. See the contract at the
+  // top of this file.
+  | "item_generation_timing"
   | "checkout_started"
   | "free_plan_budget";
 

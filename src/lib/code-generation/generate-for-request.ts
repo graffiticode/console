@@ -91,6 +91,22 @@ export async function generateCodeForRequest({
 }) {
   const rid = generateRequestId();
 
+  // Per-stage timing. Accumulates (+=) rather than assigns, because the repair
+  // loop re-enters codeGenerationService and parseCode — a run that repaired
+  // twice should report the total spent generating, not the last attempt.
+  //
+  // Declared out here, with the outcome trackers, so the `finally` below can
+  // emit on EVERY exit: the early returns (revision budget, non-English gate,
+  // out-of-scope reject, composition error) are exactly the paths whose cost is
+  // otherwise invisible, and the throw path is where a 300s timeout lands.
+  const tStart = Date.now();
+  const stageMs: Record<string, number> = {};
+  const mark = (stage: string, since: number) => {
+    stageMs[stage] = (stageMs[stage] ?? 0) + (Date.now() - since);
+  };
+  let composedRun = false;
+  let repairRuns = 0;
+
   try {
     if (!language) {
       return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, usage: null, errors: [{ message: "language is required" }], upstreamLangs: [], rid };
@@ -238,7 +254,9 @@ export async function generateCodeForRequest({
       // picked wrong (clients freelance). Fresh creates only — never relabel an edit. Independent
       // of client cooperation and of the generation LLM volunteering OUT_OF_SCOPE.
       if (process.env.SCOPE_GATE_ENABLED !== "false" && !currentSrc) {
+        const tRoute = Date.now();
         const route = await classifyAndRoute({ userRequest: prompt, currentLang: language, rid, itemId, auth });
+        mark("route", tRoute);
         // Log EVERY decision (in-scope included) so routing is observable — an in-scope verdict
         // is otherwise silent, which masks scope.json contracts that are too permissive.
         // `lang=${langKey(language)}` rather than `lang=L${language}`: this line
@@ -269,7 +287,9 @@ export async function generateCodeForRequest({
       // Head-lang retrieval (for the routed language), reused by the atomic gen and the
       // composition head. Never fail generation if retrieval errors; just treat it as atomic.
       try {
+        const tRetrieve = Date.now();
         headExamples = await getRelevantExamples({ prompt, lang: language, rid }) || [];
+        mark("retrieve", tRetrieve);
       } catch (err: any) {
         console.warn(`[composition] rid=${rid} head retrieval failed: ${err?.message}`);
       }
@@ -280,7 +300,9 @@ export async function generateCodeForRequest({
       let sequence: string[] = [language];
       const permits = process.env.COMPOSITION_ENABLED === "false" ? [] : composesWithFor(language);
       if (permits.length > 0) {
+        const tPlan = Date.now();
         const planResult = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid, itemId, preferHaiku: true });
+        mark("plan", tPlan);
         const fenced = fenceComposition(planResult.sequence, permits);
         if (fenced.dropped.length > 0) {
           console.warn(`[composition] rid=${rid} fenced unpermitted upstreams=[${fenced.dropped.join(",")}] permits=[${permits.join(",")}]`);
@@ -305,6 +327,8 @@ export async function generateCodeForRequest({
         console.log(`[composition] rid=${rid} sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
         ragLog(rid, "composition.plan", { sequence });
 
+        composedRun = true;
+        const tCompose = Date.now();
         const orch = await orchestrateComposition({
           sequence,
           prompt,
@@ -316,6 +340,7 @@ export async function generateCodeForRequest({
           conversationSummary,
           headExamples: headLang === language ? headExamples : null,
         });
+        mark("compose", tCompose);
 
         if (orch.errors) {
           return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: orch.headProvider ?? null, tier: orch.headTier ?? null, usage: null, errors: mapUsageLimit(orch.errors), upstreamLangs: [], rid };
@@ -332,6 +357,7 @@ export async function generateCodeForRequest({
         upstreamTaskIds = orch.upstreamTaskIds;
       } else {
         // Atomic — single-language code gen, reusing the head retrieval.
+        const tGen = Date.now();
         const result = await codeGenerationService({
           auth,
           prompt,
@@ -343,6 +369,7 @@ export async function generateCodeForRequest({
           precomputedExamples: headExamples,
           itemId,
         });
+        mark("generate", tGen);
 
         if ('errors' in result && result.errors) {
           return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: (result as any).provider ?? null, tier: (result as any).tier ?? null, usage: null, errors: mapUsageLimit(result.errors), upstreamLangs: [], rid };
@@ -375,7 +402,9 @@ export async function generateCodeForRequest({
     const privateValues: Record<string, string> = await getSecretsForUser(auth?.uid);
     const publicValues: Record<string, string> = await getPublicValuesForUser(auth?.uid);
     if (itemId) publicValues.itemId = itemId;
+    const tParse = Date.now();
     const parseResult = await parseCode({ lang: headLang, src, privateValues, publicValues, accessToken: auth?.token });
+    mark("parse", tParse);
     if (parseResult.errors) {
       // Preserve the generated source alongside the parse errors so the
       // editor can render it with inline compile-error decorations, matching
@@ -441,6 +470,8 @@ export async function generateCodeForRequest({
         if (expected && !resolved.upstreams.includes(expected)) {
           console.log(`[composition] rid=${rid} repair.start head=L${headLang} expected=L${expected}`);
           ragLog(rid, "composition.repair.start", { headLang, expected });
+          repairRuns++;
+          const tRepair = Date.now();
           const repair: any = await codeGenerationService({
             auth,
             lang: headLang,
@@ -453,10 +484,13 @@ export async function generateCodeForRequest({
             upstreamContext: { lang: expected },
             prompt: `${prompt}\n\nIMPORTANT: This program is the HEAD of a composition pipeline and MUST bind its upstream by emitting a top-level \`data use "${expected}"\` so the upstream data flows at runtime. Do not omit it.`,
           });
+          mark("repair", tRepair);
           if (repair?.errors) {
             return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: mapUsageLimit(repair.errors), upstreamLangs: [], rid };
           }
+          const tReparse = Date.now();
           const reparsed = await parseCode({ lang: headLang, src: repair.code, privateValues, publicValues, accessToken: auth?.token });
+          mark("parse", tReparse);
           if (reparsed.errors) {
             return { src: repair.code, taskId: null, language, description, changeSummary, model, provider, tier, usage, errors: reparsed.errors, upstreamLangs: [] };
           }
@@ -491,6 +525,7 @@ export async function generateCodeForRequest({
       };
     }
 
+    const tPost = Date.now();
     const taskData = await postTask({
       auth,
       task: { lang: headLang, code },
@@ -500,6 +535,7 @@ export async function generateCodeForRequest({
       // public so /form?id=<taskId> renders by their unguessable taskId.
       isPublic: auth.freePlan === true,
     });
+    mark("post", tPost);
     const headTaskId = taskData.id;
     if (!headTaskId) {
       throw new Error("Failed to get taskId");
@@ -536,6 +572,28 @@ export async function generateCodeForRequest({
     // bound, and a throw this far out may predate generation entirely — so
     // nulls here are the honest answer, not a dropped field.
     return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: null, tier: null, usage: null, errors: [{ message: error.message }], upstreamLangs: [], rid };
+  } finally {
+    // Best-effort, and deliberately in `finally`: the early returns above (revision
+    // budget, non-English gate, out-of-scope reject, composition error) and the
+    // caught throw are exactly the runs whose cost is otherwise unrecorded.
+    // emitEvent swallows its own errors, so this cannot break a generation.
+    //
+    // `language` is the function PARAMETER and is reassigned by a preflight
+    // reroute, so this reports the language that actually generated — matching
+    // the [composition] head= line rather than the caller's original pick.
+    emitEvent("item_generation_timing", {
+      ...actor(auth),
+      lang: langKey(language),
+      app: client ?? "console",
+      rid,
+      total_ms: Date.now() - tStart,
+      // Milliseconds per stage. Absent means the stage did not run — an atomic
+      // request has no compose_ms, an edit has no route_ms — which is itself the
+      // signal: it says which pipeline a run actually took.
+      ...Object.fromEntries(Object.entries(stageMs).map(([k, v]) => [`${k}_ms`, v])),
+      composed: composedRun,
+      repairs: repairRuns,
+    });
   }
 }
 
