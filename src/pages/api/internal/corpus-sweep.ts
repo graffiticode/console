@@ -26,8 +26,10 @@ import {
   formatSweepSms,
   recordSweepRun,
   runSweep,
+  sweepRunId,
 } from "../../../lib/corpus-sweep";
 import { sendSms } from "../../../lib/alert-sms";
+import { sweepReportUrl } from "../../../lib/report-link";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const dry = req.query.dry === "1";
@@ -53,9 +55,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const now = new Date();
     const run = await runSweep({ langs: requested ?? SWEEP_LANGUAGES, mode: "sample", now });
-    const message = formatSweepSms(run);
+    const url = sweepReportUrl(sweepRunId(run), now);
+    const message = formatSweepSms(run, url);
 
-    if (dry) return res.status(200).json({ dry: true, message, ...run });
+    if (dry) return res.status(200).json({ dry: true, message, url, ...run });
 
     // Record before alerting: the run log is what makes a silent week diagnosable, so it must
     // survive a Twilio outage.
@@ -67,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 200 even when languages failed: the JOB succeeded — it swept and reported. A non-2xx would
     // make the scheduler retry a run that already spent its money and already has the answer.
-    return res.status(200).json({ message, sms: sent, ...run });
+    return res.status(200).json({ message, url, sms: sent, ...run });
   } catch (err: any) {
     console.error("[corpus-sweep] run failed:", err?.message || err);
     return res.status(500).json({ error: err?.message || String(err) });

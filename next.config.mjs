@@ -33,6 +33,10 @@ const nextConfig = {
       // every character competes with the digest text in a 160-char segment.
       source: "/r/:token",
       destination: "/api/r/:token",
+    }, {
+      // Corpus sweep reports. Same reasoning as /r/ above — no sign-in, short path.
+      source: "/s/:token",
+      destination: "/api/s/:token",
     }];
   },
   async headers() {

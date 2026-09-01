@@ -303,7 +303,17 @@ export function formatSweepSms(run: SweepRun, reportUrl?: string): string {
     (reportUrl ? ` ${reportUrl}` : "");
 }
 
+/**
+ * The document id a run is stored under, and the id its report link addresses. ONE definition:
+ * computing it separately at the call sites means a change to either makes every existing report
+ * link 404, and nothing would fail until somebody opened one.
+ *
+ * Contains no dot, which is what keeps the three-part sweep token unambiguous (report-link.ts).
+ */
+export function sweepRunId(run: SweepRun): string {
+  return run.mode === "sample" ? `wk${run.week}` : `full-${run.at.replace(/[:.]/g, "-")}`;
+}
+
 export async function recordSweepRun(run: SweepRun): Promise<void> {
-  const id = run.mode === "sample" ? `wk${run.week}` : `full-${run.at.replace(/[:.]/g, "-")}`;
-  await getFirestore().collection("corpus-sweep-runs").doc(id).set(run, { merge: true });
+  await getFirestore().collection("corpus-sweep-runs").doc(sweepRunId(run)).set(run, { merge: true });
 }

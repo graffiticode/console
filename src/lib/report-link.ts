@@ -92,3 +92,43 @@ export function reportUrl(from: Date, to: Date, now = new Date()): string {
   const base = (process.env.CONSOLE_URL || "https://console.graffiticode.org").replace(/\/$/, "");
   return `${base}/r/${signReportToken(from, to, now)}`;
 }
+
+// ---- Corpus sweep runs -------------------------------------------------------------------------
+//
+// The funnel token signs a WINDOW because its report is rendered live from events. A sweep report
+// addresses one stored run instead (corpus-sweep-runs/<id>), so the token signs that id. Same key,
+// same MAC, same expiry — a second scheme would be a second thing to rotate.
+//
+// Run ids are `wk2957` or `full-<iso with : and . replaced>`, so they never contain a dot and the
+// three-part split stays unambiguous.
+
+export function signSweepToken(runId: string, now = new Date()): string {
+  const body = `${runId}.${enc(now.getTime() + TTL_MS)}`;
+  return `${body}.${macFor(body)}`;
+}
+
+/** Verify a sweep token and return its run id, or null. Null for every failure mode, as above. */
+export function verifySweepToken(token: string, now = new Date()): string | null {
+  if (typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [runId, e, sig] = parts;
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(runId)) return null;
+
+  const expected = macFor(`${runId}.${e}`);
+  if (
+    sig.length !== expected.length ||
+    !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))
+  ) {
+    return null;
+  }
+
+  const exp = dec(e);
+  if (!Number.isFinite(exp) || now.getTime() > exp) return null;
+  return runId;
+}
+
+export function sweepReportUrl(runId: string, now = new Date()): string {
+  const base = (process.env.CONSOLE_URL || "https://console.graffiticode.org").replace(/\/$/, "");
+  return `${base}/s/${signSweepToken(runId, now)}`;
+}
