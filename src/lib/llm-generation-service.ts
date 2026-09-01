@@ -1054,6 +1054,8 @@ export async function generateCodeWithContinuation({
   priority: LlmProvider[];
   attempts: GenerationAttempt[];
   fallbackReason?: string;
+  /** Characters the model emitted in total, before assembly. */
+  rawChars?: number;
   /** Set when the continuation loop cut the run short — see LongGenerationResult. */
   stopEarly?: LongGenerationResult["stopEarly"];
   error?: string;
@@ -1161,6 +1163,12 @@ Do not include any explanatory text outside the code blocks unless specifically 
       );
       return {
         code: assembleProgram(result.content),
+        // Length of everything the model emitted, before assembleProgram picks
+        // the surviving program out of it. Paired with the assembled code's
+        // length this is the only measurement that separates "the model wrote
+        // prose around the code" from "we discarded restarted chunks" — the two
+        // are indistinguishable in outputTokens alone.
+        rawChars: result.content.length,
         usage: result.usage,
         chunks: result.chunks,
         // Why the loop stopped short, if it did. Carried up so the [code-gen]

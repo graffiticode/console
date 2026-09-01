@@ -1637,12 +1637,23 @@ export async function generateCode({
     // Surface normalized provider usage. Input/cache counts use a disjoint
     // convention for both APIs, so cost and cache telemetry remain comparable.
     {
-      const u = streamResult.usage || { inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 };
+      const u = streamResult.usage || { inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0, reasoningTokens: 0 };
       console.log(
         `[code-gen] rid=${rid} lang=L${lang} provider=${providerUsed} model=${modelToUse} tier=${tierToUse} ` +
         `input=${u.inputTokens} output=${u.outputTokens} ` +
         `cache_create=${u.cacheCreationInputTokens || 0} cache_read=${u.cacheReadInputTokens || 0} ` +
         `latencyMs=${generationLatency}` +
+        // Where the output tokens actually went. `output` alone cannot separate
+        // three very different things: code we kept, prose the model wrapped
+        // around it (which carries the <DESCRIPTION>/<CHANGE_SUMMARY> tags we
+        // parse, so it is not free to remove), and reasoning tokens — which
+        // Anthropic folds into output_tokens without reporting, and which no
+        // output-format change can remove. rawChars is everything emitted;
+        // codeChars is what survived assembly. The gap is prose + discarded
+        // restarts; `reasoning` splits out the part only OpenAI reports.
+        ` reasoning=${u.reasoningTokens || 0}` +
+        (streamResult.rawChars !== undefined ? ` rawChars=${streamResult.rawChars}` : "") +
+        ` codeChars=${(streamResult.code || "").length}` +
         // Only present when the continuation loop cut the run short. Absent is
         // the normal case and stays absent so existing log parsing is unaffected.
         (streamResult.stopEarly ? ` stopEarly=${streamResult.stopEarly}` : "") +
