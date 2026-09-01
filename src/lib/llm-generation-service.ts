@@ -33,6 +33,14 @@ export interface StreamOptions {
    * CODEGEN_PROVIDER_TIMEOUT_MS.
    */
   timeoutMs?: number;
+  /**
+   * Wall-clock deadline (epoch ms) for the WHOLE generation, continuation loop
+   * included. Created once per request and threaded down, so the repair loop and
+   * provider failover can't each start a fresh budget.
+   */
+  deadlineAt?: number;
+  /** Cumulative output-token ceiling across every continuation chunk. */
+  maxOutputTokensTotal?: number;
 }
 
 export interface SystemBlock {
@@ -84,6 +92,14 @@ interface LongGenerationResult {
   usage: TokenUsage;
   chunks: number;
   failure?: ProviderFailure;
+  /**
+   * Why the continuation loop stopped short, if it did. Absent means the model
+   * finished on its own terms.
+   *
+   * Load-bearing for measurement: without it "we cut a runaway" and "we cut a
+   * good run" are the same event, and the caps below can't be tuned.
+   */
+  stopEarly?: "deadline" | "output_budget" | "restart" | "no_growth";
 }
 
 interface ClaudeStreamEvent {
@@ -140,6 +156,27 @@ function configuredNumber(name: string, fallback: number): number {
 
 function providerTimeoutMs(): number {
   return configuredNumber("CODEGEN_PROVIDER_TIMEOUT_MS", 180_000);
+}
+
+/**
+ * How long a live stream may go without delivering a byte before we abort it.
+ *
+ * This is NOT redundant with `providerTimeoutMs`. Both providers are called with
+ * streaming responses, and a stream timeout covers time-to-RESPONSE-HEADERS
+ * only: once the first SSE byte arrives, `for await (const chunk of ...)` has no
+ * deadline of any kind. A stream that opens and then goes silent hangs until
+ * something upstream gives up.
+ *
+ * That is not hypothetical — three production runs on 2026-08-23/28 ran ~1800s
+ * and returned ZERO output tokens, which no token-budget or chunk-count cap can
+ * explain or stop. Only aborting the read does.
+ *
+ * 30s: the widest observed healthy inter-chunk gap is far below this (streams
+ * deliver continuously at 60-140 tok/s once started), so this can only fire on a
+ * genuinely dead stream.
+ */
+function streamStallMs(): number {
+  return configuredNumber("CODEGEN_STREAM_STALL_MS", 30_000);
 }
 
 function circuitIsOpen(provider: LlmProvider): boolean {
@@ -209,7 +246,51 @@ function flattenSystemPrompt(systemPrompt?: SystemPrompt): string | undefined {
   return undefined;
 }
 
+/**
+ * First non-empty line of a block, normalized. Shared by the continuation loop
+ * and assembleProgram so "did this chunk restart" has exactly one definition.
+ */
+function firstCodeLine(value: string): string {
+  return (value.split("\n").find((line) => line.trim()) || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** One chunk re-opening the program the previous one began. */
+function isRestartLine(first: string, next: string): boolean {
+  return (
+    first.length >= 8 &&
+    next.length >= 8 &&
+    (first.startsWith(next) || next.startsWith(first))
+  );
+}
+
+/**
+ * Whether the accumulated content ends in Graffiticode's `..` terminator.
+ *
+ * Checks the LAST FENCED BLOCK, and falls back to the raw tail when fence
+ * parsing yields nothing usable. The subtlety: this runs over the CONCATENATION
+ * of every continuation chunk, and a model asked to "continue" routinely re-opens
+ * its own ``` fence. That opener then parses as the previous block's CLOSER,
+ * every later block mis-segments, and the final block is a fragment that cannot
+ * end in `..` no matter what the model wrote. `needsContinuation` would then loop
+ * to the cap on a program that finished — consistent with 89,486 output tokens
+ * for a program worth a few thousand.
+ *
+ * Checking the trimmed tail of the whole content as a fallback is immune to fence
+ * mis-segmentation: if the last thing the model emitted is `..`, it terminated.
+ */
 function programIsTerminated(content: string): boolean {
+  // Strip trailing whitespace and any closing fence, then ask whether the last
+  // thing the model actually wrote was the terminator. Immune to fence
+  // mis-segmentation, because it never needs to know where blocks begin.
+  const tail = content
+    .replace(/\s*```[\w]*\s*$/, "")
+    .trimEnd();
+  if (tail.endsWith("..")) return true;
+  // Original behavior, kept as the fallback for content that ends in prose after
+  // the program. Deliberately the LAST block only, not any block: `..` can occur
+  // inside a program's data, so an early match is not proof of termination.
   const blocks = extractCodeBlocks(content);
   const lastBlock = blocks.length ? blocks[blocks.length - 1] : content;
   return lastBlock.trimEnd().endsWith("..");
@@ -351,6 +432,18 @@ async function requestAnthropic({
   const usage = EMPTY_USAGE();
   let content = "";
   let stopReason: string | undefined;
+  // Aborts the stream read itself. `timeout` below cannot: with
+  // responseType:"stream" it bounds only the wait for headers. See streamStallMs().
+  const controller = new AbortController();
+  let stalled = false;
+  let watchdog: NodeJS.Timeout | undefined;
+  const armWatchdog = () => {
+    clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      stalled = true;
+      controller.abort();
+    }, streamStallMs());
+  };
   try {
     const response = await axios.post(
       "https://api.anthropic.com/v1/messages",
@@ -378,11 +471,14 @@ async function requestAnthropic({
         },
         responseType: "stream",
         timeout: options.timeoutMs || providerTimeoutMs(),
+        signal: controller.signal,
       },
     );
 
     const parser = new ClaudeStreamParser();
+    armWatchdog();
     for await (const chunk of response.data) {
+      armWatchdog();
       for (const event of parser.parseChunk(chunk.toString())) {
         if (event.type === "content" && event.content) {
           content += event.content;
@@ -418,6 +514,23 @@ async function requestAnthropic({
     }
     return { content, usage, stopReason };
   } catch (error: any) {
+    if (stalled) {
+      // Failoverable: the stream died, the request itself was well-formed, and
+      // the other provider deserves a turn. Content generated before the stall
+      // is returned rather than discarded.
+      return {
+        content,
+        usage,
+        failure: new ProviderFailure(
+          `Anthropic stream stalled: no data for ${streamStallMs()}ms`,
+          "anthropic",
+          true,
+          undefined,
+          "stream_stalled",
+          "stream_stalled",
+        ),
+      };
+    }
     const status = error.response?.status as number | undefined;
     const body = await readAxiosErrorBody(error.response?.data);
     const code =
@@ -442,6 +555,10 @@ async function requestAnthropic({
         "request_error",
       ),
     };
+  } finally {
+    // Every exit path, or a pending timer keeps the process awake and can abort
+    // a controller nobody is reading any more.
+    clearTimeout(watchdog);
   }
 }
 
@@ -492,6 +609,18 @@ async function requestOpenAI({
   let response: any;
   let refusal = "";
   let streamError: { message: string; code?: string } | undefined;
+  // Same reasoning as the Anthropic path: the SDK timeout does not bound the
+  // async iteration over a stream that has already started. See streamStallMs().
+  const controller = new AbortController();
+  let stalled = false;
+  let watchdog: NodeJS.Timeout | undefined;
+  const armWatchdog = () => {
+    clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      stalled = true;
+      controller.abort();
+    }, streamStallMs());
+  };
   try {
     // The installed SDK predates GPT-5.6 model ids and its expanded reasoning
     // effort union. The request shape is current Responses API, so keep this
@@ -518,12 +647,14 @@ async function requestOpenAI({
     // Per-request timeout override: the client is cached and carries the long
     // generation default, so a short-leash caller (the judge) passes its own here
     // rather than getting the 180s one.
-    const stream = await client.responses.create(
-      request,
-      options.timeoutMs ? { timeout: options.timeoutMs } : undefined,
-    );
+    const stream = await client.responses.create(request, {
+      signal: controller.signal,
+      ...(options.timeoutMs ? { timeout: options.timeoutMs } : {}),
+    });
 
+    armWatchdog();
     for await (const event of stream as any) {
+      armWatchdog();
       if (event.type === "response.output_text.delta") {
         const delta = event.delta || "";
         content += delta;
@@ -635,6 +766,20 @@ async function requestOpenAI({
           : "end_turn",
     };
   } catch (error: any) {
+    if (stalled) {
+      return {
+        content,
+        usage: EMPTY_USAGE(),
+        failure: new ProviderFailure(
+          `OpenAI stream stalled: no data for ${streamStallMs()}ms`,
+          "openai",
+          true,
+          undefined,
+          "stream_stalled",
+          "stream_stalled",
+        ),
+      };
+    }
     const status = error.status as number | undefined;
     const code = error.code || error.error?.code;
     const message = error.message || "OpenAI request failed";
@@ -650,6 +795,8 @@ async function requestOpenAI({
         "request_error",
       ),
     };
+  } finally {
+    clearTimeout(watchdog);
   }
 }
 
@@ -722,17 +869,43 @@ async function generateLongCode({
   const usage = EMPTY_USAGE();
   let fullContent = "";
   let chunks = 0;
+  let stopEarly: LongGenerationResult["stopEarly"];
+  // Budgets for the WHOLE loop. Each chunk was already bounded (16k tokens,
+  // 180s); nothing bounded their product, which is how a run reached 60,828
+  // tokens over 9.5 minutes with every individual chunk behaving normally.
+  const deadlineAt =
+    options.deadlineAt ??
+    Date.now() + configuredNumber("CODEGEN_GENERATION_BUDGET_MS", 240_000);
+  const maxOutputTokensTotal =
+    options.maxOutputTokensTotal ??
+    configuredNumber("CODEGEN_MAX_OUTPUT_TOKENS_TOTAL", 40_000);
+  let firstChunkLine = "";
+  let lowGrowthStreak = 0;
 
   if (prompt) {
     conversationHistory.push({ role: "user", content: prompt });
   }
 
   while (chunks < maxContinuations) {
+    if (Date.now() >= deadlineAt) {
+      stopEarly = "deadline";
+      break;
+    }
     const result = await requestProvider(provider, {
       model,
       systemPrompt,
       messages: conversationHistory,
-      options,
+      options: {
+        ...options,
+        // Never let the last chunk overrun the budget it is being measured against.
+        timeoutMs: Math.max(
+          1_000,
+          Math.min(
+            options.timeoutMs || providerTimeoutMs(),
+            deadlineAt - Date.now(),
+          ),
+        ),
+      },
       onChunk,
     });
     chunks += 1;
@@ -752,8 +925,42 @@ async function generateLongCode({
       };
     }
 
+    const grew = result.content.trim().length;
     fullContent += result.content;
     if (!needsContinuation(fullContent, result.stopReason)) break;
+
+    // --- Non-convergence guards -------------------------------------------
+    // A chunk that hits max_tokens AND makes no progress will not make progress
+    // on the next turn either; continuing just buys another 16k tokens of the
+    // same. These are the cheapest signals that distinguish "writing a big
+    // program" from "going in circles".
+    const line = firstCodeLine(result.content.replace(/^\s*```[\w]*\n?/, ""));
+    if (!firstChunkLine) {
+      firstChunkLine = line;
+    } else if (line && isRestartLine(firstChunkLine, line)) {
+      // The model started the program over instead of continuing it. Whatever it
+      // produces now replaces what came before, so the earlier chunks were pure
+      // cost. Every L0179 program opens with `sheets [`, so this is the common
+      // shape for the spreadsheet runaways.
+      stopEarly = "restart";
+      break;
+    }
+    if (grew < 200) {
+      if (++lowGrowthStreak >= 2) {
+        stopEarly = "no_growth";
+        break;
+      }
+    } else {
+      lowGrowthStreak = 0;
+    }
+    if (usage.outputTokens >= maxOutputTokensTotal) {
+      stopEarly = "output_budget";
+      break;
+    }
+    if (Date.now() >= deadlineAt) {
+      stopEarly = "deadline";
+      break;
+    }
 
     console.log(
       `[llm-generation] provider=${provider} continuing chunk ${chunks + 1}/${maxContinuations}`,
@@ -768,7 +975,12 @@ async function generateLongCode({
     });
   }
 
-  return { content: fullContent, usage, chunks };
+  if (stopEarly) {
+    console.log(
+      `[llm-generation] provider=${provider} stopped early reason=${stopEarly} chunks=${chunks} outputTokens=${usage.outputTokens}`,
+    );
+  }
+  return { content: fullContent, usage, chunks, stopEarly };
 }
 
 export function extractCodeBlocks(content: string): string[] {
@@ -786,14 +998,10 @@ export function extractCodeBlocks(content: string): string[] {
 
 function assembleProgram(content: string): string {
   const codeBlocks = extractCodeBlocks(content);
-  const firstLine = (value: string) =>
-    (value.split("\n").find((line) => line.trim()) || "")
-      .replace(/\s+/g, " ")
-      .trim();
-  const isRestart = (first: string, next: string) =>
-    first.length >= 8 &&
-    next.length >= 8 &&
-    (first.startsWith(next) || next.startsWith(first));
+  // Shared with the continuation loop's restart guard — one definition, so the
+  // loop cannot decide a chunk restarted while the assembler decides it didn't.
+  const firstLine = firstCodeLine;
+  const isRestart = isRestartLine;
   let finalCode = "";
   let firstBlockLine = "";
 
@@ -839,6 +1047,8 @@ export async function generateCodeWithContinuation({
   priority: LlmProvider[];
   attempts: GenerationAttempt[];
   fallbackReason?: string;
+  /** Set when the continuation loop cut the run short — see LongGenerationResult. */
+  stopEarly?: LongGenerationResult["stopEarly"];
   error?: string;
 }> {
   let systemPrompt: SystemPrompt;
@@ -946,6 +1156,9 @@ Do not include any explanatory text outside the code blocks unless specifically 
         code: assembleProgram(result.content),
         usage: result.usage,
         chunks: result.chunks,
+        // Why the loop stopped short, if it did. Carried up so the [code-gen]
+        // line can distinguish a bounded runaway from a clean finish.
+        stopEarly: result.stopEarly,
         provider,
         model,
         // The tier that actually ran, not the route-wide default: with per-family

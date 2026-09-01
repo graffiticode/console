@@ -1631,7 +1631,11 @@ export async function generateCode({
         `[code-gen] rid=${rid} lang=L${lang} provider=${providerUsed} model=${modelToUse} tier=${tierToUse} ` +
         `input=${u.inputTokens} output=${u.outputTokens} ` +
         `cache_create=${u.cacheCreationInputTokens || 0} cache_read=${u.cacheReadInputTokens || 0} ` +
-        `latencyMs=${generationLatency}`
+        `latencyMs=${generationLatency}` +
+        // Only present when the continuation loop cut the run short. Absent is
+        // the normal case and stays absent so existing log parsing is unaffected.
+        (streamResult.stopEarly ? ` stopEarly=${streamResult.stopEarly}` : "") +
+        (streamResult.chunks > 1 ? ` chunks=${streamResult.chunks}` : "")
       );
       if (requestId) {
         ragLog(requestId, "llm.usage", {
@@ -1646,6 +1650,8 @@ export async function generateCode({
           cacheReadInputTokens: u.cacheReadInputTokens || 0,
           latencyMs: generationLatency,
           fallbackReason: streamResult.fallbackReason || null,
+          stopEarly: streamResult.stopEarly || null,
+          chunks: streamResult.chunks,
           attempts: streamResult.attempts,
         });
       }

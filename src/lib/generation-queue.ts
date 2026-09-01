@@ -28,8 +28,14 @@ const CONSOLE_URL = process.env.CONSOLE_URL || "https://console.graffiticode.org
 // maxAttempts times CONCURRENTLY, each doing a full LLM run, and the attempt
 // that eventually answered had its response thrown away by the proxy. Observed
 // 2026-08-28: three dispatches per job, a uniform 125s apart. Going direct puts
-// the task's own dispatchDeadline (300s) and Cloud Run's request timeout (300s)
-// back in charge of when an attempt is considered failed.
+// the task's own dispatchDeadline and Cloud Run's request timeout back in charge
+// of when an attempt is considered failed. Both are 900s since e7b9dd0 — this
+// line said 300s until 2026-09-01, which is what led an analysis to conclude
+// generations were being killed at a 300s wall that no longer exists.
+//
+// The MCP server's own worker-died guard (GENERATION_STALE_MS in
+// graffiticode-mcp-server/src/tools.ts) MUST stay above this 900s ceiling, or it
+// reports a still-running generation to the agent as failed. Move the two together.
 const WORKER_URL = process.env.GENERATION_JOB_URL || `${CONSOLE_URL}/api/generate-job`;
 // Fire the worker directly (un-awaited fetch) instead of via Cloud Tasks. Set
 // for local dev, where the dev server stays running and there's no queue.
