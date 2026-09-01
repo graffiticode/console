@@ -197,9 +197,27 @@ export async function generateCodeForRequest({
     // it is turned on deliberately, and it can be tuned or reverted on a live
     // service without a rebuild.
     const codegenEffort = process.env.CODEGEN_EFFORT || undefined;
+    // ONE deadline for the whole request, created here and threaded down.
+    //
+    // generateLongCode bounds its continuation loop, but it defaults the budget
+    // when none is passed — so every caller that starts a fresh generation starts
+    // a fresh budget, and those callers MULTIPLY: the repair loop runs up to
+    // MAX_FIX_ATTEMPTS (5) generations, and each of those tries up to 2 providers.
+    // 5 x 2 fresh 240s budgets is 40 minutes of legal runtime, which is not a
+    // bound at all. Creating it once here is what makes the number mean something.
+    //
+    // 420s leaves headroom under the 900s Cloud Run / Cloud Tasks ceiling for
+    // parse, postTask and the item write that follow generation. It is the
+    // REQUEST budget; the per-generation budget inside the loop stays smaller.
+    const requestDeadlineAt =
+      Date.now() +
+      (Number(process.env.CODEGEN_REQUEST_BUDGET_MS) > 0
+        ? Number(process.env.CODEGEN_REQUEST_BUDGET_MS)
+        : 420_000);
     const codegenOptions = {
       temperature: options?.temperature,
       maxTokens: options?.maxTokens,
+      deadlineAt: requestDeadlineAt,
       ...(codegenEffort ? { effort: codegenEffort } : {}),
     };
     const mapUsageLimit = (errs: any[]) => errs.map(err => ({

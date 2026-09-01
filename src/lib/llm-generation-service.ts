@@ -873,9 +873,16 @@ async function generateLongCode({
   // Budgets for the WHOLE loop. Each chunk was already bounded (16k tokens,
   // 180s); nothing bounded their product, which is how a run reached 60,828
   // tokens over 9.5 minutes with every individual chunk behaving normally.
-  const deadlineAt =
-    options.deadlineAt ??
+  // The EARLIER of this generation's own budget and the request-wide deadline.
+  // Not `??`: the request deadline (420s) is longer than the per-generation one
+  // (240s), so preferring it would quietly widen the bound this loop exists to
+  // enforce. One generation never gets the whole request's budget, and no
+  // generation outlives the request either.
+  const generationDeadline =
     Date.now() + configuredNumber("CODEGEN_GENERATION_BUDGET_MS", 240_000);
+  const deadlineAt = options.deadlineAt
+    ? Math.min(options.deadlineAt, generationDeadline)
+    : generationDeadline;
   const maxOutputTokensTotal =
     options.maxOutputTokensTotal ??
     configuredNumber("CODEGEN_MAX_OUTPUT_TOKENS_TOTAL", 40_000);

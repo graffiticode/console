@@ -1185,7 +1185,14 @@ interface GenerateCodeOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
-  maxContinuations?: number;  // Max number of continuation chunks (default: 5)
+  maxContinuations?: number;  // Max number of continuation chunks (default: 10)
+  /**
+   * Wall-clock deadline (epoch ms) for the WHOLE request, created once by the
+   * caller (see generate-for-request.ts) and threaded through every generation
+   * this request makes. Bounds the repair loop, which would otherwise multiply
+   * any per-generation limit by MAX_FIX_ATTEMPTS.
+   */
+  deadlineAt?: number;
   // Optional thinking/effort passthrough. Off by default (API model defaults
   // apply). Set both identically across models for a MATCHED comparison — e.g.
   // Sonnet 5 runs adaptive thinking by default while Opus 4.8 does not, so a
@@ -1600,6 +1607,10 @@ export async function generateCode({
         temperature: options.temperature ?? 0.2,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         maxContinuations: options.maxContinuations || 10,  // Conservative default
+        // The request-wide deadline. These options are built field-by-field, so
+        // anything not named here is silently dropped — omitting this made the
+        // budget inert without any type error to say so.
+        ...(options.deadlineAt ? { deadlineAt: options.deadlineAt } : {}),
         // Passthrough (undefined ⇒ omitted ⇒ API model default). Set to match models.
         ...(options.thinking !== undefined ? { thinking: options.thinking } : {}),
         ...(options.effort !== undefined ? { effort: options.effort } : {}),
@@ -1772,8 +1783,20 @@ export async function generateCode({
     if (accessToken) {
       safeRAGAnalytics.startStage(requestId, "compilation");
 
-      // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times
+      // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times, or until
+      // the request's wall-clock budget is spent — whichever comes first.
+      //
+      // The attempt COUNT was never the real bound: each repair attempt starts a
+      // full generation, so five attempts against a slow language could outlast
+      // any per-generation limit. Checking the shared deadline here is what keeps
+      // MAX_FIX_ATTEMPTS from multiplying it.
       while (fixAttempts < MAX_FIX_ATTEMPTS && estimatedUnits <= MAX_UNITS_FOR_FIXES) {
+        if (options?.deadlineAt && Date.now() >= options.deadlineAt) {
+          console.log(
+            `[code-gen] rid=${rid} repair loop stopped: request budget spent after ${fixAttempts} attempt(s)`,
+          );
+          break;
+        }
         verificationResult = await verifyCode(generatedCode, accessToken, lang, requestId, isFreePlan);
 
         // If compilation was successful, break the loop. (Success = no real
@@ -1915,6 +1938,9 @@ export async function generateCode({
               temperature: 0.1, // Lower temperature for more deterministic fixes
               maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
               maxContinuations: 10,
+              // Same request deadline as the initial generation, deliberately not
+              // a fresh one: a repair is part of the request that spawned it.
+              ...(options.deadlineAt ? { deadlineAt: options.deadlineAt } : {}),
               ...(options.effort !== undefined
                 ? { effort: options.effort }
                 : {}),
