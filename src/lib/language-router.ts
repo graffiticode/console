@@ -88,7 +88,7 @@ interface RoutingResult {
 // description otherwise. The richer block helps Haiku make a better routing
 // suggestion than a single one-liner can.
 async function buildLanguageCatalog(opts?: { excludeLang?: string }) {
-  const languages = await listLanguages({});
+  const languages = await listLanguages({ enrich: true });
   // Exclude internal dialects (e.g. the L0010 planner itself) so the planner
   // never proposes itself as a composition stage; also honor excludeLang.
   //
@@ -295,7 +295,7 @@ export async function classifyAndRoute({
       console.warn("[routing] ANTHROPIC_API_KEY not set; fail-open (in-scope)");
       return FAIL_OPEN;
     }
-    const all = await listLanguages({});
+    const all = await listLanguages({ enrich: true });
     const current = all.find((l) => l.id === currentLang);
     const { candidates, catalog } = await buildLanguageCatalog({ excludeLang: currentLang });
     const curScope = [
@@ -427,7 +427,7 @@ export async function splitRequest({
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return null;
 
-    const all = await listLanguages({});
+    const all = await listLanguages({ enrich: true });
     const roster = sequence
       .map((id, i) => {
         const l = all.find((x) => x.id === id);

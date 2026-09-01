@@ -23,10 +23,18 @@ export interface Language {
   // away from the person still building it. findLanguageById also keeps answering,
   // so existing items render and `language(id)` still resolves.
   hidden?: boolean;
-  // Populated at runtime by listLanguages() from each lang server's
-  // scope.json. The static `description` and `routingHint` above remain as
-  // cold-start / unreachable-server fallbacks; once scope.json is universal
-  // they'll be trimmed.
+  // Populated from each lang server's scope.json, but ONLY when a caller asks for
+  // it with `listLanguages({ enrich: true })` — the catalog listing does not.
+  //
+  // This reverses an earlier intent recorded here, that scope.json would become
+  // universal and the static `description`/`routingHint` would then be trimmed.
+  // Listing and detail are deliberately different surfaces now: listing answers
+  // "what exists" from static metadata and must be fast enough to route against,
+  // while scope.json stays authoritative for single-language detail via
+  // getLanguageInfo(). Making the listing depend on ~19 other services to answer
+  // is what took it to 57-75s. If this text should ever be authoritative for
+  // listing too, publish it INTO the catalog at language-deploy time rather than
+  // fetching it on every read.
   summary?: string;
   inScope?: string[];
   outOfScope?: string[];
@@ -167,7 +175,7 @@ export const LANGUAGES: Language[] = [
   // evidence items ARE in scope. Text entry, ordering, matching, classification, hotspot and
   // sliders are NOT built. The routingHint says so, because a model that routes an ordering
   // item here gets a compile error rather than an approximation.
-  { id: "0180", name: "L0180", description: "Quizzes and assessment items", routingHint: "The general-purpose assessment language: use it for quizzes, tests, practice questions, comprehension checks and self-checks whenever no particular vendor or platform is named. Authors a single assessment item that renders and scores in a browser with no assessment platform behind it — multiple choice, multi-select (\"select all that apply\") and true/false, with per-option points, weighted answers, partial credit, penalized distractors, shuffled options, and unscored polls. Compiles the presentation and the answer key as separate halves, so a graded delivery can withhold the key and score server-side. Also authors multi-part items over a reading passage — a stimulus with numbered paragraphs and several questions scored together, either summed or conjunctively (every part right or the item earns nothing), which is the EBSR two-part evidence shape. Multi-select can score per-option for partial credit or as an exact set, where every correct option and nothing else earns the point. Also authors hot text, where the candidate clicks inside the passage itself rather than picking from a list — a sentence that supports an inference, any three of several that fit, or a single word in a vocabulary item, with the passage rendered once and its sentences clickable. EARLY: choice and hot text ONLY. Text entry / fill-in-the-blank, ordering, matching, classification, hotspot and sliders are not built yet, and neither is a cloze passage with blanks inside running text — do not route those here; say no dialect covers them yet rather than substituting a choice item. If the user names Learnosity, that is L0176, not this.", domains: ["assessments"], status: "Beta" },
+  { id: "0180", name: "L0180", description: "Quizzes and assessment items", routingHint: "The general-purpose assessment language: use it for a quiz, quizzes, tests, exams, practice questions, comprehension checks and self-checks whenever no particular vendor or platform is named. Authors a single assessment item that renders and scores in a browser with no assessment platform behind it — multiple choice, multi-select (\"select all that apply\") and true/false, with per-option points, weighted answers, partial credit, penalized distractors, shuffled options, and unscored polls. Compiles the presentation and the answer key as separate halves, so a graded delivery can withhold the key and score server-side. Also authors multi-part items over a reading passage — a stimulus with numbered paragraphs and several questions scored together, either summed or conjunctively (every part right or the item earns nothing), which is the EBSR two-part evidence shape. Multi-select can score per-option for partial credit or as an exact set, where every correct option and nothing else earns the point. Also authors hot text, where the candidate clicks inside the passage itself rather than picking from a list — a sentence that supports an inference, any three of several that fit, or a single word in a vocabulary item, with the passage rendered once and its sentences clickable. EARLY: choice and hot text ONLY. Text entry / fill-in-the-blank, ordering, matching, classification, hotspot and sliders are not built yet, and neither is a cloze passage with blanks inside running text — do not route those here; say no dialect covers them yet rather than substituting a choice item. If the user names Learnosity, that is L0176, not this.", domains: ["assessments"], status: "Beta" },
 ];
 
 export function findLanguageById(id: string): Language | undefined {
@@ -181,7 +189,34 @@ export function selectLanguages(domain?: string): Language[] {
   return LANGUAGES.filter(lang => lang.domains.includes(d));
 }
 
-export async function listLanguages({ search, domain }: { search?: string; domain?: string }): Promise<Language[]> {
+/**
+ * The catalog listing.
+ *
+ * `enrich` fans out to every candidate language server for scope.json and
+ * language-info.json. It is OFF by default, and the default is the whole point:
+ * that fan-out is three HTTP fetches per language — ~57 across the catalog —
+ * so a listing's latency is the latency of the SLOWEST language server, and a
+ * cold one cost 57-75s in production. (These go through fetchText/assetUrlFor,
+ * which unlike getLanguageAsset adds no cache-buster, so some are CDN hits; the
+ * request count is the problem, not a guaranteed origin round-trip each time.)
+ *
+ * Three facts make the unenriched default correct rather than merely cheaper:
+ *   - The GraphQL `Language` type exposes only id/name/description/routingHint/
+ *     domains, so every external caller (the MCP server included) has ALWAYS had
+ *     the enriched fields dropped from its response. The work was already invisible.
+ *   - The search block below runs AFTER enrichment, so even a one-result search
+ *     paid the full fan-out.
+ *   - listLanguages reads only `envelope.description` from the doc fetch, while
+ *     getLanguageServerDoc also pulls the whole usage-guide.md (3-18KB each) —
+ *     fetched and discarded on every listing.
+ *
+ * Pass `enrich: true` only where the richer scope text actually changes a decision
+ * and the latency is affordable: language-router.ts builds the planner prompt from
+ * it, on the create path, which already runs 60-110s. Single-language detail does
+ * NOT come through here at all — getLanguageInfo() in pages/api/languages.ts does
+ * its own fetch for one language, which is where remote docs belong.
+ */
+export async function listLanguages({ search, domain, enrich = false }: { search?: string; domain?: string; enrich?: boolean }): Promise<Language[]> {
   // `hidden` is applied here rather than in selectLanguages() so the console's own
   // picker keeps showing these while the catalog stops offering them. See the field.
   let results = selectLanguages(domain).filter(lang => !lang.hidden);
@@ -190,7 +225,7 @@ export async function listLanguages({ search, domain }: { search?: string; domai
   //   - scope.json → summary / inScope / outOfScope (routing-only descriptor)
   //   - language-info.json → longDescription
   // Both fetchers cache with a TTL; repeated calls are in-memory.
-  results = await Promise.all(
+  if (enrich) results = await Promise.all(
     results.map(async (lang) => {
       const [scope, doc] = await Promise.all([
         getLanguageScope(lang.id),
