@@ -174,9 +174,33 @@ function providerTimeoutMs(): number {
  * 30s: the widest observed healthy inter-chunk gap is far below this (streams
  * deliver continuously at 60-140 tok/s once started), so this can only fire on a
  * genuinely dead stream.
+ *
+ * "ONCE STARTED" is doing all the work in that sentence, and applying the same
+ * number BEFORE the first byte was a bug. Extended thinking emits no stream data
+ * while it thinks, and claude-sonnet-5 thinks by default — so on a long prescriptive
+ * prompt the first token can be well over 30s away and the watchdog aborted a
+ * perfectly healthy generation. Measured 2026-09-01 on a 2751-char case: 0/2 runs at
+ * 30s (both `outputTokens: 0`), 2/2 first-pass at 120s, nothing else changed.
  */
 function streamStallMs(): number {
   return configuredNumber("CODEGEN_STREAM_STALL_MS", 30_000);
+}
+
+/**
+ * How long to wait for the FIRST byte, which is a different question.
+ *
+ * This window covers queueing, prompt ingestion and the whole thinking phase, none
+ * of which produce stream data. It has to be generous enough for the slowest
+ * legitimate request — the ones an agent actually sends, where a short user ask has
+ * been expanded into a 2-3KB layout spec — while still bounding the ~1800s
+ * zero-token hangs that motivated the watchdog in the first place.
+ *
+ * Separate from the inter-chunk threshold on purpose: keeping the tight 30s for a
+ * stream that has already started is what still catches a genuinely dead stream
+ * mid-answer, which a single blunt timeout large enough for thinking would not.
+ */
+function firstTokenMs(): number {
+  return configuredNumber("CODEGEN_FIRST_TOKEN_MS", 180_000);
 }
 
 function circuitIsOpen(provider: LlmProvider): boolean {
@@ -437,12 +461,20 @@ async function requestAnthropic({
   const controller = new AbortController();
   let stalled = false;
   let watchdog: NodeJS.Timeout | undefined;
+  // Two thresholds, not one: the generous window applies until the first CONTENT
+  // token, the tight one between content chunks thereafter. Keyed on content and
+  // not on raw stream activity — the SSE stream sends message_start and
+  // thinking-block events immediately, so "some bytes arrived" goes true long
+  // before the model has written anything and put the tight threshold back in
+  // front of the thinking phase. Measured: keying on raw chunks still failed 0/2
+  // with "between chunks". See firstTokenMs().
+  let sawData = false;
   const armWatchdog = () => {
     clearTimeout(watchdog);
     watchdog = setTimeout(() => {
       stalled = true;
       controller.abort();
-    }, streamStallMs());
+    }, sawData ? streamStallMs() : firstTokenMs());
   };
   try {
     const response = await axios.post(
@@ -481,6 +513,7 @@ async function requestAnthropic({
       armWatchdog();
       for (const event of parser.parseChunk(chunk.toString())) {
         if (event.type === "content" && event.content) {
+          sawData = true;
           content += event.content;
           onChunk?.(event.content);
         } else if (event.type === "usage" && event.usage) {
@@ -522,7 +555,7 @@ async function requestAnthropic({
         content,
         usage,
         failure: new ProviderFailure(
-          `Anthropic stream stalled: no data for ${streamStallMs()}ms`,
+          `Anthropic stream stalled: no data for ${sawData ? streamStallMs() : firstTokenMs()}ms ${sawData ? "between chunks" : "before the first byte"}`,
           "anthropic",
           true,
           undefined,
@@ -614,12 +647,20 @@ async function requestOpenAI({
   const controller = new AbortController();
   let stalled = false;
   let watchdog: NodeJS.Timeout | undefined;
+  // Two thresholds, not one: the generous window applies until the first CONTENT
+  // token, the tight one between content chunks thereafter. Keyed on content and
+  // not on raw stream activity — the SSE stream sends message_start and
+  // thinking-block events immediately, so "some bytes arrived" goes true long
+  // before the model has written anything and put the tight threshold back in
+  // front of the thinking phase. Measured: keying on raw chunks still failed 0/2
+  // with "between chunks". See firstTokenMs().
+  let sawData = false;
   const armWatchdog = () => {
     clearTimeout(watchdog);
     watchdog = setTimeout(() => {
       stalled = true;
       controller.abort();
-    }, streamStallMs());
+    }, sawData ? streamStallMs() : firstTokenMs());
   };
   try {
     // The installed SDK predates GPT-5.6 model ids and its expanded reasoning
@@ -657,6 +698,7 @@ async function requestOpenAI({
       armWatchdog();
       if (event.type === "response.output_text.delta") {
         const delta = event.delta || "";
+        sawData = true;
         content += delta;
         onChunk?.(delta);
       } else if (event.type === "response.refusal.delta") {
@@ -771,7 +813,7 @@ async function requestOpenAI({
         content,
         usage: EMPTY_USAGE(),
         failure: new ProviderFailure(
-          `OpenAI stream stalled: no data for ${streamStallMs()}ms`,
+          `OpenAI stream stalled: no data for ${sawData ? streamStallMs() : firstTokenMs()}ms ${sawData ? "between chunks" : "before the first byte"}`,
           "openai",
           true,
           undefined,
