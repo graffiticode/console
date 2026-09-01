@@ -159,12 +159,14 @@ export const LANGUAGES: Language[] = [
   // Deliberately NOT gatedBy anything: being reachable from a generic quiz request is the
   // whole point, and it is where L0176's `when_to_use` has always been steering generic asks.
   //
-  // COVERAGE IS ONE INTERACTION. Choice only — single-select, multi-select and true/false,
-  // with per-option points, weighted answers and penalized distractors. Text entry, ordering,
-  // matching, classification, hot text, hotspot and sliders are NOT built, and neither are
-  // multi-part items. The routingHint says so, because a model that routes an ordering item
-  // here gets a compile error rather than an approximation.
-  { id: "0180", name: "L0180", description: "Quizzes and assessment items", routingHint: "The general-purpose assessment language: use it for quizzes, tests, practice questions, comprehension checks and self-checks whenever no particular vendor or platform is named. Authors a single assessment item that renders and scores in a browser with no assessment platform behind it — multiple choice, multi-select (\"select all that apply\") and true/false, with per-option points, weighted answers, partial credit, penalized distractors, shuffled options, and unscored polls. Compiles the presentation and the answer key as separate halves, so a graded delivery can withhold the key and score server-side. EARLY: choice interactions ONLY. Text entry / fill-in-the-blank, ordering, matching, classification, hot text, hotspot and sliders are not built yet, and neither are multi-part items such as cloze passages with several blanks — do not route those here; say no dialect covers them yet rather than substituting a choice item. If the user names Learnosity, that is L0176, not this.", domains: ["assessments"], status: "Beta" },
+  // COVERAGE IS ONE INTERACTION, plus a wrapper. Choice only — single-select, multi-select and
+  // true/false, with per-option points, weighted answers, penalized distractors, exact-set
+  // ("all or nothing") scoring, and a rationale per wrong answer. The `item` wrapper adds a
+  // reading passage and several parts scored together, so EBSR-style two-part evidence items
+  // ARE in scope. Text entry, ordering, matching, classification, hot text, hotspot and sliders
+  // are NOT built. The routingHint says so, because a model that routes an ordering item here
+  // gets a compile error rather than an approximation.
+  { id: "0180", name: "L0180", description: "Quizzes and assessment items", routingHint: "The general-purpose assessment language: use it for quizzes, tests, practice questions, comprehension checks and self-checks whenever no particular vendor or platform is named. Authors a single assessment item that renders and scores in a browser with no assessment platform behind it — multiple choice, multi-select (\"select all that apply\") and true/false, with per-option points, weighted answers, partial credit, penalized distractors, shuffled options, and unscored polls. Compiles the presentation and the answer key as separate halves, so a graded delivery can withhold the key and score server-side. Also authors multi-part items over a reading passage — a stimulus with numbered paragraphs and several questions scored together, either summed or conjunctively (every part right or the item earns nothing), which is the EBSR two-part evidence shape. Multi-select can score per-option for partial credit or as an exact set, where every correct option and nothing else earns the point. EARLY: choice interactions ONLY. Text entry / fill-in-the-blank, ordering, matching, classification, hot text (clicking a word or sentence inside the passage), hotspot and sliders are not built yet, and neither is a cloze passage with blanks inside running text — do not route those here; say no dialect covers them yet rather than substituting a choice item. If the user names Learnosity, that is L0176, not this.", domains: ["assessments"], status: "Beta" },
 ];
 
 export function findLanguageById(id: string): Language | undefined {
