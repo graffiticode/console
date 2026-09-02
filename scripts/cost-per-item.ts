@@ -95,6 +95,17 @@ Average AI cost to produce one item, for a period.
                             repeatable, so --lang 0158 --lang 0176 pools a family.
                             Both the cost and the item count are narrowed to it,
                             so cost per item stays a like-for-like ratio.
+  --min-items <n>           Drop any language with fewer than n items created in
+                            the window (default: 10; 0 disables). A language with
+                            a handful of items has an average one item wide, and
+                            it moves the blended figure out of all proportion to
+                            the traffic it represents. Dropped from BOTH sides,
+                            and the run always lists what it dropped.
+  --exclude-lang <id>       The inverse: drop a language from BOTH sides, to ask
+                            what the blended figure looks like without an
+                            outlier dialect. Repeatable. Unlike --lang this
+                            keeps the blended figure, since the remainder is
+                            still a whole population divided by its own cost.
   --as-of YYYY-MM-DD        Price the SAME tokens on the SAME models at this
                             date's rate card (default: today). Rates move on
                             their own — intro pricing expires, list prices fall —
@@ -121,6 +132,8 @@ interface Opts {
   excludeTrial: boolean;
   perItem: boolean;
   langs: string[];
+  excludeLangs: string[];
+  minItems: number;
   output?: string;
   json: boolean;
   /**
@@ -139,6 +152,19 @@ function normalizeLang(raw: string): string {
   return /^\d+$/.test(digits) ? digits.padStart(4, '0') : digits;
 }
 
+/**
+ * The single language filter, applied identically to generations and to items —
+ * cost per item is only meaningful when both sides cover the same population,
+ * so an include or exclude that reached only one of them would reintroduce the
+ * mismatch documented at the top of this file.
+ */
+function langKept(raw: unknown, langs: string[], excludeLangs: string[]): boolean {
+  const lang = normalizeLang(String(raw ?? ''));
+  if (langs.length > 0 && !langs.includes(lang)) return false;
+  if (excludeLangs.includes(lang)) return false;
+  return true;
+}
+
 function parseArgs(argv: string[]): Opts {
   const args = argv.slice(2);
   const opts: Opts = {
@@ -146,6 +172,8 @@ function parseArgs(argv: string[]): Opts {
     excludeTrial: false,
     perItem: false,
     langs: [],
+    excludeLangs: [],
+    minItems: 10,
     json: false,
     asOf: new Date(),
     byLang: false,
@@ -162,6 +190,16 @@ function parseArgs(argv: string[]): Opts {
     else if (a === '--exclude-trial') { opts.excludeTrial = true; }
     else if (a === '--per-item') { opts.perItem = true; }
     else if (a === '--lang' && args[i + 1]) { opts.langs.push(normalizeLang(args[++i])); }
+    else if (a === '--exclude-lang' && args[i + 1]) { opts.excludeLangs.push(normalizeLang(args[++i])); }
+    else if (a === '--min-items' && args[i + 1]) {
+      const raw = args[++i];
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0) {
+        console.error(`Error: --min-items must be a non-negative integer (got "${raw}")`);
+        process.exit(1);
+      }
+      opts.minItems = n;
+    }
     else if (a === '--output' && args[i + 1]) { opts.output = args[++i]; }
     else if (a === '--json') { opts.json = true; }
     else if (a === '--by-lang') { opts.byLang = true; opts.perItem = true; }
@@ -194,9 +232,20 @@ function parseArgs(argv: string[]): Opts {
     console.error('Error: --period must be "day", "week", or "month"');
     process.exit(1);
   }
+  const contradictory = opts.excludeLangs.filter(l => opts.langs.includes(l));
+  if (contradictory.length > 0) {
+    console.error(`Error: ${contradictory.join(', ')} passed to both --lang and --exclude-lang (empty result)`);
+    process.exit(1);
+  }
   // Provider spend can't be split by language, so a language scope is only
-  // answerable from the attributed records.
-  if (opts.langs.length > 0) opts.perItem = true;
+  // answerable from the attributed records. An EXCLUSION needs no such promotion:
+  // it leaves a whole population behind, which the aggregate path counts fine.
+  if (opts.langs.length > 0) {
+    opts.perItem = true;
+    // An explicit --lang IS the scope the caller asked for. Thresholding it away
+    // would answer with an empty report instead of the small language they named.
+    opts.minItems = 0;
+  }
   return opts;
 }
 
@@ -236,6 +285,14 @@ function toMillis(v: any): number {
   return 0;
 }
 
+interface ItemCounts {
+  /** Items created in the window, per normalized language id ('' = unrecorded). */
+  byLang: Record<string, number>;
+  /** day -> lang -> count, so the daily series can be folded after exclusions. */
+  byDayLang: Record<string, Record<string, number>>;
+  unmarked: number;
+}
+
 /**
  * Items created in the window.
  *
@@ -247,18 +304,21 @@ function toMillis(v: any): number {
  */
 async function countItems(
   start: Date, end: Date, langs: string[] = [], env: 'prod' | 'local' | 'all' = 'all',
-): Promise<{ total: number; byDay: Record<string, number>; unmarked: number }> {
+): Promise<ItemCounts> {
   const snap = await db.collection('usage')
     .where('type', '==', 'item_created')
     .select('createdAt', 'lang', 'env')
     .get();
 
-  let total = 0;
   let unmarked = 0;
-  const byDay: Record<string, number> = {};
+  const byLang: Record<string, number> = {};
+  const byDayLang: Record<string, Record<string, number>> = {};
   for (const doc of snap.docs) {
     const d = doc.data();
-    if (langs.length > 0 && !langs.includes(normalizeLang(String(d.lang ?? '')))) continue;
+    // Only the INCLUDE filter runs here. Exclusions are applied by the caller,
+    // because the thin-language threshold is derived from these very counts and
+    // so cannot be known during the scan.
+    if (!langKept(d.lang, langs, [])) continue;
     const ms = toMillis(d.createdAt);
     if (ms < start.getTime() || ms >= end.getTime()) continue;
     // Same convention as the generation side: no `env` means the record predates
@@ -273,11 +333,34 @@ async function countItems(
     const recordEnv: string | null = d.env ?? null;
     if (recordEnv === null) unmarked++;
     if (env !== 'all' && (env === 'prod' ? recordEnv === 'local' : recordEnv !== 'local')) continue;
-    total++;
+    const lang = normalizeLang(String(d.lang ?? ''));
+    byLang[lang] = (byLang[lang] || 0) + 1;
     const day = new Date(ms).toISOString().split('T')[0];
-    byDay[day] = (byDay[day] || 0) + 1;
+    (byDayLang[day] ??= {})[lang] = (byDayLang[day]?.[lang] || 0) + 1;
   }
-  return { total, byDay, unmarked };
+  return { byLang, byDayLang, unmarked };
+}
+
+/**
+ * Collapse the per-language item tallies once the excluded set is known.
+ * Exclusion has to happen here rather than in the scan so that the threshold
+ * can be computed from the unfiltered counts.
+ */
+function foldItemCounts(
+  counts: ItemCounts, excluded: Set<string>,
+): { total: number; byDay: Record<string, number>; unmarked: number } {
+  let total = 0;
+  const byDay: Record<string, number> = {};
+  for (const [lang, n] of Object.entries(counts.byLang)) {
+    if (excluded.has(lang)) continue;
+    total += n;
+  }
+  for (const [day, langs] of Object.entries(counts.byDayLang)) {
+    let n = 0;
+    for (const [lang, c] of Object.entries(langs)) if (!excluded.has(lang)) n += c;
+    if (n > 0) byDay[day] = n;
+  }
+  return { total, byDay, unmarked: counts.unmarked };
 }
 
 /**
@@ -403,6 +486,7 @@ interface PerItem {
  */
 async function fetchPerItem(
   start: Date, end: Date, asOf: Date, langs: string[] = [], env: 'prod' | 'local' | 'all' = 'all',
+  excludeLangs: string[] = [],
 ): Promise<PerItem> {
   const snap = await db.collection('usage')
     .where('type', '==', 'ai_generation')
@@ -414,7 +498,7 @@ async function fetchPerItem(
   let envDropped = 0;
   for (const doc of snap.docs) {
     const d = doc.data();
-    if (langs.length > 0 && !langs.includes(normalizeLang(String(d.lang ?? '')))) continue;
+    if (!langKept(d.lang, langs, excludeLangs)) continue;
     const ms = toMillis(d.createdAt);
     if (ms < start.getTime() || ms >= end.getTime()) continue;
     // No `env` means the record predates the marker. Counting those under prod
@@ -560,6 +644,9 @@ interface HtmlInput {
   totalCost: number;
   rows: DayRow[];
   langRows: LangCost[];
+  droppedLangs: { lang: string; items: number }[];
+  thinLangRows: LangCost[];
+  minItems: number;
   warnings: string[];
   /** The two sides could not be scoped to the same env — no blended figure. */
   blendedBlocked: boolean;
@@ -697,6 +784,16 @@ ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</di
   <tr><th>Language</th><th class="num">Items</th><th class="num">Cost / item</th><th class="num">Tokens / item</th></tr>
   ${langRows || '<tr><td colspan="4" class="dim">No attributed items in this window.</td></tr>'}
 </table></div>
+${d.droppedLangs.length === 0 ? '' : `<div class="sub" style="margin-top:10px">
+  Excluded from this whole report (fewer than ${d.minItems} items created in the window, so the
+  average would be a few items wide): ${esc(d.droppedLangs.map(t => `${t.lang} (${t.items})`).join(', '))}.
+  Their cost and their items are both dropped, so every figure above is a whole population over its own spend.
+</div>`}
+${d.thinLangRows.length === 0 ? '' : `<div class="sub" style="margin-top:6px">
+  Rows hidden — cleared the ${d.minItems}-item bar on items created, but fewer than ${d.minItems} of their items
+  have a generation record joined to them, so the average would still be a few items wide:
+  ${esc(d.thinLangRows.map(r => `${r.lang || '(unrecorded)'} (${r.items})`).join(', '))}. Hiding a row changes no total above.
+</div>`}
 
 <h2>By model</h2>
 <div class="scroll"><table>
@@ -739,11 +836,11 @@ async function main() {
 
   // One scan over our own ai_generation records supplies everything: the window
   // total, the per-model and per-provider split, and the per-item attribution.
-  console.error('Reading token usage...');
-  const perItem = await fetchPerItem(start, end, opts.asOf, opts.langs, opts.env);
-
+  // Items are counted FIRST, because the thin-language threshold is derived from
+  // the per-language item counts and then applied to the generation side. Doing
+  // it the other way round would price languages the denominator has dropped.
   console.error('Counting items...');
-  const [items, trial] = await Promise.all([
+  const [itemCounts, trial] = await Promise.all([
     countItems(start, end, opts.langs, opts.env),
     // The trial counter is a per-day tally with no language dimension, so it
     // can't be narrowed. Zeroed under --lang rather than reported as a subset
@@ -752,6 +849,24 @@ async function main() {
       ? Promise.resolve({ total: 0, byDay: {} as Record<string, number> })
       : countTrialItems(start, end),
   ]);
+
+  // A language with only a handful of items in the window has an average that is
+  // one item wide: L0166's two items read $0.99 each and pulled the blended
+  // figure up by 60%. Those languages are dropped from BOTH sides — cost and
+  // item count — so what remains is still a whole population over its own spend.
+  // The unrecorded bucket ('') is never thresholded: it is not a language, and
+  // dropping it would silently shrink the denominator by real items.
+  const thinLangs = Object.entries(itemCounts.byLang)
+    .filter(([lang, n]) => lang !== '' && n < opts.minItems)
+    .map(([lang, n]) => ({ lang, items: n }))
+    .sort((a, b) => a.lang.localeCompare(b.lang));
+  const excluded = new Set([...opts.excludeLangs, ...thinLangs.map(t => t.lang)]);
+
+  const items = foldItemCounts(itemCounts, excluded);
+
+  console.error('Reading token usage...');
+  const perItem = await fetchPerItem(start, end, opts.asOf, opts.langs, opts.env, [...excluded]);
+
   const totalItems = items.total;
   const trialItems = trial.total;
 
@@ -762,7 +877,17 @@ async function main() {
   const totalCost = perItem.attributedCost + perItem.unattributedCost;
   const paidItems = Math.max(0, totalItems - trialItems);
   const denominator = opts.excludeTrial ? paidItems : totalItems;
-  const langRows = costByLang(perItem.byItem);
+  // Two different populations carry the same threshold. The report-wide drop
+  // above is measured on items CREATED (the denominator). The by-language table
+  // is measured on items ATTRIBUTED — only ~half of created items have a
+  // generation record joined to them — so a language can clear the first bar and
+  // still show a one-item average here. Both are the thin-average problem, so
+  // both are held to `minItems`; hiding a table row changes no total.
+  const allLangRows = costByLang(perItem.byItem);
+  const langRows = opts.minItems > 0
+    ? allLangRows.filter(r => r.items >= opts.minItems)
+    : allLangRows;
+  const thinLangRows = allLangRows.filter(r => !langRows.includes(r));
 
   // The one way this can read plausibly but be wrong: records that predate the
   // token-usage refactor carry no tokens, so they price at nothing. Excluding
@@ -775,6 +900,19 @@ async function main() {
   // numerator, their 873 items kept in the denominator. When that asymmetry is
   // present the blended figure is withheld rather than printed with a caveat —
   // a wrong number with a footnote still gets quoted.
+  // The free-plan trial tally is a per-day counter with no language dimension,
+  // so it cannot follow an exclusion the way both other sides do. The blended
+  // figure is unaffected (it divides by `totalItems`), but the paid/trial SPLIT
+  // — and therefore --exclude-trial — would over-count trial items if any of
+  // them were in the dropped language.
+  if (excluded.size > 0 && trialItems > 0) {
+    warnings.push(
+      `Trial items (${num(trialItems)}) are counted by a per-day tally with no language dimension, so it ` +
+      `cannot follow a language exclusion (${[...excluded].sort().join(', ')}). The blended cost per item ` +
+      `is unaffected — it divides by all items — but the paid/trial split shown above, and --exclude-trial, ` +
+      `over-count trial items by however many of them were in an excluded language.`,
+    );
+  }
   const blendedBlocked = opts.env !== 'all' && perItem.envDropped > 0 && items.unmarked > 0;
   if (blendedBlocked) {
     warnings.push(
@@ -832,6 +970,8 @@ async function main() {
       blendedBlocked,
       tokens: totals, costByModel, costByProvider, totalCost,
       rows, langRows, warnings,
+      droppedLangs: thinLangs,
+      hiddenLangRows: thinLangRows, thinLangRows, minItems: opts.minItems,
     });
     writeFileSync(opts.output, html, 'utf-8');
     console.error(`Wrote ${opts.output}`);
@@ -846,6 +986,9 @@ async function main() {
       unmarkedRecords: perItem.unmarked,
       warnings,
       langs: opts.langs.length > 0 ? opts.langs : null,
+      minItems: opts.minItems,
+      droppedLangs: thinLangs,
+      excludedLangs: [...excluded].sort(),
       items: { total: totalItems, trial: trialItems, paid: paidItems, denominator, unmarked: items.unmarked },
       envDroppedGenerations: perItem.envDropped,
       blendedBlocked,
@@ -886,6 +1029,10 @@ async function main() {
   console.log(`${pad('Items created')}: ${num(totalItems)}`);
   console.log(`${pad('  paid accounts')}: ${num(paidItems)}`);
   console.log(`${pad('  free-plan trial')}: ${num(trialItems)}`);
+  if (thinLangs.length > 0) {
+    const dropped = thinLangs.map(t => `${t.lang} (${t.items})`).join(', ');
+    console.log(`${pad('  excluded (<' + opts.minItems + ' items)')}: ${dropped}`);
+  }
 
   console.log(`\nTokens recorded — env ${opts.env}, priced at the ${opts.asOf.toISOString().split('T')[0]} rate card`);
   console.log(`${pad('  input')}: ${num(totals.input)} tok`);
@@ -952,6 +1099,10 @@ async function main() {
     console.log(`  ${'lang'.padEnd(14)}${'items'.padStart(7)}${'cost/item'.padStart(11)}${'tokens/item'.padStart(13)}`);
     for (const e of langRows) {
       console.log(`  ${e.lang.padEnd(14)}${String(e.items).padStart(7)}${usd(e.usd / e.items).padStart(11)}${num(Math.round(e.tokens / e.items)).padStart(13)}`);
+    }
+    if (thinLangRows.length > 0) {
+      const hidden = thinLangRows.map(r => `${r.lang || '(unrecorded)'} (${r.items})`).join(', ');
+      console.log(`  hidden — under ${opts.minItems} attributed items: ${hidden}`);
     }
   }
 
