@@ -114,7 +114,9 @@ export const LANGUAGES: Language[] = [
   // { id: "0156", name: "L0156", description: "Short text scorers", domains: [] },
   // { id: "0157", name: "L0157", description: "Geoboard manipulatives", domains: [] },
   { id: "0158", name: "L0158", description: "Learnosity assessment items (legacy; prefer L0176). Use ONLY when the user names Learnosity or a Learnosity Item Bank / LMS.", routingHint: "Do NOT use for generic quizzes, tests, or practice items that don't name Learnosity. Deprecated in favor of L0176 — prefer L0176 for all new Learnosity item content. Learnosity assessment items — MCQ, short text, cloze, formula, classification, order list, and choice matrix question types via Learnosity API. Embeds another Graffiticode dialect (e.g. L0166 spreadsheets) as a `custom` question for spreadsheet-based, table-based, or worksheet-style assessments.", domains: ["learnosity"], gatedBy: ["learnosity"], status: "Deprecated", composesWith: ["0166", "0179"] },
-  { id: "0159", name: "L0159", description: "Flashcards, Match and Memory card games", routingHint: "Flashcard study decks, match games, and memory card games with LaTeX math support. Define fact pairs for card-based learning activities.", domains: ["assessments"] },
+  // Flashcards moved to L0181 — same study loop, rebuilt on L0000. L0159 keeps match and
+  // memory, which L0181 does not do, and keeps serving every item already authored in it.
+  { id: "0159", name: "L0159", description: "Match and Memory card games", routingHint: "Matching games, where a player pairs related terms, and memory (concentration) card games, where a player flips hidden cards to find pairs. Both are driven by a list of two-sided fact pairs, with LaTeX math support. For a FLASHCARD deck — cards a learner flips and rates one at a time — use L0181, not this.", domains: ["assessments"] },
   // { id: "0160", name: "L0160", description: "Learnosity QTI Importer", domains: [] },
   // { id: "0161", name: "L0161", description: "Expression translators", domains: [] },
   // { id: "0162", name: "L0162", description: "Walking routes", domains: [] },
