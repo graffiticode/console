@@ -1219,6 +1219,11 @@ Do not include any explanatory text outside the code blocks unless specifically 
         ...options,
         maxTokens: options.maxTokens || 4096,
         maxContinuations: options.maxContinuations || 10,
+        // Per-language effort beats the global CODEGEN_EFFORT that `options` carries.
+        // Resolved here, beside the model, because the two are one decision: effort is
+        // meaningless without knowing which model is about to receive it, and a model
+        // with no effort dial drops it again at the send site.
+        ...(route.effort ? { effort: route.effort } : {}),
       },
     });
 

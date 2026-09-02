@@ -36,7 +36,7 @@
 
 // Type-only import: llm-models imports modelPriorityFor from here, so this must
 // stay erasable or the two modules form a runtime cycle.
-import type { GenerationTier, LlmProvider } from "./llm-models";
+import type { EffortLevel, GenerationTier, LlmProvider } from "./llm-models";
 
 /**
  * A family, optionally pinned to a tier: "anthropic" or "anthropic+fast".
@@ -104,6 +104,24 @@ export type PriorityConfig =
       propertyUpdate?: GenerationTier;
       /** Tier for get_spec. Defaults to "fast". Tier only — see GenerationMode. */
       spec?: GenerationTier;
+      /**
+       * How hard the model thinks, overriding the global CODEGEN_EFFORT default.
+       *
+       * Same duality as the entry itself: a bare level applies to every mode, an object
+       * names the modes that differ. `{ effort: "high" }` and
+       * `{ effort: { create: "high", repair: "low" } }` are both valid.
+       *
+       * This is the per-language half of the effort knob, and it exists because
+       * CODEGEN_EFFORT is global: one setting that is right for ten languages and wrong
+       * for the eleventh has nowhere to record the exception. Recording it HERE rather
+       * than in another env var is the point — the table is reviewable, diffable, and
+       * already the one place you can read what a language runs on.
+       *
+       * Inert on a language whose model has no effort dial (see modelSupportsEffort):
+       * the value resolves, the parameter is then dropped at the send site, and the
+       * request succeeds without it.
+       */
+      effort?: EffortLevel | Partial<Record<GenerationMode, EffortLevel>>;
     };
 
 /** The ordering out of either entry form. */
@@ -449,4 +467,38 @@ export function modeTierFor(
   if (!config || Array.isArray(config)) return undefined;
   const tier = config[mode];
   return tier && KNOWN_TIERS.has(tier) ? tier : undefined;
+}
+
+const KNOWN_EFFORTS = new Set<EffortLevel>([
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+]);
+
+/**
+ * The effort a language wants for a given mode, or undefined to keep the global default.
+ *
+ * Exactly the shape of modeTierFor, and undefined means the same thing: "you were right,
+ * carry on". The default lives at the call site — `route.effort ?? options.effort`, where
+ * options.effort is CODEGEN_EFFORT — so a language with no entry behaves precisely as it
+ * did before this existed, and the table stays a record of exceptions rather than a
+ * second place the default is written down.
+ *
+ * Unlike modeTierFor, a BARE level is accepted as well as the per-mode object, because
+ * effort is usually a whole-language opinion ("this dialect needs to think") where tier
+ * is usually a per-mode one.
+ */
+export function modeEffortFor(
+  lang: string | number | undefined | null,
+  mode: GenerationMode,
+): EffortLevel | undefined {
+  if (lang === undefined || lang === null || String(lang).trim() === "") return undefined;
+  const config = MODEL_PRIORITY[normalizeLangId(lang)];
+  if (!config || Array.isArray(config)) return undefined;
+  const effort = config.effort;
+  if (!effort) return undefined;
+  const level = typeof effort === "string" ? effort : effort[mode];
+  return level && KNOWN_EFFORTS.has(level) ? level : undefined;
 }
