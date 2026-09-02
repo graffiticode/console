@@ -8,6 +8,12 @@
 // llm-generation-service.ts) the next family is tried. A language absent from the
 // table has not been evaluated and uses DEFAULT_MODEL_PRIORITY.
 //
+// One CAPABILITY failure fails over too: a model rejecting a request PARAMETER it does
+// not carry (`"does not support the effort parameter"`). That is not the request being
+// wrong, it is this model's surface being narrower than the next one's — so the second
+// family is a genuinely different attempt rather than a doomed retry. Every other
+// invalid_request (over-length, safety) still fails outright.
+//
 // It is deliberately NOT client-settable. Which model runs is a platform decision
 // for the same reason head routing and composition are — see
 // docs/language-routing-and-composition.md. Neither an end user nor a client agent

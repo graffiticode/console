@@ -12,6 +12,7 @@ import {
   LlmProvider,
   modelForProvider,
   modelRejectsTemperature,
+  modelSupportsEffort,
   resolveGenerationRoute,
 } from "./llm-models";
 
@@ -237,6 +238,31 @@ function failoverableProviderError({
   message?: string;
 }): boolean {
   const normalized = `${code || ""} ${message || ""}`.toLowerCase();
+  // BEFORE the deny list, and deliberately so — this is the one invalid_request that
+  // must fail over.
+  //
+  // A model rejecting a PARAMETER says nothing about the request being wrong; it says
+  // this model's surface does not carry that knob. The other family is a different
+  // model with a different surface, so the fallback is not a retry of a doomed call —
+  // it is the one case where we know the second attempt is materially different.
+  //
+  // The case that motivated this: `output_config.effort` sent to Haiku 4.5 returned
+  // `invalid_request_error: "This model does not support the effort parameter."`, the
+  // clause below matched `invalid[_ -]?request` first, and L0176 hard-failed with
+  // `openai+balanced` sitting unused in its priority list. modelSupportsEffort now stops
+  // that request being built at all; this stops the NEXT one costing a language.
+  //
+  // Narrow on purpose. Blanket-failing-over every 400 would send over-length prompts and
+  // safety refusals to the second provider to fail identically, doubling latency and
+  // spend on requests that cannot succeed anywhere.
+  if (
+    /(does not support|not supported|unsupported|unrecognized)[^.]{0,40}(parameter|field|argument|property|for this model|on this model|with this model)/i.test(
+      normalized,
+    ) ||
+    /(unsupported|unknown|invalid)_(parameter|value)/i.test(normalized)
+  ) {
+    return true;
+  }
   if (
     /(content[_ -]?filter|safety|refusal|context[_ -]?length|too many tokens|invalid[_ -]?request)/i.test(
       normalized,
@@ -490,7 +516,11 @@ async function requestAnthropic({
         ...(options.thinking !== undefined
           ? { thinking: options.thinking }
           : {}),
-        ...(options.effort !== undefined
+        // Gated on the MODEL, exactly like temperature three lines up: Haiku 4.5
+        // (ANTHROPIC_MODELS.FAST) 400s on `output_config.effort`, so a global
+        // CODEGEN_EFFORT would otherwise take down every language routed to the
+        // fast tier. See modelSupportsEffort.
+        ...(options.effort !== undefined && modelSupportsEffort(model)
           ? { output_config: { effort: options.effort } }
           : {}),
         stream: true,
@@ -681,7 +711,7 @@ async function requestOpenAI({
       options.temperature === undefined
         ? {}
         : { temperature: options.temperature }),
-      ...(options.effort
+      ...(options.effort && modelSupportsEffort(model)
         ? { reasoning: { effort: options.effort } }
         : {}),
     };
