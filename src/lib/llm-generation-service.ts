@@ -15,6 +15,15 @@ import {
   modelSupportsEffort,
   resolveGenerationRoute,
 } from "./llm-models";
+import {
+  type RequestBudget,
+  BUDGET_ERROR_CODE,
+  BUDGET_ERROR_MESSAGE,
+  budgetSummary,
+  charge as chargeBudget,
+  estimateTokens,
+  exhausted,
+} from "./request-budget";
 
 export interface StreamOptions {
   /** Language id — selects the family ordering. Not caller-selectable beyond this. */
@@ -42,6 +51,16 @@ export interface StreamOptions {
   deadlineAt?: number;
   /** Cumulative output-token ceiling across every continuation chunk. */
   maxOutputTokensTotal?: number;
+  /**
+   * Token ceiling for the WHOLE request, shared by reference across every
+   * stage, repair attempt and provider failover — the same one-object-threaded
+   * -down shape as `deadlineAt` above, and for the same reason: created once
+   * per request so composition cannot start a fresh budget per stage.
+   *
+   * Charged in `requestProvider` (not in recordTokenUsage, which runs only on
+   * success). Callers outside a request pass `unlimitedBudget()`.
+   */
+  budget?: RequestBudget;
 }
 
 export interface SystemBlock {
@@ -100,7 +119,7 @@ interface LongGenerationResult {
    * Load-bearing for measurement: without it "we cut a runaway" and "we cut a
    * good run" are the same event, and the caps below can't be tuned.
    */
-  stopEarly?: "deadline" | "output_budget" | "restart" | "no_growth";
+  stopEarly?: "deadline" | "output_budget" | "restart" | "no_growth" | "request_budget";
 }
 
 interface ClaudeStreamEvent {
@@ -872,13 +891,74 @@ async function requestOpenAI({
   }
 }
 
+/**
+ * The one chokepoint every streaming provider call passes through — its only
+ * callers are `completeOnce` and `generateLongCode`, which between them cover
+ * generation, every repair attempt, the L0010 planner's nested codegen and the
+ * judge. The request token budget is charged and checked HERE rather than at
+ * recordTokenUsage, because this layer sees failures and aborted streams, and
+ * those spent real tokens.
+ *
+ * On breach it returns a synthetic failure instead of dispatching.
+ * `failoverable: false` is load-bearing: a failoverable refusal would send
+ * generateCodeWithContinuation to the other provider, which trips identically —
+ * a wasted round trip and doubled log noise for a decision already made.
+ */
 async function requestProvider(
   provider: LlmProvider,
   args: Parameters<typeof requestAnthropic>[0],
 ): Promise<ProviderRequestResult> {
-  return provider === "openai"
-    ? requestOpenAI(args)
-    : requestAnthropic(args);
+  const budget = args.options?.budget;
+
+  if (!budget && process.env.NODE_ENV !== "production") {
+    // Not an error — scripts and the eval harness legitimately run unbudgeted.
+    // It is a warning because the options bag is rebuilt field-by-field in
+    // code-generation-service, which drops unnamed fields with no type error,
+    // and that is exactly how a threaded request-wide bound goes inert.
+    console.warn(
+      `[budget] unbudgeted provider call provider=${provider} model=${args.model}`,
+    );
+  }
+
+  if (budget && exhausted(budget)) {
+    console.log(
+      `[budget] rid=${budget.rid} refused provider=${provider} ${budgetSummary(budget)}`,
+    );
+    return {
+      content: "",
+      usage: EMPTY_USAGE(),
+      failure: new ProviderFailure(
+        BUDGET_ERROR_MESSAGE,
+        provider,
+        false,
+        undefined,
+        BUDGET_ERROR_CODE,
+        BUDGET_ERROR_CODE,
+      ),
+    };
+  }
+
+  const result = provider === "openai"
+    ? await requestOpenAI(args)
+    : await requestAnthropic(args);
+
+  if (budget) {
+    // Floor the charge at an estimate of what we sent. A failed call reports
+    // EMPTY_USAGE() on both OpenAI failure paths and partial usage on the
+    // Anthropic stall path, but the input tokens were billed either way —
+    // trusting reported usage would leave the accumulator blind to failures,
+    // which is the case it exists for.
+    const sent =
+      estimateTokens(
+        typeof args.systemPrompt === "string"
+          ? args.systemPrompt
+          : args.systemPrompt?.map((b) => b.text).join(""),
+      ) +
+      args.messages.reduce((n, m) => n + estimateTokens(m.content), 0);
+    chargeBudget(budget, result.usage, sent);
+  }
+
+  return result;
 }
 
 /**
@@ -968,6 +1048,13 @@ async function generateLongCode({
   while (chunks < maxContinuations) {
     if (Date.now() >= deadlineAt) {
       stopEarly = "deadline";
+      break;
+    }
+    // Breaking here rather than letting requestProvider refuse the next chunk
+    // keeps the content assembled so far: a partial program may still compile,
+    // where a refusal at the seam below converts the whole run into a failure.
+    if (options.budget && exhausted(options.budget)) {
+      stopEarly = "request_budget";
       break;
     }
     const result = await requestProvider(provider, {
@@ -1189,6 +1276,11 @@ Do not include any explanatory text outside the code blocks unless specifically 
 
   onProgress?.("Starting code generation...");
   const attempts: GenerationAttempt[] = [];
+  // Usage across EVERY attempt, failed ones included. Returning only the
+  // successful attempt's usage under-reported every failover run — the first
+  // provider's whole generation vanished from the usage row, even on success —
+  // and returning EMPTY_USAGE() on total failure discarded all of it.
+  const attemptUsage = EMPTY_USAGE();
   let fallbackReason: string | undefined = circuitFallbackReason;
   let lastFailure: ProviderFailure | undefined;
   let lastProvider = providers[0];
@@ -1226,6 +1318,11 @@ Do not include any explanatory text outside the code blocks unless specifically 
         ...(route.effort ? { effort: route.effort } : {}),
       },
     });
+    attemptUsage.inputTokens += result.usage.inputTokens;
+    attemptUsage.outputTokens += result.usage.outputTokens;
+    attemptUsage.cacheCreationInputTokens += result.usage.cacheCreationInputTokens;
+    attemptUsage.cacheReadInputTokens += result.usage.cacheReadInputTokens;
+    attemptUsage.reasoningTokens += result.usage.reasoningTokens;
 
     if (!result.failure) {
       noteProviderSuccess(provider);
@@ -1246,7 +1343,7 @@ Do not include any explanatory text outside the code blocks unless specifically 
         // prose around the code" from "we discarded restarted chunks" — the two
         // are indistinguishable in outputTokens alone.
         rawChars: result.content.length,
-        usage: result.usage,
+        usage: attemptUsage,
         chunks: result.chunks,
         // Why the loop stopped short, if it did. Carried up so the [code-gen]
         // line can distinguish a bounded runaway from a clean finish.
@@ -1291,7 +1388,9 @@ Do not include any explanatory text outside the code blocks unless specifically 
 
   return {
     code: "",
-    usage: EMPTY_USAGE(),
+    // NOT EMPTY_USAGE(): every attempt above spent real tokens, and zeroing them
+    // is why a failed generation left no trace in the usage collection at all.
+    usage: attemptUsage,
     chunks: 0,
     provider: lastProvider,
     model: lastModel,

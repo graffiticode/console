@@ -77,7 +77,16 @@ export interface FunnelEventFields {
   app?: string;
   /** First billable item ever for this account. */
   first_for_account?: boolean;
-  /** wall_hit: which limit was hit. */
+  /**
+   * wall_hit: which limit was hit. Free-form — funnel-digest buckets by the
+   * string, so a new wall needs no change there.
+   *
+   * "request_token_budget" is the odd one out: it is a circuit breaker, not a
+   * limit a customer can raise by upgrading, and unlike non_english_request it
+   * is emitted ONLY when a request was actually refused. In shadow mode the
+   * signal is the `[budget]` log line instead — a wall counter that also counted
+   * would-be refusals would misreport how many users hit a wall.
+   */
   wall?: string;
   /**
    * non_english_request: the NATURAL language of the prompt — a dominant script

@@ -1259,9 +1259,19 @@ export async function setItemGenerationStatus({
 // life of an attempt and released on every terminal path, so a user's next
 // update_item on the same item is never blocked by it. The expiry is the
 // backstop for a worker that dies without releasing: it must outlive the longest
-// possible attempt (Cloud Run caps the request at 300s) so that an UNEXPIRED
-// lease always means a live attempt rather than a stuck one.
-const GENERATION_LEASE_MS = 5 * 60_000;
+// possible attempt so that an UNEXPIRED lease always means a live attempt rather
+// than a stuck one.
+//
+// It was 5 minutes, justified by "Cloud Run caps the request at 300s". That
+// stopped being true on 2026-08-31: the Cloud Run timeout and the queue's
+// dispatchDeadline are both 900s now, and CODEGEN_REQUEST_BUDGET_MS alone allows
+// 420s before the parse/postTask/item-write that follow. So any generation past
+// 300s expired its own lease while still running, and the queue's second attempt
+// (retryConfig.maxAttempts = 2) could claim it and start a SECOND concurrent
+// generation on the same item — the duplicate-generation failure of 2026-08-28,
+// reopened from the other side. Matched to the 900s dispatch deadline: past that
+// point Cloud Tasks has given up, so no attempt can still be live.
+const GENERATION_LEASE_MS = 15 * 60_000;
 
 export type GenerationClaim = "claimed" | "busy" | "missing";
 

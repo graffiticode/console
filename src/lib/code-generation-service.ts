@@ -36,6 +36,13 @@ import {
   resolveGenerationRoute,
 } from "./llm-models";
 import { modeTierFor } from "./model-priority";
+import {
+  type RequestBudget,
+  BUDGET_ERROR_CODE,
+  budgetSummary,
+  exhausted,
+  tripped,
+} from "./request-budget";
 import { safeRAGAnalytics } from "./rag-analytics-safe";
 import { findBestLanguages } from "./language-router";
 import { stripQueryPassage, queryFacets } from "./lang-embedding";
@@ -100,6 +107,13 @@ export { CLAUDE_MODELS, modelRejectsTemperature };
 // programs (incl. multi-page L0175 assessments) complete in a single chunk
 // rather than relying on the continuation loop. Sonnet 4.6 supports far more.
 export const DEFAULT_MAX_TOKENS = 16384;
+
+/**
+ * Upper bound on a client-supplied `maxTokens`. 64k is 4x the server default
+ * and above any model's practical single-response output, so it bounds abuse
+ * without capping legitimate long programs.
+ */
+export const MAX_CLIENT_MAX_TOKENS = 65536;
 
 /**
  * Always returns Graffiticode as the language
@@ -1193,6 +1207,13 @@ interface GenerateCodeOptions {
    * any per-generation limit by MAX_FIX_ATTEMPTS.
    */
   deadlineAt?: number;
+  /**
+   * Token ceiling for the WHOLE request, threaded exactly like `deadlineAt`
+   * above and for the same reason — one budget per request, not one per stage.
+   * Charged in requestProvider. Callers outside a request pass
+   * `unlimitedBudget()`.
+   */
+  budget?: RequestBudget;
   // Optional thinking/effort passthrough. Off by default (API model defaults
   // apply). Set both identically across models for a MATCHED comparison — e.g.
   // Sonnet 5 runs adaptive thinking by default while Opus 4.8 does not, so a
@@ -1275,13 +1296,23 @@ export async function generateCode({
   // Generate request ID if not provided
   const requestId = rid || generateRequestId();
 
-  // Floor max output tokens at the server default. A client must not be able to
-  // request a cap so small it forces large programs to chunk — continuation can
-  // corrupt or restart a long program (see llm-generation-service). Clients may
-  // still request MORE than the default; they just can't go below it.
+  // Clamp max output tokens into [DEFAULT_MAX_TOKENS, MAX_CLIENT_MAX_TOKENS].
+  //
+  // The floor: a client must not be able to request a cap so small it forces
+  // large programs to chunk — continuation can corrupt or restart a long
+  // program (see llm-generation-service).
+  //
+  // The ceiling: `maxTokens` is a client-supplied GraphQL field
+  // (CodeGenerationOptions), and until this clamp existed the Math.max floor
+  // let a caller name any number at all — every chunk of every repair attempt
+  // of every composed stage, multiplied. A ceiling here is cheaper than
+  // discovering the multiplication in a bill.
   options = {
     ...options,
-    maxTokens: Math.max(options.maxTokens ?? 0, DEFAULT_MAX_TOKENS),
+    maxTokens: Math.min(
+      Math.max(options.maxTokens ?? 0, DEFAULT_MAX_TOKENS),
+      MAX_CLIENT_MAX_TOKENS,
+    ),
   };
 
   // Which FAMILY serves this request comes from the language's static priority
@@ -1611,6 +1642,7 @@ export async function generateCode({
         // anything not named here is silently dropped — omitting this made the
         // budget inert without any type error to say so.
         ...(options.deadlineAt ? { deadlineAt: options.deadlineAt } : {}),
+        ...(options.budget ? { budget: options.budget } : {}),
         // Passthrough (undefined ⇒ omitted ⇒ API model default). Set to match models.
         ...(options.thinking !== undefined ? { thinking: options.thinking } : {}),
         ...(options.effort !== undefined ? { effort: options.effort } : {}),
@@ -1693,6 +1725,34 @@ export async function generateCode({
         success: false,
         errorMessage: streamResult.error,
       }, "");
+      // Record BEFORE the throw. The success-path recordTokenUsage call is ~350
+      // lines below this point, so until now a failed generation wrote no usage
+      // row at all — a retry storm left no trace and every cost report
+      // understated spend by exactly the failures. streamResult.usage now
+      // carries every provider attempt's tokens, failed ones included.
+      if (auth?.uid) {
+        await recordTokenUsage({
+          auth,
+          rid: requestId,
+          stage: "code_gen",
+          itemId: itemId ?? null,
+          generatedTaskId: null,
+          lang,
+          provider: providerUsed,
+          model: modelToUse,
+          tier: tierToUse ?? null,
+          usage: streamResult.usage,
+          outcome: "failed",
+          extra: {
+            fallbackReason: streamResult.fallbackReason || null,
+            stopEarly: streamResult.stopEarly || null,
+            providerAttempts: streamResult.attempts ?? [],
+            error: String(streamResult.error).slice(0, 200),
+          },
+        }).catch((err) => {
+          console.error("[token-usage] failed to record failed generation", err);
+        });
+      }
       throw new Error(streamResult.error);
     }
 
@@ -1711,7 +1771,7 @@ export async function generateCode({
     if (outOfScopeMatch) {
       const reason = outOfScopeMatch[1].trim();
       console.log(`[code-gen] rid=${rid} lang=${lang} out-of-scope: ${reason}`);
-      const routing = await findBestLanguages({ userRequest: prompt, outOfScopeReason: reason, currentLang: lang, rid, itemId, auth });
+      const routing = await findBestLanguages({ userRequest: prompt, outOfScopeReason: reason, currentLang: lang, rid, itemId, auth, budget: options?.budget });
 
       let errorMessage = `Out of scope: ${reason}`;
       if (routing.suggestions.length > 0) {
@@ -1768,6 +1828,14 @@ export async function generateCode({
     // The errors the previous attempt was asked to fix. A repair that produces
     // the identical error made no progress, and another turn won't either.
     let lastErrorSignature: string | null = null;
+    // Repair spend, tracked alongside finalUsage rather than as a separate doc.
+    // The Stage union declares "repair" and nothing writes it, so repair cost
+    // has been indistinguishable from authoring cost in the per-item rollup. A
+    // second doc would fix that but change the record COUNT per generation,
+    // which every existing cost query treats as "one generation" — carrying the
+    // subtotal on the existing doc separates the two without moving that
+    // denominator.
+    const repairTokens = { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 };
     let finalUsage = {
       prompt_tokens: streamResult.usage.inputTokens,
       completion_tokens: streamResult.usage.outputTokens,
@@ -1805,6 +1873,17 @@ export async function generateCode({
         if (options?.deadlineAt && Date.now() >= options.deadlineAt) {
           console.log(
             `[code-gen] rid=${rid} repair loop stopped: request budget spent after ${fixAttempts} attempt(s)`,
+          );
+          break;
+        }
+        // The token twin of the deadline check above, and the same reasoning:
+        // MAX_FIX_ATTEMPTS is per generateCode, so composition multiplies it.
+        // Breaking degrades the request to "return the unrepaired program and
+        // its compile errors" — the existing failure mode — rather than
+        // refusing outright, which is the right call for a repair breach.
+        if (options?.budget && exhausted(options.budget)) {
+          console.log(
+            `[budget] rid=${rid} repair loop stopped ${budgetSummary(options.budget)} attempts=${fixAttempts}`,
           );
           break;
         }
@@ -1952,6 +2031,7 @@ export async function generateCode({
               // Same request deadline as the initial generation, deliberately not
               // a fresh one: a repair is part of the request that spawned it.
               ...(options.deadlineAt ? { deadlineAt: options.deadlineAt } : {}),
+        ...(options.budget ? { budget: options.budget } : {}),
               ...(options.effort !== undefined
                 ? { effort: options.effort }
                 : {}),
@@ -1977,6 +2057,10 @@ export async function generateCode({
           finalUsage.cache_creation_tokens += fixResult.usage.cacheCreationInputTokens || 0;
           finalUsage.cache_read_tokens += fixResult.usage.cacheReadInputTokens || 0;
           finalUsage.reasoning_tokens += fixResult.usage.reasoningTokens || 0;
+          repairTokens.input += fixResult.usage.inputTokens;
+          repairTokens.output += fixResult.usage.outputTokens;
+          repairTokens.cacheCreation += fixResult.usage.cacheCreationInputTokens || 0;
+          repairTokens.cacheRead += fixResult.usage.cacheReadInputTokens || 0;
           const fixCostUsd = estimateUsdCost(
             fixResult.usage,
             fixResult.model,
@@ -2073,6 +2157,9 @@ export async function generateCode({
           fallbackReason: streamResult.fallbackReason ?? null,
           plan,
           fixAttempts,
+          // Subset of `tokens` above, not an addition — the share of this
+          // generation spent repairing rather than authoring.
+          repairTokens,
         },
       });
     }

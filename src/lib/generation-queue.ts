@@ -122,6 +122,16 @@ export async function enqueueGenerationJob(job: GenerationJob): Promise<void> {
         // killing the worker a minute and a half before the model finished.
         // Cloud Tasks permits up to 30 minutes for HTTP targets.
         dispatchDeadline: "900s",
+        // NOTE: retry limits are QUEUE config, not task config — there is no
+        // per-task maxAttempts to set here, and Cloud Tasks defaults to 100.
+        // The deployed queue is set to 2, which is what keeps a failing job from
+        // re-running this whole fan-out (router + planner + up to 4 stages x 5
+        // repair attempts) a hundred times. It is not expressed in this repo, so
+        // verify it rather than assuming, and re-apply after any queue recreate:
+        //   gcloud tasks queues describe generation-jobs --location=us-central1 \
+        //     --project=graffiticode-app --format='yaml(retryConfig)'
+        //   gcloud tasks queues update generation-jobs --location=us-central1 \
+        //     --project=graffiticode-app --max-attempts=2
       },
     }),
   });
