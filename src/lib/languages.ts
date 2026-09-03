@@ -229,7 +229,18 @@ export function selectLanguages(domain?: string): Language[] {
 export async function listLanguages({ search, domain, enrich = false }: { search?: string; domain?: string; enrich?: boolean }): Promise<Language[]> {
   // `hidden` is applied here rather than in selectLanguages() so the console's own
   // picker keeps showing these while the catalog stops offering them. See the field.
-  let results = selectLanguages(domain).filter(lang => !lang.hidden);
+  //
+  // Deprecated languages are dropped on the same terms, and for the same reason the
+  // `hidden` note gives: this withholds them from DISCOVERY, it does not retire them.
+  // Languages are deprecated but never retired, so content already in the wild keeps
+  // working — findLanguageById() still answers, `language(id)` still resolves, and an
+  // existing L0166 item still renders and still updates. What stops is being OFFERED:
+  // a language whose own routingHint says "prefer L0179" has no business appearing as
+  // a candidate for a new request, in list_languages or in the planner's catalog
+  // (language-router.ts builds that from this same function).
+  let results = selectLanguages(domain)
+    .filter(lang => !lang.hidden)
+    .filter(lang => lang.status !== "Deprecated");
 
   // Enrich each entry from the lang server in parallel:
   //   - scope.json → summary / inScope / outOfScope (routing-only descriptor)
