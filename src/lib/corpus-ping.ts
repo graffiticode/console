@@ -43,6 +43,13 @@ import { getBaseUrlForApi } from "./api";
 export const PING_LANGUAGES = [
   "0000", "0159", "0169", "0170", "0172",
   "0173", "0175", "0176", "0177", "0178", "0179",
+  // 0181 (flashcards) joined 2026-09-03, the day its 90-example corpus was seeded and
+  // embedded. Adding it here is the point: until it was in this list, a brand-new
+  // language with a full corpus had no health check at all — neither the daily ping nor
+  // the weekly sweep, which reads SWEEP_LANGUAGES = PING_LANGUAGES, touched it. That is
+  // the same blind spot that let L0176 sit broken for 27 hours: a language nothing
+  // routinely generates has no detector.
+  "0181",
 ];
 
 /** How many generations run at once. Eleven serial generations would be ~11-25 min,
