@@ -11,8 +11,9 @@
  *
  * `crawler` is a client that SAYS it is one — directory audits, reputation
  * scanners, uptime probes, `Mozilla/`-shaped user agents pasted into
- * clientInfo. `internal` is us exercising our own server (MCP Inspector is the
- * project's standard manual-testing app). Everything else that gives a name is
+ * clientInfo. `internal` is us exercising our own server — the MCP Inspector
+ * (the project's standard manual-testing app) plus our own named one-off
+ * harnesses, see INTERNAL_NAMES. Everything else that gives a name is
  * an `agent`, including names we suspect are automated: `Anthropic/ClaudeAI` is
  * far and away the largest bucket and has never produced a tool call, but
  * guessing it into the bin would delete the evidence either way. It gets its
@@ -35,8 +36,9 @@ export type ClientClass = "crawler" | "internal" | "agent" | "unnamed";
 
 export function classifyClient(kind?: string): ClientClass {
   if (!kind) return "unnamed";
-  if (INTERNAL_PATTERN.test(kind)) return "internal";
-  if (CRAWLER_NAMES.has(kind.toLowerCase())) return "crawler";
+  const lower = kind.toLowerCase();
+  if (INTERNAL_NAMES.has(lower) || INTERNAL_PATTERN.test(kind)) return "internal";
+  if (CRAWLER_NAMES.has(lower)) return "crawler";
   return CRAWLER_PATTERN.test(kind) ? "crawler" : "agent";
 }
 
@@ -113,6 +115,31 @@ const CRAWLER_NAMES = new Set([
  */
 const CRAWLER_PATTERN =
   /\b(scanner|crawler|spider|censys|probe|audit|healthcheck|uptime|monitor|beacon|detector|verifier|profiler|nuclei|reputation|harvest|inspect)\b|^Mozilla\//i;
+
+/**
+ * Our OWN one-off harnesses and debug clients, by exact name.
+ *
+ * These are `internal`, not `crawler`: they are us exercising the server, and
+ * the report renders the two as separate buckets even though both are held out
+ * of user traffic. Filing them under `crawler` would say a third party probed
+ * us, which is the wrong story about our own afternoon.
+ *
+ * Exact names for the same reason `adoption-verify` is: none of these contains
+ * a word that generalises safely. A `\bharness\b` or `\bdebug\b` rule would
+ * also bin a customer's `debug-assistant`, and the cost of a misfile here is
+ * deleting demand.
+ *
+ * Learned on 2026-09-03, reading 09-01: 20 of that day's 91 tool calls were
+ * these three, counted as user demand, which made the next quiet day read as a
+ * collapse in traffic rather than the absence of our own testing. Note this
+ * does NOT cover `claude-code`/`firebase`, which is also us but is shaped
+ * exactly like a real keyed customer — no name-based rule can separate those.
+ */
+const INTERNAL_NAMES = new Set([
+  "perf-harness",
+  "gc-widget-debug",
+  "codex-list-languages-diagnostic",
+]);
 
 /**
  * MCP Inspector is the project's standard manual-testing app (see the repo's
