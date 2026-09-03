@@ -39,8 +39,77 @@ const cacheTtlMs = (() => {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_TTL_MS;
 })();
 
-const cache = new Map<string, { doc: LanguageServerDoc; expires: number }>();
+const cache = new Map<string, { value: LanguageServerDoc; expires: number }>();
 const scopeCache = new Map<string, { value: LanguageScope | null; expires: number }>();
+
+// One in-flight refresh per language, so a burst cannot stampede the origin.
+// listLanguages({enrich:true}) asks for every language at once, so without this a
+// cold cache means N concurrent identical fetches per language.
+const docInflight = new Map<string, Promise<LanguageServerDoc>>();
+const scopeInflight = new Map<string, Promise<LanguageScope | null>>();
+
+/**
+ * Stale-while-revalidate for the per-language assets.
+ *
+ * These are read on the routing path: classifyAndRoute() runs on every MCP create
+ * (the scope gate — console generations carry src and skip it) and enriches the
+ * whole catalog first. With a plain TTL cache, the first routed create after any
+ * 5-minute lull paid a full cold fan-out; measured route_ms was ~3.0s warm and
+ * ~11.7s cold, and the cold case recurs by construction — every TTL expiry, every
+ * new instance, every deploy.
+ *
+ * So: a stale value answers immediately and the refresh happens behind it. The
+ * cold path (nothing cached at all) still waits, because there is nothing else to
+ * serve. Freshness is unchanged in the sense that matters — scope.json changes on
+ * a language deploy, not minute to minute, and being one TTL behind on routing
+ * text is invisible next to an 8s stall.
+ *
+ * A failed refresh NEVER replaces a good value; it re-arms on the short failure
+ * TTL so a sick language server is retried soon without discarding what works.
+ */
+function staleWhileRevalidate<T>(
+  store: Map<string, { value: T; expires: number }>,
+  inflight: Map<string, Promise<T>>,
+  key: string,
+  load: () => Promise<T>,
+  isGood: (value: T) => boolean,
+): Promise<T> {
+  const cached = store.get(key);
+  if (cached && Date.now() < cached.expires) return Promise.resolve(cached.value);
+
+  let refresh = inflight.get(key);
+  if (!refresh) {
+    refresh = load()
+      .then((value) => {
+        // Don't let a failed fetch evict a good value — keep the good one and try
+        // again on the short TTL.
+        if (!isGood(value) && cached && isGood(cached.value)) {
+          store.set(key, { value: cached.value, expires: Date.now() + FAILURE_TTL_MS });
+          return cached.value;
+        }
+        store.set(key, {
+          value,
+          expires: Date.now() + (isGood(value) ? cacheTtlMs : FAILURE_TTL_MS),
+        });
+        return value;
+      })
+      .catch((err) => {
+        if (cached) {
+          store.set(key, { value: cached.value, expires: Date.now() + FAILURE_TTL_MS });
+          return cached.value;
+        }
+        throw err;
+      })
+      .finally(() => {
+        inflight.delete(key);
+      });
+    inflight.set(key, refresh);
+  }
+
+  // Stale answer now; the refresh above lands for the next caller.
+  if (cached) return Promise.resolve(cached.value);
+  return refresh;
+}
 
 import { isLangOverridden } from "./api";
 
@@ -69,16 +138,7 @@ async function fetchText(url: string, accessToken?: string): Promise<string | nu
   }
 }
 
-export async function getLanguageServerDoc(langId: string, accessToken?: string): Promise<LanguageServerDoc> {
-  const now = Date.now();
-  // When this language is overridden for the caller the fetch is redirected to a
-  // test revision, so skip the shared (lang-keyed) cache on read and write.
-  const overridden = await isLangOverridden(langId, accessToken);
-  const cached = !overridden && cache.get(langId);
-  if (cached && now < cached.expires) {
-    return cached.doc;
-  }
-
+async function loadLanguageServerDoc(langId: string, accessToken?: string): Promise<LanguageServerDoc> {
   // Prefer the canonical `usage-guide.md`; fall back to the legacy
   // `user-guide.md` name for languages that haven't been renamed yet.
   const [envelopeRaw, usageGuideRaw] = await Promise.all([
@@ -99,18 +159,24 @@ export async function getLanguageServerDoc(langId: string, accessToken?: string)
   }
 
   const doc: LanguageServerDoc = { envelope, usageGuide: usageGuideRaw };
-
-  const success = envelope !== null || usageGuideRaw !== null;
-  if (!overridden) {
-    const ttl = success ? cacheTtlMs : FAILURE_TTL_MS;
-    cache.set(langId, { doc, expires: now + ttl });
-  }
-
-  if (!success) {
+  if (envelope === null && usageGuideRaw === null) {
     console.warn(`language-server-client: could not fetch docs for L${langId}`);
   }
-
   return doc;
+}
+
+export async function getLanguageServerDoc(langId: string, accessToken?: string): Promise<LanguageServerDoc> {
+  // See getLanguageScope: an overridden language bypasses the shared cache entirely.
+  const overridden = await isLangOverridden(langId, accessToken);
+  if (overridden) return loadLanguageServerDoc(langId, accessToken);
+
+  return staleWhileRevalidate(
+    cache,
+    docInflight,
+    langId,
+    () => loadLanguageServerDoc(langId, accessToken),
+    (value) => value.envelope !== null || value.usageGuide !== null,
+  );
 }
 
 export function clearLanguageServerCache(langId?: string): void {
@@ -127,14 +193,7 @@ export function clearLanguageServerCache(langId?: string): void {
 // ${base}/scope.json. Cached separately from the heavier envelope+guide so
 // the router and catalog can poll it cheaply. Returns null when the file
 // is unavailable or malformed; callers should fall back to a static seed.
-export async function getLanguageScope(langId: string, accessToken?: string): Promise<LanguageScope | null> {
-  const now = Date.now();
-  const overridden = await isLangOverridden(langId, accessToken);
-  const cached = !overridden && scopeCache.get(langId);
-  if (cached && now < cached.expires) {
-    return cached.value;
-  }
-
+async function loadLanguageScope(langId: string, accessToken?: string): Promise<LanguageScope | null> {
   const raw = await fetchText(assetUrlFor(langId, "scope.json"), accessToken);
 
   let scope: LanguageScope | null = null;
@@ -156,10 +215,20 @@ export async function getLanguageScope(langId: string, accessToken?: string): Pr
       console.warn(`language-server-client: invalid JSON from L${langId} scope.json: ${message}`);
     }
   }
-
-  if (!overridden) {
-    const ttl = scope !== null ? cacheTtlMs : FAILURE_TTL_MS;
-    scopeCache.set(langId, { value: scope, expires: now + ttl });
-  }
   return scope;
+}
+
+export async function getLanguageScope(langId: string, accessToken?: string): Promise<LanguageScope | null> {
+  // An overridden language is pinned to a test revision for THIS caller, so it must
+  // never read from or write to the shared cache — and must never be served stale.
+  const overridden = await isLangOverridden(langId, accessToken);
+  if (overridden) return loadLanguageScope(langId, accessToken);
+
+  return staleWhileRevalidate(
+    scopeCache,
+    scopeInflight,
+    langId,
+    () => loadLanguageScope(langId, accessToken),
+    (value) => value !== null,
+  );
 }
