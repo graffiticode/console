@@ -20,6 +20,7 @@ import { unparse } from "@graffiticode/parser";
 import { getLanguageAsset, getLanguageLexicon, isLangOverridden } from "../api";
 import { generateCode as codeGenerationService, getRelevantExamples, extractSearchQuery } from "../code-generation-service";
 import {
+  MAX_STAGES,
   planSequence,
   classifyAndRoute,
   composesWithFor,
@@ -29,6 +30,14 @@ import {
   splitRequest,
 } from "../language-router";
 import { resolveUpstreams } from "../composition-discovery";
+import {
+  BUDGET_ERROR_CODE,
+  BUDGET_ERROR_MESSAGE,
+  budgetSummary,
+  createRequestBudget,
+  exhausted,
+  tripped,
+} from "../request-budget";
 import { ragLog, generateRequestId } from "../logger";
 import { langKey, emitEvent, actor } from "../funnel-events";
 import { classifyPromptLanguage, promptLanguageKey } from "../prompt-language";
@@ -214,11 +223,51 @@ export async function generateCodeForRequest({
       (Number(process.env.CODEGEN_REQUEST_BUDGET_MS) > 0
         ? Number(process.env.CODEGEN_REQUEST_BUDGET_MS)
         : 420_000);
+    // ONE token budget for the whole request, on exactly the same terms as the
+    // deadline above and for the same reason: shared by reference so that every
+    // composed stage, repair attempt and provider failover draws on one pool
+    // rather than each starting a fresh one. Charged at the provider call
+    // (requestProvider), so failed and aborted attempts count too.
+    //
+    // Sharing by reference is also what makes parallel stages stop together:
+    // the instant one trips the budget, every sibling sees it.
+    const requestBudget = createRequestBudget(rid);
     const codegenOptions = {
       temperature: options?.temperature,
       maxTokens: options?.maxTokens,
       deadlineAt: requestDeadlineAt,
+      budget: requestBudget,
       ...(codegenEffort ? { effort: codegenEffort } : {}),
+    };
+    /** Uniform refusal envelope — same shape GUARDRAIL 0 returns. */
+    const budgetRefusal = (stage: string) => {
+      const blocked = exhausted(requestBudget);
+      console.log(
+        `[budget] rid=${rid} tripped stage=${stage} ${budgetSummary(requestBudget)} blocked=${blocked}`,
+      );
+      ragLog(rid, "budget.exhausted", {
+        stage,
+        on: requestBudget.trippedOn,
+        tokens: requestBudget.tokens,
+        calls: requestBudget.calls,
+        limit: requestBudget.tokenLimit,
+        blocked,
+      });
+      if (!blocked) return null;
+      // Only when a user was actually refused. Unlike non_english_request, the
+      // shadow-mode signal is the log line above — a wall counter that also
+      // counted non-refusals would misreport how often users hit a wall.
+      emitEvent("wall_hit", {
+        ...actor(auth),
+        wall: "request_token_budget",
+        lang: langLog,
+      });
+      return {
+        src: null, taskId: null, language, description: null, changeSummary: null,
+        model: null, usage: null,
+        errors: [{ message: BUDGET_ERROR_MESSAGE, code: BUDGET_ERROR_CODE }],
+        upstreamLangs: [], rid,
+      };
     };
     const mapUsageLimit = (errs: any[]) => errs.map(err => ({
       ...err,
@@ -307,7 +356,7 @@ export async function generateCodeForRequest({
       // of client cooperation and of the generation LLM volunteering OUT_OF_SCOPE.
       if (process.env.SCOPE_GATE_ENABLED !== "false" && !skipScopeGate && !currentSrc) {
         const tRoute = Date.now();
-        const route = await classifyAndRoute({ userRequest: prompt, currentLang: language, rid, itemId, auth });
+        const route = await classifyAndRoute({ userRequest: prompt, currentLang: language, rid, itemId, auth, budget: requestBudget });
         mark("route", tRoute);
         // Log EVERY decision (in-scope included) so routing is observable — an in-scope verdict
         // is otherwise silent, which masks scope.json contracts that are too permissive.
@@ -353,7 +402,7 @@ export async function generateCodeForRequest({
       const permits = process.env.COMPOSITION_ENABLED === "false" ? [] : composesWithFor(language);
       if (permits.length > 0) {
         const tPlan = Date.now();
-        const planResult = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid, itemId, preferHaiku: true });
+        const planResult = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid, itemId, preferHaiku: true, budget: requestBudget });
         mark("plan", tPlan);
         const fenced = fenceComposition(planResult.sequence, permits);
         if (fenced.dropped.length > 0) {
@@ -380,6 +429,13 @@ export async function generateCodeForRequest({
         ragLog(rid, "composition.plan", { sequence });
 
         composedRun = true;
+        // Request-level gate. The router and planner calls above already
+        // charged; if they alone blew the budget, refusing here gives a clean
+        // message instead of one attributed to whichever stage tripped first.
+        if (tripped(requestBudget)) {
+          const refusal = budgetRefusal("composition");
+          if (refusal) return refusal;
+        }
         const tCompose = Date.now();
         const orch = await orchestrateComposition({
           sequence,
@@ -409,6 +465,10 @@ export async function generateCodeForRequest({
         upstreamTaskIds = orch.upstreamTaskIds;
       } else {
         // Atomic — single-language code gen, reusing the head retrieval.
+        if (tripped(requestBudget)) {
+          const refusal = budgetRefusal("atomic");
+          if (refusal) return refusal;
+        }
         const tGen = Date.now();
         const result = await codeGenerationService({
           auth,
@@ -472,6 +532,34 @@ export async function generateCodeForRequest({
         // generating each upstream with the user's prompt verbatim.
         const resolved = await resolveUpstreams(code);
         if (resolved.upstreams.length > 0) {
+          // resolveUpstreams returns EVERY `data use` in the node pool with no
+          // limit, and each one below starts a full generateCode. Until this
+          // check, that made the reactive path the one composition route that
+          // honoured neither MAX_STAGES nor the composesWith allowlist — both
+          // are applied to the planner's sequence only. A model emitting N
+          // bindings therefore bought N concurrent generations, outside the
+          // fence that exists to stop exactly that.
+          const proposed = [headLang, ...resolved.upstreams];
+          const fenced = fenceComposition(proposed, composesWithFor(headLang));
+          const overDepth = proposed.length > MAX_STAGES;
+          if (fenced.dropped.length > 0 || overDepth) {
+            console.log(
+              `[composition] rid=${rid} headLang=${headLang} reactive refused ` +
+              `dropped=${fenced.dropped.join(",") || "none"} depth=${proposed.length}/${MAX_STAGES}`,
+            );
+            ragLog(rid, "composition.reactive.refused", {
+              headLang, proposed: resolved.upstreams, dropped: fenced.dropped, overDepth,
+            });
+            const detail = fenced.dropped.length > 0
+              ? `L${headLang} is not permitted to compose with ${fenced.dropped.map((d) => "L" + d).join(", ")}.`
+              : `A composition may use at most ${MAX_STAGES} languages; this one proposed ${proposed.length}.`;
+            return {
+              src: null, taskId: null, language, description: null, changeSummary: null,
+              model, provider, tier, usage: null,
+              errors: [{ message: `${detail} Try describing the item as a single language, or splitting it into separate items.` }],
+              upstreamLangs: [], rid,
+            };
+          }
           code = resolved.ast;
           upstreamLangs = resolved.upstreams;
           console.log(`[composition] rid=${rid} headLang=${headLang} reactive upstreams=${upstreamLangs.join(",")}`);
@@ -487,8 +575,12 @@ export async function generateCodeForRequest({
             rid,
             itemId,
             auth,
+            budget: requestBudget,
           });
-          const upstreamResults = await Promise.all(
+          // allSettled, not all: a rejection here used to escape while every
+          // sibling kept running, unhandled and uncancellable, spending tokens
+          // for a request that had already decided to fail.
+          const settled = await Promise.allSettled(
             upstreamLangs.map((uLang, i) =>
               codeGenerationService({
                 auth,
@@ -499,6 +591,16 @@ export async function generateCodeForRequest({
                 itemId,
               })
             )
+          );
+          // Budget FIRST. After the per-result loop the caller would instead see
+          // "Upstream L0179 failed to produce a taskId" — a downstream symptom
+          // whose identity depends on which stage happened to trip first.
+          if (tripped(requestBudget)) {
+            const refusal = budgetRefusal("composition.reactive");
+            if (refusal) return refusal;
+          }
+          const upstreamResults = settled.map((r) =>
+            r.status === "fulfilled" ? r.value : { errors: [{ message: String((r as PromiseRejectedResult).reason?.message ?? r.reason) }] },
           );
           const upstreamErrors = upstreamResults.flatMap((r: any, i: number) => {
             if (r && 'errors' in r && r.errors) return r.errors;

@@ -5,10 +5,19 @@ import { listLanguages, findLanguageById } from "./languages";
 import { hybridSearch } from "./embedding-service";
 import { parseCode } from "../pages/api/resolvers";
 import { recordTokenUsage, Stage } from "./token-usage-service";
+import {
+  type RequestBudget,
+  BUDGET_ERROR_CODE,
+  BUDGET_ERROR_MESSAGE,
+  budgetSummary,
+  charge as chargeBudget,
+  exhausted,
+  tripped,
+} from "./request-budget";
 
 // Hard bound on composition depth: head + at most (MAX_STAGES-1) upstream
 // stages. Keeps planning cost and chain length sane.
-const MAX_STAGES = 4;
+export const MAX_STAGES = 4;
 
 // Composition planning is its own Graffiticode dialect, L0010: a program maps a
 // prompt to an ordered language sequence (and nothing else). Plans are written
@@ -136,6 +145,7 @@ export async function findBestLanguages({
   rid,
   itemId,
   auth,
+  budget,
 }: {
   userRequest: string;
   outOfScopeReason: string;
@@ -143,6 +153,8 @@ export async function findBestLanguages({
   rid?: string;
   itemId?: string | null;
   auth?: { uid: string };
+  /** Request-wide token budget; these calls bypass the provider seam. */
+  budget?: RequestBudget;
 }): Promise<RoutingResult> {
   try {
     const { candidates, catalog } = await buildLanguageCatalog({ excludeLang: currentLang });
@@ -157,6 +169,7 @@ export async function findBestLanguages({
       return { suggestions: [] };
     }
 
+    chargeRouterAttempt(budget);
     const response = await axios.post(
       "https://api.anthropic.com/v1/messages",
       {
@@ -186,10 +199,12 @@ If none fit, return {"suggestions": []}`,
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },
+        timeout: ROUTER_TIMEOUT_MS,
       }
     );
 
     // Record token usage if auth and rid are provided
+    chargeRouterResult(budget, response.data?.usage);
     if (auth && rid && response.data?.usage) {
       const usage = response.data.usage;
       await recordTokenUsage({
@@ -259,12 +274,15 @@ export async function classifyAndRoute({
   rid,
   itemId,
   auth,
+  budget,
 }: {
   userRequest: string;
   currentLang: string;
   rid?: string;
   itemId?: string | null;
   auth?: { uid: string };
+  /** Request-wide token budget; these calls bypass the provider seam. */
+  budget?: RequestBudget;
 }): Promise<RouteResult> {
   const FAIL_OPEN: RouteResult = { inScope: true, routedLang: null, reason: "" };
   // Separate the ASK from source material pasted under it.
@@ -304,6 +322,7 @@ export async function classifyAndRoute({
       current?.outOfScope?.length ? `out of scope: ${current.outOfScope.join("; ")}` : "",
     ].filter(Boolean).join("\n");
 
+    chargeRouterAttempt(budget);
     const response = await axios.post(
       "https://api.anthropic.com/v1/messages",
       {
@@ -343,10 +362,12 @@ Be conservative: only route away when the request clearly belongs to a different
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },
+        timeout: ROUTER_TIMEOUT_MS,
       },
     );
 
     // Record token usage if auth and rid are provided
+    chargeRouterResult(budget, response.data?.usage);
     if (auth && rid && response.data?.usage) {
       const usage = response.data.usage;
       await recordTokenUsage({
@@ -415,12 +436,15 @@ export async function splitRequest({
   rid,
   itemId,
   auth,
+  budget,
 }: {
   prompt: string;
   sequence: string[];
   rid?: string | null;
   itemId?: string | null;
   auth?: any;
+  /** Request-wide token budget; these calls bypass the provider seam. */
+  budget?: RequestBudget;
 }): Promise<string[] | null> {
   if (sequence.length <= 1) return null;
   try {
@@ -437,6 +461,7 @@ export async function splitRequest({
       })
       .join("\n\n");
 
+    chargeRouterAttempt(budget);
     const response = await axios.post(
       "https://api.anthropic.com/v1/messages",
       {
@@ -473,9 +498,11 @@ Return JSON only, exactly ${sequence.length} stages, in the same order:
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },
+        timeout: ROUTER_TIMEOUT_MS,
       },
     );
 
+    chargeRouterResult(budget, response.data?.usage);
     if (auth && rid && response.data?.usage) {
       const usage = response.data.usage;
       await recordTokenUsage({
@@ -540,12 +567,15 @@ export async function planComposition({
   rid,
   itemId,
   auth,
+  budget,
 }: {
   prompt: string;
   currentLang: string;
   rid?: string;
   itemId?: string | null;
   auth?: { uid: string };
+  /** Request-wide token budget; these calls bypass the provider seam. */
+  budget?: RequestBudget;
 }): Promise<CompositionPlan> {
   const fallback: CompositionPlan = [{ lang: currentLang, prompt }];
   try {
@@ -576,6 +606,7 @@ export async function planComposition({
       return fallback;
     }
 
+    chargeRouterAttempt(budget);
     const response = await axios.post(
       "https://api.anthropic.com/v1/messages",
       {
@@ -636,10 +667,12 @@ Rules:
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },
+        timeout: ROUTER_TIMEOUT_MS,
       }
     );
 
     // Record token usage if auth and rid are provided
+    chargeRouterResult(budget, response.data?.usage);
     if (auth && rid && response.data?.usage) {
       const usage = response.data.usage;
       await recordTokenUsage({
@@ -725,9 +758,65 @@ export interface OrchestrationResult {
   errors?: { message: string }[];
 }
 
+/**
+ * Charge a router/planner Haiku call against the request budget.
+ *
+ * These four calls post to the Anthropic API directly rather than through
+ * `requestProvider`, so they are the one family of model calls the provider
+ * seam cannot see. Without this they would be free, and a scope gate plus a
+ * planner plus a splitter is three calls a runaway never pays for.
+ *
+ * Floored at an estimate of what was sent, for the same reason the provider
+ * seam floors its charge: a failed call reports no usage at all, and those are
+ * the calls that matter here.
+ */
+function chargeRouterAttempt(budget: RequestBudget | undefined): void {
+  if (!budget) return;
+  // Counts the ATTEMPT only, no tokens. These four calls are fail-open, so a
+  // charge that ran only after a successful response would make exactly the
+  // failing calls free — and a router stuck in a retry loop is one of the
+  // shapes the call ceiling exists to stop. Tokens are added below when the
+  // provider reports them.
+  chargeBudget(budget, null, 0);
+}
+
+/**
+ * Add what the provider actually reported, once the call has returned.
+ * `countCall: false` — the attempt above already counted it.
+ */
+function chargeRouterResult(
+  budget: RequestBudget | undefined,
+  usage: any,
+): void {
+  if (!budget || !usage) return;
+  chargeBudget(
+    budget,
+    {
+      inputTokens: usage.input_tokens || 0,
+      outputTokens: usage.output_tokens || 0,
+      cacheCreationInputTokens: usage.cache_creation_input_tokens || 0,
+      cacheReadInputTokens: usage.cache_read_input_tokens || 0,
+      reasoningTokens: 0,
+    },
+    0,
+    false,
+  );
+}
+
+/**
+ * Timeout for the router/planner calls.
+ *
+ * These were bare `axios.post` with no timeout at all — axios defaults to
+ * infinite — and they never consult the request deadline, so one hung Haiku
+ * call could eat the whole 420s request budget before generation began.
+ */
+const ROUTER_TIMEOUT_MS = 30_000;
+
 function failedOrchestration(
   headLang: string,
-  errors: { message: string }[],
+  // `code` is optional and additive: it lets a non-human caller branch on the
+  // reason without matching prose, following the `out_of_scope` precedent.
+  errors: { message: string; code?: string }[],
   headModel = "",
   headUsage = { input_tokens: 0, output_tokens: 0 },
 ): OrchestrationResult {
@@ -776,7 +865,7 @@ export async function orchestrateComposition({
   // Only the upstreams — the stages that never asked for the host's framing — get a
   // scoped share. Null (split unavailable or malformed) restores the previous
   // behavior of sending the original prompt everywhere.
-  const stagePrompts = await splitRequest({ prompt, sequence, rid, itemId, auth });
+  const stagePrompts = await splitRequest({ prompt, sequence, rid, itemId, auth, budget: options?.budget });
   if (stagePrompts) {
     console.log(`[composition] rid=${rid} split=${sequence.map((l, i) => `L${l}:${stagePrompts[i].length}c`).join(" ")}`);
   } else if (sequence.length > 1) {
@@ -804,7 +893,32 @@ export async function orchestrateComposition({
     return generateCodeService({ auth, prompt: promptFor(i), lang, options, rid, itemId, upstreamContext });
   });
 
-  const results: any[] = await Promise.all(gens);
+  // allSettled, not all: `all` rejects on the FIRST rejection while every
+  // sibling generation keeps running — unhandled, uncancellable, and spending
+  // tokens for a request that has already failed. Settling lets each stage's
+  // outcome be reported through the existing failedOrchestration path.
+  const settled = await Promise.allSettled(gens);
+  const results: any[] = settled.map((r) =>
+    r.status === "fulfilled"
+      ? r.value
+      : { errors: [{ message: String((r as PromiseRejectedResult).reason?.message ?? r.reason) }] },
+  );
+
+  // Budget BEFORE the per-stage inspection below. Stages share one budget
+  // object, so the moment any one trips it the others stop starting calls and
+  // drain; reporting the budget here rather than after the loop keeps the
+  // message deterministic instead of naming whichever stage happened to fail
+  // first as the cause.
+  if (options?.budget && tripped(options.budget)) {
+    console.log(
+      `[budget] rid=${rid} composition stopped ${budgetSummary(options.budget)}`,
+    );
+    if (exhausted(options.budget)) {
+      return failedOrchestration(headLang, [
+        { message: BUDGET_ERROR_MESSAGE, code: BUDGET_ERROR_CODE },
+      ]);
+    }
+  }
   const headResult = results[0];
 
   for (let i = 1; i < results.length; i++) {
@@ -966,6 +1080,7 @@ export async function planSequence({
   rid,
   itemId,
   preferHaiku = false,
+  budget,
 }: {
   prompt: string;
   headLang: string;
@@ -980,6 +1095,8 @@ export async function planSequence({
   // don't want a ~4s Sonnet call on that hot atomic path. Haiku's prompt fast-returns
   // a single stage for those cases.
   preferHaiku?: boolean;
+  /** Request-wide token budget; these calls bypass the provider seam. */
+  budget?: RequestBudget;
 }): Promise<PlanResult> {
   // Head pinning: head selection is the scope gate's job, never a planner's. Whatever any
   // planner returns, the head stays headLang; stray langs become upstream candidates (the
@@ -1002,7 +1119,7 @@ export async function planSequence({
 
   // Capability-only trigger → skip the Sonnet L0010 codegen entirely.
   if (preferHaiku) {
-    const plan = await planComposition({ prompt, currentLang: headLang, rid, itemId, auth });
+    const plan = await planComposition({ prompt, currentLang: headLang, rid, itemId, auth, budget });
     return { sequence: pin(plan.map((s) => s.lang)), fromRag: false };
   }
 
@@ -1022,6 +1139,10 @@ export async function planSequence({
   }
 
   // Fallback → Haiku planner. (Capture happens at the resolver's success point.)
-  const plan = await planComposition({ prompt, currentLang: headLang });
+  // rid/auth/itemId were missing here, so this fallback planner call recorded
+  // NO usage row at all — the `if (auth && rid)` guard inside planComposition
+  // silently skipped it. Passing them makes the fallback as accountable as the
+  // path above, and the budget makes it chargeable.
+  const plan = await planComposition({ prompt, currentLang: headLang, rid, itemId, auth, budget });
   return { sequence: pin(plan.map((s) => s.lang)), fromRag: false };
 }

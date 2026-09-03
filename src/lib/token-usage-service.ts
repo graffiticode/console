@@ -49,6 +49,16 @@ interface RecordTokenUsageArgs {
   model: string;
   tier?: string | null;
   usage: TokenUsage;
+  /**
+   * Did the work this usage paid for succeed?
+   *
+   * Until this existed only successes were recorded at all, so a request that
+   * failed repeatedly left no trace and every cost report understated real
+   * spend by exactly the failures. Records written before this field carry no
+   * `outcome` — a consumer that wants successes only must treat MISSING as
+   * success, not filter on equality, or it silently drops all history.
+   */
+  outcome?: "success" | "failed";
   extra?: Record<string, unknown>;
 }
 
@@ -71,6 +81,7 @@ export async function recordTokenUsage({
   model,
   tier,
   usage,
+  outcome = "success",
   extra,
 }: RecordTokenUsageArgs): Promise<void> {
   // No-op if no tokens spent (including cache reads, which bill at 0.1×)
@@ -98,6 +109,7 @@ export async function recordTokenUsage({
       timestamp: now.toISOString(),
       lang: lang ?? null,
       type: "ai_generation",
+      outcome,
       env: currentEnv(),
       provider,
       tier: tier ?? null,
@@ -116,8 +128,10 @@ export async function recordTokenUsage({
     // Write flat log
     await db.collection("usage").add(doc);
 
-    // Write/update item-doc rollup if itemId is known
-    if (itemId) {
+    // Write/update item-doc rollup if itemId is known. Failed generations are
+    // deliberately excluded: the flat log carries them for cost reporting, but
+    // an item's own rollup should describe what producing THAT item cost.
+    if (itemId && outcome === "success") {
       await updateItemTokenUsage(auth.uid, itemId, usage, model, stage);
     }
   } catch (error) {

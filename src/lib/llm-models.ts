@@ -1,8 +1,19 @@
-import { modelPriorityFor, modelTiersFor, modeTierFor, type GenerationMode } from "./model-priority";
+import { modelPriorityFor, modelTiersFor, modeEffortFor, modeTierFor, type GenerationMode } from "./model-priority";
 
 export type LlmProvider = "anthropic" | "openai";
 export type ProviderMode = LlmProvider | "auto";
 export type GenerationTier = "quality" | "balanced" | "fast";
+
+/**
+ * How hard the model thinks before answering — the second cost/quality dial, orthogonal
+ * to tier. Tier picks WHICH model; effort picks how much of it you spend.
+ *
+ * Not every model carries this dial: see modelSupportsEffort, which drops the parameter
+ * for a model that would 400 on it. A language pinned to a non-supporting model (today,
+ * anything on `anthropic+fast` → Haiku 4.5) silently ignores whatever effort is set for
+ * it, so raising effort there is not expressible without also changing its tier.
+ */
+export type EffortLevel = "low" | "medium" | "high" | "xhigh" | "max";
 
 export const ANTHROPIC_MODELS = {
   // Opus 5 rather than 4.8: same $5/$25, current generation. Two behaviors this
@@ -97,6 +108,36 @@ export function modelRejectsTemperature(model?: string): boolean {
   return !!model && /(opus|sonnet-5|fable|mythos|gpt-5\.6)/i.test(model);
 }
 
+/**
+ * Does this model accept an effort parameter at all?
+ *
+ * `effort` is not universal. Anthropic takes it as `output_config.effort` and OpenAI as
+ * `reasoning.effort`, but on both sides it is a property of the MODEL, not the provider:
+ * the Claude 5 family and Opus 4.6-4.8 accept it, and Haiku 4.5 — which is
+ * ANTHROPIC_MODELS.FAST, the model `anthropic+fast` resolves to — rejects it with a 400,
+ * `"This model does not support the effort parameter."`
+ *
+ * That is not hypothetical. CODEGEN_EFFORT=low went onto the console service on
+ * 2026-09-01 and every L0176 generation started failing, because L0176 is the one
+ * language pinned to `anthropic+fast` (model-priority.ts). It was a hard failure rather
+ * than a slow one: 0 tokens, 159ms, and no failover, since an `invalid_request_error`
+ * was on failoverableProviderError's deny list. The daily corpus ping was the only thing
+ * that caught it — L0176 has no other traffic.
+ *
+ * ALLOW-LIST, not a deny-list of the two 4.5 models, and that direction is the whole
+ * point. An unrecognized model here silently loses effort — a request that succeeds
+ * without a tuning knob. A deny-list would let the next model we add 400 on every call.
+ * Being wrong in the quiet direction is the requirement.
+ */
+export function modelSupportsEffort(model?: string): boolean {
+  return (
+    !!model &&
+    /(opus-5|sonnet-5|opus-4-[678]|sonnet-4-6|fable|mythos|gpt-5\.6)/i.test(
+      model,
+    )
+  );
+}
+
 export interface LanguageGenerationPolicy {
   tier?: GenerationTier;
 }
@@ -178,6 +219,14 @@ export interface GenerationRoute {
    */
   tierByProvider?: Partial<Record<LlmProvider, GenerationTier>>;
   model?: string;
+  /**
+   * Per-language effort override from the priority table. Absent for every language that
+   * states no opinion, in which case the global CODEGEN_EFFORT applies.
+   *
+   * Callers must read `route.effort ?? options.effort` — the route value WINS, because a
+   * table entry is a deliberate exception to a global default.
+   */
+  effort?: EffortLevel;
   /** Where the ordering came from, for telemetry and log lines. */
   source: "model_pin" | "operator_override" | "language_priority";
 }
@@ -254,11 +303,16 @@ export function resolveGenerationRoute(
   // dialect saying "revisions are lighter" means lighter on whichever family serves it, and
   // leaving the +tier suffixes in force would let them veto the very override being asked
   // for. Absent an override (the normal case) the suffixes apply as before.
+  // Effort rides along on this path only, for the same reason the mode tier does: a model
+  // pin (eval harness) and an operator override are deliberate bypasses of the table, and
+  // an eval that silently inherited a language's effort would be measuring the wrong thing.
+  const modeEffort = modeEffortFor(input.lang, input.mode ?? "create");
   const modeTier = modeTierFor(input.lang, input.mode ?? "create");
   if (modeTier) {
     return {
       providers: configuredFallbackEnabled() ? providers : providers.slice(0, 1),
       tier: modeTier,
+      ...(modeEffort ? { effort: modeEffort } : {}),
       source: "language_priority",
     };
   }
@@ -267,6 +321,7 @@ export function resolveGenerationRoute(
     providers: configuredFallbackEnabled() ? providers : providers.slice(0, 1),
     tier,
     ...(Object.keys(tierByProvider).length ? { tierByProvider } : {}),
+    ...(modeEffort ? { effort: modeEffort } : {}),
     source: "language_priority",
   };
 }
