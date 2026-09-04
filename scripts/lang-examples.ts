@@ -30,8 +30,22 @@ export interface ExamplesSource {
   source: string;
 }
 
+/**
+ * Both package layouts, because both are in use: languages from 0174 up (plus 0000, 0003, 0010,
+ * 0013) keep the spec under `packages/core/spec/`, while 0002 and the 0158-0173 family keep it
+ * under `packages/api/spec/`. Knowing only `core` made the local read miss for every api-layout
+ * language and fall through to the served asset — which those same languages do not publish, so
+ * `readExamplesMarkdown("0172")` had no path at all and threw.
+ */
+const LOCAL_SPEC_DIRS = ["core", "api"];
+
+export function localExamplesPaths(langCode: string): string[] {
+  return LOCAL_SPEC_DIRS.map((pkg) =>
+    path.resolve(__dirname, `../../l${langCode}/packages/${pkg}/spec/examples.md`));
+}
+
 export function localExamplesPath(langCode: string): string {
-  return path.resolve(__dirname, `../../l${langCode}/packages/core/spec/examples.md`);
+  return localExamplesPaths(langCode).find((p) => fs.existsSync(p)) ?? localExamplesPaths(langCode)[0];
 }
 
 function apiBase(): string {
@@ -62,9 +76,10 @@ async function fetchExamplesAsset(langCode: string): Promise<ExamplesSource | nu
  */
 export async function readExamplesMarkdown(langCode: string): Promise<ExamplesSource> {
   const pref = process.env.EXAMPLES_SOURCE;
-  const localPath = localExamplesPath(langCode);
-  const readLocal = (): ExamplesSource | null =>
-    fs.existsSync(localPath) ? { text: fs.readFileSync(localPath, "utf-8"), source: localPath } : null;
+  const readLocal = (): ExamplesSource | null => {
+    const localPath = localExamplesPaths(langCode).find((p) => fs.existsSync(p));
+    return localPath ? { text: fs.readFileSync(localPath, "utf-8"), source: localPath } : null;
+  };
 
   const order: Array<() => Promise<ExamplesSource | null> | ExamplesSource | null> =
     pref === "asset" ? [() => fetchExamplesAsset(langCode)]
