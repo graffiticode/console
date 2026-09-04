@@ -40,7 +40,7 @@ import { getBaseUrlForApi } from "./api";
  * Languages registered with no corpus (0003, 0013, 0152, 0153, 0154, 0171, 0174, 0180)
  * cannot be pinged at all until they have one — there is no prompt to send. They are
  * absent rather than silently passing, and `no-corpus` is reported if one is added here
- * early. 0180 is the live case: it has 113 prompts in examples.md but no corpus has been
+ * early. 0180 is the live case: it has 131 prompts in examples.md but no corpus has been
  * generated from them, so it is a create-items-from-prompts run away from being pingable.
  */
 export const PING_LANGUAGES = [
