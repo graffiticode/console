@@ -20,8 +20,9 @@ Curated training examples to single-turn prompts that match how users actually a
 
 ### Workflow
 ```bash
-# Download examples from Firestore (mark=4 items)
-npm run download-training-examples -- --lang 0166 --mark 4
+# Download examples from Firestore. The RAG training corpus is ALWAYS mark 3,
+# which is now the script's default. --lang is required; there is no default language.
+npm run download-training-examples -- --lang 0166
 
 # Edit training/l0166-training-examples.md as needed
 

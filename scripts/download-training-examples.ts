@@ -3,10 +3,9 @@
 /**
  * Script to download training examples from Firebase to a markdown file
  *
- * Usage:
- *   npm run download-training-examples
- *   npm run download-training-examples -- --lang 0159
- *   npm run download-training-examples -- --limit 100
+ * Usage (--lang is required; mark defaults to 3, the RAG corpus):
+ *   npm run download-training-examples -- --lang 0181
+ *   npm run download-training-examples -- --lang 0159 --limit 100
  */
 
 import fs from "fs";
@@ -38,7 +37,12 @@ const languageFilter = args.includes("--lang")
 
 const markValues: number[] = args.includes("--mark")
   ? args[args.indexOf("--mark") + 1].split(",").map(v => parseInt(v.trim()))
-  : [4]; // Default to mark 4 for high quality examples
+  // The RAG training corpus is mark 3. This defaulted to 4 and called it "high quality
+  // examples", which made a bare run silently download the wrong set — and the docs
+  // repeated it (docs/rag-training-notes.md said --mark 4). scripts/verify-0178-corpus.ts
+  // is the one that always agreed: it promotes compile-passing items to mark 3, and
+  // scripts/create-items-from-prompts.ts seeds a corpus at mark 3.
+  : [3];
 
 // Default user ID
 const defaultUserId = "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1";
@@ -58,21 +62,31 @@ if (args.includes("--help")) {
 Usage: npm run download-training-examples -- [options]
 
 Options:
+  --lang <language>      Language code to download (REQUIRED, e.g. "0181")
   --limit <number>       Maximum number of items to download (default: 10000)
-  --lang <language>      Filter by language code (e.g., "0159")
-  --mark <marks>         Filter by mark value(s), comma-separated (default: 4)
+  --mark <marks>         Filter by mark value(s), comma-separated (default: 3 — the RAG corpus)
   --user <userId>        User ID to fetch items from (default: predefined ID)
   --append               Append to existing file instead of overwriting (default: overwrite)
   --help                 Show this help message
 
 Examples:
-  npm run download-training-examples                    # Download L0002 mark=4 examples (default)
-  npm run download-training-examples -- --lang 0159     # Download L0159 mark=4 examples
-  npm run download-training-examples -- --mark 5        # Download L0002 mark=5 examples
-  npm run download-training-examples -- --mark 3,4      # Download L0002 mark=3 and mark=4 examples
-  npm run download-training-examples -- --append        # Append to existing L0002 file
+  npm run download-training-examples -- --lang 0181     # L0181, mark 3 (the corpus)
+  npm run download-training-examples -- --lang 0159     # L0159, mark 3
+  npm run download-training-examples -- --lang 0166 --mark 5   # a non-corpus mark
+  npm run download-training-examples -- --lang 0166 --append   # append to the existing file
 `);
   process.exit(0);
+}
+
+// --lang is REQUIRED. It used to be optional, and an omitted language did not mean
+// "nothing" — it meant every language at once, written out per-language over whatever
+// training/*.md files those groups map to. Combined with the default overwrite (--append
+// off), a bare run could rewrite corpus files for languages the caller never named.
+// There is no sensible default here: the corpus is per-language by construction.
+if (!languageFilter) {
+  console.error("Error: --lang is required (e.g. --lang 0181)");
+  console.error("Usage: npm run download-training-examples -- --lang <code> [--mark 3] [--limit N] [--append]");
+  process.exit(1);
 }
 
 let apiFirestore: admin.firestore.Firestore;
