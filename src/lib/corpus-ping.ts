@@ -32,16 +32,25 @@ import { getBaseUrlForApi } from "./api";
 
 /**
  * The pinged set: registered in LANGUAGES *and* carrying a RAG corpus, minus the
- * deprecated dialects (0158, 0166) and the internal composition planner (0010). A
- * failure in one of these is a customer-facing breakage; the excluded ones are either
- * being subsumed or are not content-authoring targets.
+ * deprecated dialects (0158, 0166) and the internal composition planner (0010). A failure
+ * in one of these is a customer-facing breakage; the excluded ones are either being
+ * subsumed or are not content-authoring targets. Beta is NOT itself a reason to be out
+ * (0181 is here) — 0172 and 0159 were removed by request.
  *
- * Languages registered with no corpus (0003, 0013, 0152, 0153, 0154, 0171, 0174) cannot
- * be pinged at all until they have one — there is no prompt to send. They are absent
- * rather than silently passing, and `no-corpus` is reported if one is added here early.
+ * Languages registered with no corpus (0003, 0013, 0152, 0153, 0154, 0171, 0174, 0180)
+ * cannot be pinged at all until they have one — there is no prompt to send. They are
+ * absent rather than silently passing, and `no-corpus` is reported if one is added here
+ * early. 0180 is the live case: it has 113 prompts in examples.md but no corpus has been
+ * generated from them, so it is a create-items-from-prompts run away from being pingable.
  */
 export const PING_LANGUAGES = [
-  "0000", "0159", "0169", "0170", "0172",
+  "0000", "0169", "0170",
+  // 0172 (FigJam) and 0159 (match/memory) left the set 2026-09-04, by request. Note what
+  // that costs: SWEEP_LANGUAGES is this same list, so a language dropped here leaves the
+  // weekly sweep too and has NO routine detector — the blind spot described for 0181
+  // below. Both still have a live corpus (0172: 133 rows, regenerated the same day;
+  // 0159: 20 rows), so nothing here reflects a doubt about them; they are simply
+  // unwatched now, which is what let L0176 sit broken for 27 hours.
   "0173", "0175", "0176", "0177", "0178", "0179",
   // 0181 (flashcards) joined 2026-09-03, the day its 90-example corpus was seeded and
   // embedded. Adding it here is the point: until it was in this list, a brand-new
