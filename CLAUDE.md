@@ -12,6 +12,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 There is no unit-test runner (no `npm test`); `test:streaming` is a manual `tsx` script. The real gate is: `npm run lint` and `npm run typecheck` must pass.
 
+**Any change to the code generator also runs the corpus ping** — `llm-generation-service.ts`, `code-generation-service.ts`, `code-generation/`, `model-priority.ts`, `llm-models.ts`, dialect instructions, **and env-var changes to the console service**.
+
+```bash
+curl 'https://console.graffiticode.org/api/internal/corpus-ping?dry=1'             # all 11, ~50s
+curl 'https://console.graffiticode.org/api/internal/corpus-ping?dry=1&langs=0176'  # while iterating
+```
+
+`?dry=1` sends no SMS, writes no run log, skips auth. It costs 11 real generations — narrow with `&langs=` while iterating, but run the full set before calling it done.
+
+Why lint+typecheck isn't sufficient: 2026-09-01, `CODEGEN_EFFORT=low` was set with `gcloud run services update`. `output_config.effort` is Claude 5 / Opus 4.6–4.8 only, L0176 is the one language pinned to `anthropic+fast` (→ Haiku 4.5), and every L0176 generation 400'd for 27 hours. It was in no file, so there was no diff and nothing to typecheck. A config change is a code change, and `model-priority.ts` gives languages different models — a global knob can be fine on 10 of 11 and fatal on the 11th.
+
+Ping, not sweep: the ping is the daily liveness check above. `npm run corpus-sweep` is weekly, ~110 generations, and compares output *shape* — for changes that could move quality (retuning a model, tier, or prompt).
+
 ## Architecture
 
 Next.js 15 + React 18 app with GraphQL API, Claude AI code generation, and Firestore.
