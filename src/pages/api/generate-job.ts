@@ -177,6 +177,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // If the pre-flight scope gate re-routed away from the client's pick, persist the corrected
     // language (and any composition upstreams) so MCP get_item reflects what was actually built.
     const rerouted = result.language && result.language !== lang;
+    // The status flip rides INSIDE updateItem, fired the moment the taskId write
+    // lands — see its onRenderable parameter. It used to run after updateItem
+    // returned, which put a re-read and the version/billing writes (24ms + 308ms
+    // measured) between "the item is renderable" and "anyone can see it". Those
+    // writes still happen, still awaited, still before this handler returns 200.
+    let statusMs = 0;
+    let toReadyMs = 0;
     const tUpdate = Date.now();
     await updateItem({
       auth,
@@ -187,17 +194,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       label: modification,
       ...(rerouted ? { lang: result.language } : {}),
       ...(Array.isArray(result.upstreamLangs) ? { upstreamLangs: result.upstreamLangs } : {}),
+      onRenderable: async () => {
+        const tStatus = Date.now();
+        await setItemGenerationStatus({ auth, id: itemId, status: "ready" });
+        statusMs = Date.now() - tStatus;
+        toReadyMs = Date.now() - tPost;
+      },
     });
     const updateMs = Date.now() - tUpdate;
-    const tStatus = Date.now();
-    await setItemGenerationStatus({ auth, id: itemId, status: "ready" });
-    const statusMs = Date.now() - tStatus;
     // The item is visible as ready HERE. Everything after this line is bookkeeping
     // the caller never waits on, so it is deliberately outside the number below.
     console.log(
       `[generate-job] post rid=${result.rid ?? "-"} lang=L${lang} ` +
         `getItem=${tGetItem} updateItem=${updateMs} status=${statusMs} ` +
-        `toReady=${Date.now() - tPost}`,
+        // toReady is the number that matters: the item is VISIBLE here. The
+        // trailing bookkeeping is in updateItem's total, deliberately not in this.
+        `toReady=${toReadyMs} workerTotal=${Date.now() - tPost}`,
     );
     await resolveFirstOutcome(workspaceKey, "ok");
     await releaseGeneration({ auth, id: itemId, owner: attemptId });
