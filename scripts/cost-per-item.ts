@@ -95,6 +95,15 @@ Average AI cost to produce one item, for a period.
                             repeatable, so --lang 0158 --lang 0176 pools a family.
                             Both the cost and the item count are narrowed to it,
                             so cost per item stays a like-for-like ratio.
+  --outcome all|success|failed
+                            Which generations to price (default: all — a failed
+                            generation spent real tokens, so excluding it
+                            understates what producing an item costs, on the
+                            same reasoning that keeps unattributed generations
+                            in). Records written before failure recording
+                            shipped carry no outcome field and are counted as
+                            successes, so "success" does not silently empty
+                            every older window.
   --min-items <n>           Drop any language with fewer than n items created in
                             the window (default: 10; 0 disables). A language with
                             a handful of items has an average one item wide, and
@@ -134,6 +143,7 @@ interface Opts {
   langs: string[];
   excludeLangs: string[];
   minItems: number;
+  outcome: 'all' | 'success' | 'failed';
   output?: string;
   json: boolean;
   /**
@@ -145,6 +155,14 @@ interface Opts {
   byLang: boolean;
   env: 'prod' | 'local' | 'all';
 }
+
+/**
+ * When failure recording shipped. Before this instant a generation that failed
+ * wrote no usage row at all — it threw ~350 lines before the recorder — so every
+ * window ending earlier prices SUCCESSES ONLY, whatever --outcome says. The run
+ * warns rather than letting a window that straddles this look like a cost jump.
+ */
+const FAILURE_RECORDING_SINCE = Date.parse('2026-09-03T01:04:00Z');
 
 /** Records store a bare 4-digit id ("0176"); accept the L-prefixed and unpadded forms too. */
 function normalizeLang(raw: string): string {
@@ -174,6 +192,7 @@ function parseArgs(argv: string[]): Opts {
     langs: [],
     excludeLangs: [],
     minItems: 10,
+    outcome: 'all',
     json: false,
     asOf: new Date(),
     byLang: false,
@@ -191,6 +210,14 @@ function parseArgs(argv: string[]): Opts {
     else if (a === '--per-item') { opts.perItem = true; }
     else if (a === '--lang' && args[i + 1]) { opts.langs.push(normalizeLang(args[++i])); }
     else if (a === '--exclude-lang' && args[i + 1]) { opts.excludeLangs.push(normalizeLang(args[++i])); }
+    else if (a === '--outcome' && args[i + 1]) {
+      const v = args[++i];
+      if (v !== 'all' && v !== 'success' && v !== 'failed') {
+        console.error(`Error: --outcome must be all, success or failed (got "${v}")`);
+        process.exit(1);
+      }
+      opts.outcome = v;
+    }
     else if (a === '--min-items' && args[i + 1]) {
       const raw = args[++i];
       const n = Number(raw);
@@ -471,6 +498,12 @@ interface PerItem {
   unmarked: number;
   /** Generations excluded by the --env filter. Drives the like-for-like guard. */
   envDropped: number;
+  /** Failed generations in the window, before any --outcome filter. */
+  failedSeen: number;
+  /** Generations excluded by the --outcome filter. */
+  outcomeDropped: number;
+  /** Priced spend of the FAILED generations that were kept. */
+  failedUsd: number;
 }
 
 /**
@@ -486,21 +519,30 @@ interface PerItem {
  */
 async function fetchPerItem(
   start: Date, end: Date, asOf: Date, langs: string[] = [], env: 'prod' | 'local' | 'all' = 'all',
-  excludeLangs: string[] = [],
+  excludeLangs: string[] = [], outcome: 'all' | 'success' | 'failed' = 'all',
 ): Promise<PerItem> {
   const snap = await db.collection('usage')
     .where('type', '==', 'ai_generation')
-    .select('createdAt', 'userId', 'itemId', 'generatedTaskId', 'cost', 'lang', 'model', 'tokens', 'provider', 'env')
+    .select('createdAt', 'userId', 'itemId', 'generatedTaskId', 'cost', 'lang', 'model', 'tokens', 'provider', 'env', 'outcome')
     .get();
 
   const records: GenRecord[] = [];
   let unmarked = 0;
   let envDropped = 0;
+  let failedSeen = 0;
+  let outcomeDropped = 0;
+  let failedUsd = 0;
   for (const doc of snap.docs) {
     const d = doc.data();
     if (!langKept(d.lang, langs, excludeLangs)) continue;
     const ms = toMillis(d.createdAt);
     if (ms < start.getTime() || ms >= end.getTime()) continue;
+    // A record with no `outcome` predates failure recording. It is counted as a
+    // SUCCESS rather than dropped: those rows are the entire history, and
+    // filtering them out on equality would empty every older window.
+    const recordOutcome: string = d.outcome === 'failed' ? 'failed' : 'success';
+    if (recordOutcome === 'failed') failedSeen++;
+    if (outcome !== 'all' && recordOutcome !== outcome) { outcomeDropped++; continue; }
     // No `env` means the record predates the marker. Counting those under prod
     // keeps history readable — dropping them would silently empty every window
     // older than this change — but the count is surfaced so the dilution is
@@ -522,6 +564,7 @@ async function fetchPerItem(
       cacheCreationInputTokens: Number(t.cacheCreation ?? 0),
       cacheReadInputTokens: Number(t.cacheRead ?? 0),
     }, d.model, asOf, provider);
+    if (recordOutcome === 'failed') failedUsd += Number.isFinite(usd) ? usd : 0;
     records.push({
       userId: String(d.userId || ''),
       itemId: d.itemId ?? null,
@@ -571,6 +614,9 @@ async function fetchPerItem(
     byDay: {},
     unmarked,
     envDropped,
+    failedSeen,
+    outcomeDropped,
+    failedUsd,
   };
 
   for (const r of records) {
@@ -865,7 +911,7 @@ async function main() {
   const items = foldItemCounts(itemCounts, excluded);
 
   console.error('Reading token usage...');
-  const perItem = await fetchPerItem(start, end, opts.asOf, opts.langs, opts.env, [...excluded]);
+  const perItem = await fetchPerItem(start, end, opts.asOf, opts.langs, opts.env, [...excluded], opts.outcome);
 
   const totalItems = items.total;
   const trialItems = trial.total;
@@ -911,6 +957,22 @@ async function main() {
       `cannot follow a language exclusion (${[...excluded].sort().join(', ')}). The blended cost per item ` +
       `is unaffected — it divides by all items — but the paid/trial split shown above, and --exclude-trial, ` +
       `over-count trial items by however many of them were in an excluded language.`,
+    );
+  }
+  // The discontinuity guard. Failed generations were invisible before
+  // FAILURE_RECORDING_SINCE, so a window ending earlier prices successes only no
+  // matter what --outcome says, and a window that STRADDLES the boundary mixes
+  // two different measurements — which would read as a cost jump rather than as
+  // instrumentation arriving. Say so instead of letting it be inferred.
+  if (start.getTime() < FAILURE_RECORDING_SINCE) {
+    const straddles = end.getTime() > FAILURE_RECORDING_SINCE;
+    warnings.push(
+      straddles
+        ? `This window straddles ${new Date(FAILURE_RECORDING_SINCE).toISOString().slice(0, 10)}, when failed generations began being recorded. ` +
+          `Spend before that instant counts successes only, so part of this window is measured differently from the rest — ` +
+          `a rise against an earlier window may be the instrumentation, not the cost. Use --outcome success to compare like with like.`
+        : `Failed generations were not recorded before ${new Date(FAILURE_RECORDING_SINCE).toISOString().slice(0, 10)}, so this window ` +
+          `prices successes only whatever --outcome says, and understates true cost per item by the failures it cannot see.`,
     );
   }
   const blendedBlocked = opts.env !== 'all' && perItem.envDropped > 0 && items.unmarked > 0;
@@ -987,6 +1049,10 @@ async function main() {
       warnings,
       langs: opts.langs.length > 0 ? opts.langs : null,
       minItems: opts.minItems,
+      outcome: opts.outcome,
+      failedGenerations: perItem.failedSeen,
+      failedUsd: perItem.failedUsd,
+      outcomeDropped: perItem.outcomeDropped,
       droppedLangs: thinLangs,
       excludedLangs: [...excluded].sort(),
       items: { total: totalItems, trial: trialItems, paid: paidItems, denominator, unmarked: items.unmarked },
@@ -1039,6 +1105,12 @@ async function main() {
   console.log(`${pad('  cache write / read')}: ${num(totals.cacheCreation)} / ${num(totals.cacheRead)} tok`);
   console.log(`${pad('  output')}: ${num(totals.output)} tok`);
   console.log(`${pad('  generations')}: ${num(perItem.instrumented)}`);
+  if (opts.outcome !== 'all') {
+    console.log(`${pad('  outcome filter')}: ${opts.outcome}  (${num(perItem.outcomeDropped)} record(s) excluded)`);
+  }
+  if (perItem.failedSeen > 0) {
+    console.log(`${pad('  failed generations')}: ${num(perItem.failedSeen)}${perItem.failedUsd > 0 ? `  ${usd(perItem.failedUsd)} of the total` : ''}`);
+  }
   if (opts.env !== 'all' && perItem.unmarked > 0) {
     console.log(`${pad('  pre-marker records')}: ${num(perItem.unmarked)}  (no env field — counted here, may include local work)`);
   }
