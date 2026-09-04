@@ -144,7 +144,14 @@ export async function sweepSize(lang: string, mode: "sample" | "full"): Promise<
 
 async function taskCompiles(taskId: string, accessToken: string): Promise<{ compiled: boolean; error?: string }> {
   try {
-    const resp = await fetch(`${getBaseUrlForApi()}/data?id=${encodeURIComponent(taskId)}`, {
+    // ?refresh=1 recompiles rather than answering from the compile cache. A
+    // taskId is content-addressed over {lang, code} and carries no compiler
+    // version, so a verdict cached before a language shipped a breaking change
+    // keeps returning a clean 200 — a program the checker now rejects reads as
+    // a PASS. This check exists to assert "this compiles", so it must reach the
+    // compiler, not the record. (L0172, 2026-09-04: three regenerated programs
+    // came out byte-identical to April ones and inherited their April verdicts.)
+    const resp = await fetch(`${getBaseUrlForApi()}/data?id=${encodeURIComponent(taskId)}&refresh=1`, {
       headers: { Authorization: accessToken },
       signal: AbortSignal.timeout(STEP_TIMEOUT_MS),
     });
