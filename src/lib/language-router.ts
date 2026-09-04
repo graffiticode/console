@@ -329,6 +329,25 @@ export async function classifyAndRoute({
         model: CLAUDE_MODELS.HAIKU,
         max_tokens: 300,
         temperature: 0,
+        // Stop once the JSON block closes.
+        //
+        // The verdict is the FIRST thing this model emits, and it emits it inside a
+        // ```json fence. Everything after the closing fence is the model explaining
+        // itself to nobody: the parser takes the first {...} and discards the rest.
+        // Measured 2026-09-04 on the real prompt and real scopes, 7 cases: an
+        // in-scope verdict cost 93-125 output tokens, of which 15 were the JSON.
+        // Stopping at the fence cut those calls ~65% (2,167ms -> 696ms) and the set
+        // 51%, with 0/7 verdict changes — reroutes included, which save little and
+        // should, since their `reason` is genuinely part of the JSON.
+        //
+        // Anthropic excludes the stop text from the response, so "\n```" keeps the
+        // closing brace the parser needs and drops only the fence. Degrades safely:
+        // an unfenced answer never matches, and the call behaves exactly as before.
+        //
+        // NOT the same thing as telling the model to be terse. That was tried on the
+        // same cases and CHANGED VERDICTS — "Multiply 10 and 21" rerouted away from
+        // L0000. Sampling is untouched here; only the tail is cut.
+        stop_sequences: ["\n```"],
         messages: [
           {
             role: "user",
@@ -392,7 +411,16 @@ Be conservative: only route away when the request clearly belongs to a different
 
     const text = response.data?.content?.[0]?.text || "";
     const m = text.match(/\{[\s\S]*\}/);
-    if (!m) return FAIL_OPEN;
+    if (!m) {
+      // Was silent. A fail-open here disables the gate for that request, and the
+      // stop sequence above is one more way to reach it (an answer that opened
+      // with a fence on its own line would stop at once, empty). If this line
+      // starts appearing, that is the first thing to check.
+      console.warn(
+        `[routing] rid=${rid} no JSON in classifier output; fail-open (in-scope) len=${text.length}`,
+      );
+      return FAIL_OPEN;
+    }
     const parsed = JSON.parse(m[0]);
     if (parsed.inScope === true) return { inScope: true, routedLang: null, reason: "" };
     let routedLang: string | null = parsed.routedLang ? String(parsed.routedLang).replace(/^L/i, "") : null;
