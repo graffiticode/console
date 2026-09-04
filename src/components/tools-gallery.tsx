@@ -12,6 +12,10 @@ import { getTitle } from '../lib/utils';
 // source item id they snapped. Same constant as lib/generate-thumbnail.ts.
 const SNAP_LANG = '0013';
 
+// The mark an L0013 snap item must carry to appear in the gallery. Matches the corpus
+// convention elsewhere in the repo, where 3 is the curated set rather than raw capture.
+const APPROVED_MARK = 3;
+
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
@@ -63,11 +67,12 @@ export default function ToolsGallery({ language, setLanguage }) {
 
   // The gallery is curated, not "whatever PNG happens to exist". Every thumbnail is produced by
   // an L0013 `snap` item named after its source item id (see lib/generate-thumbnail.ts), and mark
-  // 1 on that L0013 item is what admits the image here — demoting it (mark 5) retires the
-  // thumbnail without deleting the PNG or touching the source item. Loaded once for the user
-  // rather than per language, since one L0013 collection backs every language's tiles.
+  // 3 on that L0013 item is what admits the image here — anything else (a fresh snap lands at
+  // mark 1) keeps the PNG but stays out of the gallery, so promoting to 3 is the publish step.
+  // Loaded once for the user rather than per language, since one L0013 collection backs every
+  // language's tiles.
   const { data: snapItems } = useSWR(
-    user ? { user, lang: SNAP_LANG, mark: 1, client: 'all' } : null,
+    user ? { user, lang: SNAP_LANG, mark: APPROVED_MARK, client: 'all' } : null,
     loadItems,
   );
   const approvedIds = new Set((snapItems || []).map((it: any) => it.name).filter(Boolean));
