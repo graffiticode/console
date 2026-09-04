@@ -1057,6 +1057,7 @@ export async function updateItem({
   lang,
   source,
   label,
+  onRenderable,
 }: {
   auth: AuthArg;
   id: string;
@@ -1073,6 +1074,25 @@ export async function updateItem({
   // Provenance for the version record written when taskId changes.
   source?: VersionSource;
   label?: string;
+  /**
+   * Called the moment the item is RENDERABLE — immediately after the taskId write
+   * lands, before the re-read and the version/billing records.
+   *
+   * It exists for the generation worker. Measured on L0000 "multiply 10 and 21"
+   * (console 07ecc7b): of the 773ms between `item_generation_timing` and the item
+   * reading "ready", 308ms was bookkeeping and 24ms was a re-read — work no viewer
+   * waits on, all of it landing BEFORE the status flip. The item was fully
+   * renderable a third of a second before anyone could see it.
+   *
+   * Deliberately NOT "move the writes off the request". They still run, still
+   * awaited, still before the worker returns 200 — so nothing becomes lossier and
+   * the billing row cannot be dropped by a process that dies in a new window. Only
+   * the announcement moves.
+   *
+   * Throwing here would abandon those writes, so it is caught and logged: a failed
+   * status flip must not cost the version and billing records.
+   */
+  onRenderable?: () => Promise<void>;
 }) {
   // Step timings for the one caller that waits on them: the generation worker,
   // whose whole post-generation path is round trips (see generate-job.ts). Logged
@@ -1168,6 +1188,17 @@ export async function updateItem({
     const tWrite = Date.now();
     await itemRef.update(updates);
     writeMs = Date.now() - tWrite;
+    // The item now has its taskId: renderable. Announce before the bookkeeping.
+    let renderableMs = 0;
+    if (onRenderable && taskId !== undefined) {
+      const tHook = Date.now();
+      try {
+        await onRenderable();
+      } catch (err) {
+        console.error("updateItem(): onRenderable failed for item", id, err);
+      }
+      renderableMs = Date.now() - tHook;
+    }
     // Re-reads the document that was just written, to build the return value.
     // The generation worker discards that return value entirely.
     const tReread = Date.now();
@@ -1228,7 +1259,8 @@ export async function updateItem({
     if (taskIdChanged) {
       console.log(
         `[updateItem] id=${id} read=${readMs} apiTask=${apiTaskMs} write=${writeMs} ` +
-          `reread=${rereadMs} bookkeeping=${versionMs ? Date.now() - versionMs : 0} ` +
+          `reread=${rereadMs} onRenderable=${renderableMs} ` +
+          `bookkeeping=${versionMs ? Date.now() - versionMs : 0} ` +
           `total=${Date.now() - tUpdateItem}`,
       );
     }
