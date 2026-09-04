@@ -223,6 +223,46 @@ function firstTokenMs(): number {
   return configuredNumber("CODEGEN_FIRST_TOKEN_MS", 180_000);
 }
 
+/**
+ * The hard ceiling on ONE provider turn — the wall the stall watchdogs cannot be.
+ *
+ * `streamStallMs` and `firstTokenMs` both measure SILENCE. A turn that streams
+ * steadily at 100 tok/s never trips either one, however long it runs: the 567s and
+ * 318s L0179 runs were perfectly healthy streams that simply had 60,828 and 32,768
+ * output tokens to emit. Nothing bounded the turn itself, because `options.timeoutMs`
+ * cannot — with `responseType: "stream"` axios `timeout` bounds the wait for HEADERS
+ * only, and the clamp in generateLongCode that looks like a per-chunk deadline is
+ * therefore inert. `generateLongCode`'s own deadline is tested BETWEEN chunks, so it
+ * can be overrun by a whole turn: 240s of budget produced a 318s run.
+ *
+ * So this is wall-clock, armed once per turn, and it aborts the read.
+ *
+ * 30s rather than the 10s target: at the measured ~100 tok/s a 10s turn is ~1,000
+ * output tokens, and half of those are currently invisible thinking (visible-tokens
+ * over output-tokens sits at 0.52 in EVERY size band). L0175 emits 3.3KB of code on a
+ * median call and 74% of its turns already exceed 10s; a 10s wall today would cut
+ * them mid-program. 30s stops the runaway tail — the thing that has no legitimate
+ * case — without truncating work that is merely large. Tighten it once the
+ * inefficiencies behind CODEGEN_TURN_SOFT_MS violations are fixed.
+ */
+function turnBudgetMs(): number {
+  return configuredNumber("CODEGEN_TURN_BUDGET_MS", 30_000);
+}
+
+/**
+ * The target every turn is SUPPOSED to meet. Nothing is aborted at this threshold;
+ * exceeding it logs one `[codegen-turn] over_soft` line naming the language, the
+ * model, and where the tokens went.
+ *
+ * It is a separate number from the wall on purpose. The wall is what production can
+ * survive today; this is the standard, and the gap between them is the backlog. A
+ * violation is not a failure to page on — it is a request that spent more than 10s
+ * in one provider call, with enough on the line to say why.
+ */
+function turnSoftMs(): number {
+  return configuredNumber("CODEGEN_TURN_SOFT_MS", 10_000);
+}
+
 function circuitIsOpen(provider: LlmProvider): boolean {
   const state = providerCircuit.get(provider);
   return !!state && state.openUntil > Date.now();
@@ -367,7 +407,14 @@ function programIsTerminated(content: string): boolean {
 
 function needsContinuation(content: string, stopReason?: string): boolean {
   if (stopReason) {
-    return stopReason === "max_tokens" && !programIsTerminated(content);
+    // "turn_budget" is the wall in turnBudgetMs() cutting a healthy stream. It means
+    // the same thing max_tokens does — the model stopped because it ran out of room,
+    // not because the program was finished — so it continues on the same terms. The
+    // termination check still applies: a turn cut just after the final `..` is done.
+    return (
+      (stopReason === "max_tokens" || stopReason === "turn_budget") &&
+      !programIsTerminated(content)
+    );
   }
   const fenceCount = (content.match(/```/g) || []).length;
   return (
@@ -514,6 +561,15 @@ async function requestAnthropic({
   // front of the thinking phase. Measured: keying on raw chunks still failed 0/2
   // with "between chunks". See firstTokenMs().
   let sawData = false;
+  // The turn wall. Armed once, never re-armed — unlike armWatchdog, which measures
+  // silence and is reset by every chunk. A turn that streams steadily forever is
+  // exactly the case this exists to stop. See turnBudgetMs().
+  let overran = false;
+  const turnStartedAt = Date.now();
+  const turnTimer = setTimeout(() => {
+    overran = true;
+    controller.abort();
+  }, turnBudgetMs());
   const armWatchdog = () => {
     clearTimeout(watchdog);
     watchdog = setTimeout(() => {
@@ -596,6 +652,17 @@ async function requestAnthropic({
     }
     return { content, usage, stopReason };
   } catch (error: any) {
+    if (overran) {
+      // NOT a failure, and deliberately NOT failoverable: the stream was healthy and
+      // the request well-formed, so the other provider would emit the same program at
+      // the same rate and spend the budget twice. Keep what streamed and hand it back
+      // as a seam — `needsContinuation` treats "turn_budget" like "max_tokens", so the
+      // continuation loop resumes from here instead of losing the work.
+      console.log(
+        `[codegen-turn] cut provider=anthropic model=${model} ms=${Date.now() - turnStartedAt} chars=${content.length}`,
+      );
+      return { content, usage, stopReason: "turn_budget" };
+    }
     if (stalled) {
       // Failoverable: the stream died, the request itself was well-formed, and
       // the other provider deserves a turn. Content generated before the stall
@@ -641,6 +708,7 @@ async function requestAnthropic({
     // Every exit path, or a pending timer keeps the process awake and can abort
     // a controller nobody is reading any more.
     clearTimeout(watchdog);
+    clearTimeout(turnTimer);
   }
 }
 
@@ -704,6 +772,15 @@ async function requestOpenAI({
   // front of the thinking phase. Measured: keying on raw chunks still failed 0/2
   // with "between chunks". See firstTokenMs().
   let sawData = false;
+  // The turn wall. Armed once, never re-armed — unlike armWatchdog, which measures
+  // silence and is reset by every chunk. A turn that streams steadily forever is
+  // exactly the case this exists to stop. See turnBudgetMs().
+  let overran = false;
+  const turnStartedAt = Date.now();
+  const turnTimer = setTimeout(() => {
+    overran = true;
+    controller.abort();
+  }, turnBudgetMs());
   const armWatchdog = () => {
     clearTimeout(watchdog);
     watchdog = setTimeout(() => {
@@ -857,6 +934,21 @@ async function requestOpenAI({
           : "end_turn",
     };
   } catch (error: any) {
+    if (overran) {
+      // NOT a failure, and deliberately NOT failoverable: the stream was healthy and
+      // the request well-formed, so the other provider would emit the same program at
+      // the same rate and spend the budget twice. Keep what streamed and hand it back
+      // as a seam — `needsContinuation` treats "turn_budget" like "max_tokens", so the
+      // continuation loop resumes from here instead of losing the work.
+      console.log(
+        `[codegen-turn] cut provider=openai model=${model} ms=${Date.now() - turnStartedAt} chars=${content.length}`,
+      );
+      // EMPTY_USAGE, matching the stall path above: the Responses stream reports usage
+      // only in the terminal `response.completed` event, which a cut turn never sees.
+      // The tokens were spent; requestProvider's estimate floor is what keeps the
+      // request budget from being blind to them.
+      return { content, usage: EMPTY_USAGE(), stopReason: "turn_budget" };
+    }
     if (stalled) {
       return {
         content,
@@ -888,6 +980,7 @@ async function requestOpenAI({
     };
   } finally {
     clearTimeout(watchdog);
+    clearTimeout(turnTimer);
   }
 }
 
@@ -938,9 +1031,26 @@ async function requestProvider(
     };
   }
 
+  const turnStartedAt = Date.now();
   const result = provider === "openai"
     ? await requestOpenAI(args)
     : await requestAnthropic(args);
+  const turnMs = Date.now() - turnStartedAt;
+
+  // The standard, measured at the only place that sees every provider call. Nothing
+  // is aborted here — the wall is turnBudgetMs(), inside the stream. This line is the
+  // backlog: `chars` against `out` says whether the turn was slow because it wrote a
+  // large program or because it spent the budget thinking. Across 7 days of
+  // production the visible-to-output ratio is 0.52 in every size band, so the
+  // expected answer today is "half of it was thinking" — and that is the thing to
+  // fix before this threshold can become the wall.
+  if (turnMs > turnSoftMs()) {
+    console.log(
+      `[codegen-turn] over_soft rid=${budget?.rid || "-"} provider=${provider} ` +
+        `model=${args.model} ms=${turnMs} out=${result.usage.outputTokens} ` +
+        `chars=${result.content.length} stop=${result.stopReason || "-"}`,
+    );
+  }
 
   if (budget) {
     // Floor the charge at an estimate of what we sent. A failed call reports
