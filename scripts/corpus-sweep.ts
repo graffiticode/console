@@ -17,6 +17,7 @@
  *   npm run corpus-sweep -- --langs 0175 --sample  # 10 by rotation, what the weekly job does
  *   npm run corpus-sweep -- --langs 0175 --dry-run # how many prompts it WOULD generate
  *   npm run corpus-sweep -- --langs 0173 --json out.json
+ *   npm run corpus-sweep -- --langs 0179 --sample --no-record   # an A/B arm, not corpus history
  *
  * COST. Every prompt is one real generation on the eval account. --all is ~960 generations; the
  * script prints the count and, unless --yes is passed, requires confirmation above a threshold.
@@ -134,6 +135,16 @@ async function main() {
   const out = flag("json");
   if (out) { writeFileSync(out, JSON.stringify(run, null, 2)); console.log(`\nwrote ${out}`); }
 
+  // A/B runs are not corpus history. `corpus-sweep-runs` is read as a time series of the
+  // corpus against the CURRENT configuration; a run made under a deliberately different
+  // config (CODEGEN_EFFORT while deciding whether to set it, a pinned model) is a different
+  // experiment wearing the same clothes, and silently filed next to the weekly ones it looks
+  // like a regression that nobody can explain later. Opt out explicitly rather than
+  // remembering to delete rows afterwards.
+  if (has("no-record")) {
+    console.log(`not recorded (--no-record)`);
+    return;
+  }
   await recordSweepRun(run);
   console.log(`recorded to corpus-sweep-runs`);
 }
