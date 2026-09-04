@@ -1074,9 +1074,21 @@ export async function updateItem({
   source?: VersionSource;
   label?: string;
 }) {
+  // Step timings for the one caller that waits on them: the generation worker,
+  // whose whole post-generation path is round trips (see generate-job.ts). Logged
+  // only when the taskId actually changes, which is the create/update path.
+  const tUpdateItem = Date.now();
+  let tApiTask = 0;
+  let apiTaskMs = 0;
+  let readMs = 0;
+  let writeMs = 0;
+  let rereadMs = 0;
+  let versionMs = 0;
   try {
     const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+    const tRead = Date.now();
     const itemDoc = await itemRef.get();
+    readMs = Date.now() - tRead;
     if (!itemDoc.exists) {
       throw new Error("Item not found");
     }
@@ -1102,7 +1114,9 @@ export async function updateItem({
       // does this; updateItem must too whenever taskId changes.
       if (taskId !== itemData.taskId) {
         try {
+          tApiTask = Date.now();
           const apiTask = await getApiTask({ id: taskId, auth });
+          apiTaskMs = Date.now() - tApiTask;
           const taskData = apiTask?.[0] || apiTask;
           const code = taskData?.code;
           if (code !== undefined && code !== null) {
@@ -1151,12 +1165,19 @@ export async function updateItem({
       const ttlBase = updates.updated || itemData.updated || Date.now();
       updates.expiresAt = ttlBase + FREE_PLAN_ITEM_TTL_MS;
     }
+    const tWrite = Date.now();
     await itemRef.update(updates);
+    writeMs = Date.now() - tWrite;
+    // Re-reads the document that was just written, to build the return value.
+    // The generation worker discards that return value entirely.
+    const tReread = Date.now();
     const updatedDoc = await itemRef.get();
+    rereadMs = Date.now() - tReread;
     const data = updatedDoc.data();
     // A changed taskId IS a new version — the one signal every producer (chat,
     // direct editor edit, generation worker, MCP) funnels through.
     if (taskIdChanged) {
+      versionMs = Date.now();
       const resolvedSource = normalizeVersionSource(source) ?? defaultVersionSource(data.client);
       await recordVersion({
         auth,
@@ -1204,12 +1225,24 @@ export async function updateItem({
         }
       }
     }
+    if (taskIdChanged) {
+      console.log(
+        `[updateItem] id=${id} read=${readMs} apiTask=${apiTaskMs} write=${writeMs} ` +
+          `reread=${rereadMs} bookkeeping=${versionMs ? Date.now() - versionMs : 0} ` +
+          `total=${Date.now() - tUpdateItem}`,
+      );
+    }
+    const tTokens = Date.now();
+    const tokens = await freePlanTokens(auth);
+    if (taskIdChanged && Date.now() - tTokens > 50) {
+      console.log(`[updateItem] id=${id} freePlanTokens=${Date.now() - tTokens}`);
+    }
     return {
       id,
       ...data,
       created: String(data.created),
       updated: String(data.updated),
-      ...(await freePlanTokens(auth)),
+      ...tokens,
     };
   } catch (error) {
     console.error("updateItem()", "ERROR", error);

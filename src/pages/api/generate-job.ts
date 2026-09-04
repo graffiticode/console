@@ -160,11 +160,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Persist the new task + appended help, then mark ready. updateItem handles
     // the code-refresh + (free-plan) expiry bump on taskId change.
+    // Everything from here to setItemGenerationStatus is time the MCP poll cannot
+    // see: `item_generation_timing` has already been emitted, but the item does not
+    // read "ready" until the status write below lands. Profiling the L0000
+    // "multiply 10 and 21" case put that gap at 1,267-1,865ms across three runs —
+    // larger than the code-generating model call itself (1,784ms), and entirely
+    // round trips: ~8 serial Firestore/API calls at ~160ms warm apiece, several of
+    // them re-reading a document another step just read or wrote.
+    //
+    // Timed per step rather than in aggregate because the aggregate is what we
+    // already had, and it cannot say which call to remove.
+    const tPost = Date.now();
     const existing = await getItem({ auth, id: itemId });
+    const tGetItem = Date.now() - tPost;
     const updatedHelp = appendHelpEntry(existing?.help ?? "[]", modification, result.taskId);
     // If the pre-flight scope gate re-routed away from the client's pick, persist the corrected
     // language (and any composition upstreams) so MCP get_item reflects what was actually built.
     const rerouted = result.language && result.language !== lang;
+    const tUpdate = Date.now();
     await updateItem({
       auth,
       id: itemId,
@@ -175,7 +188,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...(rerouted ? { lang: result.language } : {}),
       ...(Array.isArray(result.upstreamLangs) ? { upstreamLangs: result.upstreamLangs } : {}),
     });
+    const updateMs = Date.now() - tUpdate;
+    const tStatus = Date.now();
     await setItemGenerationStatus({ auth, id: itemId, status: "ready" });
+    const statusMs = Date.now() - tStatus;
+    // The item is visible as ready HERE. Everything after this line is bookkeeping
+    // the caller never waits on, so it is deliberately outside the number below.
+    console.log(
+      `[generate-job] post rid=${result.rid ?? "-"} lang=L${lang} ` +
+        `getItem=${tGetItem} updateItem=${updateMs} status=${statusMs} ` +
+        `toReady=${Date.now() - tPost}`,
+    );
     await resolveFirstOutcome(workspaceKey, "ok");
     await releaseGeneration({ auth, id: itemId, owner: attemptId });
 
