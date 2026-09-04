@@ -8,6 +8,10 @@ import ToolsThumbnailGrid from './tools-thumbnail-grid';
 import SignIn from './SignIn';
 import { getTitle } from '../lib/utils';
 
+// The dialect that renders an item's form view to a PNG; its items are named after the
+// source item id they snapped. Same constant as lib/generate-thumbnail.ts.
+const SNAP_LANG = '0013';
+
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
@@ -56,6 +60,17 @@ export default function ToolsGallery({ language, setLanguage }) {
     user && selectedLangId ? { user, lang: selectedLangId, mark: null, client: 'all' } : null,
     loadItems,
   );
+
+  // The gallery is curated, not "whatever PNG happens to exist". Every thumbnail is produced by
+  // an L0013 `snap` item named after its source item id (see lib/generate-thumbnail.ts), and mark
+  // 1 on that L0013 item is what admits the image here — demoting it (mark 5) retires the
+  // thumbnail without deleting the PNG or touching the source item. Loaded once for the user
+  // rather than per language, since one L0013 collection backs every language's tiles.
+  const { data: snapItems } = useSWR(
+    user ? { user, lang: SNAP_LANG, mark: 1, client: 'all' } : null,
+    loadItems,
+  );
+  const approvedIds = new Set((snapItems || []).map((it: any) => it.name).filter(Boolean));
 
   const toggleLangPanel = useCallback(() => {
     const newState = !isLangPanelCollapsed;
@@ -176,7 +191,15 @@ export default function ToolsGallery({ language, setLanguage }) {
               </div>
               {/* Scrolling thumbnail grid */}
               <div className="flex-1 min-h-0 overflow-auto px-4 pb-4">
-                <ToolsThumbnailGrid items={(toolItems || []).filter(it => it.mark !== 5)} />
+                <ToolsThumbnailGrid
+                  items={
+                    // undefined until BOTH loads land: passing a partial list would render an
+                    // empty grid and flash "No thumbnails yet" before the approvals arrive.
+                    toolItems && snapItems
+                      ? toolItems.filter(it => it.mark !== 5 && approvedIds.has(it.id))
+                      : undefined
+                  }
+                />
               </div>
             </div>
           ) : (
