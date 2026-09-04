@@ -200,8 +200,14 @@ export default function ToolsGallery({ language, setLanguage }) {
                   items={
                     // undefined until BOTH loads land: passing a partial list would render an
                     // empty grid and flash "No thumbnails yet" before the approvals arrive.
+                    //
+                    // The snap's mark is the ONLY gate. The source item's own mark used to be
+                    // checked here too, which let a mark-5 source silently veto a snap someone
+                    // had deliberately promoted — two gates that could disagree about the same
+                    // tile (3 of 19 on 2026-09-04). Promotion is the publish decision; nothing
+                    // else overrides it.
                     toolItems && snapItems
-                      ? toolItems.filter(it => it.mark !== 5 && approvedIds.has(it.id))
+                      ? toolItems.filter(it => approvedIds.has(it.id))
                       : undefined
                   }
                 />
