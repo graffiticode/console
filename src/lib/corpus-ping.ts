@@ -37,11 +37,10 @@ import { getBaseUrlForApi } from "./api";
  * subsumed or are not content-authoring targets. Beta is NOT itself a reason to be out
  * (0181 is here) — 0172 and 0159 were removed by request.
  *
- * Languages registered with no corpus (0003, 0013, 0152, 0153, 0154, 0171, 0174, 0180)
+ * Languages registered with no corpus (0003, 0013, 0152, 0153, 0154, 0171, 0174)
  * cannot be pinged at all until they have one — there is no prompt to send. They are
  * absent rather than silently passing, and `no-corpus` is reported if one is added here
- * early. 0180 is the live case: it has 131 prompts in examples.md but no corpus has been
- * generated from them, so it is a create-items-from-prompts run away from being pingable.
+ * early.
  */
 export const PING_LANGUAGES = [
   "0000", "0169", "0170",
@@ -59,6 +58,11 @@ export const PING_LANGUAGES = [
   // the same blind spot that let L0176 sit broken for 27 hours: a language nothing
   // routinely generates has no detector.
   "0181",
+  // 0180 (general-purpose assessment) joined 2026-09-05, the day its 131-example corpus
+  // was seeded and embedded — same reasoning as 0181 above. It is the widest dialect in
+  // the set (17 interaction categories, three of them added days before the corpus was
+  // generated), so it is exactly the kind of language whose corpus can rot unnoticed.
+  "0180",
 ];
 
 /** How many generations run at once. Eleven serial generations would be ~11-25 min,
