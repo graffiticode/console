@@ -189,6 +189,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       auth,
       id: itemId,
       taskId: result.taskId,
+      // The AST the generator just posted, so updateItem need not fetch it back.
+      taskCode: (result as any).taskCode,
       help: updatedHelp,
       source: "generation-job",
       label: modification,
