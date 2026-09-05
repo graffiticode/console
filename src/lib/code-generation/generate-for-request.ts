@@ -718,7 +718,17 @@ export async function generateCodeForRequest({
       success: true,
     });
 
-    return { src: resolvedSrc, taskId, language: headLang, description, changeSummary, model, provider, tier, usage, fixAttempts, errors: null, upstreamLangs, rid };
+    // `taskCode` is the AST this function just POSTED as the task (see postTask
+    // above, `task: { lang: headLang, code }`) — the head segment's code for a
+    // composition, which is exactly the segment updateItem's code refresh keeps.
+    // Handing it back lets the caller persist it without a `GET /task` round trip
+    // to read back what it already had: 229-369ms measured, 66% of the remaining
+    // time between generation finishing and the item reading "ready".
+    //
+    // Safe because the API returns the AST verbatim. Verified 2026-09-05 by
+    // posting a stored AST and re-fetching it, 7/7 byte-identical across L0010,
+    // L0166, L0175, L0176, L0177, L0179 and L0180, at 282 to 103,424 chars.
+    return { src: resolvedSrc, taskCode: code, taskId, language: headLang, description, changeSummary, model, provider, tier, usage, fixAttempts, errors: null, upstreamLangs, rid };
   } catch (error) {
     console.error("generateCodeForRequest()", "ERROR", error);
     ragLog(rid, "request.error", { error: error.message });
