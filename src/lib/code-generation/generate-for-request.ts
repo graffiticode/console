@@ -375,6 +375,18 @@ export async function generateCodeForRequest({
             const reason = route.reason || `Request is out of scope for L${language}.`;
             console.log(`[routing] rid=${rid} preflight.reject lang=${langLog} reason=${reason}`);
             ragLog(rid, "preflight.reject", { lang: langLog, reason });
+            // The demand signal. A refusal is the platform saying "someone wanted
+            // something we do not have", and until now it was visible only by
+            // grepping raw logs — which is how three of these went unnoticed until
+            // the capability happened to get built anyway. Mirrors
+            // non_english_request: the named event carries `app` so the MCP-origin
+            // surfaces keep it, and the wall_hit below is taxonomy consistency.
+            emitEvent("out_of_scope_request", {
+              ...actor(auth),
+              app: client ?? "console",
+              lang: langLog,
+            });
+            emitEvent("wall_hit", { ...actor(auth), wall: "out_of_scope", lang: langLog });
             // `code` is additive and nothing branches on it today. It exists so a
             // non-human caller can tell "the platform correctly refused an out-of-scope
             // request" apart from "generation broke" without matching on prose — the
