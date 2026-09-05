@@ -47,6 +47,22 @@ export type FunnelEventName =
   // nothing is refused, so a wall_hit would report zero for exactly the period
   // the measurement exists to cover.
   | "non_english_request"
+  // The scope gate refusing a fresh create outright — inScope=false with no
+  // routedLang, i.e. "no language we have fits this". It is the ONE wall that was
+  // counted nowhere: `language_scope` in the wall taxonomy is the free-plan
+  // allow-list, a different thing, and the reject path emitted nothing at all.
+  //
+  // It is worth counting because it is a DEMAND signal, not just a failure. Every
+  // refusal in the 30 days to 2026-09-05 named a capability that then got built,
+  // usually within hours: L0180's `order` interaction (refused 09-04 20:06 UTC,
+  // added 09-04 19:33), generic MCQ (refused 08-31, L0180 registered 08-31), a
+  // Data API query (refused 08-13, L0178 registered 08-13). Read as a backlog,
+  // these say what someone asked for that the catalog could not answer yet.
+  //
+  // Carries `lang` and the coarse shape only — never the reason text, which is
+  // model prose about the request and can quote it. The reason stays in the
+  // `[routing] preflight.reject` log line for a human.
+  | "out_of_scope_request"
   // context
   | "item_updated"
   | "item_generation_failed"
