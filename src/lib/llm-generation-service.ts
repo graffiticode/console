@@ -224,29 +224,39 @@ function firstTokenMs(): number {
 }
 
 /**
- * The hard ceiling on ONE provider turn — the wall the stall watchdogs cannot be.
+ * The ceiling on how long one provider turn may spend EMITTING.
  *
- * `streamStallMs` and `firstTokenMs` both measure SILENCE. A turn that streams
- * steadily at 100 tok/s never trips either one, however long it runs: the 567s and
- * 318s L0179 runs were perfectly healthy streams that simply had 60,828 and 32,768
- * output tokens to emit. Nothing bounded the turn itself, because `options.timeoutMs`
- * cannot — with `responseType: "stream"` axios `timeout` bounds the wait for HEADERS
- * only, and the clamp in generateLongCode that looks like a per-chunk deadline is
- * therefore inert. `generateLongCode`'s own deadline is tested BETWEEN chunks, so it
- * can be overrun by a whole turn: 240s of budget produced a 318s run.
+ * Not on the turn. That distinction is the whole of this comment, and getting it
+ * wrong took down generation on 2026-09-06.
  *
- * So this is wall-clock, armed once per turn, and it aborts the read.
+ * What this exists for: `streamStallMs` and `firstTokenMs` both measure SILENCE, so
+ * a stream delivering steadily at ~100 tok/s trips neither however long it runs. The
+ * 567s and 318s L0179 runs were healthy streams with 60,828 and 32,768 tokens to
+ * emit, and `options.timeoutMs` cannot bound them — with `responseType: "stream"`
+ * axios `timeout` covers only the wait for headers.
  *
- * 30s rather than the 10s target: at the measured ~100 tok/s a 10s turn is ~1,000
- * output tokens, and half of those are currently invisible thinking (visible-tokens
- * over output-tokens sits at 0.52 in EVERY size band). L0175 emits 3.3KB of code on a
- * median call and 74% of its turns already exceed 10s; a 10s wall today would cut
- * them mid-program. 30s stops the runaway tail — the thing that has no legitimate
- * case — without truncating work that is merely large. Tighten it once the
- * inefficiencies behind CODEGEN_TURN_SOFT_MS violations are fixed.
+ * WHY IT IS ARMED ON THE FIRST CONTENT TOKEN, not at the start of the turn: this
+ * shipped as a wall-clock timer from turn start, set to 30s. claude-sonnet-5 thinks
+ * before it writes, and on a long prescriptive prompt the first token is well over
+ * 30s away — so the timer fired mid-thought, aborted the turn at `chars=0`, and the
+ * continuation loop's no-growth guard then failed the whole generation. L0179 and
+ * L0173 creates ran 120-145s and produced nothing; a user's Codex session got
+ * `generation_failed`. 30s is the exact value `firstTokenMs` had been RAISED from,
+ * on 2026-09-01, for this identical reason — the comment on firstTokenMs records the
+ * measurement (0/2 runs at 30s, 2/2 at 120s) and it was quoted in the commit that
+ * then reintroduced the bug from the other side.
+ *
+ * So the thinking phase belongs to `firstTokenMs` alone, and this timer starts when
+ * the model begins to write. A turn that never writes is already bounded at 180s.
+ *
+ * 120s of emitting, not 30: at ~100 tok/s that is ~12,000 tokens, where the largest
+ * legitimate program measured is ~2,250 (L0179 max codeChars 8,982) — roughly 5x
+ * headroom, chosen deliberately wide because the failure mode of "too tight" is
+ * silent truncation of real work, and this knob has already caused one incident.
+ * The 567s run is still cut to ~120s of emitting.
  */
 function turnBudgetMs(): number {
-  return configuredNumber("CODEGEN_TURN_BUDGET_MS", 30_000);
+  return configuredNumber("CODEGEN_TURN_BUDGET_MS", 120_000);
 }
 
 /**
@@ -561,15 +571,22 @@ async function requestAnthropic({
   // front of the thinking phase. Measured: keying on raw chunks still failed 0/2
   // with "between chunks". See firstTokenMs().
   let sawData = false;
-  // The turn wall. Armed once, never re-armed — unlike armWatchdog, which measures
-  // silence and is reset by every chunk. A turn that streams steadily forever is
-  // exactly the case this exists to stop. See turnBudgetMs().
+  // The emit wall. Armed by the FIRST CONTENT TOKEN and never re-armed — unlike
+  // armWatchdog, which measures silence and resets on every chunk. Before that first
+  // token the turn is thinking, and thinking is firstTokenMs's business, not this
+  // timer's. Arming at turn start is what broke generation on 2026-09-06; see
+  // turnBudgetMs().
   let overran = false;
-  const turnStartedAt = Date.now();
-  const turnTimer = setTimeout(() => {
-    overran = true;
-    controller.abort();
-  }, turnBudgetMs());
+  let turnStartedAt = 0;
+  let turnTimer: NodeJS.Timeout | undefined;
+  const armTurnWall = () => {
+    if (turnTimer) return;
+    turnStartedAt = Date.now();
+    turnTimer = setTimeout(() => {
+      overran = true;
+      controller.abort();
+    }, turnBudgetMs());
+  };
   const armWatchdog = () => {
     clearTimeout(watchdog);
     watchdog = setTimeout(() => {
@@ -618,6 +635,9 @@ async function requestAnthropic({
       armWatchdog();
       for (const event of parser.parseChunk(chunk.toString())) {
         if (event.type === "content" && event.content) {
+          // First written character: the model has stopped thinking and started
+          // emitting, so the emit wall starts here and not before.
+          armTurnWall();
           sawData = true;
           content += event.content;
           onChunk?.(event.content);
@@ -772,15 +792,22 @@ async function requestOpenAI({
   // front of the thinking phase. Measured: keying on raw chunks still failed 0/2
   // with "between chunks". See firstTokenMs().
   let sawData = false;
-  // The turn wall. Armed once, never re-armed — unlike armWatchdog, which measures
-  // silence and is reset by every chunk. A turn that streams steadily forever is
-  // exactly the case this exists to stop. See turnBudgetMs().
+  // The emit wall. Armed by the FIRST CONTENT TOKEN and never re-armed — unlike
+  // armWatchdog, which measures silence and resets on every chunk. Before that first
+  // token the turn is thinking, and thinking is firstTokenMs's business, not this
+  // timer's. Arming at turn start is what broke generation on 2026-09-06; see
+  // turnBudgetMs().
   let overran = false;
-  const turnStartedAt = Date.now();
-  const turnTimer = setTimeout(() => {
-    overran = true;
-    controller.abort();
-  }, turnBudgetMs());
+  let turnStartedAt = 0;
+  let turnTimer: NodeJS.Timeout | undefined;
+  const armTurnWall = () => {
+    if (turnTimer) return;
+    turnStartedAt = Date.now();
+    turnTimer = setTimeout(() => {
+      overran = true;
+      controller.abort();
+    }, turnBudgetMs());
+  };
   const armWatchdog = () => {
     clearTimeout(watchdog);
     watchdog = setTimeout(() => {
@@ -824,6 +851,8 @@ async function requestOpenAI({
       armWatchdog();
       if (event.type === "response.output_text.delta") {
         const delta = event.delta || "";
+        // See the Anthropic path: the emit wall starts at the first written character.
+        armTurnWall();
         sawData = true;
         content += delta;
         onChunk?.(delta);
