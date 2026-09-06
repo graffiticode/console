@@ -119,7 +119,7 @@ interface LongGenerationResult {
    * Load-bearing for measurement: without it "we cut a runaway" and "we cut a
    * good run" are the same event, and the caps below can't be tuned.
    */
-  stopEarly?: "deadline" | "output_budget" | "restart" | "no_growth" | "request_budget";
+  stopEarly?: "deadline" | "output_budget" | "restart" | "no_growth" | "request_budget" | "no_output";
 }
 
 interface ClaudeStreamEvent {
@@ -1233,6 +1233,26 @@ async function generateLongCode({
     const grew = result.content.trim().length;
     fullContent += result.content;
     if (!needsContinuation(fullContent, result.stopReason)) break;
+
+    // A chunk that spent its ENTIRE token budget and wrote nothing has not been
+    // interrupted mid-program — it never began one, and there is nothing to
+    // continue from. Asking it to "continue exactly where you left off" from an
+    // empty assistant turn buys another full budget of the same.
+    //
+    // This is the L0179 runaway in its pure form, seen twice today with identical
+    // telemetry (rid 715f0ad5 and bb31ddb8): out=16384 chars=0 stop=max_tokens,
+    // twice, then no_growth — 318s and 330s to produce zero characters for a
+    // spreadsheet a normal run writes in about 200 tokens.
+    //
+    // Nothing else catches it. The emit wall arms on the first content token, which
+    // never arrives. `firstTokenMs` is 180s and a 16,384-token thinking chunk takes
+    // ~164s at the measured rate, so it lands JUST under and the chunk "succeeds".
+    // The low-growth streak below needs two chunks by design, which is one chunk too
+    // many when the first produced literally nothing.
+    if (grew === 0) {
+      stopEarly = "no_output";
+      break;
+    }
 
     // --- Non-convergence guards -------------------------------------------
     // A chunk that hits max_tokens AND makes no progress will not make progress
