@@ -526,6 +526,35 @@ export async function generateCodeForRequest({
     const privateValues: Record<string, string> = await getSecretsForUser(auth?.uid);
     const publicValues: Record<string, string> = await getPublicValuesForUser(auth?.uid);
     if (itemId) publicValues.itemId = itemId;
+    // An empty generation is a GENERATOR failure, and must not be reported as a
+    // parser one.
+    //
+    // `src` goes straight into parseCode, and the parser's verdict on an empty
+    // program is "End of program reached." That string then becomes the item's
+    // generationError and reaches the agent verbatim — where it reads as "your
+    // program is malformed" about a program that was never written. On 2026-09-06 a
+    // user watched a retirement calculator fail twice with it while the real cause
+    // was a turn wall aborting the model before it emitted a character; the message
+    // sent them, and me, looking at the wrong layer.
+    //
+    // Any cause of empty output lands here — a cut turn, a provider failure that
+    // returns partial content, a budget refusal at the seam — so the check is on the
+    // value rather than on any one of its causes.
+    if (!src || String(src).trim() === "") {
+      console.log(`[code-gen] rid=${rid} empty generation lang=L${headLang} — no code emitted`);
+      ragLog(rid, "generation.empty", { lang: headLang });
+      return {
+        src: null, taskId: null, language, description, changeSummary, model, provider, tier, usage,
+        errors: [{
+          message:
+            "The generator produced no code for this request. This is a generation " +
+            "failure rather than a problem with the request or the item — trying again " +
+            "usually succeeds.",
+          code: "empty_generation",
+        }],
+        upstreamLangs: [], rid,
+      };
+    }
     const tParse = Date.now();
     const parseResult = await parseCode({ lang: headLang, src, privateValues, publicValues, accessToken: auth?.token });
     mark("parse", tParse);
