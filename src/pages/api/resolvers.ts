@@ -670,9 +670,6 @@ export async function deleteCredential({ auth, name }: { auth: AuthArg; name: st
   return true;
 }
 
-// Global cache for templates to avoid repeated fetches
-const templateCache = new Map<string, string>();
-
 const taskDaoFactory = buildTaskDaoFactory();
 const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);
 const taskDao = getTaskDaoForStore("firestore");

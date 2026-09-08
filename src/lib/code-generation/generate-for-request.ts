@@ -57,8 +57,13 @@ type AuthArg = {
 
 const db = getFirestore();
 
-// Global cache for templates to avoid repeated fetches
-const templateCache = new Map<string, string>();
+// Template cache: short TTL, matching the lexicon and unparse-hints caches in lib/api.ts and
+// for the same reason — a language deploy must be picked up within minutes. Without one this
+// Map held a template for the life of the instance, so the New Item button kept seeding from
+// whatever template.gc was current when the instance started, long after the language shipped
+// a new one.
+const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000;
+const templateCache = new Map<string, { value: string; expires: number }>();
 
 /**
  * Free-plan revision budget.
@@ -284,11 +289,12 @@ export async function generateCodeForRequest({
       // to a test revision, so bypass the shared (lang-keyed) template cache on
       // read and write. Non-overridden languages keep using the shared cache.
       const overridden = await isLangOverridden(language, auth?.token);
-      src = overridden ? undefined : templateCache.get(cacheKey);
+      const cached = overridden ? undefined : templateCache.get(cacheKey);
+      src = cached && Date.now() < cached.expires ? cached.value : undefined;
       if (!src) {
         src = await getLanguageAsset(`L${language}`, 'template.gc', auth?.token);
         if (src && !overridden) {
-          templateCache.set(cacheKey, src);
+          templateCache.set(cacheKey, { value: src, expires: Date.now() + TEMPLATE_CACHE_TTL_MS });
         }
       }
       if (src) {
