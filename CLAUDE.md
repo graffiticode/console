@@ -25,6 +25,18 @@ Why lint+typecheck isn't sufficient: 2026-09-01, `CODEGEN_EFFORT=low` was set wi
 
 Ping, not sweep: the ping is the daily liveness check above. `npm run corpus-sweep` is weekly, ~110 generations, and compares output *shape* — for changes that could move quality (retuning a model, tier, or prompt).
 
+Neither one licenses a **`MODEL_PRIORITY` change**. That comes from `npm run eval` (`scripts/model-eval.ts`), which varies one axis — today the model, with `options.model` pinned and one RAG retrieval shared by every variant — and reports first-pass compile, drift, warnings, agreement, latency and cost. Two rules it enforces that are easy to skip by hand: eval cases **must not be in the RAG corpus** (`npm run eval:holdout`; the gate fails the run before any spend, `--allow-leak` downgrades it to a warning), and a cross-family ordering needs `--panel` — one judge per family, reporting self-preference — before a `MODEL_PRIORITY` line is committed, because a single Claude judge ranking Claude against GPT is grading its own family. For a dialect whose compile rate is already saturated, `--converge N` is the metric that separates variants (the item reached after feeding the compiler's warnings back, and what that iteration cost). Case + label helpers: `eval:cases`, `eval:label-*`, `eval:calibrate`.
+
+## Deploy
+
+```bash
+npm run gcp:build     # Cloud Build → gcr.io/graffiticode-app/console:<sha> → deploy `console` (us-central1)
+npm run gcp:restart   # redeploy :latest, no rebuild
+npm run gcp:logs      # last 100 requests;  gcp:logs:tail for live
+```
+
+Most of the service's environment is set **out-of-band on the Cloud Run service**, not in `cloudbuild.yaml`: ANTHROPIC/OPENAI, Stripe, DSPY, OTEL, and the Secret Manager mounts (`INTERNAL_JOB_SECRET`, `FREE_PLAN_*`). So any `gcloud run deploy/update` must use **`--update-env-vars` (additive)** — `--set-env-vars` wipes everything not listed and takes the generator down. The same asymmetry is why an env-var change is a code change (see the `CODEGEN_EFFORT` story above): it has no diff, so the corpus ping is the only thing that catches it.
+
 ## Architecture
 
 Next.js 15 + React 18 app with GraphQL API, Claude AI code generation, and Firestore.
@@ -41,6 +53,13 @@ Request → **scope-gate head routing** → **permission-governed composition** 
 **Per-language Opus opt-in:** code generation defaults to Sonnet (`CLAUDE_MODELS.DEFAULT`), with Haiku for small property-only edits. A language whose generation is more subtle can opt its **initial** generation into Opus by placing `<!-- gc:model=opus -->` anywhere in its `instructions.md` (served by its l0NNN service). The directive is parsed + stripped during the instructions fetch in `src/lib/code-generation-service.ts` (`dialectOptsIntoOpus`), so it never reaches the LLM. Only the initial generation uses Opus; the error-correction/fix pass and all non-opted languages stay on the current Sonnet/Haiku scheme. An explicit caller `options.model` still overrides everything.
 
 **`get_spec` model (`spec` mode):** spec generation is the inverse direction and has its own tier, read from the same `MODEL_PRIORITY` table (`src/lib/model-priority.ts`) as code-gen routing — `{ spec: <tier> }` on a language's entry, defaulting to **fast/Haiku**. Tier only: spec-gen calls the Anthropic Messages API directly, so family orderings don't reach it. Raise it for a dialect whose spec-directive asks for something other than verbalize-the-content (L0177's recipe: `{ spec: "balanced" }`), since `assertCoverage` only checks that source strings survive and cannot see a wrong recipe. `SPEC_MODEL` overrides everything as the no-deploy hatch.
+
+**Async generation (Cloud Tasks → `/api/generate-job`):** the MCP-facing `startCodeGeneration` mutation enqueues a job (`src/lib/generation-queue.ts`) and returns immediately; Cloud Tasks holds the worker request open for the full 60-110s generation and clients poll `get_item` for `generationStatus`. Three couplings that are invisible from any single file:
+- The worker URL must be the service's **own Cloud Run origin**, never the Cloudflare-proxied `console.graffiticode.org` — the proxy cuts the connection at ~100s and returns 524, which Cloud Tasks reads as a failed attempt and re-dispatches, so every slow generation ran up to `maxAttempts` **concurrent** full LLM runs (observed 2026-08-28). Dispatch deadline and Cloud Run timeout are both 900s.
+- The MCP server's worker-died guard (`GENERATION_STALE_MS` in `graffiticode-mcp-server/src/tools.ts`) must stay **above** that 900s ceiling, or it reports a still-running generation as failed. Move the two together.
+- The payload is versioned (`GENERATION_JOB_VERSION`): a task already queued was serialized by the previous revision, so renaming or removing a field silently loses it in flight — bump and branch in the worker. Adding an optional field is backward compatible and must **not** bump (a bump 400s every in-flight job). No model-selection fields travel in the payload, so a queued task can never pin an unreviewed model.
+
+Local dev has no queue: `GENERATION_QUEUE_LOCAL=1` fires the worker directly with an un-awaited fetch.
 
 **Authentication:** Ethereum wallet sign-in (SIWE) is primary; email magic-link via Privy derives an embedded wallet that signs the same SIWE nonce, so **the wallet must be reused, never re-created** (a fresh one changes the uid). Google OAuth is account-linking only, never a sign-in method. Server-side `authenticate()` accepts a Firebase ID token OR an api key, but **api.graffiticode.org accepts only Firebase ID tokens** — convert via `getCredentialsForApiKey` before forwarding. Details: skill `auth-and-signin`.
 

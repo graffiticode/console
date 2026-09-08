@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+> [CLAUDE.md](./CLAUDE.md) is authoritative where the two disagree; it carries the deploy, code-generation, and corpus-check contracts this file omits.
+
 ## Project Structure & Module Organization
 - `src/pages/`: Next.js routes and API (`src/pages/api`).
 - `src/components/`: React components; `src/hooks/` custom hooks.
