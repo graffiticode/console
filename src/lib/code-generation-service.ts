@@ -1675,6 +1675,9 @@ export async function generateCode({
         `input=${u.inputTokens} output=${u.outputTokens} ` +
         `cache_create=${u.cacheCreationInputTokens || 0} cache_read=${u.cacheReadInputTokens || 0} ` +
         `latencyMs=${generationLatency}` +
+        // Which effort actually went on the wire — the per-language table entry, the
+        // global CODEGEN_EFFORT, or neither. Absent when nothing was sent.
+        (streamResult.effort ? ` effort=${streamResult.effort}` : "") +
         // Where the output tokens actually went. `output` alone cannot separate
         // three very different things: code we kept, prose the model wrapped
         // around it (which carries the <DESCRIPTION>/<CHANGE_SUMMARY> tags we
