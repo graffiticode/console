@@ -10,8 +10,8 @@
 // PROMPTS COME FROM THE CORPUS, not from `spec/examples.md`. Two reasons, both hard:
 //   - Cloud Run has no sibling language repos, so the `../l{lang}/packages/core/spec/`
 //     path that scripts/create-items-from-prompts.ts reads does not exist here.
-//   - Five of the eleven pinged languages (0159, 0169, 0170, 0172, 0173) ship no
-//     examples.md at all; the corpus is their only prompt source.
+//   - Several pinged languages (0169, 0170 and 0173 among them) ship no examples.md at
+//     all; the corpus is their only prompt source.
 //
 // ROTATION IS DETERMINISTIC, not random. Day N takes corpus index N mod size, so a month
 // walks ~30 distinct prompts per language with no repeats and no luck involved. A random
@@ -63,11 +63,20 @@ export const PING_LANGUAGES = [
   // the set (17 interaction categories, three of them added days before the corpus was
   // generated), so it is exactly the kind of language whose corpus can rot unnoticed.
   "0180",
+  // 0182 (collective-intelligence surveys) joined 2026-09-08, the day its 52-example
+  // corpus was seeded and embedded — same reasoning as 0181 and 0180 above. It has the
+  // sharpest reason of the three to be watched: its ideas arrive over `fetch` at compile
+  // time from datasets served out of the l0182 repo, so a rename or a reshape THERE breaks
+  // generation here with no deploy and no diff on this side — the shape of failure that
+  // typecheck and lint cannot see.
+  "0182",
 ];
 
-/** How many generations run at once. Eleven serial generations would be ~11-25 min,
- *  uncomfortably close to Cloud Scheduler's 30-minute attempt deadline; four at a time
- *  brings a full run to ~3-6 min and leaves headroom as the set grows. */
+/** How many generations run at once. Run serially, PING_LANGUAGES would take roughly a
+ *  minute to two-and-a-half per language — at a dozen languages that is uncomfortably
+ *  close to Cloud Scheduler's 30-minute attempt deadline; four at a time brings a full
+ *  run to ~3-6 min and leaves headroom as the set grows. Deliberately not written as a
+ *  count: this list moves, and a number here goes stale silently. */
 const CONCURRENCY = 4;
 
 /** Per-language wall-clock cap. A stalled generation fails that language rather than
@@ -332,8 +341,8 @@ export async function recordPingRun(run: PingRun): Promise<void> {
 /**
  * Send on any failure, and once a week when green.
  *
- * Alert-only-on-failure is the right default for a daily job — nobody wants eleven green
- * texts a week — but taken alone it makes a broken scheduler look exactly like a healthy
+ * Alert-only-on-failure is the right default for a daily job — nobody wants a green text
+ * every morning — but taken alone it makes a broken scheduler look exactly like a healthy
  * pipeline. The Monday all-clear is the cheapest fix that keeps silence meaningful.
  */
 export function shouldSend(run: PingRun, now: Date = new Date()): boolean {
