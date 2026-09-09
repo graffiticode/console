@@ -34,7 +34,8 @@
     "eval:judge-smoke": "npx tsx scripts/judge-smoke.ts",
     "eval:cases": "npx tsx scripts/eval-cases-from-mcp.ts",
     "eval:proximity": "npx tsx scripts/eval-case-proximity.ts",
-    "corpus-sweep": "npx tsx scripts/corpus-sweep.ts"
+    "corpus-sweep": "npx tsx scripts/corpus-sweep.ts",
+    "check-min-instances": "npx tsx scripts/check-min-instances.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",
