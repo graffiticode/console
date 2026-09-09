@@ -1368,6 +1368,16 @@ export async function generateCodeWithContinuation({
   tier: GenerationTier;
   /** Where the family ordering came from — see GenerationRoute.source. */
   routeSource: GenerationRoute["source"];
+  /**
+   * The effort actually sent, after `route.effort ?? options.effort`.
+   *
+   * Reported because "is the per-language entry applying?" was unanswerable from
+   * production on 2026-09-09: a slow L0179 create could not be told from an
+   * unbounded one except by inferring from the visible/output ratio, which moves
+   * with the request at least as much as with the setting. Null when neither the
+   * table nor CODEGEN_EFFORT had an opinion, which is itself the answer.
+   */
+  effort?: string | null;
   /** The family ordering this call resolved to, post circuit filtering. */
   priority: LlmProvider[];
   attempts: GenerationAttempt[];
@@ -1514,6 +1524,7 @@ Do not include any explanatory text outside the code blocks unless specifically 
         // while serving haiku — making the log unusable for confirming a deploy.
         tier: route.tierByProvider?.[provider] ?? route.tier,
         routeSource: route.source,
+        effort: route.effort ?? options.effort ?? null,
         priority: providers,
         attempts,
         fallbackReason,
@@ -1555,6 +1566,7 @@ Do not include any explanatory text outside the code blocks unless specifically 
     model: lastModel,
     tier: route.tierByProvider?.[lastProvider] ?? route.tier,
     routeSource: route.source,
+    effort: route.effort ?? options.effort ?? null,
     priority: providers,
     attempts,
     fallbackReason,
