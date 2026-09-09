@@ -1201,6 +1201,17 @@ interface GenerateCodeOptions {
   maxTokens?: number;
   maxContinuations?: number;  // Max number of continuation chunks (default: 10)
   /**
+   * Live progress sink: called with the RUNNING TOTAL of visible characters as
+   * they stream, across continuation chunks and repairs.
+   *
+   * Declared on this type, not just on StreamOptions, because the options bag is
+   * rebuilt field-by-field on the way down — an unnamed field is dropped with no
+   * type error, which is precisely how this went inert on its first deploy. Being
+   * a distinct type is what now makes the omission a compile failure instead of a
+   * silent one.
+   */
+  onOutput?: (writtenChars: number) => void;
+  /**
    * Wall-clock deadline (epoch ms) for the WHOLE request, created once by the
    * caller (see generate-for-request.ts) and threaded through every generation
    * this request makes. Bounds the repair loop, which would otherwise multiply
@@ -1643,6 +1654,12 @@ export async function generateCode({
         // budget inert without any type error to say so.
         ...(options.deadlineAt ? { deadlineAt: options.deadlineAt } : {}),
         ...(options.budget ? { budget: options.budget } : {}),
+        // The live progress sink. Named here for the reason the deadline comment
+        // above gives: this bag is rebuilt field-by-field, so an unnamed field is
+        // dropped with no type error. That is exactly what happened on 2026-09-09 —
+        // the counter ticked in a direct call to generateCodeWithContinuation and
+        // never fired in production, because production goes through here.
+        ...(options.onOutput ? { onOutput: options.onOutput } : {}),
         // Passthrough (undefined ⇒ omitted ⇒ API model default). Set to match models.
         ...(options.thinking !== undefined ? { thinking: options.thinking } : {}),
         ...(options.effort !== undefined ? { effort: options.effort } : {}),
@@ -2035,6 +2052,9 @@ export async function generateCode({
               // a fresh one: a repair is part of the request that spawned it.
               ...(options.deadlineAt ? { deadlineAt: options.deadlineAt } : {}),
         ...(options.budget ? { budget: options.budget } : {}),
+              // A repair is still the same request from the caller's side, and its
+              // output is still output — a user watching should see it move.
+              ...(options.onOutput ? { onOutput: options.onOutput } : {}),
               ...(options.effort !== undefined
                 ? { effort: options.effort }
                 : {}),
