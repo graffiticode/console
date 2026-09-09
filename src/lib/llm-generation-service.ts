@@ -37,6 +37,19 @@ export interface StreamOptions {
   thinking?: unknown;
   effort?: string;
   /**
+   * Called as visible characters stream in, with the RUNNING TOTAL for this
+   * generation. Rides on options because that bag already flows from
+   * generate-for-request down to generateLongCode; nothing else does.
+   *
+   * Characters, not tokens, because characters are the only thing available live:
+   * Anthropic reports output_tokens in `message_delta`, which arrives at the END of
+   * a turn, so a token count cannot tick during one. The caller converts.
+   *
+   * Never called from requestAnthropic/requestOpenAI directly — the running total
+   * has to span continuation chunks, and only generateLongCode sees those.
+   */
+  onOutput?: (writtenChars: number) => void;
+  /**
    * Per-call timeout. Generation wants the long default (a program can take
    * 60-110s); an observer like the judge wants a much shorter leash, since a
    * hung judge would stall the run it is only scoring. Falls back to
@@ -1177,6 +1190,9 @@ async function generateLongCode({
   const maxOutputTokensTotal =
     options.maxOutputTokensTotal ??
     configuredNumber("CODEGEN_MAX_OUTPUT_TOKENS_TOTAL", 40_000);
+  // Spans continuation chunks: a caller watching this wants "how much has been
+  // written for my request", not "for this turn".
+  let writtenChars = 0;
   let firstChunkLine = "";
   let lowGrowthStreak = 0;
 
@@ -1200,6 +1216,13 @@ async function generateLongCode({
       model,
       systemPrompt,
       messages: conversationHistory,
+      onChunk: options.onOutput
+        ? (chunk: string) => {
+            writtenChars += chunk.length;
+            options.onOutput!(writtenChars);
+            onChunk?.(chunk);
+          }
+        : onChunk,
       options: {
         ...options,
         // Never let the last chunk overrun the budget it is being measured against.
@@ -1211,7 +1234,6 @@ async function generateLongCode({
           ),
         ),
       },
-      onChunk,
     });
     chunks += 1;
     usage.inputTokens += result.usage.inputTokens;

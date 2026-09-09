@@ -1321,10 +1321,36 @@ export async function setItemGenerationStatus({
   };
   if (status === "generating") {
     updates.generationStartedAt = Date.now();
+    updates.generationChars = 0;
   } else {
     updates.generationStartedAt = null;
+    // A finished item must not report a count; the MCP only shows it while pending.
+    updates.generationChars = null;
   }
   await itemRef.update(updates);
+}
+
+/**
+ * Write how many characters a running generation has emitted.
+ *
+ * Deliberately a bare `update` of one field rather than going through updateItem:
+ * this runs DURING generation, several times, and must not touch the taskId path,
+ * the version record, billing, or the free-plan expiry bump. It is progress, not a
+ * mutation of the item's content.
+ *
+ * Cleared by setItemGenerationStatus on any terminal status, so a finished item
+ * never carries a stale count.
+ */
+export async function setItemGenerationChars({
+  auth,
+  id,
+  chars,
+}: {
+  auth: AuthArg;
+  id: string;
+  chars: number;
+}) {
+  await db.doc(`users/${auth.uid}/items/${id}`).update({ generationChars: chars });
 }
 
 // --- Generation lease (idempotency for the Cloud Tasks worker) --------------
@@ -1551,6 +1577,7 @@ export async function getItems({ auth, lang, mark, client }) {
         generationStatus: data.generationStatus ?? null,
         generationError: data.generationError ?? null,
         generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
+        generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
       };
 
       const timestamp = data.updated || data.created || 0;

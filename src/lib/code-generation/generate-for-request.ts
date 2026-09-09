@@ -38,6 +38,7 @@ import {
   exhausted,
   tripped,
 } from "../request-budget";
+import { setItemGenerationChars } from "../../pages/api/resolvers";
 import { ragLog, generateRequestId } from "../logger";
 import { langKey, emitEvent, actor } from "../funnel-events";
 import { classifyPromptLanguage, promptLanguageKey } from "../prompt-language";
@@ -237,11 +238,47 @@ export async function generateCodeForRequest({
     // Sharing by reference is also what makes parallel stages stop together:
     // the instant one trips the budget, every sibling sees it.
     const requestBudget = createRequestBudget(rid);
+    /**
+     * Publish how much has been WRITTEN, so a waiting caller can tell a large
+     * program from a stuck one.
+     *
+     * A user watching Codex poll render_item saw three identical "still generating"
+     * lines and read it as thrashing. Elapsed seconds says the job is alive; this
+     * says it is producing. Together they separate the three cases that actually
+     * occur here: writing steadily, thinking with nothing emitted yet, and hung —
+     * and the middle one is real, an L0179 run today spent 5.5 minutes emitting
+     * ZERO characters.
+     *
+     * Characters, not tokens, because characters are what streams. Anthropic reports
+     * output_tokens in `message_delta` at the end of a turn, so a token count cannot
+     * tick during one. The MCP server converts at ~4 chars/token and says "~N
+     * tokens", which is honest at the precision anyone reads it at.
+     *
+     * THROTTLED to one write per 2s, skipped when nothing new arrived, and fire and
+     * forget. The cost lands on a path this session deliberately shortened, so it is
+     * bounded: a 60s generation costs ~30 writes, a 3s one costs one, and a failure
+     * to write can never delay or fail the generation.
+     */
+    const PROGRESS_WRITE_MS = 2_000;
+    let lastProgressWrite = 0;
+    let lastProgressChars = -1;
+    const publishProgress = (writtenChars: number) => {
+      if (!itemId || !auth?.uid) return;
+      const now = Date.now();
+      if (now - lastProgressWrite < PROGRESS_WRITE_MS) return;
+      if (writtenChars === lastProgressChars) return;
+      lastProgressWrite = now;
+      lastProgressChars = writtenChars;
+      setItemGenerationChars({ auth: auth as any, id: itemId, chars: writtenChars })
+        .catch(() => {});
+    };
+
     const codegenOptions = {
       temperature: options?.temperature,
       maxTokens: options?.maxTokens,
       deadlineAt: requestDeadlineAt,
       budget: requestBudget,
+      onOutput: publishProgress,
       ...(codegenEffort ? { effort: codegenEffort } : {}),
     };
     /** Uniform refusal envelope — same shape GUARDRAIL 0 returns. */
