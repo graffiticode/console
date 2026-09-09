@@ -26,6 +26,17 @@
 // the run refuses to print a blended figure when the two sides cannot be scoped
 // alike.
 //
+// The same like-for-like rule is why the internal harnesses are excluded. The
+// daily corpus ping and weekly sweep call the generator with a synthetic
+// per-language `itemId` and create no item, so their spend is a numerator with
+// no denominator: counting it made cost/item rise every time a language joined
+// the ping set. Worse, the id is CONSTANT per language, so grouping by itemId
+// booked a whole window of harness runs as one gigantic item — L0175 reported
+// $1.62/item for the week of 2026-09-03 off a $3.38 "item" that was 25 daily
+// pings, against a real item that cost $0.04. Harness rows now leave the
+// population in fetchPerItem and are reported on their own line; --include-harness
+// folds them back for a fully-loaded "what did the generator cost us" figure.
+//
 // Consequently this script calls NO provider API and needs no admin keys.
 // Nothing here checks whether our token counts are COMPLETE — that is a
 // separate measurement audit against the provider's metered totals, designed
@@ -38,6 +49,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { estimateUsdCost, usdCostFromReport } from '../src/lib/model-pricing';
 import { PLANS, type PlanId } from '../src/lib/plans-config';
+import { harnessKindOf } from '../src/lib/harness-item-ids';
 
 // Load .env.local
 const envPath = resolve(process.cwd(), '.env.local');
@@ -91,6 +103,14 @@ Average AI cost to produce one item, for a period.
   --per-item                Also show the per-item cost distribution
                             (mean/median/p90). Only sees generations recorded
                             after per-item attribution shipped.
+  --include-harness         Fold the internal generation harnesses — the daily
+                            corpus ping and the weekly corpus sweep — back into
+                            the ratio. They are EXCLUDED by default: both pass a
+                            synthetic per-language itemId and create no item, so
+                            their spend has no denominator, and grouping by
+                            itemId turns a whole window of them into one giant
+                            fake item. Use this only for a fully-loaded "what did
+                            the generator cost us" figure, never for pricing.
   --lang <id>               Restrict to a language (0176, L0176 and 176 all work);
                             repeatable, so --lang 0158 --lang 0176 pools a family.
                             Both the cost and the item count are narrowed to it,
@@ -154,6 +174,8 @@ interface Opts {
   asOf: Date;
   byLang: boolean;
   env: 'prod' | 'local' | 'all';
+  /** Fold the internal harnesses' spend back into the ratio (see --include-harness). */
+  includeHarness: boolean;
 }
 
 /**
@@ -196,6 +218,10 @@ function parseArgs(argv: string[]): Opts {
     json: false,
     asOf: new Date(),
     byLang: false,
+    // The corpus ping and sweep produce NO item, so their spend has no
+    // denominator to divide by. Default is to keep them out of the ratio and
+    // report them separately.
+    includeHarness: false,
     // `all`, not `prod`: the numerator and denominator are both scoped by this,
     // and excluding training runs would throw away real generations that
     // produced real items.
@@ -208,6 +234,7 @@ function parseArgs(argv: string[]): Opts {
     else if (a === '--to' && args[i + 1]) { opts.to = args[++i]; }
     else if (a === '--exclude-trial') { opts.excludeTrial = true; }
     else if (a === '--per-item') { opts.perItem = true; }
+    else if (a === '--include-harness') { opts.includeHarness = true; }
     else if (a === '--lang' && args[i + 1]) { opts.langs.push(normalizeLang(args[++i])); }
     else if (a === '--exclude-lang' && args[i + 1]) { opts.excludeLangs.push(normalizeLang(args[++i])); }
     else if (a === '--outcome' && args[i + 1]) {
@@ -504,7 +531,28 @@ interface PerItem {
   outcomeDropped: number;
   /** Priced spend of the FAILED generations that were kept. */
   failedUsd: number;
+  /**
+   * The internal harnesses, held apart from every total above. Real spend that
+   * produces no item, so it belongs in neither half of a per-item ratio — but it
+   * is never silently dropped: the run prints it.
+   */
+  harness: HarnessSpend;
 }
+
+/** Corpus ping / sweep spend, excluded from the ratio unless --include-harness. */
+interface HarnessSpend {
+  records: number;
+  usd: number;
+  tokens: TokenTotals;
+  /** Per harness, so a run can tell a daily ping's cost from a weekly sweep's. */
+  byKind: Record<string, { records: number; usd: number }>;
+  /** Per language, ascending — this is where the fake per-item averages came from. */
+  byLang: Record<string, { records: number; usd: number }>;
+}
+
+const emptyHarness = (): HarnessSpend => ({
+  records: 0, usd: 0, tokens: emptyTokens(), byKind: {}, byLang: {},
+});
 
 /**
  * Cost per individual item, from the `ai_generation` usage records.
@@ -520,6 +568,7 @@ interface PerItem {
 async function fetchPerItem(
   start: Date, end: Date, asOf: Date, langs: string[] = [], env: 'prod' | 'local' | 'all' = 'all',
   excludeLangs: string[] = [], outcome: 'all' | 'success' | 'failed' = 'all',
+  includeHarness = false,
 ): Promise<PerItem> {
   const snap = await db.collection('usage')
     .where('type', '==', 'ai_generation')
@@ -527,6 +576,7 @@ async function fetchPerItem(
     .get();
 
   const records: GenRecord[] = [];
+  const harness = emptyHarness();
   let unmarked = 0;
   let envDropped = 0;
   let failedSeen = 0;
@@ -537,33 +587,84 @@ async function fetchPerItem(
     if (!langKept(d.lang, langs, excludeLangs)) continue;
     const ms = toMillis(d.createdAt);
     if (ms < start.getTime() || ms >= end.getTime()) continue;
+
+    // The corpus ping and sweep pass a synthetic, CONSTANT-per-language itemId
+    // and create nothing (src/lib/harness-item-ids.ts). They belong in NEITHER
+    // half of a per-item ratio: the spend is real, but no item comes of it, so
+    // dividing it by items charges customer items for infrastructure and makes
+    // cost/item climb every time a language joins the ping set.
+    //
+    // Leaving them in did worse than inflate the blended figure. Grouping by
+    // itemId collapsed a whole window of harness runs into ONE item, so the
+    // per-item distribution and the --by-lang table reported those sums as
+    // single items: in the week of 2026-09-03, L0175 read $1.62/item on the
+    // strength of a $3.38 "item" that was 25 daily pings, while the one real
+    // item it produced cost $0.04. Fleet-wide the two harnesses were 64% of
+    // that window's spend across 51% of its generations.
+    //
+    // Detected on the raw `itemId`, not the resolved one: a harness always
+    // passes its id outright, so this never depends on the versions join below.
+    const harnessKind = includeHarness ? null : harnessKindOf(d.itemId);
+
+    // No `env` means the record predates the marker. Counting those under prod
+    // keeps history readable — dropping them would silently empty every window
+    // older than this change — but the count is surfaced so the dilution is
+    // visible. Counted AFTER the window filter, or it tallies the whole
+    // collection and reports more pre-marker records than generations.
+    //
+    // Harness rows obey this filter (so --env local shows no ping spend) but do
+    // not move the counters, which describe the population being reported.
+    const recordEnv: string | null = d.env ?? null;
+    if (env !== 'all') {
+      if (env === 'prod' ? recordEnv === 'local' : recordEnv !== 'local') {
+        if (!harnessKind) envDropped++;
+        continue;
+      }
+      if (recordEnv === null && !harnessKind) unmarked++;
+    }
+
+    // The frozen figure is kept only to detect legacy records; the cost this
+    // report divides is the SAME tokens on the SAME model re-priced at `asOf`.
+    const frozen = Number(d.cost?.usd ?? d.cost?.total ?? 0);
+    const t = (d.tokens ?? {}) as any;
+    const provider = d.provider ?? (/^(gpt|o\d)/.test(String(d.model ?? '')) ? 'openai' : 'anthropic');
+    const tokens: TokenTotals = {
+      input: Number(t.input ?? 0),
+      output: Number(t.output ?? 0),
+      cacheCreation: Number(t.cacheCreation ?? 0),
+      cacheRead: Number(t.cacheRead ?? 0),
+    };
+    const usd = estimateUsdCost({
+      inputTokens: tokens.input,
+      outputTokens: tokens.output,
+      cacheCreationInputTokens: tokens.cacheCreation,
+      cacheReadInputTokens: tokens.cacheRead,
+    }, d.model, asOf, provider);
+
+    // Harness spend leaves here, BEFORE the outcome counters: a failed ping is
+    // still harness spend, and letting it raise `failedSeen` would report a
+    // failure count the cost total does not cover. Never dropped silently —
+    // main() prints the whole of it.
+    if (harnessKind) {
+      const safeUsd = Number.isFinite(usd) ? usd : 0;
+      harness.records++;
+      harness.usd += safeUsd;
+      addTokens(harness.tokens, tokens);
+      const k = (harness.byKind[harnessKind] ??= { records: 0, usd: 0 });
+      k.records++; k.usd += safeUsd;
+      const norm = normalizeLang(String(d.lang ?? ''));
+      const langKey = /^\d{4}$/.test(norm) ? `L${norm}` : '(unrecorded)';
+      const l = (harness.byLang[langKey] ??= { records: 0, usd: 0 });
+      l.records++; l.usd += safeUsd;
+      continue;
+    }
+
     // A record with no `outcome` predates failure recording. It is counted as a
     // SUCCESS rather than dropped: those rows are the entire history, and
     // filtering them out on equality would empty every older window.
     const recordOutcome: string = d.outcome === 'failed' ? 'failed' : 'success';
     if (recordOutcome === 'failed') failedSeen++;
     if (outcome !== 'all' && recordOutcome !== outcome) { outcomeDropped++; continue; }
-    // No `env` means the record predates the marker. Counting those under prod
-    // keeps history readable — dropping them would silently empty every window
-    // older than this change — but the count is surfaced so the dilution is
-    // visible. Counted AFTER the window filter, or it tallies the whole
-    // collection and reports more pre-marker records than generations.
-    const recordEnv: string | null = d.env ?? null;
-    if (env !== 'all') {
-      if (env === 'prod' ? recordEnv === 'local' : recordEnv !== 'local') { envDropped++; continue; }
-      if (recordEnv === null) unmarked++;
-    }
-    // The frozen figure is kept only to detect legacy records; the cost this
-    // report divides is the SAME tokens on the SAME model re-priced at `asOf`.
-    const frozen = Number(d.cost?.usd ?? d.cost?.total ?? 0);
-    const t = (d.tokens ?? {}) as any;
-    const provider = d.provider ?? (/^(gpt|o\d)/.test(String(d.model ?? '')) ? 'openai' : 'anthropic');
-    const usd = estimateUsdCost({
-      inputTokens: Number(t.input ?? 0),
-      outputTokens: Number(t.output ?? 0),
-      cacheCreationInputTokens: Number(t.cacheCreation ?? 0),
-      cacheReadInputTokens: Number(t.cacheRead ?? 0),
-    }, d.model, asOf, provider);
     if (recordOutcome === 'failed') failedUsd += Number.isFinite(usd) ? usd : 0;
     records.push({
       userId: String(d.userId || ''),
@@ -574,12 +675,7 @@ async function fetchPerItem(
       model: d.model ?? null,
       provider,
       day: new Date(ms).toISOString().slice(0, 10),
-      tokens: {
-        input: Number(t.input ?? 0),
-        output: Number(t.output ?? 0),
-        cacheCreation: Number(t.cacheCreation ?? 0),
-        cacheRead: Number(t.cacheRead ?? 0),
-      },
+      tokens,
       // A record is instrumented if it has a priced cost (legacy pre-refactor docs)
       // OR it carries the new token-usage shape (stage + tokens from the refactor).
       // Legacy docs carry cost.total, new docs carry stage.
@@ -617,14 +713,19 @@ async function fetchPerItem(
     failedSeen,
     outcomeDropped,
     failedUsd,
+    harness,
   };
 
   for (const r of records) {
     if (!r.instrumented) continue;
 
-    // Window totals first: these count every instrumented record, whether or not
-    // it resolves to an item, so the headline's numerator and denominator come
-    // from one population.
+    // Resolve the item BEFORE touching any total, because whether this record
+    // belongs in the totals at all depends on what it resolves to.
+    const itemId = r.itemId ?? (r.taskId ? taskToItem.get(`${r.userId}:${r.taskId}`) : undefined);
+
+    // Window totals: every instrumented record that survived the filter above,
+    // whether or not it resolves to an item, so the headline's numerator and
+    // denominator come from one population.
     const model = r.model ?? '(unrecorded)';
     out.costByModel[model] = (out.costByModel[model] ?? 0) + r.usd;
     out.costByProvider[r.provider] += r.usd;
@@ -633,7 +734,6 @@ async function fetchPerItem(
     day[r.provider] += r.usd;
     day.tokens += sumTokens(r.tokens);
 
-    const itemId = r.itemId ?? (r.taskId ? taskToItem.get(`${r.userId}:${r.taskId}`) : undefined);
     if (!itemId) {
       // A generation that never became an item: it failed, or the item was
       // created outside the window. Real spend, deliberately not divided away.
@@ -696,6 +796,8 @@ interface HtmlInput {
   warnings: string[];
   /** The two sides could not be scoped to the same env — no blended figure. */
   blendedBlocked: boolean;
+  /** Corpus ping + sweep, held out of every figure above. Zeroed under --include-harness. */
+  harness: HarnessSpend;
 }
 
 function generateHtml(d: HtmlInput): string {
@@ -816,6 +918,12 @@ ${d.warnings.map(w => `<div class="warn"><strong>Warning:</strong> ${esc(w)}</di
   ${card('Total AI cost', `$${totalCost.toFixed(2)}`,
     `Anthropic $${d.costByProvider.anthropic.toFixed(2)} · OpenAI $${d.costByProvider.openai.toFixed(2)}`)}
   ${card('Items created', d.totalItems.toLocaleString(), `${d.paidItems} paid · ${d.trialItems} trial`)}
+  ${d.harness.records > 0
+    ? card('Harness (excluded)', `$${d.harness.usd.toFixed(2)}`,
+        `${d.harness.records.toLocaleString()} gen(s) · ${Object.entries(d.harness.byKind)
+          .sort((a, b) => b[1].usd - a[1].usd)
+          .map(([k, v]) => `${esc(k)} $${v.usd.toFixed(2)}`).join(' · ')} — creates no item`)
+    : ''}
 </div>
 
 <h2>By day</h2>
@@ -911,7 +1019,7 @@ async function main() {
   const items = foldItemCounts(itemCounts, excluded);
 
   console.error('Reading token usage...');
-  const perItem = await fetchPerItem(start, end, opts.asOf, opts.langs, opts.env, [...excluded], opts.outcome);
+  const perItem = await fetchPerItem(start, end, opts.asOf, opts.langs, opts.env, [...excluded], opts.outcome, opts.includeHarness);
 
   const totalItems = items.total;
   const trialItems = trial.total;
@@ -919,6 +1027,10 @@ async function main() {
   // Every record we priced, attributed to an item or not. Both halves are real
   // spend, so the headline divides the whole window's cost by the whole window's
   // items rather than silently dropping the unattributed part.
+  //
+  // The denominator needs no matching harness exclusion: the ping and sweep
+  // write no item_created, so `countItems` never saw them. That asymmetry is
+  // the whole point — harness spend had a numerator and no denominator.
   const { costByModel, costByProvider, tokens: totals } = perItem;
   const totalCost = perItem.attributedCost + perItem.unattributedCost;
   const paidItems = Math.max(0, totalItems - trialItems);
@@ -1031,6 +1143,7 @@ async function main() {
       totalItems, trialItems, paidItems, denominator, excludeTrial: opts.excludeTrial,
       blendedBlocked,
       tokens: totals, costByModel, costByProvider, totalCost,
+      harness: perItem.harness,
       rows, langRows, warnings,
       droppedLangs: thinLangs,
       hiddenLangRows: thinLangRows, thinLangRows, minItems: opts.minItems,
@@ -1057,6 +1170,15 @@ async function main() {
       excludedLangs: [...excluded].sort(),
       items: { total: totalItems, trial: trialItems, paid: paidItems, denominator, unmarked: items.unmarked },
       envDroppedGenerations: perItem.envDropped,
+      includeHarness: opts.includeHarness,
+      // Null when folded in, so a consumer cannot double-count it against `cost`.
+      harness: opts.includeHarness ? null : {
+        records: perItem.harness.records,
+        usd: perItem.harness.usd,
+        tokens: perItem.harness.tokens,
+        byKind: perItem.harness.byKind,
+        byLang: perItem.harness.byLang,
+      },
       blendedBlocked,
       tokens: totals,
       cost: {
@@ -1119,6 +1241,23 @@ async function main() {
   console.log(`${' '.repeat(25)}--------`);
   console.log(`${pad('Total AI cost')}: ${usd(totalCost)}`);
 
+  // Excluded, but never invisible: this is real money, and a reader comparing
+  // against a provider invoice has to be able to find it. Shown right under the
+  // total it is NOT part of, with the reason it is not part of it.
+  const h = perItem.harness;
+  if (h.records > 0) {
+    const kinds = Object.entries(h.byKind)
+      .sort((a, b) => b[1].usd - a[1].usd)
+      .map(([k, v]) => `${k} ${num(v.records)} gen(s) ${usd(v.usd)}`)
+      .join(', ');
+    console.log(`\n${pad('Harness spend (excluded)')}: ${usd(h.usd)} · ${num(h.records)} generation(s)`);
+    console.log(`  ${kinds}`);
+    console.log(`  Real spend, but the corpus ping and sweep create no item, so it has no`);
+    console.log(`  denominator and is kept out of the ratio. --include-harness folds it back in.`);
+  } else if (opts.includeHarness) {
+    console.log(`${pad('  incl. harness')}: corpus ping + sweep spend is INSIDE the total above (--include-harness)`);
+  }
+
   if (blendedBlocked) {
     console.log(`\n${pad('Cost per item')}: withheld — see WARNING below`);
   } else if (denominator > 0) {
@@ -1175,6 +1314,18 @@ async function main() {
     if (thinLangRows.length > 0) {
       const hidden = thinLangRows.map(r => `${r.lang || '(unrecorded)'} (${r.items})`).join(', ');
       console.log(`  hidden — under ${opts.minItems} attributed items: ${hidden}`);
+    }
+    // The same table, for the spend this report refuses to divide. Worth showing
+    // next to it: a language whose harness cost dwarfs its real cost is one whose
+    // per-item average used to be pure artifact, and is also a real signal that
+    // the ping set is carrying a dialect nobody is using.
+    const hLangs = Object.entries(perItem.harness.byLang).sort((a, b) => b[1].usd - a[1].usd);
+    if (hLangs.length > 0) {
+      console.log(`\nHarness spend by language (excluded from the table above)`);
+      console.log(`  ${'lang'.padEnd(14)}${'gens'.padStart(7)}${'cost'.padStart(11)}`);
+      for (const [lang, v] of hLangs) {
+        console.log(`  ${lang.padEnd(14)}${String(v.records).padStart(7)}${usd(v.usd).padStart(11)}`);
+      }
     }
   }
 

@@ -29,6 +29,7 @@ import { getFirestore } from "../utils/db";
 import { generateCodeForRequest } from "./code-generation/generate-for-request";
 import { getCredentialsForApiKey } from "./api-credentials";
 import { getBaseUrlForApi } from "./api";
+import { harnessItemId } from "./harness-item-ids";
 
 /**
  * The pinged set: registered in LANGUAGES *and* carrying a RAG corpus, minus the
@@ -237,7 +238,7 @@ async function pingLang(lang: string, day: number, auth: { uid: string; token: s
         //
         // Creates nothing: the id is never written, and the only lookup keyed on it
         // (assertRevisionsRemaining) is free-plan-only, which this eval account is not.
-        itemId: `corpus-ping-${lang}`,
+        itemId: harnessItemId("ping", lang),
         // Replay the prompt under the regime it was authored in — see PingOutcome. Without this
         // a vendor-gated language (L0176) is refused on every single run.
         skipScopeGate: true,
