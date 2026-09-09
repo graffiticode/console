@@ -146,6 +146,8 @@ const typeDefs = `
     generationStatus: String
     generationError: String
     generationStartedAt: String
+    # Characters written so far by a RUNNING generation; null once terminal.
+    generationChars: Int
     # Free-plan only. workspace is a signed handle the client sends back as
     # X-Free-Plan-Session so its next call lands in the same workspace even
     # though its transport session is gone; claimToken addresses that
