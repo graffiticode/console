@@ -30,6 +30,7 @@ import { generateCodeForRequest } from "./code-generation/generate-for-request";
 import { getCredentialsForApiKey } from "./api-credentials";
 import { getBaseUrlForApi } from "./api";
 import { compareShape, type ShapeLevel } from "./code-shape";
+import { harnessItemId } from "./harness-item-ids";
 import { PING_LANGUAGES } from "./corpus-ping";
 
 /** Same set as the daily ping: registered, has a corpus, not deprecated or internal. */
@@ -191,7 +192,7 @@ async function sweepOne(
         // Both required for the same reason as the daily ping: itemId so a dialect reading
         // get-val-public "itemId" resolves, skipScopeGate so a corpus prompt is replayed under
         // the regime it was authored in (see corpus-ping.ts PingOutcome).
-        itemId: `corpus-sweep-${lang}`,
+        itemId: harnessItemId("sweep", lang),
         skipScopeGate: true,
       }),
       `generate L${lang} ${entry.ref}`,
