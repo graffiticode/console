@@ -321,6 +321,44 @@ export const MODEL_PRIORITY: Record<string, PriorityConfig> = {
   // source it covers. A confidently wrong recipe tells a developer a restriction holds when the
   // Author API failed open, which is the specific hazard the directive exists to prevent.
   "0177": { order: ["openai+balanced", "anthropic+balanced"], spec: "balanced" },
+
+  // measured 2026-09-09, 4 trials per arm on one prescriptive retirement-calculator
+  // prompt (the shape that spiralled in production), sonnet-5, fresh creates:
+  //
+  //                 latency (s)                 median   output tok    code chars
+  //   no effort     7.9  10.4  16.7  18.6        13.5      740-2172     med 1586
+  //   effort=low    3.8   5.5   5.8   7.9         5.7       405-1062    med 1694
+  //
+  // ~2.4x faster for the SAME amount of code — median code chars is slightly higher
+  // with low, and the slowest low run ties the fastest no-effort run. What shrinks is
+  // the invisible half: the same prompt went from 82% of output tokens unwritten to
+  // 39%.
+  //
+  // WHY THIS LANGUAGE. L0179 has a zero-output thinking spiral, seen twice in
+  // production with identical telemetry (rid 715f0ad5, bb31ddb8, hours apart):
+  // `out=16384 chars=0 stop=max_tokens` twice, then no_growth — 32,768 tokens and
+  // 5.5 minutes to write ZERO characters, for a spreadsheet the same model writes in
+  // 219 tokens and 2.2s. A user lost an evening to it. Nothing else catches it: the
+  // emit wall arms on a first content token that never comes, and a 16,384-token
+  // thinking chunk takes ~164s against a 180s first-token watchdog, so it lands just
+  // under and counts as a successful chunk.
+  //
+  // The bound here is on the CAUSE. `grew === 0` and CODEGEN_MAX_OUTPUT_TOKENS_TOTAL
+  // only make the spiral fail faster; nothing but a thinking budget stops it starting.
+  //
+  // WHY NOT THE GLOBAL CODEGEN_EFFORT. Measured 2026-09-04 across four corpus-sweep
+  // arms over the same 30 prompts: `low` broke 3 of 18 stably-matching prompts and
+  // `medium` 2, with zero improvements, and its apparent latency win was
+  // indistinguishable from a same-config repeat (p90 moved 23.7s -> 14.4s with NO
+  // change at all). That verdict stands for the median and for the other languages —
+  // and it never sampled this case, because corpus L0179 prompts generate in 2.2s.
+  // This entry is the exception that finding has nowhere else to record.
+  //
+  // `create` only: all six trials above and both production spirals were fresh
+  // creates. A revision has the working artifact in hand and is a different regime
+  // with no measurement behind it, so it keeps the default rather than inheriting a
+  // bound on the strength of a create-mode eval.
+  "0179": { effort: { create: "low" } },
 };
 
 /**
