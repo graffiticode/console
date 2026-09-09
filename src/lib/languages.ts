@@ -97,7 +97,7 @@ export const LANGUAGES: Language[] = [
   { id: "0000", name: "L0000", description: "Root language", domains: [], sponsored: { by: "Artcompiler Inc." }, status: "Internal", internal: true },
   // L0001 is DEPRECATED — retained as a repo for historical reference only. Do not re-enable.
   // { id: "0002", name: "L0002", description: "Core language", domains: [] },
-  { id: "0003", name: "L0003", description: "Hello, image, theme, and print", domains: [] },
+  { id: "0003", name: "L0003", description: "Hello, image, theme, and print", domains: [], hidden: true },
   { id: "0010", name: "L0010", description: "Composition planner (internal)", routingHint: "Internal composition-planning dialect: maps a request to an ordered language sequence (`plan [...]` → { langs }). Not a content-authoring target.", domains: [], status: "Internal", internal: true },
   { id: "0013", name: "L0013", description: "Screenshot thumbnails (internal)", routingHint: "Internal utility dialect: renders an existing item's form view to a cropped PNG thumbnail and uploads it (`snap item \"<id>\" {}`). Not a content-authoring target.", domains: [], status: "Internal", internal: true },
   // { id: "0011", name: "L0011", description: "Property editors", domains: [] },
@@ -116,7 +116,7 @@ export const LANGUAGES: Language[] = [
   { id: "0158", name: "L0158", description: "Learnosity assessment items (legacy; prefer L0176). Use ONLY when the user names Learnosity or a Learnosity Item Bank / LMS.", routingHint: "Do NOT use for generic quizzes, tests, or practice items that don't name Learnosity. Deprecated in favor of L0176 — prefer L0176 for all new Learnosity item content. Learnosity assessment items — MCQ, short text, cloze, formula, classification, order list, and choice matrix question types via Learnosity API. Embeds another Graffiticode dialect (e.g. L0166 spreadsheets) as a `custom` question for spreadsheet-based, table-based, or worksheet-style assessments.", domains: ["learnosity"], gatedBy: ["learnosity"], status: "Deprecated", composesWith: ["0166", "0179"] },
   // Flashcards moved to L0181 — same study loop, rebuilt on L0000. L0159 keeps match and
   // memory, which L0181 does not do, and keeps serving every item already authored in it.
-  { id: "0159", name: "L0159", description: "Match and Memory card games", routingHint: "Matching games, where a player pairs related terms, and memory (concentration) card games, where a player flips hidden cards to find pairs. Both are driven by a list of two-sided fact pairs, with LaTeX math support. For a FLASHCARD deck — cards a learner flips and rates one at a time — use L0181, not this.", domains: ["assessments"] },
+  { id: "0159", name: "L0159", description: "Match and Memory card games", routingHint: "Matching games, where a player pairs related terms, and memory (concentration) card games, where a player flips hidden cards to find pairs. Both are driven by a list of two-sided fact pairs, with LaTeX math support. For a FLASHCARD deck — cards a learner flips and rates one at a time — use L0181, not this.", domains: ["assessments"], hidden: true },
   // { id: "0160", name: "L0160", description: "Learnosity QTI Importer", domains: [] },
   // { id: "0161", name: "L0161", description: "Expression translators", domains: [] },
   // { id: "0162", name: "L0162", description: "Walking routes", domains: [] },
