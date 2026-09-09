@@ -94,7 +94,7 @@ export interface Language {
 }
 
 export const LANGUAGES: Language[] = [
-  { id: "0000", name: "L0000", description: "Root language", domains: [], sponsored: { by: "Artcompiler Inc." } },
+  { id: "0000", name: "L0000", description: "Root language", domains: [], sponsored: { by: "Artcompiler Inc." }, status: "Internal", internal: true },
   // L0001 is DEPRECATED — retained as a repo for historical reference only. Do not re-enable.
   // { id: "0002", name: "L0002", description: "Core language", domains: [] },
   { id: "0003", name: "L0003", description: "Hello, image, theme, and print", domains: [] },
@@ -107,7 +107,7 @@ export const LANGUAGES: Language[] = [
   // { id: "0147", name: "L0147", description: "Chart renderers", domains: [] },
   // { id: "0150", name: "L0150", description: "Free shipping calculators", domains: [] },
   // { id: "0151", name: "L0151", description: "Spreadsheets questions", domains: [] },
-  { id: "0152", name: "L0152", description: "Interactive map questions", routingHint: "Interactive map-based questions — learners answer by clicking or identifying locations on a map (states, capitals, countries, regions).", domains: ["assessments"] },
+  { id: "0152", name: "L0152", description: "Interactive map questions", routingHint: "Interactive map-based questions — learners answer by clicking or identifying locations on a map (states, capitals, countries, regions).", domains: ["assessments"], status: "Deprecated" },
   { id: "0153", name: "L0153", description: "Area model questions", routingHint: "Area model multiplication questions with visual grid representations.", domains: ["assessments"], status: "Beta" },
   { id: "0154", name: "L0154", description: "Magic square questions", routingHint: "Magic square puzzle questions with grid-based number placement.", domains: ["assessments"], status: "Beta" },
   // { id: "0155", name: "L0155", description: "Stoplight questions", domains: [] },
@@ -159,7 +159,7 @@ export const LANGUAGES: Language[] = [
   // other. The controlled sweep (L0166's own cases run against L0179, near-identical retrieval)
   // found the style neither helps nor hurts generation rate; what it buys is correctness a
   // compile-rate sweep cannot see.
-  { id: "0179", name: "L0179", description: "Spreadsheets", routingHint: "Interactive spreadsheet authoring with tabular cell data, cell-level formatting, formulas (SUM, AVERAGE, ROUND, IF), parameterized values, and optional assessment validation with per-cell points. Supersedes L0166 — prefer this for all new spreadsheet content.", domains: ["assessments", "sheets"], status: "Beta" },
+  { id: "0179", name: "L0179", description: "Spreadsheets", routingHint: "Interactive spreadsheet authoring with tabular cell data, cell-level formatting, formulas (SUM, AVERAGE, ROUND, IF), parameterized values, and optional assessment validation with per-cell points. Supersedes L0166 — prefer this for all new spreadsheet content.", domains: ["assessments", "sheets"] },
   // The ungated general assessment language. Until this entry existed the catalog had none:
   // L0176 authors the item types generically but is gatedBy learnosity, and L0175 is
   // Grade-5-ELA-only, so a plain "make me a five-question quiz" had nowhere to route and the

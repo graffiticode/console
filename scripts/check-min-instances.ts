@@ -19,10 +19,11 @@
  * Usage:
  *   npm run check-min-instances            # report drift, exit 1 if any
  *   npm run check-min-instances -- --fix   # and set them
- *   npm run check-min-instances -- --all-languages   # every l0*, not just the live set
+ *   npm run check-min-instances -- --all-languages   # every l0*, beta included
  */
 import { execFileSync } from "child_process";
 import { PING_LANGUAGES } from "../src/lib/corpus-ping";
+import { findLanguageById } from "../src/lib/languages";
 
 const REGION = "us-central1";
 const WANT = 1;
@@ -81,17 +82,22 @@ async function targets() {
     for (const name of names) rows.push({ name, project: "graffiticode", why: "language (--all-languages)" });
     return rows;
   }
-  // PING_LANGUAGES: the live set, and the same list SWEEP_LANGUAGES uses. It is the
-  // right source here for the reason it exists — a language in it is one whose
-  // breakage is customer-facing, which is exactly the population worth keeping warm.
+  // NON-BETA PING_LANGUAGES. Two filters, and each carries its own reason.
   //
-  // Deliberately NOT `listLanguages()`. That returns everything not hidden and not
-  // deprecated, which today still includes 0159 and four corpus-less dialects
-  // (0003, 0152, 0153, 0154). If one of those is reachable by the scope gate but
-  // should not be, the fix belongs in the catalog, not in a warm-instance list that
-  // would quietly pay to keep it fast.
+  // PING_LANGUAGES is the live set — the same list the weekly sweep uses, and the
+  // population whose breakage is customer-facing. Deliberately NOT `listLanguages()`,
+  // which returns everything neither hidden nor deprecated and today still includes
+  // 0159 and four corpus-less dialects (0003, 0152, 0153, 0154); paying to keep those
+  // warm would quietly fund a routing question instead of answering it.
+  //
+  // Beta is then excluded because a warm instance is a standing bill, and a dialect
+  // still labelled Beta has not earned one. Clearing the tag is the deliberate act
+  // that promotes a language into this set — 0179 crossed that line on 2026-09-09 —
+  // so the list follows the catalog rather than being maintained beside it.
   for (const id of PING_LANGUAGES) {
-    rows.push({ name: `l${id}`, project: "graffiticode", why: "live language" });
+    const lang = findLanguageById(id) as { status?: string } | undefined;
+    if (lang?.status === "Beta") continue;
+    rows.push({ name: `l${id}`, project: "graffiticode", why: "live, non-beta language" });
   }
   return rows;
 }
