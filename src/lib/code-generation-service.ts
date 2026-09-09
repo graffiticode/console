@@ -103,10 +103,29 @@ const languageAssetsCache = {
 // Preserve the existing imports used by the router and spec generator.
 export { CLAUDE_MODELS, modelRejectsTemperature };
 
-// Default max output tokens per generation chunk. Large enough that most
-// programs (incl. multi-page L0175 assessments) complete in a single chunk
-// rather than relying on the continuation loop. Sonnet 4.6 supports far more.
-export const DEFAULT_MAX_TOKENS = 16384;
+/**
+ * Max output tokens per generation chunk.
+ *
+ * This is also the CEILING ON A THINKING SPIRAL, and that is what sets it.
+ *
+ * L0179 intermittently spends a whole chunk reasoning and writes nothing:
+ * `output=16384 rawChars=0 codeChars=0 stopEarly=no_output`, twice in one user's
+ * session on 2026-09-09, at ~100 tok/s — so 16,384 tokens IS ~150 seconds of
+ * silence before the loop can even notice. The `no_output` break stops it after one
+ * chunk rather than two, and `effort: low` did NOT prevent it (both spirals above
+ * ran with `effort=low` applied and logged). Nothing bounds how long that one chunk
+ * runs except this number.
+ *
+ * 8192 halves the worst case to ~80s. The cost is continuations: the same user's
+ * successful run emitted 12,792 output tokens in one chunk and would now take two.
+ * The continuation loop handles that — it is the same path a long L0175 assessment
+ * has always used — and its own guards (restart, no_growth, no_output) apply per
+ * chunk, so a spiral is caught sooner rather than later.
+ *
+ * Was 16384, chosen so most programs finished in a single chunk. That reasoning
+ * optimised the good case; this number now also has to bound the bad one.
+ */
+export const DEFAULT_MAX_TOKENS = 8192;
 
 /**
  * Upper bound on a client-supplied `maxTokens`. 64k is 4x the server default
