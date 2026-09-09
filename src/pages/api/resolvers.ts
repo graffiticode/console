@@ -1819,6 +1819,11 @@ export async function getItem({ auth, id, includeSpec = false }: {
       generationStatus: data.generationStatus ?? null,
       generationError: data.generationError ?? null,
       generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
+      // The SINGLE-item resolver, which is the one the MCP polls. Adding this field
+      // to the list resolver alone left the counter reading null for every
+      // render_item call while Firestore held 12,512 — the write worked and the
+      // read looked broken. Two shaping sites, both need the field.
+      generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
       // Claim token only — a read must be able to offer "save this item" for the
       // workspace the item actually lives in (this retrieval path is where the
       // claim link is surfaced, after the agent polls a create to "ready"), but
