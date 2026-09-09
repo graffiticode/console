@@ -30,7 +30,20 @@ steps:
       - '--allow-unauthenticated'
       - '--memory=1Gi'
       - '--cpu=1'
-      - '--min-instances=0'
+      # Pinned warm, and pinned HERE because this line is what decides it.
+      #
+      # Cloud Run cold-starts the first request after idle and after every deploy,
+      # which retires all warm instances. Measured 2026-09-09: a create_item that
+      # takes 0.8s warm took 33.7s, with `✓ Ready in 13.2s` in the log — a user was
+      # waiting through it. console is on the shared path (GraphQL API + the
+      # generate-job worker), so the boot is charged to every language, not one.
+      #
+      # This was set to 0, which is why setting it by hand never held: a
+      # `gcloud run services update --min-instances=1` survives a deploy only when
+      # the deploy does not name the flag, and this one names it. The value has to
+      # live here or it is reverted on the next build. Check it with
+      # `npm run check-min-instances`.
+      - '--min-instances=1'
       - '--max-instances=10'
       - '--port=8080'
       # Cross-app SSO: scope the shared refresh-token cookie to the parent domain
