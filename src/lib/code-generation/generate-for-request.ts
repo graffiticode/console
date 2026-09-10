@@ -3,9 +3,20 @@
 //
 // This is the layer ABOVE the per-stage generator. `generateCode` in
 // ../code-generation-service.ts generates a single language's program; this
-// function owns everything around that — the scope gate, the composition
-// planner and its permission fence, upstream orchestration, the `data use`
-// binding repair, and stitching `head+s2+s3`.
+// function owns everything around that — the scope gate, the reactive
+// composition path and its permission fence, upstream generation, the atomic
+// fallback, and stitching `head+s2+s3`.
+//
+// Composition here is REACTIVE, never planned: nothing decides to compose before
+// the head is generated. The head's own instructions.md decides, by emitting
+// `data use "<lang>"`; this module notices the binding after the parse and
+// generates exactly those upstreams, if `composesWith` permits them. The
+// pre-flight LLM planner that used to sit above generation (planSequence /
+// planComposition / the L0010 planning-RAG) was removed on 2026-09-09: it ran on
+// every fresh create whose head declared an edge, and its worst failure was
+// silent to the head language — an upstream stage refusing the WHOLE request
+// with its own `OUT_OF_SCOPE:` sentinel, so a user asking L0173 for a bar chart
+// was told L0170 cannot draw charts.
 //
 // It lives here rather than in pages/api/resolvers.ts so that scripts, jobs and
 // the GraphQL resolver all reach the SAME code path. When it lived in the
@@ -21,12 +32,10 @@ import { getLanguageAsset, getLanguageLexicon, isLangOverridden } from "../api";
 import { generateCode as codeGenerationService, getRelevantExamples, extractSearchQuery } from "../code-generation-service";
 import {
   MAX_STAGES,
-  planSequence,
   classifyAndRoute,
   composesWithFor,
+  extractLangIds,
   fenceComposition,
-  orchestrateComposition,
-  capturePlanForCuration,
   splitRequest,
 } from "../language-router";
 import { resolveUpstreams } from "../composition-discovery";
@@ -133,7 +142,11 @@ export async function generateCodeForRequest({
     stageMs[stage] = (stageMs[stage] ?? 0) + (Date.now() - since);
   };
   let composedRun = false;
-  let repairRuns = 0;
+  // Atomic fallbacks taken: an upstream failed and the head was regenerated
+  // standalone. Was `repairs` (head regenerated because the PLANNER pre-committed
+  // it to a tail it then failed to bind) — a different event with a different
+  // cause, so it gets a different name rather than a quiet reuse.
+  let fallbackRuns = 0;
 
   try {
     if (!language) {
@@ -182,9 +195,6 @@ export async function generateCodeForRequest({
     let upstreamLangs: string[] = [];
     let upstreamTaskIds: string[] = [];
     let headLang = language;
-    // True only when the sequence came from a planning-RAG hit (already curated),
-    // so we don't re-capture a duplicate mark-2 plan for it.
-    let fromRagHit = false;
 
     // Hoisted out of the `if (!src)` block below so the post-parse repair (which lives in
     // the outer scope) can reuse them: codegen options, the usage-limit message mapper, and
@@ -450,76 +460,13 @@ export async function generateCodeForRequest({
         console.warn(`[composition] rid=${rid} head retrieval failed: ${err?.message}`);
       }
 
-      // GUARDRAIL 2 — permission-governed composition. `composesWith` is the HARD FENCE: the
-      // planner may only propose edges within it (fenceComposition drops the rest). An empty
-      // allowlist ⇒ atomic. The whole path is also globally disable-able via COMPOSITION_ENABLED.
-      let sequence: string[] = [language];
-      const permits = process.env.COMPOSITION_ENABLED === "false" ? [] : composesWithFor(language);
-      if (permits.length > 0) {
-        const tPlan = Date.now();
-        const planResult = await planSequence({ prompt, headLang: language, auth, options: codegenOptions, rid, itemId, preferHaiku: true, budget: requestBudget });
-        mark("plan", tPlan);
-        const fenced = fenceComposition(planResult.sequence, permits);
-        if (fenced.dropped.length > 0) {
-          console.warn(`[composition] rid=${rid} fenced unpermitted upstreams=[${fenced.dropped.join(",")}] permits=[${permits.join(",")}]`);
-        }
-        sequence = fenced.sequence;
-        fromRagHit = planResult.fromRag;
-      }
-      // `head` is the EFFECTIVE head — `language` after any preflight reroute —
-      // not the one the caller asked for. langLog is the pre-reroute value, and
-      // printing it here made a reroute look like a composition failure: the
-      // 2026-08-29 L0169→L0166 misroute logged `head=L0169 sequence=["0166"]`,
-      // which reads as the planner emitting a foreign head under an empty
-      // permits list — a bug in a component that had not run. The requested
-      // language is already recorded by preflight.classify/preflight.reroute, so
-      // nothing is lost by making this line agree with what actually generated.
-      const headLog = langKey(language);
-      console.log(`[composition] rid=${rid} head=${headLog} requested=${langLog} permits=[${permits.join(",")}] sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
-      ragLog(rid, "composition.gate", { head: headLog, requested: langLog, permits, sequence });
-
-      if (sequence.length > 1) {
-        headLang = sequence[0];
-        console.log(`[composition] rid=${rid} sequence=${sequence.map(l => `L${l}`).join(" -> ")}`);
-        ragLog(rid, "composition.plan", { sequence });
-
-        composedRun = true;
-        // Request-level gate. The router and planner calls above already
-        // charged; if they alone blew the budget, refusing here gives a clean
-        // message instead of one attributed to whichever stage tripped first.
-        if (tripped(requestBudget)) {
-          const refusal = budgetRefusal("composition");
-          if (refusal) return refusal;
-        }
-        const tCompose = Date.now();
-        const orch = await orchestrateComposition({
-          sequence,
-          prompt,
-          auth,
-          options: codegenOptions,
-          currentCode: currentSrc,
-          rid,
-          itemId,
-          conversationSummary,
-          headExamples: headLang === language ? headExamples : null,
-        });
-        mark("compose", tCompose);
-
-        if (orch.errors) {
-          return { src: null, taskId: null, language, description: null, changeSummary: null, model: null, provider: orch.headProvider ?? null, tier: orch.headTier ?? null, usage: null, errors: mapUsageLimit(orch.errors), upstreamLangs: [], rid };
-        }
-
-        src = orch.headSrc;
-        model = orch.headModel;
-        provider = orch.headProvider;
-        tier = orch.headTier;
-        usage = orch.headUsage;
-        description = orch.headDescription;
-        changeSummary = orch.headChangeSummary;
-        upstreamLangs = orch.upstreamLangs;
-        upstreamTaskIds = orch.upstreamTaskIds;
-      } else {
-        // Atomic — single-language code gen, reusing the head retrieval.
+      // No pre-flight composition decision. The head generates FIRST, atomically;
+      // whether this request composes is read off the program it produced (see the
+      // reactive block after parseCode below). Composition is therefore something a
+      // language OPTS INTO through its own instructions.md, which is the only place
+      // that knows when a request needs an upstream — not something a planner infers
+      // from a catalog blurb before a single line of code exists.
+      {
         if (tripped(requestBudget)) {
           const refusal = budgetRefusal("atomic");
           if (refusal) return refusal;
@@ -610,107 +557,154 @@ export async function generateCodeForRequest({
     let code = JSON.parse(parseResult.code);
 
     try {
-      if (upstreamTaskIds.length === 0) {
-        // No planner-driven composition. Honor any hand-written
-        // `data use "<lang>"` in the generated/edited head (reactive path),
-        // generating each upstream with the user's prompt verbatim.
-        const resolved = await resolveUpstreams(code);
-        if (resolved.upstreams.length > 0) {
-          // resolveUpstreams returns EVERY `data use` in the node pool with no
-          // limit, and each one below starts a full generateCode. Until this
-          // check, that made the reactive path the one composition route that
-          // honoured neither MAX_STAGES nor the composesWith allowlist — both
-          // are applied to the planner's sequence only. A model emitting N
-          // bindings therefore bought N concurrent generations, outside the
-          // fence that exists to stop exactly that.
-          const proposed = [headLang, ...resolved.upstreams];
-          const fenced = fenceComposition(proposed, composesWithFor(headLang));
-          const overDepth = proposed.length > MAX_STAGES;
-          if (fenced.dropped.length > 0 || overDepth) {
-            console.log(
-              `[composition] rid=${rid} headLang=${headLang} reactive refused ` +
-              `dropped=${fenced.dropped.join(",") || "none"} depth=${proposed.length}/${MAX_STAGES}`,
-            );
-            ragLog(rid, "composition.reactive.refused", {
-              headLang, proposed: resolved.upstreams, dropped: fenced.dropped, overDepth,
-            });
-            const detail = fenced.dropped.length > 0
-              ? `L${headLang} is not permitted to compose with ${fenced.dropped.map((d) => "L" + d).join(", ")}.`
-              : `A composition may use at most ${MAX_STAGES} languages; this one proposed ${proposed.length}.`;
-            return {
-              src: null, taskId: null, language, description: null, changeSummary: null,
-              model, provider, tier, usage: null,
-              errors: [{ message: `${detail} Try describing the item as a single language, or splitting it into separate items.` }],
-              upstreamLangs: [], rid,
-            };
-          }
-          code = resolved.ast;
-          upstreamLangs = resolved.upstreams;
-          console.log(`[composition] rid=${rid} headLang=${headLang} reactive upstreams=${upstreamLangs.join(",")}`);
-          ragLog(rid, "composition.reactive", { headLang, upstreamLangs });
+      // REACTIVE COMPOSITION — the only composition path there is.
+      //
+      // The head is already generated and parsed. If it authored `data use "<lang>"`,
+      // that binding IS the request to compose, and the head's instructions.md is what
+      // put it there (L0176's "Pipeline Composition" section is the reference: it tells
+      // the generator when a Learnosity `custom` question needs an L0179 spreadsheet
+      // behind it, and makes the binding a hard requirement with a finish-time check).
+      // `composesWith` says only whether that binding is PERMITTED — it is a fence, not
+      // a trigger. A language with no such section never binds and is atomic in practice
+      // whatever its allowlist says.
+      const resolved = await resolveUpstreams(code);
 
-          // Same split as the planner path: an upstream discovered from the head's
-          // `data use` still receives the whole request otherwise, host framing and
-          // all. Head keeps the original prompt (it is already generated by now);
-          // only the upstreams get a scoped share. Fail-open to the original.
-          const reactivePrompts = await splitRequest({
-            prompt,
-            sequence: [headLang, ...upstreamLangs],
-            rid,
-            itemId,
-            auth,
-            budget: requestBudget,
-          });
-          // allSettled, not all: a rejection here used to escape while every
-          // sibling kept running, unhandled and uncancellable, spending tokens
-          // for a request that had already decided to fail.
-          const settled = await Promise.allSettled(
-            upstreamLangs.map((uLang, i) =>
-              codeGenerationService({
-                auth,
-                prompt: reactivePrompts?.[i + 1] ?? prompt,
-                lang: uLang,
-                options: codegenOptions,
-                rid,
-                itemId,
-              })
-            )
+      // Bindings the item ALREADY had are permitted regardless of the allowlist.
+      //
+      // Narrowing composesWith retroactively forbids edges that existing items were
+      // built on: an L0158+L0166 or L0173+L0170 item still carries `data use` in its
+      // source, the model preserves it across an edit, and the fence below would then
+      // refuse to save a one-word change to an item that has worked for months.
+      // Deprecating an edge must stop NEW ones, never strand live content.
+      // extractLangIds reads the source text directly — no second parse.
+      const grandfathered = currentSrc ? extractLangIds(currentSrc, true) : [];
+      const permits = process.env.COMPOSITION_ENABLED === "false"
+        ? []
+        : [...composesWithFor(headLang), ...grandfathered];
+      if (grandfathered.length > 0) {
+        ragLog(rid, "composition.grandfathered", { headLang, langs: grandfathered });
+      }
+      // One line per run, composing or not, so an atomic outcome is observable rather
+      // than merely silent — the same reason the scope gate logs its in-scope verdicts.
+      console.log(
+        `[composition] rid=${rid} head=${langKey(headLang)} requested=${langLog} ` +
+        `permits=[${permits.join(",")}] upstreams=[${resolved.upstreams.join(",")}]`,
+      );
+      ragLog(rid, "composition.gate", {
+        head: langKey(headLang), requested: langLog, permits, upstreams: resolved.upstreams,
+      });
+
+      if (resolved.upstreams.length > 0) {
+        // resolveUpstreams returns EVERY `data use` in the node pool with no
+        // limit, and each one below starts a full generateCode. A model emitting
+        // N bindings would otherwise buy N concurrent generations, outside the
+        // fence that exists to stop exactly that.
+        const proposed = [headLang, ...resolved.upstreams];
+        const fenced = fenceComposition(proposed, permits);
+        const overDepth = proposed.length > MAX_STAGES;
+        if (fenced.dropped.length > 0 || overDepth) {
+          console.log(
+            `[composition] rid=${rid} headLang=${headLang} refused ` +
+            `dropped=${fenced.dropped.join(",") || "none"} depth=${proposed.length}/${MAX_STAGES}`,
           );
-          // Budget FIRST. After the per-result loop the caller would instead see
-          // "Upstream L0179 failed to produce a taskId" — a downstream symptom
-          // whose identity depends on which stage happened to trip first.
+          ragLog(rid, "composition.refused", {
+            headLang, proposed: resolved.upstreams, dropped: fenced.dropped, overDepth,
+          });
+          const detail = fenced.dropped.length > 0
+            ? `L${headLang} is not permitted to compose with ${fenced.dropped.map((d) => "L" + d).join(", ")}.`
+            : `A composition may use at most ${MAX_STAGES} languages; this one proposed ${proposed.length}.`;
+          return {
+            src: null, taskId: null, language, description: null, changeSummary: null,
+            model, provider, tier, usage: null,
+            errors: [{ message: `${detail} Try describing the item as a single language, or splitting it into separate items.` }],
+            upstreamLangs: [], rid,
+          };
+        }
+        code = resolved.ast;
+        upstreamLangs = resolved.upstreams;
+        composedRun = true;
+
+        const tCompose = Date.now();
+        // An upstream discovered from the head's `data use` would otherwise receive
+        // the whole request, host framing and all. The head keeps the original prompt
+        // (it is already generated by now); only the upstreams get a scoped share.
+        // Fail-open to the original.
+        const reactivePrompts = await splitRequest({
+          prompt,
+          sequence: [headLang, ...upstreamLangs],
+          rid,
+          itemId,
+          auth,
+          budget: requestBudget,
+        });
+        // allSettled, not all: a rejection here used to escape while every
+        // sibling kept running, unhandled and uncancellable, spending tokens
+        // for a request that had already decided to fail.
+        const settled = await Promise.allSettled(
+          upstreamLangs.map((uLang, i) =>
+            codeGenerationService({
+              auth,
+              prompt: reactivePrompts?.[i + 1] ?? prompt,
+              lang: uLang,
+              options: codegenOptions,
+              rid,
+              itemId,
+            })
+          )
+        );
+        mark("compose", tCompose);
+        // Budget FIRST. After the per-result loop the caller would instead see
+        // "Upstream L0179 failed to produce a taskId" — a downstream symptom
+        // whose identity depends on which stage happened to trip first.
+        if (tripped(requestBudget)) {
+          const refusal = budgetRefusal("composition.reactive");
+          if (refusal) return refusal;
+        }
+        const upstreamResults = settled.map((r) =>
+          r.status === "fulfilled" ? r.value : { errors: [{ message: String((r as PromiseRejectedResult).reason?.message ?? r.reason) }] },
+        );
+        const upstreamErrors = upstreamResults.flatMap((r: any, i: number) => {
+          if (r && 'errors' in r && r.errors) return r.errors;
+          if (!r?.taskId) return [{ message: `Upstream L${upstreamLangs[i]} failed to produce a taskId` }];
+          return [];
+        });
+        if (upstreamErrors.length > 0) {
+          // ATOMIC FALLBACK — the head asked for an upstream and could not have it.
+          //
+          // Returning the upstream's own error here is what produced the 2026-09-09
+          // report: a user asked for an interactive bar chart and was told "Out of
+          // scope: L0170 is a data-transformation dialect ... it has no charting
+          // capabilities" — L0170's OUT_OF_SCOPE sentinel, about a language the user
+          // never named, refusing a capability the language they DID name has. The
+          // failure of an upstream is not a reason to hand back nothing: the head can
+          // almost always author the content inline instead, which is exactly what the
+          // user did by hand once the platform gave up.
+          //
+          // Exactly one retry, and only if the budget allows the spend.
+          const upstreamReason = upstreamErrors[0]?.message ?? "";
+          console.warn(
+            `[composition] rid=${rid} fallback.atomic head=L${headLang} ` +
+            `failed_upstreams=[${upstreamLangs.join(",")}]`,
+          );
+          ragLog(rid, "composition.fallback.atomic", { headLang, upstreamLangs });
+          const composedFailure = () => ({
+            src: null, taskId: null, language, description: null, changeSummary: null,
+            model, provider, tier, usage: null,
+            errors: [{
+              message:
+                `L${headLang} needed an upstream ${upstreamLangs.map((l) => "L" + l).join(", ")} ` +
+                `program and it could not be generated${upstreamReason ? ` (${upstreamReason})` : ""}. ` +
+                `Try describing the item as a single language, or supplying the data inline.`,
+            }],
+            upstreamLangs: [], rid,
+          });
           if (tripped(requestBudget)) {
-            const refusal = budgetRefusal("composition.reactive");
+            const refusal = budgetRefusal("composition.fallback");
             if (refusal) return refusal;
           }
-          const upstreamResults = settled.map((r) =>
-            r.status === "fulfilled" ? r.value : { errors: [{ message: String((r as PromiseRejectedResult).reason?.message ?? r.reason) }] },
-          );
-          const upstreamErrors = upstreamResults.flatMap((r: any, i: number) => {
-            if (r && 'errors' in r && r.errors) return r.errors;
-            if (!r?.taskId) return [{ message: `Upstream L${upstreamLangs[i]} failed to produce a taskId` }];
-            return [];
-          });
-          if (upstreamErrors.length > 0) {
-            return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: upstreamErrors, upstreamLangs: [], rid };
-          }
-          upstreamTaskIds = upstreamResults.map((r: any) => r.taskId as string);
-        }
-      } else {
-        // Planner/provenance-driven composition already generated the tail. Verify the head
-        // actually emitted `data use "<nextStageLang>"` so the chained upstream data will
-        // flow. Linear pipeline → the head only binds upstreamLangs[0] (deeper stages bind
-        // each other). If the binding is missing, regenerate the head ONCE with a
-        // strengthened directive; if it still won't bind, fail with an actionable error
-        // rather than silently posting a `+`-chain whose upstream data never flows.
-        const expected = upstreamLangs[0];
-        let resolved = await resolveUpstreams(code);
-        if (expected && !resolved.upstreams.includes(expected)) {
-          console.log(`[composition] rid=${rid} repair.start head=L${headLang} expected=L${expected}`);
-          ragLog(rid, "composition.repair.start", { headLang, expected });
-          repairRuns++;
-          const tRepair = Date.now();
-          const repair: any = await codeGenerationService({
+          fallbackRuns++;
+          const tFallback = Date.now();
+          const fallback: any = await codeGenerationService({
             auth,
             lang: headLang,
             options: codegenOptions,
@@ -719,40 +713,48 @@ export async function generateCodeForRequest({
             conversationSummary,
             precomputedExamples: headLang === language ? headExamples : null,
             itemId,
-            upstreamContext: { lang: expected },
-            prompt: `${prompt}\n\nIMPORTANT: This program is the HEAD of a composition pipeline and MUST bind its upstream by emitting a top-level \`data use "${expected}"\` so the upstream data flows at runtime. Do not omit it.`,
+            prompt: `${prompt}\n\nIMPORTANT: Author all content for this program INLINE. Do NOT emit \`data use\` — there is no upstream program available to bind, so a binding would render empty.`,
           });
-          mark("repair", tRepair);
-          if (repair?.errors) {
-            return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: mapUsageLimit(repair.errors), upstreamLangs: [], rid };
+          mark("fallback", tFallback);
+          // The fallback's OWN failure is the freshest and most actionable one, and it
+          // is about the language the user actually named — so report it rather than
+          // composedFailure(), which would bury a usage-limit or a head-language refusal
+          // under a story about an upstream. mapUsageLimit for the same reason it wraps
+          // every other generation error on this path.
+          if (fallback?.errors) {
+            return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: mapUsageLimit(fallback.errors), upstreamLangs: [], rid };
           }
           const tReparse = Date.now();
-          const reparsed = await parseCode({ lang: headLang, src: repair.code, privateValues, publicValues, accessToken: auth?.token });
+          const reparsed = await parseCode({ lang: headLang, src: fallback.code, privateValues, publicValues, accessToken: auth?.token });
           mark("parse", tReparse);
+          // Parse errors carry the source so the editor can decorate it inline, matching
+          // the user-typed flow and the head parse above.
           if (reparsed.errors) {
-            return { src: repair.code, taskId: null, language, description, changeSummary, model, provider, tier, usage, errors: reparsed.errors, upstreamLangs: [] };
+            return { src: fallback.code, taskId: null, language, description, changeSummary, model, provider, tier, usage, errors: reparsed.errors, upstreamLangs: [] };
           }
-          code = JSON.parse(reparsed.code);
-          resolved = await resolveUpstreams(code);
-          if (resolved.upstreams.includes(expected)) {
-            src = repair.code;
-            model = repair.model;
-            provider = repair.provider;
-            tier = repair.tier;
-            usage = repair.usage;
-            description = repair.description ?? description;
-            changeSummary = repair.changeSummary ?? changeSummary;
-            console.log(`[composition] rid=${rid} repair.ok head=L${headLang} bound=L${expected}`);
-            ragLog(rid, "composition.repair.ok", { headLang, expected });
-          } else {
-            console.warn(`[composition] rid=${rid} repair.failed head=L${headLang} expected=L${expected}`);
-            ragLog(rid, "composition.repair.failed", { headLang, expected });
-            return {
-              src: repair.code, taskId: null, language, description, changeSummary, model, provider, tier, usage,
-              errors: [{ message: `Composition failed: head L${headLang} could not bind upstream L${expected}. Try rephrasing the request.` }],
-              upstreamLangs: [],
-            };
+          const reparsedCode = JSON.parse(reparsed.code);
+          // Still bound ⇒ the head cannot author this content itself, and posting it
+          // would render an empty interaction. That is the one case worth failing on.
+          if ((await resolveUpstreams(reparsedCode)).upstreams.length > 0) {
+            console.warn(`[composition] rid=${rid} fallback.failed head=L${headLang} still bound`);
+            ragLog(rid, "composition.fallback.failed", { headLang, upstreamLangs });
+            return composedFailure();
           }
+          code = reparsedCode;
+          src = fallback.code;
+          model = fallback.model;
+          provider = fallback.provider;
+          tier = fallback.tier;
+          usage = fallback.usage;
+          description = fallback.description ?? description;
+          changeSummary = fallback.changeSummary ?? changeSummary;
+          upstreamLangs = [];
+          upstreamTaskIds = [];
+          composedRun = false;
+          console.log(`[composition] rid=${rid} fallback.ok head=L${headLang} atomic`);
+          ragLog(rid, "composition.fallback.ok", { headLang });
+        } else {
+          upstreamTaskIds = upstreamResults.map((r: any) => r.taskId as string);
         }
       }
     } catch (err: any) {
@@ -782,13 +784,6 @@ export async function generateCodeForRequest({
       ? `${headTaskId}+${upstreamTaskIds.join("+")}`
       : headTaskId;
     console.log(`[composition] rid=${rid} final taskId=${taskId} upstreamLangs=${upstreamLangs.length ? upstreamLangs.join(",") : "none"}`);
-    // Capture the realized composition sequence as a mark-2 L0010 plan item for
-    // curation — covers BOTH the planner and the reactive paths (the planner's
-    // RAG trigger can miss, so capture here, not inside planSequence). Skip when
-    // the sequence came from a planning-RAG hit: that plan is already curated.
-    if (upstreamLangs.length > 0 && !fromRagHit) {
-      await capturePlanForCuration(auth, prompt, [headLang, ...upstreamLangs]);
-    }
     const lexicon = await getLanguageLexicon(headLang, auth?.token);
     const resolvedSrc = unparse(code, lexicon || {});
 
@@ -840,7 +835,7 @@ export async function generateCodeForRequest({
       // signal: it says which pipeline a run actually took.
       ...Object.fromEntries(Object.entries(stageMs).map(([k, v]) => [`${k}_ms`, v])),
       composed: composedRun,
-      repairs: repairRuns,
+      fallbacks: fallbackRuns,
     });
   }
 }

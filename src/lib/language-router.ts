@@ -1,47 +1,36 @@
 import axios from "axios";
-import admin from "firebase-admin";
-import { CLAUDE_MODELS, generateCode as generateCodeService, extractSearchQuery } from "./code-generation-service";
+import { CLAUDE_MODELS } from "./code-generation-service";
 import { listLanguages, findLanguageById } from "./languages";
-import { hybridSearch } from "./embedding-service";
-import { parseCode } from "../pages/api/resolvers";
-import { recordTokenUsage, Stage } from "./token-usage-service";
+import { recordTokenUsage } from "./token-usage-service";
 import {
   type RequestBudget,
-  BUDGET_ERROR_CODE,
-  BUDGET_ERROR_MESSAGE,
-  budgetSummary,
   charge as chargeBudget,
-  exhausted,
-  tripped,
 } from "./request-budget";
 
 // Hard bound on composition depth: head + at most (MAX_STAGES-1) upstream
-// stages. Keeps planning cost and chain length sane.
+// stages. Keeps chain length sane.
+//
+// Composition is REACTIVE — nothing in this file decides to compose. A head's
+// generated program either emits `data use "<lang>"` or it does not, and
+// generate-for-request.ts reads that off the parsed AST. What lives here is the
+// FENCE (composesWithFor / fenceComposition), the head router (classifyAndRoute),
+// and the per-stage prompt splitter (splitRequest).
+//
+// The pre-flight planner that used to live here — planSequence, planComposition,
+// lookupPlanRAG over the L0010 planning corpus, orchestrateComposition,
+// capturePlanForCuration — was removed on 2026-09-09. It ran before any code
+// existed, so it could only guess from catalog blurbs, and its failures were
+// charged to the wrong language: an upstream stage refusing the whole request
+// with its own `OUT_OF_SCOPE:` sentinel told a user who asked L0173 for a bar
+// chart that L0170 cannot draw charts. L0010 stays registered and keeps
+// compiling; it is simply no longer called.
 export const MAX_STAGES = 4;
 
-// Composition planning is its own Graffiticode dialect, L0010: a program maps a
-// prompt to an ordered language sequence (and nothing else). Plans are written
-// as mark-1 items under the generating user's account; a human promotes
-// good ones to mark 3/4, then `download-training-examples --lang 0010` (sourced
-// from the admin uid) + `update-embeddings` move them into the `training_examples`
-// corpus that the runtime planning-RAG (`lookupPlanRAG`) consults.
-const PLAN_LANG = "0010";
-// A planning-RAG hit must be at least this similar to be trusted (no compile / no LLM on a hit).
-const PLAN_RAG_THRESHOLD = Number(process.env.COMPOSE_PLAN_RAG_THRESHOLD ?? 0.7);
-
-function getDb() {
-  try {
-    return admin.firestore();
-  } catch {
-    if (!admin.apps.length) admin.initializeApp();
-    return admin.firestore();
-  }
-}
-
-// Pull language ids out of a string — used both to find `data use "<id>"`
-// triggers in head-lang examples and to read the sequence out of a stored L0010
-// `plan ["0158" "0166"]` program without compiling it.
-function extractLangIds(text: string, requireUse: boolean): string[] {
+// Pull language ids out of a string. With `requireUse`, matches only
+// `use "<id>"` — the shape of a composition binding in source text, which is how
+// generate-for-request.ts grandfathers the upstreams an item already had without
+// a second parse round-trip.
+export function extractLangIds(text: string, requireUse: boolean): string[] {
   if (!text) return [];
   const re = requireUse ? /\buse\s+"(\d{3,5})"/g : /"(\d{3,5})"/g;
   const out: string[] = [];
@@ -51,8 +40,9 @@ function extractLangIds(text: string, requireUse: boolean): string[] {
 }
 
 // Composition permission helpers. Each language's `composesWith` allowlist is the HARD FENCE
-// for composition: the server's planner may only propose edges within it, and the client can
-// never create an undeclared edge.
+// for composition: a head may only bind upstreams within it, and the client can never create
+// an undeclared edge. It is a PERMISSION, not a trigger — what makes a head compose is its
+// own instructions.md telling it to emit the binding.
 
 // The upstreams a head language is permitted to compose with (["*"] = any non-internal).
 // Empty ⇒ atomic only. Sourced from the static LANGUAGES array (sync, in-memory; hot-path).
@@ -60,7 +50,7 @@ export function composesWithFor(headLang: string): string[] {
   return findLanguageById(headLang)?.composesWith ?? [];
 }
 
-// Enforce the allowlist on a planner-proposed sequence ([head, up1, up2, ...]). If ANY upstream
+// Enforce the allowlist on a proposed sequence ([head, up1, up2, ...]). If ANY upstream
 // is not permitted, drop to atomic [head] rather than post a partially-broken chain. Returns the
 // fenced sequence plus any dropped (unpermitted) upstream ids for logging.
 export function fenceComposition(
@@ -88,8 +78,8 @@ interface RoutingResult {
 }
 
 // Build the catalog string used by both the routing helper (findBestLanguages)
-// and the composition planner (planComposition). excludeLang lets the routing
-// path filter out the current language; the planner passes none so every
+// and findBestLanguages. excludeLang lets the routing path filter out the
+// current language; findBestLanguages passes none so every
 // language is in scope.
 //
 // Each entry uses scope.json fields (summary / in_scope / out_of_scope) when
@@ -98,7 +88,7 @@ interface RoutingResult {
 // suggestion than a single one-liner can.
 async function buildLanguageCatalog(opts?: { excludeLang?: string }) {
   const languages = await listLanguages({ enrich: true });
-  // Exclude internal dialects (e.g. the L0010 planner itself) so the planner
+  // Exclude internal dialects (e.g. the L0010 planner) so the router
   // never proposes itself as a composition stage; also honor excludeLang.
   //
   // Deprecated dialects are excluded too. This catalog feeds the two paths that
@@ -445,9 +435,10 @@ Be conservative: only route away when the request clearly belongs to a different
  * program" refuses a request it was correctly chosen for. Telling the upstream to ignore the
  * noise treats the symptom; not sending it is the fix.
  *
- * This runs AFTER the sequence is decided, so it is uniform across all three plan sources —
- * planRAG hits and L0010 plans carry only lang ids, and planComposition's own per-stage prompts
- * are not available on those paths. One Haiku call, fail-open.
+ * This runs AFTER the head has already been generated: the sequence comes from the `data use`
+ * bindings the head emitted, which carry lang ids and nothing else. The head keeps the original
+ * prompt (it is the language the user chose, and on an edit only the verbatim request lines up
+ * with currentCode); only the upstreams get a scoped share. One Haiku call, fail-open.
  *
  * FIDELITY IS THE WHOLE RISK HERE. A vague sub-prompt ("a spreadsheet with some test scores")
  * is WORSE than the noise it replaces: the noise made a stage refuse loudly, while a lossy
@@ -576,223 +567,13 @@ Return JSON only, exactly ${sequence.length} stages, in the same order:
   }
 }
 
-// Proactive composition planner. A plan is an ORDERED linear pipeline of
-// stages: stages[0] is the head (what the user ultimately gets), and each
-// stage consumes the data model produced by the next (stages[i] consumes
-// stages[i+1]). A single-element plan means no composition — the resolver
-// follows the plain single-language path. This mirrors the runtime chain id
-// `head+s2+s3`, which api.graffiticode.org evaluates depth-first: compile the
-// deepest stage, feed its output up as `data` to the stage above, to the head.
-export interface CompositionStage {
-  lang: string;
-  prompt: string;
-}
-export type CompositionPlan = CompositionStage[];
-
-export async function planComposition({
-  prompt,
-  currentLang,
-  rid,
-  itemId,
-  auth,
-  budget,
-}: {
-  prompt: string;
-  currentLang: string;
-  rid?: string;
-  itemId?: string | null;
-  auth?: { uid: string };
-  /** Request-wide token budget; these calls bypass the provider seam. */
-  budget?: RequestBudget;
-}): Promise<CompositionPlan> {
-  const fallback: CompositionPlan = [{ lang: currentLang, prompt }];
-  try {
-    const { candidates, catalog } = await buildLanguageCatalog();
-    if (candidates.length === 0) return fallback;
-
-    // The head's composesWith allowlist, stated to the planner rather than left for
-    // fenceComposition to discover afterwards. A proposal outside the allowlist is not a
-    // near-miss — the fence drops the WHOLE chain to atomic, so the user silently gets an
-    // item with no embedded widget at all. Naming the permitted set up front is also what
-    // keeps this prompt from having to hardcode "the spreadsheet dialect is L____", which
-    // is exactly how it froze on a dialect that has since been deprecated.
-    const permits = composesWithFor(currentLang);
-    const permitBlock = permits.includes("*")
-      ? `L${currentLang} may compose with any non-internal language in the catalog.`
-      : permits.length > 0
-        ? `L${currentLang} may compose ONLY with these upstreams: ${permits
-            .map((id) => {
-              const l = candidates.find((c) => c.id === id);
-              return `L${id}${l?.status === "Deprecated" ? " (DEPRECATED — choose only if the request explicitly names it)" : ""}`;
-            })
-            .join(", ")}. This list is authoritative: do NOT propose an upstream outside it even if the request names a different dialect by id — that naming is a hint about intent, not a permission. Proposing any other upstream causes the entire chain to be discarded, so if none of these authors what the request needs, return a SINGLE stage.`
-        : `L${currentLang} is ATOMIC — it may not compose with any upstream. Return a single stage.`;
-
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      console.warn("[language-router] ANTHROPIC_API_KEY not set");
-      return fallback;
-    }
-
-    chargeRouterAttempt(budget);
-    const response = await axios.post(
-      "https://api.anthropic.com/v1/messages",
-      {
-        model: CLAUDE_MODELS.HAIKU,
-        max_tokens: 800,
-        temperature: 0,
-        messages: [
-          {
-            role: "user",
-            content: `A user asked: "${prompt}"
-
-The active language is L${currentLang}. Available languages (each routing hint may state which other dialects it embeds):
-${catalog}
-
-Composition is a LINEAR PIPELINE: a head program may consume a data model produced by an upstream program, which may itself consume one from a further upstream, and so on. Decompose the request into an ORDERED sequence of stages from the head (what the user ultimately gets) down to the deepest data source. Stage i consumes the data model produced by stage i+1.
-
-${permitBlock}
-
-Add a downstream stage whenever a stage describes-but-does-not-author a content type produced by another dialect — a host language embedding an interactive widget that another dialect authors. Stop when a stage can author its content directly (a leaf). If the active language alone can fulfil the request, return a single stage.
-
-Heuristics — decide from the catalog and the permitted list above, never from a dialect id you remember:
-- If a stage's routing hint says it "embeds" or "hosts" another dialect for a content type the user asked for, add that dialect as the next stage.
-- If the request asks a host for an interactive widget it does not author itself (a spreadsheet, a chart, a deck), the next stage is whichever PERMITTED upstream's routing hint says it authors that content. If two could, and one is marked deprecated, choose the one that is not.
-- A pure question-form prompt (MCQ, short text, fill-in-the-blank) under an assessment-item host ⇒ single stage, no upstream.
-- If the active language already authors the content directly ⇒ single stage.
-- If the data or content a downstream stage would supply is ALREADY present inline in the prompt (the user pasted the actual numbers, rows, or values), do NOT add that upstream stage — the request is self-contained. Only add a data-providing upstream when the values must be FETCHED or TRANSFORMED from a source not in the prompt.
-
-Return JSON only:
-{
-  "stages": [
-    { "lang": "${currentLang}", "prompt": "<scoped, standalone prompt for the head>" },
-    { "lang": "<id>", "prompt": "<scoped, standalone prompt for the upstream it consumes>" }
-  ]
-}
-
-Examples of SHAPE only — the ids below are placeholders, never real choices. Take real ids from the catalog and the permitted list above:
-- a request asking an item host for an embedded widget, currentLang: <HOST> →
-  { "stages": [
-    { "lang": "<HOST>", "prompt": "Build the item that embeds the widget via its custom question type." },
-    { "lang": "<WIDGET>", "prompt": "Author the widget itself, carrying every concrete value the request gave." } ] }
-- a plain question-form request, currentLang: <HOST> →
-  { "stages": [ { "lang": "<HOST>", "prompt": "Build the question item." } ] }
-- a request the active language authors directly, currentLang: <LEAF> →
-  { "stages": [ { "lang": "<LEAF>", "prompt": "Author it directly." } ] }
-
-Rules:
-- stages[0].lang MUST be "${currentLang}". You decide ONLY the upstream chain it consumes; never
-  replace the head — head/language selection is handled before planning, not here.
-- At most ${MAX_STAGES} stages.
-- No language repeats in the sequence.
-- Each "prompt" is a complete, standalone description of what that stage should produce.`,
-          },
-        ],
-      },
-      {
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        timeout: ROUTER_TIMEOUT_MS,
-      }
-    );
-
-    // Record token usage if auth and rid are provided
-    chargeRouterResult(budget, response.data?.usage);
-    if (auth && rid && response.data?.usage) {
-      const usage = response.data.usage;
-      await recordTokenUsage({
-        auth,
-        rid,
-        stage: "compose_plan",
-        itemId: itemId ?? null,
-        lang: currentLang,
-        provider: "anthropic",
-        model: CLAUDE_MODELS.HAIKU,
-        usage: {
-          inputTokens: usage.input_tokens || 0,
-          outputTokens: usage.output_tokens || 0,
-          cacheCreationInputTokens: usage.cache_creation_input_tokens || 0,
-          cacheReadInputTokens: usage.cache_read_input_tokens || 0,
-          reasoningTokens: 0,
-        },
-      }).catch(() => {
-        // Never throw from usage recording
-      });
-    }
-
-    const text = response.data?.content?.[0]?.text || "";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.log(`[language-router] planComposition: no JSON in response, falling back. raw=${text.substring(0, 200)}`);
-      return fallback;
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    const rawStages = Array.isArray(parsed?.stages) ? parsed.stages : [];
-
-    // Validate: every lang must be a known candidate, no lang repeats, length
-    // bounded. Drop anything that fails rather than trusting the model.
-    const seen = new Set<string>();
-    const stages: CompositionPlan = [];
-    for (const s of rawStages) {
-      const lang = String(s?.lang || "");
-      const stagePrompt = String(s?.prompt || "");
-      if (!lang || !stagePrompt) continue;
-      if (!candidates.some((c) => c.id === lang)) continue;
-      if (seen.has(lang)) continue;
-      seen.add(lang);
-      stages.push({ lang, prompt: stagePrompt });
-      if (stages.length >= MAX_STAGES) break;
-    }
-
-    // Head pinning: head selection is the scope gate's job, not the planner's. Guarantee the
-    // head is currentLang; if the model proposed a different head, reinstate currentLang and
-    // demote the rest to upstream candidates (the composesWith fence drops any not allowed).
-    const headStage = stages.find((s) => s.lang === currentLang) ?? { lang: currentLang, prompt };
-    const upstreamStages = stages.filter((s) => s.lang !== currentLang);
-    const pinned: CompositionPlan = [headStage, ...upstreamStages].slice(0, MAX_STAGES);
-
-    console.log(
-      `[language-router] planComposition: sequence=${pinned.map((s) => `L${s.lang}`).join(" -> ")}`
-    );
-    return pinned;
-  } catch (error) {
-    console.error("[language-router] planComposition error:", (error as Error)?.message);
-    return fallback;
-  }
-}
-
-// Execute a multi-stage plan TAIL-FIRST: generate the deepest stage first,
-// then each stage above it knowing the ACTUAL data model the stage below
-// produced (injected as upstreamContext so the head authors `data use "<lang>"`
-// against real fields). Returns the head's source (unposted — the resolver
-// re-parses+posts it with systemValues) plus the tail taskIds in chain order
-// for the resolver to stitch into `head+s2+s3`. Composition awareness lives
-// only here.
-export interface OrchestrationResult {
-  headSrc: string | null;
-  headDescription: string | null;
-  headChangeSummary: string | null;
-  headModel: string;
-  headProvider: string | null;
-  headTier: string | null;
-  headUsage: { input_tokens: number; output_tokens: number };
-  headLang: string;
-  upstreamLangs: string[];
-  upstreamTaskIds: string[];
-  errors?: { message: string }[];
-}
-
 /**
- * Charge a router/planner Haiku call against the request budget.
+ * Charge a router Haiku call against the request budget.
  *
- * These four calls post to the Anthropic API directly rather than through
+ * These calls post to the Anthropic API directly rather than through
  * `requestProvider`, so they are the one family of model calls the provider
  * seam cannot see. Without this they would be free, and a scope gate plus a
- * planner plus a splitter is three calls a runaway never pays for.
+ * suggester plus a splitter is three calls a runaway never pays for.
  *
  * Floored at an estimate of what was sent, for the same reason the provider
  * seam floors its charge: a failed call reports no usage at all, and those are
@@ -800,7 +581,7 @@ export interface OrchestrationResult {
  */
 function chargeRouterAttempt(budget: RequestBudget | undefined): void {
   if (!budget) return;
-  // Counts the ATTEMPT only, no tokens. These four calls are fail-open, so a
+  // Counts the ATTEMPT only, no tokens. These calls are fail-open, so a
   // charge that ran only after a successful response would make exactly the
   // failing calls free — and a router stuck in a retry loop is one of the
   // shapes the call ceiling exists to stop. Tokens are added below when the
@@ -832,7 +613,7 @@ function chargeRouterResult(
 }
 
 /**
- * Timeout for the router/planner calls.
+ * Timeout for the router calls.
  *
  * These were bare `axios.post` with no timeout at all — axios defaults to
  * infinite — and they never consult the request deadline, so one hung Haiku
@@ -840,337 +621,3 @@ function chargeRouterResult(
  */
 const ROUTER_TIMEOUT_MS = 30_000;
 
-function failedOrchestration(
-  headLang: string,
-  // `code` is optional and additive: it lets a non-human caller branch on the
-  // reason without matching prose, following the `out_of_scope` precedent.
-  errors: { message: string; code?: string }[],
-  headModel = "",
-  headUsage = { input_tokens: 0, output_tokens: 0 },
-): OrchestrationResult {
-  return {
-    headSrc: null,
-    headDescription: null,
-    headChangeSummary: null,
-    headModel,
-    headProvider: null,
-    headTier: null,
-    headUsage,
-    headLang,
-    upstreamLangs: [],
-    upstreamTaskIds: [],
-    errors,
-  };
-}
-
-export async function orchestrateComposition({
-  sequence,
-  prompt,
-  auth,
-  options,
-  currentCode,
-  rid,
-  itemId,
-  conversationSummary,
-  headExamples,
-}: {
-  sequence: string[];          // [headLang, s2, s3, …]; head consumes s2 consumes s3 …
-  prompt: string;              // original user prompt — the content source for every stage
-  auth: any;
-  options?: any;
-  currentCode?: string | null;
-  rid?: string | null;
-  itemId?: string | null;
-  conversationSummary?: any;
-  headExamples?: any[] | null; // precomputed head-lang retrieval to reuse for the head stage
-}): Promise<OrchestrationResult> {
-  const headLang = sequence[0];
-  const tail = sequence.slice(1); // langs consumed downstream, head→deepest order
-
-  // Per-stage prompts. The HEAD deliberately keeps the ORIGINAL prompt: it is the
-  // language the user chose, its output is the user-visible artifact, and on an edit
-  // it carries currentCode/conversation that only the verbatim request lines up with.
-  // Only the upstreams — the stages that never asked for the host's framing — get a
-  // scoped share. Null (split unavailable or malformed) restores the previous
-  // behavior of sending the original prompt everywhere.
-  const stagePrompts = await splitRequest({ prompt, sequence, rid, itemId, auth, budget: options?.budget });
-  if (stagePrompts) {
-    console.log(`[composition] rid=${rid} split=${sequence.map((l, i) => `L${l}:${stagePrompts[i].length}c`).join(" ")}`);
-  } else if (sequence.length > 1) {
-    console.log(`[composition] rid=${rid} split=none (original prompt to every stage)`);
-  }
-  const promptFor = (i: number) => (i === 0 ? prompt : stagePrompts?.[i] ?? prompt);
-
-  // Generate ALL stages CONCURRENTLY. No stage needs another's compiled output
-  // at gen time — each just emits `data use "<next>"` (its dialect knows how) and
-  // api merges the upstream data at runtime via depth-first chain eval. So each
-  // stage gets only a wiring hint (the next lang id), never a fetched sample —
-  // avoiding the serial tail-first wait + the redundant compile/getData. Content
-  // always comes from the original prompt; the sequence only fixes order.
-  const gens = sequence.map((lang, i) => {
-    const next = sequence[i + 1];
-    const upstreamContext = next ? { lang: next } : null;
-    if (i === 0) {
-      // Head: carries currentCode/conversation + reuses the head retrieval;
-      // returned unposted for the resolver to post with systemValues.
-      return generateCodeService({
-        auth, prompt: promptFor(0), lang, options, currentCode, rid, itemId, conversationSummary,
-        upstreamContext, precomputedExamples: headExamples ?? null,
-      });
-    }
-    return generateCodeService({ auth, prompt: promptFor(i), lang, options, rid, itemId, upstreamContext });
-  });
-
-  // allSettled, not all: `all` rejects on the FIRST rejection while every
-  // sibling generation keeps running — unhandled, uncancellable, and spending
-  // tokens for a request that has already failed. Settling lets each stage's
-  // outcome be reported through the existing failedOrchestration path.
-  const settled = await Promise.allSettled(gens);
-  const results: any[] = settled.map((r) =>
-    r.status === "fulfilled"
-      ? r.value
-      : { errors: [{ message: String((r as PromiseRejectedResult).reason?.message ?? r.reason) }] },
-  );
-
-  // Budget BEFORE the per-stage inspection below. Stages share one budget
-  // object, so the moment any one trips it the others stop starting calls and
-  // drain; reporting the budget here rather than after the loop keeps the
-  // message deterministic instead of naming whichever stage happened to fail
-  // first as the cause.
-  if (options?.budget && tripped(options.budget)) {
-    console.log(
-      `[budget] rid=${rid} composition stopped ${budgetSummary(options.budget)}`,
-    );
-    if (exhausted(options.budget)) {
-      return failedOrchestration(headLang, [
-        { message: BUDGET_ERROR_MESSAGE, code: BUDGET_ERROR_CODE },
-      ]);
-    }
-  }
-  const headResult = results[0];
-
-  for (let i = 1; i < results.length; i++) {
-    const r = results[i];
-    if (r?.errors || !r?.taskId) {
-      return failedOrchestration(
-        headLang,
-        r?.errors || [{ message: `Upstream L${sequence[i]} failed to produce a taskId` }],
-      );
-    }
-  }
-
-  if (headResult?.errors) {
-    return failedOrchestration(headLang, headResult.errors, headResult.model || "", {
-      input_tokens: headResult.usage?.input_tokens || 0,
-      output_tokens: headResult.usage?.output_tokens || 0,
-    });
-  }
-
-  // Chain order: head + s2 + s3 + … (api evaluates depth-first).
-  const upstreamTaskIds: string[] = [];
-  for (let i = 1; i < results.length; i++) upstreamTaskIds.push(results[i].taskId as string);
-
-  return {
-    headSrc: headResult.code || null,
-    headDescription: headResult.description ?? null,
-    headChangeSummary: headResult.changeSummary ?? null,
-    headModel: headResult.model || "",
-    headProvider: headResult.provider || null,
-    headTier: headResult.tier || null,
-    headUsage: {
-      input_tokens: headResult.usage?.input_tokens || 0,
-      output_tokens: headResult.usage?.output_tokens || 0,
-    },
-    headLang,
-    upstreamLangs: tail,
-    upstreamTaskIds,
-  };
-}
-
-// ── Planning: prompt → language sequence ────────────────────────────────────
-// The fast path is L0010 planning RAG (a vector lookup over curated, promoted
-// L0010 examples); a miss falls back to the Haiku planner, whose result is
-// captured as a mark-1 L0010 item for human curation. Returns the ordered
-// sequence (length 1 ⇒ atomic).
-
-// Planning-RAG lookup over promoted L0010 examples. Returns the stored sequence
-// when the top hit clears PLAN_RAG_THRESHOLD, else null. The matched id +
-// similarity are logged for analytics ONLY — never injected anywhere.
-export async function lookupPlanRAG({
-  prompt,
-  rid,
-}: {
-  prompt: string;
-  rid?: string | null;
-}): Promise<string[] | null> {
-  try {
-    // Use the SAME query path as the main code-gen RAG (extractSearchQuery +
-    // hybridSearch) so the lookup is symmetric with how L0010 keys are stored —
-    // an identical prompt scores ~1.0. allowExact keeps a perfect (distance 0)
-    // match from being dropped as degenerate.
-    const query = extractSearchQuery(prompt);
-    const results = await hybridSearch({
-      collection: "training_examples",
-      query,
-      limit: 1,
-      lang: PLAN_LANG,
-      db: getDb(),
-      rid: rid ?? null,
-      allowExact: true,
-    });
-    const top = results?.[0];
-    if (!top) return null;
-    const score = top.combinedScore ?? top.similarity ?? 0;
-    if (score < PLAN_RAG_THRESHOLD) {
-      console.log(`[language-router] planRAG: best score=${score.toFixed(3)} < ${PLAN_RAG_THRESHOLD}, miss`);
-      return null;
-    }
-    const sequence = extractLangIds(top.code || "", false);
-    if (sequence.length === 0) return null;
-    console.log(`[language-router] planRAG: HIT id=${top.id} score=${score.toFixed(3)} sequence=${sequence.map((l) => `L${l}`).join(" -> ")}`);
-    return sequence;
-  } catch (err) {
-    console.warn("[language-router] planRAG lookup failed:", (err as Error)?.message);
-    return null;
-  }
-}
-
-// Persist a generated plan as a mark-1 L0010 item under the
-// generating user's account, in the shape `download-training-examples` reads
-// (help dialog + `plan [...]` source). Writing under the requesting user keeps
-// item-owner == task-owner (the L0010 task was posted under their auth), so
-// there's no cross-uid ACL mismatch. A human promotes good ones to mark 3/4,
-// after which `update-embeddings` moves them into the L0010 planning-RAG corpus.
-// The RAG itself stays curated from the admin uid via the curation scripts.
-// Best-effort; skipped for free-plan / anonymous sessions.
-export async function capturePlanForCuration(auth: any, prompt: string, sequence: string[]): Promise<void> {
-  if (!auth?.uid || auth.freePlan) return;
-  try {
-    // Key the item on the canonical request (context-stripped) — the same text
-    // the planning-RAG lookup queries with — so an identical prompt re-hits.
-    const key = extractSearchQuery(prompt);
-    const planSrc = `plan [${sequence.map((l) => `"${l}"`).join(" ")}]..`;
-    const help = JSON.stringify([
-      { type: "user", user: key, timestamp: "" },
-      { type: "bot", help: { type: "code", language: "graffiticode", text: planSrc }, timestamp: "" },
-    ]);
-    // Parse to AST so it's a first-class item: getItems can lazily post a task
-    // and the editor renders it. `src` is also kept for download-training-examples.
-    let code: any = null;
-    try {
-      const parsed = await parseCode({ lang: PLAN_LANG, src: planSrc });
-      if (!parsed.errors) code = JSON.parse(parsed.code);
-    } catch (err) {
-      console.warn("[language-router] capture: parse failed:", (err as Error)?.message);
-    }
-    const db = getDb();
-    const ref = db.collection(`users/${auth.uid}/items`).doc();
-    const now = Date.now();
-    const item: Record<string, any> = {
-      id: ref.id,
-      name: `plan: ${key.slice(0, 60)}`,
-      lang: PLAN_LANG,
-      mark: 1, // uncurated auto-capture; a human promotes to 3/4 to enter the fast path
-      help,
-      src: planSrc,
-      isPublic: false,
-      client: "console",
-      upstreamLangs: [],
-      created: now,
-      updated: now,
-    };
-    if (code) item.code = code;
-    await ref.set(item);
-    console.log(`[language-router] captured mark-1 L${PLAN_LANG} plan ${ref.id} sequence=${sequence.map((l) => `L${l}`).join(" -> ")}`);
-  } catch (err) {
-    console.warn("[language-router] capturePlanForCuration failed:", (err as Error)?.message);
-  }
-}
-
-// Resolve the language sequence for a composable request:
-//   1. planning-RAG hit (fast, no LLM) → return the stored sequence;
-//   2. miss → generate an L0010 `plan` item (the planner dialect), parse its
-//      sequence;
-//   3. if L0010 is unreachable/unusable → fall back to the Haiku planner.
-// Returns [headLang] when the request is atomic. `fromRag` is true only on a
-// planning-RAG hit, so the resolver can skip re-capturing an already-curated
-// plan.
-export interface PlanResult {
-  sequence: string[];
-  fromRag: boolean;
-}
-
-export async function planSequence({
-  prompt,
-  headLang,
-  auth,
-  options,
-  rid,
-  itemId,
-  preferHaiku = false,
-  budget,
-}: {
-  prompt: string;
-  headLang: string;
-  auth?: any;
-  options?: any;
-  rid?: string | null;
-  itemId?: string | null;
-  // Skip the L0010 (Sonnet) codegen on a planRAG miss and go straight to the cheap
-  // Haiku planner. Set when the gate was opened ONLY by capability (no RAG signal):
-  // such requests are usually atomic (an agent inlined the data, or it's a plain
-  // question), atomic plans are never curated so they ALWAYS miss planRAG, and we
-  // don't want a ~4s Sonnet call on that hot atomic path. Haiku's prompt fast-returns
-  // a single stage for those cases.
-  preferHaiku?: boolean;
-  /** Request-wide token budget; these calls bypass the provider seam. */
-  budget?: RequestBudget;
-}): Promise<PlanResult> {
-  // Head pinning: head selection is the scope gate's job, never a planner's. Whatever any
-  // planner returns, the head stays headLang; stray langs become upstream candidates (the
-  // composesWith fence vets them downstream).
-  const pin = (seq: string[]) =>
-    seq[0] === headLang ? seq : [headLang, ...seq.filter((l) => l !== headLang)];
-
-  // A curated plan is only applicable to the head it was curated FOR. pin() exists to
-  // override a *planner* that proposed the wrong head; applying it to a RAG hit instead
-  // rewrites a stored composition onto a head that may permit none of its upstreams —
-  // and fenceComposition then drops the whole chain to atomic, silently producing an item
-  // with no embedded widget. (Concretely: every curated plan is ["0176","0179"], and only
-  // L0176 permits 0179, so ANY other head hitting one of them collapses.) A head mismatch
-  // is not a near-match, so treat it as a miss and let the planner decide for this head.
-  const hit = await lookupPlanRAG({ prompt, rid });
-  if (hit && hit.length > 0) {
-    if (hit[0] === headLang) return { sequence: hit, fromRag: true };
-    console.log(`[language-router] planRAG: hit ${hit.map((l) => `L${l}`).join("->")} is for head L${hit[0]}, not L${headLang} — treating as miss`);
-  }
-
-  // Capability-only trigger → skip the Sonnet L0010 codegen entirely.
-  if (preferHaiku) {
-    const plan = await planComposition({ prompt, currentLang: headLang, rid, itemId, auth, budget });
-    return { sequence: pin(plan.map((s) => s.lang)), fromRag: false };
-  }
-
-  // Miss → generate an L0010 plan. This is a direct service call (it does NOT
-  // re-enter the resolver's composition cascade, so no recursion). The L0010
-  // program is `plan ["<id>" ...]`; read the sequence straight from its source.
-  try {
-    const r: any = await generateCodeService({ auth, prompt, lang: PLAN_LANG, options, rid });
-    if (!r?.errors && typeof r?.code === "string" && /\bplan\b/.test(r.code)) {
-      const seq = [...new Set(extractLangIds(r.code, false))].slice(0, MAX_STAGES);
-      console.log(`[language-router] L${PLAN_LANG} plan: ${seq.length ? seq.map((l) => `L${l}`).join(" -> ") : "atomic"}`);
-      return { sequence: pin(seq.length > 0 ? seq : [headLang]), fromRag: false };
-    }
-    console.warn(`[language-router] L${PLAN_LANG} codegen returned no usable plan; falling back to Haiku planner`);
-  } catch (err) {
-    console.warn(`[language-router] L${PLAN_LANG} codegen failed (${(err as Error)?.message}); falling back to Haiku planner`);
-  }
-
-  // Fallback → Haiku planner. (Capture happens at the resolver's success point.)
-  // rid/auth/itemId were missing here, so this fallback planner call recorded
-  // NO usage row at all — the `if (auth && rid)` guard inside planComposition
-  // silently skipped it. Passing them makes the fallback as accountable as the
-  // path above, and the budget makes it chargeable.
-  const plan = await planComposition({ prompt, currentLang: headLang, rid, itemId, auth, budget });
-  return { sequence: pin(plan.map((s) => s.lang)), fromRag: false };
-}
