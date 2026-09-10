@@ -1291,6 +1291,13 @@ async function generateLongCode({
   // thinking, and for how long".
   let sawThinkingBlock = false;
   let msToFirstText: number | null = null;
+  // Whether ANY provider turn reported the phase at all. Only the Anthropic path
+  // measures it; without this flag an OpenAI run reports `think=never` — which reads
+  // as "spent the whole budget reasoning and wrote nothing", the precise signature this
+  // field exists to name. Observed in production on the first ping after deploy:
+  // `L0175 model=gpt-5.6-sol codeChars=1677 think=never`. Unmeasured must be ABSENT,
+  // not a value; a diagnostic that lies about the other provider is worse than no field.
+  let measuredReasoning = false;
 
   if (prompt) {
     conversationHistory.push({ role: "user", content: prompt });
@@ -1338,6 +1345,7 @@ async function generateLongCode({
       result.usage.cacheCreationInputTokens;
     usage.cacheReadInputTokens += result.usage.cacheReadInputTokens;
     usage.reasoningTokens += result.usage.reasoningTokens;
+    if (result.reasoning) measuredReasoning = true;
     if (result.reasoning?.sawThinkingBlock) sawThinkingBlock = true;
     if (msToFirstText === null && result.reasoning?.msToFirstText != null) {
       msToFirstText = result.reasoning.msToFirstText;
@@ -1425,9 +1433,11 @@ async function generateLongCode({
   if (stopEarly) {
     console.log(
       `[llm-generation] provider=${provider} stopped early reason=${stopEarly} ` +
-        `chunks=${chunks} outputTokens=${usage.outputTokens} ` +
-        `think=${msToFirstText === null ? "never" : msToFirstText + "ms"}` +
-        `${sawThinkingBlock ? "" : " thinkBlock=no"}`,
+        `chunks=${chunks} outputTokens=${usage.outputTokens}` +
+        (measuredReasoning
+          ? ` think=${msToFirstText === null ? "never" : msToFirstText + "ms"}` +
+            `${sawThinkingBlock ? "" : " thinkBlock=no"}`
+          : ""),
     );
   }
   return {
@@ -1435,7 +1445,7 @@ async function generateLongCode({
     usage,
     chunks,
     stopEarly,
-    reasoning: { sawThinkingBlock, msToFirstText },
+    reasoning: measuredReasoning ? { sawThinkingBlock, msToFirstText } : undefined,
   };
 }
 
