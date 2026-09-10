@@ -6,8 +6,10 @@ the right language** and **compose languages safely**. The model is server-autho
 - **Routing** decides the *head* language for a request. The client's chosen `language` is a
   hint; the server validates it against each language's `scope.json` and re-routes if wrong.
   (Clients — especially Codex/ChatGPT — freelance; routing cannot depend on them.)
-- **Composition** is governed by an explicit per-language `composesWith` allowlist (the hard
-  fence). The server's planner may only propose edges within it; the client never composes.
+- **Composition** is **reactive**, and governed by an explicit per-language `composesWith`
+  allowlist (the hard fence). Nothing decides to compose before generation: the head generates
+  first, and if the program it wrote emits `data use "<lang>"`, the console generates that
+  upstream — provided the allowlist permits it. The client never composes.
 
 Both decisions are only as good as the metadata each language publishes. This doc enumerates
 that metadata, per language.
@@ -67,46 +69,72 @@ Keep it. It's biased toward "when in doubt, generate," so it is not a substitute
 
 ---
 
-## 4. Composition: declare your edges (`composesWith`)
+## 4. Composition: two separate things
+
+Composition needs **both** of the following, and they are owned in different places. Confusing
+them is the mistake this section exists to prevent.
+
+### 4a. Permission — `composesWith` (the console decides)
 
 The permission matrix is the **hard fence** — composition can only happen along declared edges.
 Set `composesWith` on the language's `LANGUAGES` entry (`src/lib/languages.ts`). Enforced by
 `composesWithFor` + `fenceComposition` in `src/lib/language-router.ts`.
 
-- **Explicit list** (`composesWith: ["0166"]`) — may compose ONLY with those upstreams. Use for
-  widget-embedding hosts (e.g. L0158 embeds the L0166 spreadsheet as a Learnosity `custom`
-  question).
-- **Explicit data-consumer list** (e.g. L0173 charts → `composesWith: ["0170"]`) — a consumer that
-  binds upstream data names exactly the provider(s) it pulls from. (L0173 is deliberately
-  over-constrained to the one data-sourcing dialect, L0170, for now, rather than `["*"]`.)
+- **Explicit list** (`composesWith: ["0179"]`) — may compose ONLY with those upstreams. Use for
+  widget-embedding hosts (L0176 embeds the L0179 spreadsheet as a Learnosity `custom` question —
+  as of 2026-09-09 this is the platform's only live edge).
 - **`["*"]`** — *may* compose with any non-internal authoring language; the broad wildcard. Use
   only when a host genuinely consumes from anything. Prefer an explicit list — `["*"]` is a wide
   trust grant.
-- **Absent / empty** — **atomic only.** No composition. This is the default and correct for most
-  languages (e.g. L0175 ELA — it never composes; it authors complete items itself).
+- **Absent / empty** — **atomic only.** No composition. This is the default and correct for
+  nearly every language (e.g. L0175 ELA — it never composes; it authors complete items itself).
 
-The planner (`planSequence`/`planComposition`) decides *whether* to compose within the fence;
-any upstream it proposes that isn't permitted is dropped (the whole sequence falls back to
-atomic rather than posting a partial/broken chain).
+A permission is **not** a trigger. Declaring an edge costs nothing at runtime and makes nothing
+happen: if the head's generator never emits the binding, the language is atomic in practice.
 
-> Today `composesWith` lives in the console's static `LANGUAGES`. Adding a composition edge is a
+**Removing an edge** stops NEW compositions only. Bindings already present in an item's source
+are grandfathered at edit time (`extractLangIds(currentSrc)` in `generate-for-request.ts`), so an
+item built on an edge that has since been withdrawn still edits and still renders.
+
+> `composesWith` lives in the console's static `LANGUAGES`. Adding a composition edge is a
 > console change, not a language-repo change. (Planned: move it into each `scope.json` so
 > languages self-declare.)
 
+### 4b. Trigger — your `instructions.md` (the language decides)
+
+**A language that wants to compose must teach its own generator when to bind.** This is the whole
+trigger; there is no planner. `instructions.md` needs a section that says, in the dialect's own
+terms, which request shapes require an upstream and which upstream each maps to — see L0176's
+"Pipeline Composition" section for the reference implementation (a content-type → upstream-id
+table, the exact syntax, and a finish-time self-check).
+
+There used to be a pre-flight LLM planner (`planSequence` / `planComposition` / an L0010
+planning-RAG corpus) that decided this from catalog blurbs before any code existed. It was
+removed on 2026-09-09. It guessed, and its guesses failed in the direction that reads worst to a
+user: an upstream stage would refuse the whole request with **its own** `OUT_OF_SCOPE:` sentinel,
+so someone who asked L0173 for an interactive bar chart was told that L0170 has no charting
+capabilities — a refusal from a language they never named, about a capability the language they
+did name has. A dialect knows when it needs an upstream; a router reading a one-line summary does
+not.
+
 ## 5. Composition — as a HEAD (consumer)
 
-If your language consumes an upstream (it's in someone's pipeline as stage 0):
+If your language consumes an upstream:
 
-- **Reliably emit the binding.** The head MUST author `data use "<lang>"` (where `<lang>` is the
-  upstream id) so the upstream's compiled output flows in at runtime. A head that describes the
-  embedded content but omits the binding renders an **empty** interaction.
+- **Emit the binding when you author the embed, in the same breath.** The head MUST author
+  `data use "<lang>"` (where `<lang>` is the upstream id) so the upstream's compiled output flows
+  in at runtime. A head that describes the embedded content but omits the binding renders an
+  **empty** interaction — and, now that the binding is also the *trigger*, omitting it means no
+  upstream is generated at all.
   - Make this a **hard requirement** in `instructions.md`, with a finish-time self-check —
     not a soft "preferred." (Lesson: L0158 dropped the `data use "0166"` binding ~40% of the
-    time, forcing the console's repair pass to regenerate the head.)
-- The console verifies the binding post-parse and runs **one repair** (regenerate the head with a
-  strengthened directive) if it's missing; if it still can't bind, it fails with an actionable
-  error rather than posting a broken chain. The repair is a safety net — don't rely on it;
-  binding-first-try is the goal.
+    time.)
+- **If the upstream fails, the console retries your head atomically** — one regeneration with a
+  directive to author the content inline and emit no binding — rather than handing the user the
+  upstream's error. So a dialect that *can* author the content itself should be able to; say so
+  in `instructions.md` (L0176 documents a direct-table form alongside the L0179 embed). If the
+  retry still emits a binding, the request fails with an error naming your language and the
+  upstream.
 - The surrounding `custom`/embed node's `lang` should equal the `use` argument.
 
 ## 6. Composition — as an UPSTREAM (provider)
@@ -144,8 +172,9 @@ in another language. For this to be faithful, your language must provide:
   gcp:build`), then allow the console's fetch-cache TTL to lapse before the change takes effect.
 - **Verify routing** via `npm run gcp:logs`: look for
   `[routing] … preflight.reroute from=… to=…` (re-route happened),
-  `[routing] … scope-gate … inScope=…` (every decision), and
-  `[composition] … head=L… permits=[…] sequence=…` (composition fence outcome).
+  `[routing] … scope-gate … inScope=…` (every decision),
+  `[composition] … head=L… permits=[…] upstreams=[…]` (one line per run, composing or not), and
+  `[composition] … fallback.atomic head=L…` (an upstream failed and the head was retried alone).
 - **Kill switches:** `SCOPE_GATE_ENABLED=false` disables routing; `COMPOSITION_ENABLED=false`
   forces everything atomic.
 
@@ -158,7 +187,8 @@ in another language. For this to be faithful, your language must provide:
 | **Routing in** | sharp `scope.json` `summary` + `in_scope`; accurate `domains`/`routingHint` |
 | **Routing out** | `out_of_scope` naming the adjacent things you'd be mis-sent (domain boundaries) |
 | **Backstop** | `OUT_OF_SCOPE:` sentinel in `instructions.md` |
-| **Compose: allowed?** | `composesWith` on the `LANGUAGES` entry (explicit list e.g. `["0166"]` / `["0170"]` / `["*"]` wildcard / omit ⇒ atomic) |
+| **Compose: allowed?** | `composesWith` on the `LANGUAGES` entry (explicit list e.g. `["0179"]` / `["*"]` wildcard / omit ⇒ atomic) — a permission, not a trigger |
+| **Compose: when?** | a section in your own `instructions.md` mapping request shapes to upstream ids (L0176's "Pipeline Composition" is the reference) — this is the only trigger |
 | **Compose: as head** | `instructions.md` makes `data use "<lang>"` a REQUIRED binding + self-check |
 | **Compose: as upstream** | stable data model + `schema.json`; renders standalone with empty `data {}` |
 | **Cross-language** | lexicon + unparse-hints + `instructions.md` for `get_spec` |
