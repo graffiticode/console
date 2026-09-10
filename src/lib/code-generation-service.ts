@@ -106,26 +106,38 @@ export { CLAUDE_MODELS, modelRejectsTemperature };
 /**
  * Max output tokens per generation chunk.
  *
- * This is also the CEILING ON A THINKING SPIRAL, and that is what sets it.
+ * This sizes the ANSWER, and it is not a latency dial. On Sonnet 5 thinking is on
+ * by default (nothing here sends `thinking`, and adaptive is the default), the
+ * thinking tokens are billed inside `output_tokens`, and `max_tokens` caps thinking
+ * PLUS the response text. So this number decides whether a turn that thinks for a
+ * while still has room left to write the program.
  *
- * L0179 intermittently spends a whole chunk reasoning and writes nothing:
- * `output=16384 rawChars=0 codeChars=0 stopEarly=no_output`, twice in one user's
- * session on 2026-09-09, at ~100 tok/s — so 16,384 tokens IS ~150 seconds of
- * silence before the loop can even notice. The `no_output` break stops it after one
- * chunk rather than two, and `effort: low` did NOT prevent it (both spirals above
- * ran with `effort=low` applied and logged). Nothing bounds how long that one chunk
- * runs except this number.
+ * 16384 rather than 8192, reversing 2026-09-09. That change halved the ceiling to
+ * bound the DURATION of a silent chunk (~150s to ~80s at ~100 tok/s), which it did.
+ * But the zero-output failure it was aimed at is the thinking phase exhausting this
+ * budget before the text block opens — `out=<cap> chars=0 stop=max_tokens`, where
+ * `out` is always exactly the cap — so lowering the cap makes that MORE likely, not
+ * less. Measured on one L0179-shaped prompt, 3 runs per cell, effort at the API
+ * default:
  *
- * 8192 halves the worst case to ~80s. The cost is continuations: the same user's
- * successful run emitted 12,792 output tokens in one chunk and would now take two.
- * The continuation loop handles that — it is the same path a long L0175 assessment
- * has always used — and its own guards (restart, no_growth, no_output) apply per
- * chunk, so a spiral is caught sooner rather than later.
+ *   cap=2048   first text [14390ms, never, never]   chars [826, 0, 0]   zero-output 2/3
+ *   cap=8192   first text [11900, 16863, 15816ms]   chars [2770, 2228, 1347]  zero-output 0/3
  *
- * Was 16384, chosen so most programs finished in a single chunk. That reasoning
- * optimised the good case; this number now also has to bound the bad one.
+ * Same arm, same prompt: the smaller cap is the failure. Duration belongs to the
+ * watchdogs that already own it — firstTokenMs() before the first content token,
+ * turnBudgetMs() after it, and the request deadline over the whole run — none of
+ * which need this number to be small.
+ *
+ * The lever that actually shortens the thinking phase is `effort` (low/medium cut
+ * time-to-first-text from ~12-17s to ~1-1.8s in the same trials, for equal or more
+ * code). It is deliberately NOT set here: the 2026-09-04 corpus sweep found global
+ * `low` broke 3 of 18 stably-matching prompts and `medium` 2, with zero
+ * improvements, so moving it is an `npm run eval` decision, not a default.
+ *
+ * Keep this ABOVE the per-chunk ceiling in CODEGEN_MAX_OUTPUT_TOKENS_TOTAL — see the
+ * note there; a total below one chunk silently disables the continuation loop.
  */
-export const DEFAULT_MAX_TOKENS = 8192;
+export const DEFAULT_MAX_TOKENS = 16384;
 
 /**
  * Upper bound on a client-supplied `maxTokens`. 64k is 4x the server default
@@ -1728,7 +1740,17 @@ export async function generateCode({
         // Only present when the continuation loop cut the run short. Absent is
         // the normal case and stays absent so existing log parsing is unaffected.
         (streamResult.stopEarly ? ` stopEarly=${streamResult.stopEarly}` : "") +
-        (streamResult.chunks > 1 ? ` chunks=${streamResult.chunks}` : "")
+        (streamResult.chunks > 1 ? ` chunks=${streamResult.chunks}` : "") +
+        // Time to the first visible character — the reasoning phase, which the
+        // `reasoning=` field above CANNOT report on Anthropic (it folds thinking into
+        // output_tokens and breaks out nothing). `think=never` means no text block
+        // ever opened: the whole budget went to thinking, which is the zero-output
+        // spiral. See ProviderRequestResult.reasoning.
+        (streamResult.reasoning
+          ? ` think=${streamResult.reasoning.msToFirstText === null
+              ? "never"
+              : streamResult.reasoning.msToFirstText + "ms"}`
+          : "")
       );
       if (requestId) {
         ragLog(requestId, "llm.usage", {

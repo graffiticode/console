@@ -118,6 +118,26 @@ interface ProviderRequestResult {
   usage: TokenUsage;
   stopReason?: string;
   failure?: ProviderFailure;
+  /**
+   * What the turn did before it wrote its first visible character.
+   *
+   * On Sonnet 5 thinking is on by default and billed inside `output_tokens`, under
+   * the same `max_tokens` ceiling as the response — so a turn can spend its entire
+   * budget reasoning and emit nothing (`out=<cap> chars=0 stop=max_tokens`). Without
+   * these fields that turn is indistinguishable from a stalled stream, which is how
+   * it went four incidents unexplained: the fix was argued from the visible/output
+   * ratio because nothing measured the phase directly.
+   *
+   * `msToFirstText` is null when no text block ever opened — the spiral itself.
+   * `thinkingChars` is 0 whenever `thinking.display` is "omitted" (the Sonnet 5
+   * default, and what we send): the blocks stream with empty text but the tokens are
+   * still spent, so presence is the signal, not length.
+   */
+  reasoning?: {
+    sawThinkingBlock: boolean;
+    msToFirstText: number | null;
+    thinkingChars: number;
+  };
 }
 
 interface LongGenerationResult {
@@ -133,11 +153,19 @@ interface LongGenerationResult {
    * good run" are the same event, and the caps below can't be tuned.
    */
   stopEarly?: "deadline" | "output_budget" | "restart" | "no_growth" | "request_budget" | "no_output";
+  /**
+   * The reasoning phase across the run — see ProviderRequestResult.reasoning.
+   * `msToFirstText: null` with a non-empty run means every chunk was silent, which
+   * is the zero-output spiral and the reason `stopEarly` is "no_output".
+   */
+  reasoning?: { sawThinkingBlock: boolean; msToFirstText: number | null };
 }
 
 interface ClaudeStreamEvent {
-  type: "content" | "usage" | "complete" | "error";
+  type: "content" | "thinking" | "block" | "usage" | "complete" | "error";
   content?: string;
+  /** `block` events: which content block just opened ("thinking" | "text" | ...). */
+  blockType?: string;
   stopReason?: string;
   error?: string;
   code?: string;
@@ -464,11 +492,28 @@ class ClaudeStreamParser {
       }
       try {
         const parsed = JSON.parse(data);
-        if (parsed.type === "content_block_delta") {
+        if (parsed.type === "content_block_start") {
+          // The one event that distinguishes "thinking" from "hung". Everything
+          // below streams inside a block; until 2026-09-10 nothing read this, so a
+          // turn that spent its whole budget reasoning was indistinguishable from a
+          // dead stream — see the reasoning fields on ProviderRequestResult.
           events.push({
-            type: "content",
-            content: parsed.delta?.text || "",
+            type: "block",
+            blockType: parsed.content_block?.type || "",
           });
+        } else if (parsed.type === "content_block_delta") {
+          // Branch on the DELTA type. `thinking_delta` carries its payload on
+          // `delta.thinking` and `signature_delta` on `delta.signature`; reading
+          // `delta.text` off all three yielded "" for the thinking phase, which the
+          // consumer then dropped as empty content. That is why a spiral logged
+          // `chars=0` with no other trace: not a bug in what was collected, but a
+          // whole phase of the turn that nothing could see.
+          const delta = parsed.delta || {};
+          if (delta.type === "thinking_delta") {
+            events.push({ type: "thinking", content: delta.thinking || "" });
+          } else if (delta.type === "text_delta" || typeof delta.text === "string") {
+            events.push({ type: "content", content: delta.text || "" });
+          }
         } else if (parsed.type === "message_start" && parsed.message?.usage) {
           const usage = parsed.message.usage;
           events.push({
@@ -584,6 +629,14 @@ async function requestAnthropic({
   // front of the thinking phase. Measured: keying on raw chunks still failed 0/2
   // with "between chunks". See firstTokenMs().
   let sawData = false;
+  // Reasoning-phase telemetry — see ProviderRequestResult.reasoning. `startedAt` is
+  // the send, not the first byte, so msToFirstText covers queueing and the whole
+  // thinking phase: the interval the spiral lives in.
+  const startedAt = Date.now();
+  let sawThinkingBlock = false;
+  let thinkingChars = 0;
+  let msToFirstText: number | null = null;
+  const reasoningSnapshot = () => ({ sawThinkingBlock, msToFirstText, thinkingChars });
   // The emit wall. Armed by the FIRST CONTENT TOKEN and never re-armed — unlike
   // armWatchdog, which measures silence and resets on every chunk. Before that first
   // token the turn is thinking, and thinking is firstTokenMs's business, not this
@@ -651,9 +704,17 @@ async function requestAnthropic({
           // First written character: the model has stopped thinking and started
           // emitting, so the emit wall starts here and not before.
           armTurnWall();
+          if (msToFirstText === null) msToFirstText = Date.now() - startedAt;
           sawData = true;
           content += event.content;
           onChunk?.(event.content);
+        } else if (event.type === "block") {
+          if (event.blockType === "thinking") sawThinkingBlock = true;
+        } else if (event.type === "thinking") {
+          // Deliberately NOT added to `content` and NOT counted as sawData: this is
+          // the phase firstTokenMs() exists to wait through, and treating it as
+          // output would put the tight between-chunks watchdog back in front of it.
+          thinkingChars += event.content?.length || 0;
         } else if (event.type === "usage" && event.usage) {
           usage.inputTokens += event.usage.inputTokens;
           usage.outputTokens += event.usage.outputTokens;
@@ -668,6 +729,7 @@ async function requestAnthropic({
           return {
             content,
             usage,
+            reasoning: reasoningSnapshot(),
             failure: new ProviderFailure(
               message,
               "anthropic",
@@ -683,7 +745,7 @@ async function requestAnthropic({
         }
       }
     }
-    return { content, usage, stopReason };
+    return { content, usage, stopReason, reasoning: reasoningSnapshot() };
   } catch (error: any) {
     if (overran) {
       // NOT a failure, and deliberately NOT failoverable: the stream was healthy and
@@ -694,7 +756,7 @@ async function requestAnthropic({
       console.log(
         `[codegen-turn] cut provider=anthropic model=${model} ms=${Date.now() - turnStartedAt} chars=${content.length}`,
       );
-      return { content, usage, stopReason: "turn_budget" };
+      return { content, usage, stopReason: "turn_budget", reasoning: reasoningSnapshot() };
     }
     if (stalled) {
       // Failoverable: the stream died, the request itself was well-formed, and
@@ -703,6 +765,7 @@ async function requestAnthropic({
       return {
         content,
         usage,
+        reasoning: reasoningSnapshot(),
         failure: new ProviderFailure(
           `Anthropic stream stalled: no data for ${sawData ? streamStallMs() : firstTokenMs()}ms ${sawData ? "between chunks" : "before the first byte"}`,
           "anthropic",
@@ -728,6 +791,7 @@ async function requestAnthropic({
     return {
       content,
       usage,
+      reasoning: reasoningSnapshot(),
       failure: new ProviderFailure(
         `Anthropic request failed${status ? ` (${status})` : ""}: ${message}`,
         "anthropic",
@@ -1087,10 +1151,19 @@ async function requestProvider(
   // expected answer today is "half of it was thinking" — and that is the thing to
   // fix before this threshold can become the wall.
   if (turnMs > turnSoftMs()) {
+    // `think=` is the field that names the failure instead of implying it. A turn
+    // that writes nothing reads `chars=0 stop=max_tokens think=never`: the budget
+    // went to the reasoning phase and no text block ever opened. Before this,
+    // `chars=0` alone could not tell that apart from a stalled stream.
+    const r = result.reasoning;
+    const think = r
+      ? ` think=${r.msToFirstText === null ? "never" : r.msToFirstText + "ms"}` +
+        `${r.sawThinkingBlock ? "" : " thinkBlock=no"}`
+      : "";
     console.log(
       `[codegen-turn] over_soft rid=${budget?.rid || "-"} provider=${provider} ` +
         `model=${args.model} ms=${turnMs} out=${result.usage.outputTokens} ` +
-        `chars=${result.content.length} stop=${result.stopReason || "-"}`,
+        `chars=${result.content.length} stop=${result.stopReason || "-"}${think}`,
     );
   }
 
@@ -1187,14 +1260,37 @@ async function generateLongCode({
   const deadlineAt = options.deadlineAt
     ? Math.min(options.deadlineAt, generationDeadline)
     : generationDeadline;
-  const maxOutputTokensTotal =
+  // Cumulative output ceiling across every continuation chunk.
+  //
+  // MUST stay above one chunk's `max_tokens` (DEFAULT_MAX_TOKENS), or the
+  // continuation loop is dead: a chunk that fills its own budget trips the
+  // `output_budget` break below before it can continue, so a program too long for
+  // one chunk is truncated instead of resumed, silently and with no error.
+  //
+  // That is not hypothetical. CODEGEN_MAX_OUTPUT_TOKENS_TOTAL=8000 was set on the
+  // Cloud Run service on 2026-09-06 00:35Z as an incident brake, below the 16384
+  // (later 8192) chunk size. Continuations across the two weeks either side: 46
+  // before that revision, 0 after. It has no diff and nothing to typecheck, which
+  // is exactly why the floor is asserted here rather than left to the deployment.
+  const maxOutputTokensTotal = Math.max(
     options.maxOutputTokensTotal ??
-    configuredNumber("CODEGEN_MAX_OUTPUT_TOKENS_TOTAL", 40_000);
+      configuredNumber("CODEGEN_MAX_OUTPUT_TOKENS_TOTAL", 40_000),
+    // Room for a continuation, not just the chunk that triggered it. The `|| 4096`
+    // matches the send site's own fallback below; DEFAULT_MAX_TOKENS is not imported
+    // because code-generation-service imports THIS module, and the cycle is worse
+    // than restating the fallback.
+    2 * (options.maxTokens || 4096),
+  );
   // Spans continuation chunks: a caller watching this wants "how much has been
   // written for my request", not "for this turn".
   let writtenChars = 0;
   let firstChunkLine = "";
   let lowGrowthStreak = 0;
+  // Reasoning across the whole run, not one chunk: `no_output` fires on the first
+  // chunk that writes nothing, and the question a reader has then is "was it
+  // thinking, and for how long".
+  let sawThinkingBlock = false;
+  let msToFirstText: number | null = null;
 
   if (prompt) {
     conversationHistory.push({ role: "user", content: prompt });
@@ -1242,6 +1338,10 @@ async function generateLongCode({
       result.usage.cacheCreationInputTokens;
     usage.cacheReadInputTokens += result.usage.cacheReadInputTokens;
     usage.reasoningTokens += result.usage.reasoningTokens;
+    if (result.reasoning?.sawThinkingBlock) sawThinkingBlock = true;
+    if (msToFirstText === null && result.reasoning?.msToFirstText != null) {
+      msToFirstText = result.reasoning.msToFirstText;
+    }
 
     if (result.failure) {
       return {
@@ -1324,10 +1424,19 @@ async function generateLongCode({
 
   if (stopEarly) {
     console.log(
-      `[llm-generation] provider=${provider} stopped early reason=${stopEarly} chunks=${chunks} outputTokens=${usage.outputTokens}`,
+      `[llm-generation] provider=${provider} stopped early reason=${stopEarly} ` +
+        `chunks=${chunks} outputTokens=${usage.outputTokens} ` +
+        `think=${msToFirstText === null ? "never" : msToFirstText + "ms"}` +
+        `${sawThinkingBlock ? "" : " thinkBlock=no"}`,
     );
   }
-  return { content: fullContent, usage, chunks, stopEarly };
+  return {
+    content: fullContent,
+    usage,
+    chunks,
+    stopEarly,
+    reasoning: { sawThinkingBlock, msToFirstText },
+  };
 }
 
 export function extractCodeBlocks(content: string): string[] {
@@ -1408,6 +1517,8 @@ export async function generateCodeWithContinuation({
   rawChars?: number;
   /** Set when the continuation loop cut the run short — see LongGenerationResult. */
   stopEarly?: LongGenerationResult["stopEarly"];
+  /** The reasoning phase — see LongGenerationResult.reasoning. */
+  reasoning?: LongGenerationResult["reasoning"];
   error?: string;
 }> {
   let systemPrompt: SystemPrompt;
@@ -1539,6 +1650,10 @@ Do not include any explanatory text outside the code blocks unless specifically 
         // Why the loop stopped short, if it did. Carried up so the [code-gen]
         // line can distinguish a bounded runaway from a clean finish.
         stopEarly: result.stopEarly,
+        // How long the turn thought before writing. The [code-gen] line reports it
+        // as `think=`; on Anthropic it is the ONLY view of the reasoning phase,
+        // since thinking is folded into output_tokens and broken out nowhere.
+        reasoning: result.reasoning,
         provider,
         model,
         // The tier that actually ran, not the route-wide default: with per-family
