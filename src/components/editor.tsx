@@ -282,6 +282,10 @@ export default function Editor({
               onError={onError}
               taskId={taskId}
               itemVersions={itemVersions}
+              // The compiled record DataPanel fetched for this taskId. The chat
+              // needs it for dialects whose values live outside the program, and
+              // it is already in hand — the Data tab renders the same object.
+              compiledData={compileErrors ? null : data}
             />
           </div>
           <div style={{ display: tab === "Data" ? undefined : "none" }}>

@@ -618,6 +618,46 @@ When in doubt, attempt to generate code. Only use OUT_OF_SCOPE when you are conf
  * @param {string} currentCode - The current code (if available) to use as a starting point
  * @returns {string} - A well-formatted generation prompt
  */
+/**
+ * The <CURRENT_DATA> block: what the current code COMPILES TO, when the caller has it.
+ *
+ * Source and data are not the same information, and for some dialects the
+ * difference is the whole request. L0182 names a survey and nothing else — its
+ * ideas, title and bounds are fetched by the compiler from the back end — so a
+ * program's own text cannot tell the model what is in the survey it takes. An
+ * edit like "take the survey" was therefore unanswerable from <CURRENT_CODE>
+ * alone: the generator has never seen an idea, and L0182's instructions rightly
+ * forbid guessing one (a guessed position lands in range and records the wrong
+ * ideas silently). Handed the compiled record, the same request is obvious.
+ *
+ * Only ever CONTEXT: the model edits the source, never this. Capped because a
+ * compiled item can be far larger than the program that wrote it (L0176 items
+ * run to tens of KB), and a truncated data model still answers "what is in here?".
+ */
+const MAX_CURRENT_DATA_CHARS = 6000;
+
+function renderCurrentDataSection(currentData: unknown): string {
+  if (currentData == null) return "";
+  let rendered: string;
+  try {
+    rendered = JSON.stringify(currentData, null, 2) ?? "";
+  } catch {
+    // A compiled record that will not serialize (a cycle) is context we can do
+    // without — never a reason to fail the generation it was decorating.
+    return "";
+  }
+  if (!rendered) return "";
+  const clipped = rendered.length > MAX_CURRENT_DATA_CHARS
+    ? rendered.slice(0, MAX_CURRENT_DATA_CHARS) + "\n… (truncated)"
+    : rendered;
+  return `\n<CURRENT_DATA>
+What the current code compiles to. This is context to read, not code to edit — the program to change is <CURRENT_CODE> above. Values that live here rather than in the source (a set the compiler fetched, say) are visible to you ONLY here, so name them exactly as they appear.
+\`\`\`json
+${clipped}
+\`\`\`
+`;
+}
+
 async function createCodeGenerationPrompt(
   userPrompt,
   examples = [],
@@ -627,6 +667,7 @@ async function createCodeGenerationPrompt(
   conversationSummary = null,
   upstreamContext: { lang: string; sample?: unknown } | null = null,
   accessToken?: string,
+  currentData: unknown = null,
 ) {
   // Dialect-specific blocks (cached per-language). The dialect block already
   // carries cache_control: ephemeral, so the per-language prefix is reused
@@ -698,13 +739,15 @@ This program is one stage of a composition pipeline. At runtime it consumes a da
 `
     : "";
 
+  const currentDataSection = renderCurrentDataSection(currentData);
+
   // Build user message using USER_TEMPLATE format (matches dspy-service)
   const userMessage = `<USER_REQUEST>
 ${userPrompt}
 
 <CURRENT_CODE>
 ${currentCode ? `\`\`\`\n${currentCode}\n\`\`\`` : "No existing code."}
-
+${currentDataSection}
 <CONVERSATION_SUMMARY>
 ${conversationContext}
 
@@ -728,6 +771,7 @@ Emit the Graffiticode between triple backticks, must end with "..". Then on new 
       ),
       charCount: systemPromptCharCount + userMessage.length,
       hasCurrentCode: !!currentCode,
+      hasCurrentData: !!currentDataSection,
       hasConversationSummary: !!conversationSummary,
       sectionsIncluded: ["system", "developer", "user"],
       systemBlockCount: systemBlocks.length,
@@ -1270,6 +1314,7 @@ export async function generateCode({
   lang,
   options = {},
   currentCode = null,
+  currentData = null,
   rid = null,
   userId = null,
   sessionId = null,
@@ -1283,6 +1328,12 @@ export async function generateCode({
   lang?: string;
   options?: GenerateCodeOptions;
   currentCode?: string | null;
+  /**
+   * What `currentCode` compiles to, when the caller already has it. Context for
+   * the model, never something it edits — see the <CURRENT_DATA> block in
+   * createCodeGenerationPrompt for why a dialect can need it.
+   */
+  currentData?: unknown;
   rid?: string | null;
   userId?: string | null;
   sessionId?: string | null;
@@ -1512,6 +1563,23 @@ export async function generateCode({
 
           const rendered = renderPromptSpecToMessages(promptSpec, renderContext);
 
+          // The compiled record has no slot in the DSPy templates (they live in
+          // the DSPy service, not here), so append it to the last user message
+          // rather than let this path silently drop it — an update that needs the
+          // data model needs it under either prompt builder.
+          const dataSection = renderCurrentDataSection(currentData);
+          if (dataSection) {
+            for (let i = rendered.messages.length - 1; i >= 0; i--) {
+              if (rendered.messages[i].role === "user") {
+                rendered.messages[i] = {
+                  ...rendered.messages[i],
+                  content: `${rendered.messages[i].content}\n${dataSection}`,
+                };
+                break;
+              }
+            }
+          }
+
           // Convert to legacy format for compatibility with generateCodeWithContinuation.
           // Wrap the system prompt as a single content-block with cache_control:ephemeral
           // so Anthropic can cache the prefix; OpenAI receives the same text.
@@ -1560,6 +1628,7 @@ export async function generateCode({
         conversationSummary,
         upstreamContext,
         accessToken,
+        currentData,
       );
     }
 

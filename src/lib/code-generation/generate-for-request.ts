@@ -103,6 +103,11 @@ export async function generateCodeForRequest({
   language,
   options,
   currentSrc,
+  // What `currentSrc` COMPILES TO, when the caller has it. Context only — the
+  // model edits the source, never this — and the only way it can see values that
+  // live outside the program (a set the compiler fetched from a back end). See
+  // renderCurrentDataSection in code-generation-service.ts.
+  currentData = null,
   conversationSummary = null,
   itemId = undefined,
   // The surface this request came from ("mcp" | "console" | "front"), threaded
@@ -478,6 +483,7 @@ export async function generateCodeForRequest({
           lang: language,
           options: codegenOptions,
           currentCode: currentSrc,
+          currentData,
           rid,
           conversationSummary,
           precomputedExamples: headExamples,
@@ -709,6 +715,7 @@ export async function generateCodeForRequest({
             lang: headLang,
             options: codegenOptions,
             currentCode: currentSrc,
+            currentData,
             rid,
             conversationSummary,
             precomputedExamples: headLang === language ? headExamples : null,

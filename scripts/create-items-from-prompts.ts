@@ -6,7 +6,12 @@
  * Single-pass script combining code generation + item creation:
  * 1. Extracts prompts from the language's examples.md (served asset, or a local checkout —
  *    see scripts/lang-examples.ts)
- * 2. Generates code for each prompt via generateCode()
+ * 2. Generates code for each prompt via generateCode(). An example written as
+ *    `**Turn 1** — …` / `**Turn 2** — …` is a CONVERSATION: each turn is its own
+ *    request, and every turn after the first edits the source the previous one
+ *    produced (L0182: turn 1 takes a survey, turn 2 answers that same item). One
+ *    example is still one item — the last turn's source — whose recorded help is
+ *    every turn.
  * 3. Normalizes lrn-id references to the example id
  * 4. Recompiles the normalized source to get a real taskId
  * 5. Creates the item via createItem() library function, which handles Firestore write + billing
@@ -137,7 +142,10 @@ const outputPath = args.includes("--output")
 
 interface TrainingExample {
   id: string;
+  /** The whole conversation, turns joined — what the item records as its prompt. */
   prompt: string;
+  /** One entry per request. Single-turn examples have exactly one. */
+  turns: string[];
   exampleNumber: number;
 }
 
@@ -153,6 +161,17 @@ interface AuditLogEntry {
   // Repair turns the generator needed. 0 = compiled first try. Without it, "did
   // this need fixing?" was only inferable from an inflated token count.
   fixAttempts?: number | null;
+  // Per-turn cost and repairs, one entry per request made. A multi-turn example
+  // spends on every turn, and a single top-level `usage` reports only the last —
+  // which understates a two-turn example by about half.
+  turns: Array<{
+    prompt: string;
+    model?: string | null;
+    usage?: { input_tokens?: number; output_tokens?: number } | null;
+    fixAttempts?: number | null;
+    /** Whether this turn's source compiled. Only the last turn becomes the item. */
+    compiled?: boolean;
+  }>;
   taskId?: string | null;
   upstreamLangs?: string[];
   /** Which model actually wrote this. See PROVENANCE below. */
@@ -160,6 +179,19 @@ interface AuditLogEntry {
   created?: boolean;
   error?: string;
   timestamp: string;
+}
+
+// A turn marker inside an example: "**Turn 2** — Pick the two you would fund first."
+// Some examples are a CONVERSATION, not a single request (L0182: turn 1 takes a
+// survey, turn 2 answers the item turn 1 made). Written as one numbered entry
+// whose first line carries the marker and whose continuation lines carry the
+// rest, so the turns of an example stay visibly one example.
+const TURN_MARKER = /^\*\*Turn\s+\d+\*\*\s*(?:[—–-]\s*)?(.*)$/;
+
+/** Strip a leading "**Turn N** — " marker; return the prompt text either way. */
+function stripTurnMarker(text: string): string {
+  const m = text.match(TURN_MARKER);
+  return (m ? m[1] : text).trim();
 }
 
 /**
@@ -171,13 +203,15 @@ function extractExamples(content: string, langCode: string): TrainingExample[] {
 
   const lines = content.split("\n");
   let exampleCount = 0;
+  // The example whose continuation lines we are still reading, if any.
+  let open: TrainingExample | null = null;
 
   for (const line of lines) {
     const trimmed = line.trim();
     const match = trimmed.match(/^(\d+[a-z]?)\.\s+(.+)$/);
     if (match) {
       exampleCount++;
-      const prompt = match[2];
+      const prompt = stripTurnMarker(match[2]);
 
       // Number the example by the LABEL written in examples.md, not by scan
       // order. A sub-lettered entry ("86a.") advances the counter without
@@ -187,11 +221,34 @@ function extractExamples(content: string, langCode: string): TrainingExample[] {
       const label = Number.parseInt(match[1], 10);
       const exampleNumber = Number.isFinite(label) ? label : exampleCount;
 
-      examples.push({
+      open = {
         id: `${langCode}-example-${exampleNumber}`,
         prompt,
+        turns: [prompt],
         exampleNumber,
-      });
+      };
+      examples.push(open);
+      continue;
+    }
+
+    // A later turn of the example we are inside. Only a turn MARKER continues an
+    // example — an unmarked continuation line is prose (or a wrapped prompt), and
+    // treating it as a turn would send the document's own commentary to the
+    // generator as a request.
+    if (open && TURN_MARKER.test(trimmed)) {
+      const turn = stripTurnMarker(trimmed);
+      if (turn) {
+        open.turns.push(turn);
+        open.prompt = open.turns.join("\n\n");
+      }
+      continue;
+    }
+
+    // Anything else ends the example: the turns of one example are written
+    // together, so a blank line or a heading means the next marker belongs to
+    // whatever comes after it, not to this one.
+    if (!trimmed || trimmed.startsWith("#")) {
+      open = null;
     }
   }
 
@@ -241,7 +298,7 @@ function withTimeout<T>(work: Promise<T>, label: string, ms = stepTimeoutMs): Pr
 async function taskCompiles(
   taskId: string,
   accessToken: string,
-): Promise<{ compiled: boolean; error?: string }> {
+): Promise<{ compiled: boolean; error?: string; data?: unknown }> {
   try {
     const resp = await fetch(
       // ?refresh=1 recompiles rather than answering from the compile cache. A
@@ -269,7 +326,11 @@ async function taskCompiles(
     if (obj?.data == null) {
       return { compiled: false, error: "/data returned no compile output" };
     }
-    return { compiled: true };
+    // The compile output itself, not just the verdict: a later turn is handed it
+    // as `currentData`, which for some dialects is the only place the values it
+    // must edit against exist (L0182's ideas are fetched by the compiler, and
+    // never appear in the program).
+    return { compiled: true, data: obj.data };
   } catch (x: any) {
     return { compiled: false, error: `/data fetch failed: ${x?.message || x}` };
   }
@@ -322,123 +383,193 @@ async function processExample(
     exampleNumber: example.exampleNumber,
     prompt: example.prompt,
     compiled: false,
+    turns: [],
     upstreamLangs: [],
     timestamp: new Date().toISOString(),
   };
 
   try {
-    // Step 1: Generate. This is the REQUEST-level orchestrator, not the
-    // per-stage generator — it runs the scope gate, the composition planner and
-    // its permission fence, generates any upstream stages, and returns a
-    // `head+upstream` chained taskId. Importing the per-stage generator here is
-    // what silently made every generated item atomic.
-    const genResult: any = await withTimeout(
-      generateCodeForRequest({
-        auth,
-        prompt: example.prompt,
-        language: langCode,
-        options: {
-          maxTokens: 4096,
-        },
-        currentSrc: null,
-        itemId: example.id,
-      }),
-      `generate ${example.id}`,
-    );
-
-    if (genResult.errors && genResult.errors.length > 0) {
-      entry.error = genResult.errors[0].message;
-      return entry;
-    }
-
-    entry.generatedCode = genResult.src || "";
-    entry.usage = genResult.usage || null;
-    entry.model = genResult.model || null;
-    entry.fixAttempts = genResult.fixAttempts ?? null;
-    entry.upstreamLangs = Array.isArray(genResult.upstreamLangs) ? genResult.upstreamLangs : [];
-
-    if (!genResult.src) {
-      entry.error = "generateCodeForRequest returned empty source";
-      return entry;
-    }
-
-    // Step 2: Normalize lrn-id to the example.id
-    const normalizedCode = normalizeCode(genResult.src, example.id);
-    entry.normalizedCode = normalizedCode;
-
-    // Step 3: Recompile the normalized HEAD and re-attach the upstream segments.
-    // Only segment 0 is ours to rewrite; re-posting the head alone would drop
-    // the chain and with it the upstream data. Same shape as the editor's
-    // hand-edit path (src/components/editor.tsx).
-    const upstreamSegments = String(genResult.taskId || "").split("+").slice(1);
-
     // Same credential wiring the resolver uses (generate-for-request.ts). Without
     // the private store a program that reads `get-val-private "learnosity-secret"`
     // bakes an empty secret here and fails the compile with "key and secret must
     // both be set together" — after passing generation-time verification, which
     // compiles under the `verify-itemid` sentinel and is exempt from the
     // credential gate. Generation is not the place that difference shows up.
+    //
+    // Fetched once and reused by every turn: they do not change within an example,
+    // and a two-turn example would otherwise read the secret store twice.
     const privateValues: Record<string, string> = await getSecretsForUser(auth.uid);
     const publicValues: Record<string, string> = await getPublicValuesForUser(auth.uid);
     publicValues.itemId = example.id;
 
-    const parseResult = await withTimeout(
-      parseCode({
-        lang: langCode,
-        src: normalizedCode,
-        privateValues,
-        publicValues,
-        accessToken: auth.token,
-      }),
-      `parse ${example.id}`,
-    );
-
-    if (parseResult.errors && parseResult.errors.length > 0) {
-      entry.error = `Parse error: ${parseResult.errors[0].message}`;
-      return entry;
-    }
-
-    const postResult = await withTimeout(
-      postTask({
-        auth,
-        task: {
+    /**
+     * Compile one turn's source under THIS example's identity, and hand back what
+     * it compiled to.
+     *
+     * Recompiles the normalized HEAD and re-attaches the upstream segments: only
+     * segment 0 is ours to rewrite, and re-posting the head alone would drop the
+     * chain and with it the upstream data. Same shape as the editor's hand-edit
+     * path (src/components/editor.tsx).
+     *
+     * Run for EVERY turn, not just the last, because the next turn is generated
+     * against this turn's data model — and that data model has to come from a
+     * compile under the real `itemId` (publicValues above). A dialect that draws
+     * per session keys on it: L0182's `you-can-choose` picks one of twelve
+     * versions from `session-id`, so a data model compiled under generation's
+     * `verify-itemid` sentinel would describe a survey this item never showed.
+     */
+    async function compileTurn(
+      src: string,
+      upstreamSegments: string[],
+      label: string,
+    ): Promise<{ taskId?: string; data?: unknown; error?: string }> {
+      const parseResult = await withTimeout(
+        parseCode({
           lang: langCode,
-          code: JSON.parse(parseResult.code),
-        },
-        ephemeral: false,
-        isPublic: false,
-      }),
-      `postTask ${example.id}`,
-    );
+          src,
+          privateValues,
+          publicValues,
+          accessToken: auth.token,
+        }),
+        `parse ${label}`,
+      );
 
-    if (!postResult || !postResult.id) {
-      entry.error = "postTask returned no taskId";
-      return entry;
+      if (parseResult.errors && parseResult.errors.length > 0) {
+        return { error: `Parse error: ${parseResult.errors[0].message}` };
+      }
+
+      const postResult = await withTimeout(
+        postTask({
+          auth,
+          task: {
+            lang: langCode,
+            code: JSON.parse(parseResult.code),
+          },
+          ephemeral: false,
+          isPublic: false,
+        }),
+        `postTask ${label}`,
+      );
+
+      if (!postResult || !postResult.id) {
+        return { error: "postTask returned no taskId" };
+      }
+
+      const taskId = upstreamSegments.length > 0
+        ? [postResult.id, ...upstreamSegments].join("+")
+        : postResult.id;
+
+      // A posted task is not a compiled one. Ask the api to actually evaluate the
+      // chain — that is the only thing that proves the program runs.
+      const check = await taskCompiles(taskId, auth.token);
+      if (!check.compiled) {
+        return { taskId, error: check.error || "task posted but did not compile" };
+      }
+      return { taskId, data: check.data ?? null };
     }
 
-    entry.taskId = upstreamSegments.length > 0
-      ? [postResult.id, ...upstreamSegments].join("+")
-      : postResult.id;
+    // Step 1: Generate, one request per turn. This is the REQUEST-level
+    // orchestrator, not the per-stage generator — it runs the scope gate, the
+    // composition planner and its permission fence, generates any upstream
+    // stages, and returns a `head+upstream` chained taskId. Importing the
+    // per-stage generator here is what silently made every generated item atomic.
+    //
+    // A later turn EDITS what the previous one wrote, and is given both halves of
+    // that state: the source as `currentSrc` and what the source COMPILED TO as
+    // `currentData` — exactly what an update against a live item can see. The
+    // second half is not a nicety: L0182 names a survey and nothing else, its
+    // ideas being fetched by the compiler, so "take the survey" is answerable only
+    // from the data model. Without it the model has never seen an idea, and
+    // (correctly) declines to invent one.
+    //
+    // Only the LAST turn's source becomes the item. The intermediate states are
+    // real requests, and really compiled, but not separate items: one example is
+    // one item, and its recorded conversation (help) is every turn.
+    let genResult: any = null;
+    let normalizedCode = "";
+    let currentData: unknown = null;
 
-    // Step 3b: A posted task is not a compiled one. Ask the api to actually
-    // evaluate the chain — that is the only thing that proves the program runs.
-    const compileCheck = await taskCompiles(entry.taskId, auth.token);
-    entry.compiled = compileCheck.compiled;
-    if (!entry.compiled) {
-      entry.error = compileCheck.error || "task posted but did not compile";
-      return entry;
+    for (let t = 0; t < example.turns.length; t++) {
+      const turnPrompt = example.turns[t];
+      const multi = example.turns.length > 1;
+      const label = multi ? `${example.id} turn ${t + 1}` : example.id;
+      const fail = (message: string) => {
+        entry.error = multi ? `turn ${t + 1}: ${message}` : message;
+        return entry;
+      };
+
+      genResult = await withTimeout(
+        generateCodeForRequest({
+          auth,
+          prompt: turnPrompt,
+          language: langCode,
+          options: {
+            maxTokens: 4096,
+          },
+          // The previous turn's source, normalized — so an lrn-id the first turn
+          // wrote is already the example id the edit builds on.
+          currentSrc: t === 0 ? null : normalizedCode,
+          currentData,
+          itemId: example.id,
+        }),
+        `generate ${label}`,
+      );
+
+      if (genResult.errors && genResult.errors.length > 0) {
+        return fail(genResult.errors[0].message);
+      }
+
+      if (!genResult.src) {
+        return fail("generateCodeForRequest returned empty source");
+      }
+
+      // Step 2: Normalize lrn-id to the example.id
+      normalizedCode = normalizeCode(genResult.src, example.id);
+
+      // Step 3: Compile this turn — the verdict for the last turn, the next
+      // turn's `currentData` for any before it.
+      const upstreamSegments = String(genResult.taskId || "").split("+").slice(1);
+      const compiledTurn = await compileTurn(normalizedCode, upstreamSegments, label);
+
+      entry.turns.push({
+        prompt: turnPrompt,
+        model: genResult.model || null,
+        usage: genResult.usage || null,
+        fixAttempts: genResult.fixAttempts ?? null,
+        compiled: !compiledTurn.error,
+      });
+
+      entry.taskId = compiledTurn.taskId ?? null;
+      if (compiledTurn.error) {
+        return fail(compiledTurn.error);
+      }
+      currentData = compiledTurn.data ?? null;
     }
+
+    // Top-level provenance describes the state that became the item — the last
+    // turn. Per-turn cost and repairs are in entry.turns.
+    entry.generatedCode = genResult.src || "";
+    entry.usage = genResult.usage || null;
+    entry.model = genResult.model || null;
+    entry.fixAttempts = genResult.fixAttempts ?? null;
+    entry.upstreamLangs = Array.isArray(genResult.upstreamLangs) ? genResult.upstreamLangs : [];
+    entry.normalizedCode = normalizedCode;
+    entry.compiled = true;
 
     // Step 4: Create the item via createItem() — this handles Firestore write + billing
     const itemName = String(example.exampleNumber).padStart(3, "0");
-    const helpEntry = JSON.stringify([
-      {
+    // The recorded conversation is every turn, in order. download-training-examples
+    // joins an example's user messages back into one prompt, so a two-turn example
+    // reaches the corpus as the conversation that produced the code — which is what
+    // the model has to learn to answer.
+    const helpEntry = JSON.stringify(
+      example.turns.map((turn) => ({
         type: "user",
-        user: example.prompt,
-        help: { text: example.prompt },
+        user: turn,
+        help: { text: turn },
         timestamp: new Date().toISOString(),
-      },
-    ]);
+      })),
+    );
     const newItem = await withTimeout(createItem({
       auth,
       lang: langCode,
@@ -518,7 +649,9 @@ async function main() {
     console.log("\nExtracted prompts:");
     slice.forEach((ex) => {
       console.log(`\n[${ex.exampleNumber}] ${ex.id}:`);
-      console.log(`  ${ex.prompt}`);
+      ex.turns.forEach((turn, i) => {
+        console.log(ex.turns.length > 1 ? `  turn ${i + 1}: ${turn}` : `  ${turn}`);
+      });
     });
     return;
   }
@@ -569,7 +702,9 @@ async function main() {
   for (let i = 0; i < slice.length; i++) {
     const example = slice[i];
     process.stdout.write(
-      `[${i + 1}/${slice.length}] Processing ${example.id}... `
+      `[${i + 1}/${slice.length}] Processing ${example.id}` +
+        (example.turns.length > 1 ? ` (${example.turns.length} turns)` : "") +
+        `... `
     );
 
     const entry = await processExample(example, auth, db);

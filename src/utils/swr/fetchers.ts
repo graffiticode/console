@@ -504,7 +504,19 @@ export const getItem = async ({ user, id }) => {
   return client.request(query, { id }).then(data => data.item);
 };
 
-export const generateCode = async ({ user, prompt, language, options, currentSrc, conversationSummary = null, itemId = undefined }) => {
+/**
+ * What a data model may weigh before it stops travelling with the request.
+ *
+ * The server renders at most 6KB of it into the prompt, so a cap a little above
+ * that loses nothing it would have used — while keeping a large compiled item
+ * (a Learnosity record runs to tens of KB) from padding every generation request
+ * toward the API route's 1MB body limit, where it would fail the generation
+ * outright rather than merely decorate it. Context worth having here is the kind
+ * the SOURCE cannot carry, and that kind is small.
+ */
+const MAX_CURRENT_DATA_CHARS = 8000;
+
+export const generateCode = async ({ user, prompt, language, options, currentSrc, currentData = null, conversationSummary = null, itemId = undefined }) => {
   if (!user) {
     return {};
   }
@@ -515,8 +527,8 @@ export const generateCode = async ({ user, prompt, language, options, currentSrc
     }
   });
   const query = gql`
-    mutation GenerateCode($prompt: String!, $language: String!, $options: CodeGenerationOptions, $currentSrc: String, $conversationSummary: ConversationSummaryInput, $itemId: String) {
-      generateCode(prompt: $prompt, language: $language, options: $options, currentSrc: $currentSrc, conversationSummary: $conversationSummary, itemId: $itemId) {
+    mutation GenerateCode($prompt: String!, $language: String!, $options: CodeGenerationOptions, $currentSrc: String, $currentData: String, $conversationSummary: ConversationSummaryInput, $itemId: String) {
+      generateCode(prompt: $prompt, language: $language, options: $options, currentSrc: $currentSrc, currentData: $currentData, conversationSummary: $conversationSummary, itemId: $itemId) {
         src
         taskId
         description
@@ -538,12 +550,29 @@ export const generateCode = async ({ user, prompt, language, options, currentSrc
     }
   `;
 
+  // The compiled record the editor already fetched for its Data tab, serialized
+  // for transport (the schema has no JSON scalar). Sent only on an EDIT: on a
+  // fresh create there is no current code for it to describe, and whatever the
+  // Data tab is still showing belongs to the previous item.
+  let currentDataJson: string | null = null;
+  if (currentSrc && currentData && Object.keys(currentData).length > 0) {
+    try {
+      const serialized = JSON.stringify(currentData);
+      if (serialized && serialized.length <= MAX_CURRENT_DATA_CHARS) {
+        currentDataJson = serialized;
+      }
+    } catch {
+      currentDataJson = null;
+    }
+  }
+
   // Prepare the variables
   const variables = {
     prompt,
     language,
     options,
     currentSrc,
+    currentData: currentDataJson,
     conversationSummary,
     itemId,
   };
