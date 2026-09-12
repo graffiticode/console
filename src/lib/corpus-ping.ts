@@ -154,20 +154,39 @@ async function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
  * rotation — acceptable for a liveness check, which only needs *a* valid prompt, not a
  * specific one.
  */
-async function promptForLang(lang: string, day: number): Promise<{ prompt: string; ref: string } | null> {
+async function promptForLang(lang: string, day: number): Promise<{ turns: string[]; ref: string } | null> {
   const snap = await getFirestore()
     .collection("training_examples")
     .where("lang", "==", lang)
-    .select("prompt")
+    // `messages` as well as `prompt`: an example can be a CONVERSATION, and the two
+    // fields say different things about it. `prompt` is every user turn joined (see
+    // extractTaskFromMessages in scripts/download-training-examples.ts), while
+    // `messages` keeps them apart — which is the only way to replay them as the turns
+    // they were. 44 of L0182's 50 rows are two-turn as of 2026-09-11.
+    .select("prompt", "messages")
     .get();
 
   if (snap.empty) return null;
 
   const docs = snap.docs.slice().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const picked = docs[day % docs.length];
+
+  // Turns come from `messages` when it carries them, never from splitting `prompt`:
+  // a passage-bearing language (L0175) has blank lines inside a SINGLE request, so
+  // splitting text would invent turns that were never asked.
+  const messages = picked.get("messages");
+  const turns = Array.isArray(messages)
+    ? messages
+        .filter((m: any) => m?.role === "user" && typeof m?.content === "string")
+        .map((m: any) => m.content.trim())
+        .filter(Boolean)
+    : [];
+  if (turns.length > 0) return { turns, ref: picked.id };
+
+  // A row embedded before messages were stored still pings, as one turn.
   const prompt = String(picked.get("prompt") || "").trim();
   if (!prompt) return null;
-  return { prompt, ref: picked.id };
+  return { turns: [prompt], ref: picked.id };
 }
 
 /**
@@ -175,7 +194,7 @@ async function promptForLang(lang: string, day: number): Promise<{ prompt: strin
  * and note that a 200 is NOT sufficient: /data answers 200 with an errors array, so
  * status-code gating alone reads as a false PASS. All three conditions are load-bearing.
  */
-async function taskCompiles(taskId: string, accessToken: string): Promise<{ compiled: boolean; error?: string }> {
+async function taskCompiles(taskId: string, accessToken: string): Promise<{ compiled: boolean; error?: string; data?: unknown }> {
   try {
     // ?refresh=1 recompiles rather than answering from the compile cache. A
     // taskId is content-addressed over {lang, code} and carries no compiler
@@ -199,7 +218,10 @@ async function taskCompiles(taskId: string, accessToken: string): Promise<{ comp
       return { compiled: false, error: `Compile error: ${message}` };
     }
     if (obj?.data == null) return { compiled: false, error: "/data returned no compile output" };
-    return { compiled: true };
+    // The payload, not just the verdict: a later turn is handed it as `currentData`,
+    // which for some dialects holds the values the edit acts on (L0182's ideas are
+    // fetched by the compiler and never appear in the program).
+    return { compiled: true, data: obj.data };
   } catch (x: any) {
     return { compiled: false, error: `/data fetch failed: ${x?.message || x}` };
   }
@@ -215,53 +237,88 @@ async function pingLang(lang: string, day: number, auth: { uid: string; token: s
       return { ...base, outcome: "failed", stage: "no-corpus", error: "no corpus prompt for language", latencyMs: Date.now() - started };
     }
 
-    // The REQUEST-level orchestrator, not the per-stage generator: it runs the scope
-    // gate, the composition planner and its permission fence, and returns a chained
-    // `head+upstream` taskId. Importing the per-stage generator instead is what once
-    // made every generated item silently atomic.
-    const gen: any = await withTimeout(
-      generateCodeForRequest({
-        auth,
-        prompt: picked.prompt,
-        language: lang,
-        options: { maxTokens: 4096 },
-        currentSrc: null,
-        // REQUIRED, not cosmetic. `itemId` becomes publicValues.itemId
-        // (generate-for-request.ts:368), which is what a dialect reading
-        // `get-val-public "itemId"` resolves against. Omit it and L0176 compiles to
-        // `set-var "lrn-id" must be set to a non-empty string before items is called` —
-        // a permanent red that is an artifact of the ping, not a breakage. The corpus
-        // pipeline gets there differently, rewriting the source to a literal
-        // (normalizeCode in scripts/create-items-from-prompts.ts) because it needs a
-        // stable literal in the STORED example; the ping stores nothing and only needs
-        // the value to resolve.
-        //
-        // Creates nothing: the id is never written, and the only lookup keyed on it
-        // (assertRevisionsRemaining) is free-plan-only, which this eval account is not.
-        itemId: harnessItemId("ping", lang),
-        // Replay the prompt under the regime it was authored in — see PingOutcome. Without this
-        // a vendor-gated language (L0176) is refused on every single run.
-        skipScopeGate: true,
-      }),
-      `generate L${lang}`,
-    );
+    // ONE REQUEST PER TURN, because an example can be a conversation and half of one is
+    // not a liveness check. 44 of L0182's 50 rows are two-turn — take a survey, then
+    // answer it — and replaying the joined text as a single create produced only the
+    // taking, which compiles and reports green while the answering turn, the part with
+    // all the failure modes, was never exercised.
+    //
+    // A later turn is an EDIT of what the previous one wrote, and gets both halves of
+    // that state: the source as `currentSrc`, and what it compiled to as `currentData`.
+    // The second is load-bearing for a dialect whose values live outside the program —
+    // without it the generator has never seen the survey it is answering.
+    //
+    // Cost: one generation per TURN, so a two-turn language runs two. Still the same
+    // order of magnitude as the ~12 this sends daily, and the alternative is a check
+    // that cannot fail on the half that breaks.
+    let gen: any = null;
+    let currentSrc: string | null = null;
+    let currentData: unknown = null;
+    let out: PingResult = { ...base, outcome: "failed", exampleRef: picked.ref, latencyMs: Date.now() - started };
 
-    const out: PingResult = { ...base, outcome: "failed", exampleRef: picked.ref, model: gen?.model || undefined, latencyMs: Date.now() - started };
+    for (let t = 0; t < picked.turns.length; t++) {
+      const multi = picked.turns.length > 1;
+      const label = multi ? `L${lang} turn ${t + 1}` : `L${lang}`;
+      // Prefix a failing turn so a red names the turn that broke, not just the language.
+      const where = (stage: PingStage, error?: string): PingResult => ({
+        ...out,
+        stage,
+        error: multi ? `turn ${t + 1}: ${error ?? ""}`.trim() : error,
+        latencyMs: Date.now() - started,
+      });
 
-    if (gen?.errors?.length > 0) {
-      const first = gen.errors[0];
-      return { ...out, stage: "generate", error: String(first?.message || first), latencyMs: Date.now() - started };
-    }
-    if (!gen?.src) {
-      return { ...out, stage: "empty", error: "generation returned empty source", latencyMs: Date.now() - started };
-    }
-    if (!gen?.taskId) {
-      return { ...out, stage: "empty", error: "generation returned no taskId", latencyMs: Date.now() - started };
-    }
+      // The REQUEST-level orchestrator, not the per-stage generator: it runs the scope
+      // gate, the composition planner and its permission fence, and returns a chained
+      // `head+upstream` taskId. Importing the per-stage generator instead is what once
+      // made every generated item silently atomic.
+      gen = await withTimeout(
+        generateCodeForRequest({
+          auth,
+          prompt: picked.turns[t],
+          language: lang,
+          options: { maxTokens: 4096 },
+          currentSrc,
+          currentData,
+          // REQUIRED, not cosmetic. `itemId` becomes publicValues.itemId
+          // (generate-for-request.ts:368), which is what a dialect reading
+          // `get-val-public "itemId"` resolves against. Omit it and L0176 compiles to
+          // `set-var "lrn-id" must be set to a non-empty string before items is called` —
+          // a permanent red that is an artifact of the ping, not a breakage. The corpus
+          // pipeline gets there differently, rewriting the source to a literal
+          // (normalizeCode in scripts/create-items-from-prompts.ts) because it needs a
+          // stable literal in the STORED example; the ping stores nothing and only needs
+          // the value to resolve.
+          //
+          // The SAME id on every turn, which is what makes them turns: L0182 writes it
+          // as `session-id`, and the session is what brings back the version this taker
+          // was shown.
+          //
+          // Creates nothing: the id is never written, and the only lookup keyed on it
+          // (assertRevisionsRemaining) is free-plan-only, which this eval account is not.
+          itemId: harnessItemId("ping", lang),
+          // Replay the prompt under the regime it was authored in — see PingOutcome. Without this
+          // a vendor-gated language (L0176) is refused on every single run.
+          skipScopeGate: true,
+        }),
+        `generate ${label}`,
+      );
 
-    const compile = await taskCompiles(gen.taskId, auth.token);
-    if (!compile.compiled) {
-      return { ...out, stage: "compile", error: compile.error, latencyMs: Date.now() - started };
+      out = { ...out, model: gen?.model || out.model };
+
+      if (gen?.errors?.length > 0) {
+        const first = gen.errors[0];
+        return where("generate", String(first?.message || first));
+      }
+      if (!gen?.src) return where("empty", "generation returned empty source");
+      if (!gen?.taskId) return where("empty", "generation returned no taskId");
+
+      // Compile EVERY turn: the verdict for the last one, and the next turn's data model
+      // for any before it.
+      const compile = await taskCompiles(gen.taskId, auth.token);
+      if (!compile.compiled) return where("compile", compile.error);
+
+      currentSrc = gen.src;
+      currentData = compile.data ?? null;
     }
 
     return { ...out, outcome: "ok", latencyMs: Date.now() - started };
