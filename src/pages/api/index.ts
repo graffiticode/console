@@ -305,7 +305,7 @@ const typeDefs = `
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
     generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, currentData: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
-    startCodeGeneration(itemId: String, siblingOf: String, lang: String!, name: String, client: String, clientKind: String, geoCountry: String, prompt: String!, modification: String!, currentSrc: String): GenerationJob!
+    startCodeGeneration(itemId: String, siblingOf: String, lang: String!, name: String, client: String, clientKind: String, geoCountry: String, prompt: String!, modification: String!, currentSrc: String, currentData: String): GenerationJob!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
@@ -502,6 +502,7 @@ const resolvers = {
         prompt,
         modification,
         currentSrc,
+        currentData,
       } = args;
 
       // The agent OMTM counts a workspace's FIRST create attempt, any outcome.
@@ -612,6 +613,10 @@ const resolvers = {
         prompt,
         modification,
         currentSrc,
+        // Serialized JSON, passed through untouched: the worker hands it to
+        // generateCodeForRequest, which parses and renders it as <CURRENT_DATA>.
+        // Kept as a string end to end so the queue payload stays one flat shape.
+        currentData,
         authReplay,
         client,
       });

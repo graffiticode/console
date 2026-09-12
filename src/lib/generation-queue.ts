@@ -54,7 +54,8 @@ export type AuthReplay =
  * loss for anything in flight. Bump this when the shape changes and have the
  * worker branch on it rather than trusting field presence.
  *
- * v1: itemId/lang/prompt/modification/currentSrc/authReplay. NOTE there are no
+ * v1: itemId/lang/prompt/modification/currentSrc/authReplay (+ optional client,
+ * currentData — see those fields). NOTE there are no
  * model-selection fields: the family and tier come from the language's static
  * priority list at generation time, so nothing about model choice travels in the
  * payload and an in-flight task can never pin an unreviewed model.
@@ -68,6 +69,21 @@ export interface GenerationJob {
   prompt: string;
   modification: string;
   currentSrc?: string | null;
+  /**
+   * What `currentSrc` COMPILES TO, when the caller has it — serialized JSON.
+   *
+   * Optional, and deliberately NOT a version bump, for the same reason `client`
+   * is not: adding a field is backward compatible, while bumping 400s every job
+   * already queued. A job that predates this simply generates without the data
+   * model, exactly as every job did before.
+   *
+   * Why a caller sends it: some dialects keep the values an edit acts on outside
+   * the program. L0182 names a survey whose ideas the compiler fetches, so an
+   * agent asking to record three of them by name had nothing anchoring those
+   * strings — measured 2026-09-11 across 12 answers, 7 failed to compile against
+   * invented or mis-slotted text and 3 more silently recorded a short answer.
+   */
+  currentData?: string | null;
   authReplay: AuthReplay;
   /**
    * Source surface ("console" | "mcp" | "front"), carried solely so a terminal

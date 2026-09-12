@@ -62,6 +62,17 @@ function appendHelpEntry(helpJson: string, modification: string, taskId: string)
   return JSON.stringify(history);
 }
 
+/** Job payloads carry the data model as JSON text; bad JSON means no context, never a failure. */
+function parseCurrentData(raw: unknown): unknown {
+  if (typeof raw !== "string" || raw.length === 0) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    console.warn("[generate-job] currentData was not parseable JSON; generating without it");
+    return null;
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -79,6 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     prompt,
     modification,
     currentSrc,
+    currentData,
     authReplay,
     client,
   } = job || {};
@@ -137,6 +149,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       language: lang,
       options: {},
       currentSrc: currentSrc ?? null,
+      // The compiled record the enqueuer had, as serialized JSON. Parsed here
+      // rather than in the prompt builder so a malformed payload costs the
+      // CONTEXT and not the generation — it decorates the prompt, and a job that
+      // predates the field (or a caller that sends none) simply has none.
+      currentData: parseCurrentData(currentData),
       itemId,
       // Already on the job payload (see generation-queue.ts); passed down so the
       // language gate's funnel event can be qualified as MCP activity.
