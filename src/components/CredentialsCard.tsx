@@ -196,9 +196,9 @@ export default function CredentialsCard() {
 
   // Editing renders in place of the row being edited; adding renders below the list.
   const form = (
-    <div className="border border-gray-300 p-3 space-y-2">
+    <div className="border border-gray-300 px-4 py-2 space-y-2">
       {editBackend ? (
-        <h3 className="text-sm font-semibold text-gray-900 font-mono">{isCustom ? customName : def?.label}</h3>
+        <span className="block font-mono">{isCustom ? customName : def?.label}</span>
       ) : (
         <select
           className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm"
@@ -235,12 +235,12 @@ export default function CredentialsCard() {
         </>
       ) : (
         def?.fields.map(f => (
-          <label key={f.name} className="block">
-            <span className="block text-xs font-medium text-gray-700 mb-1">{f.label}</span>
+          <label key={f.name} className="flex items-center gap-2 text-sm text-neutral-500 font-light">
+            <span className="w-14 shrink-0">{f.label}:</span>
             <input
               type={f.visibility === "public" ? "text" : "password"}
               placeholder={f.label}
-              className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
+              className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono font-light text-neutral-500"
               value={fieldValues[f.name] || ""}
               onChange={e => setFieldValues({ ...fieldValues, [f.name]: e.target.value })} />
           </label>
