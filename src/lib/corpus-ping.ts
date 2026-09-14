@@ -230,12 +230,18 @@ async function taskCompiles(taskId: string, accessToken: string): Promise<{ comp
 async function pingLang(lang: string, day: number, auth: { uid: string; token: string }): Promise<PingResult> {
   const started = Date.now();
   const base = { lang, latencyMs: 0 };
+  // Hoisted so the catch below can still name the corpus row. A step that TIMES OUT
+  // throws rather than returning, and a red whose exampleRef is undefined cannot be
+  // reproduced — the prompt text is never recorded, so the doc id is the only handle.
+  let ref: string | undefined;
 
   try {
     const picked = await promptForLang(lang, day);
     if (!picked) {
       return { ...base, outcome: "failed", stage: "no-corpus", error: "no corpus prompt for language", latencyMs: Date.now() - started };
     }
+
+    ref = picked.ref;
 
     // ONE REQUEST PER TURN, because an example can be a conversation and half of one is
     // not a liveness check. 44 of L0182's 50 rows are two-turn — take a survey, then
@@ -323,7 +329,7 @@ async function pingLang(lang: string, day: number, auth: { uid: string; token: s
 
     return { ...out, outcome: "ok", latencyMs: Date.now() - started };
   } catch (err: any) {
-    return { ...base, outcome: "failed", stage: "generate", error: err?.message || String(err), latencyMs: Date.now() - started };
+    return { ...base, outcome: "failed", stage: "generate", exampleRef: ref, error: err?.message || String(err), latencyMs: Date.now() - started };
   }
 }
 
