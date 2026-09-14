@@ -194,6 +194,84 @@ export default function CredentialsCard() {
     }
   };
 
+  // Editing renders in place of the row being edited; adding renders below the list.
+  const form = (
+    <div className="border border-gray-300 p-3 space-y-2">
+      {editBackend ? (
+        <h3 className="text-sm font-semibold text-gray-900 font-mono">{isCustom ? customName : def?.label}</h3>
+      ) : (
+        <select
+          className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm"
+          value={backend}
+          onChange={e => { setBackend(e.target.value); setFieldValues({}); }}>
+          {CREDENTIAL_BACKENDS.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}
+          <option value={CUSTOM_BACKEND_KEY}>Custom</option>
+        </select>
+      )}
+
+      {isCustom ? (
+        <>
+          {!editBackend && (
+            <input
+              type="text"
+              placeholder="name (e.g. my-backend-token)"
+              className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
+              value={customName}
+              onChange={e => setCustomName(e.target.value)} />
+          )}
+          <select
+            className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm"
+            value={customIsPublic ? "public" : "private"}
+            onChange={e => setCustomIsPublic(e.target.value === "public")}>
+            <option value="private">Secret (encrypted)</option>
+            <option value="public">Public id (stored in clear)</option>
+          </select>
+          <input
+            type={customIsPublic ? "text" : "password"}
+            placeholder="value"
+            className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
+            value={fieldValues.__custom || ""}
+            onChange={e => setFieldValues({ __custom: e.target.value })} />
+        </>
+      ) : (
+        def?.fields.map(f => (
+          <label key={f.name} className="block">
+            <span className="block text-xs font-medium text-gray-700 mb-1">{f.label}</span>
+            <input
+              type={f.visibility === "public" ? "text" : "password"}
+              placeholder={f.label}
+              className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
+              value={fieldValues[f.name] || ""}
+              onChange={e => setFieldValues({ ...fieldValues, [f.name]: e.target.value })} />
+          </label>
+        ))
+      )}
+
+      {!isCustom && def?.docsUrl && (
+        <a href={def.docsUrl} target="_blank" rel="noreferrer" className="block text-xs text-blue-600 hover:underline">
+          {def.label} credential docs
+        </a>
+      )}
+      {editBackend && <p className="text-xs text-gray-400">Clear a secret field to replace it; leave it to keep the current value.</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          className="inline-flex items-center px-3 py-2 bg-gray-900 text-white border border-gray-900 rounded-none text-sm hover:bg-gray-700 disabled:opacity-50"
+          onClick={isCustom ? handleSaveCustom : handleSaveKnown}
+          disabled={saving}>
+          {saving ? "Saving..." : "Save"}
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-300 rounded-none text-sm text-gray-700 hover:bg-gray-200"
+          onClick={resetForm}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+
   if (!user) return null;
 
   if (status === "loading") {
@@ -217,6 +295,7 @@ export default function CredentialsCard() {
         {knownGroups.map(g => {
           const d = getCredentialBackend(g.key)!;
           return (
+            editBackend === g.key ? <li key={g.key}>{form}</li> :
             <li key={g.key} className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
               <div className="flex flex-col">
                 <span className="font-mono">{d.label}</span>
@@ -240,7 +319,7 @@ export default function CredentialsCard() {
             </li>
           );
         })}
-        {customVars.map(v => (
+        {customVars.map(v => editBackend === CUSTOM_BACKEND_KEY && customName === v.name ? <li key={v.name}>{form}</li> : (
           <li key={v.name} className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
             <div className="flex flex-col">
               <span className="font-mono">{v.name}</span>
@@ -261,79 +340,7 @@ export default function CredentialsCard() {
       </ul>
 
       {open ? (
-        <div className="border border-gray-300 p-3 space-y-2">
-          {editBackend ? (
-            <h3 className="text-sm font-semibold text-gray-900">{def?.label || "Custom"}</h3>
-          ) : (
-            <select
-              className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm"
-              value={backend}
-              onChange={e => { setBackend(e.target.value); setFieldValues({}); }}>
-              {CREDENTIAL_BACKENDS.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}
-              <option value={CUSTOM_BACKEND_KEY}>Custom</option>
-            </select>
-          )}
-
-          {isCustom ? (
-            <>
-              <input
-                type="text"
-                placeholder="name (e.g. my-backend-token)"
-                className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
-                value={customName}
-                disabled={!!editBackend}
-                onChange={e => setCustomName(e.target.value)} />
-              <select
-                className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm"
-                value={customIsPublic ? "public" : "private"}
-                onChange={e => setCustomIsPublic(e.target.value === "public")}>
-                <option value="private">Secret (encrypted)</option>
-                <option value="public">Public id (stored in clear)</option>
-              </select>
-              <input
-                type={customIsPublic ? "text" : "password"}
-                placeholder="value"
-                className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
-                value={fieldValues.__custom || ""}
-                onChange={e => setFieldValues({ __custom: e.target.value })} />
-            </>
-          ) : (
-            def?.fields.map(f => (
-              <label key={f.name} className="block">
-                <span className="block text-xs font-medium text-gray-700 mb-1">{f.label}</span>
-                <input
-                  type={f.visibility === "public" ? "text" : "password"}
-                  placeholder={f.label}
-                  className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
-                  value={fieldValues[f.name] || ""}
-                  onChange={e => setFieldValues({ ...fieldValues, [f.name]: e.target.value })} />
-              </label>
-            ))
-          )}
-
-          {!isCustom && def?.docsUrl && (
-            <a href={def.docsUrl} target="_blank" rel="noreferrer" className="block text-xs text-blue-600 hover:underline">
-              {def.label} credential docs
-            </a>
-          )}
-          {editBackend && <p className="text-xs text-gray-400">Clear a secret field to replace it; leave it to keep the current value.</p>}
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center px-3 py-2 bg-gray-900 text-white border border-gray-900 rounded-none text-sm hover:bg-gray-700 disabled:opacity-50"
-              onClick={isCustom ? handleSaveCustom : handleSaveKnown}
-              disabled={saving}>
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-300 rounded-none text-sm text-gray-700 hover:bg-gray-200"
-              onClick={resetForm}>
-              Cancel
-            </button>
-          </div>
-        </div>
+        !editBackend && form
       ) : (
         <div>
           <button
