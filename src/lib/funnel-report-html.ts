@@ -242,6 +242,13 @@ function sparkTable(series: DayPoint[]): string {
  * MCP-funnel events, and item failures survive because item_generation_failed
  * now carries `app`.
  */
+function itemsHint(d: Digest): string | undefined {
+  const parts: string[] = [];
+  if (d.items.failed) parts.push(`${d.items.failed} failed`);
+  if (d.items.outOfScope) parts.push(`${d.items.outOfScope} out of scope`);
+  return parts.length ? parts.join(" · ") : undefined;
+}
+
 function digestBlock(d: Digest): string {
   const conv = d.claims.count
     ? `${d.claims.count} claim (+${d.claims.transferred} items)`
@@ -251,7 +258,7 @@ function digestBlock(d: Digest): string {
   <div class="stats">
     ${stat("tool calls", d.context.toolCalls)}
     ${stat("workspaces", d.workspaces.total, `${d.reach.agentIdle} agents idle`)}
-    ${stat("items", d.items.ok, d.items.failed ? `${d.items.failed} failed` : undefined)}
+    ${stat("items", d.items.ok, itemsHint(d))}
     ${stat("edits", d.context.edits)}
     ${stat("views", d.context.views)}
   </div>

@@ -168,7 +168,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // attempt.
       // `app` mirrors the item_created/item_updated convention in resolvers.ts —
       // it is what lets the MCP-only report keep this event (isMcpOrigin).
-      emitEvent("item_generation_failed", { ...actor(auth), lang, app: client ?? "console", err: message });
+      // `code` lets the report tell a correct out-of-scope refusal from a broken
+      // generation without matching on prose (isOutOfScopeRefusal in funnel-digest.ts).
+      const code = result.errors?.find((e: any) => e.code)?.code;
+      emitEvent("item_generation_failed", { ...actor(auth), lang, app: client ?? "console", err: message, code });
       await resolveFirstOutcome(workspaceKey, "generation_failed");
       await releaseGeneration({ auth, id: itemId, owner: attemptId });
       // Handled outcome — 2xx so the queue does NOT retry.

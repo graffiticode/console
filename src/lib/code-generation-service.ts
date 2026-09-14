@@ -1910,7 +1910,9 @@ export async function generateCode({
       }
 
       return {
-        errors: [{ message: errorMessage }],
+        // Same code as the scope gate's refusal in generate-for-request.ts: a
+        // correct "no", which callers must be able to tell from a broken generation.
+        errors: [{ message: errorMessage, code: "out_of_scope" }],
         code: null,
         taskId: null,
         lang,

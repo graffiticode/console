@@ -154,6 +154,9 @@ export function buildBrief(
   }
   out.push(`tool calls ${a.context.toolCalls}, edits ${a.context.edits}`);
   out.push(`items built ${a.items.ok}, items that failed to build ${a.items.failed}`);
+  // A correct refusal, not a fault — kept off the failure count so the model
+  // doesn't narrate a right "no" as the generator breaking.
+  if (a.items.outOfScope) out.push(`requests refused as out of scope (no language fits) ${a.items.outOfScope}`);
   if (a.items.firstForAccount) out.push(`of those, ${a.items.firstForAccount} were that account's first item ever`);
   if (a.context.genFailures) out.push(`generation failures ${a.context.genFailures}`);
   if (Object.keys(a.languages.created).length) out.push(`languages built: ${list(a.languages.created)}`);
