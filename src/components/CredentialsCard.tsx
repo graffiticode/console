@@ -262,14 +262,17 @@ export default function CredentialsCard() {
 
       {open ? (
         <div className="border border-gray-300 p-3 space-y-2">
-          <select
-            className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm"
-            value={backend}
-            disabled={!!editBackend}
-            onChange={e => { setBackend(e.target.value); setFieldValues({}); }}>
-            {CREDENTIAL_BACKENDS.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}
-            <option value={CUSTOM_BACKEND_KEY}>Custom</option>
-          </select>
+          {editBackend ? (
+            <h3 className="text-sm font-semibold text-gray-900">{def?.label || "Custom"}</h3>
+          ) : (
+            <select
+              className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm"
+              value={backend}
+              onChange={e => { setBackend(e.target.value); setFieldValues({}); }}>
+              {CREDENTIAL_BACKENDS.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}
+              <option value={CUSTOM_BACKEND_KEY}>Custom</option>
+            </select>
+          )}
 
           {isCustom ? (
             <>
@@ -296,13 +299,15 @@ export default function CredentialsCard() {
             </>
           ) : (
             def?.fields.map(f => (
-              <input
-                key={f.name}
-                type={f.visibility === "public" ? "text" : "password"}
-                placeholder={f.label}
-                className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
-                value={fieldValues[f.name] || ""}
-                onChange={e => setFieldValues({ ...fieldValues, [f.name]: e.target.value })} />
+              <label key={f.name} className="block">
+                <span className="block text-xs font-medium text-gray-700 mb-1">{f.label}</span>
+                <input
+                  type={f.visibility === "public" ? "text" : "password"}
+                  placeholder={f.label}
+                  className="w-full border border-gray-300 px-2 py-1 rounded-none text-sm font-mono"
+                  value={fieldValues[f.name] || ""}
+                  onChange={e => setFieldValues({ ...fieldValues, [f.name]: e.target.value })} />
+              </label>
             ))
           )}
 
