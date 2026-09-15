@@ -191,20 +191,66 @@ export interface PreservedAllocation {
 }
 
 /**
- * Items included for a subscription, honoring a downgrade's preserved
- * allocation. The preserved bucket exists so a downgraded customer keeps what
- * they already paid for until the period ends — so it may only ever RAISE the
- * allowance. A stale or smaller value (e.g. a legacy compile-unit figure left
- * on the doc, or an expired grace window) must never cap a plan below its own
- * included items.
+ * A per-account bump to a plan's included items (e.g. a Silver account at 1,000
+ * instead of 500), set by scripts/set-included-items.ts. Scoped to the plan it
+ * was granted on, so it never follows the account to another tier. With
+ * `includedItemsOverrideUntil` set it lapses at that instant (e.g. one cycle).
+ */
+export interface IncludedItemsGrant {
+  includedItemsOverride?: number | null;
+  includedItemsOverridePlan?: string | null;
+  includedItemsOverrideUntil?: string | Date | null;
+}
+
+/**
+ * Items a grant adds on top of the plan's own bucket — 0 when absent, expired,
+ * granted on another plan, or not above the plan's allowance.
+ */
+export function grantedExtraItems(
+  id: string | undefined | null,
+  subscription: IncludedItemsGrant | undefined | null,
+  now: Date = new Date(),
+): number {
+  const granted = subscription?.includedItemsOverride;
+  if (typeof granted !== 'number' || subscription?.includedItemsOverridePlan !== getPlan(id).id) return 0;
+  const until = subscription?.includedItemsOverrideUntil;
+  if (until && new Date(until) <= now) return 0;
+  return Math.max(0, granted - includedItemsFor(id));
+}
+
+/**
+ * Whether the period's Nth item is one a grant makes free. Stripe's metered
+ * price is graduated at the PLAN's bucket and cannot see the grant, so items
+ * past the plan's bucket but within the granted extra must be withheld from the
+ * meter — reporting them would bill them as overage. Items beyond the grant are
+ * reported and land past Stripe's free tier as usual.
+ */
+export function grantCoversItem(
+  id: string | undefined | null,
+  subscription: IncludedItemsGrant | undefined | null,
+  periodItemCount: number,
+  now: Date = new Date(),
+): boolean {
+  const planIncluded = includedItemsFor(id);
+  return periodItemCount > planIncluded &&
+    periodItemCount <= planIncluded + grantedExtraItems(id, subscription, now);
+}
+
+/**
+ * Items included for a subscription, honoring a per-account grant and a
+ * downgrade's preserved allocation. The preserved bucket exists so a downgraded
+ * customer keeps what they already paid for until the period ends — so it may
+ * only ever RAISE the allowance. A stale or smaller value (e.g. a legacy
+ * compile-unit figure left on the doc, or an expired grace window) must never
+ * cap a plan below its own included items.
  */
 export function effectiveIncludedItems(
   id: string | undefined | null,
-  subscription: PreservedAllocation | undefined | null,
+  subscription: (PreservedAllocation & IncludedItemsGrant) | undefined | null,
   now: Date = new Date(),
   baseIncluded?: number,
 ): number {
-  const included = baseIncluded ?? includedItemsFor(id);
+  const included = (baseIncluded ?? includedItemsFor(id)) + grantedExtraItems(id, subscription, now);
   const preserved = subscription?.preservedAllocation;
   const until = subscription?.preservedUntil;
   if (typeof preserved === 'number' && until && new Date(until) > now) {
@@ -216,12 +262,12 @@ export function effectiveIncludedItems(
 /** Whether a preserved allocation is both unexpired and actually raising the allowance. */
 export function preservedAllocationApplies(
   id: string | undefined | null,
-  subscription: PreservedAllocation | undefined | null,
+  subscription: (PreservedAllocation & IncludedItemsGrant) | undefined | null,
   now: Date = new Date(),
   baseIncluded?: number,
 ): boolean {
-  const included = baseIncluded ?? includedItemsFor(id);
-  return effectiveIncludedItems(id, subscription, now, included) > included;
+  const included = (baseIncluded ?? includedItemsFor(id)) + grantedExtraItems(id, subscription, now);
+  return effectiveIncludedItems(id, subscription, now, baseIncluded) > included;
 }
 
 /** Per-item overage rate for a plan (null when no overage/hard cap). */
@@ -242,7 +288,7 @@ export function isHardCapped(id: string | undefined | null): boolean {
 }
 
 /** Shape of the cached `users/{uid}.subscription` map that gating reads. */
-export interface SubscriptionState extends PreservedAllocation {
+export interface SubscriptionState extends PreservedAllocation, IncludedItemsGrant {
   plan?: string | null;
   status?: string | null;
   stripeSubscriptionId?: string | null;

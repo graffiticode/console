@@ -5,7 +5,7 @@
 // included bucket in arrears on the next invoice. Contact-sales tiers have no
 // meter and are skipped. Best-effort: never throws into the create path.
 import Stripe from 'stripe';
-import { STRIPE_API_VERSION, getPlan, payAsYouGoEnabled, type SubscriptionState } from './plans-config';
+import { STRIPE_API_VERSION, getPlan, grantCoversItem, payAsYouGoEnabled, type SubscriptionState } from './plans-config';
 
 let stripe: Stripe | null = null;
 function getStripe(): Stripe | null {
@@ -19,12 +19,15 @@ export async function reportItemUsage({
   subscription,
   stripeCustomerId,
   identifier,
+  periodItemCount,
 }: {
   /** The cached `users/{uid}.subscription` map — plan AND enrollment state. */
   subscription: SubscriptionState | undefined | null;
   stripeCustomerId: string | undefined | null;
   /** Idempotency key (Stripe dedupes within a 24h window). Use itemId__taskId. */
   identifier?: string;
+  /** This item's position in the period's count, for grant-covered items. */
+  periodItemCount?: number;
 }): Promise<void> {
   try {
     const plan = subscription?.plan;
@@ -40,6 +43,8 @@ export async function reportItemUsage({
     // it is checked here — the single choke point every create funnels through
     // — rather than at the call site where a future caller could miss it.
     if (planConfig.hardCap && !payAsYouGoEnabled(subscription)) return;
+    // Included by a per-account grant that Stripe's graduated tier can't see.
+    if (periodItemCount != null && grantCoversItem(plan, subscription, periodItemCount)) return;
     const client = getStripe();
     if (!client) return;
 
