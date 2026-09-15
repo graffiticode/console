@@ -38,7 +38,7 @@ import {
   maybeAlertBudget,
   recordTrialItem,
 } from "../../lib/free-plan-quota";
-import { freePlanLanguageIds, isLanguageInFreePlanScope, isLanguageSponsored } from "../../lib/languages";
+import { freePlanLanguageIds, isLanguageInFreePlanScope, isLanguageSponsored, languageSponsorUid } from "../../lib/languages";
 import { trialItemRevisionLimit } from "../../lib/plans-config";
 import { mintSessionToken, isSessionTokenConfigured } from "../../lib/free-plan-session-token";
 import { mintClaimToken } from "../../lib/claim-token";
@@ -372,6 +372,91 @@ export async function recordVersion({
   }
 }
 
+function periodStartFor(subscription: { currentPeriodStart?: string | number } | undefined, now: Date): Date {
+  return subscription?.currentPeriodStart
+    ? new Date(subscription.currentPeriodStart)
+    : new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+// Increment an account's monthly item counter, resetting at its billing-period
+// boundary (mirrors logCompile). currentMonthTotal is the item count for the period.
+async function incrementItemCounter(
+  uid: string,
+  periodStart: Date,
+  now: Date,
+  usageDoc?: admin.firestore.DocumentSnapshot,
+) {
+  const ref = db.collection("usage").doc(uid);
+  const doc = usageDoc ?? await ref.get();
+  const lastReset = doc.exists && doc.data()?.lastReset ? new Date(doc.data()?.lastReset) : null;
+  if (lastReset && lastReset >= periodStart) {
+    await ref.update({
+      currentMonthTotal: admin.firestore.FieldValue.increment(1),
+      lastUpdated: now.toISOString(),
+    });
+  } else {
+    await ref.set({
+      currentMonthTotal: 1,
+      lastReset: periodStart.toISOString(),
+      lastUpdated: now.toISOString(),
+    });
+  }
+}
+
+/**
+ * Charge a sponsored item to the sponsor: a units: 1 usage row under the
+ * sponsor's uid, its monthly counter, and a meter event on its Stripe customer.
+ *
+ * Deliberately NOT gated on the sponsor's cap — sponsorship is uncapped, so
+ * items past the allowance are metered as the sponsor's overage. The sponsor's
+ * OWN creates still see this volume in checkItemCreateAllowed. A hard-capped
+ * sponsor (unenrolled Bronze) is counted but never metered: reportItemUsage
+ * refuses it, so a sponsor needs a metered plan to actually be invoiced.
+ */
+async function debitSponsor({
+  sponsorUid,
+  creatorUid,
+  itemId,
+  taskId,
+  lang,
+  client,
+  env,
+  now,
+}: {
+  sponsorUid: string;
+  creatorUid: string;
+  itemId: string;
+  taskId: string;
+  lang?: string;
+  client?: string;
+  env: string;
+  now: Date;
+}) {
+  const sponsorDoc = await db.collection("users").doc(sponsorUid).get();
+  const sponsorData = sponsorDoc.exists ? sponsorDoc.data() : {};
+  const subscription = sponsorData?.subscription || {};
+  await db.collection("usage").add({
+    userId: sponsorUid,
+    itemId,
+    taskId,
+    units: 1,
+    // Whose item this paid for. Firestore-only; never logged or shown.
+    sponsoredFor: creatorUid,
+    createdAt: now,
+    timestamp: now.toISOString(),
+    lang: lang ?? null,
+    client: client ?? "console",
+    env,
+    type: "item_created",
+  });
+  await incrementItemCounter(sponsorUid, periodStartFor(subscription, now), now);
+  await reportItemUsage({
+    subscription,
+    stripeCustomerId: sponsorData?.stripeCustomerId,
+    identifier: `${itemId}__${taskId}`,
+  });
+}
+
 /**
  * Count a billable item exactly once — the first time a distinct item gains a
  * valid taskId (its first successful compile). Called from createItem (sync /
@@ -445,6 +530,8 @@ export async function recordBillableItem({
     // `client`, which is caller-supplied and would therefore be a bypass.
     const sponsored = isLanguageSponsored(lang);
     const billable = env !== "local" && !sponsored;
+    // The account that pays for a sponsored item, or null when we absorb it.
+    const sponsorUid = sponsored && env !== "local" ? languageSponsorUid(lang) : null;
 
     // Audit record for the billable item.
     //
@@ -486,38 +573,12 @@ export async function recordBillableItem({
     const userDoc = await db.collection("users").doc(auth.uid).get();
     const userData = userDoc.exists ? userDoc.data() : {};
     const subscription = userData?.subscription || {};
-    const usageDocRef = db.collection("usage").doc(auth.uid);
-    const usageDoc = await usageDocRef.get();
+    const usageDoc = await db.collection("usage").doc(auth.uid).get();
     // The usage doc is created by the first billable item and never deleted, so
     // its absence is the account's first-ever item (not merely first this period).
     const firstForAccount = !usageDoc.exists;
-    const periodStart = subscription.currentPeriodStart
-      ? new Date(subscription.currentPeriodStart)
-      : new Date(now.getFullYear(), now.getMonth(), 1);
     if (billable) {
-      if (usageDoc.exists) {
-        const currentData = usageDoc.data();
-        const lastReset = currentData.lastReset ? new Date(currentData.lastReset) : null;
-        const isNewBillingPeriod = !lastReset || lastReset < periodStart;
-        if (isNewBillingPeriod) {
-          await usageDocRef.set({
-            currentMonthTotal: 1,
-            lastReset: periodStart.toISOString(),
-            lastUpdated: now.toISOString(),
-          });
-        } else {
-          await usageDocRef.update({
-            currentMonthTotal: admin.firestore.FieldValue.increment(1),
-            lastUpdated: now.toISOString(),
-          });
-        }
-      } else {
-        await usageDocRef.set({
-          currentMonthTotal: 1,
-          lastReset: periodStart.toISOString(),
-          lastUpdated: now.toISOString(),
-        });
-      }
+      await incrementItemCounter(auth.uid, periodStartFor(subscription, now), now, usageDoc);
     }
 
     emitEvent("item_created", {
@@ -533,6 +594,12 @@ export async function recordBillableItem({
     // reaches Cloud Logging, so the emitEvent above cannot reach the funnel
     // digest either.
     if (env === "local") return;
+
+    // A sponsored item is free to its creator but not to its sponsor. Before the
+    // trial return below, so a sponsored trial item is charged to the sponsor too.
+    if (sponsorUid) {
+      await debitSponsor({ sponsorUid, creatorUid: auth.uid, itemId, taskId, lang, client, env, now });
+    }
 
     // Anonymous free-plan (MCP trial) items are COUNTED — the writes above are
     // what checkItemCreateAllowed reads, so the trial account's own plan

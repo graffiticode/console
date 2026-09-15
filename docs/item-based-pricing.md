@@ -34,9 +34,12 @@ wall, and when they set a spend cap (`POST /api/payments/overage-limit` answers 
 
 Enrollment is a hosted Stripe Checkout in `mode: 'subscription'` carrying the **$0/mo base price + the
 graduated metered price**; `payment_method_collection: 'always'` is what makes Stripe collect a card on a
-$0 total. A monthly spend cap is **required** to enroll — a $0-base account with an uncapped card is how
-a trial user gets a four-figure surprise — and rides on `subscription_data.metadata.overageLimitUsd` so an
-abandoned Checkout leaves nothing behind.
+$0 total. Enrollment is **never uncapped** — a $0-base account with an uncapped card is how a trial user gets a
+four-figure surprise. The cap defaults to **$10 (25 items)** (`defaultCapUsd` on the plan, read through
+`defaultOverageCapUsd()`); the Usage tab pre-fills it, and the server applies it when a client sends none.
+It rides on `subscription_data.metadata.overageLimitUsd` so an abandoned Checkout leaves nothing behind.
+"Remove cap" on an enrolled Bronze account resets to the default rather than to unlimited. With no card,
+the 25-item wall stands until the customer adds one.
 
 Read the state with `payAsYouGoEnabled(subscription)` / `isHardCappedFor(plan, subscription)`
 (`plans-config.ts`), never bare `isHardCapped(plan)` — that one can't see the enrollment and answers
@@ -120,6 +123,14 @@ Bronze account at its cap or a metered account at its overage cap can still crea
 since they cost nothing. Free-plan (anonymous trial) callers keep their gate — sponsored trial items
 still count toward daily pace.
 
+**The sponsor pays when it has an account.** A language with `sponsorUid` debits each sponsored item
+(trial items included) from that account via `debitSponsor()` in `resolvers.ts`: a `units: 1`
+`item_created` row under the sponsor's uid (with `sponsoredFor: <creator uid>`), the sponsor's
+`currentMonthTotal`, and a meter event on the sponsor's Stripe customer. It is **not** gated on the
+sponsor's cap — past the allowance it bills as the sponsor's overage — but the sponsor's own creates
+see that volume in `checkItemCreateAllowed`. An unenrolled Bronze sponsor is counted but never metered,
+so a sponsor needs a metered plan to be invoiced. Without `sponsorUid` we absorb the cost.
+
 Sponsorship is **uncapped**: while the flag is set every item in that language is free, and ending a
 sponsorship is a flag flip after which items bill normally with no wall and no notice. `sponsorId` is
 namespaced so a per-user or global cap — or a `client:acme` partner sponsorship — can be added later
@@ -132,11 +143,59 @@ and evaluated against rows that already exist.
 - Hard-capped (Bronze, unenrolled) = **hard block** at `includedItems`, wall `plan_item_limit`. Metered
   (paid, or Bronze enrolled) = allowed up to the customer cap `subscription.overageLimitItems`, else
   unlimited (overage bills in arrears), wall `overage_cap`. No new wall kind was added.
+- **Default cap = the monthly base fee** for a **new** paid subscription (Silver $100, Gold $1,000,
+  Platinum $10,000), so a bill can't more than double without the customer choosing it. Written by
+  `defaultOverageCapFor()` from both the `customer.subscription.created` webhook (Checkout) and
+  `quick-subscribe`'s create branch. Applied only when neither cap field has ever been set — `null` is an
+  explicit "no cap" and `overageLimitItems: 0` a deliberate hard cap. Plan changes on an existing
+  subscription and accounts subscribed before 2026-09-15 are not touched. Bronze enrollment defaults to
+  $10 (25 items) and can't be made uncapped — see "Bronze is two states". Plan cards tell a new subscriber
+  their starting cap.
 - The cap is set in **dollars** via `POST /api/payments/overage-limit` (stored as items using the tier
   rate) and enforced by us, so Stripe never bills past it. A plan change **recomputes
   `overageLimitItems` from `overageLimitUsd`** at the new rate (`quick-subscribe.ts`) — carrying the item
   count across would silently move the dollar ceiling the customer agreed to. UI: the spend-cap control in
   `components/payments/UsageMonitor.tsx`.
+
+## Downgrades
+
+A downgrade takes effect **immediately**, with **no proration and no refund**, and the customer keeps
+the old plan's included items until the end of the period they already paid for. Nothing carries past
+period end: unused items are gone. Upgrades are the opposite (prorated, charged now, no grace window).
+
+The grace window is two fields on `users/{uid}.subscription`, always written together:
+`preservedAllocation` (the old bucket) and `preservedUntil` (the old period end). The gate reads them
+through `effectiveIncludedItems()` (`plans-config.ts`), which returns `max(plan's included,
+preservedAllocation)` until `preservedUntil` — it can only **raise** the allowance, never cap it. The
+usage counter is **not** reset, so items already created this period still count against the window.
+
+| Move | Path | Stripe | Preserved allocation |
+|---|---|---|---|
+| Paid → lower paid (e.g. Gold → Silver) | `quick-subscribe.ts` | base price swapped now, `proration_behavior: 'none'`, `billing_cycle_anchor: 'unchanged'` | old plan's `includedItems`, **×12 if the old interval was annual** |
+| Paid → Bronze (pricing-page Bronze button → `cancelToDemo`) | `cancel-subscription.ts`, `immediately: true` | subscription cancelled now | old plan's `includedItems` (monthly — no ×12) |
+| Cancel at period end | `cancel-subscription.ts`, `immediately: false` | `cancel_at_period_end: true` | none needed — plan is unchanged until `customer.subscription.deleted` resets it to `demo` |
+
+Paid → Bronze also sets `plan: 'demo'`, clears `interval`, and **clears `stripeSubscriptionId`** — which
+is what `payAsYouGoEnabled()` keys off, so the account is **hard-capped** from its next create. The old
+plan's overage no longer applies and Bronze pay-as-you-go needs re-enrollment. Cancelling an *enrolled*
+Bronze account goes the same way and drops it back to the 25-item cap.
+
+**Example.** Silver with 400 of 500 used, downgrading to Bronze mid-period: 100 more creates until the
+Silver period end, then a hard block; from period end the allowance is 25.
+
+The old plan is resolved from the **live Stripe price**, falling back to the cached `subscription.plan`,
+and never to `DEFAULT_PLAN` (that once wrote a 25-item cap onto a cancelled Gold customer). If neither
+resolves, `quick-subscribe` refuses the change (500) and `cancel-subscription` cancels but withholds the
+grace window and logs an error — restore it with `scripts/set-preserved-allocation.ts`.
+
+A downgrade also recomputes the spend cap (`overageLimitItems` from `overageLimitUsd`) at the new rate —
+see Gating below.
+
+Open questions:
+- The Bronze path doesn't apply the annual ×12 that `quick-subscribe` does, so annual Silver → Bronze
+  preserves one month's bucket.
+- `stripe.subscriptions.cancel()` is called without `invoice_now`, so overage metered on the cancelled
+  subscription before an immediate cancel may never be invoiced. Unverified against Stripe.
 
 ## Stripe integration
 
