@@ -17,7 +17,6 @@ export GRAFFITICODE_APP_CREDENTIALS=~/graffiticode-app-key.json # graffiticode-a
 - `npx tsx scripts/clear-compile.ts <taskId>` - Delete a compile record
 
 **graffiticode-app project** (console data):
-- `npx tsx scripts/adjust-overage-credits.ts <userId> <adjustment> [reason]` - Adjust user credits
 - `npx tsx scripts/get-app-names.ts` - List app names from items
 - `npx tsx scripts/cost-per-item.ts [--period day|week|month] [--from/--to] [--by-lang] [--lang <id>] [--output f.html] [--json]` - **What producing one item costs at today's prices.** Prices *our own* recorded tokens (`ai_generation` usage docs, cache tokens included) with `MODEL_RATES` at the `--as-of` rate card (default today) — a forward-looking pricing question, not what we were billed. **Calls no provider API and needs no admin keys**, so there is no usage-report lag: a window covering today is fine. Only `GRAFFITICODE_APP_CREDENTIALS` is required. `--help` is authoritative for flags. Things to know:
   - **Like-for-like is the whole design.** Numerator and denominator come from the same population, and every filter (`--env`, `--lang`, `--exclude-lang`, `--min-items`) narrows both sides. An earlier version divided one API key's provider spend by all items and misreported cost/item by up to 4x.

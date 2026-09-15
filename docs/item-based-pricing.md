@@ -103,7 +103,7 @@ the Stripe meter. They are told apart by `nonBillableReason`, because they are s
 | `nonBillableReason` | What it is | Customer sees it? |
 |---|---|---|
 | `'local-script'` | `currentEnv() === 'local'` — a tsx script (corpus generation, evals). Writes to **prod** Firestore but carries `.env.local`'s **test** Stripe key, so its meter events can never reach the live customer. | **No.** Ours, not theirs. |
-| `'sponsored'` | The item's language carries `sponsor: "<name>"` in `src/lib/languages.ts` (which also sets its `status` to `"Sponsored"`). Also stamps `sponsorId: 'lang:0000'`. | **Yes** — own bar on the Usage tab, attributed to the sponsor. |
+| `'sponsored'` | The item's language carries `sponsor: "<name>"` in `src/lib/languages.ts` (which also sets its `status` to `"Sponsored"`). Also stamps `sponsorId: 'lang:0000'`. | **Yes** — listed on the Usage tab by sponsor and language, with counts (no bar: there is no limit to fill toward). |
 
 Order matters in `recordBillableItem`: a local run in a sponsored language is **both**, and `local`
 wins. Labelling it `sponsored` would put a training run on the customer's usage page.

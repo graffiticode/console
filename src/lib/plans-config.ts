@@ -41,6 +41,8 @@ export interface PlanConfig {
    * reading this directly — this flag alone cannot see the enrollment.
    */
   hardCap: boolean;
+  /** Starting spend cap where the base-fee default doesn't fit (Bronze has a $0 base). */
+  defaultCapUsd?: number;
   /** Tier ranking for upgrade/downgrade comparisons. */
   tier: number;
   /** Non-self-serve (contact sales) tier. */
@@ -69,6 +71,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     overageRatePerItem: 0.4,
     // True = hard-capped *until enrolled*; see isHardCappedFor.
     hardCap: true,
+    // Spend cap at enrollment when the customer doesn't pick one: 25 more items.
+    defaultCapUsd: 10,
     tier: 0,
     stripe: {
       // $0/month recurring price. It exists solely so a Bronze subscription has
@@ -269,7 +273,7 @@ export function payAsYouGoEnabled(subscription: SubscriptionState | undefined | 
  * Whether creation must be blocked at the included bucket for THIS account.
  *
  * Answers the question isHardCapped() can't: a Bronze account that has enrolled
- * in pay-as-you-go is no longer capped at 50, it is capped by its own spend cap
+ * in pay-as-you-go is no longer capped at 25, it is capped by its own spend cap
  * (enforced by the same overage path every paid tier uses).
  */
 export function isHardCappedFor(
@@ -329,4 +333,33 @@ export function overageDollarsToItems(id: string | undefined | null, usd: number
   const rate = overageRateFor(id);
   if (!rate || !(usd > 0)) return null;
   return Math.floor(usd / rate);
+}
+
+/**
+ * Spend cap an account starts with. Paid tiers: overage up to the monthly base
+ * fee, so a bill can't more than double without the customer choosing it.
+ * Bronze has no base fee, so it names its own (`defaultCapUsd`). Null when there
+ * is no overage to cap (contact-sales).
+ */
+export function defaultOverageCapUsd(id: string | undefined | null): number | null {
+  const plan = getPlan(id);
+  if (plan.overageRatePerItem == null) return null;
+  if (plan.defaultCapUsd != null) return plan.defaultCapUsd;
+  return !plan.hardCap && plan.basePriceMonthly > 0 ? plan.basePriceMonthly : null;
+}
+
+/**
+ * The cap fields to write for a new subscription, or null to leave them alone.
+ * Only an account that has never had a cap gets the default: `null` is a
+ * customer's explicit "no cap", and `overageLimitItems: 0` is a deliberate
+ * hard cap (scripts/cap-trial-account.ts).
+ */
+export function defaultOverageCapFor(
+  id: string | undefined | null,
+  subscription: { overageLimitItems?: unknown; overageLimitUsd?: unknown } | undefined | null,
+): { overageLimitUsd: number; overageLimitItems: number } | null {
+  if (subscription?.overageLimitItems !== undefined || subscription?.overageLimitUsd !== undefined) return null;
+  const usd = defaultOverageCapUsd(id);
+  const items = usd == null ? null : overageDollarsToItems(id, usd);
+  return usd == null || items == null ? null : { overageLimitUsd: usd, overageLimitItems: items };
 }

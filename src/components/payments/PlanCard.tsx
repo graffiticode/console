@@ -1,4 +1,5 @@
 import { Plan, PlanId, BillingInterval, isUpgrade, isDowngrade, getButtonLabel, perItem } from '@/utils/plans';
+import { defaultOverageCapUsd } from '@/lib/plans-config';
 
 interface PlanCardProps {
   plan: Plan;
@@ -43,6 +44,7 @@ export default function PlanCard({
     (isCurrentPlan && currentBillingInterval === 'annual' && billingInterval === 'monthly')
   );
 
+  const defaultCapUsd = defaultOverageCapUsd(plan.id);
   const isHighlighted = plan.id === highlightedPlan;
   const isPendingCancel = pendingCancelPlan === plan.id;
 
@@ -188,6 +190,13 @@ export default function PlanCard({
       {wouldBeDowngrade && (
         <p className="mt-2 text-xs text-gray-500 text-center">
           Downgrades apply immediately current credits retained
+        </p>
+      )}
+
+      {/* A new subscription starts with a spend cap; say so before they commit. */}
+      {!isFree && !isContactSales && !hasActiveSubscription && defaultCapUsd != null && (
+        <p className="mt-2 text-xs text-gray-500 text-center">
+          Additional items capped at ${defaultCapUsd.toLocaleString('en-US')}/mo to start. Change it on the Usage tab.
         </p>
       )}
 

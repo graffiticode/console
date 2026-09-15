@@ -4,16 +4,17 @@ import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { paymentsGet, paymentsPost } from '../../utils/payments-client';
 import { planDetails, type PlanId } from '../../utils/plans';
+import { defaultOverageCapUsd } from '../../lib/plans-config';
 
 interface UsageData {
   plan: string;
   itemsUsed: number;
   /** Free items in a sponsored language. Outside the allowance, never invoiced. */
   sponsoredItems?: number;
-  /** Which languages those came from, e.g. ["L0179"]. */
-  sponsoredLanguages?: string[];
   /** Who is paying, e.g. ["Artcompiler Inc."]. */
   sponsors?: string[];
+  /** Sponsored item counts per language, most first. */
+  sponsoredByLanguage?: { lang: string; sponsor: string | null; items: number }[];
   includedItems: number;
   overageItems: number;
   overageRatePerItem: number | null;
@@ -31,10 +32,10 @@ interface UsageData {
 
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// Prefilled enrollment cap. Deliberately a round, small number: the point of
-// asking is that the customer picks a ceiling they're comfortable with before
-// a card goes on file, not that they accept ours.
-const DEFAULT_ENROLL_CAP_USD = 20;
+// Prefilled enrollment cap, from plans-config ($10 = 25 items on Bronze). The
+// customer can change it before a card goes on file; the server applies the
+// same default if none is sent.
+const DEFAULT_ENROLL_CAP_USD = defaultOverageCapUsd('demo') ?? 0;
 
 export default function UsageMonitor() {
   const { user } = useGraffiticodeAuth();
@@ -121,29 +122,24 @@ export default function UsageMonitor() {
     return <div>Error loading usage data</div>;
   }
 
-  // Within the included bucket the bar is scaled to it. Once usage spills over,
-  // the bar rescales to included + overage so both segments together fill it —
-  // the included share shrinks as the overage grows.
+  // The plan track shows the included bucket only; overage has its own track
+  // below, measured against the spend cap.
   const included = usage.includedItems;
   const used = usage.itemsUsed;
   const includedUsed = Math.min(used, included);
   const overageItems = usage.overageItems;
-  const barTotal = Math.max(included, includedUsed + overageItems);
+  const includedPct = included > 0 ? (includedUsed / included) * 100 : (used > 0 ? 100 : 0);
 
-  // Sponsored usage sits OUTSIDE the allowance, so it cannot be another segment
-  // of the plan track — that track's denominator is the allowance itself. It
-  // gets its own track, on a shared scale so the two lengths are comparable:
-  // stacking bars with different denominators invites exactly the misreading
-  // that comparing their lengths would produce. Every track is labelled, so
-  // nothing depends on pixel length alone.
+  // Sponsored items sit outside the plan and have no limit, so they're a count
+  // grouped by sponsor rather than a track: a bar with nothing to fill toward
+  // would read as a budget.
   const sponsoredItems = usage.sponsoredItems ?? 0;
-  const scale = Math.max(barTotal, sponsoredItems);
-  const pct = (n: number) => (scale > 0 ? (n / scale) * 100 : 0);
-  const includedPct = scale > 0 ? pct(includedUsed) : (used > 0 ? 100 : 0);
-  const overagePct = pct(overageItems);
-  const sponsoredPct = pct(sponsoredItems);
-  const sponsoredLangs = usage.sponsoredLanguages ?? [];
   const sponsors = usage.sponsors ?? [];
+  const sponsoredBySponsor = new Map<string, { lang: string; items: number }[]>();
+  for (const row of usage.sponsoredByLanguage ?? []) {
+    const key = row.sponsor ?? 'Sponsored';
+    sponsoredBySponsor.set(key, [...(sponsoredBySponsor.get(key) ?? []), row]);
+  }
 
   const isAtIncludedLimit = used >= included;
   const planName = planDetails[usage.plan as PlanId]?.name ?? usage.plan;
@@ -152,6 +148,14 @@ export default function UsageMonitor() {
   const capItems = usage.overageLimitItems;
   const capRemaining = capItems === null ? null : Math.max(0, included + capItems - used);
   const atCap = capItems !== null && used >= included + capItems;
+
+  // Overage budget, shown whenever there is a cap to count down from — including
+  // before any overage is used. Measured against the cap, with its own "N of M
+  // remaining" label.
+  const showOverageTrack = !usage.hardCap && capItems !== null && capItems > 0;
+  const overageBudgetUsed = capItems === null ? 0 : Math.min(overageItems, capItems);
+  const overageBudgetPct = capItems ? (overageBudgetUsed / capItems) * 100 : 0;
+  const showTrackLabels = showOverageTrack;
 
   return (
     <div className="space-y-6">
@@ -174,7 +178,7 @@ export default function UsageMonitor() {
             <div className="flex justify-end text-sm text-gray-600 mb-1">
               <span>
                 {/* A hard-capped account is counting down to a wall, so show what
-                    is left. Once the cap is reached "0 of 50 remaining" says
+                    is left. Once the cap is reached "0 of 25 remaining" says
                     nothing useful — fall back to the total, same as every other
                     plan. */}
                 {usage.hardCap && used < included
@@ -183,8 +187,8 @@ export default function UsageMonitor() {
               </span>
             </div>
             {/* Labels only appear once there is a second track to tell apart. */}
-            <div className={sponsoredItems > 0 ? 'flex items-center gap-3' : ''}>
-              {sponsoredItems > 0 && (
+            <div className={showTrackLabels ? 'flex items-center gap-3' : ''}>
+              {showTrackLabels && (
                 <span className="w-20 shrink-0 text-xs text-gray-500">Plan</span>
               )}
               <div className="w-full bg-gray-200 h-8 relative overflow-hidden">
@@ -196,41 +200,51 @@ export default function UsageMonitor() {
                   style={{ width: `${includedPct}%` }}
                   title={`Included: ${includedUsed.toLocaleString()} / ${included.toLocaleString()}`}
                 />
-                {/* Overage usage (past the included bucket) */}
-                {overageItems > 0 && (
-                  <div
-                    className={`h-8 absolute top-0 transition-all duration-300 ${atCap ? 'bg-red-600' : 'bg-yellow-500'}`}
-                    style={{ left: `${includedPct}%`, width: `${overagePct}%` }}
-                    title={`Overage: ${overageItems.toLocaleString()} items`}
-                  />
-                )}
               </div>
             </div>
 
-            {/* Sponsored: free items, outside the plan. Rendered only when there
-                are some, so the common case looks exactly as it did before. */}
-            {sponsoredItems > 0 && (
-              <div className="mt-2 flex items-center gap-3">
-                <span className="w-20 shrink-0 text-xs text-gray-500">Sponsored</span>
-                <div className="w-full bg-gray-200 h-8 relative overflow-hidden">
-                  <div
-                    className="h-8 absolute left-0 top-0 bg-emerald-600 transition-all duration-300"
-                    style={{ width: `${sponsoredPct}%` }}
-                    title={`Sponsored: ${sponsoredItems.toLocaleString()} free items`}
-                  />
+            {showOverageTrack && capItems !== null && (
+              <>
+                <div className="mt-2 flex items-center gap-3">
+                  <span className="w-20 shrink-0 text-xs text-gray-500">Overage</span>
+                  <div className="w-full bg-gray-200 h-8 relative overflow-hidden">
+                    <div
+                      className={`h-8 absolute left-0 top-0 transition-all duration-300 ${atCap ? 'bg-red-600' : 'bg-yellow-500'}`}
+                      style={{ width: `${overageBudgetPct}%` }}
+                      title={`Overage: ${overageBudgetUsed.toLocaleString()} / ${capItems.toLocaleString()} items`}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
-            {sponsoredItems > 0 && (
-              <div className="mt-1 flex justify-end text-xs text-gray-500">
-                <span>
-                  {sponsoredItems.toLocaleString()} free
-                  {sponsoredLangs.length > 0 && ` · ${sponsoredLangs.join(', ')}`}
-                  {sponsors.length > 0 && ` · sponsored by ${sponsors.join(', ')}`}
-                </span>
-              </div>
+                <div className="mt-1 flex justify-end text-xs text-gray-500">
+                  <span>
+                    {(capItems - overageBudgetUsed).toLocaleString()} of {capItems.toLocaleString()} overage items remaining
+                    {usage.overageLimitUsd != null && ` · ${money(usage.overageLimitUsd)} cap`}
+                  </span>
+                </div>
+              </>
             )}
           </div>
+
+          {/* Rendered only when there are some, so the common case is unchanged. */}
+          {sponsoredItems > 0 && (
+            <div className="mt-6 border-t pt-4">
+              <h4 className="text-sm font-medium text-gray-700">Sponsored</h4>
+              <p className="text-xs text-gray-500 mb-3">Free, and not counted toward your plan.</p>
+              <dl className="space-y-3 text-sm">
+                {Array.from(sponsoredBySponsor, ([sponsor, rows]) => (
+                  <div key={sponsor}>
+                    <dt className="text-gray-700">{sponsor}</dt>
+                    {rows.map((row) => (
+                      <dd key={row.lang} className="mt-1 flex justify-between gap-2 pl-4">
+                        <span className="font-mono text-gray-600">{row.lang}</span>
+                        <span className="font-mono text-gray-900">{row.items.toLocaleString()} items</span>
+                      </dd>
+                    ))}
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
 
           <div className="mt-6 border-t pt-4">
             <h4 className="text-sm font-medium text-gray-700 mb-3">Usage Statistics</h4>
@@ -370,7 +384,7 @@ export default function UsageMonitor() {
                     step="1"
                     value={capInput}
                     onChange={(e) => setCapInput(e.target.value)}
-                    placeholder="No cap"
+                    placeholder={usage.payAsYouGoEnabled ? 'Default' : 'No cap'}
                     className="pl-6 pr-3 py-2 w-40 border border-gray-300 rounded-none text-sm focus:outline-none focus:ring-1 focus:ring-gray-500"
                   />
                 </div>
@@ -389,7 +403,7 @@ export default function UsageMonitor() {
                     onClick={() => { setCapInput(''); saveCap(null); }}
                     className="inline-flex justify-center rounded-none bg-white px-3 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
                   >
-                    Remove cap
+                    {usage.payAsYouGoEnabled ? 'Reset to default' : 'Remove cap'}
                   </button>
                 )}
               </div>

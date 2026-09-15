@@ -45,9 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         cancelAtPeriodEnd: false,
         nextBillingDate: endOfMonth.toISOString(),
-        units: includedItemsFor('demo'),
-        overageUnits: 0,
-        overageRate: null,
+        units: includedItemsFor('demo'),        overageRate: null,
         hasActiveSubscription: false,
         trialUsedAt: null,
       });
@@ -78,9 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         cancelAtPeriodEnd: false,
         nextBillingDate: renewalDate,
-        units,
-        overageUnits: userData?.subscription?.overageUnits || 0,
-        overageRate: null,
+        units,        overageRate: null,
         hasActiveSubscription: false,
         trialUsedAt: userData?.trialUsedAt || null,
       });
@@ -109,9 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
           cancelAtPeriodEnd: false,
           nextBillingDate: renewalDate,
-          units,
-          overageUnits: userData?.subscription?.overageUnits || 0,
-          overageRate: null,
+          units,          overageRate: null,
           hasActiveSubscription: false,
           trialUsedAt: userData?.trialUsedAt || null,
         });
@@ -163,9 +157,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         cancelAtPeriodEnd: false,
         nextBillingDate: renewalDate,
-        units,
-        overageUnits: userData?.subscription?.overageUnits || 0,
-        overageRate: null,
+        units,        overageRate: null,
         isUsingPreservedAllocation: hasPreservedAllocation,
         preservedUntil: hasPreservedAllocation ? preservedUntil : null,
         hasActiveSubscription: false,
@@ -192,9 +184,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : includedItemsFor(planName);
     const hasPreservedAllocation = preservedAllocationApplies(planName, userData?.subscription, new Date(), baseUnits);
     const planUnits = effectiveIncludedItems(planName, userData?.subscription, new Date(), baseUnits);
-
-    // Get any purchased overage units from metadata or database
-    const overageUnits = parseInt(subscription.metadata?.overageUnits || '0');
 
     // Check for scheduled changes and get the correct renewal date
     let scheduledPlan = null;
@@ -251,9 +240,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       nextBillingDate: effectiveRenewalDate
         ? new Date(effectiveRenewalDate * 1000).toISOString()
         : null,
-      units: planUnits,
-      overageUnits,
-      overageRate: overageRateFor(planName),
+      units: planUnits,      overageRate: overageRateFor(planName),
       stripeSubscriptionId: subscription.id,
       isUsingPreservedAllocation: hasPreservedAllocation,
       preservedUntil: hasPreservedAllocation ? preservedUntil : null,

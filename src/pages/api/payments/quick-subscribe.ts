@@ -8,6 +8,7 @@ import {
   includedItemsFor,
   isUpgrade as isPlanUpgrade,
   overageDollarsToItems,
+  defaultOverageCapFor,
   DEFAULT_PLAN,
   PLANS,
   type PlanId,
@@ -297,6 +298,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const recomputed = overageDollarsToItems(planId as PlanId, capUsd);
       if (recomputed != null) {
         updateData['subscription.overageLimitItems'] = recomputed;
+      }
+    }
+
+    // A brand-new subscription starts capped at its base fee unless the account
+    // already has a cap. The webhook writes the same default; doing it here too
+    // means a webhook that never lands can't leave a new customer uncapped.
+    if (!existingSub) {
+      const cap = defaultOverageCapFor(planId, userData?.subscription);
+      if (cap) {
+        updateData['subscription.overageLimitUsd'] = cap.overageLimitUsd;
+        updateData['subscription.overageLimitItems'] = cap.overageLimitItems;
       }
     }
 
