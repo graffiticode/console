@@ -131,6 +131,14 @@ sponsor's cap — past the allowance it bills as the sponsor's overage — but t
 see that volume in `checkItemCreateAllowed`. An unenrolled Bronze sponsor is counted but never metered,
 so a sponsor needs a metered plan to be invoiced. Without `sponsorUid` we absorb the cost.
 
+**Sponsors get a loud warning near and at their limits.** Since nothing stops sponsored items,
+`maybeAlertSponsorLimit()` (`src/lib/sponsor-alerts.ts`) runs after each debit and fires **once per stage
+per billing period**: 80% and 100% of included items, then 80% and 100% of the spend cap (metered sponsors
+with a cap only). Each fire emails the operator (`ALERT_EMAIL_TO`) and the sponsor account's owner
+(`users/{uid}.email`, else the Stripe customer's email) through SendGrid (`src/lib/alert-email.ts`), texts
+the operator through `alert-sms.ts`, and logs `[sponsor-alert] <stage>` with a hashed uid. Dedupe state:
+`sponsor-alerts/{uid}__{periodStart}`. Unconfigured email or SMS logs the message instead of sending.
+
 Sponsorship is **uncapped**: while the flag is set every item in that language is free, and ending a
 sponsorship is a flag flip after which items bill normally with no wall and no notice. `sponsorId` is
 namespaced so a per-user or global cap — or a `client:acme` partner sponsorship — can be added later
@@ -225,6 +233,9 @@ Base + metered price ids per paid tier, resolved by `plans-config.ts`:
 `STRIPE_TEAMS_*` / `STRIPE_PLATINUM_*` equivalents; plus `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
 `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (build-time). In prod these are env vars on the `console` Cloud Run
 service (graffiticode-app).
+
+Sponsor alerts: `SENDGRID_API_KEY`, `ALERT_EMAIL_FROM` (a SendGrid-verified sender) and `ALERT_EMAIL_TO`
+(operator addresses, comma-separated); SMS reuses `TWILIO_*` and `ALERT_SMS_TO`.
 
 ## Operational scripts
 

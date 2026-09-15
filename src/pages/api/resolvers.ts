@@ -27,6 +27,7 @@ import {
   isFreePlanItemExpired,
 } from "../../lib/workspace-adoption";
 import { reportItemUsage } from "../../lib/item-metering";
+import { maybeAlertSponsorLimit } from "../../lib/sponsor-alerts";
 import { checkItemCreateAllowed } from "../../lib/usage-service";
 import { emitEvent, actor, langKey } from "../../lib/funnel-events";
 import {
@@ -38,7 +39,7 @@ import {
   maybeAlertBudget,
   recordTrialItem,
 } from "../../lib/free-plan-quota";
-import { freePlanLanguageIds, isLanguageInFreePlanScope, isLanguageSponsored, languageSponsorUid } from "../../lib/languages";
+import { freePlanLanguageIds, isLanguageInFreePlanScope, isLanguageSponsored, languageSponsor, languageSponsorUid } from "../../lib/languages";
 import { trialItemRevisionLimit } from "../../lib/plans-config";
 import { mintSessionToken, isSessionTokenConfigured } from "../../lib/free-plan-session-token";
 import { mintClaimToken } from "../../lib/claim-token";
@@ -449,11 +450,20 @@ async function debitSponsor({
     env,
     type: "item_created",
   });
-  await incrementItemCounter(sponsorUid, periodStartFor(subscription, now), now);
+  const periodStart = periodStartFor(subscription, now);
+  await incrementItemCounter(sponsorUid, periodStart, now);
   await reportItemUsage({
     subscription,
     stripeCustomerId: sponsorData?.stripeCustomerId,
     identifier: `${itemId}__${taskId}`,
+  });
+  // Nothing stops a sponsor at its limits, so warn loudly as it nears or passes them.
+  await maybeAlertSponsorLimit({
+    sponsorUid,
+    sponsorData,
+    sponsorName: languageSponsor(lang),
+    periodStart,
+    now,
   });
 }
 
