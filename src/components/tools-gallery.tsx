@@ -53,7 +53,8 @@ export default function ToolsGallery({ language, setLanguage }) {
     { keepPreviousData: true, revalidateIfStale: false },
   );
 
-  const selectedLangId = selectedLang ? languages.find(l => l.name === selectedLang)?.id : null;
+  const selectedLanguage = selectedLang ? languages.find(l => l.name === selectedLang) : null;
+  const selectedLangId = selectedLanguage?.id ?? null;
   const { data: langInfo } = useSWR(
     selectedLangId ? `https://l${selectedLangId}.graffiticode.org/language-info.json` : null,
     (url) => fetch(url).then(r => r.ok ? r.json() : null),
@@ -191,8 +192,23 @@ export default function ToolsGallery({ language, setLanguage }) {
               <div className="flex-none p-4">
                 <h2 className="text-lg font-medium text-gray-800">{selectedLang}</h2>
                 <p className="text-sm text-gray-500 mt-4 max-w-[600px]">
-                  {langInfo?.description || languages.find(l => l.name === selectedLang)?.routingHint || languages.find(l => l.name === selectedLang)?.description}
+                  {langInfo?.description || selectedLanguage?.routingHint || selectedLanguage?.description}
                 </p>
+                {selectedLanguage?.sponsor && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Sponsored by{' '}
+                    {selectedLanguage.sponsorUrl ? (
+                      <a
+                        href={selectedLanguage.sponsorUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:text-gray-600"
+                      >
+                        {selectedLanguage.sponsor}
+                      </a>
+                    ) : selectedLanguage.sponsor}
+                  </p>
+                )}
               </div>
               {/* Scrolling thumbnail grid */}
               <div className="flex-1 min-h-0 overflow-auto px-4 pb-4">

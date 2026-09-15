@@ -99,10 +99,12 @@ export interface Language {
   // tab — attribution is most of the point of sponsoring. Setting it also makes
   // the language's `status` "Sponsored" (see LANGUAGES).
   sponsor?: string;
+  // Where the "Sponsored by" footer on the Tools gallery links to.
+  sponsorUrl?: string;
 }
 
 export const LANGUAGES: Language[] = ([
-  { id: "0000", name: "L0000", description: "Functional expressions rendered as JSON (root language)", routingHint: "The root Graffiticode language that every dialect inherits from. Evaluates a closed functional program — arithmetic, strings, lists and ranges, records and tags, lambdas and let-bound helpers, pattern matching, comparisons and conditionals, map/filter/reduce — and renders the result as plain JSON. Route here only for a request to compute or transform plain values. Does NOT author content: assessments, quizzes, spreadsheets, charts, maps, diagrams, boards, flashcards and surveys belong to the dialects that extend it. No rendered UI beyond the JSON view, no side effects, and no external I/O.", domains: [], sponsor: "Artcompiler Inc.", status: "Sponsored" },
+  { id: "0000", name: "L0000", description: "Functional expressions rendered as JSON (root language)", routingHint: "The root Graffiticode language that every dialect inherits from. Evaluates a closed functional program — arithmetic, strings, lists and ranges, records and tags, lambdas and let-bound helpers, pattern matching, comparisons and conditionals, map/filter/reduce — and renders the result as plain JSON. Route here only for a request to compute or transform plain values. Does NOT author content: assessments, quizzes, spreadsheets, charts, maps, diagrams, boards, flashcards and surveys belong to the dialects that extend it. No rendered UI beyond the JSON view, no side effects, and no external I/O.", domains: [], sponsor: "Artcompiler Inc.", sponsorUrl: "https://artcompiler.com", status: "Sponsored" },
   // L0001 is DEPRECATED — retained as a repo for historical reference only. Do not re-enable.
   // { id: "0002", name: "L0002", description: "Core language", domains: [] },
   { id: "0003", name: "L0003", description: "Hello, image, theme, and print", domains: [], hidden: true },
