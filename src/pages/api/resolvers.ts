@@ -102,6 +102,11 @@ async function assertItemCreateAllowed(auth: AuthArg, lang?: string): Promise<vo
   if (auth.freePlan && !isLanguageInFreePlanScope(lang)) {
     throw buildScopeError(lang, freePlanLanguageIds());
   }
+  // A sponsored item never counts against the allowance (units: 0), so a wall
+  // reached by billable items must not refuse it. Uncapped by decision — a cap
+  // would be evaluated against the `sponsorId` rows. The trial keeps its gate:
+  // sponsored trial items still count toward pace.
+  if (!auth.freePlan && isLanguageSponsored(lang)) return;
   const gate = await checkItemCreateAllowed(auth.uid, {
     failClosed: auth.freePlan,
     // The trial account runs at its full allowance every month by design, so

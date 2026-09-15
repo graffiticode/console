@@ -75,12 +75,12 @@ export interface Language {
   // enabling it is then a reversible data change (mark the set) rather than a
   // release. See freePlanLanguageIds() / isLanguageInFreePlanScope().
   freePlan?: boolean;
-  // Sponsored: items created in this language are free to the customer — not
+  // Sponsor: items created in this language are free to the customer — not
   // metered to Stripe and not counted against the plan allowance. Used to carry
   // the cost of a language we're promoting.
   //
   // Distinct from `freePlan` above, and the two answer different questions:
-  // `freePlan` asks "may an ANONYMOUS caller create this at all", `sponsored`
+  // `freePlan` asks "may an ANONYMOUS caller create this at all", `sponsor`
   // asks "who pays for it once created". They compose without interacting — an
   // anonymous trial item in a sponsored language is simply free twice over.
   //
@@ -95,15 +95,14 @@ export interface Language {
   // cannot elect into it. The same idea keyed on `client` would be a billing
   // bypass — `client` is caller-supplied. See isLanguageSponsored().
   //
-  // `by` is the sponsor's display name, shown to the customer on the Usage tab —
-  // attribution is most of the point of sponsoring. An object rather than a bare
-  // boolean because that is also where a budget lands if sponsorship ever gains
-  // one (`{ by, items }`), with no call-site churn.
-  sponsored?: { by: string };
+  // The value is the sponsor's display name, shown to the customer on the Usage
+  // tab — attribution is most of the point of sponsoring. Setting it also makes
+  // the language's `status` "Sponsored" (see LANGUAGES).
+  sponsor?: string;
 }
 
-export const LANGUAGES: Language[] = [
-  { id: "0000", name: "L0000", description: "Root language", domains: [], sponsored: { by: "Artcompiler Inc." }, status: "Internal", internal: true },
+export const LANGUAGES: Language[] = ([
+  { id: "0000", name: "L0000", description: "Root language", domains: [], sponsor: "Artcompiler Inc.", status: "Sponsored" },
   // L0001 is DEPRECATED — retained as a repo for historical reference only. Do not re-enable.
   // { id: "0002", name: "L0002", description: "Core language", domains: [] },
   { id: "0003", name: "L0003", description: "Hello, image, theme, and print", domains: [], hidden: true },
@@ -231,7 +230,9 @@ export const LANGUAGES: Language[] = [
   //
   // `domains: ["surveys"]` introduces that domain; L0182 is currently its only member.
   { id: "0182", name: "L0182", description: "Collective-intelligence surveys", routingHint: "Collective-intelligence surveys, also called group ideation, brainstorming or idea ranking: a named set of ideas someone is asked to choose between, and the response to it — the ideas they chose, in priority order, plus at most one new idea of their own that was not already in the set. Route here for recording and prioritizing what someone picked out of a group's shared pool of ideas — which issues matter most, what the team should focus on next, what would improve this — where the options come from the group rather than from an author, and the point is which ones are favoured and in what order. The program reads its own set of ideas from a JSON or CSV dataset over HTTP, with `ideas fetch \"<url>\"`, at the moment it compiles — so a request needs the address the ideas live at. The ideas are never invented, and L0182 does NOT hold a pool, sample it, or re-read a dataset once a program has compiled. A program is one set of ideas and at most one response to it. It does NOT implement a survey-taking flow — there are no screens, steps, navigation or submission, and nothing walks a participant through anything. The response is written as code, by a person editing the program or by an AI agent, and the rendered view only displays the set beside what came back. Do NOT route a request for a fillable form, a live survey to send round, or anything a respondent is meant to complete in a browser: that is not built yet, in this or any dialect, so say so rather than substituting this one. It does NOT aggregate across respondents — no group ranking, tally, score or live result — and it never analyses responses: significance testing, clustering and sentiment analysis are out of scope. This is NOT an assessment language and does NOT score anyone: a survey response is never right or wrong, and there is no answer key, no points and no marking. Do NOT route a quiz, test, exam, practice question, comprehension check or any question with a correct answer here — that is L0180. Conventional questionnaires are not built yet: Likert scales, rating and satisfaction questions, demographics, free-text surveys with fixed questions, contact or sign-up forms and branching questionnaire logic are not built, so do not route those here. Ranking anything other than a line of text is not built yet, and nothing here enforces one response per person.", domains: ["surveys"], status: "Beta" },
-];
+] as Language[])
+  // A sponsored language's status is always "Sponsored", whatever its entry says.
+  .map(l => l.sponsor ? { ...l, status: "Sponsored" } : l);
 
 export function findLanguageById(id: string): Language | undefined {
   const normalized = id.replace(/^L/i, "").padStart(4, "0");
@@ -436,11 +437,11 @@ export function isLanguageInFreePlanScope(lang: string | undefined | null): bool
 }
 
 /**
- * Language ids whose items are currently sponsored — see `sponsored` on the
+ * Language ids whose items are currently sponsored — see `sponsor` on the
  * Language type. Empty when no sponsorship is running, which is the default.
  */
 export function sponsoredLanguageIds(): string[] {
-  return LANGUAGES.filter(l => l.sponsored).map(l => l.id);
+  return LANGUAGES.filter(l => l.sponsor).map(l => l.id);
 }
 
 /**
@@ -463,5 +464,5 @@ export function languageSponsor(lang: string | undefined | null): string | null 
   if (!lang) return null;
   // Callers pass either "0166" or "L0166".
   const id = String(lang).replace(/^L/i, "");
-  return LANGUAGES.find(l => l.id === id)?.sponsored?.by ?? null;
+  return LANGUAGES.find(l => l.id === id)?.sponsor ?? null;
 }
