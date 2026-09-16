@@ -164,6 +164,13 @@ and evaluated against rows that already exist.
   `overageLimitItems` from `overageLimitUsd`** at the new rate (`quick-subscribe.ts`) — carrying the item
   count across would silently move the dollar ceiling the customer agreed to. UI: the spend-cap control in
   `components/payments/UsageMonitor.tsx`.
+- **Per-account included-items grant** (`subscription.includedItemsOverride` +
+  `includedItemsOverridePlan`, set by `scripts/set-included-items.ts`): e.g. Silver at 1,000 instead of 500.
+  `effectiveIncludedItems()` adds the extra, so gate, usage page and billing page follow. Stripe's graduated
+  meter price still frees only the plan's bucket, so `reportItemUsage()` withholds the period's items
+  `planIncluded+1 … override` from the meter (`grantCoversItem()`). Inert once the account changes plan, or
+  after `includedItemsOverrideUntil` (`--this-cycle` sets it to the current period end).
+  `reconcile-item-metering.ts` will show those withheld items as unreported.
 
 ## Downgrades
 
@@ -266,6 +273,10 @@ npx tsx scripts/reconcile-subscriptions.ts [--apply]
 # change recomputes it, a rate change under a plan they never left does not.
 npx tsx scripts/recompute-overage-caps.ts [--apply] [--uid <uid>] [--allow-zero]
   [--previous-rates demo=0.2,pro=0.1,teams=0.05,platinum=0.025]
+
+# Bump one account's included items above its plan (scoped to its current plan; free in Stripe too).
+npx tsx scripts/set-included-items.ts --uid <uid> --items 1000 [--this-cycle] [--apply]
+npx tsx scripts/set-included-items.ts --uid <uid> --clear [--apply]
 ```
 
 Notes / gotchas:

@@ -381,12 +381,13 @@ function periodStartFor(subscription: { currentPeriodStart?: string | number } |
 
 // Increment an account's monthly item counter, resetting at its billing-period
 // boundary (mirrors logCompile). currentMonthTotal is the item count for the period.
+// Returns the new count (from the snapshot, so approximate under concurrency).
 async function incrementItemCounter(
   uid: string,
   periodStart: Date,
   now: Date,
   usageDoc?: admin.firestore.DocumentSnapshot,
-) {
+): Promise<number> {
   const ref = db.collection("usage").doc(uid);
   const doc = usageDoc ?? await ref.get();
   const lastReset = doc.exists && doc.data()?.lastReset ? new Date(doc.data()?.lastReset) : null;
@@ -395,13 +396,14 @@ async function incrementItemCounter(
       currentMonthTotal: admin.firestore.FieldValue.increment(1),
       lastUpdated: now.toISOString(),
     });
-  } else {
-    await ref.set({
-      currentMonthTotal: 1,
-      lastReset: periodStart.toISOString(),
-      lastUpdated: now.toISOString(),
-    });
+    return (doc.data()?.currentMonthTotal || 0) + 1;
   }
+  await ref.set({
+    currentMonthTotal: 1,
+    lastReset: periodStart.toISOString(),
+    lastUpdated: now.toISOString(),
+  });
+  return 1;
 }
 
 /**
@@ -451,11 +453,12 @@ async function debitSponsor({
     type: "item_created",
   });
   const periodStart = periodStartFor(subscription, now);
-  await incrementItemCounter(sponsorUid, periodStart, now);
+  const periodItemCount = await incrementItemCounter(sponsorUid, periodStart, now);
   await reportItemUsage({
     subscription,
     stripeCustomerId: sponsorData?.stripeCustomerId,
     identifier: `${itemId}__${taskId}`,
+    periodItemCount,
   });
   // Nothing stops a sponsor at its limits, so warn loudly as it nears or passes them.
   await maybeAlertSponsorLimit({
@@ -587,8 +590,9 @@ export async function recordBillableItem({
     // The usage doc is created by the first billable item and never deleted, so
     // its absence is the account's first-ever item (not merely first this period).
     const firstForAccount = !usageDoc.exists;
+    let periodItemCount: number | undefined;
     if (billable) {
-      await incrementItemCounter(auth.uid, periodStartFor(subscription, now), now, usageDoc);
+      periodItemCount = await incrementItemCounter(auth.uid, periodStartFor(subscription, now), now, usageDoc);
     }
 
     emitEvent("item_created", {
@@ -633,6 +637,7 @@ export async function recordBillableItem({
       subscription,
       stripeCustomerId: userData?.stripeCustomerId,
       identifier: `${itemId}__${taskId}`,
+      periodItemCount,
     });
   } catch (error) {
     console.error("recordBillableItem()", "ERROR", itemId, taskId, error);
