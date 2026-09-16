@@ -442,7 +442,19 @@ const resolvers = {
     },
     languages: async (_, args) => {
       const { search, domain } = args;
-      return await listLanguages({ search, domain });
+      // Internal dialects never belong in the CATALOG, which is what an agent routes
+      // against: L0010 plans compositions and L0013 makes thumbnails, and neither is
+      // a content-authoring target. They were reachable here because listLanguages()
+      // filters `hidden` and `Deprecated` but not `internal` — invisible while no
+      // search matched their text, and `keywords` made matches more likely ("mind map"
+      // reached L0010, whose hint says it "maps a request to a language sequence").
+      //
+      // Filtered at this boundary rather than inside listLanguages() because the
+      // router also uses that function to LOOK UP a language by id, internal ones
+      // included; removing them there would quietly degrade those lookups. The
+      // router already excludes internal from its own candidate list.
+      const languages = await listLanguages({ search, domain });
+      return languages.filter((l) => !l.internal);
     },
     language: async (_, args) => {
       const { id } = args;
