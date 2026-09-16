@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
-import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, type PlanId, type BillingInterval } from '../../../lib/plans-config';
+import { STRIPE_API_VERSION, stripeBasePriceId, stripeMeterPriceId, getPlan, defaultOverageCapUsd, type PlanId, type BillingInterval } from '../../../lib/plans-config';
 import { emitEvent, actor } from '../../../lib/funnel-events';
 import { requireUser } from '../../../lib/api-auth';
 
@@ -42,16 +42,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? 'monthly'
       : (interval as BillingInterval);
 
-    // A spend cap is REQUIRED to enroll: the customer is putting a card behind a
+    // Enrollment is never uncapped: the customer is putting a card behind a
     // $0-base plan, and "unlimited by default" there is how a trial user gets a
-    // four-figure surprise. Paid tiers keep their existing opt-in cap semantics.
+    // four-figure surprise. No cap sent means the plan default ($10 on Bronze).
     let enrollmentCapUsd: number | null = null;
     if (isPayAsYouGoEnrollment) {
-      const usd = Number(overageLimitUsd);
-      if (!Number.isFinite(usd) || usd <= 0) {
+      const usd = overageLimitUsd == null || overageLimitUsd === ''
+        ? defaultOverageCapUsd(planId)
+        : Number(overageLimitUsd);
+      if (usd == null || !Number.isFinite(usd) || usd <= 0) {
         return res.status(400).json({
-          error: 'A monthly spend cap is required',
-          details: 'Pass overageLimitUsd as a positive dollar amount.',
+          error: 'Invalid monthly spend cap',
+          details: 'Pass overageLimitUsd as a positive dollar amount, or omit it for the default.',
         });
       }
       enrollmentCapUsd = usd;

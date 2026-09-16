@@ -341,7 +341,20 @@ export async function classifyAndRoute({
         messages: [
           {
             role: "user",
-            content: `A user asked language L${currentLang} to create this:
+            // "sent this request to", not "asked … to CREATE this".
+            //
+            // The frame is evidence to the classifier, and "create" asserted a verb
+            // the request never used. For most languages that is harmless — creating
+            // a spreadsheet IS the request — but a language whose purpose is acting
+            // on something that already exists gets the frame arguing against it:
+            // L0182 takes a survey the back end holds and cannot author one, so
+            // "Take the you-can-choose survey." reached the model as a request to
+            // CREATE a survey and matched L0182's own out-of-scope clause forbidding
+            // exactly that. Measured on 13 cases, 2026-09-11: the neutral frame flips
+            // that refusal (and "Answer the city-budget survey for me.") to in-scope
+            // and changes no other verdict — the authoring request stays refused, and
+            // every cross-language reroute lands where it did before.
+            content: `A user sent this request to language L${currentLang}:
 "${askText}"
 ${sourceText ? `
 The user also pasted the following SOURCE MATERIAL below that request. It is

@@ -49,8 +49,8 @@ const rate = (id: PlanId) => {
 // The framing that page settles on, and that these cards carry:
 //   - every tier is a FLAT per-item rate with a monthly minimum, so the included
 //     bucket costs the same per item as anything above it — no overage penalty;
-//   - Bronze's included 25 need no card at all. A card (and a required spend
-//     cap) buys ADDITIONAL items, nothing else;
+//   - Bronze's included 25 need no card at all. A card (with a spend cap,
+//     $10 by default) buys ADDITIONAL items, nothing else;
 //   - you move up a tier exactly when it lowers your per-item cost.
 export const plans: Plan[] = [
   {

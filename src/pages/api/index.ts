@@ -304,8 +304,8 @@ const typeDefs = `
   type Mutation {
     logCompile(units: Int, id: String!, status: String!, timestamp: String!, data: String!): String!
     postTask(lang: String!, code: String!, ephemeral: Boolean, item: String): String!
-    generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
-    startCodeGeneration(itemId: String, siblingOf: String, lang: String!, name: String, client: String, clientKind: String, geoCountry: String, prompt: String!, modification: String!, currentSrc: String): GenerationJob!
+    generateCode(prompt: String!, language: String!, options: CodeGenerationOptions, currentSrc: String, currentData: String, conversationSummary: ConversationSummaryInput, itemId: String): GeneratedCode!
+    startCodeGeneration(itemId: String, siblingOf: String, lang: String!, name: String, client: String, clientKind: String, geoCountry: String, prompt: String!, modification: String!, currentSrc: String, currentData: String): GenerationJob!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
@@ -474,9 +474,23 @@ const resolvers = {
   Mutation: {
     generateCode: async (_, args, ctx) => {
       const auth = await resolveAuth(ctx);
-      const { prompt, language, options, currentSrc, conversationSummary, itemId } = args;
+      const { prompt, language, options, currentSrc, currentData, conversationSummary, itemId } = args;
+      // What `currentSrc` compiled to, as the client already had it (a JSON
+      // string — the schema has no JSON scalar, and every other data-shaped
+      // field here travels the same way). CONTEXT ONLY: some dialects keep
+      // values outside the program, so the source alone cannot answer an edit
+      // about them. Unparseable means no context, never a failed generation —
+      // it decorates the prompt, so it must not be able to break it.
+      let parsedCurrentData: unknown = null;
+      if (typeof currentData === "string" && currentData.length > 0) {
+        try {
+          parsedCurrentData = JSON.parse(currentData);
+        } catch {
+          parsedCurrentData = null;
+        }
+      }
       try {
-        return await generateCodeForRequest({ auth, prompt, language, options, currentSrc, conversationSummary, itemId });
+        return await generateCodeForRequest({ auth, prompt, language, options, currentSrc, currentData: parsedCurrentData, conversationSummary, itemId });
       } catch (error) {
         if (error instanceof FreePlanError) throw error;
         console.error("Error in generateCode mutation:", error);
@@ -500,6 +514,7 @@ const resolvers = {
         prompt,
         modification,
         currentSrc,
+        currentData,
       } = args;
 
       // The agent OMTM counts a workspace's FIRST create attempt, any outcome.
@@ -610,6 +625,10 @@ const resolvers = {
         prompt,
         modification,
         currentSrc,
+        // Serialized JSON, passed through untouched: the worker hands it to
+        // generateCodeForRequest, which parses and renders it as <CURRENT_DATA>.
+        // Kept as a string end to end so the queue payload stays one flat shape.
+        currentData,
         authReplay,
         client,
       });

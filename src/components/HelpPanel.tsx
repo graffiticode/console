@@ -94,6 +94,8 @@ export const HelpPanel = ({
   taskId,
   itemId,
   itemVersions,
+  // What `code` compiles to, as the editor already fetched it for the Data tab.
+  compiledData,
 }) => {
   const [data, setData] = useState({});
   const messageInputRef = useRef(null);
@@ -980,6 +982,10 @@ export const HelpPanel = ({
     language,
     chatHistory: help, // Pass the current help array as chat history
     currentSrc: code, // Pass the current source from the code panel
+    // ...and what that source compiles to. A dialect can keep values outside the
+    // program — L0182 names a survey whose ideas the compiler fetches — and then
+    // an edit acting on them ("answer it") cannot be served from the source.
+    currentData: compiledData,
     itemId,
   });
 

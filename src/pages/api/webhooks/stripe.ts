@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { getFirestore } from '../../../utils/db';
 import admin from '../../../utils/db';
 import { buffer } from 'micro';
-import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, getPlan, overageDollarsToItems, DEFAULT_PLAN } from '../../../lib/plans-config';
+import { STRIPE_API_VERSION, priceIdToPlan, includedItemsFor, getPlan, overageDollarsToItems, defaultOverageCapFor, defaultOverageCapUsd, DEFAULT_PLAN } from '../../../lib/plans-config';
 import { emitPlanChanged, emitEvent, actor } from '../../../lib/funnel-events';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
@@ -230,8 +230,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Stripe stamps current_period_start = the moment of enrollment. The
         // gate (checkItemCreateAllowed) counts usage from currentPeriodStart, so
         // storing Stripe's value verbatim would make every item the customer
-        // already created this month invisible — a user who enrolls at item 50
-        // on the 20th would be handed 50 fresh included items, free, and again
+        // already created this month invisible — a user who enrolls at item 25
+        // on the 20th would be handed 25 fresh included items, free, and again
         // every month they re-enrolled. Anchor the FIRST period to the calendar
         // month they actually spent those items in. billing_cycle_anchor_config
         // (day_of_month: 1, set at Checkout) makes Stripe's own periods
@@ -255,17 +255,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'subscription.currentPeriodStart': storedPeriodStart,
           'subscription.currentPeriodEnd': periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
           'subscription.cancelAtPeriodEnd': subscription.cancel_at_period_end,
-          'subscription.updatedAt': new Date().toISOString(),
-          // Note: overageUnits field is intentionally NOT updated here - overage persists across billing cycles
-        };
+          'subscription.updatedAt': new Date().toISOString(),        };
 
         // The spend cap chosen during enrollment. It rides on the subscription's
         // metadata (not the session's) precisely so an abandoned Checkout writes
         // nothing — see create-checkout-session.ts.
+        // Checkout always sends one; the plan default covers anything that doesn't.
         const capUsdRaw = subscription.metadata?.overageLimitUsd;
-        if (isEnrollment && capUsdRaw) {
-          const capUsd = Number(capUsdRaw);
-          const capItems = Number.isFinite(capUsd) ? overageDollarsToItems(planInfo.name, capUsd) : null;
+        if (isEnrollment) {
+          const requested = Number(capUsdRaw);
+          const capUsd = capUsdRaw && requested > 0 ? requested : defaultOverageCapUsd(planInfo.name);
+          const capItems = capUsd != null ? overageDollarsToItems(planInfo.name, capUsd) : null;
           if (capItems != null) {
             updateData['subscription.overageLimitItems'] = capItems;
             updateData['subscription.overageLimitUsd'] = capUsd;
@@ -274,6 +274,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               `[stripe-webhook] subscription ${subscription.id}: could not convert enrollment cap ` +
               `"${capUsdRaw}" to items for plan ${planInfo.name}; leaving the cap unset (uncapped).`,
             );
+          }
+        }
+
+        // A new paid subscription starts capped at its base fee, unless the
+        // account already has a cap (or an explicit "no cap"). quick-subscribe
+        // writes the same default; this is the path that covers Checkout.
+        if (event.type === 'customer.subscription.created' && !isEnrollment) {
+          const cap = defaultOverageCapFor(planInfo.name, userData?.subscription);
+          if (cap) {
+            updateData['subscription.overageLimitUsd'] = cap.overageLimitUsd;
+            updateData['subscription.overageLimitItems'] = cap.overageLimitItems;
           }
         }
 

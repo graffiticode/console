@@ -6,14 +6,23 @@
  * is set from measurement rather than assumption.
  *
  * WHAT VARIES vs WHAT IS FROZEN — this is the whole design:
- *   - Today the VARIANT is the model: `options.model` is pinned (which bypasses the
- *     language's family ordering and the fast-tier small-edit downgrade), and RAG
+ *   - The VARIANT is a (model, effort) pair: `options.model` is pinned (which bypasses
+ *     the language's family ordering and the fast-tier small-edit downgrade), and RAG
  *     retrieval runs ONCE per case and the identical `precomputedExamples` go to
- *     every variant. So the model is the only thing that moves.
- *   - Results are keyed on an opaque `variantId`, not on `model`, because the other
- *     axis this repo needs is the inverse: vary the prompt template or retrieval
- *     config with the model frozen. That axis is not built here, but every other
- *     part (case loader, trial runner, CIs, judge, calibration) is axis-agnostic.
+ *     every variant.
+ *   - `--models` moves the model with effort frozen (the original axis, and the default:
+ *     with no `--efforts`, variantId IS the model id, so runs on disk stay comparable).
+ *   - `--efforts low,medium,high` moves EFFORT with the model frozen — variantId becomes
+ *     `<model>@<effort>`. Use it to answer "does thinking depth buy better code", which
+ *     `npm run corpus-sweep` structurally cannot: the sweep compares each regeneration
+ *     against the STORED corpus entry and its verdicts are match/structure, so a changed
+ *     reasoning depth registers as a hit whether the new code is better, worse or equal
+ *     — and it has no channel to report an improvement at all. Shape change is not
+ *     quality. (This is why the 2026-09-04 "low broke 3 of 18 stably-matching prompts,
+ *     zero improvements" result cannot settle the effort question; see model-priority.ts.)
+ *   - Results are keyed on an opaque `variantId`, not on `model`, which is what let the
+ *     second axis be a flag rather than a rewrite: case loader, trial runner, CIs, judge
+ *     and calibration are all axis-agnostic and were not touched to add it.
  *
  * SIGNALS
  *   objective (free, deterministic, from generateCode's return):
@@ -38,6 +47,10 @@
  *     A Claude judge ranking Claude against GPT is grading its own family, so a
  *     single-judge cross-family ordering is not defensible. Required before
  *     committing a MODEL_PRIORITY line.
+ *
+ *     NOT required for an --efforts run: every arm is the same model in the same
+ *     family, so there is no self-preference axis for a panel to expose. That drops
+ *     the most expensive part of a model eval from the effort question.
  *
  * CONVERGENCE (--converge N) — the metric that matters for a dialect whose compile rate is
  * saturated. Compiling is table stakes; Graffiticode's actual advantage is that the compiler
@@ -72,6 +85,8 @@
  *   npm run eval           -- --lang 0166 --models claude-opus-5,gpt-5.6-sol --trials 3
  *   npm run eval           -- --lang 0175 --converge 5 # agent-session mode (see CONVERGENCE)
  *   npm run eval           -- --lang 0166 --panel      # + cross-family judge panel
+ *   npm run eval           -- --lang 0179 --models claude-sonnet-5 --efforts low,medium,high --converge 5
+ *                                                      # the EFFORT axis (see WHAT VARIES)
  *   npm run eval:calibrate -- --lang 0166              # judge vs human labels
  *
  * Output is timestamped by default (--no-stamp for a fixed path), so run-over-run
@@ -85,6 +100,7 @@ import { getCredentialsForApiKey } from "../src/lib/api-credentials";
 import { judgeCode, judgePair, judgePanel, judgeModelForFamily, anchorVersion } from "../src/lib/judge-service";
 import { inferProviderFromModel, type LlmProvider } from "../src/lib/llm-models";
 import { estimateUsdCost } from "../src/lib/model-pricing";
+import { modeEffortFor } from "../src/lib/model-priority";
 import { assertHoldout } from "./eval-holdout";
 import { pickRepresentative } from "./eval-representative";
 import { verifyExampleForPrompt } from "../src/lib/lang-embedding";
@@ -132,10 +148,37 @@ interface EvalCase { id: string; prompt: string; currentCode?: string | null; de
  * than a rewrite. `model` stays alongside it because pricing and the judge panel
  * genuinely need to know which model ran.
  */
+/**
+ * One arm of the comparison. `id` is the variantId everything downstream groups on;
+ * `model` is the real model id, which pricing and the judge still need to know.
+ *
+ * With no --efforts, `id === model` — byte-comparable with every run already on disk.
+ */
+interface Variant { id: string; model: string; effort?: string }
+
+/** models × efforts, or just models when the effort axis is not in play. */
+function buildVariants(models: string[], efforts: string[]): Variant[] {
+  if (!efforts.length) return models.map((model) => ({ id: model, model }));
+  return models.flatMap((model) =>
+    efforts.map((effort) => ({ id: `${model}@${effort}`, model, effort })),
+  );
+}
+
 interface RunResult {
   lang: string; variantId: string; model: string; family?: LlmProvider; caseId: string; trial: number;
   ok: boolean; firstPass: boolean; finalCompile: boolean; fixRounds: number;
   stub: boolean;   // parsed, but emitted no content — see isStub
+  /**
+   * The generator returned NO code while still burning output tokens — the zero-output
+   * thinking spiral (`out=<cap> chars=0 stop=max_tokens` in production). Distinct from
+   * `stub`, which parsed and authored nothing, and from `!ok`, which is a thrown call.
+   *
+   * Counted because it is the failure an effort sweep most needs to price: on Sonnet 5
+   * thinking is on by default and shares the `max_tokens` ceiling with the response, so
+   * a deeper effort can spend the whole budget reasoning and emit nothing. Averaged into
+   * a rate it would hide inside firstPassRate as an ordinary miss.
+   */
+  noOutput: boolean;
   drift?: boolean; // compiled, but the wrong design — see driftedFromPrompt (undefined ⇒ unjudgeable)
   latencyMs: number; inputTokens: number; outputTokens: number; cost: number;
   code?: string;   // retained for the --judge pass; discarded from the console table
@@ -234,7 +277,8 @@ function parseArgs(argv: string[]) {
     // disk stay comparable and the new mode is always an explicit choice.
     converge: 1, fromCheckpoint: undefined as string | undefined,
     calibrateOut: undefined as string | undefined,
-    thinking: undefined as unknown, effort: undefined as string | undefined };
+    thinking: undefined as unknown, effort: undefined as string | undefined,
+    efforts: [] as string[] };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
     if (v === "--lang") { while (argv[i + 1] && !argv[i + 1].startsWith("--")) a.langs.push(argv[++i]); }
@@ -272,6 +316,22 @@ function parseArgs(argv: string[]) {
         : (() => { console.error(`--thinking must be adaptive|disabled|off (got ${t})`); process.exit(1); })();
     }
     else if (v === "--effort") a.effort = argv[++i];
+    // The EFFORT AXIS: one arm per level, model frozen. Distinct from --effort above,
+    // which is a matched CONSTANT applied identically to every arm — passing both would
+    // mean "hold effort fixed while varying it", so it is refused rather than resolved.
+    else if (v === "--efforts") a.efforts = argv[++i].split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  if (a.efforts.length && a.effort !== undefined) {
+    console.error("--effort (a matched constant) and --efforts (the axis) are mutually exclusive.");
+    process.exit(1);
+  }
+  {
+    const levels = ["low", "medium", "high", "xhigh", "max"];
+    const bad = a.efforts.filter((e) => !levels.includes(e));
+    if (bad.length) {
+      console.error(`--efforts must be from ${levels.join("|")} (got ${bad.join(",")})`);
+      process.exit(1);
+    }
   }
   a.langs = a.langs.flatMap((s) => s.split(",")).map((s) => s.trim()).filter(Boolean);
   if (!a.langs.length) { console.error("Provide at least one --lang (e.g. --lang 0166)"); process.exit(1); }
@@ -361,13 +421,17 @@ function repairPrompt(originalPrompt: string, warnings: string[]): string {
  * model that rewrites the same flawed item five times bills five turns to reach turn one's result.
  */
 async function runOne(
-  auth: any, lang: string, model: string, c: EvalCase, trial: number, precomputed: any[],
-  gen: { thinking?: unknown; effort?: string }, maxTurns = 1,
+  auth: any, lang: string, v: Variant, c: EvalCase, trial: number, precomputed: any[],
+  gen: { thinking?: unknown }, maxTurns = 1,
 ): Promise<RunResult> {
   const t0 = performance.now();
+  // The real model id — pricing, the judge's authorFamily, and the rid all want this,
+  // not the variantId, which on the effort axis is `<model>@<effort>`.
+  const model = v.model;
   const base: RunResult = {
-    lang, variantId: model, model, family: inferProviderFromModel(model),
+    lang, variantId: v.id, model, family: inferProviderFromModel(model),
     caseId: c.id, trial, ok: false, firstPass: false, finalCompile: false, stub: false,
+    noOutput: false,
     fixRounds: 0, latencyMs: 0, inputTokens: 0, outputTokens: 0, cost: 0,
     warningsFixable: 0, warningsUnfixable: 0, turns: 0,
   };
@@ -385,11 +449,15 @@ async function runOne(
       const tTurn = performance.now();
       const res: any = await generateCode({
         auth, prompt, lang, currentCode,
-        // pin model → bypasses opt-in + Haiku downgrade; thinking/effort applied
-        // identically across models for a matched comparison (undefined ⇒ API default).
-        options: { model, thinking: gen.thinking, effort: gen.effort },
-        precomputedExamples: precomputed, // identical RAG context across models
-        rid: `eval-${lang}-${model}-${c.id}-${trial}-t${turn}`,
+        // pin model → bypasses opt-in + Haiku downgrade. `effort` is the variant's on
+        // the effort axis and undefined otherwise (⇒ API default); `thinking` stays a
+        // matched constant across every arm. NOTE the resolution order in
+        // llm-generation-service: `route.effort ?? options.effort`, so a language with a
+        // MODEL_PRIORITY effort entry would silently override this pin and flatten every
+        // arm into one — asserted before the run, see assertEffortAxisReaches().
+        options: { model, thinking: gen.thinking, effort: v.effort },
+        precomputedExamples: precomputed, // identical RAG context across variants
+        rid: `eval-${lang}-${v.id}-${c.id}-${trial}-t${turn}`,
       });
       const turnLatency = performance.now() - tTurn;
       const inputTokens = res?.usage?.input_tokens ?? 0;
@@ -401,6 +469,11 @@ async function runOne(
       // a first-pass win — the metric would reward emitting nothing.
       const stub = isStub(res?.code);
       const compiled = !!res?.taskId && !!res?.code && !stub;
+      // No code at all, with tokens spent: generateCode's empty-generation return
+      // (`code: null, taskId: null` + errors). Recorded on the opening move only —
+      // a repair turn producing nothing is the fix pass failing, which `turns` and the
+      // residual warnings already describe.
+      if (turn === 1 && !res?.code && outputTokens > 0) acc.noOutput = true;
       const fixRounds = res?.fixAttempts ?? 0;
       const next = typeof res?.code === "string" ? res.code : undefined;
       const prevFixable = report.fixable.length;
@@ -496,6 +569,7 @@ function summarize(runs: RunResult[]) {
     const first = rs.filter((r) => r.firstPass).length;
     const final = rs.filter((r) => r.finalCompile).length;
     const stubs = rs.filter((r) => r.stub).length;
+    const noOutput = rs.filter((r) => r.noOutput).length;
     // Drift is rated over the JUDGEABLE runs only, not over n. A language with no
     // embedding hook produces all-undefined, and dividing by n would print 0% —
     // "no drift" and "never checked" must not look the same.
@@ -512,6 +586,7 @@ function summarize(runs: RunResult[]) {
     rows.push({
       lang, variantId, model, family: rs[0].family, runs: n, errors: n - ok.length,
       firstPassRate: first / n, finalRate: final / n, stubRate: stubs / n,
+      noOutputRate: noOutput / n, noOutputRuns: noOutput,
       driftRate: judgeable.length ? drifted / judgeable.length : null, driftJudged: judgeable.length,
       convergedRate: converged / n,
       avgTurnsToClean: cleanTurns.length ? cleanTurns.reduce((s, t) => s + t, 0) / cleanTurns.length : null,
@@ -563,16 +638,80 @@ function summarize(runs: RunResult[]) {
 
 }
 
+/**
+ * PAIRED per-case comparison — the readout the effort axis actually needs.
+ *
+ * Two independent rate columns is the wrong test here: every arm ran the SAME cases with
+ * the SAME retrieval, and effort moves outcomes far less than a model swap does, so
+ * comparing two Wilson intervals throws away the pairing and needs many more trials to
+ * see a real gap. Differencing within a case removes the case's own difficulty — by far
+ * the largest source of variance in this harness — and the bootstrap over cases is then
+ * a CI on the thing being decided: "is this arm better, and by how much".
+ *
+ * Reported for every unordered variant pair, so it also serves a 3-model run. A CI that
+ * spans zero is stated as such rather than left for the reader to notice: "no measured
+ * difference at this n" is a legitimate and common outcome, and it is the one most often
+ * misread as "the cheaper arm is fine".
+ */
+function printPaired(runs: RunResult[], converge: number) {
+  const variants = [...new Set(runs.map((r) => r.variantId))];
+  if (variants.length < 2) return;
+  // Headline metric follows the mode, for the reason --converge exists: on a dialect whose
+  // compile rate is saturated, first-pass compile cannot separate arms and the item reached
+  // after feeding warnings back can.
+  const metric = converge > 1
+    ? { name: "converged", of: (r: RunResult) => (r.converged ? 1 : 0) }
+    : { name: "first-pass", of: (r: RunResult) => (r.firstPass ? 1 : 0) };
+  const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  // Per (case, variant): average over trials first, so a case counts once however many
+  // trials it got and an unbalanced run cannot weight one case more heavily.
+  const cell = new Map<string, RunResult[]>();
+  for (const r of runs) {
+    const k = `${r.lang}|${r.caseId}|${r.variantId}`;
+    (cell.get(k) ?? cell.set(k, []).get(k)!).push(r);
+  }
+  const caseKeys = [...new Set(runs.map((r) => `${r.lang}|${r.caseId}`))];
+
+  console.log(`\nPaired per-case deltas (same case, same retrieval; ${metric.name} and $/run):`);
+  console.log(["pair", "cases", `Δ${metric.name}`, "95% CI", "Δ$/run"].map((h, i) => h.padEnd([44, 7, 12, 22, 10][i])).join(""));
+  for (const [a, b] of allPairs(variants)) {
+    const rows: { d: number; dc: number }[] = [];
+    for (const ck of caseKeys) {
+      const ra = cell.get(`${ck}|${a}`), rb = cell.get(`${ck}|${b}`);
+      if (!ra?.length || !rb?.length) continue; // a case only one arm reached is not a pair
+      rows.push({
+        d: mean(rb.map(metric.of)) - mean(ra.map(metric.of)),
+        dc: mean(rb.map((r) => r.cost)) - mean(ra.map((r) => r.cost)),
+      });
+    }
+    if (!rows.length) continue;
+    const dMean = mean(rows.map((r) => r.d));
+    const [lo, hi] = bootstrapCI(rows, (rs) => mean(rs.map((r) => r.d)));
+    const dCost = mean(rows.map((r) => r.dc));
+    const sign = (x: number, digits = 0) => (x >= 0 ? "+" : "") + (100 * x).toFixed(digits) + "%";
+    console.log([
+      `${b} − ${a}`.slice(0, 42).padEnd(44),
+      String(rows.length).padEnd(7),
+      sign(dMean).padEnd(12),
+      `[${sign(lo, 1)}, ${sign(hi, 1)}]`.padEnd(22),
+      ((dCost >= 0 ? "+$" : "-$") + Math.abs(dCost).toFixed(4)).padEnd(10),
+    ].join(""));
+    if (lo <= 0 && hi >= 0) {
+      console.log(`    CI spans zero — no measured difference in ${metric.name} at this n. Decide on cost/latency, or add trials.`);
+    }
+  }
+}
+
 function printTable(rows: any[]) {
   const pct = (x: number) => (100 * x).toFixed(0) + "%";
   const ms = (x: number) => (x / 1000).toFixed(1) + "s";
   console.log(
     "\n" +
-    ["lang", "model", "runs", "err", "1st-pass", "final", "conv", "turns", "warn", "drift", "p50", "p90", "$/run", "$/conv"]
+    ["lang", "variant", "runs", "err", "1st-pass", "final", "conv", "turns", "warn", "drift", "p50", "p90", "$/run", "$/conv"]
       .map((h, i) => h.padEnd([6, 26, 5, 4, 9, 7, 6, 6, 6, 7, 7, 7, 8, 8][i])).join(""));
   for (const r of rows) {
     console.log([
-      r.lang.padEnd(6), r.model.padEnd(26), String(r.runs).padEnd(5), String(r.errors).padEnd(4),
+      r.lang.padEnd(6), r.variantId.padEnd(26), String(r.runs).padEnd(5), String(r.errors).padEnd(4),
       pct(r.firstPassRate).padEnd(9), pct(r.finalRate).padEnd(7),
       pct(r.convergedRate).padEnd(6),
       // Mean turns among runs that DID converge — blank when none did.
@@ -593,8 +732,21 @@ function printTable(rows: any[]) {
     console.log("\nDefects in the opening item (compiler warnings before any repair turn):");
     for (const r of rows) {
       const parts = Object.entries(r.defectsFirstTurn || {}).sort((a, b) => b[1] - a[1]).map(([b, k]) => `${b}=${k}`);
-      console.log(`  ${r.model.padEnd(20)} ${parts.length ? parts.join("  ") : "none"}`);
+      console.log(`  ${r.variantId.padEnd(20)} ${parts.length ? parts.join("  ") : "none"}`);
     }
+  }
+
+  // Its own line rather than a column: it is normally zero, and when it is not it is the
+  // headline, not a rate to scan past. A variant that returns NO CODE has not lost a
+  // point of compile rate — it has failed to answer, and on the effort axis that is the
+  // specific risk being priced (thinking shares the max_tokens ceiling with the answer).
+  const spirals = rows.filter((r) => r.noOutputRuns > 0);
+  if (spirals.length) {
+    console.log("\nZERO-OUTPUT runs (generator returned no code while spending output tokens):");
+    for (const r of spirals) {
+      console.log(`  ${r.variantId.padEnd(26)} ${r.noOutputRuns}/${r.runs} (${(100 * r.noOutputRate).toFixed(0)}%)`);
+    }
+    console.log("  Cross-check the `think=` field on the [code-gen] line for these rids — `think=never` means the whole budget went to reasoning.");
   }
 
   const unfixable = rows.reduce((s, r) => s + r.avgWarningsUnfixable, 0);
@@ -658,7 +810,14 @@ async function runJudge(runs: RunResult[], args: any) {
   const rep = repCode(runs);
   const prompts = promptMap(args.setDir, args.langs);
   const caseKeys = [...new Set(runs.map((r) => `${r.lang}|${r.caseId}`))];
-  const variants: string[] = args.models;
+  // From the RUNS, not from args.models: on the effort axis a variantId is
+  // `<model>@<effort>`, and the judge must rank each arm separately. Reading it back
+  // off the results also means a resumed --from-checkpoint run judges what it has.
+  const variants: string[] = [...new Set(runs.map((r) => r.variantId))];
+  // variantId → real model id. `inferProviderFromModel` needs a model, and a variantId
+  // is only sometimes one; feeding it `claude-sonnet-5@low` returns no family, which
+  // would silently break the panel's self-preference arithmetic.
+  const modelOf = new Map(runs.map((r) => [r.variantId, r.model]));
 
   const pointwise: any[] = [];
   const panels: any[] = [];
@@ -672,7 +831,8 @@ async function runJudge(runs: RunResult[], args: any) {
     for (const variantId of variants) {
       const code = rep.get(`${lang}|${caseId}|${variantId}`);
       if (!code) continue;
-      const authorFamily = inferProviderFromModel(variantId);
+      const model = modelOf.get(variantId) ?? variantId;
+      const authorFamily = inferProviderFromModel(model);
 
       if (args.panel) {
         // One judge per family. Recorded per judge so self-preference can be
@@ -682,7 +842,7 @@ async function runJudge(runs: RunResult[], args: any) {
         process.stderr.write(pv.scored.length ? (pv.agreed ? "=" : "≠") : "!");
         for (const e of pv.scored) {
           pointwise.push({
-            lang, caseId, variantId, model: variantId, authorFamily,
+            lang, caseId, variantId, model, authorFamily,
             judge: e.judge, judgeModel: e.model,
             correctness: e.verdict!.correctness,
             instructionFollowing: e.verdict!.instructionFollowing,
@@ -700,7 +860,7 @@ async function runJudge(runs: RunResult[], args: any) {
         const v = await judgeCode({ prompt, code, lang });
         process.stderr.write(v ? "." : "!");
         if (v) pointwise.push({
-          lang, caseId, variantId, model: variantId, authorFamily,
+          lang, caseId, variantId, model, authorFamily,
           judge: inferProviderFromModel(v.model), judgeModel: v.model,
           correctness: v.correctness, instructionFollowing: v.instructionFollowing,
           idiomaticity: v.idiomaticity, overall: v.overall,
@@ -1096,6 +1256,10 @@ async function main() {
     if (!runs.length) { console.error(`Checkpoint is empty: ${args.fromCheckpoint}`); process.exit(1); }
     const summary = summarize(runs);
     printTable(summary);
+    // Same paired readout as a live run: a resumed sweep should not be harder to read
+    // than the one it resumes. `converge` comes from the flags, matching how the rows
+    // were produced.
+    printPaired(runs, args.converge);
     // Recomputed from the stored code rather than read off the payload, so an agreement fix
     // applies retroactively to sweeps already on disk (the same reason defectsFirstTurn
     // re-derives its buckets from the raw messages).
@@ -1138,6 +1302,35 @@ async function main() {
   if (!holdoutOk) process.exit(1);
   if (args.holdoutOnly) { console.error("[holdout] gate only — no generation run."); return; }
 
+  // GATE 2, and for the same reason as the hold-out: a run that cannot measure what it
+  // claims to must fail BEFORE it spends, not be discovered in a flat results table.
+  //
+  // Effort resolves as `route.effort ?? options.effort` (llm-generation-service), and
+  // `route.effort` is the language's MODEL_PRIORITY entry — so a language that states an
+  // effort WINS over this harness's per-variant pin, and every arm silently runs at the
+  // table's level. The failure mode is the worst kind: a clean, balanced, expensive run
+  // reporting that effort makes no difference, which is exactly the answer it can no
+  // longer see. No language sets one today; this is here for the day one does.
+  const variants = buildVariants(args.models, args.efforts);
+  if (args.efforts.length) {
+    const pinned = args.langs.flatMap((lang) =>
+      (["create", "repair"] as const)
+        .map((mode) => ({ lang, mode, effort: modeEffortFor(lang, mode) }))
+        .filter((x) => x.effort !== undefined),
+    );
+    if (pinned.length) {
+      console.error(
+        "\n[efforts] REFUSING to run: these languages set effort in MODEL_PRIORITY, which " +
+        "overrides the per-variant pin (route.effort ?? options.effort), so every arm would " +
+        "run at the same level:\n" +
+        pinned.map((x) => `  L${x.lang} ${x.mode} → ${x.effort}`).join("\n") +
+        "\nRemove the entry (or eval a different language) before measuring the effort axis.",
+      );
+      process.exit(1);
+    }
+    console.error(`[efforts] axis active: ${variants.map((v) => v.id).join(", ")}`);
+  }
+
   const apiKey = process.env.EVAL_API_KEY;
   if (!apiKey) { console.error("Set EVAL_API_KEY (a dedicated eval account's api key) in .env.local"); process.exit(1); }
   const creds = await getCredentialsForApiKey(apiKey);
@@ -1164,13 +1357,13 @@ async function main() {
     // as whatever it happened to be when the run finished.
     const fingerprint = await dialectFingerprint(lang);
     console.error(`[${lang}] dialect ${formatFingerprint(fingerprint)}`);
-    console.error(`\n[${lang}] ${cases.length} cases × ${args.models.length} models × ${args.trials} trials`);
+    console.error(`\n[${lang}] ${cases.length} cases × ${variants.length} variants × ${args.trials} trials`);
     for (const c of cases) {
       // Retrieve RAG examples ONCE, reuse for every model (isolation).
       const precomputed = (await getRelevantExamples({ prompt: c.prompt, lang, limit: args.limit, rid: null })) || [];
-      for (const model of args.models) {
+      for (const v of variants) {
         for (let t = 0; t < args.trials; t++) {
-          const r = await runOne(auth, lang, model, c, t, precomputed, { thinking: args.thinking, effort: args.effort }, args.converge);
+          const r = await runOne(auth, lang, v, c, t, precomputed, { thinking: args.thinking }, args.converge);
           r.dialect = fingerprint;
           allRuns.push(r);
           try { appendFileSync(ckptPath, JSON.stringify(r) + "\n"); } catch { /* never fail a run over a checkpoint write */ }
@@ -1196,6 +1389,7 @@ async function main() {
 
   const summary = summarize(allRuns);
   printTable(summary);
+  printPaired(allRuns, args.converge);
   console.log(
     args.converge > 1
       ? "Legend: <n> converged in n turn(s)  'w' warnings remained (budget or stuck)  'd' off-design (facet drift)  's' stub (authored nothing)  'x' never compiled  '!' error"

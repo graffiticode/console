@@ -89,12 +89,12 @@ export interface Language {
   // enabling it is then a reversible data change (mark the set) rather than a
   // release. See freePlanLanguageIds() / isLanguageInFreePlanScope().
   freePlan?: boolean;
-  // Sponsored: items created in this language are free to the customer — not
+  // Sponsor: items created in this language are free to the customer — not
   // metered to Stripe and not counted against the plan allowance. Used to carry
   // the cost of a language we're promoting.
   //
   // Distinct from `freePlan` above, and the two answer different questions:
-  // `freePlan` asks "may an ANONYMOUS caller create this at all", `sponsored`
+  // `freePlan` asks "may an ANONYMOUS caller create this at all", `sponsor`
   // asks "who pays for it once created". They compose without interacting — an
   // anonymous trial item in a sponsored language is simply free twice over.
   //
@@ -109,20 +109,26 @@ export interface Language {
   // cannot elect into it. The same idea keyed on `client` would be a billing
   // bypass — `client` is caller-supplied. See isLanguageSponsored().
   //
-  // `by` is the sponsor's display name, shown to the customer on the Usage tab —
-  // attribution is most of the point of sponsoring. An object rather than a bare
-  // boolean because that is also where a budget lands if sponsorship ever gains
-  // one (`{ by, items }`), with no call-site churn.
-  sponsored?: { by: string };
+  // The value is the sponsor's display name, shown to the customer on the Usage
+  // tab — attribution is most of the point of sponsoring. Setting it also makes
+  // the language's `status` "Sponsored" (see LANGUAGES).
+  sponsor?: string;
+  // Where the "Sponsored by" footer on the Tools gallery links to.
+  sponsorUrl?: string;
+  // The account that pays for this language's items: each one is debited from
+  // its allowance and metered to its Stripe customer, past any cap. Unset means
+  // we absorb the cost.
+  sponsorUid?: string;
 }
 
-export const LANGUAGES: Language[] = [
-  { id: "0000", name: "L0000", description: "Root language", domains: [], sponsored: { by: "Artcompiler Inc." }, status: "Internal", internal: true },
+export const LANGUAGES: Language[] = ([
+  { id: "0000", name: "L0000", description: "Functional expressions rendered as JSON (root language)", routingHint: "The root Graffiticode language that every dialect inherits from. Evaluates a closed functional program — arithmetic, strings, lists and ranges, records and tags, lambdas and let-bound helpers, pattern matching, comparisons and conditionals, map/filter/reduce — and renders the result as plain JSON. Route here only for a request to compute or transform plain values. Does NOT author content: assessments, quizzes, spreadsheets, charts, maps, diagrams, boards, flashcards and surveys belong to the dialects that extend it. No rendered UI beyond the JSON view, no side effects, and no external I/O.", domains: [], sponsor: "Artcompiler Inc.", sponsorUrl: "https://artcompiler.com", sponsorUid: "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1", status: "Sponsored" },
   // L0001 is DEPRECATED — retained as a repo for historical reference only. Do not re-enable.
   // { id: "0002", name: "L0002", description: "Core language", domains: [] },
   { id: "0003", name: "L0003", description: "Hello, image, theme, and print", domains: [], hidden: true },
   { id: "0010", name: "L0010", description: "Composition planner (internal)", routingHint: "Internal composition-planning dialect: maps a request to an ordered language sequence (`plan [...]` → { langs }). Not a content-authoring target.", domains: [], status: "Internal", internal: true },
   { id: "0013", name: "L0013", description: "Screenshot thumbnails (internal)", routingHint: "Internal utility dialect: renders an existing item's form view to a cropped PNG thumbnail and uploads it (`snap item \"<id>\" {}`). Not a content-authoring target.", domains: [], status: "Internal", internal: true },
+  { id: "0014", name: "L0014", description: "TransLaTeX rule sets (internal)", routingHint: "Internal utility dialect: authors TransLaTeX translation rule sets (`words`/`types`/`rules`/`tests` → { options, tests }). Not a content-authoring target.", domains: [], status: "Internal", internal: true },
   // { id: "0011", name: "L0011", description: "Property editors", domains: [] },
   // { id: "0012", name: "L0012", description: "Object viewers", domains: [] },
   // { id: "0137", name: "L0137", description: "Data transformers", domains: [] },
@@ -244,7 +250,9 @@ export const LANGUAGES: Language[] = [
   //
   // `domains: ["surveys"]` introduces that domain; L0182 is currently its only member.
   { id: "0182", name: "L0182", description: "Collective-intelligence surveys", routingHint: "Collective-intelligence surveys, also called group ideation, brainstorming or idea ranking: a named set of ideas someone is asked to choose between, and the response to it — the ideas they chose, in priority order, plus at most one new idea of their own that was not already in the set. Route here for recording and prioritizing what someone picked out of a group's shared pool of ideas — which issues matter most, what the team should focus on next, what would improve this — where the options come from the group rather than from an author, and the point is which ones are favoured and in what order. The program reads its own set of ideas from a JSON or CSV dataset over HTTP, with `ideas fetch \"<url>\"`, at the moment it compiles — so a request needs the address the ideas live at. The ideas are never invented, and L0182 does NOT hold a pool, sample it, or re-read a dataset once a program has compiled. A program is one set of ideas and at most one response to it. It does NOT implement a survey-taking flow — there are no screens, steps, navigation or submission, and nothing walks a participant through anything. The response is written as code, by a person editing the program or by an AI agent, and the rendered view only displays the set beside what came back. Do NOT route a request for a fillable form, a live survey to send round, or anything a respondent is meant to complete in a browser: that is not built yet, in this or any dialect, so say so rather than substituting this one. It does NOT aggregate across respondents — no group ranking, tally, score or live result — and it never analyses responses: significance testing, clustering and sentiment analysis are out of scope. This is NOT an assessment language and does NOT score anyone: a survey response is never right or wrong, and there is no answer key, no points and no marking. Do NOT route a quiz, test, exam, practice question, comprehension check or any question with a correct answer here — that is L0180. Conventional questionnaires are not built yet: Likert scales, rating and satisfaction questions, demographics, free-text surveys with fixed questions, contact or sign-up forms and branching questionnaire logic are not built, so do not route those here. Ranking anything other than a line of text is not built yet, and nothing here enforces one response per person.", domains: ["surveys"], status: "Beta" },
-];
+] as Language[])
+  // A sponsored language's status is always "Sponsored", whatever its entry says.
+  .map(l => l.sponsor ? { ...l, status: "Sponsored" } : l);
 
 export function findLanguageById(id: string): Language | undefined {
   const normalized = id.replace(/^L/i, "").padStart(4, "0");
@@ -461,11 +469,11 @@ export function isLanguageInFreePlanScope(lang: string | undefined | null): bool
 }
 
 /**
- * Language ids whose items are currently sponsored — see `sponsored` on the
+ * Language ids whose items are currently sponsored — see `sponsor` on the
  * Language type. Empty when no sponsorship is running, which is the default.
  */
 export function sponsoredLanguageIds(): string[] {
-  return LANGUAGES.filter(l => l.sponsored).map(l => l.id);
+  return LANGUAGES.filter(l => l.sponsor).map(l => l.id);
 }
 
 /**
@@ -488,5 +496,12 @@ export function languageSponsor(lang: string | undefined | null): string | null 
   if (!lang) return null;
   // Callers pass either "0166" or "L0166".
   const id = String(lang).replace(/^L/i, "");
-  return LANGUAGES.find(l => l.id === id)?.sponsored?.by ?? null;
+  return LANGUAGES.find(l => l.id === id)?.sponsor ?? null;
+}
+
+/** The account a sponsored language's items are debited from, or null when we absorb them. */
+export function languageSponsorUid(lang: string | undefined | null): string | null {
+  if (!lang) return null;
+  const id = String(lang).replace(/^L/i, "");
+  return LANGUAGES.find(l => l.id === id)?.sponsorUid ?? null;
 }

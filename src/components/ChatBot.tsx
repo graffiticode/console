@@ -39,7 +39,7 @@ const formatImageReferences = (text: string): string =>
 /**
  * Function to generate Graffiticode responses using the generateCode function
  */
-const generateBotResponse = async ({message, user, language, chatHistory = [], currentSrc = '', itemId = undefined}) => {
+const generateBotResponse = async ({message, user, language, chatHistory = [], currentSrc = '', currentData = null, itemId = undefined}) => {
   try {
     // Use our fetcher function directly
 
@@ -95,6 +95,10 @@ const generateBotResponse = async ({message, user, language, chatHistory = [], c
       },
       language,
       currentSrc,
+      // What the current code compiles to. Some dialects keep values outside the
+      // program — L0182 names a survey whose ideas the compiler fetches — so an
+      // edit that acts on them ("answer it") is unanswerable from the source.
+      currentData,
       itemId,
       conversationSummary
     });
@@ -179,7 +183,7 @@ greeting "user"..`,
 /**
  * ChatBot component that provides a chat interface
  */
-export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], currentSrc = '', itemId = undefined }) => {
+export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], currentSrc = '', currentData = null, itemId = undefined }) => {
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -189,6 +193,7 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
   // Use refs to always have access to the latest props
   const chatHistoryRef = useRef(chatHistory);
   const currentSrcRef = useRef(currentSrc);
+  const currentDataRef = useRef(currentData);
 
   // Update refs when props change
   useEffect(() => {
@@ -198,6 +203,13 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
   useEffect(() => {
     currentSrcRef.current = currentSrc;
   }, [currentSrc]);
+
+  // Read through a ref for the same reason the source is: this component is
+  // re-created as the chat history changes, and a send in flight must use the
+  // data model as it is NOW, not as it was when the handler was created.
+  useEffect(() => {
+    currentDataRef.current = currentData;
+  }, [currentData]);
 
   // Function to cancel the current code generation
   const cancelGeneration = useCallback(() => {
@@ -221,6 +233,7 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
       // Access the latest values from refs
       const latestChatHistory = chatHistoryRef.current;
       const latestSrc = currentSrcRef.current;
+      const latestData = currentDataRef.current;
 
 
       // Check if generation has been cancelled before making the API call
@@ -235,6 +248,7 @@ export const ChatBot = ({ onSendMessage, user, language, chatHistory = [], curre
         language,
         chatHistory: latestChatHistory,
         currentSrc: latestSrc,
+        currentData: latestData,
         itemId,
       });
 

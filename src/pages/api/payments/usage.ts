@@ -140,8 +140,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let itemsUsed = 0;
     let sponsoredItems = 0;
-    let sponsoredLanguages: string[] = [];
     let sponsors: string[] = [];
+    let sponsoredByLanguage: { lang: string; sponsor: string | null; items: number }[] = [];
     let dailyUsage: DailyUsage[] = [];
     let lastUpdate: string | null = null;
 
@@ -168,8 +168,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Count only billable item records (pre-migration compile/ai_generation
       // records carry compile-unit `units` and are not items).
       let calculatedTotal = 0;
-      const langs = new Set<string>();
       const sponsorNames = new Set<string>();
+      const langCounts = new Map<string, { sponsor: string | null; items: number }>();
       usageRecordsSnapshot.docs.forEach(doc => {
         const r = doc.data();
         if (r.type !== 'item_created') return;
@@ -180,17 +180,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (r.nonBillableReason === 'sponsored') {
           sponsoredItems += 1;
           if (r.lang) {
-            langs.add(`L${String(r.lang).replace(/^L/i, '')}`);
+            const lang = `L${String(r.lang).replace(/^L/i, '')}`;
             // Resolved from config at read time rather than stored on the row:
             // a sponsor renaming itself should not need a data migration.
             const by = languageSponsor(r.lang);
             if (by) sponsorNames.add(by);
+            const entry = langCounts.get(lang) ?? { sponsor: by ?? null, items: 0 };
+            entry.items += 1;
+            langCounts.set(lang, entry);
           }
         }
       });
       itemsUsed = calculatedTotal;
-      sponsoredLanguages = Array.from(langs).sort();
       sponsors = Array.from(sponsorNames).sort();
+      sponsoredByLanguage = Array.from(langCounts, ([lang, v]) => ({ lang, ...v }))
+        .sort((a, b) => b.items - a.items || a.lang.localeCompare(b.lang));
     } catch (breakdownError) {
       console.error('Error fetching usage breakdown (may need Firestore index):', breakdownError);
     }
@@ -254,8 +258,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       plan,
       itemsUsed,
       sponsoredItems,
-      sponsoredLanguages,
       sponsors,
+      sponsoredByLanguage,
       includedItems,
       overageItems,
       overageRatePerItem,

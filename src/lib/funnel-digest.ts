@@ -303,7 +303,18 @@ export interface Digest {
     newClientKinds: string[];
     newGeos: string[];
   };
-  items: { ok: number; failed: number; byApp: Record<string, number>; firstForAccount: number };
+  /**
+   * `failed` is generations that broke; `outOfScope` is requests correctly
+   * refused because no language serves them. Kept apart so a right "no" doesn't
+   * read as a generator fault — see isOutOfScopeRefusal.
+   */
+  items: {
+    ok: number;
+    failed: number;
+    outOfScope: number;
+    byApp: Record<string, number>;
+    firstForAccount: number;
+  };
   /**
    * Language use. `created` counts items that actually compiled; `attempted`
    * counts tool calls naming that language. The gap between them is the
@@ -405,6 +416,23 @@ function bump(map: Record<string, number>, key: string | undefined, by = 1): voi
  */
 const AUTHORING_TOOLS = new Set(["create_item", "update_item"]);
 
+/** The scope gate's refusal text (generate-for-request.ts), for events that predate `code`. */
+const SCOPE_GATE_REFUSAL_PREFIX = "This request doesn't fit any available Graffiticode language.";
+
+/**
+ * Whether an item_generation_failed was a correct out-of-scope refusal rather
+ * than a broken generation.
+ *
+ * `code` is authoritative (generate-job.ts stamps it). Older events carry only
+ * `err`, so they fall back to the scope gate's prefix — never to the model
+ * sentinel's "Out of scope:", which on 2026-09-09 was also what the composition
+ * planner leaked from an upstream the user never named: a bug, not a refusal.
+ */
+function isOutOfScopeRefusal(e: LogEvent): boolean {
+  if (e.code === "out_of_scope") return true;
+  return typeof e.err === "string" && e.err.startsWith(SCOPE_GATE_REFUSAL_PREFIX);
+}
+
 /**
  * Roll events into the digest shape.
  *
@@ -422,7 +450,7 @@ export function aggregate(
     to: window.to,
     truncated: window.truncated,
     workspaces: { total: 0, byClient: {}, newClientKinds: [], newGeos: [] },
-    items: { ok: 0, failed: 0, byApp: {}, firstForAccount: 0 },
+    items: { ok: 0, failed: 0, outOfScope: 0, byApp: {}, firstForAccount: 0 },
     languages: { created: {}, attempted: {} },
     nonEnglish: { total: 0, blocked: 0, byLang: {} },
     walls: {},
@@ -610,7 +638,8 @@ export function aggregate(
 
       case "item_generation_failed":
         if (isProbe(e)) break;
-        d.items.failed++;
+        if (isOutOfScopeRefusal(e)) d.items.outOfScope++;
+        else d.items.failed++;
         break;
 
       case "non_english_request": {
@@ -882,9 +911,10 @@ export function formatDigest(d: Digest): string {
     lines.push(line);
   }
 
-  if (d.items.ok > 0 || d.items.failed > 0) {
+  if (d.items.ok > 0 || d.items.failed > 0 || d.items.outOfScope > 0) {
     let line = `✎ ${d.items.ok} item${plural(d.items.ok)}`;
     if (d.items.failed > 0) line += `, ${d.items.failed} failed`;
+    if (d.items.outOfScope > 0) line += `, ${d.items.outOfScope} out of scope`;
     const parts = breakdown(d.items.byApp);
     if (parts) line += ` — ${parts}`;
     if (d.items.firstForAccount > 0) line += ` ⚑${d.items.firstForAccount} first-ever`;

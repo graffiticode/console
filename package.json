@@ -17,7 +17,6 @@
     "download-training-examples": "npx tsx scripts/download-training-examples.ts",
     "update-embeddings": "npx tsx scripts/update-embeddings.ts",
     "update-embeddings-refresh": "npx tsx scripts/update-embeddings.ts --refresh",
-    "adjust-overage-credits": "npx tsx scripts/adjust-overage-credits.ts",
     "test:streaming": "npx tsx scripts/test-streaming.ts",
     "eval": "npx tsx scripts/model-eval.ts",
     "gcp:build": "gcloud builds submit --config cloudbuild.yaml --project graffiticode-app --substitutions=_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo 'latest')",

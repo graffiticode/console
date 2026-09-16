@@ -106,7 +106,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // The cancellation itself still proceeds — the customer asked for it
         // and is entitled to it. Only the grace allocation is withheld, and
         // omitting it is recoverable (scripts/set-preserved-allocation.ts)
-        // whereas a written 50 looks deliberate and would not be noticed.
+        // whereas a written 25 looks deliberate and would not be noticed.
         console.error(
           `[cancel-subscription] Cancelling ${subscription.id} for user ${hashUid(userId)} WITHOUT a ` +
           `preserved allocation: price ${priceId} maps to no known plan and the cached plan ` +
