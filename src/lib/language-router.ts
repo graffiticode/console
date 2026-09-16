@@ -1,6 +1,6 @@
 import axios from "axios";
 import { CLAUDE_MODELS } from "./code-generation-service";
-import { listLanguages, findLanguageById } from "./languages";
+import { listLanguages, findLanguageById, brandedLanguageIds, positiveSentences } from "./languages";
 import { recordTokenUsage } from "./token-usage-service";
 import {
   type RequestBudget,
@@ -86,7 +86,7 @@ interface RoutingResult {
 // they're available from the lang server, falling back to routingHint or
 // description otherwise. The richer block helps Haiku make a better routing
 // suggestion than a single one-liner can.
-async function buildLanguageCatalog(opts?: { excludeLang?: string }) {
+async function buildLanguageCatalog(opts?: { excludeLang?: string; onlyLangs?: string[] }) {
   const languages = await listLanguages({ enrich: true });
   // Exclude internal dialects (e.g. the L0010 planner) so the router
   // never proposes itself as a composition stage; also honor excludeLang.
@@ -110,7 +110,8 @@ async function buildLanguageCatalog(opts?: { excludeLang?: string }) {
     (l) =>
       !l.internal &&
       l.status !== "Deprecated" &&
-      (!opts?.excludeLang || l.id !== opts.excludeLang),
+      (!opts?.excludeLang || l.id !== opts.excludeLang) &&
+      (!opts?.onlyLangs || opts.onlyLangs.includes(l.id)),
   );
   const catalog = candidates
     .map((l) => {
@@ -297,19 +298,50 @@ export async function classifyAndRoute({
   const splitAt = userRequest.indexOf("\n\n");
   const askText = splitAt > 0 ? userRequest.slice(0, splitAt).trim() : userRequest;
   const sourceText = splitAt > 0 ? userRequest.slice(splitAt).trim().slice(0, 1200) : "";
+
+  // A named brand outranks the item-type words beside it. "Mystic Wonk quiz" names L0182's
+  // product with the wrong noun; left to the classifier, "quiz" matched L0180 and L0182's own
+  // "do NOT route a quiz here" clause, and the user got a quiz. So when the ASK names a brand,
+  // the verdict is confined to the languages that carry it: judged against one of them (the
+  // client's pick if it is one), rerouted only among them, and refused when none fits — a
+  // "Mystic Wonk concept web" is refused, never quietly handed to L0169.
+  const branded = brandedLanguageIds(askText);
+  const evalLang = branded.length && !branded.includes(currentLang) ? branded[0] : currentLang;
+  // In brand mode the question changes. A scope's out_of_scope clauses exist to keep
+  // UNBRANDED requests out ("do NOT route a quiz here"), and a note saying the brand decides
+  // lost to them: "Take the Mystic Wonk quiz" was refused on L0182's own quiz clause. With the
+  // language already decided, the only question left is whether the ask is for the kind of
+  // artifact it makes under any name, so those clauses — and the steer-away sentences in its
+  // summary — are withheld and the question is asked directly.
+  const brandNote = branded.length
+    ? `
+The request names ${branded.length === 1 ? "a product that" : "a platform whose products"} only ${branded.map((id) => `L${id}`).join(", ")} ${branded.length === 1 ? "serves" : "serve"}, so the language is already decided by that name. L${evalLang} makes exactly one kind of artifact: ${findLanguageById(evalLang)?.description ?? `L${evalLang} content`}. Users often call it by a looser or wrong noun (quiz, test, form, questionnaire), and that is still in scope. But if the request names a DIFFERENT kind of artifact — a concept web, diagram, chart, spreadsheet, flashcards, or anything else that is not that — it is out of scope. Do not judge details such as missing inputs; the language reports those itself.
+`
+    : "";
+  // Relabel the verdict for the caller, who asked about currentLang.
+  const verdict = (r: RouteResult): RouteResult =>
+    evalLang === currentLang ? r
+      : r.inScope ? { inScope: false, routedLang: evalLang, reason: `request names a brand served by L${evalLang}` }
+      : r;
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       console.warn("[routing] ANTHROPIC_API_KEY not set; fail-open (in-scope)");
-      return FAIL_OPEN;
+      return verdict(FAIL_OPEN);
     }
     const all = await listLanguages({ enrich: true });
-    const current = all.find((l) => l.id === currentLang);
-    const { candidates, catalog } = await buildLanguageCatalog({ excludeLang: currentLang });
+    const current = all.find((l) => l.id === evalLang);
+    const { candidates, catalog } = await buildLanguageCatalog({
+      excludeLang: evalLang,
+      onlyLangs: branded.length ? branded : undefined,
+    });
     const curScope = [
-      current?.summary || current?.routingHint || current?.description || `L${currentLang}`,
+      // Brand mode withholds the steer-away sentences with the out_of_scope list, same reason.
+      (branded.length ? positiveSentences : (t: string) => t)(
+        current?.summary || current?.routingHint || current?.description || `L${evalLang}`,
+      ),
       current?.inScope?.length ? `in scope: ${current.inScope.join("; ")}` : "",
-      current?.outOfScope?.length ? `out of scope: ${current.outOfScope.join("; ")}` : "",
+      !branded.length && current?.outOfScope?.length ? `out of scope: ${current.outOfScope.join("; ")}` : "",
     ].filter(Boolean).join("\n");
 
     chargeRouterAttempt(budget);
@@ -354,7 +386,7 @@ export async function classifyAndRoute({
             // that refusal (and "Answer the city-budget survey for me.") to in-scope
             // and changes no other verdict — the authoring request stays refused, and
             // every cross-language reroute lands where it did before.
-            content: `A user sent this request to language L${currentLang}:
+            content: `A user sent this request to language L${evalLang}:
 "${askText}"
 ${sourceText ? `
 The user also pasted the following SOURCE MATERIAL below that request. It is
@@ -364,15 +396,15 @@ request above, never on this:
 ${sourceText}
 """
 ` : ""}
-L${currentLang} scope:
+L${evalLang} scope:
 ${curScope}
-
-Decide whether this request is IN SCOPE for L${currentLang}.
-- If it clearly belongs in L${currentLang}, return {"inScope": true}.
-- If it does NOT belong in L${currentLang}, pick the single best-fit language id from the catalog below (or null if none fits): {"inScope": false, "routedLang": "<id or null>", "reason": "<one sentence>"}.
+${brandNote}
+Decide whether this request is IN SCOPE for L${evalLang}.
+- If it clearly belongs in L${evalLang}, return {"inScope": true}.
+- If it does NOT belong in L${evalLang}, pick the single best-fit language id from the catalog below (or null if none fits): {"inScope": false, "routedLang": "<id or null>", "reason": "<one sentence>"}.
 
 Catalog of other languages:
-${catalog}
+${catalog || "(none)"}
 
 Be conservative: only route away when the request clearly belongs to a different language. Return JSON only.`,
           },
@@ -397,7 +429,7 @@ Be conservative: only route away when the request clearly belongs to a different
         rid,
         stage: "route_scope_gate",
         itemId: itemId ?? null,
-        lang: currentLang,
+        lang: evalLang,
         provider: "anthropic",
         model: CLAUDE_MODELS.HAIKU,
         usage: {
@@ -422,17 +454,17 @@ Be conservative: only route away when the request clearly belongs to a different
       console.warn(
         `[routing] rid=${rid} no JSON in classifier output; fail-open (in-scope) len=${text.length}`,
       );
-      return FAIL_OPEN;
+      return verdict(FAIL_OPEN);
     }
     const parsed = JSON.parse(m[0]);
-    if (parsed.inScope === true) return { inScope: true, routedLang: null, reason: "" };
+    if (parsed.inScope === true) return verdict({ inScope: true, routedLang: null, reason: "" });
     let routedLang: string | null = parsed.routedLang ? String(parsed.routedLang).replace(/^L/i, "") : null;
     // Validate against the real, non-internal catalog (buildLanguageCatalog already excludes internal).
     if (routedLang && !candidates.some((c) => c.id === routedLang)) routedLang = null;
     return { inScope: false, routedLang, reason: String(parsed.reason || "") };
   } catch (err) {
     console.warn(`[routing] classifyAndRoute failed; fail-open (in-scope): ${(err as Error)?.message}`);
-    return FAIL_OPEN;
+    return verdict(FAIL_OPEN);
   }
 }
 

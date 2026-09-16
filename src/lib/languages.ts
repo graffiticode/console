@@ -61,6 +61,13 @@ export interface Language {
   // request. It stays reachable by naming the vendor, by domain-scoping to the gate
   // domain, or in the unfiltered full catalog.
   gatedBy?: string[];
+  // Proper nouns — a product, vendor or platform this language serves. Naming one is the
+  // strongest routing signal there is, stronger than any item-type word beside it: "Mystic
+  // Wonk quiz" is a Mystic Wonk survey with the wrong noun, not a quiz. When the ask names a
+  // brand, the scope gate may only land in the languages that carry it, and refuses the
+  // request when none of them fits ("Mystic Wonk concept web"). `gatedBy` terms count as
+  // brands too (see brandTerms), so a gate is also a pull.
+  brands?: string[];
   // Composition permission allowlist: the upstream dialects this language is ALLOWED to
   // compose with (consume/embed). This is the hard fence — a head may only bind upstreams
   // within it; the client can never create an undeclared edge.
@@ -249,7 +256,7 @@ export const LANGUAGES: Language[] = ([
   // capability moved into the language instead. Do not add a composition edge to make it work.
   //
   // `domains: ["surveys"]` introduces that domain; L0182 is currently its only member.
-  { id: "0182", name: "L0182", description: "Collective-intelligence surveys", routingHint: "Collective-intelligence surveys, also called group ideation, brainstorming or idea ranking: a named set of ideas someone is asked to choose between, and the response to it — the ideas they chose, in priority order, plus at most one new idea of their own that was not already in the set. Route here for recording and prioritizing what someone picked out of a group's shared pool of ideas — which issues matter most, what the team should focus on next, what would improve this — where the options come from the group rather than from an author, and the point is which ones are favoured and in what order. The program reads its own set of ideas from a JSON or CSV dataset over HTTP, with `ideas fetch \"<url>\"`, at the moment it compiles — so a request needs the address the ideas live at. The ideas are never invented, and L0182 does NOT hold a pool, sample it, or re-read a dataset once a program has compiled. A program is one set of ideas and at most one response to it. It does NOT implement a survey-taking flow — there are no screens, steps, navigation or submission, and nothing walks a participant through anything. The response is written as code, by a person editing the program or by an AI agent, and the rendered view only displays the set beside what came back. Do NOT route a request for a fillable form, a live survey to send round, or anything a respondent is meant to complete in a browser: that is not built yet, in this or any dialect, so say so rather than substituting this one. It does NOT aggregate across respondents — no group ranking, tally, score or live result — and it never analyses responses: significance testing, clustering and sentiment analysis are out of scope. This is NOT an assessment language and does NOT score anyone: a survey response is never right or wrong, and there is no answer key, no points and no marking. Do NOT route a quiz, test, exam, practice question, comprehension check or any question with a correct answer here — that is L0180. Conventional questionnaires are not built yet: Likert scales, rating and satisfaction questions, demographics, free-text surveys with fixed questions, contact or sign-up forms and branching questionnaire logic are not built, so do not route those here. Ranking anything other than a line of text is not built yet, and nothing here enforces one response per person.", domains: ["surveys"], status: "Beta" },
+  { id: "0182", name: "L0182", description: "Collective-intelligence surveys (Mystic Wonk)", brands: ["mystic wonk"], routingHint: "Collective-intelligence surveys, also called group ideation, brainstorming or idea ranking: a named set of ideas someone is asked to choose between, and the response to it — the ideas they chose, in priority order, plus at most one new idea of their own that was not already in the set. Route here for recording and prioritizing what someone picked out of a group's shared pool of ideas — which issues matter most, what the team should focus on next, what would improve this — where the options come from the group rather than from an author, and the point is which ones are favoured and in what order. The program reads its own set of ideas from a JSON or CSV dataset over HTTP, with `ideas fetch \"<url>\"`, at the moment it compiles — so a request needs the address the ideas live at. The ideas are never invented, and L0182 does NOT hold a pool, sample it, or re-read a dataset once a program has compiled. A program is one set of ideas and at most one response to it. It does NOT implement a survey-taking flow — there are no screens, steps, navigation or submission, and nothing walks a participant through anything. The response is written as code, by a person editing the program or by an AI agent, and the rendered view only displays the set beside what came back. Do NOT route a request for a fillable form, a live survey to send round, or anything a respondent is meant to complete in a browser: that is not built yet, in this or any dialect, so say so rather than substituting this one. It does NOT aggregate across respondents — no group ranking, tally, score or live result — and it never analyses responses: significance testing, clustering and sentiment analysis are out of scope. This is NOT an assessment language and does NOT score anyone: a survey response is never right or wrong, and there is no answer key, no points and no marking. Do NOT route a quiz, test, exam, practice question, comprehension check or any question with a correct answer here — that is L0180. Conventional questionnaires are not built yet: Likert scales, rating and satisfaction questions, demographics, free-text surveys with fixed questions, contact or sign-up forms and branching questionnaire logic are not built, so do not route those here. Ranking anything other than a line of text is not built yet, and nothing here enforces one response per person.", domains: ["surveys"], status: "Beta" },
 ] as Language[])
   // A sponsored language's status is always "Sponsored", whatever its entry says.
   .map(l => l.sponsor ? { ...l, status: "Sponsored" } : l);
@@ -349,7 +356,7 @@ export async function listLanguages({ search, domain, enrich = false }: { search
           !gates.includes(domainLower) &&
           !gates.some(g => searchLower.includes(g)));
       })
-      .map(lang => ({ lang, score: scoreLanguage(lang, tokens) }))
+      .map(lang => ({ lang, score: scoreLanguage(lang, tokens) + (namesBrandOf(search, lang) ? BRAND_SCORE : 0) }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score);
 
@@ -362,6 +369,35 @@ export async function listLanguages({ search, domain, enrich = false }: { search
   }
 
   return results;
+}
+
+/** Outranks any token score: naming a brand says which language, not what kind of thing. */
+const BRAND_SCORE = 100;
+
+/** A language's brand terms, gate terms included. */
+export function brandTerms(lang: Language): string[] {
+  return [...new Set([...(lang.brands || []), ...(lang.gatedBy || [])])];
+}
+
+/** Whole-word, case-insensitive, and loose about the gap: "Mystic Wonk", "mystic-wonk", "MysticWonk". */
+function namesBrandOf(text: string, lang: Language): boolean {
+  return brandTerms(lang).some(term => {
+    const words = term.split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    return new RegExp(`\\b${words.join("[\\s-]*")}\\b`, "i").test(text);
+  });
+}
+
+/**
+ * Ids of the offerable languages whose brand the text names — the same set listLanguages
+ * offers (no internal, hidden or deprecated dialect). Pass the ASK, not pasted source
+ * material: a get_spec'd Learnosity item converted to flashcards names Learnosity below the
+ * blank line, and that is content, not intent.
+ */
+export function brandedLanguageIds(text: string): string[] {
+  return LANGUAGES
+    .filter(l => !l.internal && !l.hidden && l.status !== "Deprecated")
+    .filter(l => namesBrandOf(text, l))
+    .map(l => l.id);
 }
 
 /** Ranked-search result ceiling. See the cap note in listLanguages(). */
@@ -441,7 +477,7 @@ function hasWord(haystack: string, token: string): boolean {
  * language still matches on its name, description and keywords, which carry no
  * negations at all.
  */
-function positiveSentences(text: string): string {
+export function positiveSentences(text: string): string {
   return text
     // Split on sentence ENDERS only. A colon is not one: "Does NOT author content:
     // assessments, quizzes, ... flashcards and surveys belong to the dialects that
