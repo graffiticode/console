@@ -424,14 +424,45 @@ function hasWord(haystack: string, token: string): boolean {
  * ("students", "shade", "6th grade"), and one unmatched word should not erase a
  * language that answers the rest.
  */
+/**
+ * The parts of a routing description that say what a language DOES.
+ *
+ * Routing prose is written to steer, so it names the things a language is NOT for
+ * as often as the things it is: "Does NOT author content: assessments, quizzes,
+ * spreadsheets, charts, maps, diagrams, boards, flashcards and surveys belong to
+ * the dialects that extend it" (L0000), "Do NOT route a quiz, test, exam ... here"
+ * (L0182). Scored whole, those sentences make a language match precisely the
+ * queries its author wrote them to deflect — L0000 came back FIRST for "flashcards"
+ * and L0182 answered "quiz".
+ *
+ * So a sentence that disclaims is dropped before scoring. Sentence-level rather
+ * than clause-level because that is the unit these disclaimers are written in, and
+ * a positive sentence that happens to contain "not" only loses its bonus — the
+ * language still matches on its name, description and keywords, which carry no
+ * negations at all.
+ */
+function positiveSentences(text: string): string {
+  return text
+    // Split on sentence ENDERS only. A colon is not one: "Does NOT author content:
+    // assessments, quizzes, ... flashcards and surveys belong to the dialects that
+    // extend it" splits there into a negative head and a tail that reads as a
+    // positive list, which is how L0000 kept answering "flashcards" after the first
+    // version of this filter.
+    .split(/(?<=[.;!?])\s+/)
+    .filter((sentence) => !/\b(not|never|n't|rather than|instead of)\b/i.test(sentence))
+    .join(" ");
+}
+
 function scoreLanguage(lang: Language, tokens: string[]): number {
   if (!tokens.length) return 1; // punctuation-only query: don't filter anything out
   const primary = `${lang.name} ${lang.description}`;
   const secondary = [
-    lang.longDescription,
-    lang.routingHint,
-    lang.summary,
+    // Steering prose, minus the sentences that steer AWAY — see positiveSentences.
+    ...[lang.longDescription, lang.routingHint, lang.summary]
+      .filter((t): t is string => Boolean(t))
+      .map(positiveSentences),
     ...(lang.inScope || []),
+    // Keywords are positive by construction: they are what the output is CALLED.
     ...(lang.keywords || []),
   ]
     .filter(Boolean)
