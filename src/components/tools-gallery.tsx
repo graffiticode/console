@@ -160,6 +160,9 @@ export default function ToolsGallery({ language, setLanguage }) {
                       <li key={lang.name} ref={(el) => { langItemRefs.current[lang.name] = el; }}>
                         <button
                           onClick={() => { handleSelectLanguage(lang); langListRef.current?.focus(); }}
+                          // The description below is truncated to one line; the tooltip is
+                          // where the full text stays reachable.
+                          title={`${lang.name}\n${lang.description}`}
                           className={classNames(
                             selectedLang === lang.name ? 'bg-gray-300' : 'bg-gray-100 hover:bg-gray-200',
                             "flex flex-col w-full text-left rounded-none py-1 pl-4 pr-2 focus:outline-none"

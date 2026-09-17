@@ -344,124 +344,170 @@ The request names ${branded.length === 1 ? "a product that" : "a platform whose 
       !branded.length && current?.outOfScope?.length ? `out of scope: ${current.outOfScope.join("; ")}` : "",
     ].filter(Boolean).join("\n");
 
-    chargeRouterAttempt(budget);
-    const response = await axios.post(
-      "https://api.anthropic.com/v1/messages",
-      {
-        model: CLAUDE_MODELS.HAIKU,
-        max_tokens: 300,
-        temperature: 0,
-        // Stop once the JSON block closes.
-        //
-        // The verdict is the FIRST thing this model emits, and it emits it inside a
-        // ```json fence. Everything after the closing fence is the model explaining
-        // itself to nobody: the parser takes the first {...} and discards the rest.
-        // Measured 2026-09-04 on the real prompt and real scopes, 7 cases: an
-        // in-scope verdict cost 93-125 output tokens, of which 15 were the JSON.
-        // Stopping at the fence cut those calls ~65% (2,167ms -> 696ms) and the set
-        // 51%, with 0/7 verdict changes — reroutes included, which save little and
-        // should, since their `reason` is genuinely part of the JSON.
-        //
-        // Anthropic excludes the stop text from the response, so "\n```" keeps the
-        // closing brace the parser needs and drops only the fence. Degrades safely:
-        // an unfenced answer never matches, and the call behaves exactly as before.
-        //
-        // NOT the same thing as telling the model to be terse. That was tried on the
-        // same cases and CHANGED VERDICTS — "Multiply 10 and 21" rerouted away from
-        // L0000. Sampling is untouched here; only the tail is cut.
-        stop_sequences: ["\n```"],
-        messages: [
-          {
-            role: "user",
-            // "sent this request to", not "asked … to CREATE this".
-            //
-            // The frame is evidence to the classifier, and "create" asserted a verb
-            // the request never used. For most languages that is harmless — creating
-            // a spreadsheet IS the request — but a language whose purpose is acting
-            // on something that already exists gets the frame arguing against it:
-            // L0182 takes a survey the back end holds and cannot author one, so
-            // "Take the you-can-choose survey." reached the model as a request to
-            // CREATE a survey and matched L0182's own out-of-scope clause forbidding
-            // exactly that. Measured on 13 cases, 2026-09-11: the neutral frame flips
-            // that refusal (and "Answer the city-budget survey for me.") to in-scope
-            // and changes no other verdict — the authoring request stays refused, and
-            // every cross-language reroute lands where it did before.
-            content: `A user sent this request to language L${evalLang}:
-"${askText}"
-${sourceText ? `
-The user also pasted the following SOURCE MATERIAL below that request. It is
-content to be CONVERTED, not a description of what to build — classify on the
-request above, never on this:
-"""
-${sourceText}
-"""
-` : ""}
-L${evalLang} scope:
-${curScope}
-${brandNote}
-Decide whether this request is IN SCOPE for L${evalLang}.
-- If it clearly belongs in L${evalLang}, return {"inScope": true}.
-- If it does NOT belong in L${evalLang}, pick the single best-fit language id from the catalog below (or null if none fits): {"inScope": false, "routedLang": "<id or null>", "reason": "<one sentence>"}.
+    // Decide on the ASK; confirm on the SOURCE.
+    //
+    // Splitting the two (above) was not enough. Measured 2026-09-17 against the
+    // real classifier and the live catalog: "Make a flashcard deck from this."
+    // with a quiz spec pasted below it rerouted L0181 -> L0180 every time, and
+    // the model's own reason said why — "the source material is a scored
+    // assessment ... this is a quiz that belongs in L0180". The SAME ask with no
+    // source attached is in-scope. One sentence of instruction does not outweigh
+    // 1,200 characters of the other language's content, however the prompt is
+    // worded: "classify on the request above, never on this" was already in the
+    // prompt, and was already being read.
+    //
+    // So the source no longer reaches the decision that matters. Phase 1 sees the
+    // ask alone — which is what the user actually asked for. Only when that comes
+    // back OUT of scope does phase 2 re-ask with the source attached, and a
+    // reroute requires both to agree.
+    //
+    // The asymmetry is deliberate. A false reroute silently produces the WRONG
+    // ARTIFACT — flashcards requested, quiz delivered, no error anywhere — while
+    // a missed reroute leaves the request with the language the client chose,
+    // which the generator usually absorbs and which the downstream OUT_OF_SCOPE
+    // path still catches. Spend the extra call on the damaging direction only.
+    //
+    // Phase 1 is also the cheaper call (1,200 fewer characters of input) and it is
+    // the common case, so the ordinary create got faster, not slower.
+    const classify = async (src: string): Promise<RouteResult> => {
+      chargeRouterAttempt(budget);
+      const response = await axios.post(
+        "https://api.anthropic.com/v1/messages",
+        {
+          model: CLAUDE_MODELS.HAIKU,
+          max_tokens: 300,
+          temperature: 0,
+          // Stop once the JSON block closes.
+          //
+          // The verdict is the FIRST thing this model emits, and it emits it inside a
+          // ```json fence. Everything after the closing fence is the model explaining
+          // itself to nobody: the parser takes the first {...} and discards the rest.
+          // Measured 2026-09-04 on the real prompt and real scopes, 7 cases: an
+          // in-scope verdict cost 93-125 output tokens, of which 15 were the JSON.
+          // Stopping at the fence cut those calls ~65% (2,167ms -> 696ms) and the set
+          // 51%, with 0/7 verdict changes — reroutes included, which save little and
+          // should, since their `reason` is genuinely part of the JSON.
+          //
+          // Anthropic excludes the stop text from the response, so "\n```" keeps the
+          // closing brace the parser needs and drops only the fence. Degrades safely:
+          // an unfenced answer never matches, and the call behaves exactly as before.
+          //
+          // NOT the same thing as telling the model to be terse. That was tried on the
+          // same cases and CHANGED VERDICTS — "Multiply 10 and 21" rerouted away from
+          // L0000. Sampling is untouched here; only the tail is cut.
+          stop_sequences: ["\n```"],
+          messages: [
+            {
+              role: "user",
+              // "sent this request to", not "asked … to CREATE this".
+              //
+              // The frame is evidence to the classifier, and "create" asserted a verb
+              // the request never used. For most languages that is harmless — creating
+              // a spreadsheet IS the request — but a language whose purpose is acting
+              // on something that already exists gets the frame arguing against it:
+              // L0182 takes a survey the back end holds and cannot author one, so
+              // "Take the you-can-choose survey." reached the model as a request to
+              // CREATE a survey and matched L0182's own out-of-scope clause forbidding
+              // exactly that. Measured on 13 cases, 2026-09-11: the neutral frame flips
+              // that refusal (and "Answer the city-budget survey for me.") to in-scope
+              // and changes no other verdict — the authoring request stays refused, and
+              // every cross-language reroute lands where it did before.
+              content: `A user sent this request to language L${evalLang}:
+  "${askText}"
+  ${src ? `
+  The user also pasted the following SOURCE MATERIAL below that request. It is
+  content to be CONVERTED, not a description of what to build — classify on the
+  request above, never on this:
+  """
+  ${src}
+  """
+  ` : ""}
+  L${evalLang} scope:
+  ${curScope}
+  ${brandNote}
+  Decide whether this request is IN SCOPE for L${evalLang}.
+  - If it clearly belongs in L${evalLang}, return {"inScope": true}.
+  - If it does NOT belong in L${evalLang}, pick the single best-fit language id from the catalog below (or null if none fits): {"inScope": false, "routedLang": "<id or null>", "reason": "<one sentence>"}.
 
-Catalog of other languages:
-${catalog || "(none)"}
+  Catalog of other languages:
+  ${catalog || "(none)"}
 
-Be conservative: only route away when the request clearly belongs to a different language. Return JSON only.`,
+  Be conservative: only route away when the request clearly belongs to a different language. Return JSON only.`,
+            },
+          ],
+        },
+        {
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
           },
-        ],
-      },
-      {
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
+          timeout: ROUTER_TIMEOUT_MS,
         },
-        timeout: ROUTER_TIMEOUT_MS,
-      },
-    );
-
-    // Record token usage if auth and rid are provided
-    chargeRouterResult(budget, response.data?.usage);
-    if (auth && rid && response.data?.usage) {
-      const usage = response.data.usage;
-      await recordTokenUsage({
-        auth,
-        rid,
-        stage: "route_scope_gate",
-        itemId: itemId ?? null,
-        lang: evalLang,
-        provider: "anthropic",
-        model: CLAUDE_MODELS.HAIKU,
-        usage: {
-          inputTokens: usage.input_tokens || 0,
-          outputTokens: usage.output_tokens || 0,
-          cacheCreationInputTokens: usage.cache_creation_input_tokens || 0,
-          cacheReadInputTokens: usage.cache_read_input_tokens || 0,
-          reasoningTokens: 0,
-        },
-      }).catch(() => {
-        // Never throw from usage recording
-      });
-    }
-
-    const text = response.data?.content?.[0]?.text || "";
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) {
-      // Was silent. A fail-open here disables the gate for that request, and the
-      // stop sequence above is one more way to reach it (an answer that opened
-      // with a fence on its own line would stop at once, empty). If this line
-      // starts appearing, that is the first thing to check.
-      console.warn(
-        `[routing] rid=${rid} no JSON in classifier output; fail-open (in-scope) len=${text.length}`,
       );
-      return verdict(FAIL_OPEN);
+
+      // Record token usage if auth and rid are provided
+      chargeRouterResult(budget, response.data?.usage);
+      if (auth && rid && response.data?.usage) {
+        const usage = response.data.usage;
+        await recordTokenUsage({
+          auth,
+          rid,
+          stage: "route_scope_gate",
+          itemId: itemId ?? null,
+          lang: evalLang,
+          provider: "anthropic",
+          model: CLAUDE_MODELS.HAIKU,
+          usage: {
+            inputTokens: usage.input_tokens || 0,
+            outputTokens: usage.output_tokens || 0,
+            cacheCreationInputTokens: usage.cache_creation_input_tokens || 0,
+            cacheReadInputTokens: usage.cache_read_input_tokens || 0,
+            reasoningTokens: 0,
+          },
+        }).catch(() => {
+          // Never throw from usage recording
+        });
+      }
+
+      const text = response.data?.content?.[0]?.text || "";
+      const m = text.match(/\{[\s\S]*\}/);
+      if (!m) {
+        // Was silent. A fail-open here disables the gate for that request, and the
+        // stop sequence above is one more way to reach it (an answer that opened
+        // with a fence on its own line would stop at once, empty). If this line
+        // starts appearing, that is the first thing to check.
+        console.warn(
+          `[routing] rid=${rid} no JSON in classifier output; fail-open (in-scope) len=${text.length}`,
+        );
+        return verdict(FAIL_OPEN);
+      }
+      const parsed = JSON.parse(m[0]);
+      if (parsed.inScope === true) return verdict({ inScope: true, routedLang: null, reason: "" });
+      let routedLang: string | null = parsed.routedLang ? String(parsed.routedLang).replace(/^L/i, "") : null;
+      // Validate against the real, non-internal catalog (buildLanguageCatalog already excludes internal).
+      if (routedLang && !candidates.some((c) => c.id === routedLang)) routedLang = null;
+      return { inScope: false, routedLang, reason: String(parsed.reason || "") };
+    };
+
+    const askOnly = await classify("");
+    // Nothing was pasted, so there is no second opinion to be had.
+    if (askOnly.inScope || !sourceText) return askOnly;
+
+    const withSource = await classify(sourceText);
+    if (withSource.inScope) {
+      // The two disagree. Keep the client's pick: the ask is the request, and the
+      // pasted material is what it operates ON.
+      console.log(
+        `[routing] rid=${rid} scope-gate split-verdict lang=L${currentLang} ask=out-of-scope source=in-scope — keeping the client pick`,
+      );
+      return withSource;
     }
-    const parsed = JSON.parse(m[0]);
-    if (parsed.inScope === true) return verdict({ inScope: true, routedLang: null, reason: "" });
-    let routedLang: string | null = parsed.routedLang ? String(parsed.routedLang).replace(/^L/i, "") : null;
-    // Validate against the real, non-internal catalog (buildLanguageCatalog already excludes internal).
-    if (routedLang && !candidates.some((c) => c.id === routedLang)) routedLang = null;
-    return { inScope: false, routedLang, reason: String(parsed.reason || "") };
+    return {
+      inScope: false,
+      routedLang: withSource.routedLang ?? askOnly.routedLang,
+      reason: withSource.reason || askOnly.reason,
+    };
   } catch (err) {
     console.warn(`[routing] classifyAndRoute failed; fail-open (in-scope): ${(err as Error)?.message}`);
     return verdict(FAIL_OPEN);
