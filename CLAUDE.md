@@ -100,6 +100,8 @@ Two prohibitions that outlive any one script:
 
 **Secrets & credentials:** account credentials are split across a public `credentials` doc and an encrypted `secrets` doc under `users/{uid}/settings`; the **identical keyring** must be present on the console runtime AND every `l0NNN` compiler service (console encrypts, compilers decrypt). Full contract (ciphertext formats, env vars, rotation procedure): `docs/secret-encryption.md`.
 
+**Eval account (`EVAL_UID` / `EVAL_API_KEY`):** all corpus operations run under this dedicated account — corpus item creation (`create-items-from-prompts.ts`), training example generation (`generate-training-examples.ts`), provenance backfills, model evals, and sweeps. The account is defined in `.env.local` as `EVAL_UID=2c9d72e315fbafb128011bc32739666c7e6e7eb9`. Scripts that take `GC_API_KEY_SECRET` should be run with `GC_API_KEY_SECRET=$EVAL_API_KEY` to ensure items land under the eval account, not a personal account. Corpus items live in `users/{EVAL_UID}/items`; the `training_examples` collection (RAG corpus) is derived from them via `generate-training-examples.ts`.
+
 ## Local Development
 
 1. Configure `.env.local` with API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, Firebase config, etc.)

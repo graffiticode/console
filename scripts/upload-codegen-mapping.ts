@@ -17,7 +17,7 @@
  *   --mark <number>       Mark to assign (required)
  *
  * Options:
- *   --user <uid>          User ID to upload items to (default: from GC_API_KEY_UID)
+ *   --user <uid>          User ID to upload items to (default: EVAL_UID)
  *   --input <path>        Input mapping file (default: training/data/{lang}-codegen-mapping.json)
  *   --refresh             Delete existing items of same lang/mark before uploading
  *   --dry-run             Show what would be uploaded without uploading

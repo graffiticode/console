@@ -656,10 +656,12 @@ async function main() {
     return;
   }
 
-  // Get authentication
-  const gcApiKey = process.env.GC_API_KEY_SECRET;
+  // Get authentication — default to EVAL_API_KEY (the dedicated eval account) so corpus
+  // items land under EVAL_UID, not a personal account. Fall back to GC_API_KEY_SECRET
+  // for backward compatibility.
+  const gcApiKey = process.env.EVAL_API_KEY || process.env.GC_API_KEY_SECRET;
   if (!gcApiKey) {
-    console.error("Error: GC_API_KEY_SECRET environment variable not set");
+    console.error("Error: EVAL_API_KEY or GC_API_KEY_SECRET environment variable not set");
     process.exit(1);
   }
 

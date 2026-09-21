@@ -190,10 +190,10 @@ async function main() {
     return;
   }
 
-  // Get authentication from GC_API_KEY_SECRET
-  const gcApiKey = process.env.GC_API_KEY_SECRET;
+  // Get authentication from EVAL_API_KEY (dedicated eval account)
+  const gcApiKey = process.env.EVAL_API_KEY;
   if (!gcApiKey) {
-    console.error("Error: GC_API_KEY_SECRET environment variable not set");
+    console.error("Error: EVAL_API_KEY environment variable not set");
     process.exit(1);
   }
 
