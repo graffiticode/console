@@ -3,7 +3,7 @@
 /**
  * Script to download training examples from Firebase to a markdown file
  *
- * Usage (--lang is required; mark defaults to 3, the RAG corpus):
+ * Usage (--lang is required; mark defaults to 1, the RAG corpus):
  *   npm run download-training-examples -- --lang 0181
  *   npm run download-training-examples -- --lang 0159 --limit 100
  */
@@ -37,15 +37,11 @@ const languageFilter = args.includes("--lang")
 
 const markValues: number[] = args.includes("--mark")
   ? args[args.indexOf("--mark") + 1].split(",").map(v => parseInt(v.trim()))
-  // The RAG training corpus is mark 3. This defaulted to 4 and called it "high quality
-  // examples", which made a bare run silently download the wrong set — and the docs
-  // repeated it (docs/rag-training-notes.md said --mark 4). scripts/verify-0178-corpus.ts
-  // is the one that always agreed: it promotes compile-passing items to mark 3, and
-  // scripts/create-items-from-prompts.ts seeds a corpus at mark 3.
-  : [3];
+  // The RAG training corpus is mark=1 on the eval account.
+  : [1];
 
-// Default user ID
-const defaultUserId = "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1";
+// Default user ID — the eval account where all corpus/eval data lives
+const defaultUserId = "2c9d72e315fbafb128011bc32739666c7e6e7eb9";
 const userId = args.includes("--user")
   ? args[args.indexOf("--user") + 1]
   : defaultUserId;
@@ -64,14 +60,14 @@ Usage: npm run download-training-examples -- [options]
 Options:
   --lang <language>      Language code to download (REQUIRED, e.g. "0181")
   --limit <number>       Maximum number of items to download (default: 10000)
-  --mark <marks>         Filter by mark value(s), comma-separated (default: 3 — the RAG corpus)
+  --mark <marks>         Filter by mark value(s), comma-separated (default: 1 — the RAG corpus)
   --user <userId>        User ID to fetch items from (default: predefined ID)
   --append               Append to existing file instead of overwriting (default: overwrite)
   --help                 Show this help message
 
 Examples:
-  npm run download-training-examples -- --lang 0181     # L0181, mark 3 (the corpus)
-  npm run download-training-examples -- --lang 0159     # L0159, mark 3
+  npm run download-training-examples -- --lang 0181     # L0181, mark 1 (the corpus)
+  npm run download-training-examples -- --lang 0159     # L0159, mark 1
   npm run download-training-examples -- --lang 0166 --mark 5   # a non-corpus mark
   npm run download-training-examples -- --lang 0166 --append   # append to the existing file
 `);
@@ -88,8 +84,6 @@ if (!languageFilter) {
   console.error("Usage: npm run download-training-examples -- --lang <code> [--mark 3] [--limit N] [--append]");
   process.exit(1);
 }
-
-let apiFirestore: admin.firestore.Firestore;
 
 // Initialize Firebase Admin SDK
 function initializeFirebase() {
@@ -112,23 +106,6 @@ function initializeFirebase() {
     if (err.code !== "app/duplicate-app") {
       console.error("Firebase initialization error:", err);
       process.exit(1);
-    }
-  }
-
-  // Init graffiticode project (for fetching task ASTs)
-  if (process.env.GRAFFITICODE_CREDENTIALS) {
-    try {
-      const apiApp = admin.initializeApp({
-        credential: admin.credential.cert(
-          JSON.parse(fs.readFileSync(process.env.GRAFFITICODE_CREDENTIALS, 'utf-8'))
-        ),
-        projectId: "graffiticode",
-      }, 'api');
-      apiFirestore = apiApp.firestore();
-    } catch (err: any) {
-      if (err.code !== "app/duplicate-app") {
-        console.warn("Warning: could not init graffiticode project, task AST lookup disabled");
-      }
     }
   }
 }
@@ -170,55 +147,6 @@ function prefetchLexicon(lang: string): void {
 
 function getCachedLexicon(lang: string): any {
   return lexiconCache[lang] || null;
-}
-
-// Fetch source code from task AST in the graffiticode project
-async function fetchCodeFromTask(taskId: string, lang: string): Promise<string | null> {
-  if (!apiFirestore || !taskId) {
-    console.log(`    fetchCode: no apiFirestore=${!!apiFirestore} or taskId=${taskId}`);
-    return null;
-  }
-  try {
-    // Compound/chained taskIds use `+` to glue head with upstream segments.
-    // For training, we only need the head — the upstream IDs would just
-    // resolve to other languages' tasks.
-    const headSegment = taskId.split('+')[0];
-    const decoded = JSON.parse(Buffer.from(headSegment, 'base64').toString());
-    const innerIds = decoded.taskIds || [];
-    if (innerIds.length === 0) {
-      console.log(`    fetchCode: no innerIds in taskId=${taskId}`);
-      return null;
-    }
-    const taskDoc = await apiFirestore.collection('tasks').doc(innerIds[0]).get();
-    if (!taskDoc.exists) {
-      console.log(`    fetchCode: task doc ${innerIds[0]} not found`);
-      return null;
-    }
-    const ast = taskDoc.data()!.code;
-    if (!ast) {
-      console.log(`    fetchCode: task doc ${innerIds[0]} has no code`);
-      return null;
-    }
-    const lexicon = getCachedLexicon(lang);
-    if (!lexicon) {
-      throw new Error(`no lexicon cached for L${lang} — refusing to unparse into stubs`);
-    }
-    const src = unparse(ast, lexicon);
-    // A tag missing from the lexicon unparses to `/* TAG */`. Such an example
-    // teaches the model to emit comments instead of code, so drop it here.
-    const stubs = src.match(/\/\*\s*[A-Z][A-Z0-9_]*\s*\*\//g);
-    if (stubs) {
-      console.warn(
-        `  ⤫ Dropping ${taskId}: unparse produced ${stubs.length} unknown-tag stub(s) ` +
-        `(${[...new Set(stubs)].slice(0, 5).join(", ")})`
-      );
-      return null;
-    }
-    return src;
-  } catch (err: any) {
-    console.warn(`  Warning: failed to fetch task code for ${taskId}: ${err.message}`);
-    return null;
-  }
 }
 
 // Extract task from messages
@@ -362,26 +290,35 @@ async function fetchItemsFromFirestore(lang: string | null, marks: number[], lim
 
   console.log(`Found ${items.length} items with help`);
 
-  // Always fetch code from task API for consistency
-  console.log(`Fetching code from API for ${items.length} items...`);
+  // Unparse AST code for each item
+  console.log(`Unparsing code for ${items.length} items...`);
   const resolved: any[] = [];
   for (const item of items) {
-    if (item.taskId) {
-      const source = await fetchCodeFromTask(item.taskId, item.lang);
-      if (source && source.trim().length >= 2) {
-        item.src = source;
-        resolved.push(item);
-        continue;
-      } else if (source !== null) {
-        console.log(`  ⚠️ ${item.id}: code too short from API (${(source || '').trim().length} chars): "${(source || '').trim()}"`);
-      }
+    if (!item.code || typeof item.code !== "object") {
+      console.log(`  ⚠️ Skipped ${item.id}: no AST code`);
+      continue;
     }
-    // Fall back to local src (item.code is the parsed AST object, not a string)
-    const fallback = typeof item.src === "string" ? item.src : "";
-    if (fallback.trim().length >= 2) {
+    const lexicon = getCachedLexicon(item.lang);
+    if (!lexicon) {
+      console.log(`  ⚠️ Skipped ${item.id}: no lexicon for L${item.lang}`);
+      continue;
+    }
+    try {
+      const src = unparse(item.code, lexicon);
+      // A tag missing from the lexicon unparses to `/* TAG */`. Drop these.
+      const stubs = src.match(/\/\*\s*[A-Z][A-Z0-9_]*\s*\*\//g);
+      if (stubs) {
+        console.warn(`  ⤫ ${item.id}: unparse produced ${stubs.length} stub(s), skipping`);
+        continue;
+      }
+      if (src.trim().length < 2) {
+        console.log(`  ⚠️ Skipped ${item.id}: code too short`);
+        continue;
+      }
+      item.src = src;
       resolved.push(item);
-    } else {
-      console.log(`  ⚠️ Skipped ${item.id}: no code available (taskId=${item.taskId || 'none'}, src=${fallback.length}chars)`);
+    } catch (e: any) {
+      console.warn(`  ⚠️ ${item.id}: unparse failed: ${e.message}`);
     }
   }
   console.log(`Found ${resolved.length} items with code`);
