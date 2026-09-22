@@ -129,7 +129,12 @@ export interface Language {
 }
 
 export const LANGUAGES: Language[] = ([
-  { id: "0000", name: "L0000", description: "Base language — functional expressions rendered as JSON", routingHint: "The root Graffiticode language that every dialect inherits from. Evaluates a closed functional program — arithmetic, strings, lists and ranges, records and tags, lambdas and let-bound helpers, pattern matching, comparisons and conditionals, map/filter/reduce — and renders the result as plain JSON. Route here only for a request to compute or transform plain values. Does NOT author content: assessments, quizzes, spreadsheets, charts, maps, diagrams, boards, flashcards and surveys belong to the dialects that extend it. No rendered UI beyond the JSON view, no side effects, and no external I/O.", domains: [], sponsor: "Artcompiler Inc.", sponsorUrl: "https://artcompiler.com", sponsorUid: "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1", status: "Sponsored" },
+  // Self-composition (L0000 → L0000) is an internal test edge for the `data use` machinery:
+  // resolveUpstreams, the fence, splitRequest, upstream generation, chaining, schema
+  // validation and the atomic fallback, with no second language in the loop. L0000's
+  // instructions.md binds only when a request describes a separate producer program.
+  // An L0000 → L0170 edge was considered and rejected: L0170 already inherits L0000.
+  { id: "0000", name: "L0000", composesWith: ["0000"], description: "Base language — functional expressions rendered as JSON", routingHint: "The root Graffiticode language that every dialect inherits from. Evaluates a closed functional program — arithmetic, strings, lists and ranges, records and tags, lambdas and let-bound helpers, pattern matching, comparisons and conditionals, map/filter/reduce — and renders the result as plain JSON. Route here only for a request to compute or transform plain values. Does NOT author content: assessments, quizzes, spreadsheets, charts, maps, diagrams, boards, flashcards and surveys belong to the dialects that extend it. No rendered UI beyond the JSON view, no side effects, and no external I/O.", domains: [], sponsor: "Artcompiler Inc.", sponsorUrl: "https://artcompiler.com", sponsorUid: "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1", status: "Sponsored" },
   // L0001 is DEPRECATED — retained as a repo for historical reference only. Do not re-enable.
   // { id: "0002", name: "L0002", description: "Core language", domains: [] },
   { id: "0003", name: "L0003", description: "Starter language — hello, image, theme, and print", domains: [], hidden: true },

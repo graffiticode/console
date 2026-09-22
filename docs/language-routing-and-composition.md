@@ -82,7 +82,8 @@ Set `composesWith` on the language's `LANGUAGES` entry (`src/lib/languages.ts`).
 
 - **Explicit list** (`composesWith: ["0179"]`) — may compose ONLY with those upstreams. Use for
   widget-embedding hosts (L0176 embeds the L0179 spreadsheet as a Learnosity `custom` question —
-  as of 2026-09-09 this is the platform's only live edge).
+  the only product edge). L0000 also declares `["0000"]` — self-composition, an internal test of
+  the `data use` path with no second language involved (2026-09-22).
 - **`["*"]`** — *may* compose with any non-internal authoring language; the broad wildcard. Use
   only when a host genuinely consumes from anything. Prefer an explicit list — `["*"]` is a wide
   trust grant.
