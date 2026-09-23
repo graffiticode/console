@@ -49,6 +49,12 @@ const CASES: Case[] = [
   { tag: "survey", lang: "0182", want: "in", prompt: "Take the workplace-pulse survey, and prefer not to say wherever it lets me." },
   // ...but a rating question with a right answer is still an assessment.
   { tag: "survey", lang: "0182", want: "0180", prompt: "Make a quiz where students rate each statement true or false, with an answer key." },
+  // L0183 (concept webs) holds its own requests and hands off what is not a hub-and-ring web.
+  { tag: "concept", lang: "0183", want: "in", prompt: "Make a concept map of the parts of a cell where students drag three terms onto blank nodes." },
+  { tag: "concept", lang: "0183", want: "in", prompt: "Create a food chain web where students label each arrow." },
+  { tag: "concept", lang: "0180", want: "0183", prompt: "Make a mind map of the causes of World War I." },
+  { tag: "concept", lang: "0183", want: "0171", prompt: "Make a Venn diagram comparing cats and dogs." },
+  { tag: "concept", lang: "0183", want: "0180", prompt: "Make a 5-question multiple choice quiz on the water cycle." },
 ];
 
 const arg = (name: string) => {
