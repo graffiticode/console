@@ -299,17 +299,17 @@ export async function classifyAndRoute({
   const askText = splitAt > 0 ? userRequest.slice(0, splitAt).trim() : userRequest;
   const sourceText = splitAt > 0 ? userRequest.slice(splitAt).trim().slice(0, 1200) : "";
 
-  // A named brand outranks the item-type words beside it. "Mystic Wonk quiz" names L0182's
-  // product with the wrong noun; left to the classifier, "quiz" matched L0180 and L0182's own
-  // "do NOT route a quiz here" clause, and the user got a quiz. So when the ASK names a brand,
-  // the verdict is confined to the languages that carry it: judged against one of them (the
-  // client's pick if it is one), rerouted only among them, and refused when none fits — a
-  // "Mystic Wonk concept web" is refused, never quietly handed to L0169.
+  // A named brand outranks the item-type words beside it. "<Brand> quiz", naming a survey
+  // product with the wrong noun, was left to the classifier once: "quiz" matched L0180 and the
+  // survey language's own "do NOT route a quiz here" clause, and the user got a quiz. So when
+  // the ASK names a brand, the verdict is confined to the languages that carry it: judged
+  // against one of them (the client's pick if it is one), rerouted only among them, and refused
+  // when none fits — a "<Brand> concept web" is refused, never quietly handed to L0169.
   const branded = brandedLanguageIds(askText);
   const evalLang = branded.length && !branded.includes(currentLang) ? branded[0] : currentLang;
   // In brand mode the question changes. A scope's out_of_scope clauses exist to keep
   // UNBRANDED requests out ("do NOT route a quiz here"), and a note saying the brand decides
-  // lost to them: "Take the Mystic Wonk quiz" was refused on L0182's own quiz clause. With the
+  // lost to them: "Take the <Brand> quiz" was refused on the survey language's own quiz clause. With the
   // language already decided, the only question left is whether the ask is for the kind of
   // artifact it makes under any name, so those clauses — and the steer-away sentences in its
   // summary — are withheld and the question is asked directly.
