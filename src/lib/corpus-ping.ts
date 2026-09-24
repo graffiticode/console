@@ -164,7 +164,7 @@ async function promptForLang(lang: string, day: number): Promise<{ turns: string
     .where("lang", "==", lang)
     // `messages` as well as `prompt`: an example can be a CONVERSATION, and the two
     // fields say different things about it. `prompt` is every user turn joined (see
-    // extractTaskFromMessages in scripts/download-training-examples.ts), while
+    // extractTaskFromMessages in scripts/generate-embeddings-from-examples.ts), while
     // `messages` keeps them apart — which is the only way to replay them as the turns
     // they were. 44 of L0182's 50 rows are two-turn as of 2026-09-11.
     .select("prompt", "messages")

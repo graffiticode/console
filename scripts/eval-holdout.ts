@@ -180,8 +180,8 @@ export async function assertHoldout(
     `\n` +
     `\n          Fix by either:` +
     `\n            - removing those prompts from the eval set, or` +
-    `\n            - dropping them from the corpus:  npx tsx scripts/update-embeddings.ts --lang <id> --refresh` +
-    `\n              (after removing them from training/l<lang>-training-examples.md)` +
+    `\n            - dropping them from the corpus: unmark the eval-account item (mark != 1) and delete` +
+    `\n              its training_examples doc — generate-embeddings-from-examples.ts does not prune` +
     `\n` +
     `\n          To measure retrieval-assisted performance deliberately, pass --allow-leak.\n`,
   );

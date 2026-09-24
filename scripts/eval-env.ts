@@ -12,7 +12,7 @@
 import * as dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
-// Firestore → prod graffiticode-app (mirrors scripts/download-training-examples.ts). Emulator env
+// Firestore → prod graffiticode-app (mirrors scripts/generate-embeddings-from-examples.ts). Emulator env
 // vars come from the shell; a .env file can't unset them, so delete here before db init runs.
 delete process.env.FIRESTORE_EMULATOR_HOST;
 delete process.env.FIREBASE_AUTH_EMULATOR_HOST;

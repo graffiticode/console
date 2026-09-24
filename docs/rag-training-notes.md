@@ -20,14 +20,9 @@ Curated training examples to single-turn prompts that match how users actually a
 
 ### Workflow
 ```bash
-# Download examples from Firestore. The RAG training corpus is ALWAYS mark 3,
-# which is now the script's default. --lang is required; there is no default language.
-npm run download-training-examples -- --lang 0166
-
-# Edit training/l0166-training-examples.md as needed
-
-# Regenerate embeddings
-npx tsx scripts/update-embeddings.ts --lang 0166 --refresh
+# Curate the corpus items (eval account, mark=1) — the RAG corpus is built from them.
+# Then rebuild embeddings for the language:
+npx tsx scripts/generate-embeddings-from-examples.ts --lang 0166
 ```
 
 ## Prompt Engineering for Pattern Fidelity

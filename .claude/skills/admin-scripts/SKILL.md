@@ -25,8 +25,7 @@ export GRAFFITICODE_APP_CREDENTIALS=~/graffiticode-app-key.json # graffiticode-a
   - `--by-lang` (implies `--per-item`) breaks cost/item down by language; `--lang <id>` (repeatable; `0176`/`L0176`/`176`) scopes to a language or family. Per-item attribution joins on `itemId` (edits) and `generatedTaskId` (fresh creates, where generation precedes the item). The free-plan trial tally has no language dimension, so the paid/trial split over-counts trial under any language filter.
   - Output ends with a margin table per plan from `PLANS`.
 - `npx tsx scripts/audit-token-counts.ts [--from/--to] [--as-of] [--json]` - **Are our recorded token counts complete?** The counterweight to `cost-per-item.ts`: compares token *counts* against the providers' org-wide metering, broken down by API key. Near parity = instrumentation is complete; materially low = a call path doesn't reach `recordTokenUsage`; materially high = double counting. A key driven by local scripts/evals shows as metered-but-unrecorded, which is not an app instrumentation gap. Needs `ANTHROPIC_ADMIN_KEY`; `OPENAI_ADMIN_KEY` optional (`api.usage.read` scope). Provider reports lag by hours, so the window defaults to 7 settled days and `--to` is **exclusive** (unlike `cost-per-item.ts`).
-- `npx tsx scripts/update-embeddings.ts` - Update training example embeddings
-- `npx tsx scripts/download-training-examples.ts` - Download training examples to markdown
+- `npx tsx scripts/generate-embeddings-from-examples.ts --lang <id>` - Build the RAG corpus (`training_examples`) from the eval account's `mark=1` items; writes a log to `training/l<id>-embeddings.json`. Upserts only — it does not delete docs for items that are no longer marked.
 - `npx tsx scripts/upgrade-basis-and-deploy.ts` - Upgrade @graffiticode/basis in all language repos and deploy
   - `--lang 0158 0166` - Only upgrade specific languages
   - `--no-force` - Skip deploy if basis is already up to date

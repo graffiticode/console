@@ -47,21 +47,20 @@ This creates indexes for:
 
 ### 3. Generate Embeddings for Existing Data
 
-If you have existing training examples without embeddings, run:
+The `training_examples` corpus is built from the eval account's `mark=1` items:
 
 ```bash
-# Update all training examples
-node scripts/update-embeddings.js --collection training_examples
+# All languages
+npx tsx scripts/generate-embeddings-from-examples.ts
 
-# Update only specific language examples
-node scripts/update-embeddings.js --collection training_examples --lang 0002
+# One language
+npx tsx scripts/generate-embeddings-from-examples.ts --lang 0002
 
-# Update successful generations
-node scripts/update-embeddings.js --collection successful_generations
-
-# Process in smaller batches (default is 10)
-node scripts/update-embeddings.js --collection training_examples --batch-size 5
+# Smaller batches (default is 10)
+npx tsx scripts/generate-embeddings-from-examples.ts --batch-size 5
 ```
+
+It upserts only; docs for items that are no longer marked must be deleted by hand.
 
 ### 4. Initialize Training Examples (Optional)
 
@@ -121,7 +120,7 @@ Store Successful Generation (with embedding)
 
 - `src/lib/embedding-service.js` - Core embedding and vector search functionality
 - `src/lib/code-generation-service.js` - Updated to use RAG
-- `scripts/update-embeddings.js` - Batch update existing documents
+- `scripts/generate-embeddings-from-examples.ts` - Build `training_examples` from corpus items
 - `firestore.indexes.json` - Vector search index definitions
 
 ## Performance Considerations

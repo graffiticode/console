@@ -558,7 +558,7 @@ async function processExample(
 
     // Step 4: Create the item via createItem() — this handles Firestore write + billing
     const itemName = String(example.exampleNumber).padStart(3, "0");
-    // The recorded conversation is every turn, in order. download-training-examples
+    // The recorded conversation is every turn, in order. generate-embeddings-from-examples
     // joins an example's user messages back into one prompt, so a two-turn example
     // reaches the corpus as the conversation that produced the code — which is what
     // the model has to learn to answer.
