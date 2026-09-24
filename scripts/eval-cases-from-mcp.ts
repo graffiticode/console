@@ -3,7 +3,7 @@
  *
  * WHY THIS EXISTS
  *   scripts/eval-holdout.ts keeps an eval case from BEING a training example. It cannot keep one
- *   from being a paraphrase of one. The corpus is dense, so a case seeded from marks-3/4 data and
+ *   from being a paraphrase of one. The corpus is dense, so a case seeded from mark-1 data and
  *   then reworded passes the gate clean while RAG still retrieves a near-answer for it — and the
  *   sweep partly measures which family copies a supplied solution best. That is the exact axis a
  *   family ordering is supposed to measure, so the contamination is directional, not noise.

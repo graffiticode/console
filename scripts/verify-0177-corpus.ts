@@ -32,11 +32,11 @@ import { getLanguageLexicon } from "../src/lib/api";
 import { getFirestore } from "../src/utils/db";
 
 /** Whose items to inspect. Defaults to the account the training corpus is harvested from. */
-const UID = process.env.CORPUS_UID || "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1";
+const UID = process.env.CORPUS_UID || "2c9d72e315fbafb128011bc32739666c7e6e7eb9";
 const VIEWS = ["item-edit", "item-list", "activity-edit", "activity-list"];
 const MARK = process.argv.includes("--mark");
-/** Marks 3 and 4 are the training set; 3 is what a downloaded corpus row carries. */
-const TRAINING_MARK = 3;
+/** Mark 1 is the training set (the RAG corpus). */
+const TRAINING_MARK = 1;
 
 interface Verdict { name: string; id: string; ok: boolean; why: string }
 

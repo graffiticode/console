@@ -104,7 +104,7 @@ const normText = (v: unknown) => String(v ?? '').trim().replace(/\s+/g, ' ');
  * stored alongside the match.
  */
 function topMatchOf(d: AnalyticsDoc): { doc: RetrievalDoc; similarity: number; selfMatch: boolean } | null {
-  const documents = d.retrieval?.documents ?? [];
+  const documents = (d.retrieval?.documents ?? []).filter(x => typeof x.similarity === 'number');
   if (documents.length === 0) return null;
   const best = [...documents].sort((a, b) => b.similarity - a.similarity)[0];
   const query = normText(d.query?.text ?? d.query?.embeddingText);

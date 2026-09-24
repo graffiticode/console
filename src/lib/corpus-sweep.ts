@@ -28,10 +28,11 @@
 import { getFirestore } from "../utils/db";
 import { generateCodeForRequest } from "./code-generation/generate-for-request";
 import { getCredentialsForApiKey } from "./api-credentials";
-import { getBaseUrlForApi } from "./api";
+import { getBaseUrlForApi, getApiTask, getLanguageLexicon } from "./api";
 import { compareShape, type ShapeLevel } from "./code-shape";
 import { harnessItemId } from "./harness-item-ids";
 import { PING_LANGUAGES } from "./corpus-ping";
+import { unparse } from "@graffiticode/parser";
 
 /** Same set as the daily ping: registered, has a corpus, not deprecated or internal. */
 export const SWEEP_LANGUAGES = PING_LANGUAGES;
@@ -99,6 +100,7 @@ interface CorpusEntry {
   ref: string;
   prompt: string;
   code: string;
+  taskId: string | null;
   model: string | null;
 }
 
@@ -119,10 +121,12 @@ async function corpusFor(lang: string, week: number | null): Promise<CorpusEntry
       ref: d.id,
       prompt: String(d.get("prompt") || "").trim(),
       code: String(d.get("code") || "").trim(),
+      // task_id for AST-based comparison; absent on older rows.
+      taskId: (d.get("task_id") as string) ?? null,
       // Written by create-items-from-prompts going forward; absent on older rows.
       model: (d.get("model") as string) ?? null,
     }))
-    .filter((e) => e.prompt && e.code);
+    .filter((e) => e.prompt && (e.code || e.taskId));
 
   if (week === null || all.length <= SAMPLE_SIZE) return all;
   const start = (week * SAMPLE_SIZE) % all.length;
@@ -173,6 +177,32 @@ async function taskCompiles(taskId: string, accessToken: string): Promise<{ comp
   }
 }
 
+/**
+ * Get source code by fetching the AST from a taskId and unparsing it.
+ * This ensures comparison uses the canonical AST representation, not stored source strings.
+ */
+async function getSourceFromTaskId(
+  taskId: string,
+  lang: string,
+  auth: { token: string },
+): Promise<string | null> {
+  try {
+    const apiTask = await getApiTask({ auth, id: taskId });
+    const taskList = Array.isArray(apiTask) ? apiTask : [apiTask];
+    const taskData = taskList[0] || apiTask;
+    if (!taskData?.code) return null;
+
+    const code = typeof taskData.code === "string"
+      ? JSON.parse(taskData.code)
+      : taskData.code;
+
+    const lexicon = await getLanguageLexicon(lang, auth.token);
+    return unparse(code, lexicon || {});
+  } catch {
+    return null;
+  }
+}
+
 async function sweepOne(
   lang: string,
   entry: CorpusEntry,
@@ -210,7 +240,14 @@ async function sweepOne(
       return { ...base, verdict: "failed", stage: "compile", error: compile.error, latencyMs: elapsed() };
     }
 
-    const diff = await compareShape(lang, entry.code, gen.src);
+    // Get source by unparsing AST from taskId for both baseline and fresh.
+    // This ensures comparison uses canonical AST representation, not stored source strings.
+    const baselineSrc = entry.taskId
+      ? (await getSourceFromTaskId(entry.taskId, lang, auth)) || entry.code
+      : entry.code;
+    const freshSrc = (await getSourceFromTaskId(gen.taskId, lang, auth)) || gen.src;
+
+    const diff = await compareShape(lang, baselineSrc, freshSrc);
     // `values` collapses into match on purpose: differing invented literals mean the prompt
     // underdetermined the content, not that the program changed.
     const verdict: SweepVerdict = diff.level === "structure" ? "structure" : "match";

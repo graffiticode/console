@@ -24,7 +24,7 @@ Options:
 
 const userId = args.includes('--uid')
   ? args[args.indexOf('--uid') + 1]
-  : '24493e1c7a7f1ad57e3c478087c74c2dacb0cba1';
+  : '2c9d72e315fbafb128011bc32739666c7e6e7eb9';
 const lang = args[args.indexOf('--lang') + 1];
 const markValues: number[] | null = args.includes('--mark')
   ? args[args.indexOf('--mark') + 1].split(',').map(v => parseInt(v.trim()))

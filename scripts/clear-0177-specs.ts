@@ -11,7 +11,7 @@ import admin from "firebase-admin";
 import { getCredentialsForApiKey } from "../src/lib/api-credentials";
 import { getFirestore } from "../src/utils/db";
 
-const ACCOUNTS = ["EVAL", "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1"];
+const ACCOUNTS = ["EVAL"];
 
 (async () => {
   const db = getFirestore();

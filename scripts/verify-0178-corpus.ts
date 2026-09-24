@@ -15,7 +15,7 @@ import { unparse } from "@graffiticode/parser";
 import { getLanguageLexicon } from "../src/lib/api";
 import { getFirestore } from "../src/utils/db";
 
-const UID = process.env.CORPUS_UID || "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1";
+const UID = process.env.CORPUS_UID || "2c9d72e315fbafb128011bc32739666c7e6e7eb9";
 const MARK = process.argv.includes("--mark");
 const BLOCKS = ["items-get", "responses-get"];
 
@@ -63,7 +63,7 @@ async function main() {
   const passed = rows.filter(r => r.ok);
   console.log(`\n${passed.length}/${rows.length} pass`);
   if (MARK) {
-    for (const r of passed) { await db.doc(`users/${UID}/items/${r.id}`).update({ mark: 3 }); console.log(`marked ${r.name}`); }
+    for (const r of passed) { await db.doc(`users/${UID}/items/${r.id}`).update({ mark: 1 }); console.log(`marked ${r.name}`); }
   }
   process.exit(passed.length === rows.length ? 0 : 1);
 }

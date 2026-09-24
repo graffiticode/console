@@ -8,6 +8,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Use concise commit comments
 - Don't automatically commit changes
 
+## Quick Reference
+
+```bash
+npm run dev           # Local development server
+npm run lint          # ESLint (gate)
+npm run typecheck     # TypeScript check (gate)
+npm run lint:fix      # Auto-fix lint issues
+npm run refresh       # Pull local .tgz from sibling l0002/l0011 repos
+```
+
+Node ≥18.17.0 required.
+
 ## Commands
 
 There is no unit-test runner (no `npm test`); `test:streaming` is a manual `tsx` script. The real gate is: `npm run lint` and `npm run typecheck` must pass.
@@ -28,6 +40,15 @@ Why lint+typecheck isn't sufficient: 2026-09-01, `CODEGEN_EFFORT=low` was set wi
 Ping, not sweep: the ping is the daily liveness check above. `npm run corpus-sweep` is weekly, ~110 generations, and compares output *shape* — for changes that could move quality (retuning a model, tier, or prompt).
 
 Neither one licenses a **`MODEL_PRIORITY` change**. That comes from `npm run eval` (`scripts/model-eval.ts`), which varies one axis — today the model, with `options.model` pinned and one RAG retrieval shared by every variant — and reports first-pass compile, drift, warnings, agreement, latency and cost. Two rules it enforces that are easy to skip by hand: eval cases **must not be in the RAG corpus** (`npm run eval:holdout`; the gate fails the run before any spend, `--allow-leak` downgrades it to a warning), and a cross-family ordering needs `--panel` — one judge per family, reporting self-preference — before a `MODEL_PRIORITY` line is committed, because a single Claude judge ranking Claude against GPT is grading its own family. For a dialect whose compile rate is already saturated, `--converge N` is the metric that separates variants (the item reached after feeding the compiler's warnings back, and what that iteration cost). Case + label helpers: `eval:cases`, `eval:label-*`, `eval:calibrate`.
+
+**Eval commands:**
+```bash
+npm run eval              # Full model evaluation (requires --panel for cross-family)
+npm run eval:holdout      # Check cases aren't in RAG corpus (run first!)
+npm run eval:calibrate    # Calibrate judge
+npm run eval:cases        # Generate eval cases from MCP sessions
+npm run eval:judge-smoke  # Quick judge sanity check before big runs
+```
 
 ## Deploy
 
@@ -63,8 +84,6 @@ Request → **scope-gate head routing** → **permission-governed composition** 
 - The MCP server's worker-died guard (`GENERATION_STALE_MS` in `graffiticode-mcp-server/src/tools.ts`) must stay **above** that 900s ceiling, or it reports a still-running generation as failed. Move the two together.
 - The payload is versioned (`GENERATION_JOB_VERSION`): a task already queued was serialized by the previous revision, so renaming or removing a field silently loses it in flight — bump and branch in the worker. Adding an optional field is backward compatible and must **not** bump (a bump 400s every in-flight job). No model-selection fields travel in the payload, so a queued task can never pin an unreviewed model.
 
-Local dev has no queue: `GENERATION_QUEUE_LOCAL=1` fires the worker directly with an un-awaited fetch.
-
 **Authentication:** Ethereum wallet sign-in (SIWE) is primary; email magic-link via Privy derives an embedded wallet that signs the same SIWE nonce, so **the wallet must be reused, never re-created** (a fresh one changes the uid). Google OAuth is account-linking only, never a sign-in method. Server-side `authenticate()` accepts a Firebase ID token OR an api key, but **api.graffiticode.org accepts only Firebase ID tokens** — convert via `getCredentialsForApiKey` before forwarding. Details: skill `auth-and-signin`.
 
 **Free-plan tier (no-signin via MCP):** anonymous MCP sessions authenticated by `X-Free-Plan-Session`, metered in **items** (not dollars or compiles), items tagged `freePlan`/`sessionNamespace`/`expiresAt` (48h TTL). `sessionNamespace` means **workspace**, not "the session that created this" — a mutation on an existing item adopts its workspace. Browser console UI always requires real sign-in. Language scope (`freePlan?` in `src/lib/languages.ts`) ships inert. Details: skill `free-plan-and-claim`; runbook `docs/free-plan-attested-sessions.md`.
@@ -85,6 +104,19 @@ Local dev has no queue: `GENERATION_QUEUE_LOCAL=1` fires the worker directly wit
 
 **Item-based pricing & metering:** billing meters **successful items created per month** — iteration, reads, and compiles are free. `src/lib/plans-config.ts` (`PLANS`) is the single source of truth for tiers, allowances, overage rates, and Stripe price-id mappings; **never hardcode any of them** (that duplication was already removed once). Counting happens in `recordBillableItem()`, gating in `checkItemCreateAllowed()`. **Bronze (`demo`, ex-"Free") is a two-state tier:** hard-capped at 25 items until the customer enrolls in pay-as-you-go, then metered at $0.40/item up to a spend cap ($10 / 25 items by default; on Bronze it can be changed but never removed). Payment details are captured at exactly two moments — the 25-item wall and setting a cap — never at signup. Branch on `isHardCappedFor(plan, subscription)`, never bare `isHardCapped(plan)`. Details: skill `item-pricing`; full reference `docs/item-based-pricing.md`.
 
+## Documentation
+
+| Topic | File |
+|-------|------|
+| Language routing & composition | `docs/language-routing-and-composition.md` |
+| Item-based pricing | `docs/item-based-pricing.md` |
+| Free-plan sessions | `docs/free-plan-attested-sessions.md` |
+| Secret encryption | `docs/secret-encryption.md` |
+| RAG setup | `docs/RAG_SETUP.md` |
+| LLM providers | `docs/LLM_PROVIDERS.md` |
+| Streaming API | `docs/STREAMING_API.md` |
+| Language authoring | `docs/language-authoring-style.md` |
+
 ## Code Style
 
 - PascalCase for components (`NewAPIKeyDialog.tsx`), camelCase for functions/variables
@@ -100,12 +132,29 @@ Two prohibitions that outlive any one script:
 
 **Secrets & credentials:** account credentials are split across a public `credentials` doc and an encrypted `secrets` doc under `users/{uid}/settings`; the **identical keyring** must be present on the console runtime AND every `l0NNN` compiler service (console encrypts, compilers decrypt). Full contract (ciphertext formats, env vars, rotation procedure): `docs/secret-encryption.md`.
 
-**Eval account (`EVAL_UID` / `EVAL_API_KEY`):** all corpus operations run under this dedicated account — corpus item creation (`create-items-from-prompts.ts`), training example generation (`generate-training-examples.ts`), provenance backfills, model evals, and sweeps. The account is defined in `.env.local` as `EVAL_UID=2c9d72e315fbafb128011bc32739666c7e6e7eb9`. Scripts that take `GC_API_KEY_SECRET` should be run with `GC_API_KEY_SECRET=$EVAL_API_KEY` to ensure items land under the eval account, not a personal account. Corpus items live in `users/{EVAL_UID}/items`; the `training_examples` collection (RAG corpus) is derived from them via `generate-training-examples.ts`.
+**Eval account (`EVAL_UID` / `EVAL_API_KEY`):** **all** eval-related content lives under this dedicated account — corpus items, the RAG corpus (`training_examples` vector collection), model evals, sweeps, and provenance backfills. The account is defined in `.env.local` as `EVAL_UID=2c9d72e315fbafb128011bc32739666c7e6e7eb9`.
+
+**RAG corpus pipeline:** corpus items → `generate-embeddings-from-examples.ts` → `training_examples` (with embeddings).
+
+**All corpus and eval scripts must use the eval account.** Scripts that take `GC_API_KEY_SECRET` should be run with `GC_API_KEY_SECRET=$EVAL_API_KEY`:
+- `create-items-from-prompts.ts` — creates corpus items from `examples.md`
+- `generate-embeddings-from-examples.ts` — builds RAG corpus (`training_examples`) from corpus items; uses `mark=1`
+- `backfill-corpus-provenance.ts` — adds provenance to existing corpus
+- `corpus-sweep.ts` — weekly quality check
+- `model-eval.ts` — model evaluation runs
+
+**RAG corpus filtering:** only items with `mark=1` are included in the RAG corpus.
+
+Corpus items live in `users/{EVAL_UID}/items`; personal accounts should never hold corpus or eval data.
 
 ## Local Development
 
 1. Configure `.env.local` with API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, Firebase config, etc.)
 2. `npm run dev`
-3. Run Graffiticode API/auth servers separately (see graffiticode/graffiticode repo)
+3. Run Graffiticode API/auth servers separately (see graffiticode/graffiticode repo) — they run on `localhost:3100` and `localhost:4100`
+
+**Local queue bypass:** `GENERATION_QUEUE_LOCAL=1` fires the async generation worker directly (no Cloud Tasks).
+
+**Language package refresh:** `npm run refresh` copies `.tgz` files from sibling `../l0002` and `../l0011` directories — use when iterating on language packages locally.
 
 **Anthropic key split — dev vs prod.** Two org API keys: `graffiticode-console` is **production only** (plain env var on the `console` Cloud Run service — do NOT put it in `.env.local`), and `graffiticode-console-dev` is what `.env.local`'s `ANTHROPIC_API_KEY` holds, so `npm run dev` spends there. Anything measuring **production** spend must read `ANTHROPIC_CONSOLE_KEY_IDS` rather than resolving `ANTHROPIC_API_KEY`. Details and traps: skill `admin-scripts`.

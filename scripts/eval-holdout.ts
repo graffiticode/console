@@ -1,7 +1,7 @@
 /**
  * Hold-out preflight for the eval harness.
  *
- * `model-eval.ts` instructs that eval cases be seeded from marks-3/4 training
+ * `model-eval.ts` instructs that eval cases be seeded from mark-1 training
  * examples "but HOLD THEM OUT of RAG so you're not grading against retrieved
  * answers." Nothing enforced that, and the failure is silent and directional:
  * if a case is also a live `training_examples` doc, RAG retrieves the answer and

@@ -45,7 +45,7 @@ import {
 } from "../src/pages/api/resolvers";
 import { getLanguageLexicon } from "../src/lib/api";
 
-const DEFAULT_UID = "24493e1c7a7f1ad57e3c478087c74c2dacb0cba1";
+const DEFAULT_UID = "2c9d72e315fbafb128011bc32739666c7e6e7eb9";
 
 function arg(name: string, fallback: string | null = null): string | null {
   const i = process.argv.indexOf(`--${name}`);

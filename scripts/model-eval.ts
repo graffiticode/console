@@ -77,7 +77,7 @@
  *   - api.graffiticode.org reachable (the compile step).
  *
  * EVAL SET: data/model-eval/<lang>.json = [{ id, prompt, currentCode? }].
- *   Seed from marks-3/4 training examples, but HOLD THEM OUT of RAG — the gate
+ *   Seed from mark-1 training examples, but HOLD THEM OUT of RAG — the gate
  *   above enforces this rather than trusting it.
  *
  * USAGE
