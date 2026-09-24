@@ -1,5 +1,10 @@
 # Language style: attribute lists, not chained attributes
 
+> **Newer style:** L0183 (2026-09-24) uses typed members and attribute chains —
+> `nodes [ node text "A" {} ]` — described in `language-style-typed-chains.md`, which is the
+> style to start a new dialect from. This document remains the reference for L0176, L0179,
+> L0180 and L0182, and for the parts both styles share (generated handlers, §7's traps).
+
 How to encode a language's attributes when you are building a new `l0NNN` dialect. This is the
 style L0176 uses and the one to copy; L0166 shows the older chained style, which is still
 correct for what it does. The audience is whoever (or whatever) is authoring a new language —

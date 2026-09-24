@@ -115,7 +115,8 @@ Request → **scope-gate head routing** → **permission-governed composition** 
 | RAG setup | `docs/RAG_SETUP.md` |
 | LLM providers | `docs/LLM_PROVIDERS.md` |
 | Streaming API | `docs/STREAMING_API.md` |
-| Language authoring | `docs/language-authoring-style.md` |
+| Language authoring (new dialects) | `docs/language-style-typed-chains.md` |
+| Language authoring (attribute-list dialects) | `docs/language-authoring-style.md` |
 
 ## Code Style
 
