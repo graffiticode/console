@@ -136,12 +136,12 @@ Two prohibitions that outlive any one script:
 
 **RAG corpus pipeline:** corpus items → `generate-embeddings-from-examples.ts` → `training_examples` (with embeddings).
 
-**All corpus and eval scripts must use the eval account.** Scripts that take `GC_API_KEY_SECRET` should be run with `GC_API_KEY_SECRET=$EVAL_API_KEY`:
+**All corpus and eval scripts must use the eval account.** Those that take `GC_API_KEY_SECRET` must be run with `GC_API_KEY_SECRET=$EVAL_API_KEY`:
 - `create-items-from-prompts.ts` — creates corpus items from `examples.md`
-- `generate-embeddings-from-examples.ts` — builds RAG corpus (`training_examples`) from corpus items; uses `mark=1`
 - `backfill-corpus-provenance.ts` — adds provenance to existing corpus
 - `corpus-sweep.ts` — weekly quality check
-- `model-eval.ts` — model evaluation runs
+
+The rest pick the eval account themselves: `generate-embeddings-from-examples.ts` (builds `training_examples` from `mark=1` corpus items; defaults to `EVAL_UID`) and `model-eval.ts` (reads `EVAL_API_KEY`).
 
 **RAG corpus filtering:** only items with `mark=1` are included in the RAG corpus.
 
