@@ -6,6 +6,9 @@ import { useToken } from '@graffiticode/auth-react';
 import { getPageTitle } from '../../lib/utils';
 import { getBaseUrlForApi, getLanguageAsset } from "../../lib/api";
 
+/** Fixed per page load: a fresh visit busts the cache, a re-render does not reload the frame. */
+const PAGE_LOAD = Date.now();
+
 type View = 'spec' | 'usage-guide' | 'instructions';
 
 const VIEW_FILES: Record<Exclude<View, 'spec'>, string> = {
@@ -71,9 +74,11 @@ export default function Spec({ language }) {
     // An iframe can't send an Authorization header, so pass the token as a
     // query param (the API accepts ?access_token) to resolve any per-user
     // language-server override for the rendered spec.
+    // `_cb` defeats the `max-age=3600` api.graffiticode.org serves spec.html with, which
+    // otherwise shows the pre-deploy spec for up to an hour (getLanguageAsset does the same).
     const src = accessToken
-      ? `${getBaseUrlForApi()}/L${langId}/spec.html?access_token=${encodeURIComponent(accessToken)}`
-      : `${getBaseUrlForApi()}/L${langId}/spec.html`;
+      ? `${getBaseUrlForApi()}/L${langId}/spec.html?_cb=${PAGE_LOAD}&access_token=${encodeURIComponent(accessToken)}`
+      : `${getBaseUrlForApi()}/L${langId}/spec.html?_cb=${PAGE_LOAD}`;
     return (
       <iframe
         className="w-full h-screen"
