@@ -71,6 +71,10 @@ export const PING_LANGUAGES = [
   // generation here with no deploy and no diff on this side — the shape of failure that
   // typecheck and lint cannot see.
   "0182",
+  // 0183 (concept webs, successor to L0169) joined 2026-09-24, the day its 112-example corpus
+  // was seeded and embedded — same reasoning as 0181. L0169 stays in the set above: it is
+  // deprecated, not retired, and its existing items still generate on edit.
+  "0183",
 ];
 
 /** How many generations run at once. Run serially, PING_LANGUAGES would take roughly a
