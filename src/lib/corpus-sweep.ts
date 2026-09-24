@@ -59,7 +59,7 @@ export interface SweepResult {
   /** Set when verdict is "structure" — vocabulary that separates the two programs. */
   onlyInBaseline?: string[];
   onlyInFresh?: string[];
-  /** True when a program could not be canonicalized, so the comparison used raw source. */
+  /** True when a program could not be canonicalized or unparsed from its AST, so the comparison used raw source. */
   degraded?: boolean;
   shapeLevel?: ShapeLevel;
   /** What wrote the stored baseline, when the corpus records it. Null for pre-provenance rows. */
@@ -126,7 +126,8 @@ async function corpusFor(lang: string, week: number | null): Promise<CorpusEntry
       // Written by create-items-from-prompts going forward; absent on older rows.
       model: (d.get("model") as string) ?? null,
     }))
-    .filter((e) => e.prompt && (e.code || e.taskId));
+    // `code` is required even when task_id is present: it is the fallback baseline.
+    .filter((e) => e.prompt && e.code);
 
   if (week === null || all.length <= SAMPLE_SIZE) return all;
   const start = (week * SAMPLE_SIZE) % all.length;
@@ -240,14 +241,16 @@ async function sweepOne(
       return { ...base, verdict: "failed", stage: "compile", error: compile.error, latencyMs: elapsed() };
     }
 
-    // Get source by unparsing AST from taskId for both baseline and fresh.
-    // This ensures comparison uses canonical AST representation, not stored source strings.
-    const baselineSrc = entry.taskId
-      ? (await getSourceFromTaskId(entry.taskId, lang, auth)) || entry.code
-      : entry.code;
-    const freshSrc = (await getSourceFromTaskId(gen.taskId, lang, auth)) || gen.src;
-
-    const diff = await compareShape(lang, baselineSrc, freshSrc);
+    // Compare unparsed ASTs when both sides have one; otherwise both fall back to raw source.
+    // Never mix the two — unparse formatting alone would read as a shape difference.
+    const [baselineAst, freshAst] = await Promise.all([
+      entry.taskId ? getSourceFromTaskId(entry.taskId, lang, auth) : null,
+      getSourceFromTaskId(gen.taskId, lang, auth),
+    ]);
+    const unparsed = baselineAst !== null && freshAst !== null;
+    const diff = unparsed
+      ? await compareShape(lang, baselineAst, freshAst)
+      : await compareShape(lang, entry.code, gen.src);
     // `values` collapses into match on purpose: differing invented literals mean the prompt
     // underdetermined the content, not that the program changed.
     const verdict: SweepVerdict = diff.level === "structure" ? "structure" : "match";
@@ -256,7 +259,7 @@ async function sweepOne(
       verdict,
       freshModel: gen.model || undefined,
       shapeLevel: diff.level,
-      degraded: diff.degraded || undefined,
+      degraded: diff.degraded || !unparsed || undefined,
       ...(verdict === "structure" ? { onlyInBaseline: diff.onlyInA.slice(0, 12), onlyInFresh: diff.onlyInB.slice(0, 12) } : {}),
       latencyMs: elapsed(),
     };
