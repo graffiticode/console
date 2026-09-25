@@ -1267,6 +1267,12 @@ export async function updateItem({
         // flips an existing private task public, so the public id can differ from
         // the private one and the item must point at it. Same content, so this
         // is a pointer swap, not a new version.
+        //
+        // Not atomic across segments: the posts run in parallel, so when one
+        // fails, others may already have created PUBLIC tasks for their
+        // content. The throw keeps this ITEM private (its record still points
+        // at the private ids), but it does not un-publish content a sibling
+        // post already made public. The api has no retraction path.
         const itemTaskId = taskId || itemData.taskId;
         if (itemTaskId) {
           const apiTask = await getApiTask({ id: itemTaskId, auth });
