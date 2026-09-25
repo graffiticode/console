@@ -1262,16 +1262,23 @@ export async function updateItem({
         // Make every task segment public BEFORE marking the item public, so a
         // failure leaves the item private (no local/API drift). A composition's
         // taskId is `head+up1+up2…`; getApiTask returns one entry per segment.
-        // Re-posting each segment's {lang, code} with isPublic flips acls.public
-        // on the existing task (postTask deletes Authorization but keeps the
-        // persistent storage-type header). Each segment has its own lang.
+        // Each segment's {lang, code} is posted anonymously (postTask deletes
+        // Authorization), which yields that content's PUBLIC task. The api never
+        // flips an existing private task public, so the public id can differ from
+        // the private one and the item must point at it. Same content, so this
+        // is a pointer swap, not a new version.
         const itemTaskId = taskId || itemData.taskId;
         if (itemTaskId) {
           const apiTask = await getApiTask({ id: itemTaskId, auth });
           const segments = Array.isArray(apiTask) ? apiTask : [apiTask];
-          await Promise.all(segments.map(({ lang, code }) =>
+          const posted = await Promise.all(segments.map(({ lang, code }) =>
             postTask({ auth, task: { lang, code }, ephemeral: false, isPublic: true })
           ));
+          const publicIds = posted.map((data) => data?.id);
+          if (publicIds.length === 0 || !publicIds.every((pid) => typeof pid === "string" && pid)) {
+            throw new Error("updateItem(): publishing did not return a task id for every segment");
+          }
+          updates.taskId = publicIds.join("+");
         }
       }
       updates.isPublic = isPublic;
