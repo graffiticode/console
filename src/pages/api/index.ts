@@ -39,6 +39,14 @@ import { checkBurstLimit, BURST } from "../../lib/free-plan-throttle";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
+import {
+  listConnections,
+  createConnection,
+  rotateConnection,
+  disableConnection,
+  deleteConnection,
+  PolicyError,
+} from "../../lib/policy-client";
 import { enqueueGenerationJob } from "../../lib/generation-queue";
 import {
   FreePlanError,
@@ -89,6 +97,18 @@ async function resolveAuth(ctx): Promise<AuthContext> {
   }
   const { uid, idToken } = await authenticate(ctx.token);
   return { uid, token: idToken };
+}
+
+// Policy errors surface as their reason only ("not-owner", "unavailable", …).
+async function viaPolicy<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof PolicyError) {
+      throw new Error(`Connection request refused: ${err.reason ?? err.status}`);
+    }
+    throw err;
+  }
 }
 
 const typeDefs = `
@@ -254,9 +274,19 @@ const typeDefs = `
     updatedAt: String!
   }
 
+  # An external-API connection the user owns. Its credential lives only in the
+  # credential broker; it is never returned here.
+  type Connection {
+    connectionId: String!
+    backend: String!
+    status: String!
+    label: String
+  }
+
   type Query {
     checkItemCreateAllowed: CompileAllowedResponse!
     credentials: [CredentialInfo!]!
+    connections: [Connection!]!
     parse(lang: String!, src: String!, itemId: String): ParseResult!
     data(id: String!): String!
     compiles(lang: String!, type: String!): [Compile!]
@@ -312,6 +342,10 @@ const typeDefs = `
     claimFreePlanSession(token: String!): ClaimResult!
     setCredential(name: String!, value: String!, backend: String, isPublic: Boolean): CredentialInfo!
     deleteCredential(name: String!): Boolean!
+    createConnection(backend: String!, label: String, key: String!, secret: String!): Connection!
+    rotateConnection(connectionId: String!, key: String!, secret: String!): Boolean!
+    disableConnection(connectionId: String!): Boolean!
+    deleteConnection(connectionId: String!): Boolean!
   }
 
   # Model selection is deliberately absent. Which model family and tier serve a
@@ -379,6 +413,11 @@ const resolvers = {
     credentials: async (_, __, ctx) => {
       const auth = await resolveAuth(ctx);
       return await listCredentials({ auth });
+    },
+    connections: async (_, __, ctx) => {
+      if (ctx.freePlan) return [];
+      const auth = await resolveAuth(ctx);
+      return await viaPolicy(() => listConnections(auth.token));
     },
     data: async (_, args, ctx) => {
       const { id } = args;
@@ -749,6 +788,31 @@ const resolvers = {
       }
       const auth = await resolveAuth(ctx);
       return await deleteCredential({ auth, name: args.name });
+    },
+    createConnection: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      return await viaPolicy(() => createConnection(auth.token, {
+        backend: args.backend, label: args.label, key: args.key, secret: args.secret,
+      }));
+    },
+    rotateConnection: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      await viaPolicy(() => rotateConnection(auth.token, args.connectionId, { key: args.key, secret: args.secret }));
+      return true;
+    },
+    disableConnection: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      await viaPolicy(() => disableConnection(auth.token, args.connectionId));
+      return true;
+    },
+    deleteConnection: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      await viaPolicy(() => deleteConnection(auth.token, args.connectionId));
+      return true;
     },
   },
   Item: {
