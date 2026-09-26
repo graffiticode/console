@@ -89,9 +89,17 @@ Those requirements are not implemented merely by updating these documents.
   at minting, and the broker refuses a token whose version is not the one it
   has installed, before touching the credential. Keeping an older reviewed
   version during a rolling deploy is not supported yet; a mismatch is refused.
-- **Artifact selection.** Not built. Views select by recipient, task-chain
-  revision and connection, and "latest" is invocation order with
-  compare-and-set, so an older run cannot replace a newer artifact.
+- **Artifact storage and selection.** Done on `policy-service`, not deployed.
+  After a successful compile through a connection, the gateway stores the
+  output minus its `request` signature as a private artifact
+  (`artifacts/{invocationId}`), bound to the recipient, owner, connection,
+  task chain, invocation and registry version, separate from the shared
+  compile cache. A head per (recipient, task chain, connection) moves only to
+  a newer invocation (compare-and-set on the policy-issued `seq`); a retry
+  rewrites its own artifact. Selection returns `ok`, `missing` or
+  `incompatible` (another registry version). Not done: no route reads
+  artifacts yet (4.2); a failed artifact write is only logged (recovery,
+  4.3). The Firestore store's emulator tests have not been run.
 - **Recovery.** Not built. Two paths, neither allocating a new invocation:
   - Artifact-only: a separate entry point, authenticated as the original
     recipient and invocation, publishes persisted unsigned content using
