@@ -59,10 +59,15 @@ Those requirements are not implemented merely by updating these documents.
   intentional reruns get a new one. Specify receipt bindings, retention,
   partial outcomes and uncertainty handling as required by the spec before
   removing intent tokens.
-- **Connection ownership.** Ownership and backend are immutable; transfers and
-  provider-account changes require a new connection ID and grants. Deleted
-  IDs cannot be reused. The broker currently loads a credential by connection
-  ID alone; it must also enforce the token's owner and backend binding.
+- **Connection ownership.** Done on `policy-service`. The broker stores each
+  credential with its owner and backend, sealed into the ciphertext's
+  associated data, and refuses a token whose owner or backend differs
+  (`credential-binding-mismatch`). Creating a secret and rotating it are
+  separate routes: rotation must keep the owner, backend and key (the
+  Learnosity consumer key identifies the provider account), and policy
+  reports a refusal as `provider-account-changed`. Deleting leaves a tombstone,
+  so an id is never reused. The Firestore store's emulator test has not been
+  run.
 - **Registry versions.** Done on `policy-service`: policy checks the version
   at minting, and the broker refuses a token whose version is not the one it
   has installed, before touching the credential. Keeping an older reviewed
