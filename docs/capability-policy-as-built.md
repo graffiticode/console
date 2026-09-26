@@ -90,11 +90,14 @@ Those requirements are not implemented merely by updating these documents.
   publication). Views run under the publication and re-check it live,
   including publication permission, and may use only view-safe functions,
   which needs a new registry flag.
-- **Connection-free compilation.** Not built; the legacy path still uses
-  parse-time credentials. It must never contact policy or the broker, list
-  skipped protected calls separately from errors, and pass verification when a
-  skipped call is the only issue. Generation, the corpus ping, eval and sweeps
-  use it.
+- **Connection-free compilation.** Partly done on l0176 `brokered-connection`.
+  Without a connection, `save-to-itembank` never writes: it evaluates to the
+  activity with `itemBank: { skipped: "no-connection", fn, occurrence }`, the
+  preview still renders, and the compile passes, so generation, the corpus
+  ping, eval and sweeps can never write. The Author Site is left unsigned. The
+  legacy write code is deleted. Deliberately kept until private artifacts
+  replace it: preview signing with parse-time credentials. Not done: a
+  language-independent skip list in l0000 (the skip is L0176's own field).
 - **Compiler egress control.** Not built or verified. Compilers must be unable
   to reach provider hosts directly; this is a deployment prerequisite.
 
