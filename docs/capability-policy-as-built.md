@@ -7,7 +7,7 @@ Those requirements are not implemented merely by updating these documents.
 
 ## How it works
 
-1. A compile that selects a connection (`connectionId`) takes the **brokered path**. Without a connection, the legacy path runs unchanged; the spec replaces it with connection-free compilation (see Required changes).
+1. A compile that selects a connection (`connectionId`) takes the **brokered path**, under an invocation the gateway allocates from policy. Without a connection, a compile never writes and never signs an Author session; it still signs previews with parse-time credentials until private artifacts replace them (see Connection-free compilation).
 2. Before any code runs, the compiler scans the parsed program for protected functions. It asks policy once for a **snapshot**: which functions this user may call through this connection. An ungranted call is a compile error, and the transformer never starts.
 3. When the transformer reaches a protected call, it asks policy to **mint** an execution token. The token covers exactly that call: function, broker operation, and a digest of the arguments.
 4. The **broker** verifies the token, checks the registry again, and confirms the payload matches the digest. It then loads the connection's credential and performs the named operation.
@@ -19,20 +19,23 @@ Those requirements are not implemented merely by updating these documents.
 |---|---|---|
 | Registry | graffiticode `packages/common/src/protected-registry.js` | Which functions map to which broker operations and backend; the single authority for both policy and broker |
 | Policy | graffiticode `packages/policy` | Connections, snapshot, mint, owner check; live connection check at every mint; KMS-signed tokens |
-| Broker | graffiticode `packages/broker` | Token verification, registry version, per-operation payload constraints, args digest, replay protection (each token once), write receipts. Only a definite provider rejection records a write as failed; a lost response, 5xx or unrecognized body records it as uncertain |
+| Broker | graffiticode `packages/broker` | Token verification, registry version, per-operation payload constraints, args digest, replay protection (each token once), write receipts bound to principal, owner, connection, language, function, operation, registry version and args digest (a receipt from another registry version is refused, not replayed). Only a definite provider rejection records a write as failed; a lost response, 5xx or unrecognized body records it as uncertain |
 | Compiler support | l0000 `exec-context` → published **0.5.0** | Per-compile context kept away from program variables; whole-program scan for protected calls; client for policy and broker |
 | L0176 | l0176 `explicit-save`, `brokered-connection` | `save-to-itembank <activity>` is the only write; preview signing, Author signing and saves go through the broker. Author signing is enforced (brokered, non-delegable); its request shape is unverified against Learnosity |
-| Gateway | graffiticode `api` | Passes `connectionId` to compilers; never serves a protected task from its cache |
+| Gateway | graffiticode `api` | Allocates one invocation per request through a connection and passes it, with each stage, to compilers; stores private artifacts; never serves a protected task from its shared cache |
 | Console | console `connections` | Server-side policy client; GraphQL connection create, list, rotate, disable and delete |
 
 ## Trust boundaries
 
 - **The calling service** is identified by a Google ID token that policy and the broker verify themselves (`X-Caller-Identity`). That caller is bound to a role:
-  - a compiler, for one language
-  - the console
-  - policy
+  - a compiler, for one language: snapshot and mint (policy), execute (broker)
+  - the console: intents and connection management (policy)
+  - the gateway: invocation allocation (policy)
+  - policy: credential provisioning (broker)
 - **The user** comes from their verified token and nothing else.
 - **Tokens** are ES256 with a fixed algorithm, issuer, audience and token type:
+  - intent token (console, for a deliberate save or Author session): 30 minutes; to be removed
+  - invocation token (gateway, one logical invocation): 30 minutes; a retry past expiry gets a fresh one for the same invocation
   - session token: about 15 minutes
   - execution token: at most 60 seconds, usable once, covering one request
 - **Credentials:** the broker holds them, encrypted under a broker-only key and tied to their connection. Policy passes a credential through once when a connection is created or rotated, and never stores it.
@@ -89,17 +92,20 @@ Those requirements are not implemented merely by updating these documents.
   at minting, and the broker refuses a token whose version is not the one it
   has installed, before touching the credential. Keeping an older reviewed
   version during a rolling deploy is not supported yet; a mismatch is refused.
-- **Artifact storage and selection.** Done on `policy-service`, not deployed.
-  After a successful compile through a connection, the gateway stores the
-  output minus its `request` signature as a private artifact
+- **Artifact storage and selection.** Built on `policy-service`, not deployed
+  or run against Firestore. After a successful compile through a connection,
+  the gateway strips the preview signature (`data.request` in the language's
+  `{ data, errors }` envelope) and stores the rest as a private artifact
   (`artifacts/{invocationId}`), bound to the recipient, owner, connection,
   task chain, invocation and registry version, separate from the shared
   compile cache. A head per (recipient, task chain, connection) moves only to
   a newer invocation (compare-and-set on the policy-issued `seq`); a retry
   rewrites its own artifact. Selection returns `ok`, `missing` or
-  `incompatible` (another registry version). Not done: no route reads
-  artifacts yet (4.2); a failed artifact write is only logged (recovery,
-  4.3). The Firestore store's emulator tests have not been run.
+  `incompatible` (another registry version). Output that still carries a
+  `signature` anywhere after stripping (an explicit `init`) is not stored. Not
+  done: no route reads artifacts yet (4.2); a failed artifact write is only
+  logged (recovery, 4.3). The Firestore store's emulator tests have not been
+  run.
 - **Recovery.** Not built. Two paths, neither allocating a new invocation:
   - Artifact-only: a separate entry point, authenticated as the original
     recipient and invocation, publishes persisted unsigned content using
@@ -119,8 +125,9 @@ Those requirements are not implemented merely by updating these documents.
   Without a connection, `save-to-itembank` never writes: it evaluates to the
   activity with `itemBank: { skipped: "no-connection", fn, occurrence }`, the
   preview still renders, and the compile passes, so generation, the corpus
-  ping, eval and sweeps can never write. The Author Site is left unsigned. The
-  legacy write code is deleted. Deliberately kept until private artifacts
+  ping, eval and sweeps can never write. The Author Site is left unsigned,
+  both from `author` and from an explicit `init author`. The legacy write code
+  is deleted. Deliberately kept until private artifacts
   replace it: preview signing with parse-time credentials. Not done: a
   language-independent skip list in l0000 (the skip is L0176's own field).
 - **Compiler egress control.** Not built or verified. Compilers must be unable
