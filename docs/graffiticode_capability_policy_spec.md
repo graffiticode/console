@@ -1,7 +1,8 @@
 # Graffiticode delegated API permissions — design state
 
-> **Status:** design recorded 2026-09-25. The owner-only part is implemented on
-> branches and tested, but **not deployed**; delegation to other accounts is
+> **Status:** design recorded 2026-09-25; execution contracts revised 2026-09-26.
+> The owner-only baseline is implemented on branches and tested, but **not
+> deployed**; the revised contracts and delegation to other accounts are
 > not built. It supersedes the earlier informal effect-scan and generic grant
 > model in this document. How the build maps onto this design, and every
 > branch, is in `capability-policy-as-built.md`.
@@ -30,7 +31,11 @@ whole system is a strict object-capability model.
   by UID. Recipients can see connections granted to them and explicitly select
   a connection for a compile. They cannot pass a grant on to someone else.
 - Grants attach to a connection, rather than to the current value of its API
-  key, so rotating the key need not change the grants.
+  key, so rotating the key need not change the grants. A connection's owner
+  and backend are immutable, and deleted connection IDs are never reused.
+  Transferring ownership or changing the provider account requires a new
+  connection ID and new grants; rotation only replaces credentials for the
+  same provider account.
 - A central policy authority owns the grant store and decisions. Auth remains
   responsible for identity; the API gateway remains responsible for task
   storage and compiler routing. The compiler cannot create or broaden grants.
@@ -52,11 +57,12 @@ whole system is a strict object-capability model.
      because the base checker does not visit every executable node.
    - Protected behaviour with no call in the source (e.g. L0176 signing every
      render) is declared by the language as an implicit protected function,
-     required on every compile.
+     required on every compile that selects a connection.
 4. When the transformer reaches a granted protected function, the policy
    authority mints a short-lived token scoped to the recipient, connection,
-   function, intended broker call, and a digest of that call's arguments. The
-   admission pass supplies early rejection; the token supplies proof at the
+   owner, language, registry version, function, intended broker call, operation
+   ID, and a digest of that call's arguments. The admission pass supplies early
+   rejection; the token supplies proof at the
    execution boundary.
 5. A Graffiticode credential broker verifies the token against the actual
    requested operation, resolves the owner's credential, makes the external
@@ -66,7 +72,8 @@ whole system is a strict object-capability model.
 
 Running the program is the action. There is no separate save step or execution
 mode: a granted protected call runs whenever its program runs, and the grant is
-the authority.
+the authority. A retry continues the same logical invocation and reuses its
+write receipts. Viewing an existing result does not run the program again.
 
 The mapping from function to broker operations, backend and kind lives in one
 reviewed, versioned **registry** that policy and the broker both consult. A
@@ -86,11 +93,12 @@ function-specific grant and enforcement model.
   so their names provide a direct permission vocabulary. This is clearer than
   inferring generic effects from an AST or treating every function in a service
   language as privileged.
-- **Check before transformation.** Checker and transformer traverse the same AST.
-  Rejecting an ungranted function in the checker prevents the transformer from
-  partially evaluating the program and making earlier API calls before it
-  discovers a later denial. The broker still checks at the actual call boundary
-  so correctness does not depend solely on the checker.
+- **Check before transformation.** The admission pass scans every node before
+  the transformer starts. Rejecting an ungranted function there prevents the
+  transformer from making earlier API calls before it discovers a later
+  denial, against the compile's snapshot. A revocation during the compile can
+  still stop a later call after earlier ones ran. The broker checks again at
+  the call boundary, so correctness does not depend on the admission pass.
 - **Keep policy central and cache only for one compile.** The connection owner
   needs to manage and revoke grants independently of the recipient's identity
   token. One policy fetch per compile avoids repeated lookups during AST
@@ -104,7 +112,7 @@ function-specific grant and enforcement model.
   sufficient inside one trusted process. A scoped token lets the independent
   broker verify that this particular function call was authorized without
   trusting the compiler's assertion. Minting it near the call limits its useful
-  lifetime; the checker's earlier policy snapshot preserves early rejection.
+  lifetime; the admission pass's snapshot preserves early rejection.
 - **Keep credentials and outbound calls in a Graffiticode broker.** A token adds
   little if the compiler can bypass it and use the owner's key directly. The
   broker holds that key and limits calls to named operations, while managed
@@ -129,45 +137,195 @@ broker is shipped by this design document.
   - Session token: one compile's snapshot, about 15 minutes.
   - Execution token: one broker call, at most 60 seconds. It covers one
     request (its args digest) and the broker accepts it once.
+- **Registry versions.** Session and execution tokens carry the registry
+  version used at admission. Policy rejects a mint against a different version;
+  the broker rejects execution unless that exact version is installed and
+  enforced, including its operation payload constraints. A rolling deployment
+  may retain an older reviewed version explicitly; it must never reinterpret
+  an old token under the current registry. A mismatch is a refusal before any
+  provider call, not a reason to silently start a new invocation.
 - **Revocation.** Admission uses the compile's snapshot. Every mint re-reads
-  the live state, so revoking a grant, or disabling, deleting or re-owning a
-  connection, stops the next protected call in a compile already running. A
-  token already issued lives at most 60 seconds.
+  the live state, so revoking a grant, or disabling or deleting a connection,
+  stops the next mint in a compile already running. A token already issued
+  lives at most 60 seconds and can authorize only its original connection and
+  owner. Reownership is prohibited; a transfer creates a new connection.
 - **Audit.** Every allowed and denied decision, and every connection change, is
   recorded with pseudonymous uids. Records never carry tokens, secrets or
   payloads.
 - **Credentials.** The broker holds them, encrypted under a broker-only key and
-  tied to their connection. Policy passes a credential through once, when a
-  connection is created or rotated, and never stores it.
+  tied to their connection, immutable owner and backend. Before using a
+  credential, the broker checks this binding against the execution token;
+  lookup by connection ID alone is insufficient. Policy passes a credential
+  through once, when a connection is created or rotated, and never stores it.
 - **Migrating parse-time credentials.** The migration is enforced by
   invalidating old credentials at the provider, including Graffiticode's own
   system credentials. Code changes only tidy up. New connection credentials
   never enter the parse-time ciphertext path.
-- **Cached results.** The gateway never serves or stores a result for a task
-  chain that requires a protected function, whether or not a connection is
-  selected.
+- **Shared compile cache.** The gateway never serves or stores a result in the
+  shared compile cache for a task chain that requires a protected function,
+  whether or not a connection is selected. The private execution artifacts
+  described below are separate from this cache and cannot bypass authorization.
 - **L0176 saves.** `save-to-itembank <activity>` is the only item-bank write.
   The older member form is rewritten to it before admission, and any other way
   of setting the flag is refused.
 
+## Invocation identity and write receipts
+
+The authenticated entry point allocates and durably records a logical
+invocation ID before dispatch. A request idempotency key is scoped to the
+recipient and bound to the task-chain revision, selected connection and input
+digest; reusing it for different input is refused. HTTP retries, job
+redispatches and compiler retries reuse that invocation ID. An intentional
+rerun receives a new ID, even for the same task. Neither a token ID nor the
+content-addressed task ID alone identifies a logical invocation.
+
+Each protected write has an operation ID derived from the invocation and a
+stable call occurrence, including its composition stage and repeated-call
+index. Policy binds that ID into the execution token. The broker atomically
+claims a durable receipt before calling the provider, binding it to the
+recipient, owner, connection, language, function, operation, registry version
+and argument digest. A second token with the same ID and binding returns the
+recorded outcome; a different binding is refused. Receipt replay still requires
+current authorization and a valid execution token. The one exception is the
+recovery path below.
+
+A pending receipt or a timeout after dispatch is an uncertain outcome, not
+permission to execute again. Reconcile through provider status or provider
+idempotency support where available; otherwise report uncertainty and require
+an explicit decision to start a new invocation. Record partial outcomes of
+multi-step writes. Do not promise exactly-once provider execution. Receipt
+retention must cover every accepted retry; after expiry, reject the old
+invocation rather than treating a missing receipt as a new write.
+
+### Recovering an invocation
+
+When the transformer finishes, the invocation persists its unsigned render
+content alongside its receipts, before publishing the artifact. If artifact
+publication then fails, recovery finishes it without recompiling.
+
+Recovery is a separate entry point, not a compile. It is authenticated as the
+invocation's original recipient and names that invocation. It runs no
+admission pass and no transformer. It publishes the persisted unsigned content,
+using replay-only tokens that policy mints for the invocation's completed
+receipts without a live grant check. The broker answers a replay-only token
+from the receipt alone, never contacting the provider or using the credential.
+A write that already happened can then finish after revocation, instead of
+forcing a rerun that repeats it.
+
+Recovery cannot complete anything unfinished. A protected call with a pending,
+uncertain or missing receipt stays that way, and if the unsigned content was
+not persisted, there is nothing to recover. Finishing that work needs a new
+invocation under current authorization.
+
+## L0176 results and reads
+
+Retain unsigned render content as a private execution artifact after a
+successful invocation, separately from the shared compile cache. Bind it to
+the recipient, owner, connection, task-chain revision, invocation and registry
+version. It contains no credential or reusable authorization token. Its
+identifier alone grants no access, and another account or connection cannot
+reuse it as an authorized compile result.
+
+Each view checks the task/artifact access rules and obtains fresh policy
+authorization for the required preview-signing function through the selected
+connection. The broker signs only the constrained preview request from the
+artifact. A missing preview grant is a refusal; a write grant is not required
+to view an existing artifact. Author signing remains a separate permission.
+Views and learner-answer requests must not rerun the source program or its
+saves. Any protected operation needed for an answer is authorized separately.
+
+A missing or incompatible artifact requires an explicit program run; a read
+must not silently rebuild it by executing writes. Artifact publication failure
+after a provider write is recovered within the original invocation using its
+receipts, including after revocation (see Recovering an invocation).
+
+A view serves the artifact of the latest successful invocation for the
+authenticated recipient, task-chain revision and connection. "Latest" is
+invocation order, not completion time: invocation IDs carry a monotonic
+sequence allocated at the entry point, and an artifact replaces the current one
+only if its invocation is newer (compare-and-set). A slow older run cannot
+replace a newer result.
+
+## Published items
+
+Publishing is the only way a protected artifact reaches another account.
+Publishing records a publication that binds the publisher, connection,
+task-chain revision and artifact. Creating one requires all of:
+
+- The publisher is the artifact's recipient. A preview grant alone never lets
+  anyone publish another recipient's private result.
+- The publisher may publish the task under the task access rules.
+- The artifact's connection and task-chain revision match the publication's.
+- The publisher holds the preview grant on that connection. Under delegation,
+  the grant must also permit publication, because published views spend the
+  owner's credential on viewers the owner never named.
+
+A view of a published item runs under the publication, not the viewer. The
+viewer needs no grant and may be anonymous where the task's access rules
+allow it. On each view, policy re-checks live state: the publication still
+exists, the connection is enabled, and the publisher still holds the preview
+grant. Only then does it authorize preview signing for that artifact.
+
+A publication authorizes only functions the registry marks as view-safe,
+which today means preview signing. Saves, Author signing and every other
+protected function are refused, and a view never runs the program.
+Unpublishing, revoking the publisher's grant, or disabling the connection
+stops further views. Any other cross-account sharing of a protected artifact
+is outside this contract.
+
+## Compiles without a connection
+
+A compile that selects no connection has no protected authority. It never
+contacts policy or the broker, allocates no invocation and writes no receipt.
+Protected calls, explicit or implicit, are validated but not executed, and
+L0176 renders unsigned. This is not an execution mode; it is the absence of a
+grant. After parse-time credentials are invalidated, such a compile has no
+credentials at all.
+
+A skipped protected call is not an error. The compile succeeds, and its
+result lists each skipped call separately from errors, with its function,
+call occurrence and reason (`no-connection`). A program that is otherwise
+valid passes verification. Real validation failures, such as an unknown
+function or bad arguments to a protected call, remain compile errors. Skipped
+calls are never fed to error correction as something to fix. This list
+reports what did not run; unlike the removed "write not executed" marker, it
+does not hide the preview.
+
+Every automated compile runs this way. Code generation, its verification and
+error-correction compiles, the corpus ping, eval and sweeps never select a
+connection. Otherwise every draft revision would be a new invocation, and each
+one would repeat the draft's writes.
+
+## Release prerequisites
+
+Removing Console-issued intent tokens, save/read write gating and the
+"write not executed" marker depends on implementing the invocation/receipt
+and artifact-read contracts above. Deployment also requires broker credential
+binding, registry-version enforcement and compiler egress control: compilers
+must be unable to reach provider hosts directly, so no call can bypass the
+broker. Without that, the broker is not the boundary. These are design
+requirements, not claims about the current branches.
+
+Before removing the gates, verify that concurrent retries and redispatched
+jobs execute each write at most once through the broker; timeouts remain
+uncertain; intentional reruns have new identities; and views/answers never
+repeat saves. Verify cross-account/connection artifact denial, current preview
+authorization, expired-invocation rejection, transfer isolation and registry
+version mismatch rejection before provider calls. Also verify:
+
+- recovery runs only for the original recipient and invocation, never
+  contacts the provider, and cannot complete an unfinished call
+- a view selects only the recipient's own artifact, and an older invocation
+  cannot replace a newer artifact
+- publication is refused for another recipient's artifact or a mismatched
+  connection or revision; published views stop once the publisher's grant is
+  revoked and can never save
+- generation and ping compiles make no broker calls, and a program whose only
+  issue is a skipped save passes verification without triggering correction
+- a compiler cannot reach a provider host directly
+
 ## Open design work
 
-- **The L0176 read path.** L0176 opts out of the cache (`cache: false`) so the
-  Learnosity tokens are refreshed on every read. As a result each view and
-  learner answer re-runs the program, including saves. Options:
-  - Cache the compiled result and sign on read through the broker, so the
-    program runs once.
-  - Keep recompiling and key write receipts to (task, call), so a re-run
-    returns the recorded outcome.
-- **Write receipts.** They are keyed to a save action today. Key them to the
-  invocation or to the task, depending on the read-path decision.
-- **A viewer without the grant.** A compile error, or a preview with the
-  protected call refused.
 - **Author signing.** It carries edit and delete authority. It stays
   non-delegable, and its request shape is unchecked against Learnosity's
   Author API.
-- **Compiler network egress.** Compilers must be unable to reach provider hosts
-  directly, so no call can bypass the broker.
-- **Built but contrary to this design (to remove).** Console-issued intent
-  tokens and the save/read execution modes that gate writes. They add a second
-  gate outside the program.
