@@ -54,11 +54,28 @@ Those requirements are not implemented merely by updating these documents.
   learner answers do not rerun saves. This storage is separate from the shared
   compile cache, which remains prohibited for protected task chains. Missing
   or incompatible artifacts must not trigger an automatic write-bearing run.
-- **Write receipts.** Replace the current save-action identity with a durable
-  logical invocation and stable call occurrence. Retries reuse that identity;
-  intentional reruns get a new one. Specify receipt bindings, retention,
-  partial outcomes and uncertainty handling as required by the spec before
-  removing intent tokens.
+- **Invocation identity.** Done on branches, not deployed.
+  - Policy (`policy-service`) allocates invocations on a new gateway-only
+    route, `POST /v1/invocations`, and returns a signed invocation token. An
+    idempotency key, scoped to the user and bound to the task chain,
+    connection and input digest, returns the same invocation; a reused key
+    with different input is refused. Each invocation carries a sequence that
+    increases per user, task chain and connection, ready for artifact
+    ordering.
+  - The gateway (`api`) allocates one invocation per request through a
+    connection (key from `Idempotency-Key` or `body.idempotencyKey`) and
+    names each chain stage by position (`s0`, `s1`, ...).
+  - l0000 (`exec-context`) and L0176 carry the invocation token and stage to
+    the snapshot. Policy accepts only its own invocation token for the same
+    user and connection.
+  - Operation ids are `invocation/stage/occurrence` for every call, replacing
+    the save-action id. Intents still gate writes until their removal.
+  - Not done: receipt retention and TTLs; clients sending idempotency keys
+    (none sends a connection yet); an l0000 release carrying this
+    (L0176 still depends on 0.5.0); the gateway's `POLICY_URL`, its
+    `run.invoker` on policy and its `gateway` entry in `policy-callers`. Not
+    run: the Firestore invocation store and the gateway's data tests (both
+    need the emulator).
 - **Connection ownership.** Done on `policy-service`. The broker stores each
   credential with its owner and backend, sealed into the ciphertext's
   associated data, and refuses a token whose owner or backend differs
