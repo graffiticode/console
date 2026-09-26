@@ -52,11 +52,19 @@ Those requirements are not implemented merely by updating these documents.
 
 ## Required changes from the 2026-09-26 review
 
-- **Reads.** The chosen design retains unsigned content in a private execution
-  artifact and authorizes preview signing afresh on every view. Views and
-  learner answers do not rerun saves. This storage is separate from the shared
-  compile cache, which remains prohibited for protected task chains. Missing
-  or incompatible artifacts must not trigger an automatic write-bearing run.
+- **Reads.** Built on `policy-service`, not deployed. `GET /data` through a
+  connection is a view: it serves the recipient's current artifact and never
+  runs the program; `POST /compile` is the explicit run. When the head
+  language signs every render (an implicit protected function in the
+  registry), the gateway sends that language's compiler a fixed data-only
+  program holding the stored activity, so the only operation it can reach is
+  the preview signature, authorized by policy for the view. All views of one
+  artifact share one invocation (idempotency key `read.<invocationId>`).
+  Missing or incompatible artifacts return an error asking for a run; nothing
+  is rebuilt. L0176's `brokered.test.ts` pins the program shape. Not done:
+  learner-answer requests (none reach the gateway yet), the viewer and console
+  sending a connection, and views of published items (4.4); reads without a
+  connection still compile and sign with parse-time credentials.
 - **Invocation identity.** Done on branches, not deployed.
   - Policy (`policy-service`) allocates invocations on a new gateway-only
     route, `POST /v1/invocations`, and returns a signed invocation token. An
@@ -103,7 +111,7 @@ Those requirements are not implemented merely by updating these documents.
   rewrites its own artifact. Selection returns `ok`, `missing` or
   `incompatible` (another registry version). Output that still carries a
   `signature` anywhere after stripping (an explicit `init`) is not stored. Not
-  done: no route reads artifacts yet (4.2); a failed artifact write is only
+  done: a failed artifact write is only
   logged (recovery, 4.3). The Firestore store's emulator tests have not been
   run.
 - **Recovery.** Not built. Two paths, neither allocating a new invocation:
