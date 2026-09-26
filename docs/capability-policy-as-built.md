@@ -70,16 +70,21 @@ Those requirements are not implemented merely by updating these documents.
 - **Artifact selection.** Not built. Views select by recipient, task-chain
   revision and connection, and "latest" is invocation order with
   compare-and-set, so an older run cannot replace a newer artifact.
-- **Recovery.** Not built. A separate entry point, authenticated as the
-  original recipient and invocation, publishes persisted unsigned content using
-  replay-only tokens for completed receipts. It never contacts the provider and
-  cannot complete an unfinished call. Needs the unsigned content persisted
-  before artifact publication.
+- **Recovery.** Not built. Two paths, neither allocating a new invocation:
+  - Artifact-only: a separate entry point, authenticated as the original
+    recipient and invocation, publishes persisted unsigned content using
+    replay-only tokens for completed receipts. It never contacts the provider
+    and cannot complete an unfinished call. Needs the unsigned content
+    persisted before artifact publication.
+  - Retry: a compile under the original invocation ID and current
+    authorization. Completed receipts return their outcome; pending or
+    uncertain ones block until reconciled.
 - **Publication.** Not built. Creating one requires that the publisher is the
   artifact's recipient, may publish the task, matches the artifact's connection
   and revision, and holds the preview grant (under delegation, one that permits
-  publication). Views run under the publication, re-check it live, and may use
-  only view-safe functions, which needs a new registry flag.
+  publication). Views run under the publication and re-check it live,
+  including publication permission, and may use only view-safe functions,
+  which needs a new registry flag.
 - **Connection-free compilation.** Not built; the legacy path still uses
   parse-time credentials. It must never contact policy or the broker, list
   skipped protected calls separately from errors, and pass verification when a

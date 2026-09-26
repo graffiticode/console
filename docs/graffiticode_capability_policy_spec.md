@@ -200,10 +200,13 @@ invocation rather than treating a missing receipt as a new write.
 ### Recovering an invocation
 
 When the transformer finishes, the invocation persists its unsigned render
-content alongside its receipts, before publishing the artifact. If artifact
-publication then fails, recovery finishes it without recompiling.
+content alongside its receipts, before publishing the artifact. An invocation
+that did not finish is recovered in one of two ways, and neither allocates a
+new invocation.
 
-Recovery is a separate entry point, not a compile. It is authenticated as the
+**Artifact-only recovery** applies when the unsigned content was persisted
+and only artifact publication failed. It finishes publication without
+recompiling. It is a separate entry point, not a compile. It is authenticated as the
 invocation's original recipient and names that invocation. It runs no
 admission pass and no transformer. It publishes the persisted unsigned content,
 using replay-only tokens that policy mints for the invocation's completed
@@ -212,10 +215,20 @@ from the receipt alone, never contacting the provider or using the credential.
 A write that already happened can then finish after revocation, instead of
 forcing a rerun that repeats it.
 
-Recovery cannot complete anything unfinished. A protected call with a pending,
-uncertain or missing receipt stays that way, and if the unsigned content was
-not persisted, there is nothing to recover. Finishing that work needs a new
-invocation under current authorization.
+Artifact-only recovery cannot complete anything unfinished.
+
+**Retrying the original invocation** applies when the unsigned content was not
+persisted, for example because the compiler crashed after a write succeeded.
+It is an ordinary compile under the original invocation ID, so it keeps its
+operation IDs. It runs admission and needs current authorization, like any
+compile. A call with a completed receipt returns the recorded outcome instead
+of writing again. A call with no receipt executes normally. A call with a
+pending or uncertain receipt blocks the retry until that receipt is
+reconciled. If authorization has been revoked, the retry is refused, and its
+completed writes stay recorded but unpublished.
+
+A new invocation means an intentional rerun, never recovery. It gets new
+operation IDs, so its writes run again.
 
 ## L0176 results and reads
 
@@ -264,13 +277,14 @@ A view of a published item runs under the publication, not the viewer. The
 viewer needs no grant and may be anonymous where the task's access rules
 allow it. On each view, policy re-checks live state: the publication still
 exists, the connection is enabled, and the publisher still holds the preview
-grant. Only then does it authorize preview signing for that artifact.
+grant, including, under delegation, permission to publish. Only then does it
+authorize preview signing for that artifact.
 
 A publication authorizes only functions the registry marks as view-safe,
 which today means preview signing. Saves, Author signing and every other
 protected function are refused, and a view never runs the program.
-Unpublishing, revoking the publisher's grant, or disabling the connection
-stops further views. Any other cross-account sharing of a protected artifact
+Unpublishing, revoking the publisher's grant, narrowing it to preview-only,
+or disabling the connection stops further views. Any other cross-account sharing of a protected artifact
 is outside this contract.
 
 ## Compiles without a connection
@@ -313,13 +327,17 @@ repeat saves. Verify cross-account/connection artifact denial, current preview
 authorization, expired-invocation rejection, transfer isolation and registry
 version mismatch rejection before provider calls. Also verify:
 
-- recovery runs only for the original recipient and invocation, never
-  contacts the provider, and cannot complete an unfinished call
+- artifact-only recovery runs only for the original recipient and
+  invocation, never contacts the provider, and cannot complete an unfinished
+  call
+- retrying an invocation after a crash that followed a completed write keeps
+  the invocation ID, returns the recorded outcome instead of writing again,
+  and blocks on a pending or uncertain receipt
 - a view selects only the recipient's own artifact, and an older invocation
   cannot replace a newer artifact
 - publication is refused for another recipient's artifact or a mismatched
   connection or revision; published views stop once the publisher's grant is
-  revoked and can never save
+  revoked or narrowed to preview-only, and can never save
 - generation and ping compiles make no broker calls, and a program whose only
   issue is a skipped save passes verification without triggering correction
 - a compiler cannot reach a provider host directly
