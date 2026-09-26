@@ -19,7 +19,7 @@ Those requirements are not implemented merely by updating these documents.
 |---|---|---|
 | Registry | graffiticode `packages/common/src/protected-registry.js` | Which functions map to which broker operations and backend; the single authority for both policy and broker |
 | Policy | graffiticode `packages/policy` | Connections, snapshot, mint, owner check; live connection check at every mint; KMS-signed tokens |
-| Broker | graffiticode `packages/broker` | Token verification, per-operation payload constraints, args digest, replay protection (each token once), write receipts |
+| Broker | graffiticode `packages/broker` | Token verification, registry version, per-operation payload constraints, args digest, replay protection (each token once), write receipts. Only a definite provider rejection records a write as failed; a lost response, 5xx or unrecognized body records it as uncertain |
 | Compiler support | l0000 `exec-context` → published **0.5.0** | Per-compile context kept away from program variables; whole-program scan for protected calls; client for policy and broker |
 | L0176 | l0176 `explicit-save`, `brokered-connection` | `save-to-itembank <activity>` is the only write; preview signing, Author signing and saves go through the broker. Author signing is enforced (brokered, non-delegable); its request shape is unverified against Learnosity |
 | Gateway | graffiticode `api` | Passes `connectionId` to compilers; never serves a protected task from its cache |
@@ -63,10 +63,10 @@ Those requirements are not implemented merely by updating these documents.
   provider-account changes require a new connection ID and grants. Deleted
   IDs cannot be reused. The broker currently loads a credential by connection
   ID alone; it must also enforce the token's owner and backend binding.
-- **Registry versions.** Tokens carry a registry version and policy checks it
-  during minting, but the broker currently checks operations against its local
-  registry without enforcing the token's version. It must execute under the
-  exact reviewed version or refuse before contacting the provider.
+- **Registry versions.** Done on `policy-service`: policy checks the version
+  at minting, and the broker refuses a token whose version is not the one it
+  has installed, before touching the credential. Keeping an older reviewed
+  version during a rolling deploy is not supported yet; a mismatch is refused.
 - **Artifact selection.** Not built. Views select by recipient, task-chain
   revision and connection, and "latest" is invocation order with
   compare-and-set, so an older run cannot replace a newer artifact.
