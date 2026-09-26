@@ -111,18 +111,18 @@ Those requirements are not implemented merely by updating these documents.
   rewrites its own artifact. Selection returns `ok`, `missing` or
   `incompatible` (another registry version). Output that still carries a
   `signature` anywhere after stripping (an explicit `init`) is not stored. Not
-  done: a failed artifact write is only
-  logged (recovery, 4.3). The Firestore store's emulator tests have not been
-  run.
-- **Recovery.** Not built. Two paths, neither allocating a new invocation:
-  - Artifact-only: a separate entry point, authenticated as the original
-    recipient and invocation, publishes persisted unsigned content using
-    replay-only tokens for completed receipts. It never contacts the provider
-    and cannot complete an unfinished call. Needs the unsigned content
-    persisted before artifact publication.
-  - Retry: a compile under the original invocation ID and current
-    authorization. Completed receipts return their outcome; pending or
-    uncertain ones block until reconciled.
+  done: the Firestore store's emulator tests have not been run.
+- **Recovery.** Built on `policy-service`, not deployed. The spec's
+  artifact-only path and replay-only tokens are dropped: the gateway stores an
+  artifact in one atomic write, so nothing is ever persisted but unpublished.
+  The gateway retries a failed artifact write within the request (3 attempts).
+  Otherwise recovery is retrying the original invocation with the same
+  idempotency key: completed receipts return their outcome and the artifact is
+  stored; an uncertain receipt blocks, and L0176's error tells the caller that
+  a new key starts a new invocation whose write may run again; after
+  revocation the retry is refused. End-to-end tests (gateway, policy and
+  broker together, compiler stubbed) cover each case. Not done: reconciling an
+  uncertain write against Learnosity's item bank.
 - **Publication.** Not built. Creating one requires that the publisher is the
   artifact's recipient, may publish the task, matches the artifact's connection
   and revision, and holds the preview grant (under delegation, one that permits

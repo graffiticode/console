@@ -185,47 +185,40 @@ index. Policy binds that ID into the execution token. The broker atomically
 claims a durable receipt before calling the provider, binding it to the
 recipient, owner, connection, language, function, operation, registry version
 and argument digest. A second token with the same ID and binding returns the
-recorded outcome; a different binding is refused. Receipt replay still requires
-current authorization and a valid execution token. The one exception is the
-recovery path below.
+recorded outcome; a different binding is refused. Receipt replay requires
+current authorization and a valid execution token, with no exception.
 
 A pending receipt or a timeout after dispatch is an uncertain outcome, not
 permission to execute again. Reconcile through provider status or provider
 idempotency support where available; otherwise report uncertainty and require
-an explicit decision to start a new invocation. Record partial outcomes of
+an explicit decision to start a new invocation. That decision is the caller's:
+it sends a new idempotency key (or none), knowing the write may run again, and
+the error that reports the uncertainty says so. Record partial outcomes of
 multi-step writes. Do not promise exactly-once provider execution. Receipt
 retention must cover every accepted retry; after expiry, reject the old
 invocation rather than treating a missing receipt as a new write.
 
 ### Recovering an invocation
 
-When the transformer finishes, the invocation persists its unsigned render
-content alongside its receipts, before publishing the artifact. An invocation
-that did not finish is recovered in one of two ways, and neither allocates a
-new invocation.
+The gateway, which receives the compile's output, stores the artifact in one
+atomic write: the unsigned content and its selection as current happen
+together or not at all. There is therefore no state in which content is
+persisted but unpublished, and no separate artifact-only recovery or
+replay-only token. (An earlier revision specified both, for a design in which
+the compiler persisted content before a separate publication step.) The
+gateway retries a failed artifact write within the request before giving up.
 
-**Artifact-only recovery** applies when the unsigned content was persisted
-and only artifact publication failed. It finishes publication without
-recompiling. It is a separate entry point, not a compile. It is authenticated as the
-invocation's original recipient and names that invocation. It runs no
-admission pass and no transformer. It publishes the persisted unsigned content,
-using replay-only tokens that policy mints for the invocation's completed
-receipts without a live grant check. The broker answers a replay-only token
-from the receipt alone, never contacting the provider or using the credential.
-A write that already happened can then finish after revocation, instead of
-forcing a rerun that repeats it.
-
-Artifact-only recovery cannot complete anything unfinished.
-
-**Retrying the original invocation** applies when the unsigned content was not
-persisted, for example because the compiler crashed after a write succeeded.
-It is an ordinary compile under the original invocation ID, so it keeps its
-operation IDs. It runs admission and needs current authorization, like any
+An invocation whose artifact was not stored — the compiler crashed after a
+write succeeded, or the artifact write failed every attempt — is recovered by
+**retrying the original invocation**: the caller repeats the request with the
+same idempotency key. It is an ordinary compile under the original invocation
+ID, so it keeps its operation IDs. It runs admission and needs current authorization, like any
 compile. A call with a completed receipt returns the recorded outcome instead
 of writing again. A call with no receipt executes normally. A call with a
 pending or uncertain receipt blocks the retry until that receipt is
 reconciled. If authorization has been revoked, the retry is refused, and its
-completed writes stay recorded but unpublished.
+completed writes stay recorded but unpublished; this is accepted rather than
+bypassing a revoked grant.
 
 A new invocation means an intentional rerun, never recovery. It gets new
 operation IDs, so its writes run again.
@@ -249,8 +242,8 @@ saves. Any protected operation needed for an answer is authorized separately.
 
 A missing or incompatible artifact requires an explicit program run; a read
 must not silently rebuild it by executing writes. Artifact publication failure
-after a provider write is recovered within the original invocation using its
-receipts, including after revocation (see Recovering an invocation).
+after a provider write is recovered by retrying the original invocation (see
+Recovering an invocation).
 
 A view serves the artifact of the latest successful invocation for the
 authenticated recipient, task-chain revision and connection. "Latest" is
@@ -327,12 +320,12 @@ repeat saves. Verify cross-account/connection artifact denial, current preview
 authorization, expired-invocation rejection, transfer isolation and registry
 version mismatch rejection before provider calls. Also verify:
 
-- artifact-only recovery runs only for the original recipient and
-  invocation, never contacts the provider, and cannot complete an unfinished
-  call
 - retrying an invocation after a crash that followed a completed write keeps
   the invocation ID, returns the recorded outcome instead of writing again,
-  and blocks on a pending or uncertain receipt
+  stores the artifact, and blocks on a pending or uncertain receipt; after
+  revocation the retry is refused without contacting the provider
+- an uncertain write reports that a new idempotency key starts a new
+  invocation whose write may run again, and that rerun does write
 - a view selects only the recipient's own artifact, and an older invocation
   cannot replace a newer artifact
 - publication is refused for another recipient's artifact or a mismatched
