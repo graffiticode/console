@@ -184,9 +184,12 @@ built. Running the program is the action, and the grant is the authority.
     the gateway's `/form` forwards `connection` / `publication` to the view and
     its data URL; the l0000 View reads them from props or its URL for the
     initial load only.
-  - Not done: publishing a new l0000-view; the preview does not refresh after
-    a Run until the item is reselected; changing a published item's task does
-    not re-point its publication.
+  - A successful Run remounts the preview so it loads the new stored result.
+  - A publication keeps showing the version it was published at
+    (`publishedTaskId`). After an edit the item menu says so and offers
+    Republish, which creates a publication for the current version (it must
+    have been run) before deleting the old one.
+  - l0000-view 0.4.0 is published and L0176's view depends on it.
 - **Compiler egress control.** Not built or verified. Compilers must be unable
   to reach provider hosts directly; this is a deployment prerequisite.
 

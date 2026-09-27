@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
+import { ITEM_RUN_EVENT } from './ItemConnection';
 import useSWR from "swr";
 import { useRouter } from 'next/router';
 import { Dialog, Transition, Menu } from '@headlessui/react'
@@ -88,6 +89,9 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   const [ hideEditor, setHideEditor ] = useState(false);
   const [ formHeight, setFormHeight ] = useState(350);
   const [ taskId, setTaskId ] = useState("");
+  // Bumped when the selected item is run through its connection, so the
+  // preview remounts and loads the new stored result.
+  const [ previewRun, setPreviewRun ] = useState(0);
   // How the pending taskId change came about, and a short description of it, for
   // the version record written server-side. Set by whoever advances the taskId;
   // read at save time, then cleared so a later metadata-only save (a rename, a
@@ -926,6 +930,14 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     setRemoteUpdateAvailable(false);
   }, [loadedItems, directItem, selectedItemId, loadItemSource]);
 
+  useEffect(() => {
+    const onRun = (e: any) => {
+      if (e?.detail?.itemId === selectedItemId) setPreviewRun(n => n + 1);
+    };
+    window.addEventListener(ITEM_RUN_EVENT, onRun);
+    return () => window.removeEventListener(ITEM_RUN_EVENT, onRun);
+  }, [selectedItemId]);
+
   // Compile form data when taskId or formData changes
   useEffect(() => {
     if (!user || !taskId || Object.keys(formData).length === 0) {
@@ -1433,7 +1445,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 </div>
               ) : (
               <FormView
-                key="form"
+                key={`form-${previewRun}`}
                 id={taskId}
                 lang={lang}
                 connectionId={items.find(i => i.id === selectedItemId)?.connectionId ?? null}

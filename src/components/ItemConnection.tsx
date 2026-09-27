@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { loadConnections, runItem, setItemConnection } from '../utils/swr/fetchers';
+import { loadConnections, republishItem, runItem, setItemConnection } from '../utils/swr/fetchers';
 
 // Languages with protected functions in the policy registry
 // (graffiticode packages/common/src/protected-registry.js). Only these items
@@ -9,6 +9,10 @@ const CONNECTABLE_LANGS = new Set(['0176']);
 export const isConnectableLang = lang =>
   CONNECTABLE_LANGS.has(String(lang ?? '').replace(/^L/i, '').padStart(4, '0'));
 
+// Fired after a successful run, so the preview (which shows the stored result)
+// reloads: a run changes that result without changing the item itself.
+export const ITEM_RUN_EVENT = 'gc:item-run';
+
 const newRunKey = () =>
   `run-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 
@@ -16,7 +20,7 @@ const newRunKey = () =>
 // explicit action that executes the program's protected calls (its item-bank
 // saves included) and stores the result views show. Each run has its own
 // idempotency key; "Retry" reuses it so a lost response never repeats a write.
-export default function ItemConnection({ user, itemId, taskId, connectionId, publicationId, onChanged }) {
+export default function ItemConnection({ user, itemId, taskId, connectionId, publicationId, publishedTaskId = null, onChanged }) {
   const [connections, setConnections] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
@@ -52,12 +56,32 @@ export default function ItemConnection({ user, itemId, taskId, connectionId, pub
       const resp = await runItem({ user, taskId, connectionId, idempotencyKey: key });
       const errors = resp?.data?.errors || [];
       setMessage(errors.length ? errors.map(e => e.message ?? e).join('; ') : 'Run complete.');
+      if (!errors.length) {
+        window.dispatchEvent(new CustomEvent(ITEM_RUN_EVENT, { detail: { itemId } }));
+      }
     } catch (err) {
       setMessage(`Run failed: ${String(err?.message || err)}. Retry repeats this run without repeating its writes.`);
     } finally {
       setBusy(false);
     }
   };
+
+  // A published item keeps showing the version it was published at until the
+  // owner republishes, so an edit never reaches learners half-finished.
+  const republish = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await republishItem({ user, id: itemId });
+      setMessage('Republished the current version.');
+      onChanged?.();
+    } catch (err) {
+      setMessage(String(err?.response?.errors?.[0]?.message || err?.message || err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const staleVersion = Boolean(publicationId && publishedTaskId && publishedTaskId !== taskId);
 
   const labelFor = c => c.label || `${c.backend} ${c.connectionId.slice(-6)}`;
 
@@ -100,7 +124,19 @@ export default function ItemConnection({ user, itemId, taskId, connectionId, pub
           )}
         </div>
       )}
-      {publicationId && <div className="text-xs text-gray-500 mt-1">Published through this connection.</div>}
+      {publicationId && !staleVersion && <div className="text-xs text-gray-500 mt-1">Published through this connection.</div>}
+      {staleVersion && (
+        <div className="text-xs text-gray-600 mt-2">
+          <div>The published version is older than the current one. Run the current version, then republish.</div>
+          <button
+            onClick={republish}
+            disabled={busy}
+            className="mt-1 px-3 py-1 text-xs text-gray-700 border border-gray-300 hover:bg-gray-100 rounded-none disabled:opacity-50"
+          >
+            Republish
+          </button>
+        </div>
+      )}
       {message && <div className="text-xs text-gray-600 mt-1 break-words">{message}</div>}
     </div>
   );

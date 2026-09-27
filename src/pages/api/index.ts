@@ -18,6 +18,7 @@ import {
   createItem,
   updateItem,
   setItemConnection,
+  republishItem,
   getItems,
   getItem,
   getSpec,
@@ -179,6 +180,9 @@ const typeDefs = `
     # its publication while it is public. Null when none.
     connectionId: String
     publicationId: String
+    # The version the publication shows; older than taskId after an edit,
+    # until the item is republished.
+    publishedTaskId: String
   }
 
   type GenerationJob {
@@ -346,6 +350,8 @@ const typeDefs = `
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     # Choose the connection an item runs through, or null for none.
     setItemConnection(id: String!, connectionId: String): Item!
+    # Move a published item's publication to its current (run) version.
+    republishItem(id: String!): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
     claimFreePlanSession(token: String!): ClaimResult!
     setCredential(name: String!, value: String!, backend: String, isPublic: Boolean): CredentialInfo!
@@ -736,6 +742,11 @@ const resolvers = {
       if (ctx.freePlan) throw new Error("Connections require a full account.");
       const auth = await resolveAuth(ctx);
       return await viaPolicy(() => setItemConnection({ auth, id: args.id, connectionId: args.connectionId ?? null }));
+    },
+    republishItem: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      return await republishItem({ auth, id: args.id });
     },
     shareItem: async (_, args, ctx) => {
       if (ctx.freePlan) {

@@ -51,10 +51,20 @@ export const setItemConnection = async ({ user, id, connectionId }: { user: any;
   const client = await buildRequestClient({ token: await user.getToken() });
   const mutation = gql`
     mutation setItemConnection($id: String!, $connectionId: String) {
-      setItemConnection(id: $id, connectionId: $connectionId) { id connectionId publicationId }
+      setItemConnection(id: $id, connectionId: $connectionId) { id connectionId publicationId publishedTaskId }
     }
   `;
   return client.request(mutation, { id, connectionId }).then((data: any) => data.setItemConnection);
+};
+
+export const republishItem = async ({ user, id }: { user: any; id: string }) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const mutation = gql`
+    mutation republishItem($id: String!) {
+      republishItem(id: $id) { id publicationId publishedTaskId }
+    }
+  `;
+  return client.request(mutation, { id }).then((data: any) => data.republishItem);
 };
 
 export const loadConnections = async ({ user }: { user: any }) => {
@@ -304,6 +314,7 @@ export const loadItems = async ({ user, lang, mark, client: clientId }) => {
         upstreamLangs
         connectionId
         publicationId
+        publishedTaskId
       }
     }
   `;
@@ -421,6 +432,7 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
         upstreamLangs
         connectionId
         publicationId
+        publishedTaskId
       }
     }
   `;

@@ -1269,6 +1269,9 @@ export async function updateItem({
           updates.publicationId = await createPublication({
             authToken: auth.token, taskId: itemTaskId, connectionId: itemData.connectionId,
           });
+          // The version it shows. It stays put when the program changes; the
+          // owner republishes deliberately (republishItem).
+          updates.publishedTaskId = itemTaskId;
         } catch (err) {
           if (err instanceof PublicationError) {
             throw new Error(`Cannot publish this item: ${err.message}`);
@@ -1286,6 +1289,7 @@ export async function updateItem({
           }
         }
         updates.publicationId = admin.firestore.FieldValue.delete();
+        updates.publishedTaskId = admin.firestore.FieldValue.delete();
       }
       if (isPublic) {
         // Make every task segment public BEFORE marking the item public, so a
@@ -1437,6 +1441,52 @@ export async function setItemConnection({ auth, id, connectionId }: { auth: Auth
     }
   }
   await itemRef.update({ connectionId: connectionId || admin.firestore.FieldValue.delete() });
+  return getItem({ auth, id });
+}
+
+// Moves a published item's publication to its current version. The new
+// publication is created first (the gateway requires a stored result for the
+// current version, so it must have been run), then the old one is deleted, so
+// the item is never unpublished in between.
+export async function republishItem({ auth, id }: { auth: AuthArg; id: string }) {
+  if (auth.freePlan) {
+    throw new Error("Connections require a full account.");
+  }
+  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+  const itemDoc = await itemRef.get();
+  if (!itemDoc.exists) {
+    throw new Error("Item not found");
+  }
+  const itemData = itemDoc.data();
+  if (!itemData.connectionId || !itemData.publicationId) {
+    throw new Error("This item is not published through a connection.");
+  }
+  if (itemData.publishedTaskId === itemData.taskId) {
+    return getItem({ auth, id });
+  }
+  let publicationId;
+  try {
+    publicationId = await createPublication({
+      authToken: auth.token, taskId: itemData.taskId, connectionId: itemData.connectionId,
+    });
+  } catch (err) {
+    if (err instanceof PublicationError && err.status === 409) {
+      throw new Error("Run the current version before republishing it.");
+    }
+    if (err instanceof PublicationError) {
+      throw new Error(`Cannot republish this item: ${err.message}`);
+    }
+    throw err;
+  }
+  try {
+    await deletePublication({ authToken: auth.token, publicationId: itemData.publicationId });
+  } catch (err) {
+    if (!(err instanceof PublicationError && err.status === 403 && /publication-not-found/.test(err.message))) {
+      // The new publication stands either way; the old one is withdrawn later.
+      console.error("republishItem(): failed to delete the previous publication", id, err);
+    }
+  }
+  await itemRef.update({ publicationId, publishedTaskId: itemData.taskId });
   return getItem({ auth, id });
 }
 
@@ -1721,6 +1771,7 @@ export async function getItems({ auth, lang, mark, client }) {
         generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
         connectionId: data.connectionId ?? null,
         publicationId: data.publicationId ?? null,
+        publishedTaskId: data.publishedTaskId ?? null,
       };
 
       const timestamp = data.updated || data.created || 0;
@@ -1969,6 +2020,7 @@ export async function getItem({ auth, id, includeSpec = false }: {
       generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
       connectionId: data.connectionId ?? null,
       publicationId: data.publicationId ?? null,
+      publishedTaskId: data.publishedTaskId ?? null,
       // Claim token only — a read must be able to offer "save this item" for the
       // workspace the item actually lives in (this retrieval path is where the
       // claim link is surfaced, after the agent polls a create to "ready"), but

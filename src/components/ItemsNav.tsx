@@ -30,7 +30,7 @@ function formatTimestamp(ts) {
   }
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, created, updated, client, connectionId = null, publicationId = null, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, created, updated, client, connectionId = null, publicationId = null, publishedTaskId = null, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
   const { user } = useGraffiticodeAuth();
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -294,6 +294,7 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                   taskId={taskId}
                   connectionId={connectionId}
                   publicationId={publicationId}
+                  publishedTaskId={publishedTaskId}
                   onChanged={onRefresh}
                 />
               )}
@@ -468,6 +469,7 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
                       client={item.client}
                       connectionId={item.connectionId}
                       publicationId={item.publicationId}
+                      publishedTaskId={item.publishedTaskId}
                       onChange={onUpdateItem}
                       onRefresh={onRefresh}
                       isOpen={openMenuId === item.id}
