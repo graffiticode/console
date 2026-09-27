@@ -1,0 +1,239 @@
+import { TrashIcon, PlusIcon, ArrowPathIcon, NoSymbolIcon } from "@heroicons/react/24/outline";
+import { useState, useEffect, useCallback } from "react";
+import useGraffiticodeAuth from "@graffiticode/auth-react";
+import {
+  loadConnections,
+  createConnection,
+  rotateConnection,
+  disableConnection,
+  deleteConnection,
+} from "../utils/swr/fetchers";
+import { CREDENTIAL_BACKENDS, getCredentialBackend } from "../lib/credential-backends";
+
+interface Connection {
+  connectionId: string;
+  backend: string;
+  status: "active" | "disabled";
+  label: string | null;
+}
+
+// A connection holds an external-API credential in the credential broker; items
+// run through it without ever seeing the credential. Only its owner can use it.
+// The secret is sent once and never shown again.
+const errorText = (err: any) =>
+  String(err?.response?.errors?.[0]?.message || err?.message || err).replace(/^Connection request refused: /, "Refused: ");
+
+export default function ConnectionsCard() {
+  const { user } = useGraffiticodeAuth();
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // One open form at a time: "add", or "rotate:<connectionId>".
+  const [form, setForm] = useState<string | null>(null);
+  const [backend, setBackend] = useState(CREDENTIAL_BACKENDS[0]?.key || "learnosity");
+  const [label, setLabel] = useState("");
+  const [key, setKey] = useState("");
+  const [secret, setSecret] = useState("");
+  // Destructive actions ask once, inline: "disable:<id>" or "delete:<id>".
+  const [confirming, setConfirming] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!user) return;
+    try {
+      setConnections((await loadConnections({ user })) || []);
+      setStatus("ready");
+    } catch (err) {
+      setError(errorText(err));
+      setStatus("error");
+    }
+  }, [user]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const resetForm = () => {
+    setForm(null);
+    setLabel("");
+    setKey("");
+    setSecret("");
+    setError(null);
+  };
+
+  const act = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      resetForm();
+      setConfirming(null);
+      await refresh();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = () => {
+    if (!key.trim() || !secret.trim()) {
+      setError("Enter both the key and the secret.");
+      return;
+    }
+    if (form === "add") {
+      act(() => createConnection({ user, backend, label: label.trim() || null, key: key.trim(), secret: secret.trim() }));
+    } else if (form?.startsWith("rotate:")) {
+      act(() => rotateConnection({ user, connectionId: form.slice("rotate:".length), key: key.trim(), secret: secret.trim() }));
+    }
+  };
+
+  const backendLabel = (b: string) => getCredentialBackend(b)?.label || b;
+  const rotating = form?.startsWith("rotate:") ? form.slice("rotate:".length) : null;
+
+  const formView = (
+    <div className="border border-gray-300 p-4 space-y-3 rounded-none">
+      {form === "add" && (
+        <>
+          <label className="block text-sm">
+            <span className="text-gray-700">Service</span>
+            <select
+              className="mt-1 block w-full border border-gray-300 rounded-none px-2 py-1 text-sm"
+              value={backend}
+              onChange={e => setBackend(e.target.value)}>
+              {CREDENTIAL_BACKENDS.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="text-gray-700">Label (optional)</span>
+            <input
+              className="mt-1 block w-full border border-gray-300 rounded-none px-2 py-1 text-sm"
+              value={label}
+              maxLength={100}
+              onChange={e => setLabel(e.target.value)}
+              placeholder="e.g. District item bank" />
+          </label>
+        </>
+      )}
+      <label className="block text-sm">
+        <span className="text-gray-700">Key</span>
+        <input
+          className="mt-1 block w-full border border-gray-300 rounded-none px-2 py-1 text-sm font-mono"
+          value={key}
+          onChange={e => setKey(e.target.value)}
+          autoComplete="off" />
+      </label>
+      <label className="block text-sm">
+        <span className="text-gray-700">Secret</span>
+        <input
+          type="password"
+          className="mt-1 block w-full border border-gray-300 rounded-none px-2 py-1 text-sm font-mono"
+          value={secret}
+          onChange={e => setSecret(e.target.value)}
+          autoComplete="new-password" />
+      </label>
+      {rotating && (
+        <p className="text-xs text-gray-500">
+          Rotation replaces the secret for the same account, so the key must stay the same. A different account needs a new connection.
+        </p>
+      )}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          className="inline-flex items-center px-3 py-2 bg-gray-900 text-white border border-gray-900 rounded-none text-sm hover:bg-gray-700 disabled:opacity-50"
+          onClick={save}
+          disabled={busy}>
+          {busy ? "Saving..." : form === "add" ? "Create connection" : "Rotate secret"}
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-300 rounded-none text-sm text-gray-700 hover:bg-gray-200"
+          onClick={resetForm}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!user) return null;
+
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden grid grid-col-1">
+      <p className="text-sm text-gray-500 mb-3">
+        A connection lets your items use an external service without the credential ever reaching them.
+        Choose it on an item and press Run. Only you can use your connections. The secret is sent once and never shown again.
+      </p>
+
+      {status === "error" && !form && (
+        <p className="text-sm text-red-600 mb-2">Connections are unavailable right now. {error}</p>
+      )}
+
+      <ul className="space-y-2 mb-2">
+        {connections.map(c => (
+          rotating === c.connectionId ? <li key={c.connectionId}>{formView}</li> :
+          <li key={c.connectionId} className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
+            <div className="flex flex-col">
+              <span className="font-mono">{c.label || backendLabel(c.backend)}</span>
+              <small className="text-sm text-neutral-500 font-light space-x-3">
+                <span>{backendLabel(c.backend)}</span>
+                <span className={c.status === "active" ? "text-green-700" : "text-gray-500"}>{c.status}</span>
+                <span className="font-mono">{c.connectionId.slice(-8)}</span>
+              </small>
+              {confirming === `disable:${c.connectionId}` && (
+                <span className="text-xs text-gray-700 mt-1">
+                  Disable? Every run and published view through it stops, and it cannot be re-enabled.{" "}
+                  <button type="button" className="underline" disabled={busy} onClick={() => act(() => disableConnection({ user, connectionId: c.connectionId }))}>Disable</button>{" "}
+                  <button type="button" className="underline" onClick={() => setConfirming(null)}>Cancel</button>
+                </span>
+              )}
+              {confirming === `delete:${c.connectionId}` && (
+                <span className="text-xs text-gray-700 mt-1">
+                  Delete? The credential is erased and items using it stop working.{" "}
+                  <button type="button" className="underline text-red-700" disabled={busy} onClick={() => act(() => deleteConnection({ user, connectionId: c.connectionId }))}>Delete</button>{" "}
+                  <button type="button" className="underline" onClick={() => setConfirming(null)}>Cancel</button>
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {c.status === "active" && (
+                <>
+                  <button type="button" title="Rotate secret" onClick={() => { resetForm(); setForm(`rotate:${c.connectionId}`); }}>
+                    <ArrowPathIcon className="h-5 w-5 text-gray-500 hover:text-gray-800" />
+                  </button>
+                  <button type="button" title="Disable" onClick={() => setConfirming(`disable:${c.connectionId}`)}>
+                    <NoSymbolIcon className="h-5 w-5 text-gray-500 hover:text-gray-800" />
+                  </button>
+                </>
+              )}
+              <button type="button" title="Delete" onClick={() => setConfirming(`delete:${c.connectionId}`)}>
+                <TrashIcon className="h-5 w-5 text-red-500 hover:text-red-700" />
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {error && !form && status !== "error" && <p className="text-sm text-red-600 mb-2">{error}</p>}
+
+      {form === "add" ? formView : (
+        <div>
+          <button
+            type="button"
+            className="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-300 rounded-none text-sm text-gray-700 hover:bg-gray-200"
+            onClick={() => { resetForm(); setForm("add"); }}>
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Add connection
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

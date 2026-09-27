@@ -67,6 +67,37 @@ export const republishItem = async ({ user, id }: { user: any; id: string }) => 
   return client.request(mutation, { id }).then((data: any) => data.republishItem);
 };
 
+// Connection management (delegated API permissions). The credential goes to
+// policy, which passes it once to the broker; it is never returned.
+const connectionMutation = async (user: any, mutation: string, variables: any, field: string) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  return client.request(mutation, variables).then((data: any) => data[field]);
+};
+
+export const createConnection = ({ user, backend, label, key, secret }: { user: any; backend: string; label?: string | null; key: string; secret: string }) =>
+  connectionMutation(user, gql`
+    mutation createConnection($backend: String!, $label: String, $key: String!, $secret: String!) {
+      createConnection(backend: $backend, label: $label, key: $key, secret: $secret) { connectionId backend status label }
+    }
+  `, { backend, label: label || null, key, secret }, "createConnection");
+
+export const rotateConnection = ({ user, connectionId, key, secret }: { user: any; connectionId: string; key: string; secret: string }) =>
+  connectionMutation(user, gql`
+    mutation rotateConnection($connectionId: String!, $key: String!, $secret: String!) {
+      rotateConnection(connectionId: $connectionId, key: $key, secret: $secret)
+    }
+  `, { connectionId, key, secret }, "rotateConnection");
+
+export const disableConnection = ({ user, connectionId }: { user: any; connectionId: string }) =>
+  connectionMutation(user, gql`
+    mutation disableConnection($connectionId: String!) { disableConnection(connectionId: $connectionId) }
+  `, { connectionId }, "disableConnection");
+
+export const deleteConnection = ({ user, connectionId }: { user: any; connectionId: string }) =>
+  connectionMutation(user, gql`
+    mutation deleteConnection($connectionId: String!) { deleteConnection(connectionId: $connectionId) }
+  `, { connectionId }, "deleteConnection");
+
 export const loadConnections = async ({ user }: { user: any }) => {
   const client = await buildRequestClient({ token: await user.getToken() });
   const query = gql`

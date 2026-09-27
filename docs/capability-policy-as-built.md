@@ -170,6 +170,10 @@ built. Running the program is the action, and the grant is the authority.
   language-independent skip list in l0000 (the skip is L0176's own field).
 - **Connection selection.** Built on console `connections`, graffiticode
   `policy-service` and l0000 `exec-context` (view), not deployed.
+  - Settings has a Connections card: create a connection (service, label, key,
+    secret; the secret is sent once and never shown), rotate its secret (same
+    key), disable it (final) or delete it. It calls the existing GraphQL
+    connection mutations.
   - Items carry `connectionId` (set by `setItemConnection`, validated against
     the user's active connections) and `publicationId`. A published item keeps
     its connection until unpublished.
