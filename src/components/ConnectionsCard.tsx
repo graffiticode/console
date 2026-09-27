@@ -1,4 +1,4 @@
-import { TrashIcon, PlusIcon, ArrowPathIcon, NoSymbolIcon } from "@heroicons/react/24/outline";
+import { TrashIcon, PlusIcon, ArrowPathIcon, NoSymbolIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 import { useState, useEffect, useCallback } from "react";
 import useGraffiticodeAuth from "@graffiticode/auth-react";
 import {
@@ -7,7 +7,9 @@ import {
   rotateConnection,
   disableConnection,
   deleteConnection,
+  leaveSharedConnection,
 } from "../utils/swr/fetchers";
+import ConnectionSharing, { presetLabel } from "./ConnectionSharing";
 import { CREDENTIAL_BACKENDS, getCredentialBackend } from "../lib/credential-backends";
 
 interface Connection {
@@ -15,11 +17,15 @@ interface Connection {
   backend: string;
   status: "active" | "disabled";
   label: string | null;
+  shared: boolean;
+  preset: string | null;
+  expiresAt: string | null;
 }
 
 // A connection holds an external-API credential in the credential broker; items
-// run through it without ever seeing the credential. Only its owner can use it.
-// The secret is sent once and never shown again.
+// run through it without ever seeing the credential. Its owner can use it and
+// share it (ConnectionSharing); people it is shared with see it here as
+// "Shared with you" and can leave. The secret is sent once and never shown again.
 const errorText = (err: any) =>
   String(err?.response?.errors?.[0]?.message || err?.message || err).replace(/^Connection request refused: /, "Refused: ");
 
@@ -38,6 +44,8 @@ export default function ConnectionsCard() {
   const [secret, setSecret] = useState("");
   // Destructive actions ask once, inline: "disable:<id>" or "delete:<id>".
   const [confirming, setConfirming] = useState<string | null>(null);
+  // The owned connection whose Share panel is open.
+  const [sharing, setSharing] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -169,7 +177,7 @@ export default function ConnectionsCard() {
     <div className="overflow-hidden grid grid-col-1">
       <p className="text-sm text-gray-500 mb-3">
         A connection lets your items use an external service without the credential ever reaching them.
-        Choose it on an item and press Run. Only you can use your connections. The secret is sent once and never shown again.
+        Choose it on an item and press Run. Share it to let someone else use it without seeing the credential. The secret is sent once and never shown again.
       </p>
 
       {status === "error" && !form && (
@@ -179,7 +187,31 @@ export default function ConnectionsCard() {
       <ul className="space-y-2 mb-2">
         {connections.map(c => (
           rotating === c.connectionId ? <li key={c.connectionId}>{formView}</li> :
-          <li key={c.connectionId} className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
+          c.shared ? (
+            <li key={c.connectionId} className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
+              <div className="flex flex-col">
+                <span className="font-mono">{c.label || backendLabel(c.backend)}</span>
+                <small className="text-sm text-neutral-500 font-light space-x-3">
+                  <span>Shared with you</span>
+                  <span>{presetLabel(c.preset)}</span>
+                  {c.expiresAt && <span>until {new Date(c.expiresAt).toLocaleDateString()}</span>}
+                  <span className={c.status === "active" ? "text-green-700" : "text-gray-500"}>{c.status}</span>
+                </small>
+                {confirming === `leave:${c.connectionId}` && (
+                  <span className="text-xs text-gray-700 mt-1">
+                    Leave? You lose access until the owner shares it again.{" "}
+                    <button type="button" className="underline" disabled={busy} onClick={() => act(() => leaveSharedConnection({ user, connectionId: c.connectionId }))}>Leave</button>{" "}
+                    <button type="button" className="underline" onClick={() => setConfirming(null)}>Cancel</button>
+                  </span>
+                )}
+              </div>
+              <button type="button" className="text-sm text-gray-600 hover:text-gray-900 underline" onClick={() => setConfirming(`leave:${c.connectionId}`)}>
+                Leave
+              </button>
+            </li>
+          ) :
+          <li key={c.connectionId}>
+          <div className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
             <div className="flex flex-col">
               <span className="font-mono">{c.label || backendLabel(c.backend)}</span>
               <small className="text-sm text-neutral-500 font-light space-x-3">
@@ -196,7 +228,7 @@ export default function ConnectionsCard() {
               )}
               {confirming === `delete:${c.connectionId}` && (
                 <span className="text-xs text-gray-700 mt-1">
-                  Delete? The credential is erased and items using it stop working.{" "}
+                  Delete? The credential is erased, items using it stop working, and everyone it is shared with loses access.{" "}
                   <button type="button" className="underline text-red-700" disabled={busy} onClick={() => act(() => deleteConnection({ user, connectionId: c.connectionId }))}>Delete</button>{" "}
                   <button type="button" className="underline" onClick={() => setConfirming(null)}>Cancel</button>
                 </span>
@@ -205,6 +237,9 @@ export default function ConnectionsCard() {
             <div className="flex items-center gap-2">
               {c.status === "active" && (
                 <>
+                  <button type="button" title="Share" onClick={() => setSharing(sharing === c.connectionId ? null : c.connectionId)}>
+                    <UserPlusIcon className="h-5 w-5 text-gray-500 hover:text-gray-800" />
+                  </button>
                   <button type="button" title="Rotate secret" onClick={() => { resetForm(); setForm(`rotate:${c.connectionId}`); }}>
                     <ArrowPathIcon className="h-5 w-5 text-gray-500 hover:text-gray-800" />
                   </button>
@@ -217,6 +252,8 @@ export default function ConnectionsCard() {
                 <TrashIcon className="h-5 w-5 text-red-500 hover:text-red-700" />
               </button>
             </div>
+          </div>
+          {sharing === c.connectionId && c.status === "active" && <ConnectionSharing user={user} connectionId={c.connectionId} />}
           </li>
         ))}
       </ul>

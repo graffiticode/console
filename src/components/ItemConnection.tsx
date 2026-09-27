@@ -83,7 +83,7 @@ export default function ItemConnection({ user, itemId, taskId, connectionId, pub
   };
   const staleVersion = Boolean(publicationId && publishedTaskId && publishedTaskId !== taskId);
 
-  const labelFor = c => c.label || `${c.backend} ${c.connectionId.slice(-6)}`;
+  const labelFor = c => `${c.label || `${c.backend} ${c.connectionId.slice(-6)}`}${c.shared ? ' (shared with you)' : ''}`;
 
   return (
     <div className="mt-4">

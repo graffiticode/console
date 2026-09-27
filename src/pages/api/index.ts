@@ -47,8 +47,15 @@ import {
   rotateConnection,
   disableConnection,
   deleteConnection,
+  shareConnection,
+  listConnectionGrants,
+  revokeConnectionGrant,
+  listSharedConnections,
+  leaveSharedConnection,
+  claimConnectionGrants,
   PolicyError,
 } from "../../lib/policy-client";
+import { accountForEmail, emailHash, isEmail, normalizeEmail, verifiedEmailHashes } from "../../lib/connection-sharing";
 import { enqueueGenerationJob } from "../../lib/generation-queue";
 import {
   FreePlanError,
@@ -290,12 +297,29 @@ const typeDefs = `
     backend: String!
     status: String!
     label: String
+    # True for a connection another account owns and shared with this user;
+    # preset says what it allows (preview, save or publish).
+    shared: Boolean!
+    preset: String
+    expiresAt: String
+  }
+
+  # One person a connection is shared with, as its owner sees it. pending: shared
+  # to an email that has not signed in yet.
+  type ConnectionGrant {
+    grantId: String!
+    recipient: String
+    pending: Boolean!
+    preset: String!
+    expiresAt: String
+    createdAt: String!
   }
 
   type Query {
     checkItemCreateAllowed: CompileAllowedResponse!
     credentials: [CredentialInfo!]!
     connections: [Connection!]!
+    connectionGrants(connectionId: String!): [ConnectionGrant!]!
     parse(lang: String!, src: String!, itemId: String): ParseResult!
     # connectionId: view the caller's stored result through that connection.
     data(id: String!, connectionId: String): String!
@@ -360,6 +384,11 @@ const typeDefs = `
     rotateConnection(connectionId: String!, key: String!, secret: String!): Boolean!
     disableConnection(connectionId: String!): Boolean!
     deleteConnection(connectionId: String!): Boolean!
+    # Share a connection with a person by email. preset: preview, save or publish.
+    # Succeeds the same way whether or not the email has an account yet.
+    shareConnection(connectionId: String!, email: String!, preset: String!, expiresAt: String): Boolean!
+    revokeConnectionGrant(connectionId: String!, grantId: String!): Boolean!
+    leaveSharedConnection(connectionId: String!): Boolean!
   }
 
   # Model selection is deliberately absent. Which model family and tier serve a
@@ -431,7 +460,26 @@ const resolvers = {
     connections: async (_, __, ctx) => {
       if (ctx.freePlan) return [];
       const auth = await resolveAuth(ctx);
-      return await viaPolicy(() => listConnections(auth.token));
+      // Shares made to this user's emails before they had an account become
+      // theirs now. Best effort: a failure here only delays them.
+      const hashes = await verifiedEmailHashes(auth.token);
+      if (hashes.length) {
+        await claimConnectionGrants(auth.token, hashes).catch(() => null);
+      }
+      const [owned, shared] = await viaPolicy(() => Promise.all([
+        listConnections(auth.token),
+        listSharedConnections(auth.token),
+      ]));
+      return [
+        ...owned.map(c => ({ ...c, shared: false, preset: null, expiresAt: null })),
+        ...shared.map(c => ({ ...c, shared: true })),
+      ];
+    },
+    connectionGrants: async (_, args, ctx) => {
+      if (ctx.freePlan) return [];
+      const auth = await resolveAuth(ctx);
+      const grants = await viaPolicy(() => listConnectionGrants(auth.token, args.connectionId));
+      return grants.map(g => ({ ...g, recipient: g.recipientLabel }));
     },
     data: async (_, args, ctx) => {
       const { id } = args;
@@ -831,6 +879,34 @@ const resolvers = {
       if (ctx.freePlan) throw new Error("Connections require a full account.");
       const auth = await resolveAuth(ctx);
       await viaPolicy(() => disableConnection(auth.token, args.connectionId));
+      return true;
+    },
+    shareConnection: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      if (!isEmail(args.email)) throw new Error("Enter a valid email address.");
+      if (!["preview", "save", "publish"].includes(args.preset)) throw new Error("Choose preview, save or publish.");
+      const auth = await resolveAuth(ctx);
+      const email = normalizeEmail(args.email);
+      const recipientUid = await accountForEmail(email);
+      if (recipientUid === auth.uid) throw new Error("You already own this connection.");
+      await viaPolicy(() => shareConnection(auth.token, args.connectionId, {
+        ...(recipientUid ? { recipientUid } : { recipientEmailHash: emailHash(email) }),
+        recipientLabel: email,
+        preset: args.preset,
+        expiresAt: args.expiresAt ?? null,
+      }));
+      return true;
+    },
+    revokeConnectionGrant: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      await viaPolicy(() => revokeConnectionGrant(auth.token, args.connectionId, args.grantId));
+      return true;
+    },
+    leaveSharedConnection: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      await viaPolicy(() => leaveSharedConnection(auth.token, args.connectionId));
       return true;
     },
     deleteConnection: async (_, args, ctx) => {

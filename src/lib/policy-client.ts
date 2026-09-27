@@ -30,6 +30,18 @@ export type Connection = {
   label: string | null;
 };
 
+// A connection someone else owns and has shared with this user.
+export type SharedConnection = Connection & { preset: string; expiresAt: string | null };
+
+export type ConnectionGrant = {
+  grantId: string;
+  recipientLabel: string | null;
+  pending: boolean;
+  preset: string;
+  expiresAt: string | null;
+  createdAt: string;
+};
+
 let auth: GoogleAuth | null = null;
 const idTokenClients = new Map<string, Promise<any>>();
 
@@ -98,3 +110,28 @@ export const disableConnection = (userToken: string, connectionId: string) =>
 
 export const deleteConnection = (userToken: string, connectionId: string) =>
   call("DELETE", `/v1/connections/${encodeURIComponent(connectionId)}`, userToken);
+
+// Sharing (delegation). The owner grants a preset ("preview", "save" or
+// "publish") to an account, or to a hash of an email until that person signs
+// in with it.
+export const shareConnection = (
+  userToken: string,
+  connectionId: string,
+  grant: { recipientUid?: string | null; recipientEmailHash?: string | null; recipientLabel?: string | null; preset: string; expiresAt?: string | null },
+): Promise<ConnectionGrant> =>
+  call("POST", `/v1/connections/${encodeURIComponent(connectionId)}/grants`, userToken, grant);
+
+export const listConnectionGrants = (userToken: string, connectionId: string): Promise<ConnectionGrant[]> =>
+  call("GET", `/v1/connections/${encodeURIComponent(connectionId)}/grants`, userToken);
+
+export const revokeConnectionGrant = (userToken: string, connectionId: string, grantId: string) =>
+  call("DELETE", `/v1/connections/${encodeURIComponent(connectionId)}/grants/${encodeURIComponent(grantId)}`, userToken);
+
+export const listSharedConnections = (userToken: string): Promise<SharedConnection[]> =>
+  call("GET", "/v1/shared", userToken);
+
+export const leaveSharedConnection = (userToken: string, connectionId: string) =>
+  call("DELETE", `/v1/shared/${encodeURIComponent(connectionId)}`, userToken);
+
+export const claimConnectionGrants = (userToken: string, emailHashes: string[]): Promise<{ claimed: number }> =>
+  call("POST", "/v1/grants/claim", userToken, { emailHashes });

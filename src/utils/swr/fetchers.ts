@@ -98,11 +98,40 @@ export const deleteConnection = ({ user, connectionId }: { user: any; connection
     mutation deleteConnection($connectionId: String!) { deleteConnection(connectionId: $connectionId) }
   `, { connectionId }, "deleteConnection");
 
+export const shareConnection = ({ user, connectionId, email, preset, expiresAt }: { user: any; connectionId: string; email: string; preset: string; expiresAt?: string | null }) =>
+  connectionMutation(user, gql`
+    mutation shareConnection($connectionId: String!, $email: String!, $preset: String!, $expiresAt: String) {
+      shareConnection(connectionId: $connectionId, email: $email, preset: $preset, expiresAt: $expiresAt)
+    }
+  `, { connectionId, email, preset, expiresAt: expiresAt || null }, "shareConnection");
+
+export const revokeConnectionGrant = ({ user, connectionId, grantId }: { user: any; connectionId: string; grantId: string }) =>
+  connectionMutation(user, gql`
+    mutation revokeConnectionGrant($connectionId: String!, $grantId: String!) {
+      revokeConnectionGrant(connectionId: $connectionId, grantId: $grantId)
+    }
+  `, { connectionId, grantId }, "revokeConnectionGrant");
+
+export const leaveSharedConnection = ({ user, connectionId }: { user: any; connectionId: string }) =>
+  connectionMutation(user, gql`
+    mutation leaveSharedConnection($connectionId: String!) { leaveSharedConnection(connectionId: $connectionId) }
+  `, { connectionId }, "leaveSharedConnection");
+
+export const loadConnectionGrants = async ({ user, connectionId }: { user: any; connectionId: string }) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const query = gql`
+    query connectionGrants($connectionId: String!) {
+      connectionGrants(connectionId: $connectionId) { grantId recipient pending preset expiresAt createdAt }
+    }
+  `;
+  return client.request(query, { connectionId }).then((data: any) => data.connectionGrants);
+};
+
 export const loadConnections = async ({ user }: { user: any }) => {
   const client = await buildRequestClient({ token: await user.getToken() });
   const query = gql`
     query connections {
-      connections { connectionId backend status label }
+      connections { connectionId backend status label shared preset expiresAt }
     }
   `;
   return client.request(query).then((data: any) => data.connections);

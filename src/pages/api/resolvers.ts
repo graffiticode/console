@@ -47,7 +47,7 @@ import fs from "fs";
 import path from "path";
 import { encrypt, decrypt, isConfigured as isSecretCryptoConfigured } from "../../lib/secret-crypto";
 import { createPublication, deletePublication, PublicationError } from "../../lib/publications";
-import { listConnections } from "../../lib/policy-client";
+import { listConnections, listSharedConnections } from "../../lib/policy-client";
 import { getCredentialBackend, fieldVisibilityFor } from "../../lib/credential-backends";
 
 type AuthArg = {
@@ -1435,8 +1435,9 @@ export async function setItemConnection({ auth, id, connectionId }: { auth: Auth
     throw new Error("Unpublish this item before changing its connection.");
   }
   if (connectionId) {
-    const connections = await listConnections(auth.token);
-    if (!connections.some(c => c.connectionId === connectionId && c.status === "active")) {
+    // The user's own connections and those shared with them both qualify.
+    const [owned, shared] = await Promise.all([listConnections(auth.token), listSharedConnections(auth.token)]);
+    if (![...owned, ...shared].some(c => c.connectionId === connectionId && c.status === "active")) {
       throw new Error("That connection is not one of your active connections.");
     }
   }

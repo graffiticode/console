@@ -1,6 +1,6 @@
 # Delegated API permissions: design as built (2026-09-25)
 
-Companion to `graffiticode_capability_policy_spec.md`. The implementation described here is on branches, tested, and **not deployed**. Delegation (grants to other users) is not built; the current scope is **owner-only**.
+Companion to `graffiticode_capability_policy_spec.md`. The implementation described here is on branches and tested. Policy and the broker are deployed (2026-09-27) but not yet called; the gateway, L0176 and console branches are not deployed. Delegation (sharing a connection with other accounts) is built on the branches.
 
 The spec's 2026-09-26 revisions add release prerequisites described below.
 Those requirements are not implemented merely by updating these documents.
@@ -155,10 +155,9 @@ built. Running the program is the action, and the grant is the authority.
   - Registry: new `viewSafe` flag, `REGISTRY_VERSION` 3.
   - l0000: admission asks policy on an invocation token alone when there is
     no user. L0176 picks this up only with the next l0000 release.
-  - Not done: the console's publish and unpublish still only flip the item's
-    `isPublic`; creating and deleting publication records needs items to
-    record their connection (connection selection). Delegated publishers and
-    the publish permission on grants wait for delegation.
+  - The console's publish and unpublish create and delete publication records
+    for items with a connection (see Connection selection). A recipient can
+    publish only with the publish preset (see Delegation).
 - **Connection-free compilation.** Partly done on l0176 `brokered-connection`.
   Without a connection, `save-to-itembank` never writes: it evaluates to the
   activity with `itemBank: { skipped: "no-connection", fn, occurrence }`, the
@@ -200,7 +199,12 @@ built. Running the program is the action, and the grant is the authority.
 ## Open decisions
 
 1. **Author signing.** It carries edit and delete authority. Enforcement is built: it goes through the broker and is non-delegable. Unverified: its request shape against Learnosity's Author API, so it is not yet usable.
-2. **Delegation.** Grant records and the UI are not built. It stays behind a flag that is off.
+2. **Delegation.** Built on graffiticode `policy-service` and console `connections`, not deployed. There is no feature flag: once deployed, owners can share.
+   - Policy holds grants (`grants/*`): owner, recipient account (or a hash of an email until that person signs in), preset, the delegable functions it names, a publish flag and an optional expiry. Every invocation, snapshot and mint checks the grant live, so revoking, narrowing or expiry stops the recipient's next call. Only registry functions marked `delegable` can be granted; Author signing never can. Recipients cannot share onward.
+   - Presets: preview (sign), save (sign and write), publish (save, plus publishing). A recipient's publication lasts only while their grant allows publishing, re-checked on every view.
+   - The console identifies people by email: the auth service maps a linked email to its account; an email with no account is shared as a hash and claimed when that person signs in with it. The owner sees the same result and the same list either way, so sharing never reveals whether an account exists.
+   - UI: a Share panel on each owned connection in Settings (email, access, optional end date, who it is shared with, remove), and "Shared with you" rows with Leave. Shared connections appear in the item Connection chooser.
+   - Deleting a connection deletes its grants. Not done: grants limited to certain items, org or group sharing, an activity view per connection.
 
 ## Not done or unverified
 
