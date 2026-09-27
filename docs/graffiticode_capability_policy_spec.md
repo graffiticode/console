@@ -306,14 +306,16 @@ one would repeat the draft's writes.
 ## Release prerequisites
 
 Removing Console-issued intent tokens, save/read write gating and the
-"write not executed" marker depends on implementing the invocation/receipt
-and artifact-read contracts above. Deployment also requires broker credential
+"write not executed" marker depended on implementing the invocation/receipt
+and artifact-read contracts above; they were removed on the branches once
+those contracts were built. The checks below must still pass against a
+deployed system before release. Deployment also requires broker credential
 binding, registry-version enforcement and compiler egress control: compilers
 must be unable to reach provider hosts directly, so no call can bypass the
 broker. Without that, the broker is not the boundary. These are design
 requirements, not claims about the current branches.
 
-Before removing the gates, verify that concurrent retries and redispatched
+Before release, verify that concurrent retries and redispatched
 jobs execute each write at most once through the broker; timeouts remain
 uncertain; intentional reruns have new identities; and views/answers never
 repeat saves. Verify cross-account/connection artifact denial, current preview

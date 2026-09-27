@@ -29,26 +29,39 @@ Those requirements are not implemented merely by updating these documents.
 
 - **The calling service** is identified by a Google ID token that policy and the broker verify themselves (`X-Caller-Identity`). That caller is bound to a role:
   - a compiler, for one language: snapshot and mint (policy), execute (broker)
-  - the console: intents and connection management (policy)
+  - the console: connection management (policy)
   - the gateway: invocation allocation and publications (policy)
   - policy: credential provisioning (broker)
 - **The user** comes from their verified token and nothing else.
 - **Tokens** are ES256 with a fixed algorithm, issuer, audience and token type:
-  - intent token (console, for a deliberate save or Author session): 30 minutes; to be removed
   - invocation token (gateway, one logical invocation): 30 minutes; a retry past expiry gets a fresh one for the same invocation. A published view's token also names the publication, which confines its session to viewSafe functions
   - session token: about 15 minutes
   - execution token: at most 60 seconds, usable once, covering one request
 - **Credentials:** the broker holds them, encrypted under a broker-only key and tied to their connection. Policy passes a credential through once when a connection is created or rotated, and never stores it.
 - **Audit:** every allowed and denied decision is recorded with pseudonymous uids, and never with tokens, secrets or payloads.
 
-## Conflicts with your model (to remove)
+## Removed: intents and execution modes
 
-- **Intent tokens and mode gating.** A write runs only in `save` mode, which comes only from a console-issued intent. That puts a second gate outside the program. Under your model, running the program is the action and the grant is the authority.
-  - Affected commits: policy `362f5ec` and `144c421`, the l0000 client `008c4dd`, the api's intent forwarding `8122f08`, and the L0176 brokered path.
-  - Removing it means an l0000 0.6.0 release.
-  - Do not remove it until invocation-based receipts and private artifact reads
-    satisfy the spec's release prerequisites.
-- **The "write not executed" marker.** It hides the preview when a program containing a save is viewed. It goes away with the mode gating.
+Removed on all branches once invocations, receipts and the read path were
+built. Running the program is the action, and the grant is the authority.
+- Policy has no intent route or token, and no modes. A snapshot allows the
+  owner every registered function the program calls (writes and Author
+  included) against the connection's backend; a publication session allows
+  only `viewSafe` functions. Registry `modes` and `EXEC_MODES` are gone
+  (`REGISTRY_VERSION` 4).
+- l0000 has no modes, intents, disabled writes or `write-disabled` /
+  `mode-disabled` sentinels (the "write not executed" marker). An ungranted
+  function is a compile error before transformation; a granted one runs
+  wherever the program calls it. This is a breaking API change for l0000:
+  `EXEC_MODES`, `ExecMode`, `SkippedResult` and `permittedModes` are no longer
+  exported.
+- The gateway no longer forwards intent tokens; the console's policy client
+  no longer requests them.
+- Author signing runs when the owner's own program calls `author` through
+  their connection. It stays non-delegable and is not `viewSafe`.
+- Release: l0000 0.6.0 must be published before L0176 is consistent. On the
+  published 0.5.0, 6 L0176 tests fail; against the local 0.6.0 build all 125
+  pass.
 
 ## Required changes from the 2026-09-26 review
 
@@ -80,7 +93,7 @@ Those requirements are not implemented merely by updating these documents.
     the snapshot. Policy accepts only its own invocation token for the same
     user and connection.
   - Operation ids are `invocation/stage/occurrence` for every call, replacing
-    the save-action id. Intents still gate writes until their removal.
+    the save-action id.
   - Not done: receipt retention and TTLs; clients sending idempotency keys
     (none sends a connection yet); an l0000 release carrying this
     (L0176 still depends on 0.5.0); the gateway's `POLICY_URL`, its
@@ -133,7 +146,7 @@ Those requirements are not implemented merely by updating these documents.
   - A view (`GET /data?id=&publication=`) carries no user. Policy re-checks
     the publication and connection live and returns an invocation token bound
     to the publisher and marked with the publication; a snapshot under it
-    needs no user, runs in render mode, takes no intent and allows only
+    needs no user and allows only
     functions the registry marks `viewSafe` (preview signing). Every mint in
     that session re-checks the publication. All views share one invocation.
   - The gateway serves the artifact the publication names, signed through the

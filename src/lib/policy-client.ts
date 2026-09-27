@@ -1,7 +1,8 @@
 // Server-side client for the policy authority (delegated API permissions).
 //
-// The console is policy's entry point: it manages a user's connections and
-// asks for intent tokens when a user deliberately saves. Policy is a private
+// The console manages a user's connections through policy. There are no
+// intents: running a program is the action, and the grant is the authority.
+// Policy is a private
 // Cloud Run service in project graffiticode; the console calls it with its own
 // service account's ID tokens (Cloud Run IAM + X-Caller-Identity) and the
 // user's Firebase ID token in Authorization, which policy re-verifies.
@@ -28,8 +29,6 @@ export type Connection = {
   status: "active" | "disabled";
   label: string | null;
 };
-
-export type ExecutionIntent = { intentToken: string; saveActionId: string | null };
 
 let auth: GoogleAuth | null = null;
 const idTokenClients = new Map<string, Promise<any>>();
@@ -99,9 +98,3 @@ export const disableConnection = (userToken: string, connectionId: string) =>
 
 export const deleteConnection = (userToken: string, connectionId: string) =>
   call("DELETE", `/v1/connections/${encodeURIComponent(connectionId)}`, userToken);
-
-// An intent binds a deliberate save (or Author Site session) to this user and
-// connection. It is requested only at the entry point where the user acted,
-// and travels with that compile (and its job retries) as `intentToken`.
-export const issueIntent = (userToken: string, { mode, connectionId }: { mode: "save" | "author"; connectionId: string }): Promise<ExecutionIntent> =>
-  call("POST", "/v1/intents", userToken, { mode, connectionId });
