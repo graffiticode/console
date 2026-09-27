@@ -17,6 +17,7 @@ import {
   getData,
   createItem,
   updateItem,
+  setItemConnection,
   getItems,
   getItem,
   getSpec,
@@ -174,6 +175,10 @@ const typeDefs = `
     # workspace's items for /claim. Both are null for authenticated callers.
     workspace: String
     claimToken: String
+    # The connection the item runs through (delegated API permissions), and
+    # its publication while it is public. Null when none.
+    connectionId: String
+    publicationId: String
   }
 
   type GenerationJob {
@@ -288,7 +293,8 @@ const typeDefs = `
     credentials: [CredentialInfo!]!
     connections: [Connection!]!
     parse(lang: String!, src: String!, itemId: String): ParseResult!
-    data(id: String!): String!
+    # connectionId: view the caller's stored result through that connection.
+    data(id: String!, connectionId: String): String!
     compiles(lang: String!, type: String!): [Compile!]
     taskVersions(lang: String!, client: String, itemId: String, limit: Int, startAfter: String): [TaskVersion!]!
     tasks(lang: String!, mark: Int!): [Task!]
@@ -338,6 +344,8 @@ const typeDefs = `
     startCodeGeneration(itemId: String, siblingOf: String, lang: String!, name: String, client: String, clientKind: String, geoCountry: String, prompt: String!, modification: String!, currentSrc: String, currentData: String): GenerationJob!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
+    # Choose the connection an item runs through, or null for none.
+    setItemConnection(id: String!, connectionId: String): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
     claimFreePlanSession(token: String!): ClaimResult!
     setCredential(name: String!, value: String!, backend: String, isPublic: Boolean): CredentialInfo!
@@ -421,8 +429,9 @@ const resolvers = {
     },
     data: async (_, args, ctx) => {
       const { id } = args;
+      const connectionId = ctx.freePlan ? null : (args.connectionId ?? null);
       const auth = await resolveAuth(ctx);
-      const data = await getData({ authToken: auth.token, id });
+      const data = await getData({ authToken: auth.token, id, connectionId });
       return JSON.stringify(data);
     },
     compiles: async (_, args, ctx) => {
@@ -722,6 +731,11 @@ const resolvers = {
       const { id, name, taskId, mark, help, isPublic, client, upstreamLangs, source, label } = args;
       const auth = await resolveAuth(ctx);
       return await updateItem({ auth, id, name, taskId, mark, help, isPublic, client, upstreamLangs, source, label });
+    },
+    setItemConnection: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      return await viaPolicy(() => setItemConnection({ auth, id: args.id, connectionId: args.connectionId ?? null }));
     },
     shareItem: async (_, args, ctx) => {
       if (ctx.freePlan) {

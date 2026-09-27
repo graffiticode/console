@@ -9,7 +9,7 @@ import SignIn from "./SignIn";
 import { isNonEmptyString } from "../utils";
 import useGraffiticodeAuth from "@graffiticode/auth-react";
 
-const useTaskIdFormUrl = ({ accessToken, lang, id, origin }) => {
+const useTaskIdFormUrl = ({ accessToken, lang, id, origin, connectionId = null }) => {
   if (!id) {
     return "";
   }
@@ -22,6 +22,10 @@ const useTaskIdFormUrl = ({ accessToken, lang, id, origin }) => {
   }
   if (origin) {
     params.set("origin", origin);
+  }
+  // Through a connection, the view shows the item's stored result for it.
+  if (connectionId) {
+    params.set("connection", connectionId);
   }
   return `${protocol}://${host}/form?lang=${lang}&id=${id}&${params.toString()}`;
 };
@@ -281,10 +285,11 @@ export const FormIFrame = ({
   data,
   className,
   height,
-  onFocus
-}) => {
+  onFocus,
+  connectionId = null,
+}: any) => {
   const origin = window.location.origin;
-  const src = useTaskIdFormUrl({accessToken, lang, id, origin});
+  const src = useTaskIdFormUrl({accessToken, lang, id, origin, connectionId});
   return (
     <IFrame
       id={id}

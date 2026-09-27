@@ -168,6 +168,25 @@ built. Running the program is the action, and the grant is the authority.
   is deleted. Deliberately kept until private artifacts
   replace it: preview signing with parse-time credentials. Not done: a
   language-independent skip list in l0000 (the skip is L0176's own field).
+- **Connection selection.** Built on console `connections`, graffiticode
+  `policy-service` and l0000 `exec-context` (view), not deployed.
+  - Items carry `connectionId` (set by `setItemConnection`, validated against
+    the user's active connections) and `publicationId`. A published item keeps
+    its connection until unpublished.
+  - The item menu has a connection chooser and a Run button for L0176 items.
+    Run is the only explicit execution through the connection: each run gets
+    a fresh idempotency key, and Retry reuses it. Generation, learner-answer
+    recompiles, thumbnails, the corpus ping and eval never send a connection.
+    Free-plan compiles have any connection stripped.
+  - Making an item with a connection public creates a publication through the
+    gateway; making it private deletes it (an already-missing one is fine).
+  - Views: the console's preview and `data` query pass the item's connection;
+    the gateway's `/form` forwards `connection` / `publication` to the view and
+    its data URL; the l0000 View reads them from props or its URL for the
+    initial load only.
+  - Not done: publishing a new l0000-view; the preview does not refresh after
+    a Run until the item is reselected; changing a published item's task does
+    not re-point its publication.
 - **Compiler egress control.** Not built or verified. Compilers must be unable
   to reach provider hosts directly; this is a deployment prerequisite.
 

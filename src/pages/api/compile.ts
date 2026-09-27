@@ -67,6 +67,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  // A free-plan compile runs under the shared trial account, which owns no
+  // connection: it never runs through one.
+  if (freePlan.freePlan && req.body && typeof req.body === "object") {
+    delete req.body.connectionId;
+    delete req.body.idempotencyKey;
+  }
   try {
     const headers = {
       authorization: downstreamAuth,

@@ -1436,6 +1436,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 key="form"
                 id={taskId}
                 lang={lang}
+                connectionId={items.find(i => i.id === selectedItemId)?.connectionId ?? null}
                 height="100%"
                 className="h-full w-full p-2"
                 setData={setFormData}

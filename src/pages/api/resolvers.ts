@@ -46,6 +46,8 @@ import { mintClaimToken } from "../../lib/claim-token";
 import fs from "fs";
 import path from "path";
 import { encrypt, decrypt, isConfigured as isSecretCryptoConfigured } from "../../lib/secret-crypto";
+import { createPublication, deletePublication, PublicationError } from "../../lib/publications";
+import { listConnections } from "../../lib/policy-client";
 import { getCredentialBackend, fieldVisibilityFor } from "../../lib/credential-backends";
 
 type AuthArg = {
@@ -1258,6 +1260,33 @@ export async function updateItem({
       updates.upstreamLangs = upstreamLangs;
     }
     if (isPublic !== undefined) {
+      // An item run through a connection is shared by a publication, not by
+      // its task alone: viewers see the publisher's stored result, signed
+      // under the publication's authority. Making it private withdraws it.
+      if (isPublic && itemData.connectionId && !itemData.publicationId && !auth.freePlan) {
+        const itemTaskId = taskId || itemData.taskId;
+        try {
+          updates.publicationId = await createPublication({
+            authToken: auth.token, taskId: itemTaskId, connectionId: itemData.connectionId,
+          });
+        } catch (err) {
+          if (err instanceof PublicationError) {
+            throw new Error(`Cannot publish this item: ${err.message}`);
+          }
+          throw err;
+        }
+      } else if (!isPublic && itemData.publicationId) {
+        try {
+          await deletePublication({ authToken: auth.token, publicationId: itemData.publicationId });
+        } catch (err) {
+          // Already gone (unpublished elsewhere, or its connection deleted) is
+          // the outcome we want; anything else keeps the item public.
+          if (!(err instanceof PublicationError && err.status === 403 && /publication-not-found/.test(err.message))) {
+            throw err;
+          }
+        }
+        updates.publicationId = admin.firestore.FieldValue.delete();
+      }
       if (isPublic) {
         // Make every task segment public BEFORE marking the item public, so a
         // failure leaves the item private (no local/API drift). A composition's
@@ -1383,6 +1412,32 @@ export async function updateItem({
     console.error("updateItem()", "ERROR", error);
     throw new Error(`Failed to update item: ${error.message}`);
   }
+}
+
+// Chooses the connection an item runs through (delegated API permissions), or
+// none. Only the user's own active connections qualify. A published item keeps
+// its connection until it is unpublished, since its publication is bound to it.
+export async function setItemConnection({ auth, id, connectionId }: { auth: AuthArg; id: string; connectionId: string | null }) {
+  if (auth.freePlan) {
+    throw new Error("Connections require a full account.");
+  }
+  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
+  const itemDoc = await itemRef.get();
+  if (!itemDoc.exists) {
+    throw new Error("Item not found");
+  }
+  const itemData = itemDoc.data();
+  if (itemData.publicationId && itemData.connectionId !== connectionId) {
+    throw new Error("Unpublish this item before changing its connection.");
+  }
+  if (connectionId) {
+    const connections = await listConnections(auth.token);
+    if (!connections.some(c => c.connectionId === connectionId && c.status === "active")) {
+      throw new Error("That connection is not one of your active connections.");
+    }
+  }
+  await itemRef.update({ connectionId: connectionId || admin.firestore.FieldValue.delete() });
+  return getItem({ auth, id });
 }
 
 // Set the async-generation status on an item. Used by startCodeGeneration
@@ -1664,6 +1719,8 @@ export async function getItems({ auth, lang, mark, client }) {
         generationError: data.generationError ?? null,
         generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
         generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
+        connectionId: data.connectionId ?? null,
+        publicationId: data.publicationId ?? null,
       };
 
       const timestamp = data.updated || data.created || 0;
@@ -1910,6 +1967,8 @@ export async function getItem({ auth, id, includeSpec = false }: {
       // render_item call while Firestore held 12,512 — the write worked and the
       // read looked broken. Two shaping sites, both need the field.
       generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
+      connectionId: data.connectionId ?? null,
+      publicationId: data.publicationId ?? null,
       // Claim token only — a read must be able to offer "save this item" for the
       // workspace the item actually lives in (this retrieval path is where the
       // claim link is surfaced, after the agent polls a create to "ready"), but

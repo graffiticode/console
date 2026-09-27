@@ -6,6 +6,7 @@ import { DocumentDuplicateIcon, ArrowTopRightOnSquareIcon, PhotoIcon } from '@he
 import MarkSelector, { marks } from './mark-selector';
 import { clientOptionForId } from './client-selector';
 import PublicToggle from './public-toggle';
+import ItemConnection, { isConnectableLang } from './ItemConnection';
 import ShareItemDialog from './ShareItemDialog';
 import CopyableId from './CopyableId';
 import { createItem } from '../utils/swr/fetchers';
@@ -29,7 +30,7 @@ function formatTimestamp(ts) {
   }
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, created, updated, client, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, created, updated, client, connectionId = null, publicationId = null, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
   const { user } = useGraffiticodeAuth();
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -286,6 +287,17 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                 </div>
               </div>
 
+              {isConnectableLang(lang) && (
+                <ItemConnection
+                  user={user}
+                  itemId={itemId}
+                  taskId={taskId}
+                  connectionId={connectionId}
+                  publicationId={publicationId}
+                  onChanged={onRefresh}
+                />
+              )}
+
               <div className="mt-4 border-t pt-4">
                 <button
                   onClick={handleCopyItem}
@@ -454,6 +466,8 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
                       created={item.created}
                       updated={item.updated}
                       client={item.client}
+                      connectionId={item.connectionId}
+                      publicationId={item.publicationId}
                       onChange={onUpdateItem}
                       onRefresh={onRefresh}
                       isOpen={openMenuId === item.id}

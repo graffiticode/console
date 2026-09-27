@@ -228,7 +228,13 @@ export const getApiData = async ({ auth, id }) => {
   }
 };
 
-export const postApiCompile = async ({ accessToken, id, data }) => {
+// With a connection this is an explicit run: the program executes through the
+// connection (its writes included) under the invocation the idempotency key
+// names, and the gateway stores the result for later views. Send the same key
+// when retrying the same run, and a new one for a deliberate rerun.
+export const postApiCompile = async ({ accessToken, id, data, connectionId = null, idempotencyKey = null }: {
+  accessToken: string; id: string; data: any; connectionId?: string | null; idempotencyKey?: string | null;
+}) => {
   try {
     // console.log(
     //   "postApiCompile()",
@@ -240,7 +246,7 @@ export const postApiCompile = async ({ accessToken, id, data }) => {
       "x-graffiticode-storage-type": "persistent",
     };
     const post = bent(apiUrl, "POST", "json", headers);
-    const body = { id, data };
+    const body = connectionId ? { id, data, connectionId, ...(idempotencyKey ? { idempotencyKey } : {}) } : { id, data };
     const resp = await post('/compile', body);
     if (resp.status !== "success") {
       throw new Error(`failed to post compile ${id}: ${resp.status}`);

@@ -36,6 +36,37 @@ export const compile = async ({ user, id, data = {}, buildLayerCount = 0 }: { us
   }
 };
 
+// Runs an item through its connection: the one explicit action that executes
+// the program's protected calls (its item-bank saves included) and stores the
+// result that views then show. `idempotencyKey` names this run; pass the same
+// key to retry it without repeating its writes.
+export const runItem = async ({ user, taskId, connectionId, idempotencyKey }: {
+  user: any; taskId: string; connectionId: string; idempotencyKey: string;
+}) => {
+  const accessToken = await user.getToken();
+  return postApiCompile({ accessToken, id: taskId, data: {}, connectionId, idempotencyKey });
+};
+
+export const setItemConnection = async ({ user, id, connectionId }: { user: any; id: string; connectionId: string | null }) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const mutation = gql`
+    mutation setItemConnection($id: String!, $connectionId: String) {
+      setItemConnection(id: $id, connectionId: $connectionId) { id connectionId publicationId }
+    }
+  `;
+  return client.request(mutation, { id, connectionId }).then((data: any) => data.setItemConnection);
+};
+
+export const loadConnections = async ({ user }: { user: any }) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const query = gql`
+    query connections {
+      connections { connectionId backend status label }
+    }
+  `;
+  return client.request(query).then((data: any) => data.connections);
+};
+
 export const parse = async ({ user, lang, src, itemId }: { user: any; lang: string; src: string; itemId?: string }) => {
   const token = await user.getToken();
   const client = new GraphQLClient("/api", {
@@ -103,7 +134,7 @@ export const loadTasks = async ({ user, lang, mark }) => {
   return client.request(query, { lang, mark }).then(data => data.tasks);
 };
 
-export const getData = async ({ user, id }) => {
+export const getData = async ({ user, id, connectionId = null }: { user: any; id: string; connectionId?: string | null }) => {
   // console.log(
   //   "getData()",
   //   "id=" + id,
@@ -120,11 +151,11 @@ export const getData = async ({ user, id }) => {
     }
   });
   const query = gql`
-    query get($id: String!) {
-      data(id: $id)
+    query get($id: String!, $connectionId: String) {
+      data(id: $id, connectionId: $connectionId)
     }
   `;
-  return client.request(query, { id }).then(data => JSON.parse(data.data));
+  return client.request(query, { id, connectionId }).then((data: any) => JSON.parse(data.data));
 };
 
 export const getSpec = async ({ user, id }) => {
@@ -271,6 +302,8 @@ export const loadItems = async ({ user, lang, mark, client: clientId }) => {
         sharedWith
         client
         upstreamLangs
+        connectionId
+        publicationId
       }
     }
   `;
@@ -386,6 +419,8 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
         updated
         client
         upstreamLangs
+        connectionId
+        publicationId
       }
     }
   `;

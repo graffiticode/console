@@ -22,9 +22,11 @@ interface FormViewProps {
   setNewTask?: any;
   className?: any;
   height?: any;
+  // The item's connection: the view shows its stored result through it.
+  connectionId?: string | null;
 }
 
-export default function FormView({ lang, id, setData, setNewTask, className, height }: FormViewProps) {
+export default function FormView({ lang, id, setData, setNewTask, className, height, connectionId = null }: FormViewProps) {
   const [open, setOpen] = useState(true);
   const [task, setTask] = useState();
   const [dataId, setDataId] = useState();
@@ -61,6 +63,7 @@ export default function FormView({ lang, id, setData, setNewTask, className, hei
         height={height || "100%"}
         user={user}
         onFocus={() => {}}
+        connectionId={connectionId}
       />
     </div>
   );

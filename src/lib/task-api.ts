@@ -98,11 +98,14 @@ export async function postTask({ auth, task, ephemeral, isPublic }) {
   }
 }
 
-export async function getData({ authToken, id }) {
+// With a connection, this is a view of the caller's stored result for the
+// item through that connection: the gateway never runs the program for it.
+export async function getData({ authToken, id, connectionId = null }: { authToken: string; id: string; connectionId?: string | null }) {
   try {
     const baseUrl = getBaseUrlForApi();
     const get = bent(baseUrl, "GET", "json", 200);
-    const resp = await get(`/data?id=${id}&access_token=${authToken}`);
+    const connection = connectionId ? `&connection=${encodeURIComponent(connectionId)}` : "";
+    const resp = await get(`/data?id=${id}&access_token=${authToken}${connection}`);
     console.log(
       "getData()",
       "resp.data=" + JSON.stringify(resp.data, null, 2),
