@@ -30,12 +30,12 @@ Those requirements are not implemented merely by updating these documents.
 - **The calling service** is identified by a Google ID token that policy and the broker verify themselves (`X-Caller-Identity`). That caller is bound to a role:
   - a compiler, for one language: snapshot and mint (policy), execute (broker)
   - the console: intents and connection management (policy)
-  - the gateway: invocation allocation (policy)
+  - the gateway: invocation allocation and publications (policy)
   - policy: credential provisioning (broker)
 - **The user** comes from their verified token and nothing else.
 - **Tokens** are ES256 with a fixed algorithm, issuer, audience and token type:
   - intent token (console, for a deliberate save or Author session): 30 minutes; to be removed
-  - invocation token (gateway, one logical invocation): 30 minutes; a retry past expiry gets a fresh one for the same invocation
+  - invocation token (gateway, one logical invocation): 30 minutes; a retry past expiry gets a fresh one for the same invocation. A published view's token also names the publication, which confines its session to viewSafe functions
   - session token: about 15 minutes
   - execution token: at most 60 seconds, usable once, covering one request
 - **Credentials:** the broker holds them, encrypted under a broker-only key and tied to their connection. Policy passes a credential through once when a connection is created or rotated, and never stores it.
@@ -123,12 +123,29 @@ Those requirements are not implemented merely by updating these documents.
   revocation the retry is refused. End-to-end tests (gateway, policy and
   broker together, compiler stubbed) cover each case. Not done: reconciling an
   uncertain write against Learnosity's item bank.
-- **Publication.** Not built. Creating one requires that the publisher is the
-  artifact's recipient, may publish the task, matches the artifact's connection
-  and revision, and holds the preview grant (under delegation, one that permits
-  publication). Views run under the publication and re-check it live,
-  including publication permission, and may use only view-safe functions,
-  which needs a new registry flag.
+- **Publication.** Built on `policy-service` and l0000 `exec-context`, not
+  deployed. Policy holds publication records (`publications/*`), created and
+  deleted only through the gateway.
+  - Publishing (`POST /publications { id, connectionId }` on the gateway)
+    names the caller's current artifact for that task and connection, so it
+    can never be another recipient's, missing or incompatible; policy then
+    requires the publisher to own the active connection (owner-only).
+  - A view (`GET /data?id=&publication=`) carries no user. Policy re-checks
+    the publication and connection live and returns an invocation token bound
+    to the publisher and marked with the publication; a snapshot under it
+    needs no user, runs in render mode, takes no intent and allows only
+    functions the registry marks `viewSafe` (preview signing). Every mint in
+    that session re-checks the publication. All views share one invocation.
+  - The gateway serves the artifact the publication names, signed through the
+    read path's data-only program, with no user sent to the compiler.
+  - Unpublishing or disabling the connection stops the next view and mint.
+  - Registry: new `viewSafe` flag, `REGISTRY_VERSION` 3.
+  - l0000: admission asks policy on an invocation token alone when there is
+    no user. L0176 picks this up only with the next l0000 release.
+  - Not done: the console's publish and unpublish still only flip the item's
+    `isPublic`; creating and deleting publication records needs items to
+    record their connection (connection selection). Delegated publishers and
+    the publish permission on grants wait for delegation.
 - **Connection-free compilation.** Partly done on l0176 `brokered-connection`.
   Without a connection, `save-to-itembank` never writes: it evaluates to the
   activity with `itemBank: { skipped: "no-connection", fn, occurrence }`, the
