@@ -31,16 +31,26 @@ export type Connection = {
 };
 
 // A connection someone else owns and has shared with this user.
-export type SharedConnection = Connection & { preset: string; expiresAt: string | null };
+export type SharedConnection = Connection & { preset: string; permissions: Permission[]; publish: boolean; expiresAt: string | null };
+
+// One function in one language, e.g. { lang: "0176", fn: "save-to-itembank" }.
+export type Permission = { lang: string; fn: string };
+export type ShareableFunction = Permission & { kind: string };
 
 export type ConnectionGrant = {
   grantId: string;
   recipientLabel: string | null;
   pending: boolean;
   preset: string;
+  permissions: Permission[];
+  publish: boolean;
   expiresAt: string | null;
   createdAt: string;
 };
+
+// What a grant sets: a preset ("preview", "save", "publish"), or "custom" with
+// exact permissions and whether publishing is allowed.
+export type GrantAccess = { preset: string; permissions?: Permission[] | null; publish?: boolean; expiresAt?: string | null };
 
 let auth: GoogleAuth | null = null;
 const idTokenClients = new Map<string, Promise<any>>();
@@ -111,15 +121,21 @@ export const disableConnection = (userToken: string, connectionId: string) =>
 export const deleteConnection = (userToken: string, connectionId: string) =>
   call("DELETE", `/v1/connections/${encodeURIComponent(connectionId)}`, userToken);
 
-// Sharing (delegation). The owner grants a preset ("preview", "save" or
-// "publish") to an account, or to a hash of an email until that person signs
-// in with it.
+// Sharing (delegation). The owner grants access (GrantAccess) to an account,
+// or to a hash of an email until that person signs in with it.
 export const shareConnection = (
   userToken: string,
   connectionId: string,
-  grant: { recipientUid?: string | null; recipientEmailHash?: string | null; recipientLabel?: string | null; preset: string; expiresAt?: string | null },
+  grant: { recipientUid?: string | null; recipientEmailHash?: string | null; recipientLabel?: string | null } & GrantAccess,
 ): Promise<ConnectionGrant> =>
   call("POST", `/v1/connections/${encodeURIComponent(connectionId)}/grants`, userToken, grant);
+
+// Changes an existing grant's access or end date; its recipient stays.
+export const updateConnectionGrant = (userToken: string, connectionId: string, grantId: string, access: GrantAccess): Promise<ConnectionGrant> =>
+  call("PATCH", `/v1/connections/${encodeURIComponent(connectionId)}/grants/${encodeURIComponent(grantId)}`, userToken, access);
+
+export const listShareableFunctions = (userToken: string, connectionId: string): Promise<ShareableFunction[]> =>
+  call("GET", `/v1/connections/${encodeURIComponent(connectionId)}/shareable`, userToken);
 
 export const listConnectionGrants = (userToken: string, connectionId: string): Promise<ConnectionGrant[]> =>
   call("GET", `/v1/connections/${encodeURIComponent(connectionId)}/grants`, userToken);

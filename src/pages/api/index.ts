@@ -48,6 +48,8 @@ import {
   disableConnection,
   deleteConnection,
   shareConnection,
+  updateConnectionGrant,
+  listShareableFunctions,
   listConnectionGrants,
   revokeConnectionGrant,
   listSharedConnections,
@@ -118,6 +120,20 @@ async function viaPolicy<T>(fn: () => Promise<T>): Promise<T> {
     }
     throw err;
   }
+}
+
+// A grant's access from shareConnection/updateConnectionGrant args. Policy
+// checks the permissions against the connection's shareable functions.
+function grantAccess(args: any) {
+  if (!["preview", "save", "publish", "custom"].includes(args.preset)) throw new Error("Choose preview, save, publish or custom.");
+  const custom = args.preset === "custom";
+  if (custom && !args.permissions?.length) throw new Error("Choose at least one function.");
+  return {
+    preset: args.preset,
+    permissions: custom ? args.permissions.map(({ lang, fn }) => ({ lang, fn })) : null,
+    publish: custom ? args.publish === true : false,
+    expiresAt: args.expiresAt ?? null,
+  };
 }
 
 const typeDefs = `
@@ -298,10 +314,31 @@ const typeDefs = `
     status: String!
     label: String
     # True for a connection another account owns and shared with this user;
-    # preset says what it allows (preview, save or publish).
+    # preset says what it allows (preview, save, publish or custom), and
+    # permissions exactly which (language, function) pairs.
     shared: Boolean!
     preset: String
+    permissions: [Permission!]
+    publish: Boolean
     expiresAt: String
+  }
+
+  # One function in one language, e.g. { lang: "0176", fn: "save-to-itembank" }.
+  type Permission {
+    lang: String!
+    fn: String!
+  }
+
+  input PermissionInput {
+    lang: String!
+    fn: String!
+  }
+
+  # A function a grant on a connection can include; kind is sign, read or write.
+  type ShareableFunction {
+    lang: String!
+    fn: String!
+    kind: String!
   }
 
   # One person a connection is shared with, as its owner sees it. pending: shared
@@ -311,6 +348,8 @@ const typeDefs = `
     recipient: String
     pending: Boolean!
     preset: String!
+    permissions: [Permission!]!
+    publish: Boolean!
     expiresAt: String
     createdAt: String!
   }
@@ -320,6 +359,7 @@ const typeDefs = `
     credentials: [CredentialInfo!]!
     connections: [Connection!]!
     connectionGrants(connectionId: String!): [ConnectionGrant!]!
+    shareableFunctions(connectionId: String!): [ShareableFunction!]!
     parse(lang: String!, src: String!, itemId: String): ParseResult!
     # connectionId: view the caller's stored result through that connection.
     data(id: String!, connectionId: String): String!
@@ -384,9 +424,12 @@ const typeDefs = `
     rotateConnection(connectionId: String!, key: String!, secret: String!): Boolean!
     disableConnection(connectionId: String!): Boolean!
     deleteConnection(connectionId: String!): Boolean!
-    # Share a connection with a person by email. preset: preview, save or publish.
-    # Succeeds the same way whether or not the email has an account yet.
-    shareConnection(connectionId: String!, email: String!, preset: String!, expiresAt: String): Boolean!
+    # Share a connection with a person by email. preset: preview, save, publish,
+    # or custom with permissions and publish. Succeeds the same way whether or
+    # not the email has an account yet.
+    shareConnection(connectionId: String!, email: String!, preset: String!, permissions: [PermissionInput!], publish: Boolean, expiresAt: String): Boolean!
+    # Change a grant's access or end date; the recipient stays.
+    updateConnectionGrant(connectionId: String!, grantId: String!, preset: String!, permissions: [PermissionInput!], publish: Boolean, expiresAt: String): Boolean!
     revokeConnectionGrant(connectionId: String!, grantId: String!): Boolean!
     leaveSharedConnection(connectionId: String!): Boolean!
   }
@@ -471,7 +514,7 @@ const resolvers = {
         listSharedConnections(auth.token),
       ]));
       return [
-        ...owned.map(c => ({ ...c, shared: false, preset: null, expiresAt: null })),
+        ...owned.map(c => ({ ...c, shared: false, preset: null, permissions: null, publish: null, expiresAt: null })),
         ...shared.map(c => ({ ...c, shared: true })),
       ];
     },
@@ -479,7 +522,12 @@ const resolvers = {
       if (ctx.freePlan) return [];
       const auth = await resolveAuth(ctx);
       const grants = await viaPolicy(() => listConnectionGrants(auth.token, args.connectionId));
-      return grants.map(g => ({ ...g, recipient: g.recipientLabel }));
+      return grants.map(g => ({ ...g, permissions: g.permissions ?? [], publish: g.publish === true, recipient: g.recipientLabel }));
+    },
+    shareableFunctions: async (_, args, ctx) => {
+      if (ctx.freePlan) return [];
+      const auth = await resolveAuth(ctx);
+      return await viaPolicy(() => listShareableFunctions(auth.token, args.connectionId));
     },
     data: async (_, args, ctx) => {
       const { id } = args;
@@ -884,7 +932,7 @@ const resolvers = {
     shareConnection: async (_, args, ctx) => {
       if (ctx.freePlan) throw new Error("Connections require a full account.");
       if (!isEmail(args.email)) throw new Error("Enter a valid email address.");
-      if (!["preview", "save", "publish"].includes(args.preset)) throw new Error("Choose preview, save or publish.");
+      const access = grantAccess(args);
       const auth = await resolveAuth(ctx);
       const email = normalizeEmail(args.email);
       const recipientUid = await accountForEmail(email);
@@ -892,9 +940,15 @@ const resolvers = {
       await viaPolicy(() => shareConnection(auth.token, args.connectionId, {
         ...(recipientUid ? { recipientUid } : { recipientEmailHash: emailHash(email) }),
         recipientLabel: email,
-        preset: args.preset,
-        expiresAt: args.expiresAt ?? null,
+        ...access,
       }));
+      return true;
+    },
+    updateConnectionGrant: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const access = grantAccess(args);
+      const auth = await resolveAuth(ctx);
+      await viaPolicy(() => updateConnectionGrant(auth.token, args.connectionId, args.grantId, access));
       return true;
     },
     revokeConnectionGrant: async (_, args, ctx) => {

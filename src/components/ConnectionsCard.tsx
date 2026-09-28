@@ -19,6 +19,8 @@ interface Connection {
   label: string | null;
   shared: boolean;
   preset: string | null;
+  permissions: { lang: string; fn: string }[] | null;
+  publish: boolean | null;
   expiresAt: string | null;
 }
 
@@ -193,7 +195,7 @@ export default function ConnectionsCard() {
                 <span className="font-mono">{c.label || backendLabel(c.backend)}</span>
                 <small className="text-sm text-neutral-500 font-light space-x-3">
                   <span>Shared with you</span>
-                  <span>{presetLabel(c.preset)}</span>
+                  <span title={c.preset === "custom" ? [...(c.permissions || []).map(p => `L${p.lang} ${p.fn}`), ...(c.publish ? ["publish"] : [])].join(", ") : undefined}>{presetLabel(c.preset)}</span>
                   {c.expiresAt && <span>until {new Date(c.expiresAt).toLocaleDateString()}</span>}
                   <span className={c.status === "active" ? "text-green-700" : "text-gray-500"}>{c.status}</span>
                 </small>

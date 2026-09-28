@@ -98,12 +98,24 @@ export const deleteConnection = ({ user, connectionId }: { user: any; connection
     mutation deleteConnection($connectionId: String!) { deleteConnection(connectionId: $connectionId) }
   `, { connectionId }, "deleteConnection");
 
-export const shareConnection = ({ user, connectionId, email, preset, expiresAt }: { user: any; connectionId: string; email: string; preset: string; expiresAt?: string | null }) =>
+export type Permission = { lang: string; fn: string };
+export type GrantAccess = { preset: string; permissions?: Permission[] | null; publish?: boolean; expiresAt?: string | null };
+const accessVars = ({ preset, permissions, publish, expiresAt }: GrantAccess) =>
+  ({ preset, permissions: preset === "custom" ? permissions : null, publish: preset === "custom" && publish === true, expiresAt: expiresAt || null });
+
+export const shareConnection = ({ user, connectionId, email, ...access }: { user: any; connectionId: string; email: string } & GrantAccess) =>
   connectionMutation(user, gql`
-    mutation shareConnection($connectionId: String!, $email: String!, $preset: String!, $expiresAt: String) {
-      shareConnection(connectionId: $connectionId, email: $email, preset: $preset, expiresAt: $expiresAt)
+    mutation shareConnection($connectionId: String!, $email: String!, $preset: String!, $permissions: [PermissionInput!], $publish: Boolean, $expiresAt: String) {
+      shareConnection(connectionId: $connectionId, email: $email, preset: $preset, permissions: $permissions, publish: $publish, expiresAt: $expiresAt)
     }
-  `, { connectionId, email, preset, expiresAt: expiresAt || null }, "shareConnection");
+  `, { connectionId, email, ...accessVars(access) }, "shareConnection");
+
+export const updateConnectionGrant = ({ user, connectionId, grantId, ...access }: { user: any; connectionId: string; grantId: string } & GrantAccess) =>
+  connectionMutation(user, gql`
+    mutation updateConnectionGrant($connectionId: String!, $grantId: String!, $preset: String!, $permissions: [PermissionInput!], $publish: Boolean, $expiresAt: String) {
+      updateConnectionGrant(connectionId: $connectionId, grantId: $grantId, preset: $preset, permissions: $permissions, publish: $publish, expiresAt: $expiresAt)
+    }
+  `, { connectionId, grantId, ...accessVars(access) }, "updateConnectionGrant");
 
 export const revokeConnectionGrant = ({ user, connectionId, grantId }: { user: any; connectionId: string; grantId: string }) =>
   connectionMutation(user, gql`
@@ -121,17 +133,27 @@ export const loadConnectionGrants = async ({ user, connectionId }: { user: any; 
   const client = await buildRequestClient({ token: await user.getToken() });
   const query = gql`
     query connectionGrants($connectionId: String!) {
-      connectionGrants(connectionId: $connectionId) { grantId recipient pending preset expiresAt createdAt }
+      connectionGrants(connectionId: $connectionId) { grantId recipient pending preset permissions { lang fn } publish expiresAt createdAt }
     }
   `;
   return client.request(query, { connectionId }).then((data: any) => data.connectionGrants);
+};
+
+export const loadShareableFunctions = async ({ user, connectionId }: { user: any; connectionId: string }) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const query = gql`
+    query shareableFunctions($connectionId: String!) {
+      shareableFunctions(connectionId: $connectionId) { lang fn kind }
+    }
+  `;
+  return client.request(query, { connectionId }).then((data: any) => data.shareableFunctions);
 };
 
 export const loadConnections = async ({ user }: { user: any }) => {
   const client = await buildRequestClient({ token: await user.getToken() });
   const query = gql`
     query connections {
-      connections { connectionId backend status label shared preset expiresAt }
+      connections { connectionId backend status label shared preset permissions { lang fn } publish expiresAt }
     }
   `;
   return client.request(query).then((data: any) => data.connections);
