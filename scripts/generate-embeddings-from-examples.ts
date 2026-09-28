@@ -516,8 +516,17 @@ async function storeExamplesInVectorDatabase(trainingExamples, db, lang: string,
           source: 'generate-embeddings-from-examples-script'
         };
 
-        // Create embedding text
-        const embeddingText = createEmbeddingText(example);
+        // Create embedding text. A multi-turn prompt is its user turns joined by blank lines,
+        // while createEmbeddingText joins them by single newlines and appends them when the two
+        // differ — so the conversation would be embedded twice. Hand it the turns as it joins them.
+        const userTurns = (example.messages || [])
+          .filter(m => m.role === 'user' && m.content)
+          .map(m => String(m.content));
+        const sameTurns = example.prompt &&
+          example.prompt.replace(/\s+/g, ' ').trim() === userTurns.join(' ').replace(/\s+/g, ' ').trim();
+        const embeddingText = createEmbeddingText(
+          sameTurns ? { ...example, prompt: userTurns.join('\n') } : example,
+        );
         textsToEmbed.push(embeddingText);
         docsToStore.push({ id: docId, data: docData, embeddingText });
       }
@@ -891,8 +900,13 @@ async function main() {
           const explanation = generateExplanation(code, `L${lang}`);
           const expected_output = determineExpectedOutput(code);
 
-          // Add to training examples
+          // Add to training examples. `prompt` and `model` are read by the corpus sweep, the
+          // provenance backfill, and the drift gate below; rows without them are invisible to
+          // the first two and pass the third unchecked. The item's own prompt is the authored
+          // one; the joined user turns are the fallback for items written before it was stored.
           trainingExamples.push({
+            prompt: String(item.prompt || '').trim() || extractTaskFromMessages(dialogMessages),
+            model: item.model ?? null,
             messages: dialogMessages,
             code,
             explanation,
