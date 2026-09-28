@@ -125,13 +125,9 @@ async function viaPolicy<T>(fn: () => Promise<T>): Promise<T> {
 // A grant's access from shareConnection/updateConnectionGrant args. Policy
 // checks the permissions against the connection's shareable functions.
 function grantAccess(args: any) {
-  if (!["preview", "save", "publish", "custom"].includes(args.preset)) throw new Error("Choose preview, save, publish or custom.");
-  const custom = args.preset === "custom";
-  if (custom && !args.permissions?.length) throw new Error("Choose at least one function.");
+  if (!args.permissions?.length) throw new Error("Choose at least one function.");
   return {
-    preset: args.preset,
-    permissions: custom ? args.permissions.map(({ lang, fn }) => ({ lang, fn })) : null,
-    publish: custom ? args.publish === true : false,
+    permissions: args.permissions.map(({ lang, fn }) => ({ lang, fn })),
     expiresAt: args.expiresAt ?? null,
   };
 }
@@ -314,12 +310,9 @@ const typeDefs = `
     status: String!
     label: String
     # True for a connection another account owns and shared with this user;
-    # preset says what it allows (preview, save, publish or custom), and
-    # permissions exactly which (language, function) pairs.
+    # permissions says which (language, function) pairs it allows.
     shared: Boolean!
-    preset: String
     permissions: [Permission!]
-    publish: Boolean
     expiresAt: String
   }
 
@@ -347,9 +340,7 @@ const typeDefs = `
     grantId: String!
     recipient: String
     pending: Boolean!
-    preset: String!
     permissions: [Permission!]!
-    publish: Boolean!
     expiresAt: String
     createdAt: String!
   }
@@ -424,12 +415,11 @@ const typeDefs = `
     rotateConnection(connectionId: String!, key: String!, secret: String!): Boolean!
     disableConnection(connectionId: String!): Boolean!
     deleteConnection(connectionId: String!): Boolean!
-    # Share a connection with a person by email. preset: preview, save, publish,
-    # or custom with permissions and publish. Succeeds the same way whether or
-    # not the email has an account yet.
-    shareConnection(connectionId: String!, email: String!, preset: String!, permissions: [PermissionInput!], publish: Boolean, expiresAt: String): Boolean!
-    # Change a grant's access or end date; the recipient stays.
-    updateConnectionGrant(connectionId: String!, grantId: String!, preset: String!, permissions: [PermissionInput!], publish: Boolean, expiresAt: String): Boolean!
+    # Share a connection with a person by email, allowing exactly the functions
+    # named. Succeeds the same way whether or not the email has an account yet.
+    shareConnection(connectionId: String!, email: String!, permissions: [PermissionInput!]!, expiresAt: String): Boolean!
+    # Change a grant's functions or end date; the recipient stays.
+    updateConnectionGrant(connectionId: String!, grantId: String!, permissions: [PermissionInput!]!, expiresAt: String): Boolean!
     revokeConnectionGrant(connectionId: String!, grantId: String!): Boolean!
     leaveSharedConnection(connectionId: String!): Boolean!
   }
@@ -514,7 +504,7 @@ const resolvers = {
         listSharedConnections(auth.token),
       ]));
       return [
-        ...owned.map(c => ({ ...c, shared: false, preset: null, permissions: null, publish: null, expiresAt: null })),
+        ...owned.map(c => ({ ...c, shared: false, permissions: null, expiresAt: null })),
         ...shared.map(c => ({ ...c, shared: true })),
       ];
     },
@@ -522,7 +512,7 @@ const resolvers = {
       if (ctx.freePlan) return [];
       const auth = await resolveAuth(ctx);
       const grants = await viaPolicy(() => listConnectionGrants(auth.token, args.connectionId));
-      return grants.map(g => ({ ...g, permissions: g.permissions ?? [], publish: g.publish === true, recipient: g.recipientLabel }));
+      return grants.map(g => ({ ...g, permissions: g.permissions ?? [], recipient: g.recipientLabel }));
     },
     shareableFunctions: async (_, args, ctx) => {
       if (ctx.freePlan) return [];

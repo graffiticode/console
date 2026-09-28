@@ -156,8 +156,8 @@ built. Running the program is the action, and the grant is the authority.
   - l0000: admission asks policy on an invocation token alone when there is
     no user. L0176 picks this up only with the next l0000 release.
   - The console's publish and unpublish create and delete publication records
-    for items with a connection (see Connection selection). A recipient can
-    publish only with the publish preset (see Delegation).
+    for items with a connection (see Connection selection). Only the
+    connection's owner can publish (see Delegation).
 - **Connection-free compilation.** Partly done on l0176 `brokered-connection`.
   Without a connection, `save-to-itembank` never writes: it evaluates to the
   activity with `itemBank: { skipped: "no-connection", fn, occurrence }`, the
@@ -199,11 +199,13 @@ built. Running the program is the action, and the grant is the authority.
 ## Open decisions
 
 1. **Author signing.** It carries edit and delete authority. Enforcement is built: it goes through the broker and is non-delegable. Unverified: its request shape against Learnosity's Author API, so it is not yet usable.
-2. **Delegation.** Built and deployed (graffiticode `policy-service`, console `connections`). There is no feature flag. Custom permissions and grant editing are built, not yet deployed.
-   - Policy holds grants (`grants/*`): owner, recipient account (or a hash of an email until that person signs in), preset, permissions as (language, function) pairs, a publish flag and an optional expiry. `mayUse` matches the exact pair, so a grant for L0176's `save-to-itembank` covers no other language's function of that name; a grant with no permissions allows nothing. Every invocation, snapshot and mint checks the grant live, so revoking, narrowing or expiry stops the recipient's next call. Only registry functions marked `delegable` can be granted; Author signing never can. Recipients cannot share onward.
-   - Presets are shortcuts that expand, when the grant is written, into that backend's delegable functions of the matching kinds: preview (sign), save (sign and write), publish (save, plus publishing). A later registry function is not added to existing grants. `custom` names the pairs exactly (1–50, each delegable against the connection's backend; `GET /v1/connections/:id/shareable` lists them) with its own publish flag. The owner can change a grant's access or end date in place (`PATCH /v1/connections/:id/grants/:grantId`; the recipient stays); the recipient's next call sees it. A recipient's publication lasts only while their grant allows publishing, re-checked on every view.
+2. **Delegation.** Built and deployed (graffiticode `policy-service`, console `connections`). There is no feature flag.
+   - Policy holds grants (`grants/*`): owner, recipient account (or a hash of an email until that person signs in), permissions as (language, function) pairs, and an optional expiry. There are no presets. `mayUse` matches the exact pair, so a grant for L0176's `save-to-itembank` covers no other language's function of that name; a grant with no permissions allows nothing. Every invocation, snapshot and mint checks the grant live, so revoking, editing or expiry stops the recipient's next call. Recipients cannot share onward.
+   - Only explicit functions the registry marks `delegable` can be granted: today just L0176 `save-to-itembank` (`GET /v1/connections/:id/shareable`). A language's implicit functions (L0176 `preview-itembank`, which signs every render) are never granted on their own; they come with any grant in that language, since nothing renders without them. Author signing never can be granted.
+   - Only the owner publishes: a grant never includes publishing.
+   - The owner can change a grant's functions or end date in place (`PATCH /v1/connections/:id/grants/:grantId`; the recipient stays).
    - The console identifies people by email: the auth service maps a linked email to its account; an email with no account is shared as a hash and claimed when that person signs in with it. The owner sees the same result and the same list either way, so sharing never reveals whether an account exists.
-   - UI: a Share panel on each owned connection in Settings (email, access as a preset or a per-language checklist of functions plus "Allow publishing", optional end date, who it is shared with, change, remove), and "Shared with you" rows with Leave. Shared connections appear in the item Connection chooser.
+   - UI: a Share panel on each owned connection in Settings (email, a per-language checklist of shareable functions, optional end date, who it is shared with, change, remove), and "Shared with you" rows with Leave. Shared connections appear in the item Connection chooser.
    - Deleting a connection deletes its grants. Not done: grants limited to certain items, org or group sharing, an activity view per connection.
 
 ## Not done or unverified

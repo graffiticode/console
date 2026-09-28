@@ -31,7 +31,7 @@ export type Connection = {
 };
 
 // A connection someone else owns and has shared with this user.
-export type SharedConnection = Connection & { preset: string; permissions: Permission[]; publish: boolean; expiresAt: string | null };
+export type SharedConnection = Connection & { permissions: Permission[]; expiresAt: string | null };
 
 // One function in one language, e.g. { lang: "0176", fn: "save-to-itembank" }.
 export type Permission = { lang: string; fn: string };
@@ -41,16 +41,13 @@ export type ConnectionGrant = {
   grantId: string;
   recipientLabel: string | null;
   pending: boolean;
-  preset: string;
   permissions: Permission[];
-  publish: boolean;
   expiresAt: string | null;
   createdAt: string;
 };
 
-// What a grant sets: a preset ("preview", "save", "publish"), or "custom" with
-// exact permissions and whether publishing is allowed.
-export type GrantAccess = { preset: string; permissions?: Permission[] | null; publish?: boolean; expiresAt?: string | null };
+// What a grant sets: the exact functions it allows, and an optional end.
+export type GrantAccess = { permissions: Permission[]; expiresAt?: string | null };
 
 let auth: GoogleAuth | null = null;
 const idTokenClients = new Map<string, Promise<any>>();

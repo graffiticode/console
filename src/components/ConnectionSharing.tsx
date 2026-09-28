@@ -8,22 +8,8 @@ import {
   updateConnectionGrant,
 } from "../utils/swr/fetchers";
 
-// What each sharing preset lets the other person do through the owner's
-// connection. "custom" names exact (language, function) permissions instead.
-// Opening the Author Site is never shareable.
-export const PRESETS = [
-  { key: "preview", label: "Can preview", detail: "Render and sign previews." },
-  { key: "save", label: "Can save", detail: "Preview, and write items to your item bank." },
-  { key: "publish", label: "Can publish", detail: "Save, and publish items that anyone can view through your connection." },
-  { key: "custom", label: "Custom…", detail: "Only the functions checked below." },
-];
-
-export const presetLabel = (key: string | null | undefined) =>
-  key === "custom" ? "Custom access" : PRESETS.find(p => p.key === key)?.label || key || "";
-
 // Plain descriptions of shareable functions; anything unlisted shows its name.
 const FUNCTION_LABELS: Record<string, string> = {
-  "preview-itembank": "Render and sign previews",
   "save-to-itembank": "Write items to your item bank",
 };
 
@@ -34,17 +20,13 @@ interface Grant {
   grantId: string;
   recipient: string | null;
   pending: boolean;
-  preset: string;
   permissions: Permission[];
-  publish: boolean;
   expiresAt: string | null;
   createdAt: string;
 }
 
 interface Access {
-  preset: string;
   permissions: Permission[];
-  publish: boolean;
   expires: string; // yyyy-mm-dd, or "" for no end
 }
 
@@ -57,14 +39,13 @@ const toDate = (iso: string | null) => {
 };
 // An end date means the end of that day, in the owner's time zone.
 const fromDate = (date: string) => (date ? new Date(`${date}T23:59:59`).toISOString() : null);
-const accessVars = (a: Access) => ({ preset: a.preset, permissions: a.permissions, publish: a.publish, expiresAt: fromDate(a.expires) });
+const accessVars = (a: Access) => ({ permissions: a.permissions, expiresAt: fromDate(a.expires) });
 
 const errorText = (err: any) =>
   String(err?.response?.errors?.[0]?.message || err?.message || err).replace(/^Connection request refused: /, "Refused: ");
 
-// Chooses a grant's access: a preset, or exact functions grouped by language.
-function AccessPicker({ access, onChange, shareable }: { access: Access; onChange: (a: Access) => void; shareable: Shareable[] }) {
-  const custom = access.preset === "custom";
+// Chooses the exact functions a grant allows, grouped by language.
+function FunctionPicker({ access, onChange, shareable }: { access: Access; onChange: (a: Access) => void; shareable: Shareable[] }) {
   const toggle = (p: Permission) => onChange({
     ...access,
     permissions: access.permissions.some(q => same(p, q))
@@ -73,52 +54,33 @@ function AccessPicker({ access, onChange, shareable }: { access: Access; onChang
   });
   const langs = [...new Set(shareable.map(s => s.lang))];
   return (
-    <>
-      <label className="block text-sm">
-        <span className="text-gray-700">Access</span>
-        <select
-          className="mt-1 block border border-gray-300 rounded-none px-2 py-1 text-sm"
-          value={access.preset}
-          onChange={e => onChange({ ...access, preset: e.target.value })}>
-          {PRESETS.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
-        </select>
-      </label>
-      {custom && (
-        <div className="basis-full space-y-2">
-          {langs.map(lang => (
-            <fieldset key={lang} className="text-sm">
-              <legend className="text-xs font-semibold text-gray-600">{langLabel(lang)}</legend>
-              {shareable.filter(s => s.lang === lang).map(s => (
-                <label key={s.fn} className="flex items-center gap-2">
-                  <input type="checkbox" checked={access.permissions.some(q => same(s, q))} onChange={() => toggle(s)} />
-                  <span>{FUNCTION_LABELS[s.fn] || s.fn}</span>
-                  <span className="font-mono text-xs text-gray-400">{s.fn}</span>
-                </label>
-              ))}
-            </fieldset>
+    <div className="basis-full space-y-2">
+      {langs.map(lang => (
+        <fieldset key={lang} className="text-sm">
+          <legend className="text-xs font-semibold text-gray-600">{langLabel(lang)}</legend>
+          {shareable.filter(s => s.lang === lang).map(s => (
+            <label key={s.fn} className="flex items-center gap-2">
+              <input type="checkbox" checked={access.permissions.some(q => same(s, q))} onChange={() => toggle(s)} />
+              <span>{FUNCTION_LABELS[s.fn] || s.fn}</span>
+              <span className="font-mono text-xs text-gray-400">{s.fn}</span>
+            </label>
           ))}
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={access.publish} onChange={e => onChange({ ...access, publish: e.target.checked })} />
-            <span>Allow publishing items that anyone can view through your connection</span>
-          </label>
-        </div>
-      )}
-    </>
+        </fieldset>
+      ))}
+    </div>
   );
 }
 
 const writes = (access: Access, shareable: Shareable[]) =>
-  access.preset === "save" || access.preset === "publish" ||
-  (access.preset === "custom" && access.permissions.some(p => shareable.find(s => same(s, p))?.kind === "write"));
+  access.permissions.some(p => shareable.find(s => same(s, p))?.kind === "write");
 
-const summary = (g: Grant) => g.preset !== "custom" ? presetLabel(g.preset) :
-  `${g.permissions.map(p => `${langLabel(p.lang)} ${FUNCTION_LABELS[p.fn]?.toLowerCase() || p.fn}`).join(", ")}${g.publish ? ", publish" : ""}`;
+const summary = (g: Grant) => g.permissions.map(p => `${langLabel(p.lang)} ${p.fn}`).join(", ");
 
-const blank: Access = { preset: "save", permissions: [], publish: false, expires: "" };
-const accessOf = (g: Grant): Access => ({ preset: g.preset, permissions: g.permissions, publish: g.publish, expires: toDate(g.expiresAt) });
+const blank: Access = { permissions: [], expires: "" };
+const accessOf = (g: Grant): Access => ({ permissions: g.permissions, expires: toDate(g.expiresAt) });
 
 // The owner's Share panel for one connection: add a person by email with
-// access (a preset or exact functions) and an optional end date, and see,
+// the exact functions they may use and an optional end date, and see,
 // change or remove who it is shared with. Changes take effect at that person's
 // next run or view.
 export default function ConnectionSharing({ user, connectionId }: { user: any; connectionId: string }) {
@@ -177,8 +139,7 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
     if (await run(() => updateConnectionGrant({ user, connectionId, grantId, ...accessVars(draft) }))) setEditing(null);
   };
 
-  const incomplete = (a: Access) => a.preset === "custom" && a.permissions.length === 0;
-  const selected = PRESETS.find(p => p.key === access.preset);
+  const incomplete = (a: Access) => a.permissions.length === 0;
 
   return (
     <div className="border border-gray-300 border-t-0 px-4 py-3 space-y-3 rounded-none">
@@ -192,7 +153,6 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
             onChange={e => setEmail(e.target.value)}
             placeholder="alice@example.com" />
         </label>
-        <AccessPicker access={access} onChange={setAccess} shareable={shareable} />
         <DateField value={access.expires} onChange={expires => setAccess({ ...access, expires })} />
         <button
           type="button"
@@ -201,10 +161,11 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
           disabled={busy || !email.trim() || incomplete(access)}>
           Share
         </button>
+        <FunctionPicker access={access} onChange={setAccess} shareable={shareable} />
       </div>
       <p className="text-xs text-gray-500">
-        {selected?.detail} They never see your key or secret, and cannot share it onward. Opening the Author Site is never shared.
-        {writes(access, shareable) && " They can write any item into your item bank."}
+        They can render items through this connection plus use the functions checked. They never see your key or secret, cannot share it onward, and cannot publish. Opening the Author Site is never shared.
+        {writes(access, shareable) && " Writing lets them write any item into your item bank."}
       </p>
       {message && <p className="text-xs text-gray-700">{message}</p>}
       {grants === null ? (
@@ -238,7 +199,7 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
               </div>
               {editing === g.grantId && (
                 <div className="flex flex-wrap items-end gap-2 border-l-2 border-gray-200 pl-3 my-2">
-                  <AccessPicker access={draft} onChange={setDraft} shareable={shareable} />
+                  <FunctionPicker access={draft} onChange={setDraft} shareable={shareable} />
                   <DateField value={draft.expires} onChange={expires => setDraft({ ...draft, expires })} />
                   <button
                     type="button"

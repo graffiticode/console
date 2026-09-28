@@ -99,21 +99,20 @@ export const deleteConnection = ({ user, connectionId }: { user: any; connection
   `, { connectionId }, "deleteConnection");
 
 export type Permission = { lang: string; fn: string };
-export type GrantAccess = { preset: string; permissions?: Permission[] | null; publish?: boolean; expiresAt?: string | null };
-const accessVars = ({ preset, permissions, publish, expiresAt }: GrantAccess) =>
-  ({ preset, permissions: preset === "custom" ? permissions : null, publish: preset === "custom" && publish === true, expiresAt: expiresAt || null });
+export type GrantAccess = { permissions: Permission[]; expiresAt?: string | null };
+const accessVars = ({ permissions, expiresAt }: GrantAccess) => ({ permissions, expiresAt: expiresAt || null });
 
 export const shareConnection = ({ user, connectionId, email, ...access }: { user: any; connectionId: string; email: string } & GrantAccess) =>
   connectionMutation(user, gql`
-    mutation shareConnection($connectionId: String!, $email: String!, $preset: String!, $permissions: [PermissionInput!], $publish: Boolean, $expiresAt: String) {
-      shareConnection(connectionId: $connectionId, email: $email, preset: $preset, permissions: $permissions, publish: $publish, expiresAt: $expiresAt)
+    mutation shareConnection($connectionId: String!, $email: String!, $permissions: [PermissionInput!]!, $expiresAt: String) {
+      shareConnection(connectionId: $connectionId, email: $email, permissions: $permissions, expiresAt: $expiresAt)
     }
   `, { connectionId, email, ...accessVars(access) }, "shareConnection");
 
 export const updateConnectionGrant = ({ user, connectionId, grantId, ...access }: { user: any; connectionId: string; grantId: string } & GrantAccess) =>
   connectionMutation(user, gql`
-    mutation updateConnectionGrant($connectionId: String!, $grantId: String!, $preset: String!, $permissions: [PermissionInput!], $publish: Boolean, $expiresAt: String) {
-      updateConnectionGrant(connectionId: $connectionId, grantId: $grantId, preset: $preset, permissions: $permissions, publish: $publish, expiresAt: $expiresAt)
+    mutation updateConnectionGrant($connectionId: String!, $grantId: String!, $permissions: [PermissionInput!]!, $expiresAt: String) {
+      updateConnectionGrant(connectionId: $connectionId, grantId: $grantId, permissions: $permissions, expiresAt: $expiresAt)
     }
   `, { connectionId, grantId, ...accessVars(access) }, "updateConnectionGrant");
 
@@ -133,7 +132,7 @@ export const loadConnectionGrants = async ({ user, connectionId }: { user: any; 
   const client = await buildRequestClient({ token: await user.getToken() });
   const query = gql`
     query connectionGrants($connectionId: String!) {
-      connectionGrants(connectionId: $connectionId) { grantId recipient pending preset permissions { lang fn } publish expiresAt createdAt }
+      connectionGrants(connectionId: $connectionId) { grantId recipient pending permissions { lang fn } expiresAt createdAt }
     }
   `;
   return client.request(query, { connectionId }).then((data: any) => data.connectionGrants);
@@ -153,7 +152,7 @@ export const loadConnections = async ({ user }: { user: any }) => {
   const client = await buildRequestClient({ token: await user.getToken() });
   const query = gql`
     query connections {
-      connections { connectionId backend status label shared preset permissions { lang fn } publish expiresAt }
+      connections { connectionId backend status label shared permissions { lang fn } expiresAt }
     }
   `;
   return client.request(query).then((data: any) => data.connections);
