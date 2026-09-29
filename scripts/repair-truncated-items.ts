@@ -40,8 +40,6 @@ import { getCredentialsForApiKey } from "../src/lib/api-credentials";
 import {
   parseCode,
   postTask,
-  getSecretsForUser,
-  getPublicValuesForUser,
 } from "../src/pages/api/resolvers";
 import { getLanguageLexicon } from "../src/lib/api";
 
@@ -106,19 +104,6 @@ async function main() {
     console.error(`Could not fetch the L${LANG} lexicon; refusing to run.`);
     process.exit(1);
   }
-
-  // Programs reference stored credentials via get-val-public/get-val-private
-  // (e.g. `save-to-itembank` items reading learnosity-key/secret). The console
-  // resolves those from the owner's credential stores before parsing; without
-  // them the parse fails at the end of the program.
-  const [privateValues, ownerPublicValues] = await Promise.all([
-    getSecretsForUser(UID),
-    getPublicValuesForUser(UID),
-  ]);
-  console.log(
-    `Credentials for ${UID.slice(0, 8)}…: ` +
-    `${Object.keys(privateValues).length} private, ${Object.keys(ownerPublicValues).length} public`,
-  );
 
   const snap = await db.collection(`users/${UID}/items`).where("lang", "==", LANG).get();
 
@@ -192,8 +177,7 @@ async function main() {
       const parsed: any = await parseCode({
         lang: LANG,
         src: code,
-        privateValues,
-        publicValues: { ...ownerPublicValues, itemId: t.id },
+        publicValues: { itemId: t.id },
       });
       if (parsed?.errors?.length) {
         const why = parsed.errors.map((e: any) => e.message).join("; ");

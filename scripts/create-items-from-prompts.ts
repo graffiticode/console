@@ -49,7 +49,6 @@ import { generateCodeForRequest } from "../src/lib/code-generation/generate-for-
 import { getCredentialsForApiKey } from "../src/lib/api-credentials";
 import { getBaseUrlForApi } from "../src/lib/api";
 import { createItem, parseCode, postTask } from "../src/pages/api/resolvers";
-import { getSecretsForUser, getPublicValuesForUser } from "../src/lib/user-credentials";
 import { readExamplesMarkdown } from "./lang-examples";
 import { dialectFingerprint, formatFingerprint, type DialectFingerprint } from "./eval-dialect-fingerprint";
 
@@ -389,18 +388,9 @@ async function processExample(
   };
 
   try {
-    // Same credential wiring the resolver uses (generate-for-request.ts). Without
-    // the private store a program that reads `get-val-private "learnosity-secret"`
-    // bakes an empty secret here and fails the compile with "key and secret must
-    // both be set together" — after passing generation-time verification, which
-    // compiles under the `verify-itemid` sentinel and is exempt from the
-    // credential gate. Generation is not the place that difference shows up.
-    //
-    // Fetched once and reused by every turn: they do not change within an example,
-    // and a two-turn example would otherwise read the secret store twice.
-    const privateValues: Record<string, string> = await getSecretsForUser(auth.uid);
-    const publicValues: Record<string, string> = await getPublicValuesForUser(auth.uid);
-    publicValues.itemId = example.id;
+    // Same parse wiring the resolver uses (generate-for-request.ts): itemId is
+    // the one parse-time value. Stored user credentials are retired.
+    const publicValues: Record<string, string> = { itemId: example.id };
 
     /**
      * Compile one turn's source under THIS example's identity, and hand back what
@@ -427,7 +417,6 @@ async function processExample(
         parseCode({
           lang: langCode,
           src,
-          privateValues,
           publicValues,
           accessToken: auth.token,
         }),

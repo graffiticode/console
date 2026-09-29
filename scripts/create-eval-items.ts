@@ -31,7 +31,7 @@ import { readFileSync, existsSync } from "fs";
 import { getCredentialsForApiKey } from "../src/lib/api-credentials";
 import {
   postTask, createItem, updateItem, parseCode,
-  getPublicValuesForUser, setItemGenerationStatus,
+  setItemGenerationStatus,
 } from "../src/pages/api/resolvers";
 import { getFirestore } from "../src/utils/db";
 
@@ -100,14 +100,6 @@ async function main() {
     seen.set(n, lab.model);
   }
 
-  // The account's non-secret credential ids (Learnosity consumer key, item bank
-  // id, ...), substituted at parse time exactly as the console's generateCode
-  // path does. Account SECRETS are deliberately not injected: a candidate
-  // carrying a side-effecting write (L0158's save-to-itembank) would then write
-  // to the real item bank on every render of an eval item. A dialect that needs
-  // one fails visibly at render instead.
-  const accountPublicValues = await getPublicValuesForUser(creds.uid);
-
   const results: any[] = [];
   let created = 0, updated = 0, unchanged = 0;
   const wanted = new Set<string>();
@@ -151,7 +143,7 @@ async function main() {
       const parsed = await parseCode({
         lang: LANG,
         src: lab.code,
-        publicValues: { ...accountPublicValues, itemId },
+        publicValues: { itemId },
         accessToken: auth.token,
       });
       if (parsed.errors) throw new Error(`parse: ${parsed.errors.map((e: any) => e.message).join("; ")}`);

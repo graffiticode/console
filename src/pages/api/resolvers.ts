@@ -8,13 +8,6 @@ import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon, isL
 import { unparse } from "@graffiticode/parser";
 import { generateCodeForRequest } from "../../lib/code-generation/generate-for-request";
 import { parseCode, postTask, getData } from "../../lib/task-api";
-import {
-  StoredVar,
-  secretsDocRef,
-  credentialsDocRef,
-  getSecretsForUser,
-  getPublicValuesForUser,
-} from "../../lib/user-credentials";
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
 import { generateSpec, specModelFor, SPEC_CACHE_VERSION } from "../../lib/spec-generation-service";
 import { backfillTokenUsageItemId, currentEnv } from "../../lib/token-usage-service";
@@ -45,10 +38,8 @@ import { mintSessionToken, isSessionTokenConfigured } from "../../lib/free-plan-
 import { mintClaimToken } from "../../lib/claim-token";
 import fs from "fs";
 import path from "path";
-import { encrypt, decrypt, isConfigured as isSecretCryptoConfigured } from "../../lib/secret-crypto";
 import { createPublication, deletePublication, PublicationError } from "../../lib/publications";
 import { listConnections, listSharedConnections } from "../../lib/policy-client";
-import { getCredentialBackend, fieldVisibilityFor } from "../../lib/credential-backends";
 
 type AuthArg = {
   uid: string;
@@ -647,116 +638,11 @@ export async function recordBillableItem({
 }
 // import { buildDynamicSchema } from "./schemas";
 
-const SECRET_NAME_RE = /^[a-z0-9-]+$/;
-
 // Re-exported so existing importers of these symbols keep working after the
-// move to lib/task-api.ts and lib/user-credentials.ts. New code should import
-// from those modules directly.
-export { parseCode, postTask, getData, getSecretsForUser, getPublicValuesForUser };
-
-function maskSecret(plaintext: string): string {
-  return plaintext.length > 4
-    ? '••••••••' + plaintext.slice(-4)
-    : plaintext.length > 0 ? '••••' : '';
-}
-
-// Lists the user's stored credential variables, flat. Public vars (credentials
-// doc) carry their plaintext value; private vars (secrets doc) are masked. The
-// client groups them into per-backend credentials.
-export async function listCredentials({ auth }: { auth: AuthArg }) {
-  const [credDoc, secretDoc] = await Promise.all([
-    credentialsDocRef(auth.uid).get(),
-    secretsDocRef(auth.uid).get(),
-  ]);
-  const publics = (credDoc.data()?.credentials || {}) as Record<string, StoredVar>;
-  const secrets = (secretDoc.data()?.secrets || {}) as Record<string, StoredVar>;
-  const out = [
-    ...Object.entries(publics).map(([name, entry]) => ({
-      name,
-      backend: entry?.backend || null,
-      isPublic: true,
-      value: entry?.value ?? "",
-      masked: "",
-      updatedAt: entry?.updatedAt || "",
-    })),
-    ...Object.entries(secrets).map(([name, entry]) => ({
-      name,
-      backend: entry?.backend || null,
-      isPublic: false,
-      value: null as string | null,
-      masked: entry?.value != null ? maskSecret(decrypt(entry.value)) : "",
-      updatedAt: entry?.updatedAt || "",
-    })),
-  ];
-  return out.sort((a, b) => a.name.localeCompare(b.name));
-}
-
-// Writes a single credential variable. Visibility is server-authoritative for
-// known backends (resolved from the registry) so a client can't store a private
-// field as public plaintext; for custom vars the caller's `isPublic` is used.
-export async function setCredential(
-  { auth, name, value, backend, isPublic }:
-  { auth: AuthArg; name: string; value: string; backend?: string | null; isPublic?: boolean | null },
-) {
-  if (!SECRET_NAME_RE.test(name)) {
-    throw new Error("Credential name must contain only lowercase letters, digits and hyphens.");
-  }
-  if (!value) {
-    throw new Error("A value is required.");
-  }
-
-  const def = getCredentialBackend(backend);
-  let pub: boolean;
-  if (def) {
-    const visibility = fieldVisibilityFor(def.key, name);
-    if (!visibility) {
-      throw new Error(`"${name}" is not a recognized field for ${def.label}.`);
-    }
-    pub = visibility === "public";
-  } else {
-    pub = !!isPublic;
-  }
-
-  const updatedAt = new Date().toISOString();
-  const tag = backend != null ? { backend } : {};
-
-  if (pub) {
-    // Public field -> credentials doc, plaintext. No key required.
-    await credentialsDocRef(auth.uid).set(
-      { credentials: { [name]: { ...tag, value, updatedAt } } },
-      { merge: true },
-    );
-  } else {
-    // Private field -> secrets doc, ciphertext.
-    if (!isSecretCryptoConfigured()) {
-      // Refuse to store plaintext: encrypt() would otherwise fail loud, but check
-      // up front for a friendly message. See scripts/set-compiler-secret.sh.
-      throw new Error("Secrets are unavailable: GRAFFITICODE_SECRET_KEY is not configured on the server.");
-    }
-    await secretsDocRef(auth.uid).set(
-      { secrets: { [name]: { ...tag, value: encrypt(value), updatedAt } } },
-      { merge: true },
-    );
-  }
-
-  return {
-    name,
-    backend: backend ?? null,
-    isPublic: pub,
-    value: pub ? value : null,
-    masked: pub ? "" : maskSecret(value),
-    updatedAt,
-  };
-}
-
-export async function deleteCredential({ auth, name }: { auth: AuthArg; name: string }) {
-  const del = admin.firestore.FieldValue.delete();
-  await Promise.all([
-    credentialsDocRef(auth.uid).set({ credentials: { [name]: del } }, { merge: true }),
-    secretsDocRef(auth.uid).set({ secrets: { [name]: del } }, { merge: true }),
-  ]);
-  return true;
-}
+// move to lib/task-api.ts. New code should import from there directly. Stored
+// user credentials (the old Credentials card) are retired: parse no longer
+// reads them, and external APIs are reached only through a connection.
+export { parseCode, postTask, getData };
 
 const taskDaoFactory = buildTaskDaoFactory();
 const getTaskDaoForStore = buildGetTaskDaoForStorageType(taskDaoFactory);

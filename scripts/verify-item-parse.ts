@@ -42,8 +42,6 @@ import { unparse } from "@graffiticode/parser";
 import { getFirestore } from "../src/utils/db";
 import {
   parseCode,
-  getSecretsForUser,
-  getPublicValuesForUser,
 } from "../src/pages/api/resolvers";
 
 const DEFAULT_UID = "2c9d72e315fbafb128011bc32739666c7e6e7eb9";
@@ -72,14 +70,6 @@ function isStub(src?: string | null): boolean {
 
 async function main() {
   const db = getFirestore();
-  const [privateValues, publicValues] = await Promise.all([
-    getSecretsForUser(UID),
-    getPublicValuesForUser(UID),
-  ]);
-  console.log(
-    `uid ${UID.slice(0, 8)}…  credentials: ` +
-    `${Object.keys(privateValues).length} private, ${Object.keys(publicValues).length} public\n`,
-  );
 
   let grandFail = 0;
   for (const lang of LANGS) {
@@ -108,8 +98,7 @@ async function main() {
       const res = await parseCode({
         lang,
         src,
-        privateValues,
-        publicValues: { ...publicValues, itemId: d.id },
+        publicValues: { itemId: d.id },
       });
 
       const why = res.errors ? res.errors.map((e: any) => e.message).join("; ") : "";

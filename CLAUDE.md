@@ -131,7 +131,7 @@ Two prohibitions that outlive any one script:
 - **Never change the value of an existing secret key version.** Old ciphertext persists forever and only decrypts with the key that wrote it.
 - `scripts/set-compiler-secret.sh` propagates `GRAFFITICODE_SECRET_KEY` to a compiler service. **That key MUST NEVER CHANGE** — the script refuses to overwrite an existing target key with a different value.
 
-**Secrets & credentials:** account credentials are split across a public `credentials` doc and an encrypted `secrets` doc under `users/{uid}/settings`; the **identical keyring** must be present on the console runtime AND every `l0NNN` compiler service (console encrypts, compilers decrypt). Full contract (ciphertext formats, env vars, rotation procedure): `docs/secret-encryption.md`.
+**Secrets & credentials:** stored account credentials (the old Credentials card) are **retired** — parse supplies only `itemId`, and external APIs go through a connection. The old `credentials`/`secrets` docs under `users/{uid}/settings` remain, unread, for already-posted ciphertext; the **identical keyring** must be present on the console runtime AND every `l0NNN` compiler service (console encrypts, compilers decrypt). Full contract (ciphertext formats, env vars, rotation procedure): `docs/secret-encryption.md`.
 
 **Eval account (`EVAL_UID` / `EVAL_API_KEY`):** **all** eval-related content lives under this dedicated account — corpus items, the RAG corpus (`training_examples` vector collection), model evals, sweeps, and provenance backfills. The account is defined in `.env.local` as `EVAL_UID=2c9d72e315fbafb128011bc32739666c7e6e7eb9`.
 

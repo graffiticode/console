@@ -55,7 +55,6 @@ import { buildRevisionLimitError } from "../free-plan-quota";
 import { trialItemRevisionLimit } from "../plans-config";
 import { getFirestore } from "../../utils/db";
 import { parseCode, postTask } from "../task-api";
-import { getSecretsForUser, getPublicValuesForUser } from "../user-credentials";
 
 type AuthArg = {
   uid: string;
@@ -517,10 +516,10 @@ export async function generateCodeForRequest({
       }
     }
 
-    // Parse the head src, then post it. Private secrets and public credential ids
-    // come from separate stores; itemId is a system-injected public value.
-    const privateValues: Record<string, string> = await getSecretsForUser(auth?.uid);
-    const publicValues: Record<string, string> = await getPublicValuesForUser(auth?.uid);
+    // Parse the head src, then post it. itemId is the one parse-time value; stored
+    // user credentials are retired, and external APIs are reached only through a
+    // connection (the credential broker).
+    const publicValues: Record<string, string> = {};
     if (itemId) publicValues.itemId = itemId;
     // An empty generation is a GENERATOR failure, and must not be reported as a
     // parser one.
@@ -552,7 +551,7 @@ export async function generateCodeForRequest({
       };
     }
     const tParse = Date.now();
-    const parseResult = await parseCode({ lang: headLang, src, privateValues, publicValues, accessToken: auth?.token });
+    const parseResult = await parseCode({ lang: headLang, src, publicValues, accessToken: auth?.token });
     mark("parse", tParse);
     if (parseResult.errors) {
       // Preserve the generated source alongside the parse errors so the
@@ -732,7 +731,7 @@ export async function generateCodeForRequest({
             return { src: null, taskId: null, language, description: null, changeSummary: null, model, provider, tier, usage: null, errors: mapUsageLimit(fallback.errors), upstreamLangs: [], rid };
           }
           const tReparse = Date.now();
-          const reparsed = await parseCode({ lang: headLang, src: fallback.code, privateValues, publicValues, accessToken: auth?.token });
+          const reparsed = await parseCode({ lang: headLang, src: fallback.code, publicValues, accessToken: auth?.token });
           mark("parse", tReparse);
           // Parse errors carry the source so the editor can decorate it inline, matching
           // the user-typed flow and the head parse above.

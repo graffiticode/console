@@ -26,11 +26,6 @@ import {
   getItemClientTags,
   shareItem,
   parseCode,
-  getSecretsForUser,
-  getPublicValuesForUser,
-  listCredentials,
-  setCredential,
-  deleteCredential,
   claimFreePlanSession,
   logClaimEvent,
   adoptWorkspaceFromSibling,
@@ -293,15 +288,6 @@ const typeDefs = `
     totalAvailable: Int
   }
 
-  type CredentialInfo {
-    name: String!
-    backend: String
-    isPublic: Boolean!
-    value: String
-    masked: String!
-    updatedAt: String!
-  }
-
   # An external-API connection the user owns. Its credential lives only in the
   # credential broker; it is never returned here.
   type Connection {
@@ -347,7 +333,6 @@ const typeDefs = `
 
   type Query {
     checkItemCreateAllowed: CompileAllowedResponse!
-    credentials: [CredentialInfo!]!
     connections: [Connection!]!
     connectionGrants(connectionId: String!): [ConnectionGrant!]!
     shareableFunctions(connectionId: String!): [ShareableFunction!]!
@@ -409,8 +394,6 @@ const typeDefs = `
     republishItem(id: String!): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
     claimFreePlanSession(token: String!): ClaimResult!
-    setCredential(name: String!, value: String!, backend: String, isPublic: Boolean): CredentialInfo!
-    deleteCredential(name: String!): Boolean!
     createConnection(backend: String!, label: String, key: String!, secret: String!): Connection!
     rotateConnection(connectionId: String!, key: String!, secret: String!): Boolean!
     disableConnection(connectionId: String!): Boolean!
@@ -469,26 +452,10 @@ const resolvers = {
     },
     parse: async (_, args, ctx) => {
       const { lang, src, itemId } = args;
-      // Private secrets and public credential ids come from separate stores;
-      // itemId is a system-injected public value. Auth is best-effort:
-      // anonymous/free-plan parse still works, just without credentials.
-      let privateValues: Record<string, string> = {};
-      let publicValues: Record<string, string> = {};
-      try {
-        const auth = await resolveAuth(ctx);
-        [privateValues, publicValues] = await Promise.all([
-          getSecretsForUser(auth.uid),
-          getPublicValuesForUser(auth.uid),
-        ]);
-      } catch {
-        // not authenticated — proceed without credentials
-      }
-      if (itemId) publicValues.itemId = itemId;
-      return await parseCode({ lang, src, privateValues, publicValues });
-    },
-    credentials: async (_, __, ctx) => {
-      const auth = await resolveAuth(ctx);
-      return await listCredentials({ auth });
+      // itemId is the one parse-time value. Stored user credentials are retired:
+      // external APIs are reached only through a connection.
+      const publicValues: Record<string, string> = itemId ? { itemId } : {};
+      return await parseCode({ lang, src, publicValues });
     },
     connections: async (_, __, ctx) => {
       if (ctx.freePlan) return [];
@@ -885,20 +852,6 @@ const resolvers = {
         }
         throw err;
       }
-    },
-    setCredential: async (_, args, ctx) => {
-      if (ctx.freePlan) {
-        throw new Error("Credentials require a full account.");
-      }
-      const auth = await resolveAuth(ctx);
-      return await setCredential({ auth, name: args.name, value: args.value, backend: args.backend, isPublic: args.isPublic });
-    },
-    deleteCredential: async (_, args, ctx) => {
-      if (ctx.freePlan) {
-        throw new Error("Credentials require a full account.");
-      }
-      const auth = await resolveAuth(ctx);
-      return await deleteCredential({ auth, name: args.name });
     },
     createConnection: async (_, args, ctx) => {
       if (ctx.freePlan) throw new Error("Connections require a full account.");

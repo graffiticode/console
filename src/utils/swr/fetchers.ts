@@ -448,45 +448,6 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, isPubli
   return client.request(mutation, { lang, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs }).then(data => data.createItem);
 };
 
-const credentialsClient = async (user: any) => {
-  const token = await user.getToken();
-  return new GraphQLClient("/api", { headers: { authorization: token } });
-};
-
-export const getCredentials = async ({ user }: { user: any }) => {
-  if (!user) return [];
-  const client = await credentialsClient(user);
-  const query = gql`
-    query credentials {
-      credentials { name backend isPublic value masked updatedAt }
-    }
-  `;
-  return client.request(query).then(data => data.credentials);
-};
-
-export const setCredential = async (
-  { user, name, value, backend, isPublic }:
-  { user: any; name: string; value: string; backend?: string; isPublic?: boolean },
-) => {
-  const client = await credentialsClient(user);
-  const mutation = gql`
-    mutation setCredential($name: String!, $value: String!, $backend: String, $isPublic: Boolean) {
-      setCredential(name: $name, value: $value, backend: $backend, isPublic: $isPublic) { name backend isPublic value masked updatedAt }
-    }
-  `;
-  return client.request(mutation, { name, value, backend, isPublic }).then(data => data.setCredential);
-};
-
-export const deleteCredential = async ({ user, name }: { user: any; name: string }) => {
-  const client = await credentialsClient(user);
-  const mutation = gql`
-    mutation deleteCredential($name: String!) {
-      deleteCredential(name: $name)
-    }
-  `;
-  return client.request(mutation, { name }).then(data => data.deleteCredential);
-};
-
 export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic, client: clientId, upstreamLangs, source, label }: { user: any; id: string; name?: string; taskId?: string; mark?: number; help?: string; isPublic?: boolean; client?: string; upstreamLangs?: string[]; source?: string; label?: string }) => {
   if (!user) {
     return null;
