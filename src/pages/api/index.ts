@@ -17,7 +17,8 @@ import {
   getData,
   createItem,
   updateItem,
-  setItemConnection,
+  retryItemWrite,
+  recompileItem,
   republishItem,
   getItems,
   getItem,
@@ -30,6 +31,7 @@ import {
   logClaimEvent,
   adoptWorkspaceFromSibling,
 } from "./resolvers";
+import { listCurrentConnections, setCurrentConnection } from "../../lib/current-connection";
 import { verifyClaimToken } from "../../lib/claim-token";
 import { checkItemCreateAllowed } from "../../lib/usage-service";
 import { checkBurstLimit, BURST } from "../../lib/free-plan-throttle";
@@ -190,13 +192,40 @@ const typeDefs = `
     # workspace's items for /claim. Both are null for authenticated callers.
     workspace: String
     claimToken: String
-    # The connection the item runs through (delegated API permissions), and
-    # its publication while it is public. Null when none.
+    # The current connection for the item's language (delegated API
+    # permissions): what its saves write through and what previews show. Not
+    # stored on the item. Null when none.
     connectionId: String
+    # Its publication while it is public, and the connection that publication
+    # was made through (kept when the current connection changes).
     publicationId: String
+    publicationConnectionId: String
     # The version the publication shows; older than taskId after an edit,
     # until the item is republished.
     publishedTaskId: String
+    # The outcome of the latest write through a connection. For the current
+    # version only when lastWrite.taskId equals taskId.
+    lastWrite: ItemWrite
+  }
+
+  type ItemWrite {
+    taskId: String!
+    connectionId: String
+    # "ok" or "failed"; message says why it failed.
+    status: String!
+    message: String
+    at: String!
+  }
+
+  # The connection a language's saves write through, system-wide per user.
+  # connectionId is the explicit choice while it is still a candidate, else the
+  # sole candidate, else null. explicit: it is the stored choice.
+  type CurrentConnection {
+    lang: String!
+    backend: String!
+    connectionId: String
+    explicit: Boolean!
+    candidates: [Connection!]!
   }
 
   type GenerationJob {
@@ -334,6 +363,7 @@ const typeDefs = `
   type Query {
     checkItemCreateAllowed: CompileAllowedResponse!
     connections: [Connection!]!
+    currentConnections: [CurrentConnection!]!
     connectionGrants(connectionId: String!): [ConnectionGrant!]!
     shareableFunctions(connectionId: String!): [ShareableFunction!]!
     parse(lang: String!, src: String!, itemId: String): ParseResult!
@@ -388,9 +418,16 @@ const typeDefs = `
     startCodeGeneration(itemId: String, siblingOf: String, lang: String!, name: String, client: String, clientKind: String, geoCountry: String, prompt: String!, modification: String!, currentSrc: String, currentData: String): GenerationJob!
     createItem(lang: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
     updateItem(id: String!, name: String, taskId: String, mark: Int, help: String, isPublic: Boolean, client: String, upstreamLangs: [String!], source: String, label: String): Item!
-    # Choose the connection an item runs through, or null for none.
-    setItemConnection(id: String!, connectionId: String): Item!
-    # Move a published item's publication to its current (run) version.
+    # Choose the connection a language's saves write through; null clears the
+    # choice (a sole candidate is then used automatically).
+    setCurrentConnection(lang: String!, connectionId: String): [CurrentConnection!]!
+    # Write the item's current version through the current connection again.
+    retryItemWrite(id: String!): Item!
+    # Compile the item's current version again instead of using the cached
+    # result. Through a connection it writes again (a fresh idempotency key).
+    recompileItem(id: String!): Item!
+    # Move a published item's publication to its current version, through the
+    # current connection.
     republishItem(id: String!): Item!
     shareItem(itemId: String!, targetUserId: String!): ShareItemResult!
     claimFreePlanSession(token: String!): ClaimResult!
@@ -474,6 +511,11 @@ const resolvers = {
         ...owned.map(c => ({ ...c, shared: false, permissions: null, expiresAt: null })),
         ...shared.map(c => ({ ...c, shared: true })),
       ];
+    },
+    currentConnections: async (_, __, ctx) => {
+      if (ctx.freePlan) return [];
+      const auth = await resolveAuth(ctx);
+      return await viaPolicy(() => listCurrentConnections({ auth }));
     },
     connectionGrants: async (_, args, ctx) => {
       if (ctx.freePlan) return [];
@@ -791,15 +833,24 @@ const resolvers = {
       const auth = await resolveAuth(ctx);
       return await updateItem({ auth, id, name, taskId, mark, help, isPublic, client, upstreamLangs, source, label });
     },
-    setItemConnection: async (_, args, ctx) => {
+    setCurrentConnection: async (_, args, ctx) => {
       if (ctx.freePlan) throw new Error("Connections require a full account.");
       const auth = await resolveAuth(ctx);
-      return await viaPolicy(() => setItemConnection({ auth, id: args.id, connectionId: args.connectionId ?? null }));
+      return await viaPolicy(() => setCurrentConnection({ auth, lang: args.lang, connectionId: args.connectionId ?? null }));
+    },
+    retryItemWrite: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      return await viaPolicy(() => retryItemWrite({ auth, id: args.id }));
+    },
+    recompileItem: async (_, args, ctx) => {
+      const auth = await resolveAuth(ctx);
+      return await viaPolicy(() => recompileItem({ auth, id: args.id }));
     },
     republishItem: async (_, args, ctx) => {
       if (ctx.freePlan) throw new Error("Connections require a full account.");
       const auth = await resolveAuth(ctx);
-      return await republishItem({ auth, id: args.id });
+      return await viaPolicy(() => republishItem({ auth, id: args.id }));
     },
     shareItem: async (_, args, ctx) => {
       if (ctx.freePlan) {

@@ -36,32 +36,68 @@ export const compile = async ({ user, id, data = {}, buildLayerCount = 0 }: { us
   }
 };
 
-// Runs an item through its connection: the one explicit action that executes
-// the program's protected calls (its item-bank saves included) and stores the
-// result that views then show. `idempotencyKey` names this run; pass the same
-// key to retry it without repeating its writes.
-export const runItem = async ({ user, taskId, connectionId, idempotencyKey }: {
-  user: any; taskId: string; connectionId: string; idempotencyKey: string;
-}) => {
-  const accessToken = await user.getToken();
-  return postApiCompile({ accessToken, id: taskId, data: {}, connectionId, idempotencyKey });
-};
+// The connection each connectable language's saves write through (system-wide
+// per user), with the candidates it can be chosen from.
+const CURRENT_CONNECTION_FIELDS = `
+  lang backend connectionId explicit
+  candidates { connectionId backend status label shared permissions { lang fn } expiresAt }
+`;
 
-export const setItemConnection = async ({ user, id, connectionId }: { user: any; id: string; connectionId: string | null }) => {
+export const loadCurrentConnections = async ({ user }: { user: any }) => {
   const client = await buildRequestClient({ token: await user.getToken() });
-  const mutation = gql`
-    mutation setItemConnection($id: String!, $connectionId: String) {
-      setItemConnection(id: $id, connectionId: $connectionId) { id connectionId publicationId publishedTaskId }
+  const query = gql`
+    query currentConnections {
+      currentConnections { ${CURRENT_CONNECTION_FIELDS} }
     }
   `;
-  return client.request(mutation, { id, connectionId }).then((data: any) => data.setItemConnection);
+  return client.request(query).then((data: any) => data.currentConnections);
+};
+
+// connectionId null clears the explicit choice (a sole candidate is then used).
+export const setCurrentConnection = async ({ user, lang, connectionId }: { user: any; lang: string; connectionId: string | null }) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const mutation = gql`
+    mutation setCurrentConnection($lang: String!, $connectionId: String) {
+      setCurrentConnection(lang: $lang, connectionId: $connectionId) { ${CURRENT_CONNECTION_FIELDS} }
+    }
+  `;
+  return client.request(mutation, { lang, connectionId }).then((data: any) => data.setCurrentConnection);
+};
+
+const ITEM_CONNECTION_FIELDS = `
+  id taskId connectionId publicationId publicationConnectionId publishedTaskId
+  lastWrite { taskId connectionId status message at }
+`;
+
+// Writes the item's current version through the current connection again,
+// under the same idempotency key as its save: never a second write.
+export const retryItemWrite = async ({ user, id }: { user: any; id: string }) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const mutation = gql`
+    mutation retryItemWrite($id: String!) {
+      retryItemWrite(id: $id) { ${ITEM_CONNECTION_FIELDS} }
+    }
+  `;
+  return client.request(mutation, { id }).then((data: any) => data.retryItemWrite);
+};
+
+// Compiles the item's current version again instead of using the cached
+// result. Through a connection, it writes again (a fresh idempotency key).
+export const recompileItem = async ({ user, id }: { user: any; id: string }) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const mutation = gql`
+    mutation recompileItem($id: String!) {
+      recompileItem(id: $id) { ${ITEM_CONNECTION_FIELDS} }
+    }
+  `;
+  return client.request(mutation, { id }).then((data: any) => data.recompileItem);
 };
 
 export const republishItem = async ({ user, id }: { user: any; id: string }) => {
   const client = await buildRequestClient({ token: await user.getToken() });
   const mutation = gql`
     mutation republishItem($id: String!) {
-      republishItem(id: $id) { id publicationId publishedTaskId }
+      republishItem(id: $id) { ${ITEM_CONNECTION_FIELDS} }
     }
   `;
   return client.request(mutation, { id }).then((data: any) => data.republishItem);
@@ -395,7 +431,9 @@ export const loadItems = async ({ user, lang, mark, client: clientId }) => {
         upstreamLangs
         connectionId
         publicationId
+        publicationConnectionId
         publishedTaskId
+        lastWrite { taskId connectionId status message at }
       }
     }
   `;
@@ -442,6 +480,8 @@ export const createItem = async ({ user, lang, name, taskId, mark, help, isPubli
         updated
         client
         upstreamLangs
+        connectionId
+        lastWrite { taskId connectionId status message at }
       }
     }
   `;
@@ -474,7 +514,9 @@ export const updateItem = async ({ user, id, name, taskId, mark, help, isPublic,
         upstreamLangs
         connectionId
         publicationId
+        publicationConnectionId
         publishedTaskId
+        lastWrite { taskId connectionId status message at }
       }
     }
   `;

@@ -1,138 +1,114 @@
 import { useEffect, useState } from 'react';
-import { loadConnections, republishItem, runItem, setItemConnection } from '../utils/swr/fetchers';
+import Link from 'next/link';
+import { loadCurrentConnections, republishItem, retryItemWrite } from '../utils/swr/fetchers';
+import { backendForLang, normalizeLang } from '../lib/connectable';
+import { getCredentialBackend } from '../lib/credential-backends';
 
-// Languages with protected functions in the policy registry
-// (graffiticode packages/common/src/protected-registry.js). Only these items
-// can run through a connection.
-const CONNECTABLE_LANGS = new Set(['0176']);
-
-export const isConnectableLang = lang =>
-  CONNECTABLE_LANGS.has(String(lang ?? '').replace(/^L/i, '').padStart(4, '0'));
-
-// Fired after a successful run, so the preview (which shows the stored result)
-// reloads: a run changes that result without changing the item itself.
+// Fired after a write through a connection, so the preview (which shows the
+// stored result) reloads: a write changes that result without changing the item.
 export const ITEM_RUN_EVENT = 'gc:item-run';
 
-const newRunKey = () =>
-  `run-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+const errorText = err => String(err?.response?.errors?.[0]?.message || err?.message || err);
 
-// Chooses the connection an item runs through, and runs it. Running is the one
-// explicit action that executes the program's protected calls (its item-bank
-// saves included) and stores the result views show. Each run has its own
-// idempotency key; "Retry" reuses it so a lost response never repeats a write.
-export default function ItemConnection({ user, itemId, taskId, connectionId, publicationId, publishedTaskId = null, onChanged }) {
-  const [connections, setConnections] = useState(null);
+// Where an item's saves go. Every save of a new version writes through the
+// user's current connection for the language (chosen in Settings, system-wide),
+// and the outcome is shown here with a Retry that reuses the save's idempotency
+// key, so a lost response never repeats a write. Publishing is per item.
+export default function ItemConnection({ user, itemId, lang, taskId, connectionId, publicationId, publicationConnectionId = null, publishedTaskId = null, lastWrite = null, onChanged }) {
+  const [current, setCurrent] = useState(undefined);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
-  const [lastKey, setLastKey] = useState(null);
 
   useEffect(() => {
     let live = true;
-    loadConnections({ user })
-      .then(list => live && setConnections((list || []).filter(c => c.status === 'active')))
-      .catch(() => live && setConnections([]));
+    loadCurrentConnections({ user })
+      .then(list => live && setCurrent((list || []).find(c => c.lang === normalizeLang(lang)) || null))
+      .catch(() => live && setCurrent(null));
     return () => { live = false; };
-  }, [user]);
+  }, [user, lang, connectionId]);
 
-  const choose = async value => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      await setItemConnection({ user, id: itemId, connectionId: value || null });
-      setLastKey(null);
-      onChanged?.();
-    } catch (err) {
-      setMessage(String(err?.response?.errors?.[0]?.message || err?.message || err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const run = async key => {
-    setBusy(true);
-    setMessage(null);
-    setLastKey(key);
-    try {
-      const resp = await runItem({ user, taskId, connectionId, idempotencyKey: key });
-      const errors = resp?.data?.errors || [];
-      setMessage(errors.length ? errors.map(e => e.message ?? e).join('; ') : 'Run complete.');
-      if (!errors.length) {
-        window.dispatchEvent(new CustomEvent(ITEM_RUN_EVENT, { detail: { itemId } }));
-      }
-    } catch (err) {
-      setMessage(`Run failed: ${String(err?.message || err)}. Retry repeats this run without repeating its writes.`);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // A published item keeps showing the version it was published at until the
-  // owner republishes, so an edit never reaches learners half-finished.
-  const republish = async () => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      await republishItem({ user, id: itemId });
-      setMessage('Republished the current version.');
-      onChanged?.();
-    } catch (err) {
-      setMessage(String(err?.response?.errors?.[0]?.message || err?.message || err));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const staleVersion = Boolean(publicationId && publishedTaskId && publishedTaskId !== taskId);
-
+  const backend = backendForLang(lang);
+  const service = getCredentialBackend(backend)?.label || backend;
   const labelFor = c => `${c.label || `${c.backend} ${c.connectionId.slice(-6)}`}${c.shared ? ' (shared with you)' : ''}`;
+  const connectionLabel = id => {
+    const c = current?.candidates?.find(c => c.connectionId === id);
+    return c ? labelFor(c) : current ? 'a connection no longer available' : 'your connection';
+  };
+
+  const act = async (fn, done) => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const item = await fn();
+      done?.(item);
+      onChanged?.();
+    } catch (err) {
+      setMessage(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const retry = () => act(() => retryItemWrite({ user, id: itemId }), item => {
+    if (item?.lastWrite?.status === 'ok') {
+      window.dispatchEvent(new CustomEvent(ITEM_RUN_EVENT, { detail: { itemId } }));
+    }
+  });
+
+  // A published item keeps showing the version (and connection) it was
+  // published with until the owner republishes, so an edit never reaches
+  // learners half-finished.
+  const republish = () => act(() => republishItem({ user, id: itemId }), () => setMessage('Republished the current version.'));
+
+  // The write for THIS version through THIS connection; older outcomes are history.
+  const write = lastWrite && lastWrite.taskId === taskId && lastWrite.connectionId === connectionId ? lastWrite : null;
+  const staleVersion = Boolean(publicationId && publishedTaskId && publishedTaskId !== taskId);
+  const staleConnection = Boolean(publicationId && connectionId && publicationConnectionId && publicationConnectionId !== connectionId);
+  const buttonClass = 'px-3 py-1 text-xs text-gray-700 border border-gray-300 hover:bg-gray-100 rounded-none disabled:opacity-50';
 
   return (
     <div className="mt-4">
       <label className="block text-xs font-semibold text-gray-600 mb-1">Connection</label>
-      <select
-        className="w-full text-xs border border-gray-300 rounded-none px-2 py-1 disabled:opacity-50"
-        value={connectionId || ''}
-        disabled={busy || connections === null || Boolean(publicationId)}
-        title={publicationId ? 'Unpublish this item to change its connection.' : undefined}
-        onChange={e => choose(e.target.value)}
-      >
-        <option value="">None (preview only)</option>
-        {(connections || []).map(c => (
-          <option key={c.connectionId} value={c.connectionId}>{labelFor(c)}</option>
-        ))}
-        {connectionId && connections && !connections.some(c => c.connectionId === connectionId) && (
-          <option value={connectionId}>Unavailable connection</option>
-        )}
-      </select>
-      {connectionId && (
-        <div className="flex gap-2 mt-2">
-          <button
-            onClick={() => run(newRunKey())}
-            disabled={busy || !taskId}
-            className="px-3 py-1 text-xs text-white bg-gray-700 hover:bg-gray-900 rounded-none disabled:opacity-50"
-            title="Runs the program through this connection, including any item-bank saves."
-          >
-            {busy ? 'Running…' : 'Run'}
-          </button>
-          {lastKey && message?.startsWith('Run failed') && (
-            <button
-              onClick={() => run(lastKey)}
-              disabled={busy}
-              className="px-3 py-1 text-xs text-gray-700 border border-gray-300 hover:bg-gray-100 rounded-none disabled:opacity-50"
-            >
-              Retry
-            </button>
-          )}
+      {current === undefined ? (
+        <div className="text-xs text-gray-500">Loading…</div>
+      ) : connectionId ? (
+        <div className="text-xs text-gray-700">
+          Saves write through {connectionLabel(connectionId)}.{' '}
+          <Link href="/settings" className="underline text-gray-500 hover:text-gray-900">Change</Link>
+        </div>
+      ) : (
+        <div className="text-xs text-gray-500">
+          {current?.candidates?.length > 1
+            ? <>No current {service} connection — previews only. <Link href="/settings" className="underline hover:text-gray-900">Choose one in Settings.</Link></>
+            : <>No {service} connection — previews only. <Link href="/settings" className="underline hover:text-gray-900">Add one in Settings.</Link></>}
         </div>
       )}
-      {publicationId && !staleVersion && <div className="text-xs text-gray-500 mt-1">Published through this connection.</div>}
-      {staleVersion && (
+      {connectionId && taskId && (
+        write?.status === 'ok' ? (
+          <div className="text-xs text-green-700 mt-1">Saved to {service}.</div>
+        ) : write?.status === 'failed' ? (
+          <div className="text-xs text-gray-600 mt-1 break-words">
+            <div>Save to {service} failed: {write.message || 'unknown error'}</div>
+            <button onClick={retry} disabled={busy} className={`mt-1 ${buttonClass}`}>
+              {busy ? 'Writing…' : 'Retry'}
+            </button>
+          </div>
+        ) : (
+          <div className="text-xs text-gray-500 mt-1">Not written through this connection yet. Recompile writes it.</div>
+        )
+      )}
+      {publicationId && !staleVersion && !staleConnection && (
+        <div className="text-xs text-gray-500 mt-1">Published through {publicationConnectionId ? connectionLabel(publicationConnectionId) : 'a connection'}.</div>
+      )}
+      {(staleVersion || staleConnection) && (
         <div className="text-xs text-gray-600 mt-2">
-          <div>The published version is older than the current one. Run the current version, then republish.</div>
-          <button
-            onClick={republish}
-            disabled={busy}
-            className="mt-1 px-3 py-1 text-xs text-gray-700 border border-gray-300 hover:bg-gray-100 rounded-none disabled:opacity-50"
-          >
+          <div>
+            {staleVersion
+              ? 'The published version is older than the current one.'
+              : 'It is published through a different connection than the current one.'}
+            {' '}Republish to publish the current version through the current connection.
+          </div>
+          <button onClick={republish} disabled={busy || !connectionId} className={`mt-1 ${buttonClass}`}>
             Republish
           </button>
         </div>

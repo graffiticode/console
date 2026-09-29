@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
 import { ITEM_RUN_EVENT } from './ItemConnection';
+import { viewConnectionId } from '../lib/connectable';
 import useSWR from "swr";
 import { useRouter } from 'next/router';
 import { Dialog, Transition, Menu } from '@headlessui/react'
@@ -145,6 +146,12 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   // distinguishes a local edit from a remote one. Baselines track the server
   // snapshot we're synced to so a stale poll can't revert our own save.
   const editorDirtyRef = useRef(false);
+  // The last save the write-back effect sent, per item. The items list only
+  // catches up when that save returns, so until then a second trigger (a code
+  // and a help change landing separately) still looks like a change and would
+  // send the identical save again — and, for an item that writes through a
+  // connection, race its write.
+  const lastSentSaveRef = useRef<{ itemId: string; signature: string } | null>(null);
   const baselineTaskIdRef = useRef<string | null>(null);
   const baselineUpdatedRef = useRef(0);
   const [ remoteUpdateAvailable, setRemoteUpdateAvailable ] = useState(false);
@@ -706,6 +713,14 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         if (result.taskId) mutateItemVersions();
       }
 
+      // A new version of a connectable item was written through the current
+      // connection before updateItem returned. The preview may already have
+      // loaded that version's (not yet stored) result, so reload it.
+      if (result && taskId !== undefined && taskId !== currentItem.taskId &&
+          result.lastWrite?.status === 'ok' && result.lastWrite.taskId === result.taskId) {
+        window.dispatchEvent(new CustomEvent(ITEM_RUN_EVENT, { detail: { itemId } }));
+      }
+
       // If mark changed and this is the selected item, we need to reload the task data
       if (isMarkChanging && selectedItemId === itemId && result && result.taskId) {
         setTaskId(result.taskId);
@@ -849,6 +864,12 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         const persistedUpstream = Array.isArray(selectedItem.upstreamLangs) ? selectedItem.upstreamLangs : [];
         const upstreamChanged = JSON.stringify(persistedUpstream) !== JSON.stringify(upstreamLangs);
         if (hasChanges || upstreamChanged) {
+          const signature = JSON.stringify([taskId || selectedItem.taskId, editorHelp, upstreamLangs]);
+          if (lastSentSaveRef.current?.itemId === selectedItemId && lastSentSaveRef.current.signature === signature) {
+            editorDirtyRef.current = false;
+            return;
+          }
+          lastSentSaveRef.current = { itemId: selectedItemId, signature };
           // Clear before the async save so edits made during the save re-mark
           // dirty and trigger a follow-up persist. The local edit is being
           // saved (last-write-wins), so any pending remote-update prompt is moot.
@@ -1448,7 +1469,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                 key={`form-${previewRun}`}
                 id={taskId}
                 lang={lang}
-                connectionId={items.find(i => i.id === selectedItemId)?.connectionId ?? null}
+                connectionId={viewConnectionId(items.find(i => i.id === selectedItemId), taskId)}
                 height="100%"
                 className="h-full w-full p-2"
                 setData={setFormData}

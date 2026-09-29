@@ -2,14 +2,15 @@ import { Menu, Transition } from '@headlessui/react'
 import { Fragment, useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import { EllipsisVerticalIcon } from '@heroicons/react/16/solid';
 import { PlusIcon, ShareIcon, UserIcon } from '@heroicons/react/20/solid';
-import { DocumentDuplicateIcon, ArrowTopRightOnSquareIcon, PhotoIcon } from '@heroicons/react/24/outline';
+import { DocumentDuplicateIcon, ArrowTopRightOnSquareIcon, ArrowPathIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import MarkSelector, { marks } from './mark-selector';
 import { clientOptionForId } from './client-selector';
 import PublicToggle from './public-toggle';
-import ItemConnection, { isConnectableLang } from './ItemConnection';
+import ItemConnection, { ITEM_RUN_EVENT } from './ItemConnection';
+import { isConnectableLang } from '../lib/connectable';
 import ShareItemDialog from './ShareItemDialog';
 import CopyableId from './CopyableId';
-import { createItem } from '../utils/swr/fetchers';
+import { createItem, recompileItem } from '../utils/swr/fetchers';
 import { elideCompoundId } from '../utils';
 import { generateThumbnail } from '../lib/generate-thumbnail';
 import { useThumbnailJob } from '../lib/thumbnail-jobs';
@@ -30,11 +31,13 @@ function formatTimestamp(ts) {
   }
 }
 
-function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, created, updated, client, connectionId = null, publicationId = null, publishedTaskId = null, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
+function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], lang, help, code, created, updated, client, connectionId = null, publicationId = null, publicationConnectionId = null, publishedTaskId = null, lastWrite = null, onChange, onRefresh, isOpen, onOpen, onClose, onArrowKey }) {
   const { user } = useGraffiticodeAuth();
   const [nameValue, setNameValue] = useState(name);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+  const [isRecompiling, setIsRecompiling] = useState(false);
+  const [recompileMessage, setRecompileMessage] = useState(null);
   // Snapshot generation is tracked in a shared store keyed by item id, so the spinner survives
   // closing/reopening the menu (and shows on other surfaces) while the ~10s render runs.
   const isSnapping = useThumbnailJob(itemId);
@@ -159,6 +162,25 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
       onRefresh();
     } catch (error) {
       console.error('Failed to generate thumbnail:', error);
+    }
+  };
+
+  // Compile the current version again instead of using the cached result. An
+  // item that writes through a connection writes again. The preview reloads.
+  const handleRecompile = async (e) => {
+    e.stopPropagation();
+    if (!user || isRecompiling || !taskId) return;
+    setIsRecompiling(true);
+    setRecompileMessage(null);
+    try {
+      await recompileItem({ user, id: itemId });
+      window.dispatchEvent(new CustomEvent(ITEM_RUN_EVENT, { detail: { itemId } }));
+      setRecompileMessage('Recompiled.');
+      onRefresh();
+    } catch (error) {
+      setRecompileMessage(String(error?.response?.errors?.[0]?.message || error?.message || error));
+    } finally {
+      setIsRecompiling(false);
     }
   };
 
@@ -291,10 +313,13 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                 <ItemConnection
                   user={user}
                   itemId={itemId}
+                  lang={lang}
                   taskId={taskId}
                   connectionId={connectionId}
                   publicationId={publicationId}
+                  publicationConnectionId={publicationConnectionId}
                   publishedTaskId={publishedTaskId}
+                  lastWrite={lastWrite}
                   onChanged={onRefresh}
                 />
               )}
@@ -353,6 +378,20 @@ function EllipsisMenu({ itemId, name, taskId, mark, isPublic, sharedWith = [], l
                   <ArrowTopRightOnSquareIcon className="h-4 w-4 mr-2" />
                   <span>Open in form view</span>
                 </button>
+                <button
+                  onClick={handleRecompile}
+                  disabled={isRecompiling || !taskId}
+                  className="flex items-center w-full px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={isConnectableLang(lang) && connectionId
+                    ? "Compile this version again instead of using the cached result. It writes through your connection again."
+                    : "Compile this version again instead of using the cached result"}
+                >
+                  <ArrowPathIcon className={classNames('h-4 w-4 mr-2', isRecompiling && 'animate-spin')} />
+                  <span>{isRecompiling ? 'Recompiling…' : 'Recompile'}</span>
+                </button>
+                {recompileMessage && (
+                  <div className="px-3 pb-1 text-xs text-gray-600 break-words">{recompileMessage}</div>
+                )}
               </div>
             </div>
           </div>
@@ -469,7 +508,9 @@ const ItemsNav = forwardRef(function ItemsNav({ items, selectedItemId, onSelectI
                       client={item.client}
                       connectionId={item.connectionId}
                       publicationId={item.publicationId}
+                      publicationConnectionId={item.publicationConnectionId}
                       publishedTaskId={item.publishedTaskId}
+                      lastWrite={item.lastWrite}
                       onChange={onUpdateItem}
                       onRefresh={onRefresh}
                       isOpen={openMenuId === item.id}

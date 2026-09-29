@@ -8,6 +8,8 @@ import {
   disableConnection,
   deleteConnection,
   leaveSharedConnection,
+  loadCurrentConnections,
+  setCurrentConnection,
 } from "../utils/swr/fetchers";
 import ConnectionSharing from "./ConnectionSharing";
 import { CREDENTIAL_BACKENDS, getCredentialBackend } from "../lib/credential-backends";
@@ -22,6 +24,14 @@ interface Connection {
   expiresAt: string | null;
 }
 
+interface CurrentConnection {
+  lang: string;
+  backend: string;
+  connectionId: string | null;
+  explicit: boolean;
+  candidates: Connection[];
+}
+
 // A connection holds an external-API credential in the credential broker; items
 // run through it without ever seeing the credential. Its owner can use it and
 // share it (ConnectionSharing); people it is shared with see it here as
@@ -32,6 +42,7 @@ const errorText = (err: any) =>
 export default function ConnectionsCard() {
   const { user } = useGraffiticodeAuth();
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [current, setCurrent] = useState<CurrentConnection[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,7 +61,9 @@ export default function ConnectionsCard() {
   const refresh = useCallback(async () => {
     if (!user) return;
     try {
-      setConnections((await loadConnections({ user })) || []);
+      const [list, currentList] = await Promise.all([loadConnections({ user }), loadCurrentConnections({ user })]);
+      setConnections(list || []);
+      setCurrent(currentList || []);
       setStatus("ready");
     } catch (err) {
       setError(errorText(err));
@@ -96,6 +109,8 @@ export default function ConnectionsCard() {
   };
 
   const backendLabel = (b: string) => getCredentialBackend(b)?.label || b;
+  const candidateLabel = (c: Connection) =>
+    `${c.label || `${backendLabel(c.backend)} ${c.connectionId.slice(-6)}`}${c.shared ? " (shared with you)" : ""}`;
   const rotating = form?.startsWith("rotate:") ? form.slice("rotate:".length) : null;
 
   const formView = (
@@ -177,7 +192,7 @@ export default function ConnectionsCard() {
     <div className="overflow-hidden grid grid-col-1">
       <p className="text-sm text-gray-500 mb-3">
         A connection lets your items use an external service without the credential ever reaching them.
-        Choose it on an item and press Run. Share it to let someone else use it without seeing the credential. The secret is sent once and never shown again.
+        Every save of an item writes through the current connection for its language, chosen below. Share it to let someone else use it without seeing the credential. The secret is sent once and never shown again.
       </p>
 
       {status === "error" && !form && (
@@ -259,6 +274,43 @@ export default function ConnectionsCard() {
       </ul>
 
       {error && !form && status !== "error" && <p className="text-sm text-red-600 mb-2">{error}</p>}
+
+      {current.length > 0 && (
+        <div className="mb-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-1">Current connection</h4>
+          <p className="text-xs text-gray-500 mb-2">
+            Saves write through this connection. Changing it does not move items already published.
+          </p>
+          <ul className="space-y-2">
+            {current.map(cc => (
+              <li key={cc.lang} className="flex items-center justify-between gap-4 border border-gray-300 px-4 py-2 rounded-none">
+                <span className="text-sm text-gray-700">L{cc.lang} <span className="text-gray-500">{backendLabel(cc.backend)}</span></span>
+                {cc.candidates.length === 0 ? (
+                  <span className="text-xs text-gray-500">No active {backendLabel(cc.backend)} connection — previews only.</span>
+                ) : (
+                  <div className="flex flex-col items-end">
+                    <select
+                      className="text-sm border border-gray-300 rounded-none px-2 py-1 disabled:opacity-50"
+                      value={cc.explicit ? cc.connectionId : ""}
+                      disabled={busy}
+                      onChange={e => act(() => setCurrentConnection({ user, lang: cc.lang, connectionId: e.target.value || null }))}>
+                      <option value="">
+                        {cc.candidates.length === 1 ? `Automatic (${candidateLabel(cc.candidates[0])})` : "None"}
+                      </option>
+                      {cc.candidates.map(c => <option key={c.connectionId} value={c.connectionId}>{candidateLabel(c)}</option>)}
+                    </select>
+                    <small className="text-xs text-gray-500 mt-1">
+                      {cc.explicit ? "Chosen" :
+                        cc.connectionId ? "The only one, so it is used automatically" :
+                        "None chosen: saves are previews only"}
+                    </small>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {form === "add" ? formView : (
         <div>

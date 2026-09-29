@@ -98,6 +98,33 @@ export async function postTask({ auth, task, ephemeral, isPublic }) {
   }
 }
 
+// Runs a program through a connection: the compile that executes its protected
+// calls (item-bank saves included) and stores the result views then show. The
+// idempotency key names this write; the same key never writes twice. Error
+// statuses come back as the api's JSON body rather than a throw, so the caller
+// can report the api's own message.
+export async function compileThroughConnection(
+  { authToken, id, connectionId, idempotencyKey }:
+  { authToken: string; id: string; connectionId: string; idempotencyKey: string },
+) {
+  const post = bent(getBaseUrlForApi(), "POST", "json", 200, 400, 401, 403, 404, 409, 422, 500, 502, 503, {
+    authorization: authToken,
+    "x-graffiticode-storage-type": "persistent",
+  });
+  return await post("/compile", { id, data: {}, connectionId, idempotencyKey }) as any;
+}
+
+// Compiles a task afresh instead of answering from the compile cache, and
+// stores the new result (api GET /data?refresh=1, which requires a signed-in
+// caller). The token travels in a header, never the URL, so it stays out of
+// request logs. Error statuses come back as the api's JSON body.
+export async function recompileTask({ authToken, id }: { authToken: string; id: string }) {
+  const get = bent(getBaseUrlForApi(), "GET", "json", 200, 400, 401, 403, 404, 500, 502, 503, {
+    authorization: authToken,
+  });
+  return await get(`/data?id=${encodeURIComponent(id)}&refresh=1`) as any;
+}
+
 // With a connection, this is a view of the caller's stored result for the
 // item through that connection: the gateway never runs the program for it.
 export async function getData({ authToken, id, connectionId = null }: { authToken: string; id: string; connectionId?: string | null }) {

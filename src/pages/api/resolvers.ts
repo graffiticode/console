@@ -7,7 +7,7 @@ import { getFirestore } from "../../utils/db";
 import { getApiTask, getBaseUrlForApi, getLanguageAsset, getLanguageLexicon, isLangOverridden, languageOfflineMessage, isLanguageOfflineError } from "../../lib/api";
 import { unparse } from "@graffiticode/parser";
 import { generateCodeForRequest } from "../../lib/code-generation/generate-for-request";
-import { parseCode, postTask, getData } from "../../lib/task-api";
+import { parseCode, postTask, getData, compileThroughConnection, recompileTask } from "../../lib/task-api";
 import { generateCode as codeGenerationService, getRelevantExamples } from "../../lib/code-generation-service";
 import { generateSpec, specModelFor, SPEC_CACHE_VERSION } from "../../lib/spec-generation-service";
 import { backfillTokenUsageItemId, currentEnv } from "../../lib/token-usage-service";
@@ -39,7 +39,8 @@ import { mintClaimToken } from "../../lib/claim-token";
 import fs from "fs";
 import path from "path";
 import { createPublication, deletePublication, PublicationError } from "../../lib/publications";
-import { listConnections, listSharedConnections } from "../../lib/policy-client";
+import { isConnectableLang } from "../../lib/connectable";
+import { resolveCurrentConnection, currentConnectionId, saveWriteKey } from "../../lib/current-connection";
 
 type AuthArg = {
   uid: string;
@@ -848,6 +849,160 @@ export async function getTaskVersions({
   }
 }
 
+type LastWrite = {
+  taskId: string;
+  connectionId: string | null;
+  status: "ok" | "failed";
+  message?: string;
+  at: number;
+};
+
+// A stored message is display text, not a log: keep the item doc small.
+const LAST_WRITE_MESSAGE_LIMIT = 1000;
+
+const errorMessages = (errors: unknown[]) =>
+  errors.map((e: any) => (typeof e === "string" ? e : e?.message ?? JSON.stringify(e))).join("; ");
+
+/**
+ * Every save writes. A new program version of a connectable item runs through
+ * the user's current connection (lib/current-connection.ts), which is what
+ * executes its protected calls — its item-bank saves included — and stores the
+ * result views show. Called only when a taskId is new or changed, after it has
+ * landed, and awaited (Cloud Run throttles background work).
+ *
+ * Never fails the save: the outcome is recorded on the item as `lastWrite`, and
+ * retryItemWrite repeats it. The idempotency key is derived from (item, task,
+ * connection), so a re-save of the same program or a retry after a lost
+ * response never writes twice. `fresh` (recompileItem) uses a new key instead:
+ * the owner asked to run it again, so it writes again.
+ *
+ * Returns null when nothing is written: free plan, a language without
+ * connections, no current connection, or a system account. The system accounts
+ * are the shared trial account (FREE_PLAN_UID: bronze/free items; also caught
+ * by the freePlan flag) and the eval account (EVAL_UID: sweeps and evals).
+ * Their items must never reach an external service, even if one of them holds
+ * a connection.
+ */
+async function writeThroughCurrentConnection({ auth, itemId, lang, taskId, fresh = false }: {
+  auth: AuthArg;
+  itemId: string;
+  lang: string;
+  taskId: string;
+  fresh?: boolean;
+}): Promise<LastWrite | null> {
+  if (auth.freePlan || !taskId || !isConnectableLang(lang)) return null;
+  const systemUids = [process.env.FREE_PLAN_UID, process.env.EVAL_UID].filter(Boolean);
+  if (systemUids.includes(auth.uid)) return null;
+  let connectionId: string | null;
+  try {
+    connectionId = (await resolveCurrentConnection({ auth, lang }))?.connectionId ?? null;
+  } catch (err) {
+    return recordLastWrite({ auth, itemId, taskId, connectionId: null, message: `Could not look up your connections: ${err?.message ?? err}` });
+  }
+  if (!connectionId) return null;
+  const idempotencyKey = fresh ? `recompile:${randomUUID()}` : saveWriteKey({ itemId, taskId, connectionId });
+  // One save arrives as two simultaneous updateItem calls. The second would
+  // reach the broker while the first is in flight and come back "uncertain";
+  // instead it waits for the first and reports its outcome. (Per process;
+  // recordLastWrite covers a duplicate that lands on another instance.)
+  const pending = inFlightWrites.get(idempotencyKey);
+  if (pending) return pending;
+  const write = performWrite({ auth, itemId, taskId, connectionId, idempotencyKey })
+    .finally(() => inFlightWrites.delete(idempotencyKey));
+  inFlightWrites.set(idempotencyKey, write);
+  return write;
+}
+
+const inFlightWrites = new Map<string, Promise<LastWrite>>();
+
+async function performWrite({ auth, itemId, taskId, connectionId, idempotencyKey }: {
+  auth: AuthArg;
+  itemId: string;
+  taskId: string;
+  connectionId: string;
+  idempotencyKey: string;
+}): Promise<LastWrite> {
+  let message: string | null = null;
+  try {
+    const resp = await compileThroughConnection({ authToken: auth.token, id: taskId, connectionId, idempotencyKey });
+    const errors = [
+      ...(Array.isArray(resp?.data?.errors) ? resp.data.errors : []),
+      ...(Array.isArray(resp?.errors) ? resp.errors : []),
+    ];
+    if (resp?.status !== "success" && errors.length === 0) {
+      errors.push(resp?.error ?? `compile ${resp?.status ?? "failed"}`);
+    }
+    if (errors.length) message = errorMessages(errors);
+  } catch (err) {
+    message = `Write failed: ${err?.message ?? err}`;
+  }
+  return recordLastWrite({ auth, itemId, taskId, connectionId, message });
+}
+
+// Stores the outcome on the item. A failure never replaces a success for the
+// same version through the same connection: the write happened, and a
+// duplicate that raced it (reported "uncertain" by the broker) says nothing new.
+async function recordLastWrite({ auth, itemId, taskId, connectionId, message }: {
+  auth: AuthArg;
+  itemId: string;
+  taskId: string;
+  connectionId: string | null;
+  message: string | null;
+}): Promise<LastWrite> {
+  const lastWrite: LastWrite = {
+    taskId,
+    connectionId,
+    status: message === null ? "ok" : "failed",
+    ...(message === null ? {} : { message: message.slice(0, LAST_WRITE_MESSAGE_LIMIT) }),
+    at: Date.now(),
+  };
+  if (message !== null) {
+    console.error("writeThroughCurrentConnection(): write failed for item", itemId, message);
+  }
+  const itemRef = db.doc(`users/${auth.uid}/items/${itemId}`);
+  try {
+    // A targeted write, not updateItem: recording the outcome is not a content change.
+    return await db.runTransaction(async tx => {
+      const prev = (await tx.get(itemRef)).data()?.lastWrite;
+      if (lastWrite.status === "failed" && prev?.status === "ok" &&
+          prev.taskId === taskId && prev.connectionId === connectionId) {
+        return prev as LastWrite;
+      }
+      tx.update(itemRef, { lastWrite });
+      return lastWrite;
+    });
+  } catch (err) {
+    console.error("writeThroughCurrentConnection(): failed to record the outcome for item", itemId, err);
+    return lastWrite;
+  }
+}
+
+// A publication keeps the connection it was made through. Items published
+// before that was recorded were published through their (legacy, per-item)
+// connectionId.
+const publicationConnectionOf = (data: any): string | null =>
+  data?.publicationId ? (data.publicationConnectionId ?? data.connectionId ?? null) : null;
+
+// Connection fields every Item shape carries. `connectionId` is the CURRENT
+// connection for the item's language — what saves write through and what the
+// preview shows — not anything stored on the item.
+async function itemConnectionFields(auth: AuthArg, data: any) {
+  const lastWrite = data?.lastWrite;
+  return {
+    connectionId: isConnectableLang(data?.lang) ? await currentConnectionId({ auth, lang: data.lang }) : null,
+    publicationConnectionId: publicationConnectionOf(data),
+    lastWrite: lastWrite?.taskId
+      ? {
+        taskId: lastWrite.taskId,
+        connectionId: lastWrite.connectionId ?? null,
+        status: lastWrite.status,
+        message: lastWrite.message ?? null,
+        at: String(lastWrite.at),
+      }
+      : null,
+  };
+}
+
 export async function createItem({
   auth,
   lang,
@@ -996,11 +1151,14 @@ export async function createItem({
         client: item.client,
         source: resolvedSource,
       });
+      const lastWrite = await writeThroughCurrentConnection({ auth, itemId: id, lang, taskId });
+      if (lastWrite) item.lastWrite = lastWrite;
     }
     return {
       ...item,
       created: String(timestamp),
       updated: String(timestamp),
+      ...(await itemConnectionFields(auth, item)),
       ...(await freePlanTokens(auth)),
     };
   } catch (error) {
@@ -1146,23 +1304,40 @@ export async function updateItem({
       updates.upstreamLangs = upstreamLangs;
     }
     if (isPublic !== undefined) {
-      // An item run through a connection is shared by a publication, not by
-      // its task alone: viewers see the publisher's stored result, signed
-      // under the publication's authority. Making it private withdraws it.
-      if (isPublic && itemData.connectionId && !itemData.publicationId && !auth.freePlan) {
+      // An item written through a connection is shared by a publication, not
+      // by its task alone: viewers see the publisher's stored result, signed
+      // under the publication's authority. It is made through the current
+      // connection and keeps that connection (publicationConnectionId) when the
+      // current one later changes. Making it private withdraws it.
+      const publishLang = lang ?? itemData.lang;
+      if (isPublic && !itemData.publicationId && !auth.freePlan && isConnectableLang(publishLang)) {
         const itemTaskId = taskId || itemData.taskId;
+        let publishVia: string | null;
         try {
-          updates.publicationId = await createPublication({
-            authToken: auth.token, taskId: itemTaskId, connectionId: itemData.connectionId,
-          });
-          // The version it shows. It stays put when the program changes; the
-          // owner republishes deliberately (republishItem).
-          updates.publishedTaskId = itemTaskId;
+          publishVia = (await resolveCurrentConnection({ auth, lang: publishLang }))?.connectionId ?? null;
         } catch (err) {
-          if (err instanceof PublicationError) {
-            throw new Error(`Cannot publish this item: ${err.message}`);
+          throw new Error(`Cannot publish this item: could not look up your connections (${err?.message ?? err})`);
+        }
+        if (publishVia) {
+          // The gateway publishes only a version with a stored result through
+          // that connection. Write it first: a no-op when this version already
+          // went through (same idempotency key), and needed when the program
+          // changes in this same call or predates saves that write.
+          await writeThroughCurrentConnection({ auth, itemId: id, lang: publishLang, taskId: itemTaskId });
+          try {
+            updates.publicationId = await createPublication({
+              authToken: auth.token, taskId: itemTaskId, connectionId: publishVia,
+            });
+            // The version it shows. It stays put when the program changes; the
+            // owner republishes deliberately (republishItem).
+            updates.publishedTaskId = itemTaskId;
+            updates.publicationConnectionId = publishVia;
+          } catch (err) {
+            if (err instanceof PublicationError) {
+              throw new Error(`Cannot publish this item: ${err.message}`);
+            }
+            throw err;
           }
-          throw err;
         }
       } else if (!isPublic && itemData.publicationId) {
         try {
@@ -1176,6 +1351,7 @@ export async function updateItem({
         }
         updates.publicationId = admin.firestore.FieldValue.delete();
         updates.publishedTaskId = admin.firestore.FieldValue.delete();
+        updates.publicationConnectionId = admin.firestore.FieldValue.delete();
       }
       if (isPublic) {
         // Make every task segment public BEFORE marking the item public, so a
@@ -1220,6 +1396,15 @@ export async function updateItem({
         console.error("updateItem(): onRenderable failed for item", id, err);
       }
       renderableMs = Date.now() - tHook;
+    }
+    // A new program version writes through the current connection. After the
+    // announcement, so renderability never waits on the external write; before
+    // the re-read, so the returned item carries its lastWrite.
+    let writeThroughMs = 0;
+    if (taskIdChanged) {
+      const tWriteThrough = Date.now();
+      await writeThroughCurrentConnection({ auth, itemId: id, lang: updates.lang ?? itemData.lang, taskId });
+      writeThroughMs = Date.now() - tWriteThrough;
     }
     // Re-reads the document that was just written, to build the return value.
     // The generation worker discards that return value entirely.
@@ -1281,7 +1466,7 @@ export async function updateItem({
     if (taskIdChanged) {
       console.log(
         `[updateItem] id=${id} read=${readMs} apiTask=${apiTaskMs} write=${writeMs} ` +
-          `reread=${rereadMs} onRenderable=${renderableMs} ` +
+          `reread=${rereadMs} onRenderable=${renderableMs} writeThrough=${writeThroughMs} ` +
           `bookkeeping=${versionMs ? Date.now() - versionMs : 0} ` +
           `total=${Date.now() - tUpdateItem}`,
       );
@@ -1296,6 +1481,7 @@ export async function updateItem({
       ...data,
       created: String(data.created),
       updated: String(data.updated),
+      ...(await itemConnectionFields(auth, data)),
       ...tokens,
     };
   } catch (error) {
@@ -1304,37 +1490,74 @@ export async function updateItem({
   }
 }
 
-// Chooses the connection an item runs through (delegated API permissions), or
-// none. Only the user's own active connections qualify. A published item keeps
-// its connection until it is unpublished, since its publication is bound to it.
-export async function setItemConnection({ auth, id, connectionId }: { auth: AuthArg; id: string; connectionId: string | null }) {
+// Repeats the write of the item's current version through the current
+// connection — after a failed save write, or to write it through a connection
+// chosen since. Same key derivation as the save, so a retry after a lost
+// response never repeats the write.
+export async function retryItemWrite({ auth, id }: { auth: AuthArg; id: string }) {
   if (auth.freePlan) {
     throw new Error("Connections require a full account.");
   }
-  const itemRef = db.doc(`users/${auth.uid}/items/${id}`);
-  const itemDoc = await itemRef.get();
+  const itemDoc = await db.doc(`users/${auth.uid}/items/${id}`).get();
   if (!itemDoc.exists) {
     throw new Error("Item not found");
   }
   const itemData = itemDoc.data();
-  if (itemData.publicationId && itemData.connectionId !== connectionId) {
-    throw new Error("Unpublish this item before changing its connection.");
+  if (!itemData.taskId) {
+    throw new Error("This item has no saved version to write yet.");
   }
-  if (connectionId) {
-    // The user's own connections and those shared with them both qualify.
-    const [owned, shared] = await Promise.all([listConnections(auth.token), listSharedConnections(auth.token)]);
-    if (![...owned, ...shared].some(c => c.connectionId === connectionId && c.status === "active")) {
-      throw new Error("That connection is not one of your active connections.");
-    }
+  if (!isConnectableLang(itemData.lang)) {
+    throw new Error("This item's language does not use connections.");
   }
-  await itemRef.update({ connectionId: connectionId || admin.firestore.FieldValue.delete() });
+  const lastWrite = await writeThroughCurrentConnection({ auth, itemId: id, lang: itemData.lang, taskId: itemData.taskId });
+  if (!lastWrite) {
+    throw new Error("There is no current connection to write through. Choose one in Settings.");
+  }
   return getItem({ auth, id });
 }
 
-// Moves a published item's publication to its current version. The new
-// publication is created first (the gateway requires a stored result for the
-// current version, so it must have been run), then the old one is deleted, so
-// the item is never unpublished in between.
+// Compiles an item's current version again instead of using the cached
+// result, for any language. An item that writes through a connection runs
+// through it again with a fresh idempotency key, so its protected calls (item-bank
+// saves included) repeat; stable references make that an update, not a copy.
+// Anything else recompiles with the api's refresh. Either way the stored result
+// is replaced, and the caller reloads the preview.
+export async function recompileItem({ auth, id }: { auth: AuthArg; id: string }) {
+  const itemDoc = await db.doc(`users/${auth.uid}/items/${id}`).get();
+  if (!itemDoc.exists) {
+    throw new Error("Item not found");
+  }
+  const itemData = itemDoc.data();
+  if (!itemData.taskId) {
+    throw new Error("This item has no saved version to recompile yet.");
+  }
+  const lastWrite = await writeThroughCurrentConnection({
+    auth, itemId: id, lang: itemData.lang, taskId: itemData.taskId, fresh: true,
+  });
+  if (lastWrite?.status === "failed") {
+    throw new Error(`Recompile through the connection failed: ${lastWrite.message ?? "unknown error"}`);
+  }
+  if (!lastWrite) {
+    const resp = await recompileTask({ authToken: auth.token, id: itemData.taskId });
+    const errors = [
+      ...(Array.isArray(resp?.data?.errors) ? resp.data.errors : []),
+      ...(Array.isArray(resp?.errors) ? resp.errors : []),
+    ];
+    if (resp?.status !== "success" && errors.length === 0) {
+      errors.push(resp?.error ?? `recompile ${resp?.status ?? "failed"}`);
+    }
+    if (errors.length) {
+      throw new Error(`Recompile failed: ${errorMessages(errors).slice(0, LAST_WRITE_MESSAGE_LIMIT)}`);
+    }
+  }
+  return getItem({ auth, id });
+}
+
+// Moves a published item's publication to its current version, through the
+// CURRENT connection. The new publication is created first (the gateway
+// requires a stored result for that version through that connection, which
+// the save wrote), then the old one is deleted, so the item is never
+// unpublished in between.
 export async function republishItem({ auth, id }: { auth: AuthArg; id: string }) {
   if (auth.freePlan) {
     throw new Error("Connections require a full account.");
@@ -1345,20 +1568,27 @@ export async function republishItem({ auth, id }: { auth: AuthArg; id: string })
     throw new Error("Item not found");
   }
   const itemData = itemDoc.data();
-  if (!itemData.connectionId || !itemData.publicationId) {
+  if (!itemData.publicationId) {
     throw new Error("This item is not published through a connection.");
   }
-  if (itemData.publishedTaskId === itemData.taskId) {
+  const connectionId = (await resolveCurrentConnection({ auth, lang: itemData.lang }))?.connectionId ?? null;
+  if (!connectionId) {
+    throw new Error("There is no current connection to republish through. Choose one in Settings.");
+  }
+  if (itemData.publishedTaskId === itemData.taskId && publicationConnectionOf(itemData) === connectionId) {
     return getItem({ auth, id });
   }
+  // Ensure the version has a stored result through this connection; a no-op
+  // when its save already wrote (same idempotency key).
+  await writeThroughCurrentConnection({ auth, itemId: id, lang: itemData.lang, taskId: itemData.taskId });
   let publicationId;
   try {
     publicationId = await createPublication({
-      authToken: auth.token, taskId: itemData.taskId, connectionId: itemData.connectionId,
+      authToken: auth.token, taskId: itemData.taskId, connectionId,
     });
   } catch (err) {
     if (err instanceof PublicationError && err.status === 409) {
-      throw new Error("Run the current version before republishing it.");
+      throw new Error("The current version has not been written through the current connection. Retry the write, then republish.");
     }
     if (err instanceof PublicationError) {
       throw new Error(`Cannot republish this item: ${err.message}`);
@@ -1373,7 +1603,7 @@ export async function republishItem({ auth, id }: { auth: AuthArg; id: string })
       console.error("republishItem(): failed to delete the previous publication", id, err);
     }
   }
-  await itemRef.update({ publicationId, publishedTaskId: itemData.taskId });
+  await itemRef.update({ publicationId, publishedTaskId: itemData.taskId, publicationConnectionId: connectionId });
   return getItem({ auth, id });
 }
 
@@ -1656,9 +1886,10 @@ export async function getItems({ auth, lang, mark, client }) {
         generationError: data.generationError ?? null,
         generationStartedAt: data.generationStartedAt ? String(data.generationStartedAt) : null,
         generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
-        connectionId: data.connectionId ?? null,
         publicationId: data.publicationId ?? null,
         publishedTaskId: data.publishedTaskId ?? null,
+        // Resolved once per request for the whole list (lib/current-connection.ts).
+        ...(await itemConnectionFields(auth, data)),
       };
 
       const timestamp = data.updated || data.created || 0;
@@ -1905,9 +2136,9 @@ export async function getItem({ auth, id, includeSpec = false }: {
       // render_item call while Firestore held 12,512 — the write worked and the
       // read looked broken. Two shaping sites, both need the field.
       generationChars: typeof data.generationChars === "number" ? data.generationChars : null,
-      connectionId: data.connectionId ?? null,
       publicationId: data.publicationId ?? null,
       publishedTaskId: data.publishedTaskId ?? null,
+      ...(await itemConnectionFields(auth, data)),
       // Claim token only — a read must be able to offer "save this item" for the
       // workspace the item actually lives in (this retrieval path is where the
       // claim link is surfaced, after the agent polls a create to "ready"), but
