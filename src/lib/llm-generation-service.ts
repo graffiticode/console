@@ -1353,7 +1353,7 @@ async function generateLongCode({
 
     if (result.failure) {
       return {
-        content: fullContent + result.content,
+        content: joinContinuation(fullContent, result.content),
         usage,
         chunks,
         failure: result.failure,
@@ -1361,7 +1361,7 @@ async function generateLongCode({
     }
 
     const grew = result.content.trim().length;
-    fullContent += result.content;
+    fullContent = joinContinuation(fullContent, result.content);
     if (!needsContinuation(fullContent, result.stopReason)) break;
 
     // A chunk that spent its ENTIRE token budget and wrote nothing has not been
@@ -1447,6 +1447,23 @@ async function generateLongCode({
     stopEarly,
     reasoning: measuredReasoning ? { sawThinkingBlock, msToFirstText } : undefined,
   };
+}
+
+/**
+ * Append a continuation chunk to the content so far.
+ *
+ * A chunk cut at max_tokens leaves its code fence open, and a continuation often
+ * opens a fresh one. Concatenated as-is, extractCodeBlocks pairs the new opening
+ * fence with the old one, the pairing shifts by one, and the continuation's code
+ * falls between blocks and is dropped. Observed 2026-09-30 on a large L0179 create
+ * (rid 0a7a069d): chunk 2 held the program's end, so the assembled program was
+ * chunk 1 alone and failed with "Missing program terminator". So when the content
+ * so far has an unclosed fence, a leading fence on the continuation is removed.
+ */
+export function joinContinuation(content: string, next: string): string {
+  const unclosed = ((content.match(/```/g) || []).length % 2) === 1;
+  if (!unclosed) return content + next;
+  return content + next.replace(/^\s*```[\w-]*[ \t]*\n?/, "");
 }
 
 export function extractCodeBlocks(content: string): string[] {
