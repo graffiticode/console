@@ -8,8 +8,8 @@ function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
 }
 
-const MIN_QUERY = 3;
-const DEBOUNCE_MS = 300;
+const MIN_QUERY = 2;
+const DEBOUNCE_MS = 250;
 
 const MATCHED_BY: Record<AccountMatch['matchedBy'], string> = {
   email: 'matched by email',
@@ -21,15 +21,20 @@ interface UserSearchComboboxProps {
   selectedUser: AccountMatch | null;
   onSelectUser: (user: AccountMatch | null) => void;
   placeholder?: string;
+  // Told the trimmed query and its matches once a search settles (null while
+  // the query is too short, searching, or the search failed).
+  onResults?: (query: string, matches: AccountMatch[] | null) => void;
 }
 
-// Finds an account by exact linked email, profile name or account ID (the
-// server's findAccounts lookup) as the user types; nothing is listed until
-// they do.
+// A typeahead over accounts: as the user types (2+ characters, debounced),
+// the server's findAccounts lists every account whose profile name, linked
+// email or account ID contains the text. Rows show the name, short ID and
+// what matched — never an email.
 export default function UserSearchCombobox({
   selectedUser,
   onSelectUser,
-  placeholder = "Email, name or account ID",
+  placeholder = "Name, email or account ID",
+  onResults,
 }: UserSearchComboboxProps) {
   const { user } = useGraffiticodeAuth();
   const [query, setQuery] = useState('');
@@ -43,6 +48,8 @@ export default function UserSearchCombobox({
   const userRef = useRef(user);
   userRef.current = user;
   const uid = user?.uid;
+  const onResultsRef = useRef(onResults);
+  onResultsRef.current = onResults;
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -62,6 +69,7 @@ export default function UserSearchCombobox({
   useEffect(() => {
     const q = query.trim();
     setError(null);
+    onResultsRef.current?.(q, null);
     if (q.length < MIN_QUERY || !uid) {
       setMatches([]);
       setLoading(false);
@@ -72,7 +80,10 @@ export default function UserSearchCombobox({
     const timer = setTimeout(async () => {
       try {
         const found = await findAccounts({ user: userRef.current, query: q });
-        if (!stale) setMatches(found);
+        if (!stale) {
+          setMatches(found);
+          onResultsRef.current?.(q, found);
+        }
       } catch {
         if (!stale) {
           setMatches([]);
@@ -92,10 +103,10 @@ export default function UserSearchCombobox({
     match ? `${match.name} (${match.shortId})` : '';
 
   const status = query.trim().length < MIN_QUERY
-    ? 'Type an exact email, full name or account ID.'
+    ? `Type at least ${MIN_QUERY} characters of a name, email or account ID.`
     : loading
-      ? 'Searching...'
-      : error || (matches.length === 0 ? 'No account found.' : null);
+      ? 'Searching…'
+      : error || (matches.length === 0 ? 'No matches' : null);
 
   return (
     <Combobox as="div" value={selectedUser} by="accountId" onChange={(match: AccountMatch | null) => {
@@ -108,6 +119,8 @@ export default function UserSearchCombobox({
           onChange={(event) => {
             setQuery(event.target.value);
             setIsOpen(true);
+            // Editing the text drops an earlier pick.
+            if (selectedUser) onSelectUser(null);
           }}
           onFocus={() => setIsOpen(true)}
           displayValue={displayValue}
