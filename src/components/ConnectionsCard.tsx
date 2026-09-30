@@ -120,6 +120,9 @@ export default function ConnectionsCard() {
   // or a shared one whose grant doesn't cover the language is never a candidate.
   const connectable = current.filter(cc => Object.prototype.hasOwnProperty.call(CONNECTABLE_LANGS, cc.lang));
   const unchosen = connectable.filter(cc => !cc.connectionId && cc.candidates.some(x => !x.system));
+  // Languages with nothing to write through: saves stay previews until a
+  // connection for the backend is added (or shared with the user).
+  const uncovered = status === "ready" ? connectable.filter(cc => !cc.candidates.some(x => !x.system)) : [];
   const currentRadios = (c: Connection) => {
     if (c.system) return null;
     const langs = connectable.filter(cc => cc.candidates.some(x => x.connectionId === c.connectionId));
@@ -244,6 +247,11 @@ export default function ConnectionsCard() {
 
       {unchosen.map(cc => (
         <p key={cc.lang} className="text-sm text-gray-700 mb-2">Choose which connection L{cc.lang} saves go through.</p>
+      ))}
+      {uncovered.map(cc => (
+        <p key={cc.lang} className="text-sm text-gray-500 mb-2">
+          No {backendLabel(cc.backend)} connection for L{cc.lang} — previews only. Add one below to save items to {backendLabel(cc.backend)}.
+        </p>
       ))}
 
       <ul className="space-y-2 mb-2">
