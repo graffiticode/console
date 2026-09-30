@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 import { selectLanguages } from './language-selector';
-import { countItems, loadItems } from '../utils/swr/fetchers';
+import { countItems, loadItemNames, loadItems } from '../utils/swr/fetchers';
 import ToolsThumbnailGrid from './tools-thumbnail-grid';
 import SignIn from './SignIn';
 import { getTitle } from '../lib/utils';
@@ -71,12 +71,12 @@ export default function ToolsGallery({ language, setLanguage }) {
   // 3 on that L0013 item is what admits the image here — anything else (a fresh snap lands at
   // mark 1) keeps the PNG but stays out of the gallery, so promoting to 3 is the publish step.
   // Loaded once for the user rather than per language, since one L0013 collection backs every
-  // language's tiles.
+  // language's tiles. Only the snap items' names are needed, so only names are fetched.
   const { data: snapItems } = useSWR(
-    user ? { user, lang: SNAP_LANG, mark: APPROVED_MARK, client: 'all' } : null,
-    loadItems,
+    user ? { user, lang: SNAP_LANG, mark: APPROVED_MARK, names: true } : null,
+    loadItemNames,
   );
-  const approvedIds = new Set((snapItems || []).map((it: any) => it.name).filter(Boolean));
+  const approvedIds = new Set(snapItems || []);
 
   const toggleLangPanel = useCallback(() => {
     const newState = !isLangPanelCollapsed;

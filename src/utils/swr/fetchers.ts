@@ -326,6 +326,21 @@ export const countTasks = async ({ user, langs, mark }) => {
   return counts;
 };
 
+// The names of the user's items in a language (optionally one mark), without
+// loading the items themselves.
+export const loadItemNames = async ({ user, lang, mark = null }: { user: any; lang: string; mark?: number | null }): Promise<string[]> => {
+  if (!user) {
+    return [];
+  }
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const query = gql`
+    query itemNames($lang: String!, $mark: Int) {
+      itemNames(lang: $lang, mark: $mark)
+    }
+  `;
+  return client.request(query, { lang, mark }).then((data: any) => data.itemNames);
+};
+
 export const countItems = async ({ user, langs }) => {
   if (!user) {
     return {};

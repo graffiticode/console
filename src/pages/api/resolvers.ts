@@ -1764,6 +1764,22 @@ export async function countItems({ auth, langs }: { auth: AuthArg; langs: string
   }));
 }
 
+// The names of the user's items in a language (optionally one mark), all
+// clients. Reads only the name field: for callers that need names alone, such
+// as the Tools view's approved-thumbnail set, getItems' full items (transcripts,
+// legacy reads, connection lookups) are wasted work.
+export async function getItemNames({ auth, lang, mark }: { auth: AuthArg; lang: string; mark?: number | null }) {
+  let query = db.collection(`users/${auth.uid}/items`).where("lang", "==", lang);
+  if (mark !== undefined && mark !== null) {
+    query = query.where("mark", "==", mark);
+  }
+  if (auth.freePlan) {
+    query = query.where("sessionNamespace", "==", auth.sessionNamespace);
+  }
+  const snap = await query.select("name").get();
+  return snap.docs.map(doc => doc.get("name")).filter(name => typeof name === "string" && name !== "");
+}
+
 export async function getItems({ auth, lang, mark, client }) {
   try {
     // Build the base query (lang + optional mark + free-plan). Client filtering

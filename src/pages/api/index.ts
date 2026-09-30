@@ -22,6 +22,7 @@ import {
   republishItem,
   getItems,
   countItems,
+  getItemNames,
   getItem,
   getSpec,
   setItemGenerationStatus,
@@ -383,6 +384,9 @@ const typeDefs = `
     # How many items the caller has in each language (all clients, mark 5
     # excluded), counted without reading the items.
     itemCounts(langs: [String!]!): [ItemCount!]!
+    # The names of the caller's items in a language (optionally one mark),
+    # read without loading the items.
+    itemNames(lang: String!, mark: Int): [String!]!
     item(id: String!): Item
     spec(id: String!): ItemSpec!
     itemClientTags(lang: String!): [String!]!
@@ -586,6 +590,10 @@ const resolvers = {
     itemCounts: async (_, args, ctx) => {
       const auth = await resolveAuth(ctx);
       return await countItems({ auth, langs: args.langs });
+    },
+    itemNames: async (_, args, ctx) => {
+      const auth = await resolveAuth(ctx);
+      return await getItemNames({ auth, lang: args.lang, mark: args.mark ?? null });
     },
     item: async (_, args, ctx) => {
       const { id } = args;
