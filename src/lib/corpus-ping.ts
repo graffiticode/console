@@ -10,7 +10,7 @@
 // PROMPTS COME FROM THE CORPUS, not from `spec/examples.md`. Two reasons, both hard:
 //   - Cloud Run has no sibling language repos, so the `../l{lang}/packages/core/spec/`
 //     path that scripts/create-items-from-prompts.ts reads does not exist here.
-//   - Several pinged languages (0169, 0170 and 0173 among them) ship no examples.md at
+//   - Several pinged languages (0170 and 0173 among them) ship no examples.md at
 //     all; the corpus is their only prompt source.
 //
 // ROTATION IS DETERMINISTIC, not random. Day N takes corpus index N mod size, so a month
@@ -44,7 +44,7 @@ import { harnessItemId } from "./harness-item-ids";
  * early.
  */
 export const PING_LANGUAGES = [
-  "0000", "0169", "0170",
+  "0000", "0170",
   // 0172 (FigJam) and 0159 (match/memory) left the set 2026-09-04, by request. Note what
   // that costs: SWEEP_LANGUAGES is this same list, so a language dropped here leaves the
   // weekly sweep too and has NO routine detector — the blind spot described for 0181
@@ -72,8 +72,9 @@ export const PING_LANGUAGES = [
   // typecheck and lint cannot see.
   "0182",
   // 0183 (concept webs, successor to L0169) joined 2026-09-24, the day its 112-example corpus
-  // was seeded and embedded — same reasoning as 0181. L0169 stays in the set above: it is
-  // deprecated, not retired, and its existing items still generate on edit.
+  // was seeded and embedded — same reasoning as 0181. L0169 left the set 2026-09-29, by
+  // request: deprecated in favor of 0183, and like 0172/0159 above it is now unwatched
+  // (no ping, no weekly sweep) even though its existing items still generate on edit.
   "0183",
 ];
 

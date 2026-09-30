@@ -31,7 +31,7 @@ curl 'https://console.graffiticode.org/api/internal/corpus-ping?dry=1'          
 curl 'https://console.graffiticode.org/api/internal/corpus-ping?dry=1&langs=0176'  # while iterating
 ```
 
-`?dry=1` sends no SMS, writes no run log, skips auth. It costs one real generation per **turn** per language in `PING_LANGUAGES` (`src/lib/corpus-ping.ts`) — 12 languages as of 2026-09-08 (0182 joined the same day its corpus was seeded), and that list moves, so read it rather than trusting a number written here. Narrow with `&langs=` while iterating, but run the full set before calling it done.
+`?dry=1` sends no SMS, writes no run log, skips auth. It costs one real generation per **turn** per language in `PING_LANGUAGES` (`src/lib/corpus-ping.ts`) — 12 languages as of 2026-09-29 (0169 left, deprecated for 0183), and that list moves, so read it rather than trusting a number written here. Narrow with `&langs=` while iterating, but run the full set before calling it done.
 
 **A corpus example can be a conversation, and the ping replays it as one.** Turns come from the corpus doc's `messages` field — never from splitting `prompt` on blank lines, which would invent turns inside a passage-bearing L0175 request — and each later turn is an edit carrying the previous turn's source AND its compiled data model, under the same `itemId` (L0182 writes that id as `session-id`, and the session is what brings back the version this taker was shown). Every turn compiles, not just the last. Why it matters: 44 of L0182's 50 rows are two-turn (take a survey, then answer it), and replaying the joined text as a single create produced only the taking — which compiles, so the ping stayed green while the answering half, where every failure lives, was never exercised.
 
