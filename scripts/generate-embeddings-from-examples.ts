@@ -540,7 +540,11 @@ async function storeExamplesInVectorDatabase(trainingExamples, db, lang: string,
 
       docsToStore.forEach((doc, index) => {
         const docRef = db.collection(vectorCollection).doc(doc.id);
-        const vectorValue = embeddings[index];
+        // Must be a Firestore vector, not a plain array: findNearest only matches
+        // vector-typed fields, so an array embedding is invisible to retrieval. The
+        // 2026-09-28 run wrote arrays and silently emptied vector search for 14
+        // languages (repair: scripts/fix-embedding-vectors.ts).
+        const vectorValue = FieldValue.vector(embeddings[index]);
 
         writeBatch.set(docRef, {
           ...doc.data,
