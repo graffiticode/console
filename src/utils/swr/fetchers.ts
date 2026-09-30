@@ -330,14 +330,20 @@ export const countItems = async ({ user, langs }) => {
   if (!user) {
     return {};
   }
-  const groups = await Promise.all(langs.map(lang => {
-    // Count items across all surfaces (console/mcp/front), not just console.
-    return loadItems({user, lang: lang.name.slice(1), mark: null, client: 'all'});
-  }));
+  // One aggregate request for every language, counted server-side across all
+  // surfaces (console/mcp/front) with mark 5 (black) excluded. Listing each
+  // language's items to count them stalled the server on every Tools load.
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const query = gql`
+    query itemCounts($langs: [String!]!) {
+      itemCounts(langs: $langs) { lang count }
+    }
+  `;
+  const ids = langs.map(lang => lang.name.slice(1));
+  const rows = await client.request(query, { langs: ids }).then((data: any) => data.itemCounts);
   const counts = {};
-  groups.forEach((group, index) => {
-    // Exclude mark 5 (black) from the Tools view count.
-    counts[langs[index].name] = group.filter(it => it.mark !== 5).length;
+  rows.forEach((row, index) => {
+    counts[langs[index].name] = row.count;
   });
   return counts;
 };

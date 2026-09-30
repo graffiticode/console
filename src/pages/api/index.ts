@@ -21,6 +21,7 @@ import {
   recompileItem,
   republishItem,
   getItems,
+  countItems,
   getItem,
   getSpec,
   setItemGenerationStatus,
@@ -208,6 +209,11 @@ const typeDefs = `
     lastWrite: ItemWrite
   }
 
+  type ItemCount {
+    lang: String!
+    count: Int!
+  }
+
   type ItemWrite {
     taskId: String!
     connectionId: String
@@ -374,6 +380,9 @@ const typeDefs = `
     tasks(lang: String!, mark: Int!): [Task!]
     task(id: String!): Task
     items(lang: String!, mark: Int, client: String): [Item!]
+    # How many items the caller has in each language (all clients, mark 5
+    # excluded), counted without reading the items.
+    itemCounts(langs: [String!]!): [ItemCount!]!
     item(id: String!): Item
     spec(id: String!): ItemSpec!
     itemClientTags(lang: String!): [String!]!
@@ -573,6 +582,10 @@ const resolvers = {
       const { lang, mark, client } = args;
       const auth = await resolveAuth(ctx);
       return await getItems({ auth, lang, mark, client });
+    },
+    itemCounts: async (_, args, ctx) => {
+      const auth = await resolveAuth(ctx);
+      return await countItems({ auth, langs: args.langs });
     },
     item: async (_, args, ctx) => {
       const { id } = args;

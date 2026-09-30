@@ -1747,6 +1747,23 @@ export async function releaseGeneration({
   }
 }
 
+// How many items the user has in each language, all clients, not counting
+// mark 5 (the Tools view hides it). Aggregate counts only: no item document is
+// read or returned, so one request for every language costs a few reads, where
+// listing each language's items to count them tied up the server on every
+// Tools page load. Unlike getItems, it also counts items with no task yet.
+export async function countItems({ auth, langs }: { auth: AuthArg; langs: string[] }) {
+  const count = async query => (await query.count().get()).data().count;
+  return Promise.all(langs.map(async lang => {
+    let query = db.collection(`users/${auth.uid}/items`).where("lang", "==", lang);
+    if (auth.freePlan) {
+      query = query.where("sessionNamespace", "==", auth.sessionNamespace);
+    }
+    const [all, hidden] = await Promise.all([count(query), count(query.where("mark", "==", 5))]);
+    return { lang, count: all - hidden };
+  }));
+}
+
 export async function getItems({ auth, lang, mark, client }) {
   try {
     // Build the base query (lang + optional mark + free-plan). Client filtering
