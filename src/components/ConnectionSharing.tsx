@@ -87,13 +87,20 @@ const summary = (g: Grant) => g.permissions.map(p => `${langLabel(p.lang)} ${p.f
 const blank: Access = { permissions: [], expires: "" };
 const accessOf = (g: Grant): Access => ({ permissions: g.permissions, expires: toDate(g.expiresAt) });
 
-// The owner's Share panel for one connection: type part of a person's name,
-// linked email or account ID, pick them from the typeahead, and grant the exact
-// functions they may use with an optional end date; see, change or remove who
-// it is shared with. Changes take effect at that person's next run or view.
-export default function ConnectionSharing({ user, connectionId }: { user: any; connectionId: string }) {
+// Sharing for one owned connection, beneath its row. The sharee list is always
+// shown (loaded with the card), each with change/remove when `editable`. The
+// find-and-share form (`showForm`, toggled by the row's Share button): type part
+// of a person's name, linked email or account ID, pick them from the typeahead,
+// and grant the exact functions they may use with an optional end date.
+// Changes take effect at that person's next run or view.
+export default function ConnectionSharing({ user, connectionId, showForm, editable = true }: {
+  user: any;
+  connectionId: string;
+  showForm: boolean;
+  editable?: boolean;
+}) {
   const [grants, setGrants] = useState<Grant[] | null>(null);
-  const [shareable, setShareable] = useState<Shareable[]>([]);
+  const [shareable, setShareable] = useState<Shareable[] | null>(null);
   // The typed text and its settled matches (null: not searched yet), for the
   // share-by-email fallback when a complete email finds no account.
   const [query, setQuery] = useState("");
@@ -118,9 +125,13 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
   }, [user, connectionId]);
 
   useEffect(() => { refresh(); }, [refresh]);
+  // The function list is only needed to share or edit, so it loads on first use.
+  const needShareable = showForm || editing !== null;
   useEffect(() => {
+    if (!needShareable || shareable !== null) return;
     loadShareableFunctions({ user, connectionId }).then(setShareable).catch(() => setShareable([]));
-  }, [user, connectionId]);
+  }, [needShareable, shareable, user, connectionId]);
+  const functions = shareable || [];
 
   const run = async (fn: () => Promise<unknown>, done?: string) => {
     setBusy(true);
@@ -210,13 +221,12 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
             <span>No account has linked this email. Share with this email anyway — it applies when they link it.</span>
           </label>
         )}
-        <FunctionPicker access={access} onChange={setAccess} shareable={shareable} />
+        <FunctionPicker access={access} onChange={setAccess} shareable={functions} />
       </div>
       <p className="text-xs text-gray-500">
         They can render items through this connection plus use the functions checked. They never see your key or secret, cannot share it onward, and cannot publish. Opening the Author Site is never shared.
-        {writes(access, shareable) && " Writing lets them write any item into your item bank."}
+        {writes(access, functions) && " Writing lets them write any item into your item bank."}
       </p>
-      {message && <p className="text-xs text-gray-700">{message}</p>}
     </div>
   );
 
@@ -224,7 +234,7 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
   const sharees = (
     <>
       {grants === null ? (
-        <p className="text-xs text-gray-400">Loading…</p>
+        <p className="text-xs text-gray-400">Loading sharees…</p>
       ) : grants.length === 0 ? (
         <p className="text-xs text-gray-400">Not shared with anyone.</p>
       ) : (
@@ -238,7 +248,7 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
                   <span className="text-gray-500"> · {summary(g)}</span>
                   {g.expiresAt && <span className="text-gray-400"> · until {new Date(g.expiresAt).toLocaleDateString()}</span>}
                 </span>
-                <span className="flex items-center gap-2">
+                {editable && <span className="flex items-center gap-2">
                   <button
                     type="button"
                     title="Change access"
@@ -249,11 +259,11 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
                   <button type="button" title="Remove access" disabled={busy} onClick={() => run(() => revokeConnectionGrant({ user, connectionId, grantId: g.grantId }))}>
                     <XMarkIcon className="h-4 w-4 text-gray-500 hover:text-red-700" />
                   </button>
-                </span>
+                </span>}
               </div>
-              {editing === g.grantId && (
+              {editable && editing === g.grantId && (
                 <div className="flex flex-wrap items-end gap-2 border-l-2 border-gray-200 pl-3 my-2">
-                  <FunctionPicker access={draft} onChange={setDraft} shareable={shareable} />
+                  <FunctionPicker access={draft} onChange={setDraft} shareable={functions} />
                   <DateField value={draft.expires} onChange={expires => setDraft({ ...draft, expires })} />
                   <button
                     type="button"
@@ -277,10 +287,17 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
     </>
   );
 
+  // Nothing under an unshared (or still loading) row until its Share form is opened.
+  if (!showForm && !message && (grants === null || grants.length === 0)) return null;
+
   return (
-    <div className="border border-gray-300 border-t-0 px-4 py-3 space-y-3 rounded-none">
-      {sharees}
-      {findAndShare}
+    <div className="border border-gray-300 border-t-0 px-4 py-2 space-y-3 rounded-none">
+      <div>
+        <p className="text-xs font-semibold text-gray-600 mb-1">Shared with</p>
+        {sharees}
+      </div>
+      {showForm && editable && findAndShare}
+      {message && <p className="text-xs text-gray-700">{message}</p>}
     </div>
   );
 }
