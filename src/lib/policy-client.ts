@@ -40,7 +40,8 @@ const withSystemFlag = <T extends { system?: unknown }>(c: T): T & { system: boo
   ({ ...c, system: c.system === true });
 
 // A connection someone else owns and has shared with this user.
-export type SharedConnection = Connection & { permissions: Permission[]; expiresAt: string | null };
+// ownerUid: who shared it (absent from a policy that predates it).
+export type SharedConnection = Connection & { permissions: Permission[]; expiresAt: string | null; ownerUid?: string };
 
 // One function in one language, e.g. { lang: "0176", fn: "save-to-itembank" }.
 export type Permission = { lang: string; fn: string };

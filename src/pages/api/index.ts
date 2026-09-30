@@ -39,7 +39,7 @@ import { checkItemCreateAllowed } from "../../lib/usage-service";
 import { checkBurstLimit, BURST } from "../../lib/free-plan-throttle";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
-import { findAccounts, isSystemAccount, profileName } from "../../lib/account-lookup";
+import { findAccounts, isSystemAccount, profileName, shortAccountId } from "../../lib/account-lookup";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
 import {
   listConnections,
@@ -352,6 +352,14 @@ const typeDefs = `
     shared: Boolean!
     permissions: [Permission!]
     expiresAt: String
+    # For a shared connection: the account that shared it (profile name, or
+    # its short ID when it has none). Null for the caller's own connections.
+    sharedBy: SharedBy
+  }
+
+  type SharedBy {
+    name: String!
+    shortId: String!
   }
 
   # One function in one language, e.g. { lang: "0176", fn: "save-to-itembank" }.
@@ -552,9 +560,16 @@ const resolvers = {
         listConnections(auth.token),
         listSharedConnections(auth.token),
       ]));
+      // Who shared each one: their profile name (or short ID) — never more.
+      const owners = new Map<string, { name: string; shortId: string } | null>();
+      await Promise.all([...new Set(shared.map(c => c.ownerUid).filter(Boolean) as string[])].map(async uid => {
+        const shortId = shortAccountId(uid);
+        const name = await profileName(uid).catch(() => null);
+        owners.set(uid, { name: name || shortId, shortId });
+      }));
       return [
-        ...owned.map(c => ({ ...c, shared: false, permissions: null, expiresAt: null })),
-        ...shared.map(c => ({ ...c, shared: true })),
+        ...owned.map(c => ({ ...c, shared: false, permissions: null, expiresAt: null, sharedBy: null })),
+        ...shared.map(c => ({ ...c, shared: true, sharedBy: (c.ownerUid && owners.get(c.ownerUid)) || null })),
       ];
     },
     currentConnections: async (_, __, ctx) => {

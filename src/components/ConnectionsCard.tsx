@@ -28,6 +28,8 @@ interface Connection {
   shared: boolean;
   permissions: { lang: string; fn: string }[] | null;
   expiresAt: string | null;
+  // For a shared connection: who shared it (profile name, or short ID).
+  sharedBy?: { name: string; shortId: string } | null;
 }
 
 interface CurrentConnection {
@@ -262,7 +264,12 @@ export default function ConnectionsCard() {
               <div className="flex flex-col">
                 <span className="font-mono">{c.label || backendLabel(c.backend)}</span>
                 <small className="text-sm text-neutral-500 font-light space-x-3">
-                  <span>Shared with you</span>
+                  <span>
+                    {c.sharedBy ? (
+                      <>Shared with you by <span className="text-neutral-700">{c.sharedBy.name}</span>
+                        {c.sharedBy.name !== c.sharedBy.shortId && <> <span className="font-mono text-xs">{c.sharedBy.shortId}</span></>}</>
+                    ) : "Shared with you"}
+                  </span>
                   <span className="font-mono">{(c.permissions || []).map(p => `L${p.lang} ${p.fn}`).join(", ")}</span>
                   {c.expiresAt && <span>until {new Date(c.expiresAt).toLocaleDateString()}</span>}
                   <span className={c.status === "active" ? "text-green-700" : "text-gray-500"}>{c.status}</span>

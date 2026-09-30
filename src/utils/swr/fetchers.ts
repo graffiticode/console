@@ -189,7 +189,7 @@ export const loadConnections = async ({ user }: { user: any }) => {
   const client = await buildRequestClient({ token: await user.getToken() });
   const query = gql`
     query connections {
-      connections { connectionId backend status label system shared permissions { lang fn } expiresAt }
+      connections { connectionId backend status label system shared permissions { lang fn } expiresAt sharedBy { name shortId } }
     }
   `;
   return client.request(query).then((data: any) => data.connections);
