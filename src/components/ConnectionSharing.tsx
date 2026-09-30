@@ -172,11 +172,12 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
 
   const incomplete = (a: Access) => a.permissions.length === 0;
 
-  return (
-    <div className="border border-gray-300 border-t-0 px-4 py-3 space-y-3 rounded-none">
+  // Finding an account and sharing with it, beneath the list of sharees.
+  const findAndShare = (
+    <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="block text-sm flex-1 min-w-[12rem]">
-          <span className="text-gray-700">Find a person (name, email or account ID)</span>
+          <span className="text-gray-700">Find an account (name, email or account ID)</span>
           <div className="mt-1">
             <UserSearchCombobox
               key={searchKey}
@@ -216,6 +217,12 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
         {writes(access, shareable) && " Writing lets them write any item into your item bank."}
       </p>
       {message && <p className="text-xs text-gray-700">{message}</p>}
+    </div>
+  );
+
+  // Who it is shared with, listed first, directly beneath the connection.
+  const sharees = (
+    <>
       {grants === null ? (
         <p className="text-xs text-gray-400">Loading…</p>
       ) : grants.length === 0 ? (
@@ -267,6 +274,13 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
           ))}
         </ul>
       )}
+    </>
+  );
+
+  return (
+    <div className="border border-gray-300 border-t-0 px-4 py-3 space-y-3 rounded-none">
+      {sharees}
+      {findAndShare}
     </div>
   );
 }

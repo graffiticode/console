@@ -146,7 +146,7 @@ export default function ShareItemDialog({
 
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Find a person (name, email or account ID)
+                        Find an account (name, email or account ID)
                       </label>
                       <UserSearchCombobox
                         selectedUser={selectedUser}
