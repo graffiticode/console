@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { STRIPE_API_VERSION } from '../../../lib/plans-config';
 import { getFirestore } from '../../../utils/db';
 import { requireUser } from '../../../lib/api-auth';
+import { normalizeName } from '../../../lib/account-lookup';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: STRIPE_API_VERSION,
@@ -196,6 +197,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Get info from billing details (from the payment method)
         if (billingDetails?.name) {
           profileUpdate.name = billingDetails.name;
+          profileUpdate.nameLower = normalizeName(billingDetails.name);
         }
         if (billingDetails?.email) {
           profileUpdate.email = billingDetails.email;

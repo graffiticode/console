@@ -39,6 +39,7 @@ import { checkItemCreateAllowed } from "../../lib/usage-service";
 import { checkBurstLimit, BURST } from "../../lib/free-plan-throttle";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
+import { findAccounts } from "../../lib/account-lookup";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
 import {
   listConnections,
@@ -398,6 +399,19 @@ const typeDefs = `
     languages(search: String, domain: String): [Language!]!
     language(id: String!): LanguageInfo
     itemData(id: String!): String!
+    # Accounts to share with, found by exact verified linked email, exact
+    # profile name (any case) or account ID. At least 3 characters; at most 10
+    # matches; never the caller or a system account; never returns an email.
+    findAccounts(query: String!): [AccountMatch!]!
+  }
+
+  type AccountMatch {
+    accountId: String!
+    # Profile name, or the short ID when the account has none.
+    name: String!
+    shortId: String!
+    # "email", "name" or "id".
+    matchedBy: String!
   }
 
   type ShareItemResult {
@@ -634,6 +648,11 @@ const resolvers = {
     language: async (_, args) => {
       const { id } = args;
       return await getLanguageInfo(id);
+    },
+    findAccounts: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Sharing requires a full account.");
+      const { uid } = await authenticate(ctx.token);
+      return await findAccounts(uid, args.query);
     },
     itemData: async (_, args, ctx) => {
       const { id } = args;

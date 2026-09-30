@@ -1,8 +1,10 @@
-// Email identity for sharing a connection. The owner names a person by email;
-// the auth service maps a linked email to an account. An email with no account
-// is shared as a hash, and becomes a grant when that person signs in with it,
-// so the owner sees the same result either way and learns nothing about
-// whether an account exists. Emails are never logged.
+// Identity for sharing a connection. The owner names a person by email or by
+// account ID. For an email, the auth service maps a linked email to an account;
+// an email with no account is shared as a hash, and becomes a grant when that
+// person signs in with it, so the owner sees the same result either way and
+// learns nothing about whether an account exists. Emails are never logged (and
+// never put in a URL). An account ID is shared directly, once it is confirmed to
+// exist: IDs are not secret, and a typo should fail rather than wait forever.
 import { createHash } from "crypto";
 
 const AUTH_SERVICE_URL = process.env.NEXT_PUBLIC_GC_AUTH_URL || "https://auth.graffiticode.org";
@@ -20,8 +22,11 @@ export const isEmail = (email: unknown): email is string =>
 export async function accountForEmail(email: string): Promise<string | null> {
   if (!INTERNAL_API_KEY) return null;
   try {
-    const url = `${AUTH_SERVICE_URL.replace(/\/$/, "")}/linked-emails/internal/lookup?email=${encodeURIComponent(normalizeEmail(email))}`;
-    const res = await fetch(url, { headers: { "X-Internal-API-Key": INTERNAL_API_KEY } });
+    const res = await fetch(`${AUTH_SERVICE_URL.replace(/\/$/, "")}/linked-emails/internal/lookup`, {
+      method: "POST",
+      headers: { "X-Internal-API-Key": INTERNAL_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: normalizeEmail(email) }),
+    });
     if (!res.ok) return null;
     const body = await res.json();
     return body?.status === "success" && body.data?.matched && typeof body.data.uid === "string" ? body.data.uid : null;
@@ -29,6 +34,31 @@ export async function accountForEmail(email: string): Promise<string | null> {
     return null;
   }
 }
+
+// An account ID is the account's 40-hex address, written with or without 0x.
+// Stored (and granted) lowercase, without the prefix.
+export const normalizeAccountId = (id: string) => id.trim().replace(/^0x/i, "").toLowerCase();
+export const isAccountId = (id: unknown): id is string =>
+  typeof id === "string" && /^[0-9a-f]{40}$/.test(normalizeAccountId(id));
+
+// Whether an account with this ID exists. Throws when the auth service cannot
+// answer, so a share by ID fails visibly instead of granting to nobody.
+export async function accountExists(accountId: string): Promise<boolean> {
+  if (!INTERNAL_API_KEY) throw new Error("Account lookup is not configured on this server.");
+  const res = await fetch(
+    `${AUTH_SERVICE_URL.replace(/\/$/, "")}/authenticate/ethereum/internal/exists/${normalizeAccountId(accountId)}`,
+    { headers: { "X-Internal-API-Key": INTERNAL_API_KEY } },
+  );
+  if (!res.ok) throw new Error("Could not look up that account right now. Try again.");
+  const body = await res.json();
+  return body?.status === "success" && body.data?.exists === true;
+}
+
+// A short, recognizable label for an account ID in the owner's share list.
+export const accountLabel = (accountId: string) => {
+  const id = normalizeAccountId(accountId);
+  return `account ${id.slice(0, 6)}…${id.slice(-4)}`;
+};
 
 // Hashes of the signed-in user's own verified emails, for claiming pending
 // shares. Empty when the auth service cannot be reached.
