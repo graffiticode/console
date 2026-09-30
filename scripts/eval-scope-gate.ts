@@ -22,6 +22,10 @@
 import { config } from "dotenv";
 
 config({ path: ".env.local" });
+// .env.local points NEXT_PUBLIC_GC_API_URL at a local API (localhost:3100) for `npm run dev`.
+// This eval claims the LIVE scope.json, so pin production as eval-env does: with a dead local
+// API every docs and scope fetch failed and the gate classified from catalog blurbs alone.
+process.env.NEXT_PUBLIC_GC_API_URL = "https://api.graffiticode.org";
 
 /** "in": stays in `lang`. "refuse": out of scope, nowhere to go. Otherwise the reroute target. */
 type Want = "in" | "refuse" | string;
@@ -53,7 +57,9 @@ const CASES: Case[] = [
   { tag: "concept", lang: "0183", want: "in", prompt: "Make a concept map of the parts of a cell where students drag three terms onto blank nodes." },
   { tag: "concept", lang: "0183", want: "in", prompt: "Create a food chain web where students label each arrow." },
   { tag: "concept", lang: "0180", want: "0183", prompt: "Make a mind map of the causes of World War I." },
-  { tag: "concept", lang: "0183", want: "0171", prompt: "Make a Venn diagram comparing cats and dogs." },
+  // L0171 (Venn) is `hidden: true`, and the gate never routes to a hidden language, so a Venn
+  // request leaves L0183 as a refusal rather than a reroute. Expect 0171 again if it is un-hidden.
+  { tag: "concept", lang: "0183", want: "refuse", prompt: "Make a Venn diagram comparing cats and dogs." },
   { tag: "concept", lang: "0183", want: "0180", prompt: "Make a 5-question multiple choice quiz on the water cycle." },
   // L0184 (charts, successor to L0173) holds charts of given numbers and hands off tables and
   // fetching.
