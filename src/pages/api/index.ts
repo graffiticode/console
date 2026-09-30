@@ -218,7 +218,9 @@ const typeDefs = `
   type ItemWrite {
     taskId: String!
     connectionId: String
-    # "ok" or "failed"; message says why it failed.
+    # "ok", "failed" or "skipped". failed: message says why. skipped: the
+    # program saves to the item bank but there was no connection to write
+    # through (message "no-connection"). A later write replaces either.
     status: String!
     message: String
     at: String!

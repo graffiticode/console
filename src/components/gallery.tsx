@@ -1,6 +1,8 @@
 import { Fragment, useCallback, useState, useEffect, useRef } from 'react'
 import { ITEM_RUN_EVENT } from './ItemConnection';
 import { viewConnectionId } from '../lib/connectable';
+import { canRetryWrite, describeWriteProblem } from '../lib/write-errors';
+import Link from 'next/link';
 import useSWR from "swr";
 import { useRouter } from 'next/router';
 import { Dialog, Transition, Menu } from '@headlessui/react'
@@ -11,7 +13,7 @@ import {
 import Editor from './editor';
 import { ImageGallery } from './ImageGallery';
 import SignIn from "./SignIn";
-import { getAccessToken, loadItems, loadItemClientTags, createItem, updateItem, getData, getItem, getTask, compile, loadTaskVersions } from '../utils/swr/fetchers';
+import { getAccessToken, loadItems, loadItemClientTags, createItem, updateItem, getData, getItem, getTask, compile, loadTaskVersions, retryItemWrite } from '../utils/swr/fetchers';
 import { readItemsCache, writeItemsCache } from '../utils/items-cache';
 import useGraffiticodeAuth from "@graffiticode/auth-react";
 import FormView from "./FormView";
@@ -107,6 +109,13 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
   const [ isCreatingItem, setIsCreatingItem ] = useState(false);
   const [ systemAlert, setSystemAlert ] = useState<string | null>(null);
   const dismissedAlertRef = useRef<string | null>(null);
+  // The save whose item-bank write failed or was skipped (lastWrite), shown as
+  // a banner over the preview until a later write succeeds, the user dismisses
+  // it, or another item is opened. What it says is read live from the item, so
+  // a successful retry (here or in the item's Connection panel) clears it.
+  const [ writeBanner, setWriteBanner ] = useState<{ itemId: string; taskId: string } | null>(null);
+  const [ retryingWrite, setRetryingWrite ] = useState(false);
+  const [ retryWriteError, setRetryWriteError ] = useState<string | null>(null);
   const itemsNavRef = useRef<any>(null);
 
   // Save the current taskId to localStorage when it changes so it can be used in Tasks view
@@ -713,6 +722,16 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
         if (result.taskId) mutateItemVersions();
       }
 
+      // A new version's write through the current connection: a failure or a
+      // skip (no connection) raises the banner; any other outcome clears it.
+      if (result && taskId !== undefined && taskId !== currentItem.taskId && selectedItemId === itemId) {
+        const write = result.lastWrite;
+        setRetryWriteError(null);
+        setWriteBanner(write && write.taskId === result.taskId && describeWriteProblem(write)
+          ? { itemId, taskId: result.taskId }
+          : null);
+      }
+
       // A new version of a connectable item was written through the current
       // connection before updateItem returned. The preview may already have
       // loaded that version's (not yet stored) result, so reload it.
@@ -951,6 +970,12 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
     setRemoteUpdateAvailable(false);
   }, [loadedItems, directItem, selectedItemId, loadItemSource]);
 
+  // Opening another item drops the banner for the previous one.
+  useEffect(() => {
+    setWriteBanner(prev => (prev && prev.itemId !== selectedItemId ? null : prev));
+    setRetryWriteError(null);
+  }, [selectedItemId]);
+
   useEffect(() => {
     const onRun = (e: any) => {
       if (e?.detail?.itemId === selectedItemId) setPreviewRun(n => n + 1);
@@ -997,6 +1022,66 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
       </div>
     );
   }
+
+  const bannerItem = writeBanner ? items.find(i => i.id === writeBanner.itemId) : null;
+  const bannerWrite = bannerItem?.lastWrite?.taskId === writeBanner?.taskId ? bannerItem?.lastWrite : null;
+  const bannerProblem = writeBanner && writeBanner.itemId === selectedItemId ? describeWriteProblem(bannerWrite) : null;
+  const bannerRetry = canRetryWrite(bannerProblem, bannerWrite, bannerItem?.connectionId);
+
+  const handleRetryWrite = async () => {
+    if (!writeBanner) return;
+    const { itemId } = writeBanner;
+    setRetryingWrite(true);
+    setRetryWriteError(null);
+    try {
+      const result = await retryItemWrite({ user, id: itemId });
+      if (result) {
+        setItems(prev => prev.map(item => (item.id === itemId ? { ...item, ...result } : item)));
+        mutate(prev => prev?.map(item => (item.id === itemId ? { ...item, ...result } : item)), { revalidate: false });
+        if (result.lastWrite?.status === 'ok' && result.lastWrite.taskId === result.taskId) {
+          setWriteBanner(null);
+          window.dispatchEvent(new CustomEvent(ITEM_RUN_EVENT, { detail: { itemId } }));
+        } else if (result.lastWrite?.taskId) {
+          setWriteBanner({ itemId, taskId: result.lastWrite.taskId });
+        }
+      }
+    } catch (err) {
+      setRetryWriteError(String(err?.response?.errors?.[0]?.message || err?.message || err));
+    } finally {
+      setRetryingWrite(false);
+    }
+  };
+
+  const writeBannerView = bannerProblem && (
+    <div role="alert" className="flex items-start justify-between gap-2 border-b border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 flex-none">
+      <div className="min-w-0 break-words">
+        <span className="font-semibold">{bannerProblem.headline}:</span>{' '}
+        <span title={bannerWrite?.message || undefined}>{bannerProblem.text}</span>
+        {retryWriteError && <div className="mt-1 text-red-700">{retryWriteError}</div>}
+        <div className="mt-1 flex items-center gap-2">
+          {bannerRetry && (
+            <button
+              type="button"
+              onClick={handleRetryWrite}
+              disabled={retryingWrite}
+              className="rounded-none border border-red-300 bg-white px-2 py-0.5 font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50"
+            >
+              {retryingWrite ? 'Retrying…' : 'Retry'}
+            </button>
+          )}
+          <Link href="/settings" className="underline hover:text-red-900">Connection settings</Link>
+        </div>
+      </div>
+      <button
+        type="button"
+        title="Dismiss"
+        onClick={() => { setWriteBanner(null); setRetryWriteError(null); }}
+        className="text-red-400 hover:text-red-600 flex-none"
+      >
+        <XMarkIcon className="h-4 w-4" />
+      </button>
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] w-full">
@@ -1294,6 +1379,7 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                   )}
                 </button>
               </div>
+              {isFormPanelCollapsed && !isEditorPanelCollapsed && writeBannerView}
               {remoteUpdateAvailable && !isEditorPanelCollapsed && (
                 <div className="flex items-center justify-between gap-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
                   <span>This item was updated elsewhere.</span>
@@ -1454,9 +1540,10 @@ export default function Gallery({ lang, mark, setMark, hideItemsNav = false, ite
                   )}
                 </button>
               </div>
+              {!isFormPanelCollapsed && writeBannerView}
               <div className={classNames(
                 isFormPanelCollapsed && "hidden",
-                "h-[calc(100%-42px)]",
+                writeBannerView ? "min-h-0" : "h-[calc(100%-42px)]",
                 "overflow-auto",
                 "flex-1"
               )}>

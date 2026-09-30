@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { loadCurrentConnections, republishItem, retryItemWrite } from '../utils/swr/fetchers';
 import { backendForLang, normalizeLang } from '../lib/connectable';
 import { getCredentialBackend } from '../lib/credential-backends';
+import { canRetryWrite, describeWriteProblem } from '../lib/write-errors';
 
 // Fired after a write through a connection, so the preview (which shows the
 // stored result) reloads: a write changes that result without changing the item.
@@ -62,6 +63,11 @@ export default function ItemConnection({ user, itemId, lang, taskId, connectionI
 
   // The write for THIS version through THIS connection; older outcomes are history.
   const write = lastWrite && lastWrite.taskId === taskId && lastWrite.connectionId === connectionId ? lastWrite : null;
+  // A failed or skipped write of THIS version, through whichever connection it
+  // tried (the current one may have changed since, or there was none).
+  const problemWrite = lastWrite && lastWrite.taskId === taskId ? lastWrite : null;
+  const problem = taskId ? describeWriteProblem(problemWrite) : null;
+  const showRetry = canRetryWrite(problem, problemWrite, connectionId);
   const staleVersion = Boolean(publicationId && publishedTaskId && publishedTaskId !== taskId);
   const staleConnection = Boolean(publicationId && connectionId && publicationConnectionId && publicationConnectionId !== connectionId);
   const buttonClass = 'px-3 py-1 text-xs text-gray-700 border border-gray-300 hover:bg-gray-100 rounded-none disabled:opacity-50';
@@ -83,16 +89,18 @@ export default function ItemConnection({ user, itemId, lang, taskId, connectionI
             : <>No {service} connection — previews only. <Link href="/settings" className="underline hover:text-gray-900">Add one in Settings.</Link></>}
         </div>
       )}
-      {connectionId && taskId && (
-        write?.status === 'ok' ? (
-          <div className="text-xs text-green-700 mt-1">Saved to {service}.</div>
-        ) : write?.status === 'failed' ? (
-          <div className="text-xs text-gray-600 mt-1 break-words">
-            <div>Save to {service} failed: {write.message || 'unknown error'}</div>
+      {problem ? (
+        <div className="text-xs text-gray-600 mt-1 break-words">
+          <div title={problemWrite?.message || undefined}>{problem.headline}: {problem.text}</div>
+          {showRetry && (
             <button onClick={retry} disabled={busy} className={`mt-1 ${buttonClass}`}>
               {busy ? 'Writing…' : 'Retry'}
             </button>
-          </div>
+          )}
+        </div>
+      ) : connectionId && taskId && (
+        write?.status === 'ok' ? (
+          <div className="text-xs text-green-700 mt-1">Saved to {service}.</div>
         ) : (
           <div className="text-xs text-gray-500 mt-1">Not written through this connection yet. Recompile writes it.</div>
         )

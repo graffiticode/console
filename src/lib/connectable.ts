@@ -30,3 +30,31 @@ export const viewConnectionId = (
     ? connectionId
     : null;
 };
+
+// Whether a program (its parsed code as stored on the item: the parser's node
+// pool, `{ "1": { tag, elts }, …, root }`) asks to write to the item bank.
+// L0176 marks it with a SAVE_TO_ITEMBANK node, in either the explicit form
+// (`save-to-itembank items [...] {}`) or the legacy member
+// (`items [save-to-itembank true, …] {}`); a literal `save-to-itembank false`
+// does not write. Walks the whole value, so a nested or differently keyed
+// shape still answers; anything unrecognizable answers false.
+export const programSavesToItemBank = (code: unknown): boolean => {
+  if (!code || typeof code !== "object") return false;
+  const pool = code as Record<string, any>;
+  const seen = new Set<unknown>();
+  const isFalseLiteral = (arg: unknown) => {
+    const node = (typeof arg === "number" || typeof arg === "string") ? pool[arg] : arg;
+    return node?.tag === "BOOL" && node.elts?.[0] === false;
+  };
+  const visit = (value: unknown): boolean => {
+    if (!value || typeof value !== "object" || seen.has(value)) return false;
+    seen.add(value);
+    const node = value as Record<string, any>;
+    if ((node.tag === "SAVE_TO_ITEMBANK" || node.tag === "save-to-itembank" || node.lexeme === "save-to-itembank") &&
+        !isFalseLiteral(node.elts?.[0])) {
+      return true;
+    }
+    return Object.values(node).some(visit);
+  };
+  return visit(pool);
+};

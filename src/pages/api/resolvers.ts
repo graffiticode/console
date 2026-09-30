@@ -39,7 +39,7 @@ import { mintClaimToken } from "../../lib/claim-token";
 import fs from "fs";
 import path from "path";
 import { createPublication, deletePublication, PublicationError } from "../../lib/publications";
-import { isConnectableLang } from "../../lib/connectable";
+import { isConnectableLang, programSavesToItemBank } from "../../lib/connectable";
 import { resolveCurrentConnection, currentConnectionId, saveWriteKey } from "../../lib/current-connection";
 
 type AuthArg = {
@@ -852,7 +852,9 @@ export async function getTaskVersions({
 type LastWrite = {
   taskId: string;
   connectionId: string | null;
-  status: "ok" | "failed";
+  // skipped: the program saves to the item bank, but there was no current
+  // connection to write through (message "no-connection").
+  status: "ok" | "failed" | "skipped";
   message?: string;
   at: number;
 };
@@ -877,18 +879,24 @@ const errorMessages = (errors: unknown[]) =>
  * the owner asked to run it again, so it writes again.
  *
  * Returns null when nothing is written: free plan, a language without
- * connections, no current connection, or a system account. The system accounts
+ * connections, no current connection, or a system account. With no current
+ * connection, a save whose program asks to write to the item bank (`code`, the
+ * version's parsed program, contains save-to-itembank) records a `skipped`
+ * lastWrite instead, so the editor says the item bank was not written; other
+ * programs only preview, as before, and record nothing. The system accounts
  * are the shared trial account (FREE_PLAN_UID: bronze/free items; also caught
  * by the freePlan flag) and the eval account (EVAL_UID: sweeps and evals).
  * Their items must never reach an external service, even if one of them holds
  * a connection.
  */
-async function writeThroughCurrentConnection({ auth, itemId, lang, taskId, fresh = false }: {
+async function writeThroughCurrentConnection({ auth, itemId, lang, taskId, fresh = false, code }: {
   auth: AuthArg;
   itemId: string;
   lang: string;
   taskId: string;
   fresh?: boolean;
+  // The saved version's parsed program; only saves pass it (see above).
+  code?: unknown;
 }): Promise<LastWrite | null> {
   if (auth.freePlan || !taskId || !isConnectableLang(lang)) return null;
   const systemUids = [process.env.FREE_PLAN_UID, process.env.EVAL_UID].filter(Boolean);
@@ -899,7 +907,11 @@ async function writeThroughCurrentConnection({ auth, itemId, lang, taskId, fresh
   } catch (err) {
     return recordLastWrite({ auth, itemId, taskId, connectionId: null, message: `Could not look up your connections: ${err?.message ?? err}` });
   }
-  if (!connectionId) return null;
+  if (!connectionId) {
+    return programSavesToItemBank(code)
+      ? recordLastWrite({ auth, itemId, taskId, connectionId: null, message: "no-connection", status: "skipped" })
+      : null;
+  }
   const idempotencyKey = fresh ? `recompile:${randomUUID()}` : saveWriteKey({ itemId, taskId, connectionId });
   // One save arrives as two simultaneous updateItem calls. The second would
   // reach the broker while the first is in flight and come back "uncertain";
@@ -942,21 +954,24 @@ async function performWrite({ auth, itemId, taskId, connectionId, idempotencyKey
 // Stores the outcome on the item. A failure never replaces a success for the
 // same version through the same connection: the write happened, and a
 // duplicate that raced it (reported "uncertain" by the broker) says nothing new.
-async function recordLastWrite({ auth, itemId, taskId, connectionId, message }: {
+// Nor does a skip replace a success for the same version. Any later outcome
+// (a retry, a new version) replaces a failure or a skip.
+async function recordLastWrite({ auth, itemId, taskId, connectionId, message, status }: {
   auth: AuthArg;
   itemId: string;
   taskId: string;
   connectionId: string | null;
   message: string | null;
+  status?: "skipped";
 }): Promise<LastWrite> {
   const lastWrite: LastWrite = {
     taskId,
     connectionId,
-    status: message === null ? "ok" : "failed",
+    status: status ?? (message === null ? "ok" : "failed"),
     ...(message === null ? {} : { message: message.slice(0, LAST_WRITE_MESSAGE_LIMIT) }),
     at: Date.now(),
   };
-  if (message !== null) {
+  if (lastWrite.status === "failed") {
     console.error("writeThroughCurrentConnection(): write failed for item", itemId, message);
   }
   const itemRef = db.doc(`users/${auth.uid}/items/${itemId}`);
@@ -964,8 +979,8 @@ async function recordLastWrite({ auth, itemId, taskId, connectionId, message }: 
     // A targeted write, not updateItem: recording the outcome is not a content change.
     return await db.runTransaction(async tx => {
       const prev = (await tx.get(itemRef)).data()?.lastWrite;
-      if (lastWrite.status === "failed" && prev?.status === "ok" &&
-          prev.taskId === taskId && prev.connectionId === connectionId) {
+      if (lastWrite.status !== "ok" && prev?.status === "ok" && prev.taskId === taskId &&
+          (lastWrite.status === "skipped" || prev.connectionId === connectionId)) {
         return prev as LastWrite;
       }
       tx.update(itemRef, { lastWrite });
@@ -1151,7 +1166,7 @@ export async function createItem({
         client: item.client,
         source: resolvedSource,
       });
-      const lastWrite = await writeThroughCurrentConnection({ auth, itemId: id, lang, taskId });
+      const lastWrite = await writeThroughCurrentConnection({ auth, itemId: id, lang, taskId, code });
       if (lastWrite) item.lastWrite = lastWrite;
     }
     return {
@@ -1403,7 +1418,9 @@ export async function updateItem({
     let writeThroughMs = 0;
     if (taskIdChanged) {
       const tWriteThrough = Date.now();
-      await writeThroughCurrentConnection({ auth, itemId: id, lang: updates.lang ?? itemData.lang, taskId });
+      // updates.code is this version's program (absent when it could not be
+      // fetched: then no skip is recorded rather than one judged on stale code).
+      await writeThroughCurrentConnection({ auth, itemId: id, lang: updates.lang ?? itemData.lang, taskId, code: updates.code });
       writeThroughMs = Date.now() - tWriteThrough;
     }
     // Re-reads the document that was just written, to build the return value.
