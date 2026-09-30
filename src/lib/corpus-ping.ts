@@ -51,9 +51,9 @@ export const PING_LANGUAGES = [
   // below. Both still have a live corpus (0172: 133 rows, regenerated the same day;
   // 0159: 20 rows), so nothing here reflects a doubt about them; they are simply
   // unwatched now, which is what let L0176 sit broken for 27 hours.
-  // 0173 was deprecated 2026-09-30 in favour of 0184, but stays pinged until 0184 has a seeded
-  // corpus: a language with none fails the ping at `no-corpus`. Swap them then.
-  "0173", "0175", "0176", "0177", "0178", "0179",
+  // 0173 left 2026-09-30, deprecated for 0184 (see the 0184 entry below), and like 0172/0159
+  // above it is now unwatched.
+  "0175", "0176", "0177", "0178", "0179",
   // 0181 (flashcards) joined 2026-09-03, the day its 90-example corpus was seeded and
   // embedded. Adding it here is the point: until it was in this list, a brand-new
   // language with a full corpus had no health check at all — neither the daily ping nor
@@ -78,6 +78,9 @@ export const PING_LANGUAGES = [
   // request: deprecated in favor of 0183, and like 0172/0159 above it is now unwatched
   // (no ping, no weekly sweep) even though its existing items still generate on edit.
   "0183",
+  // 0184 (charts, successor to L0173) joined 2026-09-30, the day its 128-example corpus was
+  // seeded and embedded — 128/128 compiled with no fix passes, covering all eleven plot kinds.
+  "0184",
 ];
 
 /** How many generations run at once. Run serially, PING_LANGUAGES would take roughly a
