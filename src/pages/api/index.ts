@@ -409,9 +409,10 @@ const typeDefs = `
     languages(search: String, domain: String): [Language!]!
     language(id: String!): LanguageInfo
     itemData(id: String!): String!
-    # Accounts to share with, found by exact verified linked email, exact
-    # profile name (any case) or account ID. At least 3 characters; at most 10
-    # matches; never the caller or a system account; never returns an email.
+    # Accounts to share with, for a typeahead: any account whose profile name,
+    # linked email or account ID contains the query (any case). At least 2
+    # characters; at most 10 matches, exact then prefix then substring; never
+    # the caller or the shared trial account; never returns an email.
     findAccounts(query: String!): [AccountMatch!]!
   }
 

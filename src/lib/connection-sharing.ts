@@ -35,6 +35,28 @@ export async function accountForEmail(email: string): Promise<string | null> {
   }
 }
 
+// Accounts whose linked email contains the fragment (auth's partial-match
+// search). Returns uids only — the auth service never sends the emails back.
+// Empty when the search is unavailable (not configured, or an auth service
+// without the route), so account lookup falls back to name and ID matching.
+export async function accountsForEmailFragment(fragment: string): Promise<string[]> {
+  const needle = typeof fragment === "string" ? fragment.trim().toLowerCase() : "";
+  if (!INTERNAL_API_KEY || needle.length < 2) return [];
+  try {
+    const res = await fetch(`${AUTH_SERVICE_URL.replace(/\/$/, "")}/linked-emails/internal/search`, {
+      method: "POST",
+      headers: { "X-Internal-API-Key": INTERNAL_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ fragment: needle }),
+    });
+    if (!res.ok) return [];
+    const body = await res.json();
+    const uids: unknown = body?.status === "success" ? body.data?.uids : null;
+    return Array.isArray(uids) ? [...new Set(uids.filter((u): u is string => typeof u === "string" && u !== ""))] : [];
+  } catch {
+    return [];
+  }
+}
+
 // An account ID is the account's 40-hex address, written with or without 0x.
 // Stored (and granted) lowercase, without the prefix.
 export const normalizeAccountId = (id: string) => id.trim().replace(/^0x/i, "").toLowerCase();
