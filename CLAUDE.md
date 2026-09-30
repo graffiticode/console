@@ -52,6 +52,8 @@ npm run eval:judge-smoke  # Quick judge sanity check before big runs
 
 ## Deploy
 
+**Deploys are always manual.** GitHub is never used to deploy: no workflow or push trigger ships anything, so pushing to `main` deploys nothing. Run the commands below by hand, after the lint/typecheck gate. (GitHub checks that only validate are fine: `.github/workflows/npm-ci.yaml` runs lint on push.)
+
 ```bash
 npm run gcp:build     # Cloud Build → gcr.io/graffiticode-app/console:<sha> → deploy `console` (us-central1)
 npm run gcp:restart   # redeploy :latest, no rebuild

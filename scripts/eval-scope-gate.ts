@@ -55,6 +55,12 @@ const CASES: Case[] = [
   { tag: "concept", lang: "0180", want: "0183", prompt: "Make a mind map of the causes of World War I." },
   { tag: "concept", lang: "0183", want: "0171", prompt: "Make a Venn diagram comparing cats and dogs." },
   { tag: "concept", lang: "0183", want: "0180", prompt: "Make a 5-question multiple choice quiz on the water cycle." },
+  // L0184 (charts, successor to L0173) holds charts of given numbers and hands off tables and
+  // fetching.
+  { tag: "chart", lang: "0184", want: "in", prompt: "Bar chart of monthly revenue: January 120, February 132, March 101, April 134." },
+  { tag: "chart", lang: "0184", want: "in", prompt: "Box plot of quiz scores by class. Class A: 72, 75, 78, 80, 84, 91. Class B: 60, 68, 70, 74, 77, 99." },
+  { tag: "chart", lang: "0179", want: "0184", prompt: "Make a pie chart of traffic sources: search 48, direct 26, email 14, social 12." },
+  { tag: "chart", lang: "0184", want: "0179", prompt: "Make a budget spreadsheet with rent 1500, food 400 and a SUM total." },
 ];
 
 const arg = (name: string) => {
