@@ -1,40 +1,19 @@
 import { getFirestore } from '../../../utils/db';
-import Stripe from 'stripe';
-import { STRIPE_API_VERSION } from '../../../lib/plans-config';
+import { requireUser } from '../../../lib/api-auth';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: STRIPE_API_VERSION,
-});
-
+// Ensure the caller's own users/{uid} doc exists and return its id. Used by
+// SetupForm before it asks for a Stripe setup intent. It never looks anyone
+// else up and never takes fields from the body.
 const handler = async (req, res) => {
+  if (req.method !== 'POST') return res.status(405).end();
+  const auth = await requireUser(req);
+  if (!auth) return res.status(401).end();
   try {
-    const db = getFirestore();
-    const { name, email } = req.body;
-    const users = await db.collection('users').get();
-    let id;
-    users.docs.map((user) => {
-      const data = user.data();
-      if (data.email === email) {
-        id = user.id;
-      }
-    });
-    if (id !== undefined) {
-      // Already have this user, so return it.
-      console.info("*POST /user id=" + id);
-      res.status(200).json({ id });
-    } else {
-      // Otherwise, make a new one.
-      // const stripeCustomer = await stripe.customers.create({
-      //   name,
-      //   email,
-      // });
-      const { id } = await db.collection('users').add({
-        ...req.body,
-        created: new Date().toISOString(),
-        // stripeCustomer,
-      });
-      res.status(200).json({ id });
+    const ref = getFirestore().collection('users').doc(auth.uid);
+    if (!(await ref.get()).exists) {
+      await ref.set({ uid: auth.uid, created: new Date().toISOString() }, { merge: true });
     }
+    res.status(200).json({ id: auth.uid });
   } catch (e) {
     console.info("POST /user error=" + e);
     res.status(400).end();

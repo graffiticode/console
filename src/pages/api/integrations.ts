@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createHash } from 'crypto';
 import { getFirestore } from '../../utils/db';
+import { requireUser } from '../../lib/api-auth';
 
 interface FrontIntegration {
   authSecret: string;
@@ -19,11 +20,12 @@ interface IntegrationsSettings {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { userId } = req.query;
-
-  if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({ error: 'User ID is required' });
+  // Acts on the caller's own settings only; any ?userId= is ignored.
+  const auth = await requireUser(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+  const userId = auth.uid;
 
   const db = getFirestore();
 

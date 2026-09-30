@@ -61,7 +61,8 @@ export default function APIKeysCard() {
   useEffect(() => {
     if (user?.uid && apiKeys) {
       const fetchProtectedIds = () => {
-        axios.get(`/api/integrations?userId=${user.uid}`)
+        getIdToken(user)
+          .then(token => axios.get('/api/integrations', { headers: { Authorization: token } }))
           .then(response => {
             const protectedIds = new Set<string>();
             // Front integration API key

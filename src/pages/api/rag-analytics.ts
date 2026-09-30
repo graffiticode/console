@@ -34,6 +34,14 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // Operator-only: "details" and "export" return every user's records (user
+  // ids, prompt text, generation results). Same shared header as the other
+  // internal routes (/api/internal/*); nothing in the app calls this.
+  const secret = process.env.INTERNAL_JOB_SECRET || "";
+  if (!secret || req.headers["x-internal-job-secret"] !== secret) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     const {
       action = "metrics",

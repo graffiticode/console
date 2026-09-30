@@ -59,9 +59,10 @@ function SetupApp() {
   const [clientSecret, setClientSecret] = useState();
   useEffect(() => {
     const fetchSecret = async () => {
-      const userRes = await axios.post('/api/user', { ...user });
-      const { id } = userRes.data;
-      const secretRes = await axios.get(`/api/secret?id=${id}`);
+      // Both routes act on the signed-in caller only, named by the token.
+      const headers = { Authorization: await user.getToken() };
+      await axios.post('/api/user', {}, { headers });
+      const secretRes = await axios.get('/api/secret', { headers });
       const { client_secret: clientSecret } = secretRes.data;
       setClientSecret(clientSecret);
     };

@@ -43,7 +43,7 @@ export default function IntegrationsCard() {
     if (!user?.uid) return;
     try {
       setLoading(true);
-      const response = await axios.get(`/api/integrations?userId=${user.uid}`);
+      const response = await axios.get('/api/integrations', { headers: { Authorization: await user.getToken() } });
       const data = response.data;
       setSettings(data);
       if (data.front) {
@@ -93,9 +93,9 @@ export default function IntegrationsCard() {
         apiKeyToken: currentApiKeyToken,
       };
 
-      await axios.post(`/api/integrations?userId=${user?.uid}`, {
+      await axios.post('/api/integrations', {
         front: frontSettings,
-      });
+      }, { headers: { Authorization: await user.getToken() } });
 
       setIsEditingSecret(false);
       await fetchSettings();
@@ -134,7 +134,7 @@ export default function IntegrationsCard() {
       }
 
       // Delete the integration settings
-      await axios.delete(`/api/integrations?userId=${user?.uid}`);
+      await axios.delete('/api/integrations', { headers: { Authorization: await user.getToken() } });
 
       // Reset local state
       setSettings({});
