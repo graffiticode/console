@@ -133,10 +133,6 @@ export async function getData({ authToken, id, connectionId = null }: { authToke
     const get = bent(baseUrl, "GET", "json", 200);
     const connection = connectionId ? `&connection=${encodeURIComponent(connectionId)}` : "";
     const resp = await get(`/data?id=${id}&access_token=${authToken}${connection}`);
-    console.log(
-      "getData()",
-      "resp.data=" + JSON.stringify(resp.data, null, 2),
-    );
     return resp.data;
   } catch (x) {
     console.log("getData()", "ERROR", x);

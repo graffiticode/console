@@ -1737,35 +1737,79 @@ export async function generateCode({
     safeRAGAnalytics.startStage(requestId, "generation");
     const generationStartTime = Date.now();
 
+    const generationOptions = {
+      lang,
+      tier: tierToUse,
+      ...(options.model ? { model: options.model } : {}),
+      temperature: options.temperature ?? 0.2,
+      maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
+      maxContinuations: options.maxContinuations || 10,  // Conservative default
+      // The request-wide deadline. These options are built field-by-field, so
+      // anything not named here is silently dropped — omitting this made the
+      // budget inert without any type error to say so.
+      ...(options.deadlineAt ? { deadlineAt: options.deadlineAt } : {}),
+      ...(options.budget ? { budget: options.budget } : {}),
+      // The live progress sink. Named here for the reason the deadline comment
+      // above gives: this bag is rebuilt field-by-field, so an unnamed field is
+      // dropped with no type error. That is exactly what happened on 2026-09-09 —
+      // the counter ticked in a direct call to generateCodeWithContinuation and
+      // never fired in production, because production goes through here.
+      ...(options.onOutput ? { onOutput: options.onOutput } : {}),
+      // Passthrough (undefined ⇒ omitted ⇒ API model default). Set to match models.
+      ...(options.thinking !== undefined ? { thinking: options.thinking } : {}),
+      ...(options.effort !== undefined ? { effort: options.effort } : {}),
+    };
+    const onGenerationProgress = requestId
+      ? (message: string) => ragLog(requestId, "streaming.progress", { message })
+      : undefined;
+
     // Use the streaming service (always, as it handles both short and long responses)
-    const streamResult = await generateCodeWithContinuation({
+    let streamResult = await generateCodeWithContinuation({
       formattedPrompt,  // Using the formatted prompt with examples
       lang,
       currentCode,
-      options: {
-        lang,
-        tier: tierToUse,
-        ...(options.model ? { model: options.model } : {}),
-        temperature: options.temperature ?? 0.2,
-        maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
-        maxContinuations: options.maxContinuations || 10,  // Conservative default
-        // The request-wide deadline. These options are built field-by-field, so
-        // anything not named here is silently dropped — omitting this made the
-        // budget inert without any type error to say so.
-        ...(options.deadlineAt ? { deadlineAt: options.deadlineAt } : {}),
-        ...(options.budget ? { budget: options.budget } : {}),
-        // The live progress sink. Named here for the reason the deadline comment
-        // above gives: this bag is rebuilt field-by-field, so an unnamed field is
-        // dropped with no type error. That is exactly what happened on 2026-09-09 —
-        // the counter ticked in a direct call to generateCodeWithContinuation and
-        // never fired in production, because production goes through here.
-        ...(options.onOutput ? { onOutput: options.onOutput } : {}),
-        // Passthrough (undefined ⇒ omitted ⇒ API model default). Set to match models.
-        ...(options.thinking !== undefined ? { thinking: options.thinking } : {}),
-        ...(options.effort !== undefined ? { effort: options.effort } : {}),
-      },
-      onProgress: requestId ? (message) => ragLog(requestId, "streaming.progress", { message }) : undefined
+      options: generationOptions,
+      onProgress: onGenerationProgress,
     });
+
+    // The zero-output thinking spiral: the first chunk spent its whole max_tokens
+    // reasoning and never opened a text block. 2 of 98 L0179 generations over
+    // 2026-09-16..30, while healthy runs think a median ~1s and at most ~83s — so
+    // no cap separates the two, and a second thinking turn usually spirals again
+    // (rid aab712e5 thought 127s more for 475 chars). Regenerate ONCE with thinking
+    // off, pinned to the same model so the setting can't reach another family.
+    // `spiralOutputTokens` is kept out of the repair gate below: those tokens are
+    // already spent and say nothing about what repairing the retry would cost.
+    let spiralOutputTokens = 0;
+    const retryHeadroomMs = 60_000;
+    if (
+      streamResult.stopEarly === "no_output" &&
+      streamResult.provider === "anthropic" &&
+      options.thinking === undefined &&
+      (!options.deadlineAt || options.deadlineAt - Date.now() > retryHeadroomMs)
+    ) {
+      console.log(`[code-gen] rid=${rid} lang=L${lang} no_output — regenerating with thinking disabled`);
+      const spiral = streamResult;
+      const retry = await generateCodeWithContinuation({
+        formattedPrompt,
+        lang,
+        currentCode,
+        options: { ...generationOptions, model: spiral.model, thinking: { type: "disabled" } },
+        onProgress: onGenerationProgress,
+      });
+      spiralOutputTokens = spiral.usage.outputTokens;
+      streamResult = {
+        ...retry,
+        usage: {
+          inputTokens: spiral.usage.inputTokens + retry.usage.inputTokens,
+          outputTokens: spiral.usage.outputTokens + retry.usage.outputTokens,
+          cacheCreationInputTokens: spiral.usage.cacheCreationInputTokens + retry.usage.cacheCreationInputTokens,
+          cacheReadInputTokens: spiral.usage.cacheReadInputTokens + retry.usage.cacheReadInputTokens,
+          reasoningTokens: spiral.usage.reasoningTokens + retry.usage.reasoningTokens,
+        },
+        attempts: [...spiral.attempts, ...retry.attempts],
+      };
+    }
 
     const generationLatency = Date.now() - generationStartTime;
     safeRAGAnalytics.endStage(requestId, "generation");
@@ -1988,10 +2032,12 @@ export async function generateCode({
     // Estimate compile units from initial generation.
     // Skip fix attempts if already expensive (>50 units).
     const MAX_UNITS_FOR_FIXES = 50;
-    const estimatedUnits = Math.ceil(finalUsage.total_tokens / 750);
+    const estimatedUnits = Math.ceil((finalUsage.total_tokens - spiralOutputTokens) / 750);
 
-    // Verify the code if an access token is provided
-    if (accessToken) {
+    // Verify the code if an access token is provided. An empty program has nothing
+    // to repair: sending it through the loop started a second full generation that
+    // spiraled like the first (~150s each, rids 0a7a069d and aab712e5).
+    if (accessToken && generatedCode?.trim()) {
       safeRAGAnalytics.startStage(requestId, "compilation");
 
       // Attempt to verify and fix the code up to MAX_FIX_ATTEMPTS times, or until
