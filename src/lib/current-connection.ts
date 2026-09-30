@@ -66,10 +66,12 @@ function choicesFor(auth: Auth): Promise<Record<string, string>> {
 const choiceKey = (lang: string, backend: string) => `${lang}:${backend}`;
 
 // Active connections for the backend; a shared one only if its grant covers
-// this language and has not ended.
+// this language and has not ended. Never a system connection: it signs
+// previews only, and policy refuses it for writes (system-connection).
 function candidatesFor(all: CandidateConnection[], lang: string, backend: string, now = Date.now()) {
   return all.filter(c =>
     c.status === "active" &&
+    c.system !== true &&
     c.backend === backend &&
     (!c.shared || (
       (c.permissions || []).some(p => normalizeLang(p.lang) === lang) &&

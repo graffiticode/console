@@ -331,6 +331,9 @@ const typeDefs = `
     backend: String!
     status: String!
     label: String
+    # A Graffiticode system connection: it signs previews only and is never
+    # used for saves, so it is never a current-connection candidate.
+    system: Boolean!
     # True for a connection another account owns and shared with this user;
     # permissions says which (language, function) pairs it allows.
     shared: Boolean!

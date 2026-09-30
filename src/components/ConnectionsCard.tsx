@@ -19,6 +19,10 @@ interface Connection {
   backend: string;
   status: "active" | "disabled";
   label: string | null;
+  // A Graffiticode system connection: signs previews only, never used for
+  // saves, so it is never offered as a current connection. Absent from an
+  // older api.
+  system?: boolean;
   shared: boolean;
   permissions: { lang: string; fn: string }[] | null;
   expiresAt: string | null;
@@ -234,6 +238,11 @@ export default function ConnectionsCard() {
                 <span className={c.status === "active" ? "text-green-700" : "text-gray-500"}>{c.status}</span>
                 <span className="font-mono">{c.connectionId.slice(-8)}</span>
               </small>
+              {c.system && (
+                <small className="text-xs text-gray-500 mt-1">
+                  Graffiticode preview account — signs previews only; not used for saves.
+                </small>
+              )}
               {confirming === `disable:${c.connectionId}` && (
                 <span className="text-xs text-gray-700 mt-1">
                   Disable? Every run and published view through it stops, and it cannot be re-enabled.{" "}
@@ -252,9 +261,9 @@ export default function ConnectionsCard() {
             <div className="flex items-center gap-2">
               {c.status === "active" && (
                 <>
-                  <button type="button" title="Share" onClick={() => setSharing(sharing === c.connectionId ? null : c.connectionId)}>
+                  {!c.system && <button type="button" title="Share" onClick={() => setSharing(sharing === c.connectionId ? null : c.connectionId)}>
                     <UserPlusIcon className="h-5 w-5 text-gray-500 hover:text-gray-800" />
-                  </button>
+                  </button>}
                   <button type="button" title="Rotate secret" onClick={() => { resetForm(); setForm(`rotate:${c.connectionId}`); }}>
                     <ArrowPathIcon className="h-5 w-5 text-gray-500 hover:text-gray-800" />
                   </button>
@@ -268,7 +277,7 @@ export default function ConnectionsCard() {
               </button>
             </div>
           </div>
-          {sharing === c.connectionId && c.status === "active" && <ConnectionSharing user={user} connectionId={c.connectionId} />}
+          {sharing === c.connectionId && c.status === "active" && !c.system && <ConnectionSharing user={user} connectionId={c.connectionId} />}
           </li>
         ))}
       </ul>
@@ -285,7 +294,7 @@ export default function ConnectionsCard() {
             {current.map(cc => (
               <li key={cc.lang} className="flex items-center justify-between gap-4 border border-gray-300 px-4 py-2 rounded-none">
                 <span className="text-sm text-gray-700">L{cc.lang} <span className="text-gray-500">{backendLabel(cc.backend)}</span></span>
-                {cc.candidates.length === 0 ? (
+                {cc.candidates.filter(c => !c.system).length === 0 ? (
                   <span className="text-xs text-gray-500">No active {backendLabel(cc.backend)} connection — previews only.</span>
                 ) : (
                   <div className="flex flex-col items-end">

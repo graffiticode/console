@@ -28,7 +28,16 @@ export type Connection = {
   backend: string;
   status: "active" | "disabled";
   label: string | null;
+  // A configured Graffiticode system connection (policy marks it): it signs
+  // system previews only and policy refuses it for writes, so it is never
+  // offered as a connection to save through. False when policy predates the
+  // flag.
+  system: boolean;
 };
+
+// The flag is read strictly: only an explicit true marks a system connection.
+const withSystemFlag = <T extends { system?: unknown }>(c: T): T & { system: boolean } =>
+  ({ ...c, system: c.system === true });
 
 // A connection someone else owns and has shared with this user.
 export type SharedConnection = Connection & { permissions: Permission[]; expiresAt: string | null };
@@ -100,14 +109,14 @@ async function call(method: string, path: string, userToken: string, body?: unkn
   return json.data;
 }
 
-export const listConnections = (userToken: string): Promise<Connection[]> =>
-  call("GET", "/v1/connections", userToken);
+export const listConnections = async (userToken: string): Promise<Connection[]> =>
+  ((await call("GET", "/v1/connections", userToken)) as Connection[]).map(withSystemFlag);
 
 export const createConnection = (
   userToken: string,
   { backend, label, key, secret }: { backend: string; label?: string | null; key: string; secret: string },
 ): Promise<Connection> =>
-  call("POST", "/v1/connections", userToken, { backend, label: label ?? null, credential: { key, secret } });
+  call("POST", "/v1/connections", userToken, { backend, label: label ?? null, credential: { key, secret } }).then(withSystemFlag);
 
 export const rotateConnection = (userToken: string, connectionId: string, { key, secret }: { key: string; secret: string }) =>
   call("POST", `/v1/connections/${encodeURIComponent(connectionId)}/rotate`, userToken, { credential: { key, secret } });
@@ -140,8 +149,8 @@ export const listConnectionGrants = (userToken: string, connectionId: string): P
 export const revokeConnectionGrant = (userToken: string, connectionId: string, grantId: string) =>
   call("DELETE", `/v1/connections/${encodeURIComponent(connectionId)}/grants/${encodeURIComponent(grantId)}`, userToken);
 
-export const listSharedConnections = (userToken: string): Promise<SharedConnection[]> =>
-  call("GET", "/v1/shared", userToken);
+export const listSharedConnections = async (userToken: string): Promise<SharedConnection[]> =>
+  ((await call("GET", "/v1/shared", userToken)) as SharedConnection[]).map(withSystemFlag);
 
 export const leaveSharedConnection = (userToken: string, connectionId: string) =>
   call("DELETE", `/v1/shared/${encodeURIComponent(connectionId)}`, userToken);
