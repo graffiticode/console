@@ -3,7 +3,7 @@ import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { ShareIcon, CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import UserSearchCombobox from './UserSearchCombobox';
-import { shareItem } from '../utils/swr/fetchers';
+import { shareItem, type AccountMatch } from '../utils/swr/fetchers';
 import useGraffiticodeAuth from '@graffiticode/auth-react';
 
 interface ShareItemDialogProps {
@@ -24,7 +24,7 @@ export default function ShareItemDialog({
   onShareSuccess
 }: ShareItemDialogProps) {
   const { user } = useGraffiticodeAuth();
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<AccountMatch | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [shareResult, setShareResult] = useState<{ success: boolean; message: string } | null>(null);
 
@@ -38,7 +38,7 @@ export default function ShareItemDialog({
       const result = await shareItem({
         user,
         itemId,
-        targetUserId: selectedUser.id
+        targetUserId: selectedUser.accountId
       });
 
       setShareResult({
@@ -146,13 +146,11 @@ export default function ShareItemDialog({
 
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select User
+                        Find a person (email, name or account ID)
                       </label>
                       <UserSearchCombobox
                         selectedUser={selectedUser}
                         onSelectUser={setSelectedUser}
-                        placeholder="Search by user ID..."
-                        currentUserId={user?.uid}
                       />
                     </div>
 

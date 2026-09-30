@@ -1,36 +1,48 @@
 import { useState, useEffect, useRef } from 'react';
 import { Combobox } from '@headlessui/react';
-import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
-import { getUsers } from '../utils/swr/fetchers';
-
-interface User {
-  id: string;
-  email?: string;
-  name?: string;
-}
+import { CheckIcon } from '@heroicons/react/20/solid';
+import useGraffiticodeAuth from '@graffiticode/auth-react';
+import { findAccounts, type AccountMatch } from '../utils/swr/fetchers';
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
 }
 
+const MIN_QUERY = 3;
+const DEBOUNCE_MS = 300;
+
+const MATCHED_BY: Record<AccountMatch['matchedBy'], string> = {
+  email: 'matched by email',
+  name: 'matched by name',
+  id: 'matched by account ID',
+};
+
 interface UserSearchComboboxProps {
-  selectedUser: User | null;
-  onSelectUser: (user: User | null) => void;
+  selectedUser: AccountMatch | null;
+  onSelectUser: (user: AccountMatch | null) => void;
   placeholder?: string;
-  currentUserId?: string;
 }
 
+// Finds an account by exact linked email, profile name or account ID (the
+// server's findAccounts lookup) as the user types; nothing is listed until
+// they do.
 export default function UserSearchCombobox({
   selectedUser,
   onSelectUser,
-  placeholder = "Search by user ID...",
-  currentUserId
+  placeholder = "Email, name or account ID",
 }: UserSearchComboboxProps) {
+  const { user } = useGraffiticodeAuth();
   const [query, setQuery] = useState('');
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [matches, setMatches] = useState<AccountMatch[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // The auth user object can change identity between renders; look up with
+  // the latest one but re-run only when the signed-in account changes.
+  const userRef = useRef(user);
+  userRef.current = user;
+  const uid = user?.uid;
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -46,59 +58,53 @@ export default function UserSearchCombobox({
     };
   }, []);
 
-  // Load all users once on mount
+  // Look up the typed query, debounced; a newer query discards older answers.
   useEffect(() => {
-    const loadUsers = async () => {
-      setLoading(true);
-      try {
-        const usersData = await getUsers();
-        setUsers(usersData);
-      } catch (error) {
-        console.error('Error loading users:', error);
-        setUsers([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadUsers();
-  }, []);
-
-  // Filter users based on query (client-side search)
-  // Always show all users when no query, filter when typing
-  // Exclude current user from the list
-  const filteredUsers = users.filter((user) => {
-    // Exclude current user
-    if (user.id === currentUserId) return false;
-
-    if (query === '') return true; // Show all users when no query
-
-    const searchQuery = query.toLowerCase();
-    const userId = user.id.toLowerCase();
-    const userEmail = (user.email || '').toLowerCase();
-    const userName = (user.name || '').toLowerCase();
-
-    return userId.includes(searchQuery) ||
-           userEmail.includes(searchQuery) ||
-           userName.includes(searchQuery);
-  });
-
-  const displayValue = (user: User | null) => {
-    if (!user) return '';
-    // Show ID and email if available
-    if (user.email) {
-      return `${user.id} (${user.email})`;
+    const q = query.trim();
+    setError(null);
+    if (q.length < MIN_QUERY || !uid) {
+      setMatches([]);
+      setLoading(false);
+      return;
     }
-    return user.id;
-  };
+    let stale = false;
+    setLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const found = await findAccounts({ user: userRef.current, query: q });
+        if (!stale) setMatches(found);
+      } catch {
+        if (!stale) {
+          setMatches([]);
+          setError('Search is unavailable right now.');
+        }
+      } finally {
+        if (!stale) setLoading(false);
+      }
+    }, DEBOUNCE_MS);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [query, uid]);
+
+  const displayValue = (match: AccountMatch | null) =>
+    match ? `${match.name} (${match.shortId})` : '';
+
+  const status = query.trim().length < MIN_QUERY
+    ? 'Type an exact email, full name or account ID.'
+    : loading
+      ? 'Searching...'
+      : error || (matches.length === 0 ? 'No account found.' : null);
 
   return (
-    <Combobox as="div" value={selectedUser} onChange={(user) => {
-      onSelectUser(user);
+    <Combobox as="div" value={selectedUser} by="accountId" onChange={(match: AccountMatch | null) => {
+      onSelectUser(match);
       setIsOpen(false);
     }}>
       <div className="relative" ref={containerRef}>
         <Combobox.Input
-          className="w-full rounded-none border border-gray-300 bg-white py-2 pl-3 pr-10 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 sm:text-sm"
+          className="w-full rounded-none border border-gray-300 bg-white py-2 pl-3 pr-3 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 sm:text-sm"
           onChange={(event) => {
             setQuery(event.target.value);
             setIsOpen(true);
@@ -107,71 +113,47 @@ export default function UserSearchCombobox({
           displayValue={displayValue}
           placeholder={placeholder}
         />
-        <Combobox.Button
-          className="absolute inset-y-0 right-0 flex items-center rounded-none px-2 focus:outline-none"
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-        </Combobox.Button>
 
         {isOpen && (
           <Combobox.Options static className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-none bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-          {loading ? (
+          {status ? (
             <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
-              Loading users...
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
-              {query !== '' ? 'No users found.' : 'No users available.'}
+              {status}
             </div>
           ) : (
-            <>
-              {query === '' && (
-                <div className="relative cursor-default select-none py-1 px-4 text-xs text-gray-500 border-b">
-                  {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} available
-                </div>
-              )}
-              {filteredUsers.map((user) => (
-                <Combobox.Option
-                  key={user.id}
-                  value={user}
-                  onClick={() => {
-                    setTimeout(() => setIsOpen(false), 0);
-                  }}
-                  className={({ active }) =>
-                    classNames(
-                      'relative cursor-default select-none py-2 pl-8 pr-4',
-                      active ? 'bg-gray-100 text-gray-900' : 'text-gray-900'
-                    )
-                  }
-                >
-                {({ active, selected }) => (
+            matches.map((match) => (
+              <Combobox.Option
+                key={match.accountId}
+                value={match}
+                onClick={() => {
+                  setTimeout(() => setIsOpen(false), 0);
+                }}
+                className={({ active }) =>
+                  classNames(
+                    'relative cursor-default select-none py-2 pl-8 pr-4',
+                    active ? 'bg-gray-100 text-gray-900' : 'text-gray-900'
+                  )
+                }
+              >
+                {({ selected }) => (
                   <>
                     <div className="flex flex-col">
                       <span className={classNames('block truncate', selected ? 'font-semibold' : 'font-normal')}>
-                        {user.id}
+                        {match.name}
                       </span>
-                      {user.email && (
-                        <span className={classNames('block truncate text-xs', 'text-gray-500')}>
-                          {user.email}
-                        </span>
-                      )}
+                      <span className="block truncate text-xs text-gray-500">
+                        {match.shortId} · {MATCHED_BY[match.matchedBy]}
+                      </span>
                     </div>
                     {selected && (
-                      <span
-                        className={classNames(
-                          'absolute inset-y-0 left-0 flex items-center pl-1.5',
-                          'text-gray-600'
-                        )}
-                      >
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-1.5 text-gray-600">
                         <CheckIcon className="h-5 w-5" aria-hidden="true" />
                       </span>
                     )}
                   </>
                 )}
               </Combobox.Option>
-            ))}
-            </>
+            ))
           )}
         </Combobox.Options>
         )}

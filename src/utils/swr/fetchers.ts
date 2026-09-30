@@ -566,18 +566,20 @@ export const shareItem = async ({ user, itemId, targetUserId }) => {
   return client.request(mutation, { itemId, targetUserId }).then(data => data.shareItem);
 };
 
-export const getUsers = async () => {
-  try {
-    const response = await fetch('/api/users');
-    if (!response.ok) {
-      throw new Error('Failed to fetch users');
+// An account found to share with. Never carries an email.
+export type AccountMatch = { accountId: string; name: string; shortId: string; matchedBy: "email" | "name" | "id" };
+
+// Accounts matching an exact linked email, profile name or account ID (at
+// least 3 characters; see src/lib/account-lookup.ts). Throws on failure.
+export const findAccounts = async ({ user, query }: { user: any; query: string }): Promise<AccountMatch[]> => {
+  const token = await user.getToken();
+  const client = new GraphQLClient("/api", { headers: { authorization: token } });
+  const data: any = await client.request(gql`
+    query findAccounts($query: String!) {
+      findAccounts(query: $query) { accountId name shortId matchedBy }
     }
-    const data = await response.json();
-    return data.usersData || [];
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    return [];
-  }
+  `, { query });
+  return data.findAccounts;
 };
 
 export const getTask = async ({ user, id }) => {
