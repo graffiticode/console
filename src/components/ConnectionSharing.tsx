@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { PencilIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
+  findAccounts,
   loadConnectionGrants,
   loadShareableFunctions,
   revokeConnectionGrant,
   shareConnection,
   updateConnectionGrant,
+  type AccountMatch,
 } from "../utils/swr/fetchers";
 
 // Plain descriptions of shareable functions; anything unlisted shows its name.
@@ -40,6 +42,13 @@ const toDate = (iso: string | null) => {
 // An end date means the end of that day, in the owner's time zone.
 const fromDate = (date: string) => (date ? new Date(`${date}T23:59:59`).toISOString() : null);
 const accessVars = (a: Access) => ({ permissions: a.permissions, expiresAt: fromDate(a.expires) });
+
+const looksLikeEmail = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s);
+const MATCHED_BY: Record<AccountMatch["matchedBy"], string> = { email: "email", name: "name", id: "account ID" };
+
+// Who a new share goes to: an account picked from the lookup, or (when an
+// email finds no account) the email itself, pending until they link it.
+type Recipient = { kind: "account"; match: AccountMatch } | { kind: "email"; email: string };
 
 const errorText = (err: any) =>
   String(err?.response?.errors?.[0]?.message || err?.message || err).replace(/^Connection request refused: /, "Refused: ");
@@ -79,14 +88,18 @@ const summary = (g: Grant) => g.permissions.map(p => `${langLabel(p.lang)} ${p.f
 const blank: Access = { permissions: [], expires: "" };
 const accessOf = (g: Grant): Access => ({ permissions: g.permissions, expires: toDate(g.expiresAt) });
 
-// The owner's Share panel for one connection: add a person by email with
-// the exact functions they may use and an optional end date, and see,
-// change or remove who it is shared with. Changes take effect at that person's
-// next run or view.
+// The owner's Share panel for one connection: find a person by linked email,
+// profile name or account ID, pick them from the matches, and grant the exact
+// functions they may use with an optional end date; see, change or remove who
+// it is shared with. Changes take effect at that person's next run or view.
 export default function ConnectionSharing({ user, connectionId }: { user: any; connectionId: string }) {
   const [grants, setGrants] = useState<Grant[] | null>(null);
   const [shareable, setShareable] = useState<Shareable[]>([]);
-  const [email, setEmail] = useState("");
+  const [query, setQuery] = useState("");
+  // Matches for the last search (null: not searched since the query changed).
+  const [matches, setMatches] = useState<AccountMatch[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [recipient, setRecipient] = useState<Recipient | null>(null);
   const [access, setAccess] = useState<Access>(blank);
   // The grant being edited, and its draft access.
   const [editing, setEditing] = useState<string | null>(null);
@@ -124,16 +137,43 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
     }
   };
 
+  const searched = query.trim();
+  const find = async () => {
+    setSearching(true);
+    setMessage(null);
+    setRecipient(null);
+    try {
+      const found = await findAccounts({ user, query: searched });
+      setMatches(found);
+    } catch (err) {
+      setMatches(null);
+      setMessage(errorText(err));
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const share = async () => {
-    const to = email.trim();
+    if (!recipient) return;
     const ok = await run(
-      () => shareConnection({ user, connectionId, email: to, ...accessVars(access) }),
-      `Shared with ${to}. If they don't have an account yet, it applies when they sign in with this email.`);
+      () => shareConnection({
+        user,
+        connectionId,
+        ...(recipient.kind === "account" ? { accountId: recipient.match.accountId } : { email: recipient.email }),
+        ...accessVars(access),
+      }),
+      recipient.kind === "account"
+        ? `Shared with ${recipient.match.name} (${recipient.match.shortId}).`
+        : `Shared with ${recipient.email}. It applies when they link this email to their account.`);
     if (ok) {
-      setEmail("");
+      setQuery("");
+      setMatches(null);
+      setRecipient(null);
       setAccess(blank);
     }
   };
+
+  const picked = (m: AccountMatch) => recipient?.kind === "account" && recipient.match.accountId === m.accountId;
 
   const save = async (grantId: string) => {
     if (await run(() => updateConnectionGrant({ user, connectionId, grantId, ...accessVars(draft) }))) setEditing(null);
@@ -144,23 +184,63 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
   return (
     <div className="border border-gray-300 border-t-0 px-4 py-3 space-y-3 rounded-none">
       <div className="flex flex-wrap items-end gap-2">
-        <label className="block text-sm flex-1 min-w-[12rem]">
-          <span className="text-gray-700">Share with (email)</span>
-          <input
-            type="email"
-            className="mt-1 block w-full border border-gray-300 rounded-none px-2 py-1 text-sm"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="alice@example.com" />
-        </label>
+        <form
+          className="flex flex-1 min-w-[12rem] items-end gap-2"
+          onSubmit={e => { e.preventDefault(); if (searched.length >= 3) find(); }}>
+          <label className="block text-sm flex-1">
+            <span className="text-gray-700">Find a person (email, name or account ID)</span>
+            <input
+              type="text"
+              className="mt-1 block w-full border border-gray-300 rounded-none px-2 py-1 text-sm"
+              value={query}
+              onChange={e => { setQuery(e.target.value); setMatches(null); setRecipient(null); }}
+              placeholder="alice@example.com, Alice Smith or their account ID" />
+          </label>
+          <button
+            type="submit"
+            className="inline-flex items-center px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-none text-sm text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+            disabled={searching || searched.length < 3}>
+            {searching ? "Finding…" : "Find"}
+          </button>
+        </form>
         <DateField value={access.expires} onChange={expires => setAccess({ ...access, expires })} />
         <button
           type="button"
           className="inline-flex items-center px-3 py-1.5 bg-gray-900 text-white border border-gray-900 rounded-none text-sm hover:bg-gray-700 disabled:opacity-50"
           onClick={share}
-          disabled={busy || !email.trim() || incomplete(access)}>
+          disabled={busy || !recipient || incomplete(access)}>
           Share
         </button>
+        {matches !== null && (
+          <div className="basis-full text-sm space-y-1">
+            {matches.map(m => (
+              <label key={m.accountId} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name={`recipient-${connectionId}`}
+                  checked={picked(m)}
+                  onChange={() => setRecipient({ kind: "account", match: m })} />
+                <span>{m.name}</span>
+                <span className="font-mono text-xs text-gray-500">{m.shortId}</span>
+                <span className="text-xs text-gray-400">matched by {MATCHED_BY[m.matchedBy]}</span>
+              </label>
+            ))}
+            {matches.length === 0 && (
+              looksLikeEmail(searched) ? (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name={`recipient-${connectionId}`}
+                    checked={recipient?.kind === "email"}
+                    onChange={() => setRecipient({ kind: "email", email: searched })} />
+                  <span>No account has linked this email. Share with this email anyway — it applies when they link it.</span>
+                </label>
+              ) : (
+                <p className="text-xs text-gray-500">No account found. Names must match exactly; or ask them for their account ID (shown on their Connections settings).</p>
+              )
+            )}
+          </div>
+        )}
         <FunctionPicker access={access} onChange={setAccess} shareable={shareable} />
       </div>
       <p className="text-xs text-gray-500">
@@ -177,8 +257,7 @@ export default function ConnectionSharing({ user, connectionId }: { user: any; c
           {grants.map(g => (
             <li key={g.grantId} className="text-sm">
               <div className="flex items-center justify-between">
-                {/* Pending and claimed shares look the same, so the list never says
-                    whether an email has an account. */}
+                {/* Pending and claimed shares look the same in this list. */}
                 <span>
                   <span className="font-mono">{g.recipient || "someone"}</span>
                   <span className="text-gray-500"> · {summary(g)}</span>

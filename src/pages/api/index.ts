@@ -39,7 +39,7 @@ import { checkItemCreateAllowed } from "../../lib/usage-service";
 import { checkBurstLimit, BURST } from "../../lib/free-plan-throttle";
 import { listLanguages, getLanguageInfo } from "./languages";
 import { client } from "../../lib/auth";
-import { findAccounts } from "../../lib/account-lookup";
+import { findAccounts, isSystemAccount, profileName } from "../../lib/account-lookup";
 import { getCredentialsForApiKey } from "../../lib/api-credentials";
 import {
   listConnections,
@@ -57,7 +57,17 @@ import {
   claimConnectionGrants,
   PolicyError,
 } from "../../lib/policy-client";
-import { accountForEmail, emailHash, isEmail, normalizeEmail, verifiedEmailHashes } from "../../lib/connection-sharing";
+import {
+  accountExists,
+  accountForEmail,
+  accountLabel,
+  emailHash,
+  isAccountId,
+  isEmail,
+  normalizeAccountId,
+  normalizeEmail,
+  verifiedEmailHashes,
+} from "../../lib/connection-sharing";
 import { enqueueGenerationJob } from "../../lib/generation-queue";
 import {
   FreePlanError,
@@ -467,9 +477,11 @@ const typeDefs = `
     rotateConnection(connectionId: String!, key: String!, secret: String!): Boolean!
     disableConnection(connectionId: String!): Boolean!
     deleteConnection(connectionId: String!): Boolean!
-    # Share a connection with a person by email, allowing exactly the functions
-    # named. Succeeds the same way whether or not the email has an account yet.
-    shareConnection(connectionId: String!, email: String!, permissions: [PermissionInput!]!, expiresAt: String): Boolean!
+    # Share a connection with a person, named by email or by account ID (exactly
+    # one), allowing exactly the functions named. By email it succeeds the same
+    # way whether or not the email has an account yet; by account ID the account
+    # must exist.
+    shareConnection(connectionId: String!, email: String, accountId: String, permissions: [PermissionInput!]!, expiresAt: String): Boolean!
     # Change a grant's functions or end date; the recipient stays.
     updateConnectionGrant(connectionId: String!, grantId: String!, permissions: [PermissionInput!]!, expiresAt: String): Boolean!
     revokeConnectionGrant(connectionId: String!, grantId: String!): Boolean!
@@ -970,9 +982,25 @@ const resolvers = {
     },
     shareConnection: async (_, args, ctx) => {
       if (ctx.freePlan) throw new Error("Connections require a full account.");
-      if (!isEmail(args.email)) throw new Error("Enter a valid email address.");
+      const byEmail = typeof args.email === "string" && args.email.trim() !== "";
+      const byAccount = typeof args.accountId === "string" && args.accountId.trim() !== "";
+      if (byEmail === byAccount) throw new Error("Enter an email address or an account ID.");
+      if (byEmail && !isEmail(args.email)) throw new Error("Enter a valid email address.");
+      if (byAccount && !isAccountId(args.accountId)) throw new Error("An account ID is 40 hexadecimal characters, with or without 0x.");
       const access = grantAccess(args);
       const auth = await resolveAuth(ctx);
+      if (byAccount) {
+        const recipientUid = normalizeAccountId(args.accountId);
+        if (recipientUid === auth.uid) throw new Error("You already own this connection.");
+        if (isSystemAccount(recipientUid) || !(await accountExists(recipientUid))) throw new Error("No account has that ID.");
+        const recipientLabel = (await profileName(recipientUid)) || accountLabel(recipientUid);
+        await viaPolicy(() => shareConnection(auth.token, args.connectionId, {
+          recipientUid,
+          recipientLabel,
+          ...access,
+        }));
+        return true;
+      }
       const email = normalizeEmail(args.email);
       const recipientUid = await accountForEmail(email);
       if (recipientUid === auth.uid) throw new Error("You already own this connection.");

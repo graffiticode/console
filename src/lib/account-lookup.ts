@@ -31,6 +31,7 @@ export const shortAccountId = (accountId: string) => {
 
 // Accounts no one shares with: the eval harness and the shared trial account.
 const systemUids = () => new Set([process.env.EVAL_UID, process.env.FREE_PLAN_UID].filter(Boolean) as string[]);
+export const isSystemAccount = (uid: string) => systemUids().has(uid);
 
 // The account's profile name, if it has one.
 export async function profileName(uid: string): Promise<string | null> {

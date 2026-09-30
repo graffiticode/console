@@ -138,12 +138,13 @@ export type Permission = { lang: string; fn: string };
 export type GrantAccess = { permissions: Permission[]; expiresAt?: string | null };
 const accessVars = ({ permissions, expiresAt }: GrantAccess) => ({ permissions, expiresAt: expiresAt || null });
 
-export const shareConnection = ({ user, connectionId, email, ...access }: { user: any; connectionId: string; email: string } & GrantAccess) =>
+// Names the recipient by email or by account ID: pass exactly one.
+export const shareConnection = ({ user, connectionId, email = null, accountId = null, ...access }: { user: any; connectionId: string; email?: string | null; accountId?: string | null } & GrantAccess) =>
   connectionMutation(user, gql`
-    mutation shareConnection($connectionId: String!, $email: String!, $permissions: [PermissionInput!]!, $expiresAt: String) {
-      shareConnection(connectionId: $connectionId, email: $email, permissions: $permissions, expiresAt: $expiresAt)
+    mutation shareConnection($connectionId: String!, $email: String, $accountId: String, $permissions: [PermissionInput!]!, $expiresAt: String) {
+      shareConnection(connectionId: $connectionId, email: $email, accountId: $accountId, permissions: $permissions, expiresAt: $expiresAt)
     }
-  `, { connectionId, email, ...accessVars(access) }, "shareConnection");
+  `, { connectionId, email, accountId, ...accessVars(access) }, "shareConnection");
 
 export const updateConnectionGrant = ({ user, connectionId, grantId, ...access }: { user: any; connectionId: string; grantId: string } & GrantAccess) =>
   connectionMutation(user, gql`

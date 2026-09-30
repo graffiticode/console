@@ -12,6 +12,7 @@ import {
   setCurrentConnection,
 } from "../utils/swr/fetchers";
 import ConnectionSharing from "./ConnectionSharing";
+import CopyableId from "./CopyableId";
 import { CREDENTIAL_BACKENDS, getCredentialBackend } from "../lib/credential-backends";
 
 interface Connection {
@@ -198,6 +199,13 @@ export default function ConnectionsCard() {
         A connection lets your items use an external service without the credential ever reaching them.
         Every save of an item writes through the current connection for its language, chosen below. Share it to let someone else use it without seeing the credential. The secret is sent once and never shown again.
       </p>
+      {user?.uid && (
+        <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+          <span>Your account ID</span>
+          <CopyableId value={user.uid} title="Click to copy your account ID" />
+          <span className="text-xs text-gray-400">Give it to someone who wants to share a connection with you.</span>
+        </div>
+      )}
 
       {status === "error" && !form && (
         <p className="text-sm text-red-600 mb-2">Connections are unavailable right now. {error}</p>
