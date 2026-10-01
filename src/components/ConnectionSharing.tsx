@@ -11,18 +11,12 @@ import {
   type AccountMatch,
 } from "../utils/swr/fetchers";
 
-// Plain descriptions of protected functions, for the share form; anything
+// Plain descriptions of protected functions (share form, column tooltips); anything
 // unlisted shows its name.
 const FUNCTION_LABELS: Record<string, string> = {
   "preview-itembank": "Render items (previews)",
   "save-to-itembank": "Write items to your item bank",
   "author-itembank": "Open items in the Author Site",
-};
-// Short column headings in the access table.
-const COLUMN_LABELS: Record<string, string> = {
-  "preview-itembank": "Preview",
-  "save-to-itembank": "Save",
-  "author-itembank": "Author",
 };
 
 interface Permission { lang: string; fn: string }
@@ -338,8 +332,8 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
           <tr className="text-xs text-gray-500">
             <th className="px-2 text-left font-normal">Account</th>
             {columns.map(f => (
-              <th key={`${f.lang}:${f.fn}`} className="px-2 font-normal" title={FUNCTION_LABELS[f.fn] || f.fn}>
-                {COLUMN_LABELS[f.fn] || f.fn}
+              <th key={`${f.lang}:${f.fn}`} className="px-2 font-mono font-normal" title={FUNCTION_LABELS[f.fn] || f.fn}>
+                {f.fn}
               </th>
             ))}
             <th className="px-2 text-left font-normal">Until</th>
