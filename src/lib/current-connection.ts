@@ -44,7 +44,7 @@ function connectionsFor(auth: Auth): Promise<CandidateConnection[]> {
   if (!listing) {
     listing = policyEnabled()
       ? Promise.all([listConnections(auth.token), listSharedConnections(auth.token)]).then(([owned, shared]) => [
-        ...owned.map(c => ({ ...c, shared: false, permissions: null, expiresAt: null })),
+        ...owned.map(c => ({ ...c, ownerPermissions: c.ownerPermissions ?? null, shared: false, permissions: null, expiresAt: null })),
         ...shared.map(c => ({ ...c, shared: true })),
       ])
       // Connections are off here (no POLICY_URL): nothing to write through.
@@ -66,17 +66,19 @@ function choicesFor(auth: Auth): Promise<Record<string, string>> {
 const choiceKey = (lang: string, backend: string) => `${lang}:${backend}`;
 
 // Active connections for the backend; a shared one only if its grant covers
-// this language and has not ended. Never a system connection: it signs
-// previews only, and policy refuses it for writes (system-connection).
+// this language and has not ended; an owned one only if the owner hasn't
+// excluded this language from their own use (null: everything). Never a
+// system connection: it signs previews only, and policy refuses it for writes
+// (system-connection).
+const coversLang = (permissions: Permission[], lang: string) => permissions.some(p => normalizeLang(p.lang) === lang);
 function candidatesFor(all: CandidateConnection[], lang: string, backend: string, now = Date.now()) {
   return all.filter(c =>
     c.status === "active" &&
     c.system !== true &&
     c.backend === backend &&
-    (!c.shared || (
-      (c.permissions || []).some(p => normalizeLang(p.lang) === lang) &&
-      !(c.expiresAt && Date.parse(c.expiresAt) <= now)
-    )));
+    (c.shared
+      ? coversLang(c.permissions || [], lang) && !(c.expiresAt && Date.parse(c.expiresAt) <= now)
+      : !c.ownerPermissions || coversLang(c.ownerPermissions, lang)));
 }
 
 // Null for free-plan callers and languages that cannot use a connection.

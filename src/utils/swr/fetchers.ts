@@ -185,11 +185,29 @@ export const loadShareableFunctions = async ({ user, connectionId }: { user: any
   return client.request(query, { connectionId }).then((data: any) => data.shareableFunctions);
 };
 
+export const loadConnectionFunctions = async ({ user, connectionId }: { user: any; connectionId: string }) => {
+  const client = await buildRequestClient({ token: await user.getToken() });
+  const query = gql`
+    query connectionFunctions($connectionId: String!) {
+      connectionFunctions(connectionId: $connectionId) { lang fn kind implicit delegable }
+    }
+  `;
+  return client.request(query, { connectionId }).then((data: any) => data.connectionFunctions);
+};
+
+// null: everything.
+export const setOwnerPermissions = ({ user, connectionId, permissions }: { user: any; connectionId: string; permissions: Permission[] | null }) =>
+  connectionMutation(user, gql`
+    mutation setOwnerPermissions($connectionId: String!, $permissions: [PermissionInput!]) {
+      setOwnerPermissions(connectionId: $connectionId, permissions: $permissions)
+    }
+  `, { connectionId, permissions }, "setOwnerPermissions");
+
 export const loadConnections = async ({ user }: { user: any }) => {
   const client = await buildRequestClient({ token: await user.getToken() });
   const query = gql`
     query connections {
-      connections { connectionId backend status label system shared permissions { lang fn } expiresAt sharedBy { name shortId } }
+      connections { connectionId backend status label system shared permissions { lang fn } expiresAt sharedBy { name shortId } ownerPermissions { lang fn } }
     }
   `;
   return client.request(query).then((data: any) => data.connections);

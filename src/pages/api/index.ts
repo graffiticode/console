@@ -50,6 +50,8 @@ import {
   shareConnection,
   updateConnectionGrant,
   listShareableFunctions,
+  listConnectionFunctions,
+  setOwnerPermissions,
   listConnectionGrants,
   revokeConnectionGrant,
   listSharedConnections,
@@ -355,6 +357,9 @@ const typeDefs = `
     # For a shared connection: the account that shared it (profile name, or
     # its short ID when it has none). Null for the caller's own connections.
     sharedBy: SharedBy
+    # For the caller's own connections: what they allow themselves through it.
+    # Null is everything (and always null for a shared connection).
+    ownerPermissions: [Permission!]
   }
 
   type SharedBy {
@@ -380,6 +385,17 @@ const typeDefs = `
     kind: String!
   }
 
+  # A protected function on a connection's backend. The owner's own access may
+  # include any of them; a share only the delegable ones. An implicit function
+  # (rendering) also comes with any other function in its language.
+  type ConnectionFunction {
+    lang: String!
+    fn: String!
+    kind: String!
+    implicit: Boolean!
+    delegable: Boolean!
+  }
+
   # One person a connection is shared with, as its owner sees it. pending: shared
   # to an email that has not signed in yet.
   type ConnectionGrant {
@@ -397,6 +413,7 @@ const typeDefs = `
     currentConnections: [CurrentConnection!]!
     connectionGrants(connectionId: String!): [ConnectionGrant!]!
     shareableFunctions(connectionId: String!): [ShareableFunction!]!
+    connectionFunctions(connectionId: String!): [ConnectionFunction!]!
     parse(lang: String!, src: String!, itemId: String): ParseResult!
     # connectionId: view the caller's stored result through that connection.
     data(id: String!, connectionId: String): String!
@@ -494,6 +511,9 @@ const typeDefs = `
     # Change a grant's functions or end date; the recipient stays.
     updateConnectionGrant(connectionId: String!, grantId: String!, permissions: [PermissionInput!]!, expiresAt: String): Boolean!
     revokeConnectionGrant(connectionId: String!, grantId: String!): Boolean!
+    # What the owner allows themselves through their connection; null restores
+    # everything. Independent of what they share.
+    setOwnerPermissions(connectionId: String!, permissions: [PermissionInput!]): Boolean!
     leaveSharedConnection(connectionId: String!): Boolean!
   }
 
@@ -568,8 +588,8 @@ const resolvers = {
         owners.set(uid, { name: name || shortId, shortId });
       }));
       return [
-        ...owned.map(c => ({ ...c, shared: false, permissions: null, expiresAt: null, sharedBy: null })),
-        ...shared.map(c => ({ ...c, shared: true, sharedBy: (c.ownerUid && owners.get(c.ownerUid)) || null })),
+        ...owned.map(c => ({ ...c, ownerPermissions: c.ownerPermissions ?? null, shared: false, permissions: null, expiresAt: null, sharedBy: null })),
+        ...shared.map(c => ({ ...c, ownerPermissions: null, shared: true, sharedBy: (c.ownerUid && owners.get(c.ownerUid)) || null })),
       ];
     },
     currentConnections: async (_, __, ctx) => {
@@ -587,6 +607,11 @@ const resolvers = {
       if (ctx.freePlan) return [];
       const auth = await resolveAuth(ctx);
       return await viaPolicy(() => listShareableFunctions(auth.token, args.connectionId));
+    },
+    connectionFunctions: async (_, args, ctx) => {
+      if (ctx.freePlan) return [];
+      const auth = await resolveAuth(ctx);
+      return await viaPolicy(() => listConnectionFunctions(auth.token, args.connectionId));
     },
     data: async (_, args, ctx) => {
       const { id } = args;
@@ -1038,6 +1063,13 @@ const resolvers = {
       if (ctx.freePlan) throw new Error("Connections require a full account.");
       const auth = await resolveAuth(ctx);
       await viaPolicy(() => revokeConnectionGrant(auth.token, args.connectionId, args.grantId));
+      return true;
+    },
+    setOwnerPermissions: async (_, args, ctx) => {
+      if (ctx.freePlan) throw new Error("Connections require a full account.");
+      const auth = await resolveAuth(ctx);
+      const permissions = Array.isArray(args.permissions) ? args.permissions.map(({ lang, fn }) => ({ lang, fn })) : null;
+      await viaPolicy(() => setOwnerPermissions(auth.token, args.connectionId, permissions));
       return true;
     },
     leaveSharedConnection: async (_, args, ctx) => {

@@ -30,6 +30,8 @@ interface Connection {
   expiresAt: string | null;
   // For a shared connection: who shared it (profile name, or short ID).
   sharedBy?: { name: string; shortId: string } | null;
+  // For an owned connection: what the owner allows themselves (null: everything).
+  ownerPermissions?: { lang: string; fn: string }[] | null;
 }
 
 interface CurrentConnection {
@@ -41,8 +43,9 @@ interface CurrentConnection {
 }
 
 // A connection holds an external-API credential in the credential broker; items
-// run through it without ever seeing the credential. Its owner can use it and
-// share it (ConnectionSharing); people it is shared with see it here as
+// run through it without ever seeing the credential. Its owner can use it,
+// limit their own use of it and share it (ConnectionSharing: one access table
+// per connection); people it is shared with see it here as
 // "Shared with you" and can leave. The secret is sent once and never shown again.
 const errorText = (err: any) =>
   String(err?.response?.errors?.[0]?.message || err?.message || err).replace(/^Connection request refused: /, "Refused: ");
@@ -346,8 +349,10 @@ export default function ConnectionsCard() {
             <ConnectionSharing
               user={user}
               connectionId={c.connectionId}
+              ownerPermissions={c.ownerPermissions ?? null}
               showForm={sharing === c.connectionId && c.status === "active"}
-              editable={c.status === "active"} />
+              editable={c.status === "active"}
+              onOwnerChanged={refresh} />
           )}
           </li>
         ))}

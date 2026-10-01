@@ -38,7 +38,9 @@ export function describeWriteProblem(write: LastWriteLike): WriteProblem | null 
     return failed("This is Graffiticode's preview account; it can't write to an item bank. Add your own Learnosity connection in Settings.", false);
   }
   if (has(message, "not-granted", "fn-not-in-session")) {
-    return failed("Your access to this connection doesn't include saving to the item bank.", false);
+    // The owner's own settings for the connection refuse it the same way a
+    // narrower share does.
+    return failed("This connection's access doesn't include saving to the item bank for this language. If it's your connection, change your access under Settings → Connections; if it was shared with you, ask its owner.", false);
   }
   if (has(message, "connection-disabled")) {
     return failed("This connection is disabled.", false);

@@ -33,6 +33,10 @@ export type Connection = {
   // offered as a connection to save through. False when policy predates the
   // flag.
   system: boolean;
+  // For the owner's own connections: the (lang, fn) pairs the owner allows
+  // themselves through it, or null for everything (absent from a policy that
+  // predates it, which means the same).
+  ownerPermissions?: Permission[] | null;
 };
 
 // The flag is read strictly: only an explicit true marks a system connection.
@@ -46,6 +50,9 @@ export type SharedConnection = Connection & { permissions: Permission[]; expires
 // One function in one language, e.g. { lang: "0176", fn: "save-to-itembank" }.
 export type Permission = { lang: string; fn: string };
 export type ShareableFunction = Permission & { kind: string };
+// Every protected function on a connection's backend: the owner's own list may
+// name any of them, a grant only the delegable ones.
+export type ConnectionFunction = ShareableFunction & { implicit: boolean; delegable: boolean };
 
 export type ConnectionGrant = {
   grantId: string;
@@ -143,6 +150,13 @@ export const updateConnectionGrant = (userToken: string, connectionId: string, g
 
 export const listShareableFunctions = (userToken: string, connectionId: string): Promise<ShareableFunction[]> =>
   call("GET", `/v1/connections/${encodeURIComponent(connectionId)}/shareable`, userToken);
+
+export const listConnectionFunctions = (userToken: string, connectionId: string): Promise<ConnectionFunction[]> =>
+  call("GET", `/v1/connections/${encodeURIComponent(connectionId)}/functions`, userToken);
+
+// The owner limits their own use of the connection; null restores everything.
+export const setOwnerPermissions = (userToken: string, connectionId: string, permissions: Permission[] | null) =>
+  call("PUT", `/v1/connections/${encodeURIComponent(connectionId)}/owner-permissions`, userToken, { permissions });
 
 export const listConnectionGrants = (userToken: string, connectionId: string): Promise<ConnectionGrant[]> =>
   call("GET", `/v1/connections/${encodeURIComponent(connectionId)}/grants`, userToken);
