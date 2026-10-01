@@ -155,7 +155,7 @@ export default function ConnectionsCard() {
                 onChange={() => act(() => setCurrentConnection({ user, lang: cc.lang, connectionId: c.connectionId }))} />
               <span>
                 Current for L{cc.lang}
-                {checked && !cc.explicit && <span className="text-gray-500"> (automatic — only one)</span>}
+                {checked && !cc.explicit && <span className="text-gray-500"> (automatic)</span>}
               </span>
             </label>
           );
