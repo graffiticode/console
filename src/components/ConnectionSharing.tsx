@@ -14,9 +14,9 @@ import {
 // Plain descriptions of protected functions (share form, column tooltips); anything
 // unlisted shows its name.
 const FUNCTION_LABELS: Record<string, string> = {
-  "preview-itembank": "Render items (previews)",
+  "init": "Render items (previews)",
   "save-to-itembank": "Write items to your item bank",
-  "author-itembank": "Open items in the Author Site",
+  "author": "Open items in the Author Site",
 };
 
 interface Permission { lang: string; fn: string }
