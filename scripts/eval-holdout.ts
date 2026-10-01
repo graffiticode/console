@@ -129,7 +129,7 @@ export async function findHoldoutLeaks(
 export async function assertHoldout(
   langs: string[],
   casesFor: (lang: string) => Array<{ id: string; prompt: string }>,
-  opts: { allowLeak?: boolean; collection?: string } = {},
+  opts: { allowLeak?: boolean; allowEmptyCorpus?: boolean; collection?: string } = {},
 ): Promise<boolean> {
   let leaked = 0;
   for (const lang of langs) {
@@ -139,6 +139,10 @@ export async function assertHoldout(
     try {
       leaks = await findHoldoutLeaks(lang, cases, opts.collection);
     } catch (err: any) {
+      if (err instanceof EmptyCorpusError && opts.allowEmptyCorpus) {
+        console.error(`[holdout] ⚠ L${lang}: corpus is EMPTY — proceeding (--allow-empty-corpus): nothing to leak into, nothing verified.`);
+        continue;
+      }
       // Cannot verify => do not proceed. An unreadable or empty corpus is
       // indistinguishable from a clean one, and both would silently pass.
       const why = err instanceof EmptyCorpusError

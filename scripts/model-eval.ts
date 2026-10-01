@@ -238,9 +238,15 @@ interface RunResult {
  * labeled candidates in 0166 + 0176 — real programs carry 2-11 brackets, the two
  * known stubs carry 0. Deliberately NOT a quality test: a substantive program
  * that gets the task wrong still compiled, and belongs to the human/judge scale.
+ *
+ * EXCEPT the value languages. L0000 and L0003 compute values: `mul 2500 pow (add 1 0.04) 3..`
+ * is a complete, correct answer with no brackets at all. The bracket test scored most of the
+ * first L0000 eval (2026-10-01) as stubs, so for them only "no code" is a stub.
  */
-function isStub(code: string | null | undefined): boolean {
+const VALUE_LANGS = new Set(["0000", "0003"]);
+function isStub(code: string | null | undefined, lang?: string): boolean {
   if (!code) return true;
+  if (lang && VALUE_LANGS.has(lang)) return !code.trim();
   return !code.replace(/"(\\.|[^"\\])*"/g, '""').includes("[");
 }
 
@@ -274,7 +280,7 @@ function parseArgs(argv: string[]) {
   const a = { langs: [] as string[], models: ["claude-sonnet-5", "gpt-5.6-terra"],
     trials: 3, limit: 3, out: "model-eval.json", setDir: "data/model-eval",
     labelsDir: "data/model-eval/labels", judge: false, calibrate: false,
-    panel: false, allowLeak: false, stamp: true, holdoutOnly: false,
+    panel: false, allowLeak: false, allowEmptyCorpus: false, stamp: true, holdoutOnly: false,
     // --converge N: run each case as an agent SESSION — generate, then repair against the
     // compiler's warnings up to N turns. Default 1 = today's single-shot behavior, so runs on
     // disk stay comparable and the new mode is always an explicit choice.
@@ -306,6 +312,9 @@ function parseArgs(argv: string[]) {
     else if (v === "--panel") { a.panel = true; a.judge = true; }
     // Deliberately measure retrieval-assisted performance (see eval-holdout.ts).
     else if (v === "--allow-leak") a.allowLeak = true;
+    // A language with NO corpus cannot leak (retrieval returns nothing), but the gate cannot
+    // tell an empty corpus from the wrong database, so it refuses. This says "I know it is empty".
+    else if (v === "--allow-empty-corpus") a.allowEmptyCorpus = true;
     // --no-stamp writes exactly --out instead of a timestamped sibling.
     else if (v === "--no-stamp") a.stamp = false;
     // Run only the hold-out gate and exit. Costs nothing and needs no eval
@@ -509,7 +518,7 @@ async function runOne(
       // compiled ⇔ verification produced a taskId AND we got back code that
       // actually authored something. A stub parses, so it would otherwise score as
       // a first-pass win — the metric would reward emitting nothing.
-      const stub = isStub(res?.code);
+      const stub = isStub(res?.code, lang);
       const compiled = !!res?.taskId && !!res?.code && !stub;
       // No code at all, with tokens spent: generateCode's empty-generation return
       // (`code: null, taskId: null` + errors). Recorded on the opening move only —
@@ -1341,7 +1350,7 @@ async function main() {
   const holdoutOk = await assertHoldout(
     args.langs,
     (lang) => loadCases(args.setDir, lang),
-    { allowLeak: args.allowLeak },
+    { allowLeak: args.allowLeak, allowEmptyCorpus: args.allowEmptyCorpus },
   );
   if (!holdoutOk) process.exit(1);
   if (args.holdoutOnly) { console.error("[holdout] gate only — no generation run."); return; }
