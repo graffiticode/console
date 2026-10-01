@@ -117,6 +117,17 @@ export default function ConnectionsCard() {
   };
 
   const backendLabel = (b: string) => getCredentialBackend(b)?.label || b;
+  // One line naming a connection, the same for owned and shared rows: the
+  // service first (what it connects to), then the owner's label for it, its
+  // status, and the end of its id.
+  const rowHeading = (c: Connection) => (
+    <div className="flex flex-wrap items-baseline gap-x-3">
+      <span className="font-medium text-gray-900">{backendLabel(c.backend)}</span>
+      {c.label && <span className="font-mono">{c.label}</span>}
+      <span className={`text-sm ${c.status === "active" ? "text-green-700" : "text-gray-500"}`}>{c.status}</span>
+      <span className="font-mono text-sm text-neutral-500">{c.connectionId.slice(-8)}</span>
+    </div>
+  );
   // Current connection per connectable language: a radio on each candidate row,
   // exclusive per language across all rows. A system connection, a disabled one,
   // or a shared one whose grant doesn't cover the language is never a candidate.
@@ -262,7 +273,7 @@ export default function ConnectionsCard() {
           c.shared ? (
             <li key={c.connectionId} className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
               <div className="flex flex-col">
-                <span className="font-mono">{c.label || backendLabel(c.backend)}</span>
+                {rowHeading(c)}
                 <small className="text-sm text-neutral-500 font-light space-x-3">
                   <span>
                     {c.sharedBy ? (
@@ -272,7 +283,6 @@ export default function ConnectionsCard() {
                   </span>
                   <span className="font-mono">{(c.permissions || []).map(p => `L${p.lang} ${p.fn}`).join(", ")}</span>
                   {c.expiresAt && <span>until {new Date(c.expiresAt).toLocaleDateString()}</span>}
-                  <span className={c.status === "active" ? "text-green-700" : "text-gray-500"}>{c.status}</span>
                 </small>
                 {currentRadios(c)}
                 {confirming === `leave:${c.connectionId}` && (
@@ -291,12 +301,7 @@ export default function ConnectionsCard() {
           <li key={c.connectionId}>
           <div className="flex items-center justify-between border border-gray-300 px-4 py-1 rounded-none">
             <div className="flex flex-col">
-              <span className="font-mono">{c.label || backendLabel(c.backend)}</span>
-              <small className="text-sm text-neutral-500 font-light space-x-3">
-                <span>{backendLabel(c.backend)}</span>
-                <span className={c.status === "active" ? "text-green-700" : "text-gray-500"}>{c.status}</span>
-                <span className="font-mono">{c.connectionId.slice(-8)}</span>
-              </small>
+              {rowHeading(c)}
               {c.system && (
                 <small className="text-xs text-gray-500 mt-1">
                   Graffiticode preview account — signs previews only; not used for saves.
