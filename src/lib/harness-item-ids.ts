@@ -27,6 +27,8 @@ export const HARNESS_ITEM_ID_PREFIXES = {
   ping: "corpus-ping-",
   /** Weekly shape sweep — src/lib/corpus-sweep.ts */
   sweep: "corpus-sweep-",
+  /** Model eval — scripts/model-eval.ts */
+  eval: "model-eval-",
 } as const;
 
 export type HarnessKind = keyof typeof HARNESS_ITEM_ID_PREFIXES;

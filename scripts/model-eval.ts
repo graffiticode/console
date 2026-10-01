@@ -96,6 +96,9 @@ import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap, before
 
 import { writeFileSync, readFileSync, existsSync, appendFileSync } from "fs";
 import { generateCode, getRelevantExamples } from "../src/lib/code-generation-service";
+import { parseCode, postTask } from "../src/pages/api/resolvers";
+import { getBaseUrlForApi } from "../src/lib/api";
+import { harnessItemId } from "../src/lib/harness-item-ids";
 import { getCredentialsForApiKey } from "../src/lib/api-credentials";
 import { judgeCode, judgePair, judgePanel, judgeModelForFamily, anchorVersion } from "../src/lib/judge-service";
 import { inferProviderFromModel, type LlmProvider } from "../src/lib/llm-models";
@@ -420,6 +423,36 @@ function repairPrompt(originalPrompt: string, warnings: string[]): string {
  * against), or NO PROGRESS — a turn that fails to reduce the fixable count. Without the last one a
  * model that rewrites the same flawed item five times bills five turns to reach turn one's result.
  */
+/**
+ * What a program compiles to, given as `currentData` to an edit — as real `update_item` traffic
+ * and the corpus ping already do. Without it an edit case runs blind: L0182's survey options and
+ * items exist only in the compiled data (the compiler fetches them), so an "answer it" turn had
+ * to guess them. Compiled under the case's `itemId`, so `get-val-public "itemId"` resolves.
+ * Throws when the program does not compile: an edit case on a broken program measures nothing.
+ */
+async function compileForData(auth: any, lang: string, src: string, itemId: string): Promise<unknown> {
+  const parsed: any = await parseCode({ lang, src, publicValues: { itemId }, accessToken: auth.token });
+  if (parsed?.errors?.length) throw new Error(`currentCode does not parse: ${parsed.errors[0].message}`);
+  const posted: any = await postTask({ auth, task: { lang, code: JSON.parse(parsed.code) }, ephemeral: true, isPublic: false });
+  if (!posted?.id) throw new Error("currentCode: postTask returned no taskId");
+  return dataForTask(auth, posted.id);
+}
+
+/** A task's compiled data, recompiled (not from cache), or throw with the compiler's errors. */
+async function dataForTask(auth: any, taskId: string): Promise<unknown> {
+  const resp = await fetch(`${getBaseUrlForApi()}/data?id=${encodeURIComponent(taskId)}&refresh=1`, {
+    headers: { Authorization: auth.token },
+    signal: AbortSignal.timeout(60_000),
+  });
+  const body: any = await resp.json();
+  const errors = Array.isArray(body?.data?.errors) ? body.data.errors : [];
+  if (errors.length) throw new Error(`currentCode does not compile: ${errors.map((e: any) => e?.message ?? e).join("; ")}`);
+  return body?.data?.data ?? null;
+}
+
+/** Compiled once per case, shared by every variant and trial — the input is identical. */
+const currentDataCache = new Map<string, Promise<unknown>>();
+
 async function runOne(
   auth: any, lang: string, v: Variant, c: EvalCase, trial: number, precomputed: any[],
   gen: { thinking?: unknown }, maxTurns = 1,
@@ -440,15 +473,24 @@ async function runOne(
   let code: string | undefined;
   let prompt = c.prompt;
   let currentCode = c.currentCode ?? null;
+  const itemId = harnessItemId("eval", lang);
+  let currentData: unknown = null;
   let report = { fixable: [] as any[], unfixable: [] as any[], all: [] as any[], alternativeClaims: null as number | null };
   let turnsToClean: number | null = null;
   let stuck = false;
 
   try {
+    // Inside the try: a case whose starting program does not compile is recorded as that
+    // run's error, not thrown out of the sweep.
+    if (currentCode) {
+      const key = `${lang}|${c.id}`;
+      if (!currentDataCache.has(key)) currentDataCache.set(key, compileForData(auth, lang, currentCode, itemId));
+      currentData = await currentDataCache.get(key);
+    }
     for (let turn = 1; turn <= Math.max(1, maxTurns); turn++) {
       const tTurn = performance.now();
       const res: any = await generateCode({
-        auth, prompt, lang, currentCode,
+        auth, prompt, lang, currentCode, currentData, itemId,
         // pin model → bypasses opt-in + Haiku downgrade. `effort` is the variant's on
         // the effort axis and undefined otherwise (⇒ API default); `thinking` stays a
         // matched constant across every arm. NOTE the resolution order in
@@ -518,6 +560,8 @@ async function runOne(
 
       prompt = repairPrompt(c.prompt, report.fixable.map((w) => w.message));
       currentCode = code ?? currentCode;
+      // The repair turn edits the program just generated, so it gets that program's data.
+      if (res?.taskId) currentData = await dataForTask(auth, res.taskId).catch(() => currentData);
     }
 
     return {
