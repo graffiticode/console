@@ -27,6 +27,7 @@
 // contract in CLAUDE.md that applies to every emitter without exception.
 import { getFirestore } from "../utils/db";
 import { generateCodeForRequest } from "./code-generation/generate-for-request";
+import { vectorSearch } from "./embedding-service";
 import { getCredentialsForApiKey } from "./api-credentials";
 import { getBaseUrlForApi } from "./api";
 import { harnessItemId } from "./harness-item-ids";
@@ -94,7 +95,7 @@ const CONCURRENCY = 4;
  *  the run — one hung language must not cost the other ten their result. */
 const STEP_TIMEOUT_MS = 180_000;
 
-export type PingStage = "no-corpus" | "generate" | "empty" | "compile";
+export type PingStage = "no-corpus" | "generate" | "empty" | "compile" | "retrieval";
 
 /**
  * Two outcomes: it generated a compiling program, or it did not.
@@ -335,6 +336,28 @@ async function pingLang(lang: string, day: number, auth: { uid: string; token: s
 
       currentSrc = gen.src;
       currentData = compile.data ?? null;
+    }
+
+    // RETRIEVAL LIVENESS. From 2026-09-28 to 09-30 vector search returned nothing for
+    // 14 languages (embeddings stored as arrays, which findNearest cannot match) and this
+    // ping stayed green: generation still compiles with no examples, or with the keyword
+    // fallback's. So ask the index directly. findNearest returns the nearest neighbours
+    // whatever their score, so a healthy index always returns candidates for a corpus
+    // prompt; zero means it is dead. Deliberately NOT "did the generation use examples":
+    // below the 0.50 cutoff a healthy search legitimately yields none (~5-8% of corpus
+    // prompts), which would be a recurring false red.
+    const candidates = await withTimeout(
+      vectorSearch({
+        collection: "training_examples",
+        query: picked.turns[0],
+        limit: 3,
+        lang,
+        db: getFirestore(),
+      }),
+      `retrieve L${lang}`,
+    );
+    if (!candidates?.length) {
+      return { ...out, stage: "retrieval", error: "vector search returned no candidates", latencyMs: Date.now() - started };
     }
 
     return { ...out, outcome: "ok", latencyMs: Date.now() - started };

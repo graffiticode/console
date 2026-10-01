@@ -307,7 +307,11 @@ export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null 
             // Include scoring information
             similarity: doc.similarity,
             keywordScore: doc.keywordScore,
-            combinedScore: doc.combinedScore
+            combinedScore: doc.combinedScore,
+            // Which path produced the example. The keyword fallback below hides a
+            // dead vector search (2026-09-28: array embeddings, 14 languages), so
+            // analytics and the corpus ping need to tell the two apart.
+            retrievalSource: "vector" as const,
           };
         });
 
@@ -411,7 +415,7 @@ export async function getRelevantExamples({ prompt, lang, limit = 3, rid = null 
       });
     }
 
-    return topExamples;
+    return topExamples.map((e) => ({ ...e, retrievalSource: "keyword" as const }));
   } catch (error) {
     console.error("Error retrieving training examples:", error);
 
@@ -1458,21 +1462,25 @@ export async function generateCode({
       // The resolver ran retrieval before this request's analytics record
       // existed, so its trackRetrieval no-op'd. Record the reused examples now
       // (record is live after startRequest above) so the RAG report shows them.
+      // Recorded even when EMPTY: skipping empty retrievals left no trace of the
+      // 2026-09-28 outage, where every affected request simply had no retrieval
+      // field and looked like it never searched.
+      const usedKeywordFallback = relevantExamples.some((ex) => ex.retrievalSource === "keyword");
+      safeRAGAnalytics.trackRetrieval(
+        requestId,
+        relevantExamples.map((ex, idx) => ({
+          id: ex.id || `example-${idx}`,
+          similarity: ex.similarity,
+          keywordScore: ex.keywordScore,
+          combinedScore: ex.combinedScore,
+          prompt: ex.task || ex.description || "",
+          code: ex.code,
+        })),
+        usedKeywordFallback ? "keyword" : "hybrid",
+        0,
+        0.7,
+      );
       if (relevantExamples.length > 0) {
-        safeRAGAnalytics.trackRetrieval(
-          requestId,
-          relevantExamples.map((ex, idx) => ({
-            id: ex.id || `example-${idx}`,
-            similarity: ex.similarity,
-            keywordScore: ex.keywordScore,
-            combinedScore: ex.combinedScore,
-            prompt: ex.task || ex.description || "",
-            code: ex.code,
-          })),
-          "hybrid",
-          0,
-          0.7,
-        );
         safeRAGAnalytics.markDocumentsUsed(
           requestId,
           relevantExamples.map((ex, idx) => ex.id || `example-${idx}`),
@@ -1504,6 +1512,24 @@ export async function generateCode({
         // Even if withRAGFallback fails, continue without examples
         console.warn("Failed to retrieve examples, continuing without them:", error.message);
         relevantExamples = [];
+      }
+
+      // hybridSearch recorded its own (vector) result. When the keyword fallback
+      // supplied the examples instead, record that, so a dead vector search shows
+      // as "keyword" rather than passing for a healthy one.
+      if (relevantExamples?.some((ex) => ex.retrievalSource === "keyword")) {
+        safeRAGAnalytics.trackRetrieval(
+          requestId,
+          relevantExamples.map((ex, idx) => ({
+            id: ex.id || `example-${idx}`,
+            similarity: ex.similarity,
+            keywordScore: ex.keywordScore,
+            prompt: ex.task || ex.description || "",
+            code: ex.code,
+          })),
+          "keyword",
+          0,
+        );
       }
 
       safeRAGAnalytics.endStage(requestId, "retrieval");
