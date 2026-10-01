@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import UserSearchCombobox from "./UserSearchCombobox";
 import {
@@ -102,15 +102,15 @@ const columnOrder = (a: Fn, b: Fn) =>
   a.fn.localeCompare(b.fn);
 
 // Who may use one owned connection, and for what: a table beneath its row
-// with one column per protected function its languages register for the
-// connection's backend (grouped by language) and one row per account. The
-// owner's row comes first and covers every function, Author included;
-// "Everything" (no list) is how every connection starts. Each sharee's row
+// with one row per protected function its languages register for the
+// connection's backend (grouped by language) and one column per account. The
+// owner's column comes first and covers every function, author included;
+// "Everything" (no list) is how every connection starts. Each sharee's column
 // covers only the functions that can be shared. A language's implicit
 // function (rendering) comes with any other function checked in it, and can
-// be checked alone for previews only. Rows edit in place with Save/Cancel;
+// be checked alone for previews only. Columns edit in place with Save/Cancel;
 // changes take effect at that account's next run or view. The find-and-share
-// form (`showForm`, toggled by the row's Share button) adds a row.
+// form (`showForm`, toggled by the row's Share button) adds a column.
 export default function ConnectionSharing({ user, connectionId, ownerPermissions, showForm, editable = true, onOwnerChanged }: {
   user: any;
   connectionId: string;
@@ -221,12 +221,12 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
 
   // One cell: checked when the list names the function, or (for rendering)
   // when it names anything else in that language, which brings it along.
-  const cell = (list: Permission[] | null, f: Fn, onToggle: ((p: Permission) => void) | null) => {
+  const cell = (key: string, list: Permission[] | null, f: Fn, onToggle: ((p: Permission) => void) | null) => {
     const everything = list === null;
     const named = everything || list.some(p => same(p, f));
     const implied = !named && f.implicit && list.some(p => p.lang === f.lang);
     return (
-      <td key={`${f.lang}:${f.fn}`} className="px-2 py-1 text-center">
+      <td key={key} className="px-3 py-1 text-center">
         <input
           type="checkbox"
           aria-label={`${langLabel(f.lang)} ${f.fn}`}
@@ -237,13 +237,13 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
       </td>
     );
   };
-  const notShareable = (f: Fn) => (
-    <td key={`${f.lang}:${f.fn}`} className="px-2 py-1 text-center text-gray-300" title="Only you can use this; it is never shared">—</td>
+  const notShareable = (key: string) => (
+    <td key={key} className="px-3 py-1 text-center text-gray-300" title="Only you can use this; it is never shared">—</td>
   );
   const toggled = (list: Permission[], p: Permission) =>
     list.some(q => same(p, q)) ? list.filter(q => !same(p, q)) : [...list, { lang: p.lang, fn: p.fn }];
-  const rowButtons = (dirty: boolean, onSave: () => void, onCancel: () => void, saveDisabled = false) => dirty && (
-    <span className="flex items-center gap-2">
+  const saveButtons = (dirty: boolean, onSave: () => void, onCancel: () => void, saveDisabled = false) => dirty && (
+    <span className="flex items-center justify-center gap-2">
       <button
         type="button"
         className="px-2 py-0.5 bg-gray-900 text-white border border-gray-900 rounded-none text-xs hover:bg-gray-700 disabled:opacity-50"
@@ -255,14 +255,28 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
     </span>
   );
 
+  // One column per account: what it may use, its end date, and its Save/Cancel
+  // (and remove, for a sharee).
+  type Column = {
+    key: string;
+    header: ReactNode;
+    list: Permission[] | null;
+    onToggle: ((p: Permission) => void) | null;
+    // A sharee's column covers only the functions that can be shared.
+    shareableOnly: boolean;
+    until: ReactNode;
+    actions: ReactNode;
+  };
+
   const ownerList = ownerDraft === undefined ? ownerPermissions : ownerDraft;
   const ownerDirty = ownerDraft !== undefined &&
     !(ownerDraft === null ? ownerPermissions === null : ownerPermissions !== null && samePermissions(ownerDraft, ownerPermissions));
-  const ownerRow = (
-    <tr className="border-t border-gray-200">
-      <th scope="row" className="px-2 py-1 text-left font-normal">
-        <span className="font-medium">You</span>
-        <label className="ml-3 inline-flex items-center gap-1 text-xs text-gray-600">
+  const ownerColumn: Column = {
+    key: "owner",
+    header: (
+      <span className="flex flex-col items-center">
+        <span className="font-medium text-gray-900">You</span>
+        <label className="inline-flex items-center gap-1 text-xs font-normal text-gray-600">
           <input
             type="checkbox"
             checked={ownerList === null}
@@ -270,79 +284,88 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
             onChange={e => setOwnerDraft(e.target.checked ? null : columns.map(f => ({ lang: f.lang, fn: f.fn })))} />
           Everything
         </label>
-      </th>
-      {columns.map(f => cell(ownerList, f, editable ? p => setOwnerDraft(toggled(ownerList || [], p)) : null))}
-      <td className="px-2 py-1 text-gray-400">—</td>
-      <td className="px-2 py-1">
-        {rowButtons(ownerDirty, saveOwner, () => setOwnerDraft(undefined))}
-      </td>
-    </tr>
-  );
+      </span>
+    ),
+    list: ownerList,
+    onToggle: editable ? p => setOwnerDraft(toggled(ownerList || [], p)) : null,
+    shareableOnly: false,
+    until: <span className="text-gray-400">—</span>,
+    actions: saveButtons(ownerDirty, saveOwner, () => setOwnerDraft(undefined)),
+  };
 
-  const shareeRow = (g: Grant) => {
+  const shareeColumn = (g: Grant): Column => {
     const draft = drafts[g.grantId] || accessOf(g);
     const dirty = !sameAccess(draft, accessOf(g));
     const edit = (a: Access) => setDrafts(d => ({ ...d, [g.grantId]: a }));
     const cancel = () => setDrafts(({ [g.grantId]: _dropped, ...rest }) => rest);
-    return (
-      <tr key={g.grantId} className="border-t border-gray-200">
-        {/* Pending and claimed shares look the same here. */}
-        <th scope="row" className="px-2 py-1 text-left font-mono font-normal">{g.recipient || "someone"}</th>
-        {columns.map(f => (f.delegable
-          ? cell(draft.permissions, f, editable ? p => edit({ ...draft, permissions: toggled(draft.permissions, p) }) : null)
-          : notShareable(f)))}
-        <td className="px-2 py-1">
-          {editable ? (
-            <input
-              type="date"
-              aria-label="Until"
-              className="border border-gray-300 rounded-none px-1 py-0.5 text-xs"
-              value={draft.expires}
-              onChange={e => edit({ ...draft, expires: e.target.value })} />
-          ) : g.expiresAt ? new Date(g.expiresAt).toLocaleDateString() : <span className="text-gray-400">—</span>}
-        </td>
-        <td className="px-2 py-1">
-          <span className="flex items-center gap-2">
-            {rowButtons(dirty, () => saveGrant(g), cancel, incomplete(draft))}
-            {editable && (
-              <button type="button" title="Remove access" disabled={busy} onClick={() => run(() => revokeConnectionGrant({ user, connectionId, grantId: g.grantId }))}>
-                <XMarkIcon className="h-4 w-4 text-gray-500 hover:text-red-700" />
-              </button>
-            )}
-          </span>
-        </td>
-      </tr>
-    );
+    return {
+      key: g.grantId,
+      // Pending and claimed shares look the same here.
+      header: (
+        <span className="inline-flex items-center gap-1">
+          <span className="font-mono font-normal text-gray-900">{g.recipient || "someone"}</span>
+          {editable && (
+            <button type="button" title="Remove access" disabled={busy} onClick={() => run(() => revokeConnectionGrant({ user, connectionId, grantId: g.grantId }))}>
+              <XMarkIcon className="h-4 w-4 text-gray-500 hover:text-red-700" />
+            </button>
+          )}
+        </span>
+      ),
+      list: draft.permissions,
+      onToggle: editable ? p => edit({ ...draft, permissions: toggled(draft.permissions, p) }) : null,
+      shareableOnly: true,
+      until: editable ? (
+        <input
+          type="date"
+          aria-label="Until"
+          className="border border-gray-300 rounded-none px-1 py-0.5 text-xs"
+          value={draft.expires}
+          onChange={e => edit({ ...draft, expires: e.target.value })} />
+      ) : g.expiresAt ? new Date(g.expiresAt).toLocaleDateString() : <span className="text-gray-400">—</span>,
+      actions: saveButtons(dirty, () => saveGrant(g), cancel, incomplete(draft)),
+    };
   };
 
+  const accounts = [ownerColumn, ...(grants || []).map(shareeColumn)];
+  const anyActions = accounts.some(c => c.actions);
+
+  // Permissions are rows, grouped by language; accounts are columns, the
+  // owner first.
   const table = fns === null ? (
     <p className="text-xs text-gray-400">Loading access…</p>
   ) : (
     <div className="overflow-x-auto">
       <table className="text-sm">
         <thead>
-          <tr className="text-xs text-gray-600">
-            <th />
-            {langs.map(lang => (
-              <th key={lang} colSpan={columns.filter(f => f.lang === lang).length} className="px-2 font-semibold">{langLabel(lang)}</th>
-            ))}
-            <th />
-            <th />
-          </tr>
-          <tr className="text-xs text-gray-500">
-            <th className="px-2 text-left font-normal">Account</th>
-            {columns.map(f => (
-              <th key={`${f.lang}:${f.fn}`} className="px-2 font-mono font-normal" title={FUNCTION_LABELS[f.fn] || f.fn}>
-                {f.fn}
-              </th>
-            ))}
-            <th className="px-2 text-left font-normal">Until</th>
-            <th />
+          <tr className="text-sm">
+            <th className="px-2 text-left text-xs font-normal text-gray-500">Permission</th>
+            {accounts.map(c => <th key={c.key} className="px-3 pb-1 align-bottom">{c.header}</th>)}
           </tr>
         </thead>
         <tbody>
-          {ownerRow}
-          {(grants || []).map(shareeRow)}
+          {langs.map(lang => [
+            <tr key={`lang:${lang}`} className="border-t border-gray-200">
+              <th colSpan={1 + accounts.length} className="px-2 pt-1 text-left text-xs font-semibold text-gray-600">{langLabel(lang)}</th>
+            </tr>,
+            ...columns.filter(f => f.lang === lang).map(f => (
+              <tr key={`${f.lang}:${f.fn}`}>
+                <th scope="row" className="px-2 py-1 text-left font-mono font-normal" title={FUNCTION_LABELS[f.fn] || f.fn}>{f.fn}</th>
+                {accounts.map(c => (c.shareableOnly && !f.delegable
+                  ? notShareable(c.key)
+                  : cell(c.key, c.list, f, c.onToggle)))}
+              </tr>
+            )),
+          ])}
+          <tr className="border-t border-gray-200">
+            <th scope="row" className="px-2 py-1 text-left text-xs font-normal text-gray-500">Until</th>
+            {accounts.map(c => <td key={c.key} className="px-3 py-1 text-center">{c.until}</td>)}
+          </tr>
+          {anyActions && (
+            <tr>
+              <th />
+              {accounts.map(c => <td key={c.key} className="px-3 py-1">{c.actions}</td>)}
+            </tr>
+          )}
         </tbody>
       </table>
       {grants === null && <p className="text-xs text-gray-400 mt-1">Loading sharees…</p>}
