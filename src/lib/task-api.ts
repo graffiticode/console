@@ -13,16 +13,17 @@ import {
   languageOfflineMessage,
   isLanguageOfflineError,
 } from "./api";
-import { encrypt } from "./secret-crypto";
 
 function buildParseCallbacks(
-  { privateValues = {}, publicValues = {} }:
-  { privateValues?: Record<string, string>; publicValues?: Record<string, string> } = {},
+  { publicValues = {} }:
+  { publicValues?: Record<string, string> } = {},
 ) {
   return {
-    GET_VAL_PRIVATE: (name: string) => {
-      return encrypt(privateValues[name] || "");
-    },
+    // Private values are retired (capability spec SECRET-01): credentials
+    // never enter a task AST, so `get-val-private` bakes "" — the value such
+    // programs already received, since nothing supplies private values — and
+    // the console holds no encryption key.
+    GET_VAL_PRIVATE: (_name: string) => "",
     GET_VAL_PUBLIC: (name: string) => {
       const result = publicValues[name] || "";
       console.log("GET_VAL_PUBLIC()", "name:", name, "result:", result);
@@ -32,8 +33,8 @@ function buildParseCallbacks(
 }
 
 export async function parseCode(
-  { lang, src, privateValues = {}, publicValues = {}, accessToken }:
-  { lang: string; src: string; privateValues?: Record<string, string>; publicValues?: Record<string, string>; accessToken?: string },
+  { lang, src, publicValues = {}, accessToken }:
+  { lang: string; src: string; publicValues?: Record<string, string>; accessToken?: string },
 ) {
   try {
     const lexicon = await getLanguageLexicon(lang, accessToken);
@@ -41,7 +42,7 @@ export async function parseCode(
       // lexicon.json couldn't be fetched — treat the language service as offline.
       return { code: null, errors: [{ message: languageOfflineMessage(lang), from: -1, to: -1 }] };
     }
-    const nodePool = await parser.parse(lang, src, lexicon, buildParseCallbacks({ privateValues, publicValues }));
+    const nodePool = await parser.parse(lang, src, lexicon, buildParseCallbacks({ publicValues }));
 
     // Scan the AST pool for ERROR nodes
     const errors: Array<{ message: string; from: number; to: number }> = [];
