@@ -1,12 +1,22 @@
-# Shared secret encryption & credentials
+# Shared secret encryption (retired)
 
-**Shared secret encryption (`get-val-private` / account Secrets):** values are encrypted at parse time (console, `src/lib/secret-crypto.ts`, used by `src/pages/api/resolvers.ts`) and decrypted at compile time (basis, `src/compiler.js`). The two `decrypt` implementations must stay in lockstep. The **identical keyring** must be present on the console runtime AND every `l0NNN` compiler service (the console encrypts; the compiler services decrypt). If no usable key is configured, `encrypt()` **throws** (never returns plaintext — so secrets are never stored/transported unencrypted); `setCredential` pre-checks `isConfigured()` (only when writing a secret) for a friendly error, and the `get-val-private` parse path surfaces the throw as a parse error. `decrypt()` stays lenient (returns the input unchanged on missing key / wrong key / tampered ciphertext) so the compile path doesn't crash on undecryptable values.
+`get-val-private` used to carry account secrets: the console encrypted each value
+with `GRAFFITICODE_SECRET_KEY` at parse time, the parser baked the ciphertext into
+the task AST, and compilers holding the same key decrypted it at compile time.
 
-**Credentials (retired 2026-09-28):** the `/settings` "Credentials" card, its `credentials` query and `setCredential`/`deleteCredential` mutations, and the parse-time loaders (`getSecretsForUser`/`getPublicValuesForUser`) are removed. Parse now supplies only `itemId` (public), so `get-val-private "<name>"` bakes `encrypt("")` and `get-val-public "<name>"` bakes `""`. External APIs are reached only through a connection (policy + credential broker); an L0176 item with no connection previews with the service's configured keys. The stored docs under `users/{uid}/settings` (`credentials`, plaintext public fields; `secrets`, ciphertext) are left in place and unread, so tasks already posted with baked ciphertext keep decrypting; delete them once nothing needs them. The keyring contract below still applies to that ciphertext.
+That path is retired (capability spec SECRET-01: credentials never enter task ASTs,
+compile configuration or compiler processes):
 
-Two ciphertext formats are understood: legacy `<iv>:<enc>` (AES-256-CBC, deterministic IV) and versioned `v<N>:<iv>:<ct>:<tag>` (AES-256-GCM, random IV, authenticated). Env vars:
-- `GRAFFITICODE_SECRET_KEY` — the canonical key; this is key **version 1** and the key for all legacy ciphertext. Created once; see the error output of `set-compiler-secret.sh`.
-- `GRAFFITICODE_SECRET_KEYS` — optional JSON keyring for versions ≥2, e.g. `{"2":"<secret2>"}`. Needed (for decrypt) on every service before any value is written under that version.
-- `GRAFFITICODE_SECRET_KEY_VERSION` — the version **new** writes use. Unset/`0` ⇒ legacy CBC (default, backward-compatible). Set to `N` (on the **console** only) to start writing GCM under key N.
+- **Credentials card retired 2026-09-28.** Parse supplies only `itemId` (public).
+- **Stored secrets deleted 2026-10-02.** The `users/{uid}/settings` secret docs are
+  gone for every user, and the one real credential found baked into stored L0158/L0176
+  tasks was retired at its provider.
+- **No encryption.** `get-val-private "<name>"` now bakes `""` without encrypting
+  (`src/lib/task-api.ts`). That is the value such programs already received. The
+  console has no `secret-crypto` module and needs no `GRAFFITICODE_SECRET_KEY`;
+  `scripts/set-compiler-secret.sh` is removed.
+- **Compilers.** The key is being unmounted from `l0176` and `l0158`, after which it
+  is destroyed. Ciphertext left in old task ASTs then decrypts to nothing anywhere.
 
-**Rotation procedure** (the reason versioning exists — old ciphertext persists forever and only decrypts with the key that wrote it): (1) add key `N` to `GRAFFITICODE_SECRET_KEYS` on **all** services and redeploy so everything can *decrypt* it; (2) set `GRAFFITICODE_SECRET_KEY_VERSION=N` on the console so new writes use it; (3) lazily/backfill re-encrypt old values via `reencryptToCurrent()` in `secret-crypto.ts`; (4) once nothing references the old key, retire it. Never change the value of an existing key version. For local dev, set the same vars in `.env.local` and in the local API/compile server's env.
+External APIs are reached only through a connection (Policy plus credential Broker).
+An L0176 item with no connection previews with the service's configured keys.

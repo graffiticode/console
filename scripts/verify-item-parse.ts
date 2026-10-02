@@ -25,8 +25,6 @@
  *                damage rather than a new break (see repair-truncated-items.ts)
  *   unparse-fail unparse itself threw
  *   no-ast       item has no stored code object; invisible to this check
- *   no-keyring   reads get-val-private and this run has no GRAFFITICODE_SECRET_KEY,
- *                so encrypt() failed — an environment gap, NOT a broken program
  *
  * Usage:
  *   npx tsx scripts/verify-item-parse.ts --lang 0176
@@ -76,7 +74,7 @@ async function main() {
     const snap = await db.collection(`users/${UID}/items`).where("lang", "==", lang).get();
     const docs = LIMIT > 0 ? snap.docs.slice(0, LIMIT) : snap.docs;
 
-    const counts = { ok: 0, "parse-error": 0, stub: 0, "unparse-fail": 0, "no-ast": 0, "no-keyring": 0 };
+    const counts = { ok: 0, "parse-error": 0, stub: 0, "unparse-fail": 0, "no-ast": 0 };
     const failures: Array<{ id: string; name: string; why: string }> = [];
 
     for (const d of docs) {
@@ -102,12 +100,7 @@ async function main() {
       });
 
       const why = res.errors ? res.errors.map((e: any) => e.message).join("; ") : "";
-      if (res.errors && /GRAFFITICODE_SECRET_KEY is not configured/.test(why)) {
-        // Local runs have no keyring, so any program reading get-val-private
-        // fails at encrypt(). That is the environment, not the program — count
-        // it separately or the sweep reports a regression that does not exist.
-        counts["no-keyring"]++;
-      } else if (res.errors) {
+      if (res.errors) {
         counts["parse-error"]++;
         failures.push({ id: d.id, name: label, why });
       } else if (isStub(src)) {
@@ -120,8 +113,7 @@ async function main() {
     const total = docs.length;
     console.log(
       `L${lang}: ${total} items — ok ${counts.ok}, parse-error ${counts["parse-error"]}, ` +
-      `stub ${counts.stub}, unparse-fail ${counts["unparse-fail"]}, no-ast ${counts["no-ast"]}` +
-      (counts["no-keyring"] ? `, no-keyring ${counts["no-keyring"]} (env, not a defect)` : ""),
+      `stub ${counts.stub}, unparse-fail ${counts["unparse-fail"]}, no-ast ${counts["no-ast"]}`,
     );
     if (failures.length) {
       console.log(`  failures:`);
