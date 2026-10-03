@@ -232,9 +232,9 @@ function providerTimeoutMs(): number {
  * and returned ZERO output tokens, which no token-budget or chunk-count cap can
  * explain or stop. Only aborting the read does.
  *
- * 30s: the widest observed healthy inter-chunk gap is far below this (streams
- * deliver continuously at 60-140 tok/s once started), so this can only fire on a
- * genuinely dead stream.
+ * 15s (30s until 2026-10-03): the widest observed healthy inter-chunk gap is far
+ * below this (streams deliver continuously at 60-140 tok/s once started), so this can
+ * only fire on a genuinely dead stream. Keep-alive pings do not count as data.
  *
  * "ONCE STARTED" is doing all the work in that sentence, and applying the same
  * number BEFORE the first byte was a bug. Extended thinking emits no stream data
@@ -244,7 +244,7 @@ function providerTimeoutMs(): number {
  * 30s (both `outputTokens: 0`), 2/2 first-pass at 120s, nothing else changed.
  */
 function streamStallMs(): number {
-  return configuredNumber("CODEGEN_STREAM_STALL_MS", 30_000);
+  return configuredNumber("CODEGEN_STREAM_STALL_MS", 15_000);
 }
 
 /**
@@ -256,7 +256,7 @@ function streamStallMs(): number {
  * been expanded into a 2-3KB layout spec — while still bounding the ~1800s
  * zero-token hangs that motivated the watchdog in the first place.
  *
- * Separate from the inter-chunk threshold on purpose: keeping the tight 30s for a
+ * Separate from the inter-chunk threshold on purpose: keeping the tight 15s for a
  * stream that has already started is what still catches a genuinely dead stream
  * mid-answer, which a single blunt timeout large enough for thinking would not.
  */
@@ -638,7 +638,7 @@ async function requestAnthropic({
   let msToFirstText: number | null = null;
   const reasoningSnapshot = () => ({ sawThinkingBlock, msToFirstText, thinkingChars });
   // The emit wall. Armed by the FIRST CONTENT TOKEN and never re-armed — unlike
-  // armWatchdog, which measures silence and resets on every chunk. Before that first
+  // armWatchdog, which measures silence and resets on every event. Before that first
   // token the turn is thinking, and thinking is firstTokenMs's business, not this
   // timer's. Arming at turn start is what broke generation on 2026-09-06; see
   // turnBudgetMs().
@@ -698,8 +698,14 @@ async function requestAnthropic({
     const parser = new ClaudeStreamParser();
     armWatchdog();
     for await (const chunk of response.data) {
-      armWatchdog();
-      for (const event of parser.parseChunk(chunk.toString())) {
+      const events = parser.parseChunk(chunk.toString());
+      // Re-armed only by a chunk that carries an event, never by a bare one. Anthropic sends
+      // `ping` events to keep an idle stream open, and they parse to nothing: re-arming on
+      // every chunk let a stream that had written its whole program in 747ms and then never
+      // closed hold the turn for 114s (L0185 corpus, 2026-10-03) — the pings kept resetting
+      // a watchdog that was meant to measure silence.
+      if (events.length) armWatchdog();
+      for (const event of events) {
         if (event.type === "content" && event.content) {
           // First written character: the model has stopped thinking and started
           // emitting, so the emit wall starts here and not before.
