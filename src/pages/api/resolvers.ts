@@ -854,7 +854,11 @@ type LastWrite = {
   connectionId: string | null;
   // skipped: the program saves to the item bank, but there was no current
   // connection to write through (message "no-connection").
-  status: "ok" | "failed" | "skipped";
+  // unstored: the provider write succeeded but the gateway could not store the
+  // result (its private artifact) for viewing; message is the gateway's
+  // `artifact-storage-unavailable` (retrying the same save stores it, with no
+  // second provider write) or `artifact-rejected (<reason>)`.
+  status: "ok" | "failed" | "skipped" | "unstored";
   message?: string;
   at: number;
 };
@@ -945,6 +949,14 @@ async function performWrite({ auth, itemId, taskId, connectionId, idempotencyKey
       errors.push(resp?.error ?? `compile ${resp?.status ?? "failed"}`);
     }
     if (errors.length) message = errorMessages(errors);
+    // The write succeeded, but its result was not stored (capability spec
+    // RECOVER-01): not a provider failure, and not an ok either.
+    const artifact = resp?.data?.artifact;
+    if (!message && artifact?.stored === false) {
+      const detail = `${artifact.error ?? "artifact-not-stored"}${artifact.reason ? ` (${artifact.reason})` : ""}`;
+      console.error("writeThroughCurrentConnection(): artifact not stored for item", itemId, detail, artifact.invocationId);
+      return recordLastWrite({ auth, itemId, taskId, connectionId, message: detail, status: "unstored" });
+    }
   } catch (err) {
     message = `Write failed: ${err?.message ?? err}`;
   }
@@ -962,7 +974,7 @@ async function recordLastWrite({ auth, itemId, taskId, connectionId, message, st
   taskId: string;
   connectionId: string | null;
   message: string | null;
-  status?: "skipped";
+  status?: "skipped" | "unstored";
 }): Promise<LastWrite> {
   const lastWrite: LastWrite = {
     taskId,

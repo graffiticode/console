@@ -27,8 +27,23 @@ const has = (message: string, ...codes: string[]) =>
   codes.some(code => new RegExp(`(^|[^A-Za-z-])${code}([^A-Za-z-]|$)`).test(message));
 
 export function describeWriteProblem(write: LastWriteLike): WriteProblem | null {
-  if (!write || (write.status !== "failed" && write.status !== "skipped")) return null;
+  if (!write || (write.status !== "failed" && write.status !== "skipped" && write.status !== "unstored")) return null;
   const message = write.message || "";
+  if (write.status === "unstored") {
+    // The item bank has it; Graffiticode's copy for viewing does not.
+    const stored = (text: string, retryable: boolean): WriteProblem =>
+      ({ headline: "Saved to the Learnosity item bank, but not stored in Graffiticode", text, retryable });
+    if (has(message, "artifact-storage-unavailable")) {
+      return stored("Graffiticode couldn't store the result for viewing. Retry stores it without writing to the item bank again.", true);
+    }
+    if (has(message, "signed-content")) {
+      return stored("The result carries signed Learnosity authority, so it can't be stored. Change the program so it doesn't return a signed request.", false);
+    }
+    if (has(message, "content-differs", "binding-differs")) {
+      return stored("This run's result differs from the one already stored for it. Recompile to run it again (the item-bank write may repeat), then republish if it is published.", false);
+    }
+    return stored(message || "unknown reason", false);
+  }
   if (write.status === "skipped" || message === "no-connection") {
     return { headline: "Not saved to the item bank", text: "no Learnosity connection. Add one in Settings.", retryable: false };
   }

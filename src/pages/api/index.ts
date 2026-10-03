@@ -231,9 +231,12 @@ const typeDefs = `
   type ItemWrite {
     taskId: String!
     connectionId: String
-    # "ok", "failed" or "skipped". failed: message says why. skipped: the
-    # program saves to the item bank but there was no connection to write
-    # through (message "no-connection"). A later write replaces either.
+    # "ok", "failed", "skipped" or "unstored". failed: message says why.
+    # skipped: the program saves to the item bank but there was no connection
+    # to write through (message "no-connection"). unstored: the item-bank write
+    # succeeded but its result could not be stored for viewing (message
+    # "artifact-storage-unavailable", which Retry fixes without writing again,
+    # or "artifact-rejected (<reason>)"). A later write replaces any of these.
     status: String!
     message: String
     at: String!
