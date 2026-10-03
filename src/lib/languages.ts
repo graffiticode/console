@@ -281,6 +281,10 @@ export const LANGUAGES: Language[] = ([
   // L0184 charts, successor to L0173 (2026-09-30): built on L0000, one `charts` collection of
   // one or more charts shown as tabs, data inline or in datasets referred to by column name.
   { id: "0184", name: "L0184", description: "Charts", routingHint: "Charts drawn with Apache ECharts: bar (grouped, stacked, horizontal), line (over categories, numbers or dates; smooth, stepped, filled), pie, donut and rose, scatter, histogram (binned from raw values), box plot (quartiles and outliers by category), candlestick, heatmap, funnel, gauge (one to four) and radar charts. Several charts can share one table of data and show as tabs. Plots the data values given in the request, inline — it does NOT fetch data from a URL or a file, so the values must be supplied with the request. Reference and trend lines, annotations, network charts (sankey, tree, treemap) and maps are not built yet. Spreadsheets are L0179.", keywords: ["chart", "graph", "plot", "visualization", "histogram", "heatmap", "gauge"], domains: [], status: "Beta" },
+  // L0185 fetch and shape data, successor to L0170 (2026-10-03): built on L0000, right-to-left
+  // steps over a guarded public https GET or inline rows; the output is the transformed data
+  // itself. Hidden until its corpus and eval land (Phase 2), then L0170 is deprecated for it.
+  { id: "0185", name: "L0185", description: "Fetch & shape data", routingHint: "Fetches JSON or CSV from a public https URL (GET only) or takes data written inline, and reshapes it: filter, pick, rename, compute fields, group and summarize, sort, limit, distinct, flatten nested data, join two data sets, format numbers. Its output is the transformed data itself, usually a list of records. Sources that need a login or API key are not built yet. Charts are L0184; spreadsheets are L0179.", keywords: ["data", "fetch", "csv", "json", "transform"], domains: [], status: "Beta", hidden: true },
 ] as Language[])
   // A sponsored language's status is always "Sponsored", whatever its entry says.
   .map(l => l.sponsor ? { ...l, status: "Sponsored" } : l);
