@@ -654,6 +654,8 @@ export async function generateCodeForRequest({
               options: codegenOptions,
               rid,
               itemId,
+              // The head is already written: the upstream produces the fields it reads.
+              downstreamContext: src ? { lang: headLang, src } : null,
             })
           )
         );

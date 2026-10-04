@@ -672,6 +672,7 @@ async function createCodeGenerationPrompt(
   upstreamContext: { lang: string; sample?: unknown } | null = null,
   accessToken?: string,
   currentData: unknown = null,
+  downstreamContext: { lang: string; src: string } | null = null,
 ) {
   // Dialect-specific blocks (cached per-language). The dialect block already
   // carries cache_control: ephemeral, so the per-language prefix is reused
@@ -743,6 +744,21 @@ This program is one stage of a composition pipeline. At runtime it consumes a da
 `
     : "";
 
+  // The reverse: this program is an UPSTREAM, and the head that reads its output has already
+  // been generated. Show it that program, so the field names it produces are the ones the head
+  // reads. Without this the two are generated independently from the same request and agree
+  // only by luck — an L0184 chart reading `columns ["region" "revenue"]` from an L0185 program
+  // that named its total "amount" fails to compile. A section of its own, not text in the
+  // request, so retrieval and the request-language checks still see only the user's words.
+  const downstreamSection = downstreamContext
+    ? `\n<DOWNSTREAM_CONSUMER>
+This program is an upstream stage of a composition pipeline. At runtime its output is read by the L${downstreamContext.lang} program below, which binds it with \`data use\`. Produce exactly the fields that program reads, with exactly those names, and nothing it does not need. Author only this program; the consumer is shown for its field names, not to be copied.
+\`\`\`
+${downstreamContext.src.slice(0, 3000)}
+\`\`\`
+`
+    : "";
+
   const currentDataSection = renderCurrentDataSection(currentData);
 
   // Build user message using USER_TEMPLATE format (matches dspy-service)
@@ -759,7 +775,7 @@ ${conversationContext}
 ${retrievedContext}
 
 When a retrieved example closely matches the user's request, follow its coding patterns and techniques. If there is existing current code, apply the example's patterns to the current code rather than replacing it.
-${upstreamSection}
+${upstreamSection}${downstreamSection}
 <OUTPUT_FORMAT>
 Emit the Graffiticode between triple backticks, must end with "..". Then on new lines emit two tagged summary blocks:
 
@@ -1324,6 +1340,7 @@ export async function generateCode({
   sessionId = null,
   conversationSummary = null,
   upstreamContext = null,
+  downstreamContext = null,
   precomputedExamples = null,
   itemId = null,
 }: {
@@ -1343,6 +1360,8 @@ export async function generateCode({
   sessionId?: string | null;
   conversationSummary?: ConversationSummary | null;
   upstreamContext?: { lang: string; sample?: unknown } | null;
+  /** The head program that will read this upstream's output — see createCodeGenerationPrompt. */
+  downstreamContext?: { lang: string; src: string } | null;
   precomputedExamples?: any[] | null;
   /**
    * The item this generation is for, when one exists. Null on a fresh create —
@@ -1572,8 +1591,10 @@ export async function generateCode({
       taskType: "codegen",
     });
 
-    // Try DSPy service if enabled
-    if (isDSPyEnabled()) {
+    // Try DSPy service if enabled — but not for a composition stage: the context pack has no
+    // place for the upstream or downstream program, so a DSPy prompt would drop exactly what
+    // makes the two stages agree on field names.
+    if (isDSPyEnabled() && !upstreamContext && !downstreamContext) {
       try {
         const promptSpec = await compilePromptSpec(contextPack, requestId);
 
@@ -1655,6 +1676,7 @@ export async function generateCode({
         upstreamContext,
         accessToken,
         currentData,
+        downstreamContext,
       );
     }
 
