@@ -130,7 +130,14 @@ function assetUrlFor(langId: string, file: string): string {
 
 async function fetchText(url: string, accessToken?: string): Promise<string | null> {
   try {
-    const res = await fetch(url, accessToken ? { headers: { Authorization: accessToken } } : undefined);
+    // Bypass the CDN edge cache, as getLanguageAsset (src/lib/api.ts) does: api.graffiticode.org
+    // serves these with `max-age=3600`, so without a unique query string a language's new
+    // scope.json reached the scope gate up to an hour after its deploy. On 2026-10-04 the gate
+    // kept re-routing L0184 chart-from-URL requests to L0185 off a scope.json that said L0184
+    // could not fetch, 48 minutes after that line was removed. The in-memory caches here keep
+    // origin load low.
+    const busted = `${url}${url.includes("?") ? "&" : "?"}_cb=${Date.now()}`;
+    const res = await fetch(busted, accessToken ? { headers: { Authorization: accessToken } } : undefined);
     if (!res.ok) return null;
     return await res.text();
   } catch {
