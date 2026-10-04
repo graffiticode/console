@@ -67,6 +67,12 @@ const CASES: Case[] = [
   { tag: "chart", lang: "0184", want: "in", prompt: "Box plot of quiz scores by class. Class A: 72, 75, 78, 80, 84, 91. Class B: 60, 68, 70, 74, 77, 99." },
   { tag: "chart", lang: "0179", want: "0184", prompt: "Make a pie chart of traffic sources: search 48, direct 26, email 14, social 12." },
   { tag: "chart", lang: "0184", want: "0179", prompt: "Make a budget spreadsheet with rent 1500, food 400 and a SUM total." },
+  // L0185 (fetch and shape data, successor to L0170) holds fetching and reshaping, and hands off
+  // drawing. A fetch sent to the charts dialect comes here.
+  { tag: "data", lang: "0185", want: "in", prompt: "Fetch https://l0185.graffiticode.org/data/people.json and list the people over 30, oldest first." },
+  { tag: "data", lang: "0185", want: "in", prompt: "Total the amount per region in https://l0185.graffiticode.org/data/sales.csv, paid orders only." },
+  { tag: "data", lang: "0185", want: "0184", prompt: "Draw a line chart of weekly visitors: 120, 132, 101, 134, 150." },
+  { tag: "data", lang: "0184", want: "0185", prompt: "Load https://l0185.graffiticode.org/data/todos.json and count the completed todos for each user." },
 ];
 
 const arg = (name: string) => {

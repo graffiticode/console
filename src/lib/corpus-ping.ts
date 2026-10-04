@@ -45,7 +45,10 @@ import { harnessItemId } from "./harness-item-ids";
  * early.
  */
 export const PING_LANGUAGES = [
-  "0000", "0170",
+  "0000",
+  // 0170 left 2026-10-04, deprecated for 0185 (fetch and shape data on L0000), which joined the
+  // same day with its 117-example corpus seeded and embedded.
+  "0185",
   // 0172 (FigJam) and 0159 (match/memory) left the set 2026-09-04, by request. Note what
   // that costs: SWEEP_LANGUAGES is this same list, so a language dropped here leaves the
   // weekly sweep too and has NO routine detector — the blind spot described for 0181
