@@ -18,5 +18,8 @@
   { "id": "mixed-kinds-separate", "prompt": "Show our survey results two ways: a pie of the 210 yes, 90 no and 40 unsure answers, and a gauge of the 62% response rate." },
   { "id": "too-many-gauges", "prompt": "Gauges for battery level on six devices: phone 82, tablet 45, laptop 67, watch 90, earbuds 30, speaker 55." },
   { "id": "radar-negative", "prompt": "Radar of year-over-year change in five product lines: hardware -5, software 12, services 8, support -2, training 3 percent." },
-  { "id": "stacked-percent-labels", "prompt": "Stacked bars of energy mix by country with values on the bars: France nuclear 65, renewables 25, fossil 10; Germany nuclear 0, renewables 50, fossil 50; Poland nuclear 0, renewables 25, fossil 75." }
+  { "id": "stacked-percent-labels", "prompt": "Stacked bars of energy mix by country with values on the bars: France nuclear 65, renewables 25, fossil 10; Germany nuclear 0, renewables 50, fossil 50; Poland nuclear 0, renewables 25, fossil 75." },
+  { "id": "url-comments-per-post", "prompt": "Column chart of how many comments each of the first ten posts has, from https://l0185.graffiticode.org/data/comments.json." },
+  { "id": "url-magnitude-histogram", "prompt": "Histogram of earthquake magnitudes from https://l0185.graffiticode.org/data/earthquakes.json, using the features list." },
+  { "id": "url-orders-by-customer", "prompt": "Bar chart of order totals per customer name, joining https://l0185.graffiticode.org/data/orders.json with the customers in https://l0185.graffiticode.org/data/customers.json." }
 ]
