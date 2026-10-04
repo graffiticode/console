@@ -752,7 +752,7 @@ This program is one stage of a composition pipeline. At runtime it consumes a da
   // request, so retrieval and the request-language checks still see only the user's words.
   const downstreamSection = downstreamContext
     ? `\n<DOWNSTREAM_CONSUMER>
-This program is an upstream stage of a composition pipeline. At runtime its output is read by the L${downstreamContext.lang} program below, which binds it with \`data use\`. Produce exactly the fields that program reads, with exactly those names, and nothing it does not need. Author only this program; the consumer is shown for its field names, not to be copied.
+This program is an upstream stage of a composition pipeline. At runtime its output is read by the L${downstreamContext.lang} program below, which binds it with \`data use\`. Where that program reads named fields of this output (for example a dataset's \`columns\`), produce those fields with exactly those names. Author only this program, as the request asks; the consumer is shown for the names it reads, not to be copied.
 \`\`\`
 ${downstreamContext.src.slice(0, 3000)}
 \`\`\`
