@@ -289,7 +289,7 @@ export const LANGUAGES: Language[] = ([
   // L0185 fetch and shape data, successor to L0170 (2026-10-03): built on L0000, right-to-left
   // steps over a guarded public https GET or inline rows; the output is the transformed data
   // itself. Promoted 2026-10-04 (117-example corpus; holdout eval 100% final compile).
-  { id: "0185", name: "L0185", description: "Fetch & shape data", routingHint: "Fetches JSON or CSV from a public https URL (GET only) or takes data written inline, and reshapes it: filter, pick, rename, compute fields, group and summarize, sort, limit, distinct, flatten nested data, join two data sets, format numbers. Its output is the transformed data itself, usually a list of records. Sources that need a login or API key are not built yet. Charts are L0184; spreadsheets are L0179.", keywords: ["data", "fetch", "csv", "json", "transform"], domains: [], status: "Beta" },
+  { id: "0185", name: "L0185", description: "Fetch & shape data", routingHint: "Fetches JSON or CSV from a public https URL (GET only) or takes data written inline, and reshapes it: filter, pick, rename, compute fields, group and summarize, sort, limit, distinct, flatten nested data, join two data sets, format numbers. Its output is the transformed data itself, usually a list of records. Sources that need a login or API key are not built yet. Charts are L0184; spreadsheets are L0179.", keywords: ["data", "fetch", "csv", "json", "transform", "aggregate", "summarize", "api"], domains: [], status: "Beta" },
 ] as Language[])
   // A sponsored language's status is always "Sponsored", whatever its entry says.
   .map(l => l.sponsor ? { ...l, status: "Sponsored" } : l);
