@@ -242,8 +242,11 @@ interface RunResult {
  * EXCEPT the value languages. L0000 and L0003 compute values: `mul 2500 pow (add 1 0.04) 3..`
  * is a complete, correct answer with no brackets at all. The bracket test scored most of the
  * first L0000 eval (2026-10-01) as stubs, so for them only "no code" is a stub.
+ *
+ * L0185 too, for the same reason: `where (<row: …>) fetch "https://…" {}..` is a complete
+ * program with no brackets, and its first eval (2026-10-03) scored every one of them a stub.
  */
-const VALUE_LANGS = new Set(["0000", "0003"]);
+const VALUE_LANGS = new Set(["0000", "0003", "0185"]);
 function isStub(code: string | null | undefined, lang?: string): boolean {
   if (!code) return true;
   if (lang && VALUE_LANGS.has(lang)) return !code.trim();
