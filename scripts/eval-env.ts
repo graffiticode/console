@@ -19,6 +19,8 @@ delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
 if (process.env.GRAFFITICODE_APP_CREDENTIALS && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GRAFFITICODE_APP_CREDENTIALS;
 }
+// Without a key file (user ADC only) firebase-admin cannot infer the project.
+process.env.GOOGLE_CLOUD_PROJECT ||= "graffiticode-app";
 if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   console.error("[eval-env] warning: GRAFFITICODE_APP_CREDENTIALS not set — prod Firestore reads (RAG, usage) will fail");
 }

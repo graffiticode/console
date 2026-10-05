@@ -29,6 +29,8 @@ export const HARNESS_ITEM_ID_PREFIXES = {
   sweep: "corpus-sweep-",
   /** Model eval — scripts/model-eval.ts */
   eval: "model-eval-",
+  /** Corpus re-baseline — scripts/corpus-rebaseline.ts */
+  rebaseline: "corpus-rebaseline-",
 } as const;
 
 export type HarnessKind = keyof typeof HARNESS_ITEM_ID_PREFIXES;

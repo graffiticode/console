@@ -32,6 +32,7 @@
     "eval:proximity": "npx tsx scripts/eval-case-proximity.ts",
     "eval:scope-gate": "npx tsx scripts/eval-scope-gate.ts",
     "corpus-sweep": "npx tsx scripts/corpus-sweep.ts",
+    "corpus-rebaseline": "npx tsx scripts/corpus-rebaseline.ts",
     "backfill-provenance": "npx tsx scripts/backfill-corpus-provenance.ts",
     "check-min-instances": "npx tsx scripts/check-min-instances.ts"
   },
