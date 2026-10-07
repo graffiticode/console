@@ -5,11 +5,11 @@ description: Catalog of scripts/ admin tools (credentials, cost-per-item, token-
 
 # Admin scripts
 
-Admin scripts in `scripts/` require Firebase service account credentials. Two separate projects are used:
+Admin scripts in `scripts/` use two separate projects. The graffiticode project uses your own application-default credentials, never a service-account key file (the one it used is being retired):
 
 ```bash
+gcloud auth application-default login                          # graffiticode project
 # Add to ~/.zshrc
-export GRAFFITICODE_CREDENTIALS=~/graffiticode-key.json        # graffiticode project
 export GRAFFITICODE_APP_CREDENTIALS=~/graffiticode-app-key.json # graffiticode-app project
 ```
 

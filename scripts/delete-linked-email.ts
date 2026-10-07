@@ -3,18 +3,20 @@
 // Use after deleting a user account directly in Firestore: removes the stale
 // email -> uid mapping so the email can be re-added or re-claimed.
 //
-//   GRAFFITICODE_CREDENTIALS=~/graffiticode-key.json \
+//   (after `gcloud auth application-default login`)
 //   npx tsx scripts/delete-linked-email.ts <email>
 
 import crypto from 'crypto';
-import fs from 'fs';
 import admin from 'firebase-admin';
 
-const credsPath = process.env.GRAFFITICODE_CREDENTIALS;
-if (!credsPath) {
-  console.error('GRAFFITICODE_CREDENTIALS not set');
-  process.exit(1);
+// The graffiticode project, as the operator's own application-default
+// credentials (`gcloud auth application-default login`), never a
+// service-account key file: GOOGLE_APPLICATION_CREDENTIALS is cleared so a key
+// path left in the environment isn't picked up instead.
+if (process.env.GRAFFITICODE_CREDENTIALS) {
+  console.warn('GRAFFITICODE_CREDENTIALS is no longer read; using application-default credentials');
 }
+delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 const email = process.argv[2];
 if (!email) {
@@ -26,7 +28,7 @@ const normalize = (s: string) => s.trim().toLowerCase();
 const docId = (s: string) => crypto.createHash('sha256').update(normalize(s)).digest('hex');
 
 admin.initializeApp({
-  credential: admin.credential.cert(JSON.parse(fs.readFileSync(credsPath, 'utf8'))),
+  credential: admin.credential.applicationDefault(),
   projectId: 'graffiticode',
 });
 

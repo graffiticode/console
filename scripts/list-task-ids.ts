@@ -3,8 +3,8 @@
  *
  * Exists to feed `clear-compile.ts --prefix`, which lives in the OTHER Firestore
  * project: items are in graffiticode-app (GRAFFITICODE_APP_CREDENTIALS), compile
- * records are in graffiticode (GRAFFITICODE_CREDENTIALS). One process can't hold
- * both service accounts as ADC, which is why this is a pipe rather than one script.
+ * records are in graffiticode (the operator's application-default credentials).
+ * The two use different credentials, which is why this is a pipe rather than one script.
  *
  * Ids go to stdout, one per line, so the pipe stays clean; everything else to stderr.
  *

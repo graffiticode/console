@@ -14,7 +14,8 @@
  *                  | npx tsx scripts/clear-compile.ts --prefix
  *   --dry-run  report what would be deleted, delete nothing
  *
- * Requires: GRAFFITICODE_CREDENTIALS (graffiticode project — NOT graffiticode-app).
+ * Requires: application-default credentials (`gcloud auth application-default login`)
+ * with access to the graffiticode project (NOT graffiticode-app).
  */
 import admin from 'firebase-admin';
 
@@ -22,14 +23,14 @@ import admin from 'firebase-admin';
 delete process.env.FIRESTORE_EMULATOR_HOST;
 delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
 
-// Use GRAFFITICODE_CREDENTIALS for the graffiticode project
+// The graffiticode project, as the operator's own application-default
+// credentials (`gcloud auth application-default login`), never a
+// service-account key file: GOOGLE_APPLICATION_CREDENTIALS is cleared so a key
+// path left in the environment isn't picked up instead.
 if (process.env.GRAFFITICODE_CREDENTIALS) {
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = process.env.GRAFFITICODE_CREDENTIALS;
-} else {
-  console.error('Error: GRAFFITICODE_CREDENTIALS environment variable not set');
-  console.error('Set it to the path of your graffiticode service account key');
-  process.exit(1);
+  console.warn('GRAFFITICODE_CREDENTIALS is no longer read; using application-default credentials');
 }
+delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 admin.initializeApp({
   credential: admin.credential.applicationDefault(),

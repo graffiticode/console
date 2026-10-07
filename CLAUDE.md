@@ -127,7 +127,7 @@ Request → **scope-gate head routing** → **permission-governed composition** 
 
 ## Scripts
 
-Admin scripts in `scripts/` require Firebase service account credentials from **two separate projects** — `GRAFFITICODE_CREDENTIALS` (graffiticode, API data) and `GRAFFITICODE_APP_CREDENTIALS` (graffiticode-app, console data). Catalog, flags, and per-script operational caveats: skill `admin-scripts`.
+Admin scripts in `scripts/` use **two separate projects**: graffiticode (API data), through the operator's application-default credentials (`gcloud auth application-default login`; no key file, and `GRAFFITICODE_CREDENTIALS` is no longer read), and graffiticode-app (console data), through `GRAFFITICODE_APP_CREDENTIALS`. Catalog, flags, and per-script operational caveats: skill `admin-scripts`.
 
 **Secrets & credentials:** stored account credentials and `get-val-private` encryption are **retired** (capability spec SECRET-01). Parse supplies only `itemId`; `get-val-private` bakes `""`; the console holds no `GRAFFITICODE_SECRET_KEY`. External APIs go through a connection. Do not reintroduce credentials into parse callbacks, task ASTs or compiler config. History: `docs/secret-encryption.md`.
 

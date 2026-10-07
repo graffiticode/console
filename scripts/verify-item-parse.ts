@@ -31,8 +31,8 @@
  *   npx tsx scripts/verify-item-parse.ts --lang 0176 --lang 0158
  *   npx tsx scripts/verify-item-parse.ts --lang 0176 --uid <uid> --limit 50
  *
- * Requires: GRAFFITICODE_APP_CREDENTIALS (prod Firestore), and GRAFFITICODE_CREDENTIALS
- * is unused here — the AST is read from the item doc, not the task store.
+ * Requires: GRAFFITICODE_APP_CREDENTIALS (prod Firestore). Nothing in the graffiticode
+ * project is read — the AST is read from the item doc, not the task store.
  */
 import "./eval-env"; // MUST be first: prod Firestore/auth/api bootstrap
 
