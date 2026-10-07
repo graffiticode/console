@@ -73,6 +73,12 @@ const CASES: Case[] = [
   { tag: "data", lang: "0185", want: "in", prompt: "Total the amount per region in https://l0185.graffiticode.org/data/sales.csv, paid orders only." },
   { tag: "data", lang: "0185", want: "0184", prompt: "Draw a line chart of weekly visitors: 120, 132, 101, 134, 150." },
   { tag: "data", lang: "0184", want: "0185", prompt: "Load https://l0185.graffiticode.org/data/todos.json and count the completed todos for each user." },
+  // L0186 (FigJam boards, successor to L0172) holds whiteboards and hands off concept maps to
+  // complete and charts.
+  { tag: "figjam", lang: "0186", want: "in", prompt: "Make a retro board with Went well, To improve and Action items columns of sticky notes." },
+  { tag: "figjam", lang: "0186", want: "in", prompt: "Add a flowchart from Start through a Valid? decision to Save or Report error to my FigJam board https://www.figma.com/board/ABC123/Flows." },
+  { tag: "figjam", lang: "0183", want: "0186", prompt: "Make a FigJam brainstorm board with a central Idea sticky and six stickies around it." },
+  { tag: "figjam", lang: "0186", want: "0184", prompt: "Bar chart of monthly revenue: January 120, February 132, March 101, April 134." },
 ];
 
 const arg = (name: string) => {

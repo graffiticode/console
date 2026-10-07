@@ -181,7 +181,10 @@ export const LANGUAGES: Language[] = ([
   // steps, output is the data itself). Stays registered so existing items keep compiling.
   { id: "0170", name: "L0170", description: "Fetch & transform data (legacy; prefer L0185)", routingHint: "Deprecated in favor of L0185 — prefer L0185 for all new data content. The go-to provider for data acquisition and transformation. Fetches JSON/CSV from external/public web URLs (or accepts inline data) and transforms it (dplyr/jq-style): navigate nested data, filter/select/mutate/group/sort/take(top-N)/join/flatten/unique. Authors a standalone transformed dataset; it produces data, it does not render it.", domains: [], status: "Deprecated" },
   { id: "0171", name: "L0171", description: "Venn diagrams", routingHint: "Venn diagrams with named sets, intersections, elements, configurable overlap, and styling.", keywords: ["set diagram", "overlap diagram"], domains: ["diagrams"], status: "Beta", hidden: true },
-  { id: "0172", name: "L0172", description: "FigJam content", routingHint: "FigJam board content authoring.", domains: [], status: "Beta", hidden: true },
+  // Deprecated 2026-10-07 in favour of L0186, a rebuild on L0000 (typed members and attribute
+  // chains, pages, connector checks, and an SVG preview that stands in for the board). NOT
+  // source-compatible, so L0172 stays registered for the items already authored in it.
+  { id: "0172", name: "L0172", description: "FigJam content (legacy; prefer L0186)", routingHint: "Deprecated in favor of L0186 — prefer L0186 for all new FigJam board content. FigJam board content authoring.", domains: [], status: "Deprecated", hidden: true },
   // Deprecated 2026-09-30 in favour of L0184, a rebuild on L0000 (multiple charts per program,
   // datasets by column name, and seven more plot kinds). NOT source-compatible, so L0173 stays
   // registered and keeps serving every item already authored in it; deprecation only stops it
@@ -293,6 +296,10 @@ export const LANGUAGES: Language[] = ([
   // steps over a guarded public https GET or inline rows; the output is the transformed data
   // itself. Promoted 2026-10-04 (117-example corpus; holdout eval 100% final compile).
   { id: "0185", name: "L0185", description: "Fetch & shape data", routingHint: "Fetches JSON or CSV from a public https URL (GET only) or takes data written inline, and reshapes it: filter, pick, rename, compute fields, group and summarize, sort, limit, distinct, flatten nested data, join two data sets, format numbers. Its output is the transformed data itself, usually a list of records. Sources that need a login or API key are not built yet. Charts are L0184; spreadsheets are L0179.", keywords: ["data", "fetch", "csv", "json", "transform", "aggregate", "summarize", "api"], domains: [], status: "Beta" },
+  // L0186 FigJam boards, successor to L0172 (2026-10-07): built on L0000. Unlike L0172 it is
+  // visible: its SVG preview finishes the board in a chat, and `save-to-figjam "<link>"` hands it
+  // to the Graffiticode FigJam plugin to draw into a FigJam file.
+  { id: "0186", name: "L0186", description: "FigJam boards", routingHint: "FigJam whiteboards: sticky notes, text, shapes with text (flowchart, engineering and decorative shapes), sections, reaction stamps and connectors (labelled, elbowed, straight or curved, dashed, with arrowheads, fanning out to many nodes), on one or more pages, laid out by coordinates. Retros, kanban boards, brainstorms, flowcharts and system diagrams. Previewed as a picture of the board; given a FigJam link, the Graffiticode FigJam plugin draws it into that file. Concept maps that learners complete are L0183; charts are L0184; Figma design files and other whiteboards are not built.", keywords: ["figjam", "whiteboard", "sticky notes", "flowchart", "retro", "kanban", "brainstorm", "diagram"], domains: [], status: "Beta" },
 ] as Language[])
   // A sponsored language's status is always "Sponsored", whatever its entry says.
   .map(l => l.sponsor ? { ...l, status: "Sponsored" } : l);
