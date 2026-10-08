@@ -264,6 +264,8 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
     onToggle: ((p: Permission) => void) | null;
     // A sharee's column covers only the functions that can be shared.
     shareableOnly: boolean;
+    // Its cell in the "Everything" row (only the owner has one).
+    everything: ReactNode;
     until: ReactNode;
     actions: ReactNode;
   };
@@ -273,22 +275,18 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
     !(ownerDraft === null ? ownerPermissions === null : ownerPermissions !== null && samePermissions(ownerDraft, ownerPermissions));
   const ownerColumn: Column = {
     key: "owner",
-    header: (
-      <span className="flex flex-col items-center">
-        <span className="font-medium text-gray-900">You</span>
-        <label className="inline-flex items-center gap-1 text-xs font-normal text-gray-600">
-          <input
-            type="checkbox"
-            checked={ownerList === null}
-            disabled={busy || !editable}
-            onChange={e => setOwnerDraft(e.target.checked ? null : columns.map(f => ({ lang: f.lang, fn: f.fn })))} />
-          Everything
-        </label>
-      </span>
-    ),
+    header: <span className="font-medium text-gray-900">You</span>,
     list: ownerList,
     onToggle: editable ? p => setOwnerDraft(toggled(ownerList || [], p)) : null,
     shareableOnly: false,
+    everything: (
+      <input
+        type="checkbox"
+        aria-label="Everything"
+        checked={ownerList === null}
+        disabled={busy || !editable}
+        onChange={e => setOwnerDraft(e.target.checked ? null : columns.map(f => ({ lang: f.lang, fn: f.fn })))} />
+    ),
     until: <span className="text-gray-400">—</span>,
     actions: saveButtons(ownerDirty, saveOwner, () => setOwnerDraft(undefined)),
   };
@@ -314,6 +312,7 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
       list: draft.permissions,
       onToggle: editable ? p => edit({ ...draft, permissions: toggled(draft.permissions, p) }) : null,
       shareableOnly: true,
+      everything: null,
       until: editable ? (
         <input
           type="date"
@@ -343,6 +342,10 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
           </tr>
         </thead>
         <tbody>
+          <tr className="border-t border-gray-200">
+            <th scope="row" className="px-2 py-1 text-left font-normal">Everything</th>
+            {accounts.map(c => <td key={c.key} className="px-3 py-1 text-center">{c.everything}</td>)}
+          </tr>
           {langs.map(lang => [
             <tr key={`lang:${lang}`} className="border-t border-gray-200">
               <th colSpan={1 + accounts.length} className="px-2 pt-1 text-left text-xs font-semibold text-gray-600">{langLabel(lang)}</th>
