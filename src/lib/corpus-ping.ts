@@ -85,6 +85,11 @@ export const PING_LANGUAGES = [
   // 0184 (charts, successor to L0173) joined 2026-09-30, the day its 128-example corpus was
   // seeded and embedded — 128/128 compiled with no fix passes, covering all eleven plot kinds.
   "0184",
+  // 0186 (FigJam boards, successor to L0172) joined 2026-10-08, the day its 120-example corpus
+  // was seeded and embedded — 120/120 compiled, one with a fix pass (13 needed a second run
+  // after a local network outage, not a dialect failure). Watched for the same reason as 0181:
+  // L0172 left this set on 2026-09-04, so until now FigJam boards had no routine detector.
+  "0186",
 ];
 
 /** How many generations run at once. Run serially, PING_LANGUAGES would take roughly a
