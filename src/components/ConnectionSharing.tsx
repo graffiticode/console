@@ -105,8 +105,11 @@ const columnOrder = (a: Fn, b: Fn) =>
 // with one row per protected function its languages register for the
 // connection's backend (grouped by language) and one column per account. The
 // owner's column comes first and covers every function, author included;
-// "Everything" (no list) is how every connection starts. Each sharee's column
-// covers only the functions that can be shared. A language's implicit
+// everything (no list) is how every connection starts, and its first edit
+// turns it into the explicit list. Each sharee's column covers only the
+// functions that can be shared. Each language has an "Everything" row that
+// checks or clears all of that language's functions in a column (select-all,
+// not a wildcard: a function added later isn't included). A language's implicit
 // function (rendering) comes with any other function checked in it, and can
 // be checked alone for previews only. Columns edit in place with Save/Cancel;
 // changes take effect at that account's next run or view. The find-and-share
@@ -222,9 +225,8 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
   // One cell: checked when the list names the function, or (for rendering)
   // when it names anything else in that language, which brings it along.
   const cell = (key: string, list: Permission[] | null, f: Fn, onToggle: ((p: Permission) => void) | null) => {
-    const everything = list === null;
-    const named = everything || list.some(p => same(p, f));
-    const implied = !named && f.implicit && list.some(p => p.lang === f.lang);
+    const named = list === null || list.some(p => same(p, f));
+    const implied = !named && list !== null && f.implicit && list.some(p => p.lang === f.lang);
     return (
       <td key={key} className="px-3 py-1 text-center">
         <input
@@ -232,7 +234,7 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
           aria-label={`${langLabel(f.lang)} ${f.fn}`}
           title={implied ? `Comes with any other ${langLabel(f.lang)} access` : `${langLabel(f.lang)} ${f.fn}`}
           checked={named || implied}
-          disabled={busy || !onToggle || everything || implied}
+          disabled={busy || !onToggle || implied}
           onChange={() => onToggle?.(f)} />
       </td>
     );
@@ -240,6 +242,8 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
   const notShareable = (key: string) => (
     <td key={key} className="px-3 py-1 text-center text-gray-300" title="Only you can use this; it is never shared">—</td>
   );
+  // Everything (null) as the explicit list it stands for, when it's edited.
+  const allPermissions = () => columns.map(f => ({ lang: f.lang, fn: f.fn }));
   const toggled = (list: Permission[], p: Permission) =>
     list.some(q => same(p, q)) ? list.filter(q => !same(p, q)) : [...list, { lang: p.lang, fn: p.fn }];
   const saveButtons = (dirty: boolean, onSave: () => void, onCancel: () => void, saveDisabled = false) => dirty && (
@@ -264,8 +268,9 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
     onToggle: ((p: Permission) => void) | null;
     // A sharee's column covers only the functions that can be shared.
     shareableOnly: boolean;
-    // Its cell in the "Everything" row (only the owner has one).
-    everything: ReactNode;
+    // Replaces the column's whole list (a language's "Everything"), or null
+    // when it can't be edited.
+    setList: ((next: Permission[]) => void) | null;
     until: ReactNode;
     actions: ReactNode;
   };
@@ -277,16 +282,9 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
     key: "owner",
     header: <span className="font-medium text-gray-900">You</span>,
     list: ownerList,
-    onToggle: editable ? p => setOwnerDraft(toggled(ownerList || [], p)) : null,
+    onToggle: editable ? p => setOwnerDraft(toggled(ownerList ?? allPermissions(), p)) : null,
     shareableOnly: false,
-    everything: (
-      <input
-        type="checkbox"
-        aria-label="Everything"
-        checked={ownerList === null}
-        disabled={busy || !editable}
-        onChange={e => setOwnerDraft(e.target.checked ? null : columns.map(f => ({ lang: f.lang, fn: f.fn })))} />
-    ),
+    setList: editable ? next => setOwnerDraft(next) : null,
     until: <span className="text-gray-400">—</span>,
     actions: saveButtons(ownerDirty, saveOwner, () => setOwnerDraft(undefined)),
   };
@@ -312,7 +310,7 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
       list: draft.permissions,
       onToggle: editable ? p => edit({ ...draft, permissions: toggled(draft.permissions, p) }) : null,
       shareableOnly: true,
-      everything: null,
+      setList: editable ? next => edit({ ...draft, permissions: next }) : null,
       until: editable ? (
         <input
           type="date"
@@ -326,6 +324,34 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
   };
 
   const accounts = [ownerColumn, ...(grants || []).map(shareeColumn)];
+
+  // A language's "Everything" cell in one column: checked when every function
+  // of that language the column covers is checked; toggling checks or clears
+  // them all.
+  const langCell = (c: Column, lang: string) => {
+    const fs = columns.filter(f => f.lang === lang && (!c.shareableOnly || f.delegable));
+    if (!fs.length) return notShareable(`${c.key}:everything`);
+    const has = (f: Fn) => c.list === null || c.list.some(p => same(p, f)) ||
+      (f.implicit && c.list.some(p => p.lang === f.lang));
+    const all = fs.every(has);
+    const set = c.setList;
+    const onChange = () => {
+      if (!set) return;
+      const others = (c.list ?? allPermissions()).filter(p => !fs.some(f => same(f, p)));
+      set(all ? others : [...others, ...fs.map(f => ({ lang: f.lang, fn: f.fn }))]);
+    };
+    return (
+      <td key={`${c.key}:everything`} className="px-3 py-1 text-center">
+        <input
+          type="checkbox"
+          aria-label={`${langLabel(lang)} everything`}
+          title={`Every ${langLabel(lang)} function${c.shareableOnly ? " that can be shared" : ""}`}
+          checked={all}
+          disabled={busy || !set}
+          onChange={onChange} />
+      </td>
+    );
+  };
   const anyActions = accounts.some(c => c.actions);
 
   // Permissions are rows, grouped by language; accounts are columns, the
@@ -342,13 +368,13 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
           </tr>
         </thead>
         <tbody>
-          <tr className="border-t border-gray-200">
-            <th scope="row" className="px-2 py-1 text-left font-normal">Everything</th>
-            {accounts.map(c => <td key={c.key} className="px-3 py-1 text-center">{c.everything}</td>)}
-          </tr>
           {langs.map(lang => [
             <tr key={`lang:${lang}`} className="border-t border-gray-200">
               <th colSpan={1 + accounts.length} className="px-2 pt-1 text-left text-xs font-semibold text-gray-600">{langLabel(lang)}</th>
+            </tr>,
+            <tr key={`everything:${lang}`}>
+              <th scope="row" className="px-2 py-1 text-left font-normal">Everything</th>
+              {accounts.map(c => langCell(c, lang))}
             </tr>,
             ...columns.filter(f => f.lang === lang).map(f => (
               <tr key={`${f.lang}:${f.fn}`}>
