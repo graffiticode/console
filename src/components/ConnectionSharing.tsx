@@ -107,9 +107,7 @@ const columnOrder = (a: Fn, b: Fn) =>
 // owner's column comes first and covers every function, author included;
 // everything (no list) is how every connection starts, and its first edit
 // turns it into the explicit list. Each sharee's column covers only the
-// functions that can be shared. Each language has a "Select all" row that
-// checks or clears all of that language's functions in a column (not a
-// wildcard: a function added later isn't included). A language's implicit
+// functions that can be shared. A language's implicit
 // function (rendering) comes with any other function checked in it, and can
 // be checked alone for previews only. Columns edit in place with Save/Cancel;
 // changes take effect at that account's next run or view. The find-and-share
@@ -268,9 +266,6 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
     onToggle: ((p: Permission) => void) | null;
     // A sharee's column covers only the functions that can be shared.
     shareableOnly: boolean;
-    // Replaces the column's whole list (a language's "Select all"), or null
-    // when it can't be edited.
-    setList: ((next: Permission[]) => void) | null;
     until: ReactNode;
     actions: ReactNode;
   };
@@ -284,7 +279,6 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
     list: ownerList,
     onToggle: editable ? p => setOwnerDraft(toggled(ownerList ?? allPermissions(), p)) : null,
     shareableOnly: false,
-    setList: editable ? next => setOwnerDraft(next) : null,
     until: <span className="text-gray-400">—</span>,
     actions: saveButtons(ownerDirty, saveOwner, () => setOwnerDraft(undefined)),
   };
@@ -310,7 +304,6 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
       list: draft.permissions,
       onToggle: editable ? p => edit({ ...draft, permissions: toggled(draft.permissions, p) }) : null,
       shareableOnly: true,
-      setList: editable ? next => edit({ ...draft, permissions: next }) : null,
       until: editable ? (
         <input
           type="date"
@@ -325,33 +318,6 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
 
   const accounts = [ownerColumn, ...(grants || []).map(shareeColumn)];
 
-  // A language's "Select all" cell in one column: checked when every function
-  // of that language the column covers is checked; toggling checks or clears
-  // them all.
-  const langCell = (c: Column, lang: string) => {
-    const fs = columns.filter(f => f.lang === lang && (!c.shareableOnly || f.delegable));
-    if (!fs.length) return notShareable(`${c.key}:select-all`);
-    const has = (f: Fn) => c.list === null || c.list.some(p => same(p, f)) ||
-      (f.implicit && c.list.some(p => p.lang === f.lang));
-    const all = fs.every(has);
-    const set = c.setList;
-    const onChange = () => {
-      if (!set) return;
-      const others = (c.list ?? allPermissions()).filter(p => !fs.some(f => same(f, p)));
-      set(all ? others : [...others, ...fs.map(f => ({ lang: f.lang, fn: f.fn }))]);
-    };
-    return (
-      <td key={`${c.key}:select-all`} className="px-3 py-1 text-center">
-        <input
-          type="checkbox"
-          aria-label={`${langLabel(lang)} select all`}
-          title={`Every ${langLabel(lang)} function${c.shareableOnly ? " that can be shared" : ""}`}
-          checked={all}
-          disabled={busy || !set}
-          onChange={onChange} />
-      </td>
-    );
-  };
   const anyActions = accounts.some(c => c.actions);
 
   // Permissions are rows, grouped by language; accounts are columns, the
@@ -371,10 +337,6 @@ export default function ConnectionSharing({ user, connectionId, ownerPermissions
           {langs.map(lang => [
             <tr key={`lang:${lang}`} className="border-t border-gray-200">
               <th colSpan={1 + accounts.length} className="px-2 pt-1 text-left text-xs font-semibold text-gray-600">{langLabel(lang)}</th>
-            </tr>,
-            <tr key={`select-all:${lang}`}>
-              <th scope="row" className="px-2 py-1 text-left font-normal">Select all</th>
-              {accounts.map(c => langCell(c, lang))}
             </tr>,
             ...columns.filter(f => f.lang === lang).map(f => (
               <tr key={`${f.lang}:${f.fn}`}>
