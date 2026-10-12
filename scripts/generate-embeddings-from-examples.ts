@@ -18,6 +18,9 @@
  *   --store-mode <mode>              Storage mode: 'file' or 'vector' (default: vector)
  *   --vector-collection <name>       Vector store collection name (default: training_examples)
  *   --batch-size <number>            Batch size for vector updates (default: 10)
+ *   --attempts <number>              Attempts per batch before it counts as failed (default: 3)
+ *   --step-timeout <seconds>         Cap on one embedding request or batch write (default: 120)
+ *   --no-caffeinate                  macOS: do not keep the machine awake for the run
  *
  * Examples:
  *   # Basic usage with defaults (stores in vector database)
@@ -48,9 +51,11 @@ import { verifyExampleForPrompt } from '../src/lib/lang-embedding';
 import { FieldValue } from 'firebase-admin/firestore';
 import dotenv from 'dotenv';
 import { unparse } from '@graffiticode/parser';
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 
-// Load environment variables
+// Load environment variables. Keys live in .env.local (as for the other corpus scripts, via
+// eval-env); .env still fills anything .env.local leaves unset.
+dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 // Force connection to production Firestore (bypass emulator)
@@ -120,6 +125,34 @@ const vectorCollection = args.includes('--vector-collection')
 const vectorBatchSize = args.includes('--batch-size')
   ? parseInt(args[args.indexOf('--batch-size') + 1])
   : 10;
+
+// Each batch gets this many attempts. On 2026-10-09 two of thirteen L0186 batches were lost to
+// one dropped connection (ECONNRESET), each a single attempt.
+const maxAttempts = Math.max(1, args.includes('--attempts')
+  ? parseInt(args[args.indexOf('--attempts') + 1])
+  : 3);
+
+// A stalled embedding request or batch write fails that attempt instead of holding the run.
+const stepTimeoutMs = (args.includes('--step-timeout')
+  ? parseInt(args[args.indexOf('--step-timeout') + 1])
+  : 120) * 1000;
+
+function withTimeout<T>(work: Promise<T>, label: string): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const bell = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(stepTimeoutMs / 1000)}s`)), stepTimeoutMs);
+  });
+  return Promise.race([work, bell]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
+
+// macOS: keep the machine awake for the run. A sleep drops every open connection.
+if (process.platform === 'darwin' && !args.includes('--no-caffeinate')) {
+  try {
+    spawn('caffeinate', ['-i', '-w', String(process.pid)], { stdio: 'ignore', detached: true }).unref();
+  } catch {
+    console.warn('caffeinate unavailable: keep the machine awake for the run');
+  }
+}
 
 // Determine output file path, adding language code to filename if filtering
 let outputDir = "./";
@@ -472,7 +505,9 @@ async function storeExamplesInVectorDatabase(trainingExamples, db, lang: string,
     total: trainingExamples.length,
     stored: 0,
     errors: 0,
-    skipped: 0
+    skipped: 0,
+    retried: 0,
+    failedBatches: [] as number[],
   };
 
   // Collect records for the log file
@@ -531,41 +566,57 @@ async function storeExamplesInVectorDatabase(trainingExamples, db, lang: string,
         docsToStore.push({ id: docId, data: docData, embeddingText });
       }
 
-      // Generate embeddings in batch
-      console.log(`  Generating embeddings for ${textsToEmbed.length} examples...`);
-      const embeddings = await generateBatchEmbeddings(textsToEmbed);
+      // Embed and write the batch, retrying the pair: the write is a set by document id, so a
+      // retry after a write that did land rewrites the same documents.
+      const batchNumber = Math.floor(i / vectorBatchSize) + 1;
+      for (let attempt = 1; ; attempt++) {
+        try {
+          console.log(`  Generating embeddings for ${textsToEmbed.length} examples...`);
+          const embeddings = await withTimeout(generateBatchEmbeddings(textsToEmbed), `embeddings for batch ${batchNumber}`);
 
-      // Store documents with embeddings
-      const writeBatch = db.batch();
+          // Store documents with embeddings
+          const writeBatch = db.batch();
 
-      docsToStore.forEach((doc, index) => {
-        const docRef = db.collection(vectorCollection).doc(doc.id);
-        // Must be a Firestore vector, not a plain array: findNearest only matches
-        // vector-typed fields, so an array embedding is invisible to retrieval. The
-        // 2026-09-28 run wrote arrays and silently emptied vector search for 14
-        // languages (repair: scripts/fix-embedding-vectors.ts).
-        const vectorValue = FieldValue.vector(embeddings[index]);
+          docsToStore.forEach((doc, index) => {
+            const docRef = db.collection(vectorCollection).doc(doc.id);
+            // Must be a Firestore vector, not a plain array: findNearest only matches
+            // vector-typed fields, so an array embedding is invisible to retrieval. The
+            // 2026-09-28 run wrote arrays and silently emptied vector search for 14
+            // languages (repair: scripts/fix-embedding-vectors.ts).
+            const vectorValue = FieldValue.vector(embeddings[index]);
 
-        writeBatch.set(docRef, {
-          ...doc.data,
-          embedding: vectorValue,
-          embeddingText: textsToEmbed[index],
-          embeddingUpdatedAt: FieldValue.serverTimestamp()
-        }, { merge: true });
+            writeBatch.set(docRef, {
+              ...doc.data,
+              embedding: vectorValue,
+              embeddingText: textsToEmbed[index],
+              embeddingUpdatedAt: FieldValue.serverTimestamp()
+            }, { merge: true });
 
-        // Collect for log file (without the actual vector)
-        storedRecords.push({
-          id: doc.id,
-          embeddingText: doc.embeddingText,
-          data: doc.data
-        });
+            console.log(`  Storing ${doc.id}`);
+          });
 
-        console.log(`  Storing ${doc.id}`);
-      });
+          await withTimeout(writeBatch.commit(), `write for batch ${batchNumber}`);
 
-      await writeBatch.commit();
-      stats.stored += docsToStore.length;
-      console.log(`  ✓ Batch stored successfully`);
+          // Collect for the log file (without the vectors) only once the batch has landed.
+          for (const doc of docsToStore) {
+            storedRecords.push({ id: doc.id, embeddingText: doc.embeddingText, data: doc.data });
+          }
+          stats.stored += docsToStore.length;
+          console.log(`  ✓ Batch stored successfully`);
+          break;
+        } catch (error) {
+          if (attempt >= maxAttempts) {
+            console.error(`  ✗ Batch ${batchNumber} failed after ${maxAttempts} attempts:`, error.message);
+            stats.errors += docsToStore.length;
+            stats.failedBatches.push(batchNumber);
+            break;
+          }
+          const wait = 5 * attempt;
+          console.warn(`  ↻ Batch ${batchNumber} attempt ${attempt} failed (${error.message}); retrying in ${wait}s...`);
+          if (attempt === 1) stats.retried++;
+          await new Promise(resolve => setTimeout(resolve, wait * 1000));
+        }
+      }
 
     } catch (error) {
       console.error(`  ✗ Error processing batch:`, error.message);
@@ -972,7 +1023,12 @@ async function main() {
       console.log(`Successfully stored: ${storageStats.stored}`);
       console.log(`Errors: ${storageStats.errors}`);
       console.log(`Skipped: ${storageStats.skipped}`);
+      console.log(`Batches that needed a retry: ${storageStats.retried}`);
+      if (storageStats.failedBatches.length) {
+        console.log(`Failed batches: ${storageStats.failedBatches.join(', ')} — re-run the same command; documents are written by id, so a re-run fills the gaps without duplicates`);
+      }
       console.log('=====================================\n');
+      if (storageStats.errors > 0) process.exitCode = 1;
       
       if (storageStats.stored > 0) {
         console.log('✅ Training examples successfully stored in vector database');
@@ -1015,8 +1071,8 @@ async function main() {
     process.exit(1);
   }
 
-  // Clean exit
-  process.exit(0);
+  // Clean exit (non-zero when any batch failed)
+  process.exit(process.exitCode ?? 0);
 }
 
 // Run the script
