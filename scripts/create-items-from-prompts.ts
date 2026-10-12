@@ -30,7 +30,13 @@
  *   --only <n,n,...>     Re-run only these example numbers (labels from examples.md);
  *                        with --refresh, deletes only those examples' items
  *   --scope-gate         Allow the scope gate to re-route out-of-scope prompts (default: pinned to --lang)
- *   --timeout <seconds>  Per-step wall-clock cap; a stalled request fails that example (default: 300)
+ *   --timeout <seconds>  Per-step wall-clock cap; a stalled request fails that attempt (default: 300)
+ *   --compile-timeout <seconds>  Cap on the /data compile check, which normally answers in
+ *                        under a second (default: 60)
+ *   --attempts <n>       Attempts per example before it counts as failed (default: 3). A failed
+ *                        attempt — a stalled request, an expired token, a program that did not
+ *                        compile — is retried with a fresh token; an item it already created is
+ *                        deleted first, so a retry never leaves a duplicate.
  *   --dry-run            Extract and print prompts only, no generation/creation
  *   --output <path>      Write a JSON audit log here (default: none — nothing reads it back)
  *
@@ -44,6 +50,7 @@ import "./eval-env"; // Production bootstrap (MUST be first)
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { spawn } from "child_process";
 import admin from "firebase-admin";
 import { generateCodeForRequest } from "../src/lib/code-generation/generate-for-request";
 import { getCredentialsForApiKey } from "../src/lib/api-credentials";
@@ -129,6 +136,19 @@ const dryRun = args.includes("--dry-run");
 const stepTimeoutMs = (args.includes("--timeout")
   ? parseInt(args[args.indexOf("--timeout") + 1], 10)
   : 300) * 1000;
+
+// A compile answers in under a second; a request that has not answered in a minute is stuck
+// (2026-10-09: one /data request held an example for the full 300s), and is better retried.
+const compileTimeoutMs = (args.includes("--compile-timeout")
+  ? parseInt(args[args.indexOf("--compile-timeout") + 1], 10)
+  : 60) * 1000;
+
+// Each example gets this many attempts. The target is that every example in a run lands: a
+// 2026-10-09 run lost 40 of 124 to one stuck request and a laptop sleep (stale sockets, then an
+// expired token), none of which a retry with a fresh token would have failed.
+const maxAttempts = Math.max(1, args.includes("--attempts")
+  ? parseInt(args[args.indexOf("--attempts") + 1], 10)
+  : 3);
 
 // Opt-in. This script creates the items itself — the audit log is a diagnostic,
 // not an input, and nothing reads it back (the two-step run-codegen ->
@@ -308,7 +328,7 @@ async function taskCompiles(
       // compiler, not the record. (L0172, 2026-09-04: three regenerated programs
       // came out byte-identical to April ones and inherited their April verdicts.)
       `${getBaseUrlForApi()}/data?id=${encodeURIComponent(taskId)}&refresh=1`,
-      { headers: { Authorization: accessToken }, signal: AbortSignal.timeout(stepTimeoutMs) },
+      { headers: { Authorization: accessToken }, signal: AbortSignal.timeout(compileTimeoutMs) },
     );
     if (resp.status !== 200) {
       return { compiled: false, error: `/data returned ${resp.status}` };
@@ -576,8 +596,9 @@ async function processExample(
     entry.firestoreItemId = newItem.id;
     entry.created = true;
 
-    // Step 5: Merge in audit metadata (prompt for reference, exampleNumber for audit)
-    await db
+    // Step 5: Merge in audit metadata (prompt for reference, exampleNumber for audit).
+    // Capped like every other step: on 2026-10-09 this write hung for 946s.
+    await withTimeout(db
       .collection("users")
       .doc(auth.uid)
       .collection("items")
@@ -593,7 +614,7 @@ async function processExample(
           generatedAt: new Date().toISOString(),
         },
         { merge: true }
-      );
+      ), `metadata ${example.id}`);
 
     return entry;
   } catch (error: any) {
@@ -654,6 +675,16 @@ async function main() {
     process.exit(1);
   }
 
+  // macOS: keep the machine awake for the run. A sleep mid-run leaves every open socket stale
+  // and lets the access token expire, and each example after it fails.
+  if (process.platform === "darwin" && !args.includes("--no-caffeinate")) {
+    try {
+      spawn("caffeinate", ["-i", "-w", String(process.pid)], { stdio: "ignore", detached: true }).unref();
+    } catch {
+      console.warn("caffeinate unavailable: keep the machine awake for the run");
+    }
+  }
+
   let credentials: any;
   try {
     credentials = await getCredentialsForApiKey(gcApiKey);
@@ -689,6 +720,16 @@ async function main() {
   let compiledCount = 0;
   let createdCount = 0;
   let errorCount = 0;
+  let retriedCount = 0;
+  const failed: number[] = [];
+
+  // A fresh token for every attempt: getCredentialsForApiKey caches one and re-exchanges the key
+  // when it is within five minutes of expiry, so a long run (or one that slept) never posts with
+  // an expired token.
+  const refreshAuth = async () => {
+    const fresh = await withTimeout(getCredentialsForApiKey(gcApiKey), "token refresh");
+    auth.token = fresh.idToken;
+  };
 
   for (let i = 0; i < slice.length; i++) {
     const example = slice[i];
@@ -698,12 +739,40 @@ async function main() {
         `... `
     );
 
-    const entry = await processExample(example, auth, db);
+    let entry!: AuditLogEntry;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      let refreshError: string | null = null;
+      try {
+        await refreshAuth();
+      } catch (error: any) {
+        refreshError = `token refresh: ${error.message || error}`;
+      }
+      entry = refreshError
+        ? { exampleId: example.id, exampleNumber: example.exampleNumber, prompt: example.prompt, compiled: false, turns: [], upstreamLangs: [], timestamp: new Date().toISOString(), error: refreshError }
+        : await processExample(example, auth, db);
+      if (!entry.error && entry.compiled) break;
+      // An attempt that created its item and then failed (the metadata write, say) leaves an item
+      // behind; delete it so the retry does not add a second one.
+      if (entry.firestoreItemId) {
+        try {
+          await withTimeout(db.collection("users").doc(auth.uid).collection("items").doc(entry.firestoreItemId).delete(), "delete partial item");
+        } catch (error: any) {
+          console.log(`\n  ! could not delete partial item ${entry.firestoreItemId}: ${error.message || error}`);
+        }
+      }
+      if (attempt < maxAttempts) {
+        const wait = 5 * attempt;
+        process.stdout.write(`\n  ↻ attempt ${attempt} failed (${entry.error || "did not compile"}); retrying in ${wait}s... `);
+        await new Promise((r) => setTimeout(r, wait * 1000));
+        if (attempt === 1) retriedCount++;
+      }
+    }
     auditLog.push(entry);
 
     if (entry.error) {
-      console.log(`✗ Error: ${entry.error}`);
+      console.log(`✗ Error after ${maxAttempts} attempts: ${entry.error}`);
       errorCount++;
+      failed.push(example.exampleNumber);
     } else if (entry.compiled) {
       console.log(`✓ Created (item: ${entry.firestoreItemId})`);
       compiledCount++;
@@ -712,6 +781,7 @@ async function main() {
       }
     } else {
       console.log(`✗ Did not compile`);
+      failed.push(example.exampleNumber);
     }
   }
 
@@ -732,7 +802,13 @@ async function main() {
   console.log(`  Compiled: ${compiledCount}`);
   console.log(`  Created (billed): ${createdCount}`);
   console.log(`  Errors: ${errorCount}`);
+  console.log(`  Needed a retry: ${retriedCount}`);
   console.log(`  Compilation rate: ${((compiledCount / slice.length) * 100).toFixed(1)}%`);
+  if (failed.length) {
+    console.log(`  Failed: ${failed.join(",")}`);
+    console.log(`  Re-run them: --lang ${langCode} --mark ${markValue} --refresh --only ${failed.join(",")}`);
+    process.exitCode = 1;
+  }
 }
 
 main()
@@ -740,7 +816,7 @@ main()
     // Exit explicitly. A step that timed out is still in flight — its socket
     // would otherwise hold the event loop open long after the audit log landed,
     // which is indistinguishable from the hang the timeouts exist to prevent.
-    process.exit(0);
+    process.exit(process.exitCode ?? 0);
   })
   .catch((error) => {
     console.error("Fatal error:", error);
