@@ -512,6 +512,7 @@ async function storeExamplesInVectorDatabase(trainingExamples, db, lang: string,
     errors: 0,
     skipped: 0,
     retried: 0,
+    replaced: 0,
     failedBatches: [] as number[],
   };
 
@@ -582,6 +583,22 @@ async function storeExamplesInVectorDatabase(trainingExamples, db, lang: string,
           // Store documents with embeddings
           const writeBatch = db.batch();
 
+          // An item's row is keyed by its task, so an item edited since it was embedded (a new
+          // taskId) would otherwise keep its old row beside the new one, and retrieval would
+          // serve both programs. Its other rows go in the same atomic write.
+          let replaced = 0;
+          for (const doc of docsToStore) {
+            const others = await withTimeout(
+              db.collection(vectorCollection).where('item_id', '==', doc.data.item_id).get(),
+              `older rows of ${doc.data.item_id}`,
+            );
+            for (const old of others.docs) {
+              if (old.id === doc.id) continue;
+              writeBatch.delete(old.ref);
+              replaced++;
+            }
+          }
+
           docsToStore.forEach((doc, index) => {
             const docRef = db.collection(vectorCollection).doc(doc.id);
             // Must be a Firestore vector, not a plain array: findNearest only matches
@@ -601,6 +618,8 @@ async function storeExamplesInVectorDatabase(trainingExamples, db, lang: string,
           });
 
           await withTimeout(writeBatch.commit(), `write for batch ${batchNumber}`);
+          if (replaced) console.log(`  Removed ${replaced} older row(s) of these items (edited since they were embedded)`);
+          stats.replaced += replaced;
 
           // Collect for the log file (without the vectors) only once the batch has landed.
           for (const doc of docsToStore) {
@@ -1062,6 +1081,7 @@ async function main() {
       console.log(`Errors: ${storageStats.errors}`);
       console.log(`Skipped: ${storageStats.skipped}`);
       console.log(`Batches that needed a retry: ${storageStats.retried}`);
+      console.log(`Older rows removed (items edited since embedded): ${storageStats.replaced}`);
       if (storageStats.failedBatches.length) {
         console.log(`Failed batches: ${storageStats.failedBatches.join(', ')} — re-run the same command; documents are written by id, so a re-run fills the gaps without duplicates`);
       }
