@@ -21,6 +21,7 @@
  *   --attempts <number>              Attempts per batch before it counts as failed (default: 3)
  *   --step-timeout <seconds>         Cap on one embedding request or batch write (default: 120)
  *   --no-caffeinate                  macOS: do not keep the machine awake for the run
+ *   --skip-gate                      Store even if a language's corpus gate fails (see lang-gate.ts)
  *
  * Examples:
  *   # Basic usage with defaults (stores in vector database)
@@ -52,6 +53,10 @@ import { FieldValue } from 'firebase-admin/firestore';
 import dotenv from 'dotenv';
 import { unparse } from '@graffiticode/parser';
 import { execSync, spawn } from 'child_process';
+import { findCorpusGate, runCorpusGate } from './lang-gate';
+
+/** item id → the example number create-items-from-prompts gave it, for the gate's report. */
+const exampleNumbers = new Map<string, number>();
 
 // Load environment variables. Keys live in .env.local (as for the other corpus scripts, via
 // eval-env); .env still fills anything .env.local leaves unset.
@@ -959,6 +964,9 @@ async function main() {
           // provenance backfill, and the drift gate below; rows without them are invisible to
           // the first two and pass the third unchecked. The item's own prompt is the authored
           // one; the joined user turns are the fallback for items written before it was stored.
+          // The example number create-items-from-prompts stamped on the item: the gate reports by it,
+          // so its `--only` hint is the list create-items takes.
+          if (item.exampleNumber != null) exampleNumbers.set(itemId, Number(item.exampleNumber));
           trainingExamples.push({
             prompt: String(item.prompt || '').trim() || extractTaskFromMessages(dialogMessages),
             model: item.model ?? null,
@@ -1011,6 +1019,36 @@ async function main() {
 
     // Sort by usage count (most used first)
     trainingExamples.sort((a, b) => b.usage_count - a.usage_count);
+
+    // Gate: a language that ships a corpus gate must pass it before any of its rows are written.
+    // A failure stores nothing — not even other languages' rows — so a run is all or none.
+    if (storeMode === 'vector') {
+      const byLang = new Map<string, any[]>();
+      for (const ex of trainingExamples) {
+        if (!byLang.has(ex.lang)) byLang.set(ex.lang, []);
+        byLang.get(ex.lang)!.push(ex);
+      }
+      const failed: string[] = [];
+      for (const [lang, examples] of byLang) {
+        const dir = findCorpusGate(lang);
+        if (!dir) continue;
+        console.log(`\nCorpus gate for L${lang} (${dir}) on ${examples.length} examples...`);
+        const gate = runCorpusGate(dir, examples.map((ex) => ({
+          label: exampleNumbers.has(ex.item_id) ? String(exampleNumbers.get(ex.item_id)) : `${ex.item_id} "${String(ex.prompt || '').slice(0, 60)}"`,
+          code: ex.code,
+        })));
+        console.log(gate.output.split('\n').map((l) => `  ${l}`).join('\n'));
+        if (!gate.ok) failed.push(lang);
+      }
+      if (failed.length) {
+        if (args.includes('--skip-gate')) {
+          console.warn(`\n⚠️  Corpus gate failed for ${failed.map((l) => `L${l}`).join(', ')}; storing anyway (--skip-gate).`);
+        } else {
+          console.error(`\n✗ Corpus gate failed for ${failed.map((l) => `L${l}`).join(', ')}: nothing stored. Regenerate the failing examples (create-items-from-prompts --refresh --only …), or pass --skip-gate to store anyway.`);
+          process.exit(1);
+        }
+      }
+    }
 
     // Store the examples based on the selected mode
     if (storeMode === 'vector') {
