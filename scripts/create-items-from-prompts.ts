@@ -26,7 +26,9 @@
  * Options:
  *   --limit <number>     Maximum examples to process (default: all)
  *   --start <index>      Start from example index (default: 0)
- *   --refresh            Delete existing items of same lang/mark before creating new ones
+ *   --refresh            Delete existing items of same lang/mark before creating new ones, and
+ *                        their rows in the vector store, so retrieval cannot hand the generator
+ *                        the program being replaced
  *   --only <n,n,...>     Re-run only these example numbers (labels from examples.md);
  *                        with --refresh, deletes only those examples' items
  *   --scope-gate         Allow the scope gate to re-route out-of-scope prompts (default: pinned to --lang)
@@ -37,6 +39,8 @@
  *                        attempt — a stalled request, an expired token, a program that did not
  *                        compile — is retried with a fresh token; an item it already created is
  *                        deleted first, so a retry never leaves a duplicate.
+ *   --vector-collection <name>  The vector store --refresh clears replaced items from
+ *                        (default: training_examples, as generate-embeddings-from-examples)
  *   --dry-run            Extract and print prompts only, no generation/creation
  *   --output <path>      Write a JSON audit log here (default: none — nothing reads it back)
  *
@@ -128,6 +132,10 @@ if (!args.includes("--scope-gate")) {
   process.env.SCOPE_GATE_ENABLED = "false";
 }
 const dryRun = args.includes("--dry-run");
+
+const vectorCollection = args.includes("--vector-collection")
+  ? args[args.indexOf("--vector-collection") + 1]
+  : "training_examples";
 
 // Wall-clock cap per network step. Nothing in this script timed out, so a single
 // stalled request blocked the whole run indefinitely — observed hanging a batch
@@ -358,6 +366,15 @@ async function taskCompiles(
 /**
  * Delete existing items for this lang/mark
  */
+/**
+ * Delete the items this run replaces, and their rows in the vector store.
+ *
+ * The rows go too because retrieval reads them: a regenerated example whose old row survives is
+ * generated with its own old program as the nearest example, and copies it — on 2026-10-12 three
+ * L0186 regenerations (107, 109, 125) reproduced the program they were meant to replace until the
+ * row was deleted by hand. Rows are keyed `lang_itemId_taskId` but found by `item_id`, which the
+ * embedding script writes on every row.
+ */
 async function deleteExistingItems(db: admin.firestore.Firestore, userId: string, lang: string, markValue: number): Promise<number> {
   console.log(`Querying existing L${lang} items with mark=${markValue} for user ${userId}...`);
 
@@ -379,12 +396,19 @@ async function deleteExistingItems(db: admin.firestore.Firestore, userId: string
 
   console.log(`Found ${docs.length} existing items to delete`);
 
+  let vectors = 0;
   for (const doc of docs) {
+    const rows = await db.collection(vectorCollection).where("item_id", "==", doc.id).get();
+    for (const row of rows.docs) {
+      if (!dryRun) await row.ref.delete();
+      vectors++;
+    }
     if (!dryRun) {
       await doc.ref.delete();
     }
     deleted++;
   }
+  console.log(`${dryRun ? "Would delete" : "Deleted"} ${vectors} ${vectorCollection} row(s) for those items`);
 
   return deleted;
 }
